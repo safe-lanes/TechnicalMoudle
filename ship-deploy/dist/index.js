@@ -12,7 +12,8 @@ var __export = (target, all) => {
 var externalApi_exports = {};
 __export(externalApi_exports, {
   APP_ENV: () => APP_ENV,
-  buildExternalMasterDataUrl: () => buildExternalMasterDataUrl
+  buildExternalMasterDataUrl: () => buildExternalMasterDataUrl,
+  getExternalMasterDataBaseUrl: () => getExternalMasterDataBaseUrl
 });
 function resolveAppEnv() {
   const appEnv = process.env.APP_ENV;
@@ -446,12 +447,14 @@ __export(schema_exports, {
   alertDeliveries: () => alertDeliveries,
   alertEvents: () => alertEvents,
   alertPolicies: () => alertPolicies,
+  approvalWorkflowConfig: () => approvalWorkflowConfig,
   auditLog: () => auditLog,
   bulkImportErrors: () => bulkImportErrors,
   bulkImportHistory: () => bulkImportHistory,
   cascadeRunningHoursSchema: () => cascadeRunningHoursSchema,
   certificates: () => certificates,
   changeRequest: () => changeRequest,
+  changeRequestApproval: () => changeRequestApproval,
   changeRequestAttachment: () => changeRequestAttachment,
   changeRequestComment: () => changeRequestComment,
   companyStandardGraceSettings: () => companyStandardGraceSettings,
@@ -498,10 +501,12 @@ __export(schema_exports, {
   insertAlertDeliverySchema: () => insertAlertDeliverySchema,
   insertAlertEventSchema: () => insertAlertEventSchema,
   insertAlertPolicySchema: () => insertAlertPolicySchema,
+  insertApprovalWorkflowConfigSchema: () => insertApprovalWorkflowConfigSchema,
   insertAuditLogSchema: () => insertAuditLogSchema,
   insertBulkImportErrorSchema: () => insertBulkImportErrorSchema,
   insertBulkImportHistorySchema: () => insertBulkImportHistorySchema,
   insertCertificateSchema: () => insertCertificateSchema,
+  insertChangeRequestApprovalSchema: () => insertChangeRequestApprovalSchema,
   insertChangeRequestAttachmentSchema: () => insertChangeRequestAttachmentSchema,
   insertChangeRequestCommentSchema: () => insertChangeRequestCommentSchema,
   insertChangeRequestSchema: () => insertChangeRequestSchema,
@@ -546,6 +551,7 @@ __export(schema_exports, {
   insertMasterListSchema: () => insertMasterListSchema,
   insertMasterListTypeSchema: () => insertMasterListTypeSchema,
   insertMasterUserSchema: () => insertMasterUserSchema,
+  insertMocApproverSchema: () => insertMocApproverSchema,
   insertMonthlySnapshotSchema: () => insertMonthlySnapshotSchema,
   insertNrAlertSchema: () => insertNrAlertSchema,
   insertNrBunkerRecordSchema: () => insertNrBunkerRecordSchema,
@@ -589,6 +595,7 @@ __export(schema_exports, {
   insertVesselSurveyApplicabilitySchema: () => insertVesselSurveyApplicabilitySchema,
   insertVesselSurveyDataSchema: () => insertVesselSurveyDataSchema,
   insertVesselTypeSchema: () => insertVesselTypeSchema,
+  insertWoPostponementApprovalSchema: () => insertWoPostponementApprovalSchema,
   insertWorkOrderAnomalySchema: () => insertWorkOrderAnomalySchema,
   insertWorkOrderDocumentSchema: () => insertWorkOrderDocumentSchema,
   insertWorkOrderExecutionDetailsSchema: () => insertWorkOrderExecutionDetailsSchema,
@@ -608,6 +615,7 @@ __export(schema_exports, {
   masterListTypes: () => masterListTypes,
   masterLists: () => masterLists,
   masterUsers: () => masterUsers,
+  mocApprovers: () => mocApprovers,
   monthlySnapshots: () => monthlySnapshots,
   nrAlerts: () => nrAlerts,
   nrBunkerRecords: () => nrBunkerRecords,
@@ -622,6 +630,7 @@ __export(schema_exports, {
   recurringDefects: () => recurringDefects,
   reportFavorites: () => reportFavorites,
   reportSnapshots: () => reportSnapshots,
+  retentionSettings: () => retentionSettings,
   runningHoursAudit: () => runningHoursAudit,
   sfiDetails: () => sfiDetails,
   shipCertificatesLabelsConfig: () => shipCertificatesLabelsConfig,
@@ -654,6 +663,7 @@ __export(schema_exports, {
   vesselSurveyData: () => vesselSurveyData,
   vesselTypes: () => vesselTypes,
   vessels: () => vessels,
+  woPostponementApprovals: () => woPostponementApprovals,
   workOrderAnomalies: () => workOrderAnomalies,
   workOrderDocuments: () => workOrderDocuments,
   workOrderExecutionDetails: () => workOrderExecutionDetails,
@@ -665,7 +675,7 @@ import { pgTable as pgTable2, text as text2, integer as integer2, boolean as boo
 import { sql as sql2 } from "drizzle-orm";
 import { createInsertSchema as createInsertSchema2 } from "drizzle-zod";
 import { z } from "zod";
-var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema;
+var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, insertMocApproverSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -809,6 +819,8 @@ var init_schema = __esm({
       // e.g., Asia/Kolkata
       enteredAtUTC: timestamp3("entered_at_utc").notNull(),
       userId: text2("user_id").notNull(),
+      actorLabel: text2("actor_label"),
+      // Audit Phase 0: frozen human actor (Office: name, Ship: rank) at write time
       source: text2("source").notNull(),
       // 'single' | 'bulk' | 'cascade' | 'inherited_cascade'
       notes: text2("notes"),
@@ -1493,7 +1505,8 @@ var init_schema = __esm({
       createdByUuid: text2("created_by_uuid"),
       updatedByUuid: text2("updated_by_uuid"),
       isDeleted: boolean2("is_deleted").default(false),
-      sortOrder: integer2("sort_order")
+      sortOrder: integer2("sort_order"),
+      approvalWorkflowSnapshot: json("approval_workflow_snapshot").$type()
     }, (table) => ({
       vesselCategoryIdx: index2("idx_vessel_category").on(table.vesselId, table.category),
       statusIdx: index2("idx_change_request_status").on(table.status)
@@ -1501,6 +1514,29 @@ var init_schema = __esm({
     insertChangeRequestSchema = createInsertSchema2(changeRequest).omit({
       id: true,
       cruuid: true,
+      createdAt: true,
+      updatedAt: true
+    });
+    changeRequestApproval = pgTable2("change_request_approval", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      crauuid: text2("crauuid").notNull().unique().default(sql2`gen_random_uuid()::text`),
+      changeRequestId: integer2("change_request_id").notNull().references(() => changeRequest.id),
+      changeRequestUuid: text2("change_request_uuid").notNull(),
+      approvalLevel: text2("approval_level").notNull(),
+      status: text2("status").notNull().default("Pending"),
+      actionByUserId: text2("action_by_user_id"),
+      actionAt: timestamp3("action_at", { withTimezone: true }),
+      remarks: text2("remarks"),
+      createdAt: timestamp3("created_at").notNull().defaultNow(),
+      updatedAt: updatedAtColumn(),
+      createdByUuid: text2("created_by_uuid"),
+      updatedByUuid: text2("updated_by_uuid"),
+      isDeleted: boolean2("is_deleted").notNull().default(false),
+      isSync: boolean2("is_sync").notNull().default(false)
+    });
+    insertChangeRequestApprovalSchema = createInsertSchema2(changeRequestApproval).omit({
+      id: true,
+      crauuid: true,
       createdAt: true,
       updatedAt: true
     });
@@ -2650,7 +2686,10 @@ var init_schema = __esm({
       createdByUuid: text2("created_by_uuid"),
       updatedByUuid: text2("updated_by_uuid"),
       isDeleted: boolean2("is_deleted").default(false),
-      sortOrder: integer2("sort_order")
+      sortOrder: integer2("sort_order"),
+      disposedAt: timestamp3("disposed_at"),
+      // Audit Phase 4: soft-dispose marker (reversible); NULL = active
+      disposedByUuid: text2("disposed_by_uuid")
     }, (table) => ({
       timestampIdx: index2("idx_audit_timestamp").on(table.timestamp),
       userIdIdx: index2("idx_audit_user_id").on(table.userId),
@@ -2662,6 +2701,21 @@ var init_schema = __esm({
     insertAuditLogSchema = createInsertSchema2(auditLog).omit({
       id: true,
       timestamp: true
+    });
+    retentionSettings = pgTable2("retention_settings", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      category: text2("category").notNull().unique(),
+      label: text2("label").notNull(),
+      retentionValue: integer2("retention_value").notNull().default(0),
+      retentionUnit: text2("retention_unit").notNull().default("years"),
+      // days | months | years | forever
+      enabled: boolean2("enabled").notNull().default(true),
+      isProtected: boolean2("is_protected").notNull().default(true),
+      minValue: integer2("min_value").notNull().default(0),
+      minUnit: text2("min_unit").notNull().default("years"),
+      description: text2("description"),
+      updatedAt: timestamp3("updated_at").notNull().defaultNow(),
+      updatedByUuid: text2("updated_by_uuid")
     });
     componentDocuments = pgTable2("component_documents", {
       id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -2795,7 +2849,10 @@ var init_schema = __esm({
       createdByUuid: text2("created_by_uuid"),
       updatedByUuid: text2("updated_by_uuid"),
       isDeleted: boolean2("is_deleted").default(false),
-      sortOrder: integer2("sort_order")
+      sortOrder: integer2("sort_order"),
+      disposedAt: timestamp3("disposed_at"),
+      // Audit Phase 4: soft-dispose marker (reversible); NULL = active
+      disposedByUuid: text2("disposed_by_uuid")
     }, (table) => ({
       componentIdIdx: index2("idx_history_component_id").on(table.componentId),
       componentCodeIdx: index2("idx_history_component_code").on(table.componentCode),
@@ -4068,19 +4125,54 @@ var init_schema = __esm({
       // Whether office was informed
       attachmentPath: text2("attachment_path"),
       // Path to any attached documents
+      approvalWorkflowSnapshot: jsonb("approval_workflow_snapshot"),
+      // Snapshot of level1/level2 config at submission time
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
       isSync: boolean2("is_sync").default(false),
       createdByUuid: text2("created_by_uuid"),
       updatedByUuid: text2("updated_by_uuid"),
       isDeleted: boolean2("is_deleted").default(false),
-      sortOrder: integer2("sort_order")
+      sortOrder: integer2("sort_order"),
+      disposedAt: timestamp3("disposed_at"),
+      // Audit Phase 4: soft-dispose marker (reversible); NULL = active
+      disposedByUuid: text2("disposed_by_uuid")
     }, (table) => ({
       workOrderIdx: index2("idx_postponement_work_order").on(table.workOrderId),
       vesselIdx: index2("idx_postponement_vessel").on(table.vesselId),
       statusIdx: index2("idx_postponement_status").on(table.status)
     }));
     insertWorkOrderPostponementSchema = createInsertSchema2(workOrderPostponements).omit({
+      createdAt: true,
+      updatedAt: true
+    });
+    woPostponementApprovals = pgTable2("wo_postponement_approvals", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      wpauuid: text2("wpauuid").notNull().unique().default(sql2`gen_random_uuid()::text`),
+      postponementId: text2("postponement_id").notNull(),
+      // FK → work_order_postponements.id
+      workOrderId: text2("work_order_id").notNull(),
+      // denormalised for convenience
+      approvalLevel: text2("approval_level").notNull(),
+      // 'Level 1' | 'Level 2'
+      status: text2("status").notNull().default("Pending"),
+      // 'Pending' | 'Approved' | 'Rejected'
+      actionByUserId: text2("action_by_user_id"),
+      actionAt: timestamp3("action_at", { withTimezone: true }),
+      remarks: text2("remarks"),
+      createdAt: timestamp3("created_at").notNull().defaultNow(),
+      updatedAt: updatedAtColumn(),
+      createdByUuid: text2("created_by_uuid"),
+      updatedByUuid: text2("updated_by_uuid"),
+      isDeleted: boolean2("is_deleted").notNull().default(false),
+      isSync: boolean2("is_sync").notNull().default(false)
+    }, (table) => ({
+      postponementIdx: index2("idx_wpa_postponement_id").on(table.postponementId),
+      workOrderIdx: index2("idx_wpa_work_order_id").on(table.workOrderId)
+    }));
+    insertWoPostponementApprovalSchema = createInsertSchema2(woPostponementApprovals).omit({
+      id: true,
+      wpauuid: true,
       createdAt: true,
       updatedAt: true
     });
@@ -4344,6 +4436,30 @@ var init_schema = __esm({
       createdAt: true,
       updatedAt: true
     });
+    approvalWorkflowConfig = pgTable2("approval_workflow_config", {
+      id: serial2("id").primaryKey(),
+      awcuuid: text2("awcuuid").notNull().unique().default(sql2`gen_random_uuid()::text`),
+      moduleId: text2("module_id").notNull(),
+      subModuleId: text2("sub_module_id").notNull(),
+      functionId: text2("function_id").notNull(),
+      variableName: text2("variable_name").notNull(),
+      level1Enabled: boolean2("level1_enabled").notNull().default(false),
+      level2Enabled: boolean2("level2_enabled").notNull().default(false),
+      createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date()),
+      createdByUuid: text2("created_by_uuid"),
+      updatedByUuid: text2("updated_by_uuid"),
+      isDeleted: boolean2("is_deleted").notNull().default(false),
+      isSync: boolean2("is_sync").notNull().default(false)
+    }, (table) => [
+      unique().on(table.functionId, table.variableName)
+    ]);
+    insertApprovalWorkflowConfigSchema = createInsertSchema2(approvalWorkflowConfig).omit({
+      id: true,
+      awcuuid: true,
+      createdAt: true,
+      updatedAt: true
+    });
     plannerDates = pgTable2("planner_dates", {
       id: serial2("id").primaryKey(),
       pduuid: text2("pduuid").notNull().unique(),
@@ -4541,6 +4657,8 @@ var init_schema = __esm({
       vesselId: text2("vessel_id"),
       changedAt: timestamp3("changed_at").defaultNow().notNull(),
       changedByUserId: text2("changed_by_user_id"),
+      changedByDisplay: text2("changed_by_display"),
+      // Audit Phase 0: frozen human actor (Office: name, Ship: rank) at write time
       instanceId: text2("instance_id").notNull(),
       syncBatchId: text2("sync_batch_id"),
       isSynced: boolean2("is_synced").default(false).notNull(),
@@ -4688,6 +4806,29 @@ var init_schema = __esm({
     insertSyncSettingsSchema = createInsertSchema2(syncSettings).omit({
       id: true,
       ssuuid: true,
+      createdAt: true,
+      updatedAt: true
+    });
+    mocApprovers = pgTable2("moc_approvers", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      mauuid: text2("mauuid").notNull().unique().default(sql2`gen_random_uuid()::text`),
+      name: text2("name"),
+      userId: text2("user_id"),
+      userUuid: text2("user_uuid"),
+      approverLevel: text2("approver_level"),
+      emailId: text2("email_id"),
+      isActive: integer2("is_active").default(1),
+      modulename: text2("modulename"),
+      createdAt: timestamp3("created_at").notNull().defaultNow(),
+      updatedAt: timestamp3("updated_at").notNull().defaultNow(),
+      createdByUuid: text2("created_by_uuid"),
+      updatedByUuid: text2("updated_by_uuid"),
+      isDeleted: boolean2("is_deleted").notNull().default(false),
+      isSync: boolean2("is_sync").notNull().default(false)
+    });
+    insertMocApproverSchema = createInsertSchema2(mocApprovers).omit({
+      id: true,
+      mauuid: true,
       createdAt: true,
       updatedAt: true
     });
@@ -6225,19 +6366,67 @@ var init_syncDiagLogger = __esm({
   }
 });
 
+// server/middleware/auditActor.ts
+function resolveAuditActor(user) {
+  if (!user) return SYSTEM_ACTOR;
+  const uuid = user.userUuid && String(user.userUuid).trim() || null;
+  const email = user.email && String(user.email).trim() || null;
+  const rank = user.rank_name && String(user.rank_name).trim() || null;
+  const role = user.forwardedRole && String(user.forwardedRole).trim() || user.role && String(user.role).trim() || null;
+  const name = user.fullName && String(user.fullName).trim() || [user.firstname, user.lastname].filter(Boolean).join(" ").trim() || user.username && String(user.username).trim() || null;
+  const userType = user.userType && String(user.userType).trim() || null;
+  if (userType === "Ship") {
+    return {
+      actorId: uuid || rank || "system",
+      actorLabel: rank || name || "Ship User",
+      actorEmail: email,
+      actorType: "Ship",
+      actorRank: rank,
+      actorRole: role
+    };
+  }
+  return {
+    actorId: uuid || email || "system",
+    actorLabel: name || email || "Office User",
+    actorEmail: email,
+    actorType: userType || "Office",
+    actorRank: rank,
+    actorRole: role
+  };
+}
+var SYSTEM_ACTOR;
+var init_auditActor = __esm({
+  "server/middleware/auditActor.ts"() {
+    "use strict";
+    SYSTEM_ACTOR = {
+      actorId: "system",
+      actorLabel: "System",
+      actorEmail: null,
+      actorType: null,
+      actorRank: null,
+      actorRole: null
+    };
+  }
+});
+
 // server/middleware/requestContext.ts
 import { AsyncLocalStorage } from "node:async_hooks";
 function requestContextMiddleware(req, _res, next) {
   const user = req.user;
   if (user && user.id != null) {
+    const actor = resolveAuditActor(user);
     const ctx = {
-      userId: String(user.id),
-      fullName: user.fullName || user.username || `User ${user.id}`
+      userId: actor.actorId,
+      fullName: actor.actorLabel,
+      actor
     };
     asyncLocalStorage.run(ctx, () => next());
   } else {
     next();
   }
+}
+function getAuditActor() {
+  return asyncLocalStorage.getStore()?.actor ?? SYSTEM_ACTOR;
 }
 function getRequestContext() {
   return asyncLocalStorage.getStore();
@@ -6246,6 +6435,7 @@ var asyncLocalStorage;
 var init_requestContext = __esm({
   "server/middleware/requestContext.ts"() {
     "use strict";
+    init_auditActor();
     asyncLocalStorage = new AsyncLocalStorage();
   }
 });
@@ -7281,8 +7471,8 @@ async function initFieldLoggerInstanceId() {
   if (cachedInstanceId) return cachedInstanceId;
   let dbId = null;
   try {
-    const { getSetting: getSetting2 } = await Promise.resolve().then(() => (init_repository(), repository_exports));
-    dbId = await getSetting2("instance_id");
+    const { getSetting: getSetting3 } = await Promise.resolve().then(() => (init_repository(), repository_exports));
+    dbId = await getSetting3("instance_id");
   } catch {
   }
   const dbIdTrimmed = (dbId || "").trim();
@@ -7319,16 +7509,20 @@ async function logFieldChanges(tableName, rowUuid, vesselId, oldRow, newRow, use
   const changedAt = /* @__PURE__ */ new Date();
   let logCount = 0;
   const skipFields = await getEffectiveSkipFields(tableName);
-  const PLACEHOLDER_USER_IDS2 = /* @__PURE__ */ new Set(["system", "admin", "System", ""]);
-  let resolvedUserId = userId;
-  if (!resolvedUserId || PLACEHOLDER_USER_IDS2.has(resolvedUserId)) {
-    const ctx = getRequestContext();
-    if (ctx?.userId) {
-      resolvedUserId = ctx.userId;
-    } else if (!resolvedUserId) {
+  const ctx = getRequestContext();
+  let resolvedUserId;
+  let resolvedDisplay;
+  if (ctx?.actor) {
+    resolvedUserId = ctx.actor.actorId;
+    resolvedDisplay = ctx.actor.actorLabel;
+  } else {
+    if (!userId) {
       syncDiag(`WARNING: logFieldChanges called without userId and no request context for ${tableName}.${rowUuid} \u2014 using 'system' fallback`);
       resolvedUserId = "system";
+    } else {
+      resolvedUserId = userId;
     }
+    resolvedDisplay = resolvedUserId;
   }
   if (oldRow === null && newRow !== null) {
     const entries = Object.entries(newRow).filter(([key, value]) => !skipFields.has(key) && value !== null && value !== void 0);
@@ -7343,6 +7537,7 @@ async function logFieldChanges(tableName, rowUuid, vesselId, oldRow, newRow, use
           vesselId,
           changedAt,
           changedByUserId: resolvedUserId,
+          changedByDisplay: resolvedDisplay,
           instanceId,
           isSynced: false
         });
@@ -7370,6 +7565,7 @@ async function logFieldChanges(tableName, rowUuid, vesselId, oldRow, newRow, use
           vesselId,
           changedAt,
           changedByUserId: resolvedUserId,
+          changedByDisplay: resolvedDisplay,
           instanceId,
           isSynced: false
         });
@@ -7392,7 +7588,6 @@ async function logFieldChangesBatch(entries, txOrDb) {
   const db2 = txOrDb || await getDb();
   const instanceId = await getInstanceId();
   const changedAt = /* @__PURE__ */ new Date();
-  const PLACEHOLDER_USER_IDS_BATCH = /* @__PURE__ */ new Set(["system", "admin", "System", ""]);
   const ctx = getRequestContext();
   const allRows = [];
   const skipFieldsByTable = /* @__PURE__ */ new Map();
@@ -7403,13 +7598,14 @@ async function logFieldChangesBatch(entries, txOrDb) {
       skipFieldsByTable.set(entry.tableName, await getEffectiveSkipFields(entry.tableName));
     }
     const skipFields = skipFieldsByTable.get(entry.tableName);
-    let resolvedUserId = entry.userId;
-    if (!resolvedUserId || PLACEHOLDER_USER_IDS_BATCH.has(resolvedUserId)) {
-      if (ctx?.userId) {
-        resolvedUserId = ctx.userId;
-      } else if (!resolvedUserId) {
-        resolvedUserId = "system";
-      }
+    let resolvedUserId;
+    let resolvedDisplay;
+    if (ctx?.actor) {
+      resolvedUserId = ctx.actor.actorId;
+      resolvedDisplay = ctx.actor.actorLabel;
+    } else {
+      resolvedUserId = entry.userId || "system";
+      resolvedDisplay = resolvedUserId;
     }
     const allKeys = Array.from(/* @__PURE__ */ new Set([...Object.keys(entry.oldRow), ...Object.keys(entry.newRow)]));
     for (const key of allKeys) {
@@ -7426,6 +7622,7 @@ async function logFieldChangesBatch(entries, txOrDb) {
         vesselId: entry.vesselId,
         changedAt,
         changedByUserId: resolvedUserId,
+        changedByDisplay: resolvedDisplay,
         instanceId,
         isSynced: false
       });
@@ -9073,7 +9270,8 @@ async function receivePushData(batchUuid, vesselId, payload) {
                       [log2.tableName, log2.rowUuid, log2.fieldName, log2.instanceId]
                     );
                     const rejectedUserId = rejectedUserQuery.rows[0]?.changed_by_user_id;
-                    if (rejectedUserId && rejectedUserId !== "system") {
+                    const MACHINE_ACTORS = /* @__PURE__ */ new Set(["system", "auto-generation"]);
+                    if (rejectedUserId && !MACHINE_ACTORS.has(rejectedUserId)) {
                       const fieldLabel = getFieldDisplayName(log2.fieldName);
                       const event = await createAlertEvent({
                         alertType: "sync_conflict_detected",
@@ -10812,11 +11010,11 @@ var init_syncEngine = __esm({
       // ═══════════════════════════════════════════════════════════════
       // SYNC API CALLER — HTTP or local direct call
       // ═══════════════════════════════════════════════════════════════
-      async callSyncApi(method, path14, body) {
+      async callSyncApi(method, path13, body) {
         if (this.isLocalMode()) {
-          return this.callLocalSync(path14, body);
+          return this.callLocalSync(path13, body);
         }
-        const url = `${this.shoreBaseUrl}${path14}`;
+        const url = `${this.shoreBaseUrl}${path13}`;
         const response = await fetch(url, {
           method,
           headers: {
@@ -10834,9 +11032,9 @@ var init_syncEngine = __esm({
         return response.json();
       }
       /** Local mode — call service functions directly (no HTTP) */
-      async callLocalSync(path14, body) {
+      async callLocalSync(path13, body) {
         const svc = await Promise.resolve().then(() => (init_service(), service_exports));
-        switch (path14) {
+        switch (path13) {
           case "/sync/initiate":
             return svc.initiateSyncSession(
               body.instanceId,
@@ -10855,21 +11053,21 @@ var init_syncEngine = __esm({
           case "/sync/complete":
             return svc.completeSyncSession(body.batchUuid, body.vesselId, body.instanceId);
           default:
-            throw new Error(`Unknown sync path: ${path14}`);
+            throw new Error(`Unknown sync path: ${path13}`);
         }
       }
       /** Retry wrapper with exponential backoff */
-      async callSyncApiWithRetry(method, path14, body) {
+      async callSyncApiWithRetry(method, path13, body) {
         let lastError = null;
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
-            return await this.callSyncApi(method, path14, body);
+            return await this.callSyncApi(method, path13, body);
           } catch (error) {
             lastError = error;
             if (attempt < MAX_RETRIES) {
               const delay = RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
               console.warn(
-                `[SyncEngine] Attempt ${attempt + 1} failed for ${path14}: ${error.message}. Retrying in ${delay}ms...`
+                `[SyncEngine] Attempt ${attempt + 1} failed for ${path13}: ${error.message}. Retrying in ${delay}ms...`
               );
               await new Promise((resolve6) => setTimeout(resolve6, delay));
             }
@@ -11187,6 +11385,24 @@ __export(pruningService_exports, {
   syncPruningScheduler: () => syncPruningScheduler
 });
 async function getRetentionConfig() {
+  let syncDays = null;
+  try {
+    const pool2 = await getPool();
+    if (pool2) {
+      const r = await pool2.query(`SELECT retention_value, retention_unit, enabled FROM retention_settings WHERE category = 'sync_logs' LIMIT 1`);
+      const row = r.rows[0];
+      if (row && row.enabled && row.retention_unit !== "forever") {
+        const v = Number(row.retention_value);
+        syncDays = row.retention_unit === "days" ? v : row.retention_unit === "months" ? Math.round(v * 30.44) : v * 365;
+      } else if (row && (!row.enabled || row.retention_unit === "forever")) {
+        syncDays = Number.MAX_SAFE_INTEGER;
+      }
+    }
+  } catch {
+  }
+  if (syncDays !== null) {
+    return { fieldLogDays: syncDays, batchDays: syncDays, fileQueueDays: syncDays, conflictDays: syncDays };
+  }
   let dbFieldLogDays = null;
   let dbBatchDays = null;
   try {
@@ -12133,6 +12349,7 @@ var init_postgresStorage = __esm({
     init_db();
     init_schema();
     init_sync();
+    init_requestContext();
     PostgresStorage = class {
       async insertWithSequenceRepair(tableName, insertFn) {
         try {
@@ -13108,6 +13325,8 @@ var init_postgresStorage = __esm({
             dateUpdatedTZ: "UTC",
             enteredAtUTC: now,
             userId: params.userId,
+            actorLabel: getAuditActor().actorLabel,
+            // Audit Phase 0: frozen human actor at write time
             updatedByUuid: params.userUuid || null,
             source: params.updateSource.toLowerCase(),
             notes: params.comments || null,
@@ -13401,7 +13620,8 @@ var init_postgresStorage = __esm({
       // ============= MODULE 3: RUNNING HOURS AUDIT =============
       async createRunningHoursAudit(audit) {
         const db2 = await getDb();
-        const result = await db2.insert(runningHoursAudit).values(audit).returning();
+        const auditWithActor = { ...audit, actorLabel: audit.actorLabel ?? getAuditActor().actorLabel };
+        const result = await db2.insert(runningHoursAudit).values(auditWithActor).returning();
         try {
           await logFieldChanges("running_hours_audit", result[0].rhauuid, result[0].vesselId || null, null, result[0], "system");
         } catch (e) {
@@ -15601,7 +15821,14 @@ var init_postgresStorage = __esm({
       }
       async updateAlertPolicy(id, data) {
         const db2 = await getDb();
-        const result = await db2.update(alertPolicies).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(alertPolicies.apuuid, id)).returning();
+        const {
+          id: _ignoredId,
+          apuuid: _ignoredApuuid,
+          createdAt: _ignoredCreatedAt,
+          updatedAt: _ignoredUpdatedAt,
+          ...mutableData
+        } = data;
+        const result = await db2.update(alertPolicies).set({ ...mutableData, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(alertPolicies.apuuid, id)).returning();
         if (!result[0]) {
           throw new Error(`Alert policy ${id} not found`);
         }
@@ -15694,11 +15921,18 @@ var init_postgresStorage = __esm({
       async createOrUpdateAlertConfig(config) {
         const db2 = await getDb();
         const existing = await this.getAlertConfig(config.vesselId);
+        const {
+          id: _ignoredId,
+          acuuid: _ignoredAcuuid,
+          createdAt: _ignoredCreatedAt,
+          updatedAt: _ignoredUpdatedAt,
+          ...mutableConfig
+        } = config;
         if (existing) {
-          const result = await db2.update(alertConfig).set({ ...config, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(alertConfig.id, existing.id)).returning();
+          const result = await db2.update(alertConfig).set({ ...mutableConfig, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(alertConfig.id, existing.id)).returning();
           return result[0];
         } else {
-          const result = await db2.insert(alertConfig).values(config).returning();
+          const result = await db2.insert(alertConfig).values(mutableConfig).returning();
           return result[0];
         }
       }
@@ -15891,10 +16125,35 @@ var init_postgresStorage = __esm({
         if (filters?.q) {
           conditions.push(ilike(changeRequest.title, `%${filters.q}%`));
         }
+        let allRequests;
         if (conditions.length > 0) {
-          return await db2.select().from(changeRequest).where(and2(...conditions)).orderBy(desc2(changeRequest.createdAt));
+          allRequests = await db2.select().from(changeRequest).where(and2(...conditions)).orderBy(desc2(changeRequest.createdAt));
+        } else {
+          allRequests = await db2.select().from(changeRequest).orderBy(desc2(changeRequest.createdAt));
         }
-        return await db2.select().from(changeRequest).orderBy(desc2(changeRequest.createdAt));
+        if (filters?.pendingForApprover) {
+          const userId = filters.pendingForApprover;
+          const submittedRequests = allRequests.filter((cr) => cr.status === "submitted");
+          const filtered = [];
+          for (const cr of submittedRequests) {
+            const steps = await db2.select().from(changeRequestApproval).where(and2(
+              eq2(changeRequestApproval.changeRequestId, cr.id),
+              eq2(changeRequestApproval.isDeleted, false)
+            ));
+            const activeStep = steps.find((s) => s.status === "Pending");
+            if (!activeStep) continue;
+            const isApprover = await db2.select().from(mocApprovers).where(and2(
+              eq2(mocApprovers.approverLevel, activeStep.approvalLevel),
+              eq2(mocApprovers.isActive, 1),
+              eq2(mocApprovers.isDeleted, false),
+              eq2(mocApprovers.modulename, "Technical"),
+              eq2(mocApprovers.userId, userId)
+            ));
+            if (isApprover.length > 0) filtered.push(cr);
+          }
+          return filtered;
+        }
+        return allRequests;
       }
       async getChangeRequest(id) {
         const db2 = await getDb();
@@ -15954,14 +16213,57 @@ var init_postgresStorage = __esm({
           requestedByUserId: userId
         });
       }
-      async approveChangeRequest(id, reviewerId, comment) {
+      // ── Approval Step CRUD ───────────────────────────────────────────────────
+      async getChangeRequestApprovalSteps(changeRequestId) {
         const db2 = await getDb();
-        const existing = await this.getChangeRequest(id);
-        if (!existing) throw new Error("Change request not found");
-        const now = /* @__PURE__ */ new Date();
+        return db2.select().from(changeRequestApproval).where(and2(
+          eq2(changeRequestApproval.changeRequestId, changeRequestId),
+          eq2(changeRequestApproval.isDeleted, false)
+        )).orderBy(changeRequestApproval.approvalLevel);
+      }
+      async createChangeRequestApprovalStep(step) {
+        const db2 = await getDb();
+        const result = await db2.insert(changeRequestApproval).values(step).returning();
+        return result[0];
+      }
+      async updateChangeRequestApprovalStep(id, data) {
+        const db2 = await getDb();
+        const result = await db2.update(changeRequestApproval).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(changeRequestApproval.id, id)).returning();
+        if (!result[0]) throw new Error(`Approval step ${id} not found`);
+        return result[0];
+      }
+      // ── Internal: verify a user is an active approver for a given level ──────
+      async verifyApproverForLevel_internal(reviewerId, approvalLevel) {
+        const db2 = await getDb();
+        const found = await db2.select().from(mocApprovers).where(and2(
+          eq2(mocApprovers.approverLevel, approvalLevel),
+          eq2(mocApprovers.isActive, 1),
+          eq2(mocApprovers.isDeleted, false),
+          eq2(mocApprovers.modulename, "Technical"),
+          eq2(mocApprovers.userUuid, reviewerId)
+        ));
+        return found.length > 0;
+      }
+      // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──
+      async finaliseApprovedCR(id, existing, reviewerId, comment) {
+        return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, /* @__PURE__ */ new Date());
+      }
+      // ── Internal: atomically mark the final approval step AND finalise the CR ──
+      // stepId: if provided, marks that step as Approved inside the same transaction.
+      async finaliseApprovedCRWithStep(id, existing, stepId, reviewerId, comment, now) {
+        const db2 = await getDb();
         const newRevisionNumber = (existing.revisionNumber || 0) + 1;
         try {
           const result = await db2.transaction(async (tx) => {
+            if (stepId !== null) {
+              await tx.update(changeRequestApproval).set({
+                status: "Approved",
+                actionByUserId: reviewerId,
+                actionAt: now,
+                remarks: comment,
+                updatedAt: now
+              }).where(eq2(changeRequestApproval.id, stepId));
+            }
             const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existing);
             const revisionHistoryEntry = {
               revisionNumber: newRevisionNumber,
@@ -15982,9 +16284,7 @@ var init_postgresStorage = __esm({
               revisionHistory: updatedHistory,
               updatedAt: now
             }).where(eq2(changeRequest.id, id)).returning();
-            if (!updateResult[0]) {
-              throw new Error("Failed to update change request status");
-            }
+            if (!updateResult[0]) throw new Error("Failed to update change request status");
             return updateResult[0];
           });
           console.log(`[CR_APPLY] Successfully approved and applied CR ${id}`);
@@ -15998,6 +16298,39 @@ var init_postgresStorage = __esm({
           console.error(`[CR_APPLY] Transaction failed for CR ${id}, all changes rolled back:`, error);
           throw new Error(`Failed to approve change request: ${error.message}`);
         }
+      }
+      async approveChangeRequest(id, reviewerId, comment, role) {
+        const existing = await this.getChangeRequest(id);
+        if (!existing) throw new Error("Change request not found");
+        const steps = await this.getChangeRequestApprovalSteps(id);
+        const now = /* @__PURE__ */ new Date();
+        if (steps.length === 0) {
+          return this.finaliseApprovedCR(id, existing, reviewerId, comment);
+        }
+        const activeStep = steps.find((s) => s.status === "Pending");
+        if (!activeStep) {
+          throw new Error("No pending approval step found \u2014 this request may have already been fully approved");
+        }
+        const isSailAdmin = role === "Sail Admin";
+        if (!isSailAdmin) {
+          const isAuthorised = await this.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+          if (!isAuthorised) {
+            throw new Error(`Not authorised to approve at ${activeStep.approvalLevel}`);
+          }
+        }
+        const remainingSteps = steps.filter((s) => s.id !== activeStep.id && s.status === "Pending");
+        if (remainingSteps.length > 0) {
+          await this.updateChangeRequestApprovalStep(activeStep.id, {
+            status: "Approved",
+            actionByUserId: reviewerId,
+            actionAt: now,
+            remarks: comment
+          });
+          console.log(`[CR_WORKFLOW] CR ${id} \u2014 ${activeStep.approvalLevel} approved; awaiting ${remainingSteps.length} more level(s)`);
+          return await this.getChangeRequest(id);
+        }
+        console.log(`[CR_WORKFLOW] CR ${id} \u2014 all approval levels satisfied, finalising`);
+        return this.finaliseApprovedCRWithStep(id, existing, activeStep.id, reviewerId, comment, now);
       }
       /**
        * Apply approved changes to the target PMS entity (non-transactional version)
@@ -16299,9 +16632,33 @@ var init_postgresStorage = __esm({
           console.error("[FieldLogger] CR apply store:", e);
         }
       }
-      async rejectChangeRequest(id, reviewerId, comment) {
+      async rejectChangeRequest(id, reviewerId, comment, role) {
         const existing = await this.getChangeRequest(id);
         const now = /* @__PURE__ */ new Date();
+        const steps = await this.getChangeRequestApprovalSteps(id);
+        if (steps.length > 0) {
+          const activeStep = steps.find((s) => s.status === "Pending");
+          if (!activeStep) {
+            throw new Error("No pending approval step found");
+          }
+          const isSailAdmin = role === "Sail Admin";
+          if (!isSailAdmin) {
+            const isAuthorised = await this.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+            if (!isAuthorised) {
+              throw new Error(`Not authorised to reject at ${activeStep.approvalLevel}`);
+            }
+          }
+          await this.updateChangeRequestApprovalStep(activeStep.id, {
+            status: "Rejected",
+            actionByUserId: reviewerId,
+            actionAt: now,
+            remarks: comment
+          });
+          const remainingPending = steps.filter((s) => s.id !== activeStep.id && s.status === "Pending");
+          for (const step of remainingPending) {
+            await this.updateChangeRequestApprovalStep(step.id, { status: "Rejected" });
+          }
+        }
         const updated = await this.updateChangeRequest(id, {
           status: "rejected",
           reviewedByUserId: reviewerId,
@@ -16766,8 +17123,21 @@ var init_postgresStorage = __esm({
       // ============= MODULE 17: AUDIT LOG =============
       async createAuditLog(data) {
         const db2 = await getDb();
+        const inRequest = getRequestContext() !== void 0;
+        const actor = getAuditActor();
+        const PLACEHOLDER_AUDIT_USER_IDS = /* @__PURE__ */ new Set(["system", "admin", "System", ""]);
+        const callerUserId = data.userId == null ? "" : String(data.userId);
+        const resolvedUserId = inRequest ? actor.actorId : callerUserId && !PLACEHOLDER_AUDIT_USER_IDS.has(callerUserId) ? callerUserId : actor.actorId;
+        const basePayload = data.payload && typeof data.payload === "object" && !Array.isArray(data.payload) ? data.payload : data.payload != null ? { value: data.payload } : {};
+        const frozenPayload = {
+          ...basePayload,
+          actorLabel: basePayload.actorLabel ?? actor.actorLabel,
+          actorType: basePayload.actorType ?? actor.actorType,
+          actorEmail: basePayload.actorEmail ?? actor.actorEmail,
+          actorRole: basePayload.actorRole ?? actor.actorRole
+        };
         const result = await db2.insert(auditLog).values({
-          userId: data.userId,
+          userId: resolvedUserId,
           vesselCode: data.vesselCode ?? null,
           componentCode: data.componentCode ?? null,
           entityType: data.entityType,
@@ -16777,36 +17147,47 @@ var init_postgresStorage = __esm({
           oldValue: data.oldValue ?? null,
           newValue: data.newValue ?? null,
           source: data.source,
-          payload: data.payload ?? null
+          payload: frozenPayload
         }).returning();
         return result[0];
       }
+      // Audit viewer (Phase 3) — shared filter builder. Read-only; additive filters (userId, source,
+      // entityTypes[]) added for the audit trail viewer. NEVER mutates audit rows.
+      buildAuditLogConditions(filters) {
+        const conditions = [];
+        conditions.push(isNull2(auditLog.disposedAt));
+        if (!filters) return conditions;
+        if (filters.vesselCode) conditions.push(eq2(auditLog.vesselCode, filters.vesselCode));
+        if (filters.componentCode) conditions.push(eq2(auditLog.componentCode, filters.componentCode));
+        if (filters.entityType) conditions.push(eq2(auditLog.entityType, filters.entityType));
+        if (filters.entityTypes && filters.entityTypes.length > 0) conditions.push(inArray2(auditLog.entityType, filters.entityTypes));
+        if (filters.entityId) conditions.push(eq2(auditLog.entityId, filters.entityId));
+        if (filters.actionType) conditions.push(eq2(auditLog.actionType, filters.actionType));
+        if (filters.userId) conditions.push(eq2(auditLog.userId, filters.userId));
+        if (filters.source) conditions.push(eq2(auditLog.source, filters.source));
+        if (filters.actor) {
+          const a = `%${filters.actor}%`;
+          conditions.push(sql5`(${auditLog.userId} ILIKE ${a} OR ${auditLog.payload}->>'actorLabel' ILIKE ${a})`);
+        }
+        if (filters.entityCode) {
+          const c = `%${filters.entityCode}%`;
+          conditions.push(sql5`(${auditLog.componentCode} ILIKE ${c} OR ${auditLog.entityId} ILIKE ${c} OR ${auditLog.payload}->>'workOrderNo' ILIKE ${c} OR ${auditLog.payload}->>'componentCode' ILIKE ${c})`);
+        }
+        if (filters.startDate) conditions.push(gte(auditLog.timestamp, filters.startDate));
+        if (filters.endDate) conditions.push(lte(auditLog.timestamp, filters.endDate));
+        return conditions;
+      }
+      async countAuditLogs(filters) {
+        const db2 = await getDb();
+        const conditions = this.buildAuditLogConditions(filters);
+        let q = db2.select({ n: sql5`count(*)::int` }).from(auditLog);
+        if (conditions.length > 0) q = q.where(and2(...conditions));
+        const r = await q;
+        return Number(r[0]?.n ?? 0);
+      }
       async getAuditLogs(filters) {
         const db2 = await getDb();
-        let conditions = [];
-        if (filters) {
-          if (filters.vesselCode) {
-            conditions.push(eq2(auditLog.vesselCode, filters.vesselCode));
-          }
-          if (filters.componentCode) {
-            conditions.push(eq2(auditLog.componentCode, filters.componentCode));
-          }
-          if (filters.entityType) {
-            conditions.push(eq2(auditLog.entityType, filters.entityType));
-          }
-          if (filters.entityId) {
-            conditions.push(eq2(auditLog.entityId, filters.entityId));
-          }
-          if (filters.actionType) {
-            conditions.push(eq2(auditLog.actionType, filters.actionType));
-          }
-          if (filters.startDate) {
-            conditions.push(gte(auditLog.timestamp, filters.startDate));
-          }
-          if (filters.endDate) {
-            conditions.push(lte(auditLog.timestamp, filters.endDate));
-          }
-        }
+        const conditions = this.buildAuditLogConditions(filters);
         let query = db2.select().from(auditLog);
         if (conditions.length > 0) {
           query = query.where(and2(...conditions));
@@ -17178,6 +17559,36 @@ var init_postgresStorage = __esm({
         }
         return result[0];
       }
+      // ── WO Postponement Approval Steps ──────────────────────
+      async getWoPostponementApprovalSteps(postponementId) {
+        const db2 = await getDb();
+        return db2.select().from(woPostponementApprovals).where(and2(
+          eq2(woPostponementApprovals.postponementId, postponementId),
+          eq2(woPostponementApprovals.isDeleted, false)
+        )).orderBy(woPostponementApprovals.approvalLevel);
+      }
+      async createWoPostponementApprovalStep(step) {
+        const db2 = await getDb();
+        const result = await db2.insert(woPostponementApprovals).values(step).returning();
+        return result[0];
+      }
+      async updateWoPostponementApprovalStep(id, data) {
+        const db2 = await getDb();
+        const result = await db2.update(woPostponementApprovals).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(woPostponementApprovals.id, id)).returning();
+        if (!result[0]) throw new Error(`WO postponement approval step ${id} not found`);
+        return result[0];
+      }
+      async getLatestAwaitingPostponement(workOrderId) {
+        const db2 = await getDb();
+        const rows = await db2.select().from(workOrderPostponements).where(and2(
+          eq2(workOrderPostponements.workOrderId, workOrderId),
+          eq2(workOrderPostponements.status, "Awaiting Approval")
+        )).orderBy(desc2(workOrderPostponements.postponementNumber));
+        return rows[0];
+      }
+      async verifyApproverForLevel(reviewerId, approvalLevel) {
+        return this.verifyApproverForLevel_internal(reviewerId, approvalLevel);
+      }
       // ============= REMAINING FILE-BOUND METHODS =============
       async getRunningHourParents(vesselId) {
         const db2 = await getDb();
@@ -17270,6 +17681,8 @@ var init_postgresStorage = __esm({
             dateUpdatedTZ: "UTC",
             enteredAtUTC: now,
             userId: userId || "system",
+            actorLabel: getAuditActor().actorLabel,
+            // Audit Phase 0: frozen human actor at write time
             updatedByUuid: userUuid || null,
             source: "cascade",
             notes: meterReplaced ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ""}` : comments,
@@ -17336,6 +17749,8 @@ var init_postgresStorage = __esm({
                 dateUpdatedTZ: "UTC",
                 enteredAtUTC: now,
                 userId: userId || "system",
+                actorLabel: getAuditActor().actorLabel,
+                // Audit Phase 0: frozen human actor at write time
                 updatedByUuid: userUuid || null,
                 source: "inherited_cascade",
                 comments: `Inherited delta ${inheritedDelta} from MASTER ${parentResult[0]?.componentCode || parentResult[0]?.name}`
@@ -17376,6 +17791,8 @@ var init_postgresStorage = __esm({
               dateUpdatedTZ: "UTC",
               enteredAtUTC: now,
               userId: userId || "system",
+              actorLabel: getAuditActor().actorLabel,
+              // Audit Phase 0: frozen human actor at write time
               updatedByUuid: userUuid || null,
               source: "cascade",
               comments
@@ -18984,6 +19401,39 @@ var init_postgresStorage = __esm({
           }
         });
         return { count: permissions.length };
+      }
+      async getApprovalWorkflowConfig() {
+        const db2 = await getDb();
+        return db2.select().from(approvalWorkflowConfig).where(eq2(approvalWorkflowConfig.isDeleted, false)).orderBy(approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName);
+      }
+      async getLocalApprovers() {
+        const db2 = await getDb();
+        return db2.select().from(mocApprovers).where(and2(eq2(mocApprovers.isDeleted, false), eq2(mocApprovers.modulename, "Technical")));
+      }
+      async upsertApprovalWorkflowConfig(rows, updatedByUuid) {
+        const db2 = await getDb();
+        const results = [];
+        for (const row of rows) {
+          const [updated] = await db2.insert(approvalWorkflowConfig).values({
+            moduleId: row.moduleId,
+            subModuleId: row.subModuleId,
+            functionId: row.functionId,
+            variableName: row.variableName,
+            level1Enabled: row.level1Enabled,
+            level2Enabled: row.level2Enabled,
+            updatedByUuid
+          }).onConflictDoUpdate({
+            target: [approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName],
+            set: {
+              level1Enabled: sql5`EXCLUDED.level1_enabled`,
+              level2Enabled: sql5`EXCLUDED.level2_enabled`,
+              updatedByUuid: sql5`EXCLUDED.updated_by_uuid`,
+              updatedAt: /* @__PURE__ */ new Date()
+            }
+          }).returning();
+          results.push(updated);
+        }
+        return results;
       }
     };
     postgresStorage = new PostgresStorage();
@@ -22200,7 +22650,7 @@ async function create5(data) {
 async function update5(id, data) {
   return storage.updateWorkOrder(id, data);
 }
-async function remove5(id) {
+async function remove4(id) {
   return storage.deleteWorkOrder(id);
 }
 async function findExecutions(componentId) {
@@ -22316,7 +22766,22 @@ async function getMaxPostponementNumber(workOrderId) {
   if (!rows || rows.length === 0) return 0;
   return Math.max(...rows.map((r) => r.postponementNumber || 1));
 }
-async function createAuditLog2(data) {
+async function getWoPostponementApprovalSteps(postponementId) {
+  return storage.getWoPostponementApprovalSteps(postponementId);
+}
+async function createWoPostponementApprovalStep(data) {
+  return storage.createWoPostponementApprovalStep(data);
+}
+async function updateWoPostponementApprovalStep(id, data) {
+  return storage.updateWoPostponementApprovalStep(id, data);
+}
+async function getLatestAwaitingPostponement(workOrderId) {
+  return storage.getLatestAwaitingPostponement(workOrderId);
+}
+async function verifyApproverForLevel(reviewerId, approvalLevel) {
+  return storage.verifyApproverForLevel(reviewerId, approvalLevel);
+}
+async function createAuditLog3(data) {
   return storage.createAuditLog(data);
 }
 async function getAuditLogsByEntity(entityType, entityId) {
@@ -23012,6 +23477,21 @@ __export(service_exports2, {
   updateRank: () => updateRank
 });
 import { eq as eq7, and as and6 } from "drizzle-orm";
+async function auditRank(actionType, rank, payload) {
+  try {
+    await storage.createAuditLog({
+      entityType: "rank",
+      entityId: rank?.rankId ?? null,
+      actionType,
+      source: "web_ui",
+      vesselCode: null,
+      componentCode: null,
+      payload: { subject: { rankId: rank?.rankId ?? null, rankName: rank?.name ?? null }, ...payload }
+    });
+  } catch (auditErr) {
+    console.error(`[Audit] rank ${actionType} log failed:`, auditErr?.message);
+  }
+}
 async function getAllRanks2() {
   const ranks = await getAllRanks();
   if (!ranks) {
@@ -23037,7 +23517,8 @@ async function saveRanks(ranks) {
     err.statusCode = 503;
     throw err;
   }
-  return postgres.db.transaction(async (tx) => {
+  const rankAudits = [];
+  const txResult = await postgres.db.transaction(async (tx) => {
     let inserted = 0;
     let updated = 0;
     for (const rank of ranks) {
@@ -23056,13 +23537,19 @@ async function saveRanks(ranks) {
       if (existing.length > 0) {
         await tx.update(admAvailableRanks).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(admAvailableRanks.rankId, rank.rankId));
         updated++;
+        rankAudits.push({ action: "rank_update", rank, before: existing[0], after: data });
       } else {
         await tx.insert(admAvailableRanks).values(data);
         inserted++;
+        rankAudits.push({ action: "rank_create", rank, before: null, after: data });
       }
     }
     return { success: true, message: `Saved ${ranks.length} ranks`, inserted, updated };
   });
+  for (const a of rankAudits) {
+    await auditRank(a.action, a.rank, a.action === "rank_update" ? { before: a.before, after: a.after } : { after: a.after });
+  }
+  return txResult;
 }
 async function updateRank(rankId, data) {
   const existing = await getRankByRankId(rankId);
@@ -23082,7 +23569,9 @@ async function updateRank(rankId, data) {
     viewMode: data.viewMode !== void 0 ? data.viewMode || null : existing.viewMode,
     isDeleted: false
   });
-  return { success: true, rank: result?.[0] || null };
+  const updatedRank = result?.[0] || null;
+  await auditRank("rank_update", updatedRank ?? existing, { before: existing, after: updatedRank });
+  return { success: true, rank: updatedRank };
 }
 async function deleteRank(rankId) {
   const rank = await getRankByRankId(rankId);
@@ -23097,6 +23586,7 @@ async function deleteRank(rankId) {
     throw err;
   }
   await softDeleteRank(rankId);
+  await auditRank("rank_delete", rank, { before: rank });
   return { success: true, message: `Rank ${rankId} deleted` };
 }
 async function getAllOrgChart2() {
@@ -23318,6 +23808,7 @@ var init_service2 = __esm({
     "use strict";
     init_repository2();
     init_postgresClient();
+    init_storage();
     init_schema();
   }
 });
@@ -24975,6 +25466,24 @@ async function createWorkOrder(body) {
   } catch (err) {
     console.error("[FieldLogger] WO create:", err);
   }
+  try {
+    await createAuditLog3({
+      entityType: "work_order",
+      entityId: workOrder.wouuid,
+      actionType: "create",
+      source: "web_ui",
+      vesselCode: workOrder.vesselId || null,
+      componentCode: workOrder.componentCode || null,
+      payload: {
+        workOrderNo: workOrder.workOrderNo,
+        status: workOrder.status,
+        jobTitle: workOrder.jobTitle ?? null,
+        component: workOrder.component ?? null
+      }
+    });
+  } catch (auditErr) {
+    console.error("[Audit] WO create log failed:", auditErr);
+  }
   return workOrder;
 }
 async function updateWorkOrder(id, body) {
@@ -25533,7 +26042,7 @@ async function updateWorkOrder(id, body) {
         changedFields[key] = { old: oldVal ?? null, new: newVal };
       }
     }
-    await createAuditLog2({
+    await createAuditLog3({
       entityType: "work_order",
       entityId: existingWO2.wouuid || id,
       actionType: auditActionType,
@@ -25935,7 +26444,7 @@ async function updateWorkOrder(id, body) {
 }
 async function deleteWorkOrder(id) {
   const existingWO2 = await findById3(id);
-  await remove5(id);
+  await remove4(id);
   if (existingWO2) {
     try {
       await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, { is_deleted: false }, { is_deleted: true }, "system");
@@ -26085,7 +26594,7 @@ async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
     actorUserUuid
   );
   try {
-    await createAuditLog2({
+    await createAuditLog3({
       entityType: "work_order",
       entityId: existingWO2.wouuid || id,
       actionType: "superintendent_reject_completion",
@@ -26146,6 +26655,39 @@ async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   }
   return updatedWO;
 }
+async function classifyWoForPostponement(wo) {
+  if (!wo.jobId) {
+    return { classification: "normal", level1Enabled: false, level2Enabled: false };
+  }
+  let classification = "normal";
+  const job = await findJob(wo.jobId);
+  if (job) {
+    let isOnCriticalEquipment = false;
+    if (job.componentId) {
+      const comp = await findComponent2(job.componentId);
+      isOnCriticalEquipment = comp?.critical === true;
+    }
+    if (isOnCriticalEquipment) {
+      classification = "criticalEquipment";
+    } else if (job.criticality === "Yes") {
+      classification = "critical";
+    }
+  }
+  const variableNameMap = {
+    criticalEquipment: "Critical Equipment WO",
+    critical: "Critical WO",
+    normal: "Normal WO"
+  };
+  const allConfigs = await storage.getApprovalWorkflowConfig();
+  const config = allConfigs.find(
+    (c) => c.functionId === "pms-wo-postponement" && c.variableName === variableNameMap[classification] && !c.isDeleted
+  );
+  return {
+    classification,
+    level1Enabled: config?.level1Enabled ?? false,
+    level2Enabled: config?.level2Enabled ?? false
+  };
+}
 async function submitPostponeRequest(id, body) {
   let wo = await findById3(id);
   if (!wo) wo = await findByCode(id);
@@ -26166,9 +26708,16 @@ async function submitPostponeRequest(id, body) {
   } catch (err) {
     console.error("[FieldLogger] WO postpone-request:", err);
   }
+  const classification = await classifyWoForPostponement(wo);
+  const approvalWorkflowSnapshot = {
+    woClassification: classification.classification,
+    level1Enabled: classification.level1Enabled,
+    level2Enabled: classification.level2Enabled
+  };
   const prevMax = await getMaxPostponementNumber(wo.wouuid);
+  const postponementId = crypto.randomUUID();
   await createPostponement({
-    id: crypto.randomUUID(),
+    id: postponementId,
     workOrderId: wo.wouuid,
     vesselId: wo.vesselId,
     postponementNumber: prevMax + 1,
@@ -26181,8 +26730,25 @@ async function submitPostponeRequest(id, body) {
     durationDays: body.duration ? parseInt(String(body.duration), 10) : null,
     submittedDate: today,
     status: "Awaiting Approval",
-    informOffice: true
+    informOffice: true,
+    approvalWorkflowSnapshot
   });
+  if (classification.level1Enabled) {
+    await createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: "Level 1",
+      status: "Pending"
+    });
+  }
+  if (classification.level2Enabled) {
+    await createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: "Level 2",
+      status: "Pending"
+    });
+  }
   return updatedWO;
 }
 async function editPostponeRequest(id, body) {
@@ -26196,6 +26762,37 @@ async function approvePostponement(id, body) {
     throw new ValidationError(
       `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
     );
+  }
+  const awaitingPostponement = await getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) {
+    const steps = await getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const now = /* @__PURE__ */ new Date();
+      const activeStep = steps.find((s) => s.status === "Pending");
+      if (!activeStep) {
+        throw new ValidationError("No pending approval step found \u2014 this request may have already been fully approved");
+      }
+      const isSailAdmin = body.sessionRole === "Sail Admin" || body.role === "Sail Admin";
+      if (!isSailAdmin) {
+        const reviewerId = body.userUuid || body.approvedBy;
+        const isAuthorised = await verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+        if (!isAuthorised) {
+          throw new ValidationError(`Not authorised to approve at ${activeStep.approvalLevel}`);
+        }
+      }
+      const remaining = steps.filter((s) => s.id !== activeStep.id && s.status === "Pending");
+      await updateWoPostponementApprovalStep(activeStep.id, {
+        status: "Approved",
+        actionByUserId: body.approvedBy,
+        actionAt: now,
+        remarks: body.approvalRemarks || null
+      });
+      if (remaining.length > 0) {
+        console.log(`[WO_POSTPONE_WORKFLOW] WO ${wo.wouuid} \u2014 ${activeStep.approvalLevel} approved; awaiting ${remaining.length} more level(s)`);
+        return await findById3(id) || wo;
+      }
+      console.log(`[WO_POSTPONE_WORKFLOW] WO ${wo.wouuid} \u2014 all approval levels satisfied, finalising`);
+    }
   }
   const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
   const newDueDate = wo.postponeRequestedDate || body.newDueDate;
@@ -26248,6 +26845,29 @@ async function rejectPostponement(id, body) {
     throw new ValidationError(
       `Only work orders with status "Awaiting Office Approval" can be rejected. Current status: ${wo.status}`
     );
+  }
+  const awaitingPostponement = await getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) {
+    const steps = await getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const activeStep = steps.find((s) => s.status === "Pending");
+      if (activeStep) {
+        const isSailAdmin = body.sessionRole === "Sail Admin" || body.role === "Sail Admin";
+        if (!isSailAdmin) {
+          const reviewerId = body.userUuid || body.approvedBy;
+          const isAuthorised = await verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+          if (!isAuthorised) {
+            throw new ValidationError(`Not authorised to reject at ${activeStep.approvalLevel}`);
+          }
+        }
+        await updateWoPostponementApprovalStep(activeStep.id, {
+          status: "Rejected",
+          actionByUserId: body.approvedBy,
+          actionAt: /* @__PURE__ */ new Date(),
+          remarks: body.approvalRemarks || null
+        });
+      }
+    }
   }
   const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
@@ -26338,7 +26958,7 @@ async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
     actorUserUuid
   );
   try {
-    await createAuditLog2({
+    await createAuditLog3({
       entityType: "work_order",
       entityId: existingWO2.wouuid || id,
       actionType: "superintendent_reopen_completion",
@@ -26416,6 +27036,227 @@ var init_workOrderService2 = __esm({
     init_schema();
     init_sync();
     init_workOrderFilters();
+  }
+});
+
+// server/modules/cert-surveys/repositories/certificateRepository.ts
+var certificateRepository_exports = {};
+__export(certificateRepository_exports, {
+  getAllVesselCertificateData: () => getAllVesselCertificateData,
+  getApplicableCertificates: () => getApplicableCertificates,
+  getCertificateApplicability: () => getCertificateApplicability,
+  getMasterCertificateById: () => getMasterCertificateById,
+  getMasterCertificatesByIds: () => getMasterCertificatesByIds,
+  getVesselCertificateDataByKey: () => getVesselCertificateDataByKey,
+  insertCertificateData: () => insertCertificateData,
+  updateCertificateData: () => updateCertificateData
+});
+import { eq as eq13, and as and10, asc as asc4, inArray as inArray4, or as or3, isNull as isNull3, sql as sql8 } from "drizzle-orm";
+function getDb3() {
+  const postgres = getPostgresClient();
+  if (!postgres) return null;
+  return postgres.db;
+}
+async function getApplicableCertificates() {
+  const db2 = await getDb3();
+  if (!db2) return null;
+  return db2.select().from(vesselCertificateApplicability).where(
+    and10(
+      eq13(vesselCertificateApplicability.isApplicable, true),
+      or3(eq13(vesselCertificateApplicability.isDeleted, false), isNull3(vesselCertificateApplicability.isDeleted))
+    )
+  );
+}
+async function getMasterCertificatesByIds(masterIds) {
+  const db2 = await getDb3();
+  if (!db2) return null;
+  return db2.select().from(shipCertificatesMaster).where(
+    and10(
+      inArray4(shipCertificatesMaster.masterId, masterIds),
+      eq13(shipCertificatesMaster.isActive, true),
+      or3(eq13(shipCertificatesMaster.isDeleted, false), isNull3(shipCertificatesMaster.isDeleted))
+    )
+  ).orderBy(asc4(shipCertificatesMaster.companySequence));
+}
+async function getAllVesselCertificateData() {
+  const db2 = await getDb3();
+  if (!db2) return null;
+  return db2.select().from(vesselCertificateData).where(
+    or3(eq13(vesselCertificateData.isDeleted, false), isNull3(vesselCertificateData.isDeleted))
+  );
+}
+async function getCertificateApplicability(vesselId, masterId) {
+  const db2 = await getDb3();
+  if (!db2) return null;
+  return db2.select().from(vesselCertificateApplicability).where(
+    and10(
+      eq13(vesselCertificateApplicability.vesselId, vesselId),
+      eq13(vesselCertificateApplicability.masterId, masterId),
+      eq13(vesselCertificateApplicability.isApplicable, true),
+      or3(eq13(vesselCertificateApplicability.isDeleted, false), isNull3(vesselCertificateApplicability.isDeleted))
+    )
+  ).limit(1);
+}
+async function getMasterCertificateById(masterId) {
+  const db2 = await getDb3();
+  if (!db2) return null;
+  return db2.select().from(shipCertificatesMaster).where(
+    and10(
+      eq13(shipCertificatesMaster.masterId, masterId),
+      eq13(shipCertificatesMaster.isActive, true),
+      or3(eq13(shipCertificatesMaster.isDeleted, false), isNull3(shipCertificatesMaster.isDeleted))
+    )
+  ).limit(1);
+}
+async function getVesselCertificateDataByKey(vesselId, masterId) {
+  const db2 = await getDb3();
+  if (!db2) return null;
+  return db2.select().from(vesselCertificateData).where(
+    and10(
+      eq13(vesselCertificateData.vesselId, vesselId),
+      eq13(vesselCertificateData.masterId, masterId),
+      or3(eq13(vesselCertificateData.isDeleted, false), isNull3(vesselCertificateData.isDeleted))
+    )
+  ).limit(1);
+}
+async function updateCertificateData(vesselId, masterId, updateData) {
+  const db2 = await getDb3();
+  if (!db2) return null;
+  return db2.update(vesselCertificateData).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(
+    and10(
+      eq13(vesselCertificateData.vesselId, vesselId),
+      eq13(vesselCertificateData.masterId, masterId),
+      or3(eq13(vesselCertificateData.isDeleted, false), isNull3(vesselCertificateData.isDeleted))
+    )
+  ).returning();
+}
+async function insertCertificateData(data) {
+  const db2 = await getDb3();
+  if (!db2) return null;
+  const inserted = await db2.insert(vesselCertificateData).values(data).onConflictDoNothing({
+    target: [vesselCertificateData.vesselId, vesselCertificateData.masterId],
+    where: sql8`${vesselCertificateData.isDeleted} = false`
+  }).returning();
+  if (inserted.length > 0) return inserted;
+  const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
+  return db2.update(vesselCertificateData).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(
+    and10(
+      eq13(vesselCertificateData.vesselId, vesselId),
+      eq13(vesselCertificateData.masterId, masterId),
+      or3(eq13(vesselCertificateData.isDeleted, false), isNull3(vesselCertificateData.isDeleted))
+    )
+  ).returning();
+}
+var init_certificateRepository = __esm({
+  "server/modules/cert-surveys/repositories/certificateRepository.ts"() {
+    "use strict";
+    init_postgresClient();
+    init_schema();
+  }
+});
+
+// server/modules/cert-surveys/repositories/surveyRepository.ts
+var surveyRepository_exports = {};
+__export(surveyRepository_exports, {
+  createSurvey: () => createSurvey,
+  getAllVesselSurveyData: () => getAllVesselSurveyData,
+  getApplicableSurveys: () => getApplicableSurveys,
+  getMasterSurveysByIds: () => getMasterSurveysByIds,
+  getSurvey: () => getSurvey,
+  getSurveyApplicabilityByKey: () => getSurveyApplicabilityByKey,
+  getSurveys: () => getSurveys,
+  getVesselSurveyDataByKey: () => getVesselSurveyDataByKey,
+  insertSurveyData: () => insertSurveyData,
+  updateSurveyData: () => updateSurveyData
+});
+import { eq as eq14, and as and11, asc as asc5, inArray as inArray5, or as or4, sql as sql9 } from "drizzle-orm";
+function getDb4() {
+  const postgres = getPostgresClient();
+  if (!postgres) return null;
+  return postgres.db;
+}
+async function getApplicableSurveys() {
+  const db2 = await getDb4();
+  if (!db2) return null;
+  return db2.select().from(vesselSurveyApplicability).where(and11(
+    eq14(vesselSurveyApplicability.isApplicable, true),
+    or4(eq14(vesselSurveyApplicability.isDeleted, false), sql9`${vesselSurveyApplicability.isDeleted} IS NULL`)
+  ));
+}
+async function getMasterSurveysByIds(masterIds) {
+  const db2 = await getDb4();
+  if (!db2) return null;
+  return db2.select().from(shipSurveysMaster).where(and11(
+    inArray5(shipSurveysMaster.masterId, masterIds),
+    eq14(shipSurveysMaster.isDeleted, false),
+    eq14(shipSurveysMaster.isActive, true)
+  )).orderBy(asc5(shipSurveysMaster.companySequence));
+}
+async function getAllVesselSurveyData() {
+  const db2 = await getDb4();
+  if (!db2) return null;
+  return db2.select().from(vesselSurveyData);
+}
+async function getSurveyApplicabilityByKey(vesselId, masterId) {
+  const db2 = await getDb4();
+  if (!db2) return null;
+  return db2.select().from(vesselSurveyApplicability).where(
+    and11(
+      eq14(vesselSurveyApplicability.vesselId, vesselId),
+      eq14(vesselSurveyApplicability.masterId, masterId)
+    )
+  ).limit(1);
+}
+async function getVesselSurveyDataByKey(vesselId, masterId) {
+  const db2 = await getDb4();
+  if (!db2) return null;
+  return db2.select().from(vesselSurveyData).where(
+    and11(
+      eq14(vesselSurveyData.vesselId, vesselId),
+      eq14(vesselSurveyData.masterId, masterId)
+    )
+  ).limit(1);
+}
+async function updateSurveyData(vesselId, masterId, updateData) {
+  const db2 = await getDb4();
+  if (!db2) return null;
+  return db2.update(vesselSurveyData).set(updateData).where(
+    and11(
+      eq14(vesselSurveyData.vesselId, vesselId),
+      eq14(vesselSurveyData.masterId, masterId)
+    )
+  ).returning();
+}
+async function insertSurveyData(data) {
+  const db2 = await getDb4();
+  if (!db2) return null;
+  const inserted = await db2.insert(vesselSurveyData).values(data).onConflictDoNothing({
+    target: [vesselSurveyData.vesselId, vesselSurveyData.masterId]
+  }).returning();
+  if (inserted.length > 0) return inserted;
+  const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
+  return db2.update(vesselSurveyData).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(
+    and11(
+      eq14(vesselSurveyData.vesselId, vesselId),
+      eq14(vesselSurveyData.masterId, masterId)
+    )
+  ).returning();
+}
+async function getSurveys() {
+  return storage.getSurveys();
+}
+async function getSurvey(id) {
+  return storage.getSurvey(id);
+}
+async function createSurvey(data) {
+  return storage.createSurvey(data);
+}
+var init_surveyRepository = __esm({
+  "server/modules/cert-surveys/repositories/surveyRepository.ts"() {
+    "use strict";
+    init_postgresClient();
+    init_storage();
+    init_schema();
   }
 });
 
@@ -27063,6 +27904,293 @@ var init_skippedCyclesEvaluator = __esm({
   }
 });
 
+// server/modules/alerts/evaluators/certificateEvaluators.ts
+function daysDiffFrom(value) {
+  const parsed = parseWorkOrderDate(value);
+  if (!parsed) return null;
+  return Math.floor((parsed.getTime() - Date.now()) / 864e5);
+}
+function evaluateCertificateExpiring(rows, policy, existingDedupeKeys, nameByMasterId) {
+  const alerts = [];
+  const t = JSON.parse(policy.thresholds || "{}");
+  const tiers = Array.isArray(t.leadDaysTiers) ? t.leadDaysTiers : [90, 30];
+  const highAtDays = typeof t.highAtDays === "number" ? t.highAtDays : 30;
+  for (const row of rows) {
+    if (row.isDeleted === true) continue;
+    if (!row.vesselId) continue;
+    const d = daysDiffFrom(row.expiryDate);
+    if (d === null) {
+      console.warn(`[certificate_expiration] unparseable expiry_date for cert row ${row.id}: "${row.expiryDate}" \u2014 skipping`);
+      continue;
+    }
+    if (d < 0) continue;
+    const certName = nameByMasterId?.get(row.masterId) || row.masterId;
+    for (const T of tiers) {
+      if (d > T) continue;
+      const dedupeKey = `cert_expiring:${row.id}:${T}`;
+      if (existingDedupeKeys.has(dedupeKey)) continue;
+      const priority = T <= highAtDays ? "high" : "medium";
+      alerts.push({
+        dedupeKey,
+        objectType: "certificate",
+        objectId: String(row.id),
+        vesselId: row.vesselId,
+        state: "expiring",
+        priority,
+        payload: {
+          certName,
+          masterId: row.masterId,
+          vesselName: row.vesselName,
+          expiryDate: row.expiryDate,
+          daysToExpiry: d,
+          tierDays: T,
+          alertMessage: `Certificate "${certName}" expires in ${d} day(s) (on ${row.expiryDate})`
+        }
+      });
+    }
+  }
+  return alerts;
+}
+function evaluateCertificateExpired(rows, policy, existingDedupeKeys, nameByMasterId) {
+  const alerts = [];
+  for (const row of rows) {
+    if (row.isDeleted === true) continue;
+    if (!row.vesselId) continue;
+    const d = daysDiffFrom(row.expiryDate);
+    if (d === null) {
+      console.warn(`[certificate_expired] unparseable expiry_date for cert row ${row.id}: "${row.expiryDate}" \u2014 skipping`);
+      continue;
+    }
+    if (d >= 0) continue;
+    const dedupeKey = `cert_expired:${row.id}`;
+    if (existingDedupeKeys.has(dedupeKey)) continue;
+    const certName = nameByMasterId?.get(row.masterId) || row.masterId;
+    alerts.push({
+      dedupeKey,
+      objectType: "certificate",
+      objectId: String(row.id),
+      vesselId: row.vesselId,
+      state: "expired",
+      priority: policy.priority,
+      payload: {
+        certName,
+        masterId: row.masterId,
+        vesselName: row.vesselName,
+        expiryDate: row.expiryDate,
+        daysOverdue: Math.abs(d),
+        alertMessage: `Certificate "${certName}" expired ${Math.abs(d)} day(s) ago (on ${row.expiryDate})`
+      }
+    });
+  }
+  return alerts;
+}
+var init_certificateEvaluators = __esm({
+  "server/modules/alerts/evaluators/certificateEvaluators.ts"() {
+    "use strict";
+    init_dateParse();
+  }
+});
+
+// server/modules/alerts/evaluators/surveyEvaluators.ts
+function daysDiffFrom2(value) {
+  const parsed = parseWorkOrderDate(value);
+  if (!parsed) return null;
+  return Math.floor((parsed.getTime() - Date.now()) / 864e5);
+}
+function evaluateSurveyDueSoon(rows, policy, existingDedupeKeys, nameByMasterId) {
+  const alerts = [];
+  const t = JSON.parse(policy.thresholds || "{}");
+  const leadDays = typeof t.leadDays === "number" ? t.leadDays : 30;
+  for (const row of rows) {
+    if (row.isDeleted === true) continue;
+    if (!row.vesselId) continue;
+    const d = daysDiffFrom2(row.dueDate);
+    if (d === null) {
+      console.warn(`[survey_due_soon] unparseable due_date for survey row ${row.id}: "${row.dueDate}" \u2014 skipping`);
+      continue;
+    }
+    if (d < 0 || d > leadDays) continue;
+    const dedupeKey = `survey_due_soon:${row.id}`;
+    if (existingDedupeKeys.has(dedupeKey)) continue;
+    const surveyName = nameByMasterId?.get(row.masterId) || row.masterId;
+    alerts.push({
+      dedupeKey,
+      objectType: "survey",
+      objectId: String(row.id),
+      vesselId: row.vesselId,
+      state: "due",
+      priority: policy.priority,
+      payload: {
+        surveyName,
+        masterId: row.masterId,
+        vesselName: row.vesselName,
+        dueDate: row.dueDate,
+        daysToDue: d,
+        alertMessage: `Survey "${surveyName}" is due in ${d} day(s) (on ${row.dueDate})`
+      }
+    });
+  }
+  return alerts;
+}
+function evaluateSurveyWindowClosing(rows, policy, existingDedupeKeys, nameByMasterId) {
+  const alerts = [];
+  const t = JSON.parse(policy.thresholds || "{}");
+  const leadDays = typeof t.leadDays === "number" ? t.leadDays : 30;
+  for (const row of rows) {
+    if (row.isDeleted === true) continue;
+    if (!row.vesselId) continue;
+    if (!row.secondRangeDate) continue;
+    const d = daysDiffFrom2(row.secondRangeDate);
+    if (d === null) {
+      console.warn(`[survey_window_closing] unparseable second_range_date for survey row ${row.id}: "${row.secondRangeDate}" \u2014 skipping`);
+      continue;
+    }
+    if (d < 0 || d > leadDays) continue;
+    const dedupeKey = `survey_window_closing:${row.id}`;
+    if (existingDedupeKeys.has(dedupeKey)) continue;
+    const surveyName = nameByMasterId?.get(row.masterId) || row.masterId;
+    alerts.push({
+      dedupeKey,
+      objectType: "survey",
+      objectId: String(row.id),
+      vesselId: row.vesselId,
+      state: "closing",
+      priority: policy.priority,
+      payload: {
+        surveyName,
+        masterId: row.masterId,
+        vesselName: row.vesselName,
+        secondRangeDate: row.secondRangeDate,
+        daysToWindowClose: d,
+        alertMessage: `Survey "${surveyName}" window closes in ${d} day(s) (on ${row.secondRangeDate})`
+      }
+    });
+  }
+  return alerts;
+}
+function evaluateSurveyOverdue(rows, policy, existingDedupeKeys, nameByMasterId) {
+  const alerts = [];
+  for (const row of rows) {
+    if (row.isDeleted === true) continue;
+    if (!row.vesselId) continue;
+    const effective = row.secondRangeDate ?? row.dueDate;
+    const d = daysDiffFrom2(effective);
+    if (d === null) {
+      console.warn(`[survey_overdue] unparseable overdue date for survey row ${row.id}: "${effective}" \u2014 skipping`);
+      continue;
+    }
+    if (d >= 0) continue;
+    const dedupeKey = `survey_overdue:${row.id}`;
+    if (existingDedupeKeys.has(dedupeKey)) continue;
+    const surveyName = nameByMasterId?.get(row.masterId) || row.masterId;
+    alerts.push({
+      dedupeKey,
+      objectType: "survey",
+      objectId: String(row.id),
+      vesselId: row.vesselId,
+      state: "overdue",
+      priority: policy.priority,
+      payload: {
+        surveyName,
+        masterId: row.masterId,
+        vesselName: row.vesselName,
+        effectiveDate: effective,
+        daysOverdue: Math.abs(d),
+        alertMessage: `Survey "${surveyName}" is overdue by ${Math.abs(d)} day(s) (was due ${effective})`
+      }
+    });
+  }
+  return alerts;
+}
+var init_surveyEvaluators = __esm({
+  "server/modules/alerts/evaluators/surveyEvaluators.ts"() {
+    "use strict";
+    init_dateParse();
+  }
+});
+
+// server/modules/alerts/evaluators/defectEvaluators.ts
+function isDone(status) {
+  const s = (status || "").toLowerCase();
+  return s.includes("closed") || s.includes("cancel");
+}
+function defectLabel(row) {
+  const desc11 = (row.description || "").trim();
+  if (!desc11) return `Defect ${row.id}`;
+  return desc11.length > 80 ? `${desc11.slice(0, 77)}...` : desc11;
+}
+function evaluateDefectOverdue(rows, policy, existingDedupeKeys) {
+  const alerts = [];
+  for (const row of rows) {
+    if (!row.vesselId) continue;
+    if (isDone(row.status)) continue;
+    if (!row.targetCloseDate) continue;
+    const parsed = parseWorkOrderDate(row.targetCloseDate);
+    if (!parsed) {
+      console.warn(`[defect_overdue] unparseable target_close_date for defect ${row.id}: "${row.targetCloseDate}" \u2014 skipping`);
+      continue;
+    }
+    const d = Math.floor((parsed.getTime() - Date.now()) / 864e5);
+    if (d >= 0) continue;
+    const dedupeKey = `defect_overdue:${row.id}`;
+    if (existingDedupeKeys.has(dedupeKey)) continue;
+    const label = defectLabel(row);
+    alerts.push({
+      dedupeKey,
+      objectType: "defect",
+      objectId: row.id,
+      vesselId: row.vesselId,
+      state: "overdue",
+      priority: policy.priority,
+      payload: {
+        defectId: row.id,
+        title: label,
+        vesselName: row.vesselName,
+        status: row.status,
+        targetCloseDate: row.targetCloseDate,
+        daysOverdue: Math.abs(d),
+        alertMessage: `Defect "${label}" is overdue by ${Math.abs(d)} day(s) (target ${row.targetCloseDate})`
+      }
+    });
+  }
+  return alerts;
+}
+function evaluateDefectCoc(rows, policy, existingDedupeKeys) {
+  const alerts = [];
+  for (const row of rows) {
+    if (!row.vesselId) continue;
+    if (isDone(row.status)) continue;
+    const isCoc = row.is_coc === true || (row.source || "").toLowerCase() === "class";
+    if (!isCoc) continue;
+    const dedupeKey = `defect_coc:${row.id}`;
+    if (existingDedupeKeys.has(dedupeKey)) continue;
+    const label = defectLabel(row);
+    alerts.push({
+      dedupeKey,
+      objectType: "defect",
+      objectId: row.id,
+      vesselId: row.vesselId,
+      state: "coc",
+      priority: policy.priority,
+      payload: {
+        defectId: row.id,
+        title: label,
+        vesselName: row.vesselName,
+        status: row.status,
+        source: row.source,
+        alertMessage: `COC / Class defect raised: "${label}"`
+      }
+    });
+  }
+  return alerts;
+}
+var init_defectEvaluators = __esm({
+  "server/modules/alerts/evaluators/defectEvaluators.ts"() {
+    "use strict";
+    init_dateParse();
+  }
+});
+
 // server/modules/alerts/services/pmsAlertEngine.ts
 var pmsAlertEngine_exports = {};
 __export(pmsAlertEngine_exports, {
@@ -27077,6 +28205,9 @@ var init_pmsAlertEngine = __esm({
     init_overdueJobsEvaluator();
     init_lowSparesEvaluator();
     init_skippedCyclesEvaluator();
+    init_certificateEvaluators();
+    init_surveyEvaluators();
+    init_defectEvaluators();
     PmsAlertEngine = class {
       isRunning = false;
       intervalId = null;
@@ -27117,6 +28248,13 @@ var init_pmsAlertEngine = __esm({
           overdueAlerts: 0,
           lowSpareAlerts: 0,
           skippedCycleAlerts: 0,
+          certExpiringAlerts: 0,
+          certExpiredAlerts: 0,
+          surveyDueSoonAlerts: 0,
+          surveyWindowClosingAlerts: 0,
+          surveyOverdueAlerts: 0,
+          defectOverdueAlerts: 0,
+          defectCocAlerts: 0,
           totalCreated: 0
         };
         try {
@@ -27171,8 +28309,107 @@ var init_pmsAlertEngine = __esm({
               console.error("[PmsAlertEngine] UC3 evaluation failed:", err);
             }
           }
-          results.totalCreated = results.overdueAlerts + results.lowSpareAlerts + results.skippedCycleAlerts;
-          console.log(`[PmsAlertEngine] Scan complete: UC1=${results.overdueAlerts}, UC2=${results.lowSpareAlerts}, UC3=${results.skippedCycleAlerts}, total=${results.totalCreated}`);
+          const certPolicy = policyMap.get("certificate_expiration");
+          const certExpiredPolicy = policyMap.get("certificate_expired");
+          if (certPolicy || certExpiredPolicy) {
+            try {
+              const certRepo = await Promise.resolve().then(() => (init_certificateRepository(), certificateRepository_exports));
+              const certRows = await certRepo.getAllVesselCertificateData() || [];
+              const liveCertRows = certRows.filter((r) => r.isDeleted !== true);
+              const masterIds = Array.from(new Set(liveCertRows.map((r) => r.masterId).filter(Boolean)));
+              const masters = masterIds.length ? await certRepo.getMasterCertificatesByIds(masterIds) : [];
+              const nameByMasterId = /* @__PURE__ */ new Map();
+              for (const m of masters) nameByMasterId.set(m.masterId, m.certificateName);
+              if (certPolicy) {
+                const alerts = evaluateCertificateExpiring(liveCertRows, certPolicy, existingDedupeKeys, nameByMasterId);
+                for (const alert of alerts) {
+                  await this.createAlertEvent(certPolicy, alert);
+                  existingDedupeKeys.add(alert.dedupeKey);
+                }
+                results.certExpiringAlerts = alerts.length;
+              }
+              if (certExpiredPolicy) {
+                const alerts = evaluateCertificateExpired(liveCertRows, certExpiredPolicy, existingDedupeKeys, nameByMasterId);
+                for (const alert of alerts) {
+                  await this.createAlertEvent(certExpiredPolicy, alert);
+                  existingDedupeKeys.add(alert.dedupeKey);
+                }
+                results.certExpiredAlerts = alerts.length;
+              }
+            } catch (err) {
+              console.error("[PmsAlertEngine] Certificate evaluation failed:", err);
+            }
+          }
+          const surveyDueSoonPolicy = policyMap.get("survey_due_soon");
+          const surveyWindowPolicy = policyMap.get("survey_window_closing");
+          const surveyOverduePolicy = policyMap.get("survey_overdue");
+          if (surveyDueSoonPolicy || surveyWindowPolicy || surveyOverduePolicy) {
+            try {
+              const surveyRepo = await Promise.resolve().then(() => (init_surveyRepository(), surveyRepository_exports));
+              const surveyRows = await surveyRepo.getAllVesselSurveyData() || [];
+              const liveSurveyRows = surveyRows.filter((r) => r.isDeleted !== true);
+              const masterIds = Array.from(new Set(liveSurveyRows.map((r) => r.masterId).filter(Boolean)));
+              const masters = masterIds.length ? await surveyRepo.getMasterSurveysByIds(masterIds) : [];
+              const nameByMasterId = /* @__PURE__ */ new Map();
+              for (const m of masters) nameByMasterId.set(m.masterId, m.surveyName);
+              if (surveyDueSoonPolicy) {
+                const alerts = evaluateSurveyDueSoon(liveSurveyRows, surveyDueSoonPolicy, existingDedupeKeys, nameByMasterId);
+                for (const alert of alerts) {
+                  await this.createAlertEvent(surveyDueSoonPolicy, alert);
+                  existingDedupeKeys.add(alert.dedupeKey);
+                }
+                results.surveyDueSoonAlerts = alerts.length;
+              }
+              if (surveyWindowPolicy) {
+                const alerts = evaluateSurveyWindowClosing(liveSurveyRows, surveyWindowPolicy, existingDedupeKeys, nameByMasterId);
+                for (const alert of alerts) {
+                  await this.createAlertEvent(surveyWindowPolicy, alert);
+                  existingDedupeKeys.add(alert.dedupeKey);
+                }
+                results.surveyWindowClosingAlerts = alerts.length;
+              }
+              if (surveyOverduePolicy) {
+                const alerts = evaluateSurveyOverdue(liveSurveyRows, surveyOverduePolicy, existingDedupeKeys, nameByMasterId);
+                for (const alert of alerts) {
+                  await this.createAlertEvent(surveyOverduePolicy, alert);
+                  existingDedupeKeys.add(alert.dedupeKey);
+                }
+                results.surveyOverdueAlerts = alerts.length;
+              }
+            } catch (err) {
+              console.error("[PmsAlertEngine] Survey evaluation failed:", err);
+            }
+          }
+          const defectOverduePolicy = policyMap.get("defect_overdue");
+          const defectCocPolicy = policyMap.get("defect_coc");
+          if (defectOverduePolicy || defectCocPolicy) {
+            try {
+              const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+              const defects2 = await storage2.getDefects() || [];
+              if (defectOverduePolicy) {
+                const alerts = evaluateDefectOverdue(defects2, defectOverduePolicy, existingDedupeKeys);
+                for (const alert of alerts) {
+                  await this.createAlertEvent(defectOverduePolicy, alert);
+                  existingDedupeKeys.add(alert.dedupeKey);
+                }
+                results.defectOverdueAlerts = alerts.length;
+              }
+              if (defectCocPolicy) {
+                const alerts = evaluateDefectCoc(defects2, defectCocPolicy, existingDedupeKeys);
+                for (const alert of alerts) {
+                  await this.createAlertEvent(defectCocPolicy, alert);
+                  existingDedupeKeys.add(alert.dedupeKey);
+                }
+                results.defectCocAlerts = alerts.length;
+              }
+            } catch (err) {
+              console.error("[PmsAlertEngine] Defect evaluation failed:", err);
+            }
+          }
+          results.totalCreated = results.overdueAlerts + results.lowSpareAlerts + results.skippedCycleAlerts + results.certExpiringAlerts + results.certExpiredAlerts + results.surveyDueSoonAlerts + results.surveyWindowClosingAlerts + results.surveyOverdueAlerts + results.defectOverdueAlerts + results.defectCocAlerts;
+          console.log(
+            `[PmsAlertEngine] Scan complete: UC1=${results.overdueAlerts}, UC2=${results.lowSpareAlerts}, UC3=${results.skippedCycleAlerts}, certExpiring=${results.certExpiringAlerts}, certExpired=${results.certExpiredAlerts}, surveyDueSoon=${results.surveyDueSoonAlerts}, surveyWindowClosing=${results.surveyWindowClosingAlerts}, surveyOverdue=${results.surveyOverdueAlerts}, defectOverdue=${results.defectOverdueAlerts}, defectCoc=${results.defectCocAlerts}, total=${results.totalCreated}`
+          );
         } catch (error) {
           console.error("[PmsAlertEngine] Scan failed:", error);
         }
@@ -27497,17 +28734,17 @@ var init_alertEngine = __esm({
 init_externalApi();
 import "dotenv/config";
 import express2 from "express";
-import fs10 from "fs";
-import path13 from "path";
+import fs9 from "fs";
+import path12 from "path";
 
 // server/routes.ts
 init_storage();
 import { createServer } from "http";
-import * as fs7 from "fs";
-import * as path9 from "path";
+import * as fs6 from "fs";
+import * as path8 from "path";
 
 // server/modules/index.ts
-import { Router as Router24 } from "express";
+import { Router as Router26 } from "express";
 
 // server/modules/vessels/routes.ts
 init_middleware();
@@ -28209,29 +29446,47 @@ async function initMockAuthRankId() {
     `\u2705 Mock auth resolves rank_name per-request (x-rank header \u2192 body.rank \u2192 "${DEFAULT_MOCK_RANK_NAME}")`
   );
 }
+function readForwardedHeader(req, name) {
+  const raw = req.headers[name];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== "string" || !value.trim()) return void 0;
+  try {
+    const decoded = decodeURIComponent(value).trim();
+    return decoded || void 0;
+  } catch {
+    return value.trim();
+  }
+}
 var mockAuthMiddleware = (req, res, next) => {
   const headerRankRaw = req.headers["x-rank"];
   const headerRank = Array.isArray(headerRankRaw) ? headerRankRaw[0] : headerRankRaw;
   const body = req.body && typeof req.body === "object" ? req.body : null;
   const bodyRank = body && typeof body.rank === "string" ? body.rank : void 0;
   const resolvedRank = typeof headerRank === "string" && headerRank.trim() || bodyRank && bodyRank.trim() || DEFAULT_MOCK_RANK_NAME;
+  const fwdId = readForwardedHeader(req, "x-user-id");
+  const fwdName = readForwardedHeader(req, "x-user-name");
+  const fwdEmail = readForwardedHeader(req, "x-user-email");
+  const fwdType = readForwardedHeader(req, "x-user-type");
+  const fwdRole = readForwardedHeader(req, "x-user-role");
   req.user = {
     id: 1,
     username: "sail_admin",
-    fullName: "Sail Administrator",
+    fullName: fwdName || "Sail Administrator",
     firstname: "Sail",
     lastname: "Administrator",
-    email: "admin@seafarer.com",
+    email: fwdEmail || "admin@seafarer.com",
     role: "Sail Admin",
+    // RBAC mock — unchanged in Phase 0 (frontend reads the real role independently)
     vesselId: null,
     isActive: true,
-    userUuid: "00000000-0000-0000-0000-000000000001",
+    userUuid: fwdId || "00000000-0000-0000-0000-000000000001",
     crewDesignation: "Marine Manager",
     rank_name: resolvedRank,
-    userType: "Office",
+    userType: fwdType || "Office",
     createdAt: /* @__PURE__ */ new Date(),
     updatedAt: /* @__PURE__ */ new Date()
   };
+  if (fwdRole) req.user.forwardedRole = fwdRole;
   next();
 };
 
@@ -28303,8 +29558,8 @@ async function findByCodeAndVessel(componentCode, vesselId) {
 async function update(id, data) {
   return storage.updateComponent(id, data);
 }
-async function remove(id) {
-  return storage.deleteComponent(id);
+async function createAuditLog(data) {
+  return storage.createAuditLog(data);
 }
 async function inactivate(id, vesselId, userId) {
   return storage.inactivateComponent(id, vesselId, userId);
@@ -28396,17 +29651,20 @@ async function updateSortOrder(updates) {
 async function updateHierarchyAndSortOrder(sortUpdates, reparents) {
   const { pool: pool2 } = getPostgresClient();
   const client = await pool2.connect();
+  const reparentAudits = [];
   try {
     await client.query("BEGIN");
     for (const rp of reparents) {
       const componentResult = await client.query(
-        `SELECT component_code FROM components WHERE cuuid = $1`,
+        `SELECT component_code, parent_id, vessel_id FROM components WHERE cuuid = $1`,
         [rp.id]
       );
       if (componentResult.rows.length === 0) {
         throw new Error(`Component not found: ${rp.id}`);
       }
       const movingCode = componentResult.rows[0].component_code;
+      const oldParent = componentResult.rows[0].parent_id ?? null;
+      const movingVesselId = componentResult.rows[0].vessel_id ?? null;
       let checkParent = rp.newParentCode;
       const visited = /* @__PURE__ */ new Set();
       while (checkParent) {
@@ -28428,6 +29686,7 @@ async function updateHierarchyAndSortOrder(sortUpdates, reparents) {
       if ((reparentResult.rowCount ?? 0) === 0) {
         throw new Error(`Reparent update matched 0 rows for component cuuid: ${rp.id}`);
       }
+      reparentAudits.push({ cuuid: rp.id, componentCode: movingCode, vesselId: movingVesselId, oldParent, newParent: rp.newParentCode });
     }
     for (const update6 of sortUpdates) {
       await client.query(
@@ -28436,6 +29695,21 @@ async function updateHierarchyAndSortOrder(sortUpdates, reparents) {
       );
     }
     await client.query("COMMIT");
+    for (const a of reparentAudits) {
+      try {
+        await storage.createAuditLog({
+          entityType: "component",
+          entityId: a.cuuid,
+          actionType: "reparent",
+          source: "web_ui",
+          vesselCode: a.vesselId,
+          componentCode: a.componentCode,
+          payload: { componentCode: a.componentCode, parentId: { old: a.oldParent, new: a.newParent } }
+        });
+      } catch (auditErr) {
+        console.error("[Audit] component reparent log failed:", auditErr);
+      }
+    }
     return { success: true, updated: sortUpdates.length, reparented: reparents.length };
   } catch (error) {
     await client.query("ROLLBACK");
@@ -28477,7 +29751,86 @@ init_errors();
 init_schema();
 init_db();
 import { eq as eq4, and as and3, ilike as ilike2 } from "drizzle-orm";
+
+// shared/utils/sfiCode.ts
+function stripSFISuffix2(sfiCode) {
+  return sfiCode.replace(/\([^)]*\)$/, "").trim();
+}
+function validateSFICode(sfiCode) {
+  const cleanCode = stripSFISuffix2(sfiCode);
+  const dottedPattern = /^[0-9]{1,3}(\.[0-9]{1,3})*$/;
+  const undottedPattern = /^[0-9]{1,9}$/;
+  return dottedPattern.test(cleanCode) || undottedPattern.test(cleanCode);
+}
+
+// server/modules/components/services/componentService.ts
 var ALLOWED_DEPARTMENTS = ["Engine", "Deck", "Electrical", "Galley", "LSA", "FFA"];
+var SFI_FORMAT_HINT = "Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.";
+async function validateParentComponentCode(componentCode, parentCode, vesselId) {
+  const code = typeof componentCode === "string" ? componentCode.trim() : "";
+  const parent = typeof parentCode === "string" ? parentCode.trim() : "";
+  if (!parent) {
+    return;
+  }
+  if (!validateSFICode(parent)) {
+    throw new ValidationError(
+      `Invalid Parent Component Code format '${parent}'. ${SFI_FORMAT_HINT}`
+    );
+  }
+  if (code && code.toUpperCase() === parent.toUpperCase()) {
+    throw new ValidationError(
+      `Component Code and Parent Component Code are both '${code}'. A component cannot be its own parent.`
+    );
+  }
+  if (vesselId) {
+    const parentExists = await findByCodeAndVessel(parent, vesselId);
+    if (!parentExists) {
+      throw new ValidationError(
+        `Parent Component Code '${parent}' does not exist in the vessel's component register. Cannot create a component without a valid parent.`
+      );
+    }
+  }
+}
+var AUDIT_TRACKED_FIELDS = [
+  "name",
+  "componentCode",
+  "critical",
+  "isActive",
+  "parentId",
+  "parentComponent",
+  "componentCategory",
+  "category",
+  "eqptSystemDept",
+  "maker",
+  "makerCode",
+  "location"
+];
+function buildComponentChangedFields(oldRow, newRow) {
+  const changed = {};
+  for (const f of AUDIT_TRACKED_FIELDS) {
+    if (newRow == null || !(f in newRow)) continue;
+    const oldVal = oldRow?.[f] ?? null;
+    const newVal = newRow[f] ?? null;
+    if (oldVal !== newVal) changed[f] = { old: oldVal, new: newVal };
+  }
+  return changed;
+}
+async function auditComponent(params) {
+  try {
+    const c = params.component || {};
+    await createAuditLog({
+      entityType: "component",
+      entityId: c.cuuid || c.id || null,
+      actionType: params.actionType,
+      source: params.source || "web_ui",
+      vesselCode: c.vesselId ?? null,
+      componentCode: c.componentCode ?? null,
+      payload: params.payload ?? {}
+    });
+  } catch (auditErr) {
+    console.error(`[Audit] component ${params.actionType} log failed:`, auditErr);
+  }
+}
 async function getActiveComponentCategories() {
   const items = await db.select({ listValue: masterLists.listValue }).from(masterLists).where(and3(eq4(masterLists.listType, "componentCategory"), eq4(masterLists.isActive, true)));
   return items.map((i) => i.listValue);
@@ -28526,7 +29879,7 @@ async function getById(id) {
 }
 async function create2(data) {
   const isParent = data.isParent === true || data.isParent === "Yes";
-  const parentOptionalKeys = ["eqptSystemDept"];
+  const isTopLevel = stripSFISuffix2(String(data.componentCode ?? "").trim()).length === 1;
   const allMandatoryFields = [
     { key: "name", label: "Component Name" },
     { key: "componentCode", label: "Component Code" },
@@ -28535,7 +29888,10 @@ async function create2(data) {
     { key: "eqptSystemDept", label: "Equipment / System Department" },
     { key: "isActive", label: "Is Active", isBoolean: true }
   ];
-  const mandatoryFields = isParent ? allMandatoryFields.filter((f) => !parentOptionalKeys.includes(f.key)) : allMandatoryFields;
+  const optionalKeys = /* @__PURE__ */ new Set();
+  if (isParent) optionalKeys.add("eqptSystemDept");
+  if (isTopLevel) optionalKeys.add("parentId");
+  const mandatoryFields = allMandatoryFields.filter((f) => !optionalKeys.has(f.key));
   const missing = mandatoryFields.filter((f) => {
     const val = data[f.key];
     if (f.isBoolean) return val === void 0 || val === null || val === "";
@@ -28565,6 +29921,7 @@ async function create2(data) {
       );
     }
   }
+  await validateParentComponentCode(data.componentCode, data.parentId, data.vesselId);
   const effectiveRhType = data.rhCounterType || "NOT_RH_DRIVEN";
   if (data.rhCounterType || data.rhMasterComponentId) {
     if (effectiveRhType === "MASTER") {
@@ -28598,6 +29955,19 @@ async function create2(data) {
     parentId: component.parentId,
     vesselId: component.vesselId
   });
+  await auditComponent({
+    actionType: "create",
+    component,
+    payload: {
+      componentCode: component.componentCode,
+      name: component.name,
+      critical: component.critical,
+      parentId: component.parentId,
+      eqptSystemDept: component.eqptSystemDept,
+      componentCategory: component.componentCategory ?? component.category,
+      isActive: component.isActive
+    }
+  });
   return component;
 }
 async function update2(id, data, userId) {
@@ -28607,7 +29977,8 @@ async function update2(id, data, userId) {
     throw new NotFoundError("Component not found");
   }
   const effectiveIsParent = data.isParent !== void 0 ? data.isParent === true || data.isParent === "Yes" : existingComponent.isParent === true;
-  const parentOptionalKeys = ["eqptSystemDept"];
+  const effectiveComponentCode = data.componentCode !== void 0 && data.componentCode !== null && data.componentCode !== "" ? data.componentCode : existingComponent.componentCode;
+  const isTopLevel = stripSFISuffix2(String(effectiveComponentCode ?? "").trim()).length === 1;
   const allMandatoryPatchFields = [
     { key: "name", label: "Component Name" },
     { key: "componentCode", label: "Component Code" },
@@ -28616,7 +29987,10 @@ async function update2(id, data, userId) {
     { key: "eqptSystemDept", label: "Equipment / System Department" },
     { key: "isActive", label: "Is Active", isBoolean: true }
   ];
-  const mandatoryPatchFields = effectiveIsParent ? allMandatoryPatchFields.filter((f) => !parentOptionalKeys.includes(f.key)) : allMandatoryPatchFields;
+  const patchOptionalKeys = /* @__PURE__ */ new Set();
+  if (effectiveIsParent) patchOptionalKeys.add("eqptSystemDept");
+  if (isTopLevel) patchOptionalKeys.add("parentId");
+  const mandatoryPatchFields = allMandatoryPatchFields.filter((f) => !patchOptionalKeys.has(f.key));
   const invalidPatch = mandatoryPatchFields.filter((f) => {
     if (!(f.key in data)) return false;
     const val = data[f.key];
@@ -28651,6 +30025,11 @@ async function update2(id, data, userId) {
         );
       }
     }
+  }
+  if ("parentId" in data) {
+    const effectiveParent = data.parentId;
+    const effectiveVesselId = existingComponent.vesselId ?? data.vesselId;
+    await validateParentComponentCode(effectiveComponentCode, effectiveParent, effectiveVesselId);
   }
   const effectiveRhType = data.rhCounterType || existingComponent.rhCounterType || "NOT_RH_DRIVEN";
   const effectiveMasterId = data.rhMasterComponentId !== void 0 ? data.rhMasterComponentId : existingComponent.rhMasterComponentId;
@@ -28717,6 +30096,16 @@ async function update2(id, data, userId) {
     component = await update(id, data);
   }
   console.log(`\u2705 Updated component:`, component.componentCode, "| vesselId:", component.vesselId, "| parentId:", component.parentId);
+  const changedFields = buildComponentChangedFields(existingComponent, component);
+  if (Object.keys(changedFields).length > 0) {
+    const isActiveChange = changedFields.isActive;
+    const actionType = isActiveChange ? isActiveChange.new === true ? "activate" : "deactivate" : "update";
+    await auditComponent({
+      actionType,
+      component,
+      payload: { componentCode: component.componentCode, changedFields }
+    });
+  }
   return component;
 }
 async function updateSortOrder2(body) {
@@ -28737,11 +30126,17 @@ async function updateSortOrder2(body) {
   }
   return updateSortOrder(updates);
 }
-async function remove2(id) {
-  return remove(id);
-}
 async function inactivate2(id, vesselId, userId) {
-  return inactivate(id, vesselId, userId);
+  const result = await inactivate(id, vesselId, userId);
+  if (result?.success) {
+    const comp = await findById(id).catch(() => void 0);
+    await auditComponent({
+      actionType: "deactivate",
+      component: comp ?? { cuuid: id, vesselId },
+      payload: { componentCode: comp?.componentCode, isActive: { old: true, new: false } }
+    });
+  }
+  return result;
 }
 
 // server/modules/components/controllers/componentController.ts
@@ -28816,17 +30211,6 @@ async function update3(req, res) {
       return res.status(400).json({ error: "Component Code already exists for this vessel. Please use a unique code." });
     }
     res.status(500).json({ error: "Failed to update component" });
-  }
-}
-async function remove3(req, res) {
-  try {
-    await remove2(req.params.id);
-    res.json({ success: true });
-  } catch (error) {
-    if (error.message?.includes("not found")) {
-      return res.status(404).json({ error: error.message });
-    }
-    res.status(500).json({ error: "Failed to delete component" });
   }
 }
 async function inactivate3(req, res) {
@@ -29191,11 +30575,11 @@ var ObjectNotFoundError = class _ObjectNotFoundError extends Error {
     Object.setPrototypeOf(this, _ObjectNotFoundError.prototype);
   }
 };
-function parseObjectPath(path14) {
-  if (!path14.startsWith("/")) {
-    path14 = `/${path14}`;
+function parseObjectPath(path13) {
+  if (!path13.startsWith("/")) {
+    path13 = `/${path13}`;
   }
-  const pathParts = path14.split("/");
+  const pathParts = path13.split("/");
   if (pathParts.length < 3) {
     throw new Error("Invalid path: must contain at least a bucket name");
   }
@@ -29244,7 +30628,7 @@ var ObjectStorageService = class {
     const pathsStr = process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
     const paths = Array.from(
       new Set(
-        pathsStr.split(",").map((path14) => path14.trim()).filter((path14) => path14.length > 0)
+        pathsStr.split(",").map((path13) => path13.trim()).filter((path13) => path13.length > 0)
       )
     );
     if (paths.length === 0) {
@@ -30069,7 +31453,6 @@ router3.post("/components/upload", upload2.single("file"), asyncHandler(upload))
 router3.get("/components", asyncHandler(listAll2));
 router3.post("/components", asyncHandler(create3));
 router3.patch("/components/:id", asyncHandler(update3));
-router3.delete("/components/:id", asyncHandler(remove3));
 router3.post("/components/:id/inactivate", asyncHandler(inactivate3));
 router3.get("/component-documents/:componentId", requireAuth, asyncHandler(listDocuments2));
 router3.post("/component-documents", requirePMSAdmin, upload2.single("file"), asyncHandler(createDocument3));
@@ -30115,7 +31498,7 @@ async function create4(data) {
 async function update4(id, data) {
   return storage.updateJob(id, data);
 }
-async function remove4(id) {
+async function remove3(id) {
   return storage.deleteJob(id);
 }
 async function findJobComponentLinks(vesselId) {
@@ -30154,7 +31537,7 @@ async function findMaintenanceHistoryByJobId(jobId) {
 async function findMaintenanceHistoryByJobCode(jobNo) {
   return storage.getMaintenanceHistoryByJobCode(jobNo);
 }
-async function createAuditLog(data) {
+async function createAuditLog2(data) {
   return storage.createAuditLog(data);
 }
 
@@ -30337,7 +31720,7 @@ async function createJob(body) {
     };
     if (!userProvidedLastDoneRH && component) {
       try {
-        await createAuditLog({
+        await createAuditLog2({
           timestamp: (/* @__PURE__ */ new Date()).toISOString(),
           userId: "system",
           vesselCode: jobData.vesselId || "",
@@ -30485,7 +31868,7 @@ async function updateJob(id, body) {
   return job;
 }
 async function deleteJob(id) {
-  await remove4(id);
+  await remove3(id);
 }
 async function inactivateJob(id, vesselId) {
   const job = await findById2(id);
@@ -32717,7 +34100,7 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
     console.error("[FieldLogger] WO reviewerApprove:", err);
   }
   try {
-    await createAuditLog2({
+    await createAuditLog3({
       entityType: "work_order",
       entityId: existingWO2.wouuid || workOrderId,
       actionType: "reviewer_approve",
@@ -32798,7 +34181,7 @@ async function reviewerReopen(workOrderId, reviewerComments, reviewedByUuid) {
     console.error("[FieldLogger] WO reviewerReopen:", err);
   }
   try {
-    await createAuditLog2({
+    await createAuditLog3({
       entityType: "work_order",
       entityId: existingWO2.wouuid || workOrderId,
       actionType: "reviewer_reopen",
@@ -32873,7 +34256,7 @@ async function bulkReject(workOrderIds, approver, rejectionComments, actor) {
         console.error("[FieldLogger] WO bulkReject:", err);
       }
       try {
-        await createAuditLog2({
+        await createAuditLog3({
           entityType: "work_order",
           entityId: existingWO2.wouuid || workOrderId,
           actionType: "reject",
@@ -33000,6 +34383,19 @@ async function autoGenerate(vesselId) {
         } catch (logErr) {
           console.error("[FieldLogger] autoGenerate WO insert:", logErr);
         }
+        try {
+          await createAuditLog3({
+            entityType: "work_order",
+            entityId: createdWO.wouuid,
+            actionType: "create",
+            source: "auto-generation",
+            vesselCode: createdWO.vesselId || null,
+            componentCode: createdWO.componentCode || null,
+            payload: { workOrderNo: createdWO.workOrderNo, status: createdWO.status, generated: true }
+          });
+        } catch (auditErr) {
+          console.error("[Audit] autoGenerate WO create log failed:", auditErr);
+        }
         results.generated++;
         results.workOrders.push(createdWO);
         activeWorkOrderKeys.add(workOrderKey);
@@ -33065,6 +34461,19 @@ async function autoGenerate(vesselId) {
           await logFieldChanges2("work_orders", createdWO.wouuid, createdWO.vesselId || null, null, woForLog, "auto-generation");
         } catch (logErr) {
           console.error("[FieldLogger] autoGenerate WO insert:", logErr);
+        }
+        try {
+          await createAuditLog3({
+            entityType: "work_order",
+            entityId: createdWO.wouuid,
+            actionType: "create",
+            source: "auto-generation",
+            vesselCode: createdWO.vesselId || null,
+            componentCode: createdWO.componentCode || null,
+            payload: { workOrderNo: createdWO.workOrderNo, status: createdWO.status, generated: true }
+          });
+        } catch (auditErr) {
+          console.error("[Audit] autoGenerate WO create log failed:", auditErr);
         }
         results.generated++;
         results.workOrders.push(createdWO);
@@ -34169,9 +35578,12 @@ async function editPostponeRequest2(req, res) {
 async function approvePostponement2(req, res) {
   try {
     const actor = resolveActorIdentity(req);
+    const authReq = req;
     const result = await approvePostponement(req.params.id, {
       ...req.body,
-      approvedBy: actor || req.body.approvedBy || "Office"
+      approvedBy: actor || req.body.approvedBy || "Office",
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role
     });
     res.json(result);
   } catch (error) {
@@ -34183,9 +35595,12 @@ async function approvePostponement2(req, res) {
 async function rejectPostponement2(req, res) {
   try {
     const actor = resolveActorIdentity(req);
+    const authReq = req;
     const result = await rejectPostponement(req.params.id, {
       ...req.body,
-      approvedBy: actor || req.body.approvedBy || "Office"
+      approvedBy: actor || req.body.approvedBy || "Office",
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role
     });
     res.json(result);
   } catch (error) {
@@ -34193,6 +35608,16 @@ async function rejectPostponement2(req, res) {
     if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
     throw error;
   }
+}
+async function getPostponementApprovalSteps(req, res) {
+  const woId = req.params.id;
+  let wo = await storage.getWorkOrder(woId);
+  if (!wo) wo = await storage.getWorkOrderByCode(woId);
+  if (!wo) return res.status(404).json({ error: "Work order not found" });
+  const awaitingPostponement = await storage.getLatestAwaitingPostponement(wo.wouuid);
+  if (!awaitingPostponement) return res.json([]);
+  const steps = await storage.getWoPostponementApprovalSteps(awaitingPostponement.id);
+  res.json(steps);
 }
 async function getExecutions2(req, res) {
   const result = await getExecutions(req.params.componentId);
@@ -34638,6 +36063,7 @@ router5.post(
   requireRole(["Office", "PMS Admin", "Sail Admin"]),
   asyncHandler(rejectPostponement2)
 );
+router5.get("/work-orders/:id/postpone-approval-steps", asyncHandler(getPostponementApprovalSteps));
 router5.get("/work-order-executions/:componentId", asyncHandler(getExecutions2));
 router5.get("/work-order-executions/details/:id", asyncHandler(getExecution2));
 router5.post("/work-order-executions", asyncHandler(createExecution3));
@@ -37762,107 +39188,8 @@ var routes_default9 = router9;
 init_middleware();
 import { Router as Router10 } from "express";
 
-// server/modules/cert-surveys/repositories/certificateRepository.ts
-init_postgresClient();
-init_schema();
-import { eq as eq13, and as and10, asc as asc4, inArray as inArray4, or as or3, isNull as isNull3, sql as sql8 } from "drizzle-orm";
-function getDb3() {
-  const postgres = getPostgresClient();
-  if (!postgres) return null;
-  return postgres.db;
-}
-async function getApplicableCertificates() {
-  const db2 = await getDb3();
-  if (!db2) return null;
-  return db2.select().from(vesselCertificateApplicability).where(
-    and10(
-      eq13(vesselCertificateApplicability.isApplicable, true),
-      or3(eq13(vesselCertificateApplicability.isDeleted, false), isNull3(vesselCertificateApplicability.isDeleted))
-    )
-  );
-}
-async function getMasterCertificatesByIds(masterIds) {
-  const db2 = await getDb3();
-  if (!db2) return null;
-  return db2.select().from(shipCertificatesMaster).where(
-    and10(
-      inArray4(shipCertificatesMaster.masterId, masterIds),
-      eq13(shipCertificatesMaster.isActive, true),
-      or3(eq13(shipCertificatesMaster.isDeleted, false), isNull3(shipCertificatesMaster.isDeleted))
-    )
-  ).orderBy(asc4(shipCertificatesMaster.companySequence));
-}
-async function getAllVesselCertificateData() {
-  const db2 = await getDb3();
-  if (!db2) return null;
-  return db2.select().from(vesselCertificateData).where(
-    or3(eq13(vesselCertificateData.isDeleted, false), isNull3(vesselCertificateData.isDeleted))
-  );
-}
-async function getCertificateApplicability(vesselId, masterId) {
-  const db2 = await getDb3();
-  if (!db2) return null;
-  return db2.select().from(vesselCertificateApplicability).where(
-    and10(
-      eq13(vesselCertificateApplicability.vesselId, vesselId),
-      eq13(vesselCertificateApplicability.masterId, masterId),
-      eq13(vesselCertificateApplicability.isApplicable, true),
-      or3(eq13(vesselCertificateApplicability.isDeleted, false), isNull3(vesselCertificateApplicability.isDeleted))
-    )
-  ).limit(1);
-}
-async function getMasterCertificateById(masterId) {
-  const db2 = await getDb3();
-  if (!db2) return null;
-  return db2.select().from(shipCertificatesMaster).where(
-    and10(
-      eq13(shipCertificatesMaster.masterId, masterId),
-      eq13(shipCertificatesMaster.isActive, true),
-      or3(eq13(shipCertificatesMaster.isDeleted, false), isNull3(shipCertificatesMaster.isDeleted))
-    )
-  ).limit(1);
-}
-async function getVesselCertificateDataByKey(vesselId, masterId) {
-  const db2 = await getDb3();
-  if (!db2) return null;
-  return db2.select().from(vesselCertificateData).where(
-    and10(
-      eq13(vesselCertificateData.vesselId, vesselId),
-      eq13(vesselCertificateData.masterId, masterId),
-      or3(eq13(vesselCertificateData.isDeleted, false), isNull3(vesselCertificateData.isDeleted))
-    )
-  ).limit(1);
-}
-async function updateCertificateData(vesselId, masterId, updateData) {
-  const db2 = await getDb3();
-  if (!db2) return null;
-  return db2.update(vesselCertificateData).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(
-    and10(
-      eq13(vesselCertificateData.vesselId, vesselId),
-      eq13(vesselCertificateData.masterId, masterId),
-      or3(eq13(vesselCertificateData.isDeleted, false), isNull3(vesselCertificateData.isDeleted))
-    )
-  ).returning();
-}
-async function insertCertificateData(data) {
-  const db2 = await getDb3();
-  if (!db2) return null;
-  const inserted = await db2.insert(vesselCertificateData).values(data).onConflictDoNothing({
-    target: [vesselCertificateData.vesselId, vesselCertificateData.masterId],
-    where: sql8`${vesselCertificateData.isDeleted} = false`
-  }).returning();
-  if (inserted.length > 0) return inserted;
-  const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
-  return db2.update(vesselCertificateData).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(
-    and10(
-      eq13(vesselCertificateData.vesselId, vesselId),
-      eq13(vesselCertificateData.masterId, masterId),
-      or3(eq13(vesselCertificateData.isDeleted, false), isNull3(vesselCertificateData.isDeleted))
-    )
-  ).returning();
-}
-
 // server/modules/cert-surveys/services/certificateService.ts
+init_certificateRepository();
 init_sync();
 async function getCertificates(filters) {
   const page = filters.page || 1;
@@ -38218,94 +39545,8 @@ async function updateCertificate2(req, res) {
   }
 }
 
-// server/modules/cert-surveys/repositories/surveyRepository.ts
-init_postgresClient();
-init_storage();
-init_schema();
-import { eq as eq14, and as and11, asc as asc5, inArray as inArray5, or as or4, sql as sql9 } from "drizzle-orm";
-function getDb4() {
-  const postgres = getPostgresClient();
-  if (!postgres) return null;
-  return postgres.db;
-}
-async function getApplicableSurveys() {
-  const db2 = await getDb4();
-  if (!db2) return null;
-  return db2.select().from(vesselSurveyApplicability).where(and11(
-    eq14(vesselSurveyApplicability.isApplicable, true),
-    or4(eq14(vesselSurveyApplicability.isDeleted, false), sql9`${vesselSurveyApplicability.isDeleted} IS NULL`)
-  ));
-}
-async function getMasterSurveysByIds(masterIds) {
-  const db2 = await getDb4();
-  if (!db2) return null;
-  return db2.select().from(shipSurveysMaster).where(and11(
-    inArray5(shipSurveysMaster.masterId, masterIds),
-    eq14(shipSurveysMaster.isDeleted, false),
-    eq14(shipSurveysMaster.isActive, true)
-  )).orderBy(asc5(shipSurveysMaster.companySequence));
-}
-async function getAllVesselSurveyData() {
-  const db2 = await getDb4();
-  if (!db2) return null;
-  return db2.select().from(vesselSurveyData);
-}
-async function getSurveyApplicabilityByKey(vesselId, masterId) {
-  const db2 = await getDb4();
-  if (!db2) return null;
-  return db2.select().from(vesselSurveyApplicability).where(
-    and11(
-      eq14(vesselSurveyApplicability.vesselId, vesselId),
-      eq14(vesselSurveyApplicability.masterId, masterId)
-    )
-  ).limit(1);
-}
-async function getVesselSurveyDataByKey(vesselId, masterId) {
-  const db2 = await getDb4();
-  if (!db2) return null;
-  return db2.select().from(vesselSurveyData).where(
-    and11(
-      eq14(vesselSurveyData.vesselId, vesselId),
-      eq14(vesselSurveyData.masterId, masterId)
-    )
-  ).limit(1);
-}
-async function updateSurveyData(vesselId, masterId, updateData) {
-  const db2 = await getDb4();
-  if (!db2) return null;
-  return db2.update(vesselSurveyData).set(updateData).where(
-    and11(
-      eq14(vesselSurveyData.vesselId, vesselId),
-      eq14(vesselSurveyData.masterId, masterId)
-    )
-  ).returning();
-}
-async function insertSurveyData(data) {
-  const db2 = await getDb4();
-  if (!db2) return null;
-  const inserted = await db2.insert(vesselSurveyData).values(data).onConflictDoNothing({
-    target: [vesselSurveyData.vesselId, vesselSurveyData.masterId]
-  }).returning();
-  if (inserted.length > 0) return inserted;
-  const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
-  return db2.update(vesselSurveyData).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(
-    and11(
-      eq14(vesselSurveyData.vesselId, vesselId),
-      eq14(vesselSurveyData.masterId, masterId)
-    )
-  ).returning();
-}
-async function getSurveys() {
-  return storage.getSurveys();
-}
-async function getSurvey(id) {
-  return storage.getSurvey(id);
-}
-async function createSurvey(data) {
-  return storage.createSurvey(data);
-}
-
 // server/modules/cert-surveys/services/surveyService.ts
+init_surveyRepository();
 init_sync();
 async function initializeSurveys() {
   const existingSurveys = await getSurveys();
@@ -40104,9 +41345,6 @@ async function createFleetScopedComponent(data) {
 async function updateFleetScopedComponent(id, data) {
   return storage.updateFleetScopedComponent(id, data);
 }
-async function deleteFleetScopedComponent(id) {
-  return storage.deleteFleetScopedComponent(id);
-}
 async function updateComponentSortOrder(updates) {
   const pool2 = await getPool();
   for (const update6 of updates) {
@@ -40232,10 +41470,6 @@ async function updateFleetScopedComponent2(id, body) {
   const partialComponentSchema = insertComponentSchema.partial();
   const validatedData = partialComponentSchema.parse(body);
   return updateFleetScopedComponent(id, validatedData);
-}
-async function deleteFleetScopedComponent2(id) {
-  await deleteFleetScopedComponent(id);
-  return { success: true };
 }
 async function updateComponentSortOrder2(body) {
   const sortOrderSchema = z4.object({
@@ -40754,21 +41988,6 @@ async function updateFleetScopedComponent3(req, res) {
     }
     console.error("Error updating fleet component:", error);
     res.status(500).json({ error: "Failed to update fleet component" });
-  }
-}
-async function deleteFleetScopedComponent3(req, res) {
-  try {
-    const result = await deleteFleetScopedComponent2(req.params.id);
-    res.json(result);
-  } catch (error) {
-    if (error.message?.includes("not found")) {
-      return res.status(404).json({ error: error.message });
-    }
-    if (error.message?.includes("with child components")) {
-      return res.status(400).json({ error: error.message });
-    }
-    console.error("Error deleting fleet component:", error);
-    res.status(500).json({ error: "Failed to delete fleet component" });
   }
 }
 async function updateComponentSortOrder3(req, res) {
@@ -43100,7 +44319,6 @@ router11.get("/fleet/components", asyncHandler(getFleetScopedComponents3));
 router11.get("/fleet/components/:id", asyncHandler(getFleetScopedComponent3));
 router11.post("/fleet/components", asyncHandler(createFleetScopedComponent3));
 router11.patch("/fleet/components/:id", asyncHandler(updateFleetScopedComponent3));
-router11.delete("/fleet/components/:id", asyncHandler(deleteFleetScopedComponent3));
 router11.get("/fleet/jobs/export", asyncHandler(exportFleetJobs2));
 router11.get("/fleet/jobs", asyncHandler(getFleetJobs3));
 router11.get("/fleet/jobs/:id", asyncHandler(getFleetJob3));
@@ -52553,14 +53771,23 @@ async function createChangeRequest(request) {
 async function updateChangeRequest(id, data) {
   return storage.updateChangeRequest(id, data);
 }
-async function approveChangeRequest(id, reviewerId, comment) {
-  return storage.approveChangeRequest(id, reviewerId, comment);
+async function approveChangeRequest(id, reviewerId, comment, role) {
+  return storage.approveChangeRequest(id, reviewerId, comment, role);
 }
 async function getAuditLogsByEntity2(entityType, entityId) {
   return storage.getAuditLogsByEntity(entityType, entityId);
 }
-async function rejectChangeRequest(id, reviewerId, comment) {
-  return storage.rejectChangeRequest(id, reviewerId, comment);
+async function rejectChangeRequest(id, reviewerId, comment, role) {
+  return storage.rejectChangeRequest(id, reviewerId, comment, role);
+}
+async function getChangeRequestApprovalSteps(changeRequestId) {
+  return storage.getChangeRequestApprovalSteps(changeRequestId);
+}
+async function createChangeRequestApprovalStep(step) {
+  return storage.createChangeRequestApprovalStep(step);
+}
+async function getApprovalWorkflowConfig() {
+  return storage.getApprovalWorkflowConfig();
 }
 async function getChangeRequestComments(changeRequestId) {
   return storage.getChangeRequestComments(changeRequestId);
@@ -52812,10 +54039,14 @@ async function getTargetEntity(targetType, targetId) {
   return { entity, fieldValues, targetType, targetId: resolvedTargetId };
 }
 async function getChangeRequests3(query) {
-  const { vesselId, status, category, requestedBy, periodFrom, periodTo } = query;
+  const { vesselId, status, category, requestedBy, periodFrom, periodTo, pendingForApprover } = query;
   const filters = {};
   if (vesselId) {
     filters.vesselId = vesselId;
+  }
+  if (pendingForApprover) {
+    filters.pendingForApprover = pendingForApprover;
+    return getChangeRequests2(filters);
   }
   let requests = await getChangeRequests2(filters);
   if (status) {
@@ -52867,19 +54098,27 @@ async function createChangeRequest2(body) {
       console.log(`[CR_CREATE] Resolved target_id from "${validatedData.targetId}" to UUID "${resolvedTargetId}"`);
     }
   }
+  const submitAfterCreate = validatedData.status === "submitted";
   const requestData = {
     ...validatedData,
     vesselId: validatedData.vesselId,
     targetId: resolvedTargetId,
-    status: validatedData.status || "draft",
+    status: "draft",
     requestedByUserId: validatedData.requestedByUserId || "system"
   };
-  return createChangeRequest(requestData);
+  const created = await createChangeRequest(requestData);
+  if (submitAfterCreate) {
+    return submitChangeRequestWorkflow(created.id, validatedData.requestedByUserId || "system");
+  }
+  return created;
 }
 async function updateStatus(id, body) {
   const { status, reviewedByUserId } = body;
   if (!VALID_STATUSES.includes(status)) {
     throw new ValidationError("Invalid status");
+  }
+  if (status === "submitted") {
+    return submitChangeRequestWorkflow(id, reviewedByUserId || "system");
   }
   return updateChangeRequest(id, {
     status,
@@ -52887,8 +54126,117 @@ async function updateStatus(id, body) {
     reviewedAt: /* @__PURE__ */ new Date()
   });
 }
+async function submitChangeRequestWorkflow(id, userId) {
+  const cr = await getChangeRequest(id);
+  if (!cr) throw new NotFoundError("Change request not found");
+  if (cr.status !== "draft" && cr.status !== "returned") {
+    throw new ValidationError(`Cannot submit a change request with status '${cr.status}'. Only draft or returned CRs can be submitted.`);
+  }
+  let equipmentClassification = "unknown";
+  let spareClassification = "unknown";
+  let jobClassification = "unknown";
+  if (cr.targetType === "component" && cr.targetId) {
+    const component = await getComponent3(cr.targetId);
+    if (component) {
+      const isCritical = component.critical === true || component.classItem === true;
+      equipmentClassification = isCritical ? "critical" : "normal";
+    }
+  }
+  if (cr.targetType === "spare" && cr.targetId) {
+    const spare = await getSpare5(cr.targetId);
+    if (spare) {
+      const isCritical = spare.critical === "Critical" || spare.critical === "Yes";
+      spareClassification = isCritical ? "critical" : "normal";
+    }
+  }
+  if (cr.targetType === "job" && cr.targetId) {
+    const job = await getJob4(cr.targetId);
+    if (job) {
+      let isOnCriticalEquipment = false;
+      if (job.componentId) {
+        const comp = await getComponent3(job.componentId);
+        isOnCriticalEquipment = comp?.critical === true;
+      }
+      if (isOnCriticalEquipment) {
+        jobClassification = "criticalEquipment";
+      } else if (job.criticality === "Yes") {
+        jobClassification = "critical";
+      } else {
+        jobClassification = "normal";
+      }
+    }
+  }
+  let level1Enabled = false;
+  let level2Enabled = false;
+  if (cr.targetType === "spare" && spareClassification !== "unknown") {
+    const allConfigs = await getApprovalWorkflowConfig();
+    const variableName = spareClassification === "critical" ? "Critical Spares" : "Normal Spares";
+    const config = allConfigs.find(
+      (c) => c.functionId === "pms-spares-cr" && c.variableName === variableName && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
+  } else if (cr.targetType === "store") {
+    const allConfigs = await getApprovalWorkflowConfig();
+    const config = allConfigs.find(
+      (c) => c.functionId === "pms-stores-cr" && c.variableName === "Store Items" && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
+  } else if (cr.targetType === "job" && jobClassification !== "unknown") {
+    const allConfigs = await getApprovalWorkflowConfig();
+    const variableName = jobClassification === "criticalEquipment" ? "Critical Equipment Jobs" : jobClassification === "critical" ? "Critical Jobs" : "Normal Jobs";
+    const config = allConfigs.find(
+      (c) => c.functionId === "pms-jobs-cr" && c.variableName === variableName && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
+  } else if (equipmentClassification !== "unknown") {
+    const allConfigs = await getApprovalWorkflowConfig();
+    const variableName = equipmentClassification === "normal" ? "Normal Equipment" : "Critical Equipment";
+    const config = allConfigs.find(
+      (c) => c.functionId === "pms-components-cr" && c.variableName === variableName && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
+  }
+  const snapshot = cr.targetType === "spare" ? { level1Enabled, level2Enabled, spareClassification } : cr.targetType === "store" ? { level1Enabled, level2Enabled, storeClassification: "standard" } : cr.targetType === "job" ? { level1Enabled, level2Enabled, jobClassification } : { level1Enabled, level2Enabled, equipmentClassification };
+  const updated = await updateChangeRequest(id, {
+    status: "submitted",
+    submittedAt: /* @__PURE__ */ new Date(),
+    requestedByUserId: userId,
+    approvalWorkflowSnapshot: snapshot
+  });
+  if (level1Enabled) {
+    await createChangeRequestApprovalStep({
+      changeRequestId: id,
+      changeRequestUuid: cr.cruuid,
+      approvalLevel: "Level 1",
+      status: "Pending"
+    });
+  }
+  if (level2Enabled) {
+    await createChangeRequestApprovalStep({
+      changeRequestId: id,
+      changeRequestUuid: cr.cruuid,
+      approvalLevel: "Level 2",
+      status: "Pending"
+    });
+  }
+  const classLabel = cr.targetType === "spare" ? spareClassification : cr.targetType === "store" ? "standard" : cr.targetType === "job" ? jobClassification : equipmentClassification;
+  console.log(`[CR_WORKFLOW] CR ${id} (${cr.targetType}) submitted \u2014 classification: ${classLabel}, L1: ${level1Enabled}, L2: ${level2Enabled}`);
+  return updated;
+}
 async function approveChangeRequest2(id, body) {
-  const { comment, reviewerId } = body;
+  const { comment, reviewerId, role } = body;
   if (!comment) {
     throw new ValidationError("Comment is required for approval");
   }
@@ -52899,19 +54247,24 @@ async function approveChangeRequest2(id, body) {
     targetId: existing?.targetId,
     proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0
   });
-  const updated = await approveChangeRequest(id, reviewerId || "reviewer", comment);
+  const updated = await approveChangeRequest(id, reviewerId || "reviewer", comment, role);
   console.log(`[CR_SERVICE] Approval complete, status: ${updated.status}`);
   return updated;
 }
 async function rejectChangeRequest2(id, body) {
-  const { comment, reviewerId } = body;
+  const { comment, reviewerId, role } = body;
   if (!comment) {
     throw new ValidationError("Comment is required for rejection");
   }
   console.log("Rejecting change request:", id, "with comment:", comment);
-  const updated = await rejectChangeRequest(id, reviewerId || "reviewer", comment);
+  const updated = await rejectChangeRequest(id, reviewerId || "reviewer", comment, role);
   console.log("Successfully rejected request:", updated);
   return updated;
+}
+async function getApprovalSteps(changeRequestId) {
+  const cr = await getChangeRequest(changeRequestId);
+  if (!cr) throw new NotFoundError("Change request not found");
+  return getChangeRequestApprovalSteps(changeRequestId);
 }
 async function getRejectionHistory3(id) {
   const existing = await getChangeRequest(id);
@@ -52976,7 +54329,8 @@ async function getChangeRequests4(req, res) {
     category: req.query.category,
     requestedBy: req.query.requestedBy,
     periodFrom: req.query.periodFrom,
-    periodTo: req.query.periodTo
+    periodTo: req.query.periodTo,
+    pendingForApprover: req.query.pendingForApprover
   };
   const requests = await getChangeRequests3(query);
   res.json(requests);
@@ -52994,6 +54348,11 @@ async function updateStatus2(req, res) {
   const id = parseInt(req.params.id);
   const updated = await updateStatus(id, req.body);
   res.json(updated);
+}
+async function getApprovalSteps2(req, res) {
+  const changeRequestId = parseInt(req.params.id);
+  const steps = await getApprovalSteps(changeRequestId);
+  res.json(steps);
 }
 async function getComments2(req, res) {
   const changeRequestId = parseInt(req.params.id);
@@ -53017,12 +54376,26 @@ async function createAttachment2(req, res) {
 }
 async function approveChangeRequest3(req, res) {
   const id = parseInt(req.params.id);
-  const updated = await approveChangeRequest2(id, req.body);
+  const authReq = req;
+  const serverReviewerId = authReq.user?.userUuid || authReq.user?.username || "system";
+  const userRole = authReq.user?.role || "";
+  const updated = await approveChangeRequest2(id, {
+    comment: req.body.comment,
+    reviewerId: serverReviewerId,
+    role: userRole
+  });
   res.json(updated);
 }
 async function rejectChangeRequest3(req, res) {
   const id = parseInt(req.params.id);
-  const updated = await rejectChangeRequest2(id, req.body);
+  const authReq = req;
+  const serverReviewerId = authReq.user?.userUuid || authReq.user?.username || "system";
+  const userRole = authReq.user?.role || "";
+  const updated = await rejectChangeRequest2(id, {
+    comment: req.body.comment,
+    reviewerId: serverReviewerId,
+    role: userRole
+  });
   res.json(updated);
 }
 async function getRejectionHistory4(req, res) {
@@ -53038,6 +54411,7 @@ router13.get("/change-requests/target-entity/:targetType/:targetId", asyncHandle
 router13.get("/change-requests", asyncHandler(getChangeRequests4));
 router13.post("/change-requests", asyncHandler(createChangeRequest3));
 router13.patch("/change-requests/:id/status", asyncHandler(updateStatus2));
+router13.get("/change-requests/:id/approval-steps", asyncHandler(getApprovalSteps2));
 router13.get("/change-requests/:id/comments", asyncHandler(getComments2));
 router13.post("/change-requests/:id/comments", asyncHandler(createComment2));
 router13.get("/change-requests/:id/attachments", asyncHandler(getAttachments2));
@@ -53061,7 +54435,7 @@ import * as XLSX4 from "xlsx";
 import ExcelJS9 from "exceljs";
 import Papa2 from "papaparse";
 import { v4 as uuidv42 } from "uuid";
-import path8 from "path";
+import path7 from "path";
 import { promises as fsPromises2 } from "fs";
 import { eq as eq23, and as and20 } from "drizzle-orm";
 
@@ -53856,62 +55230,6 @@ function getComponentCategory(mainGroupCode) {
   if (!_dynamicCategoryMap) return null;
   return _dynamicCategoryMap[mainGroupCode] || null;
 }
-function getSubGroupCode(sfiCode) {
-  const cleanCode = stripSFISuffix(sfiCode);
-  const baseCode = cleanCode.split(".")[0];
-  if (baseCode.length >= 2) {
-    return baseCode.substring(0, 2);
-  }
-  return null;
-}
-function getSubGroupName(subGroupCode) {
-  const subGroupNames = {
-    // Group 7 - Systems for Machinery Main Components
-    "71": "LUBE OIL SYSTEMS",
-    "72": "COOLING SYSTEMS",
-    "73": "FUEL OIL SYSTEMS",
-    "74": "COMPRESSED AIR SYSTEMS",
-    "75": "HYDRAULIC SYSTEMS",
-    // Group 6 - Machinery Main Components
-    "61": "DIESEL ENGINES",
-    "62": "STEAM TURBINES",
-    "63": "GAS TURBINES",
-    // Group 2 - Hull
-    "21": "SHELL PLATING",
-    "22": "HULL",
-    "23": "SHELL DOORS"
-    // Add more mappings as needed
-  };
-  return subGroupNames[subGroupCode] || "UNKNOWN SUB GROUP";
-}
-function stripSFISuffix(sfiCode) {
-  return sfiCode.replace(/\([^)]*\)$/, "").trim();
-}
-function getParentSFICode(sfiCode) {
-  const cleanCode = stripSFISuffix(sfiCode);
-  const parts = cleanCode.split(".");
-  if (parts.length > 1) {
-    parts.pop();
-    return parts.join(".");
-  }
-  const baseCode = cleanCode;
-  if (baseCode.length >= 7) {
-    return baseCode.substring(0, baseCode.length - 3);
-  } else if (baseCode.length >= 4) {
-    return baseCode.substring(0, 3);
-  } else if (baseCode.length === 3) {
-    return baseCode.substring(0, 2);
-  } else if (baseCode.length === 2) {
-    return baseCode.charAt(0);
-  }
-  return null;
-}
-function validateSFICode(sfiCode) {
-  const cleanCode = stripSFISuffix(sfiCode);
-  const dottedPattern = /^\d{1,3}(\.\d{1,3})*$/;
-  const undottedPattern = /^\d{1,9}$/;
-  return dottedPattern.test(cleanCode) || undottedPattern.test(cleanCode);
-}
 function getExplicitParentFromRow(row) {
   const parentVariants = [
     "Parent Component Code",
@@ -54419,10 +55737,10 @@ async function generateWorkOrdersTemplate(vesselId) {
   const allCodes = validComponents.map((c) => c.componentCode);
   const parentCodes = /* @__PURE__ */ new Set();
   allCodes.forEach((code1) => {
-    const cleanCode1 = stripSFISuffix(code1);
+    const cleanCode1 = stripSFISuffix2(code1);
     allCodes.forEach((code2) => {
       if (code1 === code2) return;
-      const cleanCode2 = stripSFISuffix(code2);
+      const cleanCode2 = stripSFISuffix2(code2);
       if (cleanCode2.startsWith(cleanCode1 + ".")) {
         parentCodes.add(code1);
         return;
@@ -55112,6 +56430,55 @@ async function generateSpareHistoryTemplate() {
 
 // server/modules/bulk-upload/services/validationService.ts
 init_storage();
+function validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum) {
+  const errs = [];
+  const trimmedCode = rowMakerCode != null ? String(rowMakerCode).trim() : "";
+  const trimmedName = rowMakerName != null ? String(rowMakerName).trim() : "";
+  if (trimmedCode) {
+    const master = existingMakersByCode.get(trimmedCode.toLowerCase());
+    if (!master) {
+      errs.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
+    } else if (trimmedName && String(master.makerName ?? "").trim().toLowerCase() !== trimmedName.toLowerCase()) {
+      errs.push(`Row ${rowNum}: Maker Name '${trimmedName}' does not match the Maker List entry for Maker Code '${trimmedCode}' (expected '${master.makerName}').`);
+    }
+  } else if (trimmedName) {
+    errs.push(`Row ${rowNum}: Maker Name '${trimmedName}' was provided without a valid Maker Code. Please specify a Maker Code that exists in the Maker List.`);
+  }
+  return errs;
+}
+var YES_NO_SYNONYMS = ["yes", "no", "y", "n", "true", "false", "1", "0"];
+function validateYesNoField(rawValue, fieldLabel, rowNum, opts = {}) {
+  const isBlank = rawValue === void 0 || rawValue === null || String(rawValue).trim() === "";
+  if (isBlank) {
+    if (opts.required) {
+      return { error: `Row ${rowNum}: ${fieldLabel} is required` };
+    }
+    return {};
+  }
+  const value = String(rawValue).toLowerCase().trim();
+  if (!YES_NO_SYNONYMS.includes(value)) {
+    return { error: `Row ${rowNum}: ${fieldLabel} must be Yes or No` };
+  }
+  return { normalized: ["yes", "y", "true", "1"].includes(value) ? "Yes" : "No" };
+}
+function validateDateDDMMYYYY(rawValue, fieldLabel, rowNum) {
+  if (rawValue === void 0 || rawValue === null || String(rawValue).trim() === "") {
+    return {};
+  }
+  const value = String(rawValue).trim();
+  const match = value.match(/^([0-9]{2})-([0-9]{2})-([0-9]{4})$/);
+  if (!match) {
+    return { error: `Row ${rowNum}: ${fieldLabel} must be a valid date in DD-MM-YYYY format` };
+  }
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+    return { error: `Row ${rowNum}: ${fieldLabel} must be a valid date in DD-MM-YYYY format` };
+  }
+  return { normalized: value };
+}
 async function validateData(type, data, mode, vesselId) {
   const results = {
     columns: [],
@@ -55212,6 +56579,8 @@ async function validateData(type, data, mode, vesselId) {
   console.log(`\u{1F4CB} Total rows in file: ${data.length}, Valid data rows after filtering: ${filteredData.length}`);
   const componentCodeOccurrences = /* @__PURE__ */ new Map();
   const existingDbComponentCodes = /* @__PURE__ */ new Set();
+  const componentNameOccurrences = /* @__PURE__ */ new Map();
+  const existingDbComponentNames = /* @__PURE__ */ new Map();
   const fleetEquipmentCodeOccurrences = /* @__PURE__ */ new Map();
   const existingDbFleetEquipmentCodes = /* @__PURE__ */ new Set();
   if (type === "fleet-components") {
@@ -55269,9 +56638,9 @@ async function validateData(type, data, mode, vesselId) {
   if (type === "fleet-spares") {
     try {
       const existingFleetSpares = await storage.getFleetSparesFromTable();
-      existingFleetSpares.forEach((fs11) => {
-        if (fs11.partCode && fs11.fleetEquipmentCode) {
-          const compositeKey = `${fs11.partCode.toUpperCase()}|${fs11.fleetEquipmentCode.toUpperCase()}`;
+      existingFleetSpares.forEach((fs10) => {
+        if (fs10.partCode && fs10.fleetEquipmentCode) {
+          const compositeKey = `${fs10.partCode.toUpperCase()}|${fs10.fleetEquipmentCode.toUpperCase()}`;
           existingDbFleetSpareCompositeKeys.add(compositeKey);
         }
       });
@@ -55320,7 +56689,6 @@ async function validateData(type, data, mode, vesselId) {
     }
   }
   let existingMakersByCode = /* @__PURE__ */ new Map();
-  let existingMakersByName = /* @__PURE__ */ new Map();
   let makerListLoaded = false;
   if (type === "components" || type === "spares" || type === "fleet-spares") {
     if (type === "components") {
@@ -55331,8 +56699,19 @@ async function validateData(type, data, mode, vesselId) {
             if (comp.componentCode) {
               existingDbComponentCodes.add(comp.componentCode.toUpperCase());
             }
+            if (comp.name) {
+              const nameKey = String(comp.name).trim().toUpperCase();
+              if (nameKey) {
+                if (!existingDbComponentNames.has(nameKey)) {
+                  existingDbComponentNames.set(nameKey, /* @__PURE__ */ new Set());
+                }
+                if (comp.componentCode) {
+                  existingDbComponentNames.get(nameKey).add(String(comp.componentCode).trim().toUpperCase());
+                }
+              }
+            }
           });
-          console.log(`\u{1F4CB} Loaded ${existingDbComponentCodes.size} existing component codes for vessel '${vesselId}'`);
+          console.log(`\u{1F4CB} Loaded ${existingDbComponentCodes.size} existing component codes and ${existingDbComponentNames.size} existing component names for vessel '${vesselId}'`);
         } catch (err) {
           console.error(`Failed to fetch existing components for vessel ${vesselId}:`, err);
         }
@@ -55340,8 +56719,9 @@ async function validateData(type, data, mode, vesselId) {
     }
     try {
       const existingMakers = await storage.getMakerList();
-      existingMakersByCode = new Map(existingMakers.map((m) => [m.makerCode, m]));
-      existingMakersByName = new Map(existingMakers.map((m) => [m.makerName.toLowerCase(), m]));
+      existingMakersByCode = new Map(
+        existingMakers.map((m) => [String(m.makerCode ?? "").trim().toLowerCase(), m])
+      );
       makerListLoaded = true;
       console.log(`\u{1F4CB} Loaded ${existingMakers.length} existing makers for validation`);
     } catch (err) {
@@ -55356,6 +56736,16 @@ async function validateData(type, data, mode, vesselId) {
             componentCodeOccurrences.set(code, []);
           }
           componentCodeOccurrences.get(code).push(index3 + 2);
+        }
+        const componentName = row["Component Name"];
+        if (componentName !== void 0 && componentName !== null) {
+          const name = String(componentName).trim().toUpperCase();
+          if (name !== "") {
+            if (!componentNameOccurrences.has(name)) {
+              componentNameOccurrences.set(name, []);
+            }
+            componentNameOccurrences.get(name).push(index3 + 2);
+          }
         }
       });
     }
@@ -55400,26 +56790,25 @@ async function validateData(type, data, mode, vesselId) {
             errors.push(`Row ${rowNum}: Component Code '${codeStr}' already exists in vessel '${vesselId}'. Cannot add duplicate component.`);
           }
           const explicitParent = getExplicitParentFromRow(row);
+          const isTopLevel = stripSFISuffix2(codeStr).length === 1;
           if (explicitParent) {
-            normalized["Parent Component Code"] = explicitParent;
-          } else {
-            const parentCode = getParentSFICode(codeStr);
-            if (parentCode) {
-              normalized["Parent Component Code"] = parentCode;
-            }
-          }
-          const resolvedParent = normalized["Parent Component Code"];
-          if (resolvedParent) {
-            const resolvedParentUpper = String(resolvedParent).toUpperCase();
-            if (codeUpperCase === resolvedParentUpper) {
-              errors.push(`Row ${rowNum}: Component Code and Parent Component Code are both '${codeStr}'. A component cannot be its own parent.`);
+            if (!validateSFICode(explicitParent)) {
+              errors.push(`Row ${rowNum}: Invalid Parent Component Code format '${explicitParent}'. Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.`);
             } else {
-              const parentInFile = componentCodeOccurrences.has(resolvedParentUpper);
-              const parentInDb = existingDbComponentCodes.has(resolvedParentUpper);
-              if (!parentInFile && !parentInDb) {
-                errors.push(`Row ${rowNum}: Parent Component Code '${resolvedParent}' does not exist in the uploaded file or in the vessel's component register. Cannot create a component without a valid parent.`);
+              normalized["Parent Component Code"] = explicitParent;
+              const resolvedParentUpper = explicitParent.toUpperCase();
+              if (codeUpperCase === resolvedParentUpper) {
+                errors.push(`Row ${rowNum}: Component Code and Parent Component Code are both '${codeStr}'. A component cannot be its own parent.`);
+              } else {
+                const parentInFile = componentCodeOccurrences.has(resolvedParentUpper);
+                const parentInDb = existingDbComponentCodes.has(resolvedParentUpper);
+                if (!parentInFile && !parentInDb) {
+                  errors.push(`Row ${rowNum}: Parent Component Code '${explicitParent}' does not exist in the uploaded file or in the vessel's component register. Cannot create a component without a valid parent.`);
+                }
               }
             }
+          } else if (!isTopLevel) {
+            errors.push(`Row ${rowNum}: Parent Component Code is required for '${codeStr}'. Only a single-digit top-level Component Code may omit the parent.`);
           }
           const firstDigit = parseInt(codeStr.charAt(0));
           if (!isNaN(firstDigit) && firstDigit >= 1 && firstDigit <= 8) {
@@ -55444,42 +56833,50 @@ async function validateData(type, data, mode, vesselId) {
           errors.push(`Row ${rowNum}: Invalid Component Category "${catValue}". Allowed values: ${allowedValues}`);
         }
       }
-      if (!row["Component Name"] || String(row["Component Name"]).trim() === "") {
-        const sfiCode = normalized["Component Code"];
-        if (sfiCode) {
-          const firstDigit = parseInt(sfiCode.charAt(0));
-          if (sfiCode.length === 1) {
-            const category = getComponentCategory(firstDigit);
-            normalized["Component Name"] = category ? category.replace(/^\d+\s+/, "") : `SFI ${sfiCode}`;
-            warnings.push(`Row ${rowNum}: Component Name auto-generated from SFI code: "${normalized["Component Name"]}"`);
-          } else if (sfiCode.length === 2) {
-            normalized["Component Name"] = getSubGroupName(sfiCode);
-            warnings.push(`Row ${rowNum}: Component Name auto-generated from SFI code: "${normalized["Component Name"]}"`);
-          } else {
-            errors.push(`Row ${rowNum}: Component Name is required for detailed component codes`);
-          }
-        } else {
-          errors.push(`Row ${rowNum}: Component Name is required`);
-        }
+      const componentNameTrimmed = row["Component Name"] === void 0 || row["Component Name"] === null ? "" : String(row["Component Name"]).trim();
+      if (componentNameTrimmed === "") {
+        errors.push(`Row ${rowNum}: Component Name is required and cannot be blank`);
+      } else if (!/^[A-Za-z0-9 .,()\-]+$/.test(componentNameTrimmed)) {
+        errors.push(`Row ${rowNum}: Component Name contains invalid characters. Only letters, numbers, spaces, periods (.), commas (,), hyphens (-), and brackets () are allowed.`);
       } else {
-        normalized["Component Name"] = String(row["Component Name"]).trim();
+        normalized["Component Name"] = componentNameTrimmed;
+        const nameUpperCase = componentNameTrimmed.toUpperCase();
+        const nameOccurrences = componentNameOccurrences.get(nameUpperCase);
+        if (nameOccurrences && nameOccurrences.length > 1) {
+          const firstOccurrence = nameOccurrences[0];
+          if (rowNum !== firstOccurrence) {
+            errors.push(`Row ${rowNum}: Duplicate Component Name '${componentNameTrimmed}' - this name already appears in row ${firstOccurrence}. Each Component Name must be unique within the import file.`);
+          }
+        }
+        const codesWithName = existingDbComponentNames.get(nameUpperCase);
+        if (codesWithName) {
+          const ownCode = normalized["Component Code"] ? String(normalized["Component Code"]).trim().toUpperCase() : null;
+          const belongsOnlyToThisRow = ownCode !== null && codesWithName.size === 1 && codesWithName.has(ownCode);
+          if (mode === "add" || !belongsOnlyToThisRow) {
+            errors.push(`Row ${rowNum}: Component Name '${componentNameTrimmed}' already exists in vessel '${vesselId}'. Component Name must be unique within the vessel.`);
+          }
+        }
       }
       const yesNoFieldMappings = [
-        { template: "Critical Yes/No", legacy: "Critical (Yes/No)" },
-        { template: "Condition Based Yes/No", legacy: "Condition Based (Yes/No)" },
-        { template: "IS Active", legacy: "IS Active" }
+        { template: "Critical Yes/No", legacy: "Critical (Yes/No)", required: false },
+        { template: "IS Active", legacy: "IS Active", required: true }
       ];
-      yesNoFieldMappings.forEach(({ template, legacy }) => {
+      yesNoFieldMappings.forEach(({ template, legacy, required }) => {
         const fieldValue = row[template] ?? row[legacy];
-        if (fieldValue !== void 0 && fieldValue !== null && fieldValue !== "") {
-          const value = String(fieldValue).toLowerCase().trim();
-          if (!["yes", "no", "y", "n", "true", "false", "1", "0"].includes(value)) {
-            errors.push(`Row ${rowNum}: ${template} must be Yes or No`);
-          } else {
-            const normalizedValue = ["yes", "y", "true", "1"].includes(value);
-            normalized[template] = normalizedValue;
-            normalized[legacy] = normalizedValue;
+        const isBlank = fieldValue === void 0 || fieldValue === null || String(fieldValue).trim() === "";
+        if (isBlank) {
+          if (required) {
+            errors.push(`Row ${rowNum}: ${template} is required`);
           }
+          return;
+        }
+        const value = String(fieldValue).toLowerCase().trim();
+        if (!YES_NO_SYNONYMS.includes(value)) {
+          errors.push(`Row ${rowNum}: ${template} must be Yes or No`);
+        } else {
+          const normalizedValue = ["yes", "y", "true", "1"].includes(value);
+          normalized[template] = normalizedValue;
+          normalized[legacy] = normalizedValue;
         }
       });
       if (row["Running Hours"] !== void 0 && row["Running Hours"] !== null && row["Running Hours"] !== "") {
@@ -55490,10 +56887,28 @@ async function validateData(type, data, mode, vesselId) {
           normalized["Running Hours"] = num;
         }
       }
-      ["Installation Date", "Commissioned Date"].forEach((field) => {
-        if (row[field]) {
-          const dateStr = String(row[field]).trim();
-          normalized[field] = dateStr;
+      ["Installation Date", "Commissioned Date", "Last Updated"].forEach((field) => {
+        const { error, normalized: normDate } = validateDateDDMMYYYY(row[field], field, rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normDate !== void 0) {
+          normalized[field] = normDate;
+        }
+      });
+      [
+        { keys: ["Class Item", "Class item"], label: "Class Item" },
+        { keys: ["IS Parent", "Is Parent"], label: "Is Parent" },
+        { keys: ["Criticality"], label: "Criticality" },
+        { keys: ["Condition Based", "Condition Based Yes/No", "Condition Based (Yes/No)"], label: "Condition Based" }
+      ].forEach(({ keys, label }) => {
+        const rawValue = keys.map((k) => row[k]).find((v) => v !== void 0 && v !== null && v !== "");
+        const { error, normalized: normYesNo } = validateYesNoField(rawValue, label, rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normYesNo !== void 0) {
+          keys.forEach((k) => {
+            normalized[k] = normYesNo;
+          });
         }
       });
       const textFields = [
@@ -55512,13 +56927,8 @@ async function validateData(type, data, mode, vesselId) {
         "Eqpt / System Department",
         "Notes",
         "Vessel Code",
-        "IS Parent",
-        "Class item",
-        "Class Item",
-        "Criticality",
         "RH Counter Type",
-        "RH Counter Source",
-        "Last Updated"
+        "RH Counter Source"
       ];
       textFields.forEach((field) => {
         if (row[field] !== void 0 && row[field] !== null && row[field] !== "") {
@@ -55533,29 +56943,7 @@ async function validateData(type, data, mode, vesselId) {
       if (makerListLoaded) {
         const rowMakerCode = normalized["Maker Code"] || null;
         const rowMakerName = normalized["Maker"] || normalized["Maker Name"] || null;
-        if (rowMakerCode) {
-          const trimmedCode = String(rowMakerCode).trim();
-          if (!existingMakersByCode.has(trimmedCode)) {
-            if (rowMakerName) {
-              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
-              if (nameMatch) {
-                normalized["Maker Code"] = nameMatch.makerCode;
-              } else {
-                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-              }
-            } else {
-              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-            }
-          }
-        } else if (rowMakerName) {
-          const trimmedName = String(rowMakerName).trim();
-          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
-          if (nameMatch) {
-            normalized["Maker Code"] = nameMatch.makerCode;
-          } else {
-            errors.push(`Row ${rowNum}: Maker '${trimmedName}' not found in Maker List. Please import makers first.`);
-          }
-        }
+        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
       }
       if (row["Component Category"] && !normalized["Component Category"]) {
         normalized["Component Category"] = String(row["Component Category"]).trim();
@@ -55622,23 +57010,22 @@ async function validateData(type, data, mode, vesselId) {
           }
         }
       });
-      const criticalField = row["Criticality"] || row["Critical Yes/No"] || row["Criticality (Yes/No)"];
-      if (criticalField) {
-        const value = String(criticalField).toLowerCase().trim();
-        if (!["yes", "no", "y", "n"].includes(value)) {
-          errors.push(`Row ${rowNum}: Criticality must be Yes or No`);
-        } else {
-          const normalizedValue = ["yes", "y"].includes(value) ? "Yes" : "No";
-          normalized["Criticality"] = normalizedValue;
+      const criticalField = row["Criticality"] ?? row["Critical Yes/No"] ?? row["Criticality (Yes/No)"];
+      {
+        const { error, normalized: normCritical } = validateYesNoField(criticalField, "Criticality", rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normCritical !== void 0) {
+          normalized["Criticality"] = normCritical;
         }
       }
-      const isActiveField = row["Is Active"] || row["IS Active"];
-      if (isActiveField) {
-        const value = String(isActiveField).toLowerCase().trim();
-        if (!["yes", "no", "y", "n"].includes(value)) {
-          errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
-        } else {
-          normalized["Is Active"] = ["yes", "y"].includes(value) ? "Yes" : "No";
+      const isActiveField = row["Is Active"] ?? row["IS Active"];
+      {
+        const { error, normalized: normActive } = validateYesNoField(isActiveField, "Is Active", rowNum, { required: true });
+        if (error) {
+          errors.push(error);
+        } else if (normActive !== void 0) {
+          normalized["Is Active"] = normActive;
         }
       }
       const ihmField = row["IHM (Inventory of Hazardous Materials)"];
@@ -55684,29 +57071,7 @@ async function validateData(type, data, mode, vesselId) {
       if (makerListLoaded) {
         const rowMakerCode = normalized["Maker Code"] || null;
         const rowMakerName = normalized["Maker"] || null;
-        if (rowMakerCode) {
-          const trimmedCode = String(rowMakerCode).trim();
-          if (!existingMakersByCode.has(trimmedCode)) {
-            if (rowMakerName) {
-              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
-              if (nameMatch) {
-                normalized["Maker Code"] = nameMatch.makerCode;
-              } else {
-                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-              }
-            } else {
-              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-            }
-          }
-        } else if (rowMakerName) {
-          const trimmedName = String(rowMakerName).trim();
-          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
-          if (nameMatch) {
-            normalized["Maker Code"] = nameMatch.makerCode;
-          } else {
-            errors.push(`Row ${rowNum}: Maker '${trimmedName}' does not exist in Maker List. Please import makers first.`);
-          }
-        }
+        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
       }
     } else if (type === "stores") {
       if (!row["Item Code"]) {
@@ -56548,15 +57913,12 @@ async function validateData(type, data, mode, vesselId) {
       } else {
         normalized["Unit Of Measurement"] = String(uom).trim().toUpperCase();
       }
-      const isActiveVal = row["Is Active"];
-      if (isActiveVal === void 0 || isActiveVal === null || String(isActiveVal).trim() === "") {
-        errors.push(`Row ${rowNum}: Is Active is required`);
-      } else {
-        const val = String(isActiveVal).trim().toLowerCase();
-        if (!["yes", "no", "y", "n", "true", "false", "1", "0"].includes(val)) {
-          errors.push(`Row ${rowNum}: Is Active must be Yes/No`);
-        } else {
-          normalized["Is Active"] = isActiveVal;
+      {
+        const { error, normalized: normActive } = validateYesNoField(row["Is Active"], "Is Active", rowNum, { required: true });
+        if (error) {
+          errors.push(error);
+        } else if (normActive !== void 0) {
+          normalized["Is Active"] = normActive;
         }
       }
       if (row["Part Number"]) normalized["Part Number"] = String(row["Part Number"]).trim();
@@ -56568,35 +57930,20 @@ async function validateData(type, data, mode, vesselId) {
       if (row["Maker Code"]) normalized["Maker Code"] = String(row["Maker Code"]).trim();
       if (row["Manual Name"]) normalized["Manual Name"] = String(row["Manual Name"]).trim();
       if (row["Page Number"]) normalized["Page Number"] = String(row["Page Number"]).trim();
-      if (row["Criticality"]) normalized["Criticality"] = String(row["Criticality"]).trim();
+      {
+        const { error, normalized: normCritical } = validateYesNoField(row["Criticality"], "Criticality", rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normCritical !== void 0) {
+          normalized["Criticality"] = normCritical;
+        }
+      }
       if (row["IHM (Inventory of Hazardous Materials)"]) normalized["IHM (Inventory of Hazardous Materials)"] = String(row["IHM (Inventory of Hazardous Materials)"]).trim();
       if (row["Evidence Type"]) normalized["Evidence Type"] = String(row["Evidence Type"]).trim();
       if (makerListLoaded) {
         const rowMakerCode = normalized["Maker Code"] || null;
         const rowMakerName = normalized["Maker"] || null;
-        if (rowMakerCode) {
-          const trimmedCode = String(rowMakerCode).trim();
-          if (!existingMakersByCode.has(trimmedCode)) {
-            if (rowMakerName) {
-              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
-              if (nameMatch) {
-                normalized["Maker Code"] = nameMatch.makerCode;
-              } else {
-                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-              }
-            } else {
-              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-            }
-          }
-        } else if (rowMakerName) {
-          const trimmedName = String(rowMakerName).trim();
-          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
-          if (nameMatch) {
-            normalized["Maker Code"] = nameMatch.makerCode;
-          } else {
-            errors.push(`Row ${rowNum}: Maker '${trimmedName}' does not exist in Maker List. Please import makers first.`);
-          }
-        }
+        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
       }
     }
     let status = "ok";
@@ -56629,78 +57976,9 @@ async function validateData(type, data, mode, vesselId) {
 
 // server/modules/bulk-upload/services/importService.ts
 init_storage();
-import { v4 as uuidv4 } from "uuid";
-
-// server/utils/sfiLookup.ts
-import fs6 from "fs";
-import path7 from "path";
-import { fileURLToPath } from "url";
-import { dirname as dirname4 } from "path";
-var __filename = fileURLToPath(import.meta.url);
-var __dirname = dirname4(__filename);
-var sfiMap = null;
-function loadSFIData() {
-  const csvPath = path7.join(__dirname, "../../attached_assets/component tree_1761646533252.csv");
-  try {
-    const fileContent = fs6.readFileSync(csvPath, "utf-8");
-    const lines = fileContent.split("\n");
-    const map = /* @__PURE__ */ new Map();
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-      const fields = [];
-      let currentField = "";
-      let insideQuotes = false;
-      for (let j = 0; j < line.length; j++) {
-        const char = line[j];
-        if (char === '"') {
-          insideQuotes = !insideQuotes;
-        } else if (char === "," && !insideQuotes) {
-          fields.push(currentField.trim());
-          currentField = "";
-        } else {
-          currentField += char;
-        }
-      }
-      fields.push(currentField.trim());
-      if (fields.length >= 5) {
-        const code = fields[0];
-        const name = fields[1];
-        const parentCode = fields[2];
-        const mainGroup = fields[3];
-        const subGroup = fields[4];
-        if (code) {
-          map.set(code, {
-            code,
-            name,
-            parentCode,
-            mainGroup,
-            subGroup
-          });
-        }
-      }
-    }
-    console.log(`\u2705 Loaded ${map.size} SFI code entries from component tree CSV`);
-    return map;
-  } catch (error) {
-    console.warn("\u26A0\uFE0F  Could not load SFI component tree CSV, using fallback naming:", error);
-    return /* @__PURE__ */ new Map();
-  }
-}
-function getSFIName(code) {
-  if (!sfiMap) {
-    sfiMap = loadSFIData();
-  }
-  const entry = sfiMap.get(code);
-  if (entry) {
-    return entry.name || entry.subGroup;
-  }
-  return `SFI ${code}`;
-}
-
-// server/modules/bulk-upload/services/importService.ts
 init_dateUtils();
 init_workOrderNumbering();
+import { v4 as uuidv4 } from "uuid";
 
 // server/modules/bulk-upload/services/undoService.ts
 init_storage();
@@ -56841,6 +58119,46 @@ async function trackChange(importHistoryId, operation, entityType, entityId, pre
     checksum
   });
 }
+var BULK_AUDIT_TRACKED_FIELDS = [
+  "name",
+  "componentCode",
+  "critical",
+  "isActive",
+  "parentId",
+  "parentComponent",
+  "componentCategory",
+  "category",
+  "eqptSystemDept",
+  "maker",
+  "makerCode",
+  "location"
+];
+function buildBulkChangedFields(oldRow, newRow) {
+  const changed = {};
+  for (const f of BULK_AUDIT_TRACKED_FIELDS) {
+    if (newRow == null || !(f in newRow)) continue;
+    const oldVal = oldRow?.[f] ?? null;
+    const newVal = newRow[f] ?? null;
+    if (oldVal !== newVal) changed[f] = { old: oldVal, new: newVal };
+  }
+  return changed;
+}
+async function auditBulkComponent(actionType, component, payload) {
+  try {
+    const c = component || {};
+    await storage.createAuditLog({
+      entityType: "component",
+      entityId: c.cuuid || c.id || null,
+      actionType,
+      source: "bulk_import",
+      vesselCode: c.vesselId ?? null,
+      componentCode: c.componentCode ?? null,
+      payload
+    });
+  } catch (auditErr) {
+    console.error(`[Audit] bulk component ${actionType} log failed:`, auditErr);
+  }
+}
 async function performImport(type, data, mode, archiveMissing, vesselId, userId, importHistoryId, storeType, onProgress) {
   const result = {
     created: 0,
@@ -56869,106 +58187,51 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
   if (type === "components") {
     console.log(`\u{1F680} Starting component import: ${data.length} rows, mode: ${mode}`);
     const allCodes = data.map((row) => String(row["Component Code"] || row["Generated Code"] || row["Original SFI Code"]).trim());
-    const existingComponentsMap = await storage.getComponentsByCodes(allCodes, vesselId);
-    const parentsToCreate = /* @__PURE__ */ new Set();
-    const explicitParentsNeeded = /* @__PURE__ */ new Set();
-    const componentCodesInUpload = new Set(data.map(
-      (row) => String(row["Component Code"] || row["Generated Code"] || row["Original SFI Code"]).trim()
-    ));
-    for (const row of data) {
-      const componentCode = String(row["Component Code"] || row["Generated Code"] || row["Original SFI Code"]).trim();
-      const meta = row["__meta"] || {};
-      const explicitParentProvided = meta.explicitParentProvided === true;
-      const explicitParentCode = meta.originalExplicitParent;
-      if (explicitParentProvided && explicitParentCode) {
-        const parentInDb = existingComponentsMap.get(explicitParentCode);
-        const parentInUpload = componentCodesInUpload.has(explicitParentCode);
-        if (!parentInDb && !parentInUpload) {
-          explicitParentsNeeded.add(explicitParentCode);
-          console.log(`\u{1F4CB} Explicit parent ${explicitParentCode} for ${componentCode} needs creation`);
-        }
-        continue;
-      }
-      const originalSFICode = String(row["Original SFI Code"] || row["Component Code"] || row["Generated Code"]).trim();
-      let currentCode = getParentSFICode(originalSFICode);
-      while (currentCode && currentCode.length > 0) {
-        const parentExists = existingComponentsMap.get(currentCode);
-        if (!parentExists) {
-          parentsToCreate.add(currentCode);
-        }
-        currentCode = getParentSFICode(currentCode);
-      }
-    }
-    Array.from(explicitParentsNeeded).forEach((explicitParent) => {
-      if (!existingComponentsMap.get(explicitParent)) {
-        parentsToCreate.add(explicitParent);
+    const referencedParentCodes = data.map((row) => row["Parent Component Code"] ? String(row["Parent Component Code"]).trim() : "").filter((code) => code.length > 0);
+    const prefetchCodes = Array.from(/* @__PURE__ */ new Set([...allCodes, ...referencedParentCodes]));
+    const existingComponentsMap = await storage.getComponentsByCodes(prefetchCodes, vesselId);
+    const rowCodeOf = (row) => String(row["Component Code"] || row["Generated Code"] || row["Original SFI Code"] || "").trim();
+    const rowParentCodeOf = (row) => row["Parent Component Code"] ? String(row["Parent Component Code"]).trim() : null;
+    const codeToIndices = /* @__PURE__ */ new Map();
+    data.forEach((row, idx) => {
+      const code = rowCodeOf(row);
+      if (!code) return;
+      if (!codeToIndices.has(code)) codeToIndices.set(code, []);
+      codeToIndices.get(code).push(idx);
+    });
+    const dependents = data.map(() => []);
+    const inDegree = data.map(() => 0);
+    data.forEach((row, idx) => {
+      const parentCode = rowParentCodeOf(row);
+      if (!parentCode) return;
+      const parentIndices = codeToIndices.get(parentCode);
+      if (!parentIndices) return;
+      for (const p of parentIndices) {
+        if (p === idx) continue;
+        dependents[p].push(idx);
+        inDegree[idx]++;
       }
     });
-    const parentCodesToCheck = Array.from(parentsToCreate);
-    if (parentCodesToCheck.length > 0) {
-      const existingParents = await storage.getComponentsByCodes(parentCodesToCheck, vesselId);
-      existingParents.forEach((comp, code) => {
-        existingComponentsMap.set(code, comp);
-        parentsToCreate.delete(code);
-      });
-      if (existingParents.size > 0) {
-        console.log(`\u{1F4CB} Found ${existingParents.size} inferred parents already in DB \u2014 skipping creation`);
+    const queue = [];
+    for (let i = 0; i < data.length; i++) {
+      if (inDegree[i] === 0) queue.push(i);
+    }
+    const orderedIndices = [];
+    const placed = new Array(data.length).fill(false);
+    while (queue.length) {
+      const idx = queue.shift();
+      orderedIndices.push(idx);
+      placed[idx] = true;
+      for (const dep of dependents[idx]) {
+        if (--inDegree[dep] === 0) queue.push(dep);
       }
     }
-    const sortedParents = Array.from(parentsToCreate).sort((a, b) => {
-      const aDepth = (a.match(/\./g) || []).length;
-      const bDepth = (b.match(/\./g) || []).length;
-      return aDepth - bDepth;
-    });
-    console.log(`\u{1F4C1} Creating ${sortedParents.length} intermediate parent nodes...`);
-    for (const parentCode of sortedParents) {
-      const parentMainGroup = parseInt(parentCode.charAt(0));
-      const parentSubGroup = getSubGroupCode(parentCode);
-      let parentName = getSFIName(parentCode);
-      if (parentName === `SFI ${parentCode}`) {
-        if (parentCode.length === 1) {
-          const category = getComponentCategory(parentMainGroup);
-          parentName = category ? category.replace(/^\d+\s+/, "") : `SFI ${parentCode}`;
-        } else if (parentCode.length === 2) {
-          parentName = getSubGroupName(parentCode);
-        }
-      }
-      const parentComponent = await storage.createComponent({
-        componentCode: parentCode,
-        name: parentName,
-        category: getComponentCategory(parentMainGroup) || "",
-        parentId: getParentSFICode(parentCode),
-        vesselId: vesselId || "V001",
-        currentCumulativeRH: "0",
-        critical: false,
-        classItem: false
-      });
-      existingComponentsMap.set(parentCode, parentComponent);
-      console.log(`\u{1F4C1} Created parent node: ${parentCode} (${parentName})`);
-      result.created++;
-      if (importHistoryId) {
-        await trackChange(importHistoryId, "created", "component", parentComponent.cuuid, null, parentComponent);
+    if (orderedIndices.length < data.length) {
+      for (let i = 0; i < data.length; i++) {
+        if (!placed[i]) orderedIndices.push(i);
       }
     }
-    const explicitParentCodes = /* @__PURE__ */ new Set();
-    for (const row of data) {
-      const meta = row["__meta"] || {};
-      if (meta.explicitParentProvided && meta.originalExplicitParent) {
-        explicitParentCodes.add(String(meta.originalExplicitParent).trim());
-      }
-    }
-    const sortedData = [...data].sort((a, b) => {
-      const aCode = String(a["Component Code"] || a["Generated Code"] || a["Original SFI Code"] || "").trim();
-      const bCode = String(b["Component Code"] || b["Generated Code"] || b["Original SFI Code"] || "").trim();
-      const aIsExplicitParent = explicitParentCodes.has(aCode) ? 0 : 1;
-      const bIsExplicitParent = explicitParentCodes.has(bCode) ? 0 : 1;
-      if (aIsExplicitParent !== bIsExplicitParent) {
-        return aIsExplicitParent - bIsExplicitParent;
-      }
-      const aDepth = (aCode.match(/\./g) || []).length;
-      const bDepth = (bCode.match(/\./g) || []).length;
-      return aDepth - bDepth;
-    });
+    const sortedData = orderedIndices.map((i) => data[i]);
     const makerListItems = await storage.getMakerList();
     const validMakerNames = new Set(makerListItems.map((m) => (m.makerName || "").toLowerCase().trim()));
     console.log(`\u{1F4E6} Prefetched ${makerListItems.length} makers for validation`);
@@ -56983,6 +58246,12 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: "skipped", error: `Maker '${makerValue}' not found in Maker List. Please add the maker first.` });
           continue;
         }
+        const childParentCode = row["Parent Component Code"] ? String(row["Parent Component Code"]).trim() : null;
+        if (childParentCode && !existingComponentsMap.get(childParentCode)) {
+          result.skipped++;
+          result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: "skipped", error: `Parent Component Code '${childParentCode}' was not found in the vessel register or among the imported rows, so '${componentCode}' was skipped to avoid creating an orphaned component.` });
+          continue;
+        }
         if (mode === "add") {
           if (!existingComponent) {
             const newComponent = await createComponentFromRow(row, vesselId);
@@ -56992,6 +58261,13 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             if (importHistoryId) {
               await trackChange(importHistoryId, "created", "component", newComponent.cuuid, null, newComponent);
             }
+            await auditBulkComponent("create", newComponent, {
+              componentCode: newComponent.componentCode,
+              name: newComponent.name,
+              critical: newComponent.critical,
+              parentId: newComponent.parentId,
+              isActive: newComponent.isActive
+            });
           } else {
             result.skipped++;
             result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: "skipped", error: "Component already exists" });
@@ -57006,6 +58282,10 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             if (importHistoryId) {
               await trackChange(importHistoryId, "updated", "component", updatedComponent.cuuid, existingComponent, updatedComponent);
             }
+            await auditBulkComponent("update", updatedComponent, {
+              componentCode: updatedComponent.componentCode,
+              changedFields: buildBulkChangedFields(existingComponent, updatedComponent)
+            });
           } else {
             result.skipped++;
             result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: "skipped", error: "Component not found for update" });
@@ -57021,6 +58301,10 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             if (importHistoryId) {
               await trackChange(importHistoryId, "updated", "component", updatedComponent.cuuid, existingComponent, updatedComponent);
             }
+            await auditBulkComponent("update", updatedComponent, {
+              componentCode: updatedComponent.componentCode,
+              changedFields: buildBulkChangedFields(existingComponent, updatedComponent)
+            });
           } else {
             const newComponent = await createComponentFromRow(row, vesselId);
             existingComponentsMap.set(componentCode, newComponent);
@@ -57029,6 +58313,13 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             if (importHistoryId) {
               await trackChange(importHistoryId, "created", "component", newComponent.cuuid, null, newComponent);
             }
+            await auditBulkComponent("create", newComponent, {
+              componentCode: newComponent.componentCode,
+              name: newComponent.name,
+              critical: newComponent.critical,
+              parentId: newComponent.parentId,
+              isActive: newComponent.isActive
+            });
           }
         }
       } catch (rowError) {
@@ -57050,11 +58341,37 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           if (importHistoryId) {
             await trackChange(importHistoryId, "archived", "component", component.cuuid, component, archivedComponent);
           }
+          await auditBulkComponent("deactivate", archivedComponent ?? component, {
+            componentCode: component.componentCode,
+            isActive: { old: true, new: false },
+            via: "archiveMissing"
+          });
           console.log(`\u{1F4E6} Archived component: ${component.componentCode}`);
         }
       }
     }
     console.log(`\u2705 Component import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
+    try {
+      await storage.createAuditLog({
+        entityType: "component",
+        entityId: importHistoryId ?? "bulk_import",
+        actionType: "bulk_import",
+        source: "bulk_import",
+        vesselCode: vesselId ?? null,
+        componentCode: null,
+        payload: {
+          importHistoryId: importHistoryId ?? null,
+          mode,
+          created: result.created,
+          updated: result.updated,
+          archived: result.archived,
+          skipped: result.skipped,
+          total: data.length
+        }
+      });
+    } catch (auditErr) {
+      console.error("[Audit] bulk_import summary log failed:", auditErr);
+    }
   } else if (type === "spares") {
     const sparesVesselId = vesselId || "V001";
     console.log(`\u{1F680} Starting spares import: ${data.length} rows, mode: ${mode}, vesselId: ${sparesVesselId}`);
@@ -58904,9 +60221,9 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
   } else if (type === "fleet-spares") {
     console.log(`\u{1F680} Starting fleet-spares import: ${data.length} rows, mode: ${mode}`);
     const existingFleetSpares = await storage.getFleetSparesFromTable();
-    const fleetSparesByCompositeKey = new Map(existingFleetSpares.map((fs11) => {
-      const compositeKey = `${(fs11.partCode || "").toUpperCase()}|${(fs11.fleetEquipmentCode || "").toUpperCase()}`;
-      return [compositeKey, fs11];
+    const fleetSparesByCompositeKey = new Map(existingFleetSpares.map((fs10) => {
+      const compositeKey = `${(fs10.partCode || "").toUpperCase()}|${(fs10.fleetEquipmentCode || "").toUpperCase()}`;
+      return [compositeKey, fs10];
     }));
     console.log(`\u{1F4E6} Prefetched ${existingFleetSpares.length} existing fleet spares (${fleetSparesByCompositeKey.size} unique composite keys)`);
     const existingFleetComponents = await storage.getFleetComponents();
@@ -59409,9 +60726,9 @@ async function storeUploadedFile(fileBuffer, originalName, effectiveType) {
     }
   }
   try {
-    const uploadsDir = path8.join(process.cwd(), "uploads", "bulk-imports", effectiveType);
+    const uploadsDir = path7.join(process.cwd(), "uploads", "bulk-imports", effectiveType);
     await fsPromises2.mkdir(uploadsDir, { recursive: true });
-    const localFilePath = path8.join(uploadsDir, `${timestamp4}_${safeFileName}`);
+    const localFilePath = path7.join(uploadsDir, `${timestamp4}_${safeFileName}`);
     await fsPromises2.writeFile(localFilePath, fileBuffer);
     console.log(`\u{1F4C1} File saved locally at: ${localFilePath}`);
     return `local:${localFilePath}`;
@@ -60117,7 +61434,7 @@ async function getSheets(req, res) {
     if (!file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
-    const ext = path8.extname(file.originalname).toLowerCase();
+    const ext = path7.extname(file.originalname).toLowerCase();
     if (ext === ".csv") {
       return res.json({ sheets: ["Sheet1"] });
     } else if ([".xlsx", ".xls"].includes(ext)) {
@@ -60148,7 +61465,7 @@ async function dryRun(req, res) {
       return res.status(400).json({ error: "Invalid mode" });
     }
     let data = [];
-    const ext = path8.extname(file.originalname).toLowerCase();
+    const ext = path7.extname(file.originalname).toLowerCase();
     if (ext === ".csv") {
       const csvText = file.buffer.toString("utf-8");
       const parsed = Papa2.parse(csvText, { header: true, skipEmptyLines: true });
@@ -60723,19 +62040,38 @@ async function undoImport(req, res) {
           currentState = await storage.getSpare(log2.entityId);
         }
         if (log2.entityType === "component") {
+          const cs = currentState || {};
+          const auditUndo = async (actionType, payload) => {
+            try {
+              await storage.createAuditLog({
+                entityType: "component",
+                entityId: log2.entityId,
+                actionType,
+                source: "bulk_import",
+                vesselCode: cs.vesselId ?? null,
+                componentCode: cs.componentCode ?? null,
+                payload: { via: "undo", historyId, ...payload }
+              });
+            } catch (auditErr) {
+              console.error("[Audit] bulk undo component log failed:", auditErr);
+            }
+          };
           if (log2.operation === "created") {
             await storage.archiveComponent(log2.entityId);
             result.deleted++;
             console.log(`  \u2713 Archived component ${log2.entityId}`);
+            await auditUndo("deactivate", { isActive: { old: true, new: false }, undoOf: "created" });
           } else if (log2.operation === "updated") {
             const previousData = log2.previousData;
             await storage.updateComponent(log2.entityId, previousData);
             result.restored++;
             console.log(`  \u2713 Restored component ${log2.entityId}`);
+            await auditUndo("update", { undoOf: "updated", restoredTo: log2.previousData ?? null });
           } else if (log2.operation === "archived") {
             await storage.updateComponent(log2.entityId, { isActive: true });
             result.unarchived++;
             console.log(`  \u2713 Unarchived component ${log2.entityId}`);
+            await auditUndo("activate", { isActive: { old: false, new: true }, undoOf: "archived" });
           }
         } else if (log2.entityType === "job") {
           if (log2.operation === "created") {
@@ -60823,6 +62159,24 @@ async function undoImport(req, res) {
       console.log(`   - Deleted: ${result.deleted}`);
       console.log(`   - Restored: ${result.restored}`);
       console.log(`   - Unarchived: ${result.unarchived}`);
+      try {
+        await storage.createAuditLog({
+          entityType: "component",
+          entityId: historyId,
+          actionType: "bulk_undo",
+          source: "bulk_import",
+          vesselCode: null,
+          componentCode: null,
+          payload: {
+            historyId,
+            deleted: result.deleted,
+            restored: result.restored,
+            unarchived: result.unarchived
+          }
+        });
+      } catch (auditErr) {
+        console.error("[Audit] bulk_undo summary log failed:", auditErr);
+      }
       res.json({
         message: "Import successfully undone",
         ...result,
@@ -61509,7 +62863,10 @@ async function updatePolicy(id, data) {
 async function batchUpdatePolicies(policies) {
   const results = [];
   for (const update6 of policies) {
-    const policy = await updateAlertPolicy(update6.id, update6);
+    if (!update6.apuuid) {
+      throw new Error("Alert policy is missing apuuid; cannot update");
+    }
+    const policy = await updateAlertPolicy(update6.apuuid, update6);
     results.push(policy);
   }
   return results;
@@ -64871,7 +66228,8 @@ async function syncMasters(req, res) {
     additionalGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] },
     ports: { inserted: 0, updated: 0, skipped: 0, errors: [] },
     users: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    fleetGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] }
+    fleetGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] },
+    approvers: { inserted: 0, updated: 0, skipped: 0, errors: [] }
   };
   const fetchExternal = async (endpoint, key) => {
     const url = buildExternalMasterDataUrl(endpoint, domain);
@@ -65125,6 +66483,66 @@ async function syncMasters(req, res) {
       stats.fleetGroups.updated++;
     } catch (e) {
       stats.fleetGroups.errors.push(`FleetGroup ${fg.fleet_group_id}: ${e.message}`);
+    }
+  }
+  console.log("\u{1F4E6} Syncing Approvers...");
+  let fetchedApprovers = [];
+  let approverFetchSucceeded = false;
+  try {
+    const masterBaseUrl = getExternalMasterDataBaseUrl().replace(/\/+$/, "");
+    const approversUrl = `${masterBaseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
+    console.log(`[fetchExternal] Fetching mocapprovers from crew master: ${approversUrl}`);
+    const approversResponse = await fetch(approversUrl, { method: "GET", headers: { accept: "*/*" } });
+    if (!approversResponse.ok) {
+      throw new Error(`Failed to fetch mocapprovers: ${approversResponse.status}`);
+    }
+    const approversData = await approversResponse.json();
+    fetchedApprovers = Array.isArray(approversData) ? approversData : approversData.mocapprovers || [];
+    approverFetchSucceeded = true;
+    console.log(`[fetchExternal] mocapprovers returned ${fetchedApprovers.length} records`);
+  } catch (e) {
+    console.error(`[syncMasters] Failed to fetch approvers: ${e.message}`);
+    stats.approvers.errors.push(`Fetch failed: ${e.message}`);
+  }
+  if (approverFetchSucceeded) {
+    try {
+      await db2.update(mocApprovers).set({ isDeleted: true, updatedAt: now }).where(and22(eq25(mocApprovers.isSync, true), eq25(mocApprovers.isDeleted, false)));
+    } catch (e) {
+      console.error(`[syncMasters] Failed to soft-delete stale approvers: ${e.message}`);
+    }
+    const technicalApprovers = fetchedApprovers.filter(
+      (a) => (a.modulename || a.moduleName || "") === "Technical"
+    );
+    for (const a of technicalApprovers) {
+      try {
+        const userId = getFieldValue(a, ["userId", "user_id", "uid"]);
+        if (!userId) {
+          stats.approvers.skipped++;
+          continue;
+        }
+        const name = getFieldValue(a, ["name", "fullname", "fullName", "userName"]) || null;
+        const userUuid = getFieldValue(a, ["userUuid", "user_uuid", "uuid"]) || null;
+        const approverLevel = getFieldValue(a, ["approverLevel", "approver_level", "level"]) || null;
+        const emailId = getFieldValue(a, ["emailId", "email_id", "email"]) || null;
+        const modulename = getFieldValue(a, ["modulename", "moduleName"]) || "Technical";
+        const isActiveRaw = a.isActive ?? a.is_active;
+        const isActive = isActiveRaw === 1 || isActiveRaw === true ? 1 : 0;
+        await db2.insert(mocApprovers).values({
+          name,
+          userId,
+          userUuid,
+          approverLevel,
+          emailId,
+          isActive,
+          modulename,
+          isSync: true,
+          isDeleted: false,
+          updatedAt: now
+        });
+        stats.approvers.inserted++;
+      } catch (e) {
+        stats.approvers.errors.push(`Approver ${a.userId || a.user_id}: ${e.message}`);
+      }
     }
   }
   console.log("\u2705 Master data sync completed:", stats);
@@ -65553,14 +66971,70 @@ router19.get("/admin/access-control/:roleRuid", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch permissions", details: error.message });
   }
 });
-router19.put("/admin/access-control/:roleRuid", async (req, res) => {
+router19.put("/admin/access-control/:roleRuid", requirePMSAdmin, async (req, res) => {
   try {
     const { roleRuid } = req.params;
     const { permissions } = req.body;
     if (!Array.isArray(permissions)) {
       return res.status(400).json({ error: "permissions must be an array" });
     }
+    const normGrant = (p) => ({
+      menuMuid: p.menuMuid,
+      canView: p.canView ?? false,
+      canCreate: p.canCreate ?? false,
+      canEdit: p.canEdit ?? false,
+      canDelete: p.canDelete ?? false
+    });
+    let beforeGrants = [];
+    try {
+      beforeGrants = (await storage.getRoleMenuPermissions(roleRuid)).map(normGrant);
+    } catch {
+    }
     const result = await storage.saveRoleMenuPermissions(roleRuid, permissions);
+    try {
+      const afterGrants = permissions.map(normGrant);
+      const beforeByMenu = {};
+      beforeGrants.forEach((g) => {
+        beforeByMenu[g.menuMuid] = g;
+      });
+      const afterByMenu = {};
+      afterGrants.forEach((g) => {
+        afterByMenu[g.menuMuid] = g;
+      });
+      const flags = ["canView", "canCreate", "canEdit", "canDelete"];
+      const changedMenus = [];
+      const allMenuKeys = Object.keys({ ...beforeByMenu, ...afterByMenu });
+      for (const menuMuid of allMenuKeys) {
+        const from = beforeByMenu[menuMuid] ?? null;
+        const to = afterByMenu[menuMuid] ?? null;
+        const differs = !from || !to || flags.some((f) => from[f] !== to[f]);
+        if (differs) changedMenus.push({ menuMuid, from, to });
+      }
+      let roleName = null;
+      try {
+        const roles = await storage.getActiveRoles();
+        const role = roles.find((r) => r.ruid === roleRuid);
+        roleName = role?.assignedRole ?? role?.roleName ?? role?.name ?? null;
+      } catch {
+      }
+      await storage.createAuditLog({
+        entityType: "role_permission",
+        entityId: roleRuid,
+        actionType: "permission_change",
+        source: "web_ui",
+        vesselCode: null,
+        componentCode: null,
+        payload: {
+          subject: { roleRuid, roleName },
+          before: beforeGrants,
+          after: afterGrants,
+          changedMenus,
+          changedCount: changedMenus.length
+        }
+      });
+    } catch (auditErr) {
+      console.error("[Audit] role permission change log failed:", auditErr?.message);
+    }
     res.json({ success: true, count: result.count });
   } catch (error) {
     res.status(500).json({ error: "Failed to save permissions", details: error.message });
@@ -65568,9 +67042,661 @@ router19.put("/admin/access-control/:roleRuid", async (req, res) => {
 });
 var routes_default19 = router19;
 
-// server/modules/ranks/routes.ts
+// server/modules/audit/routes.ts
 init_middleware();
 import { Router as Router20 } from "express";
+
+// server/modules/audit/service.ts
+init_storage();
+init_db();
+var AUDIT_LOG_ENTITY_TYPES_FOR = {
+  work_orders: ["work_order"],
+  components: ["component"],
+  permissions: ["role_permission", "rank", "retention_setting", "retention_disposition"]
+};
+function humanize(s) {
+  if (!s) return "";
+  return s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function toStr(v) {
+  if (v === null || v === void 0) return null;
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+function mapAuditLogRow(r) {
+  const p = r.payload && typeof r.payload === "object" ? r.payload : {};
+  const et = r.entityType ?? r.entity_type;
+  let entityType = "Record";
+  let logType = "other";
+  let entityRef = r.entityId ?? r.entity_id;
+  if (et === "work_order") {
+    entityType = "Work Order";
+    logType = "work_orders";
+    entityRef = p.workOrderNo || entityRef;
+  } else if (et === "component") {
+    entityType = "Component";
+    logType = "components";
+    entityRef = p.componentCode || r.componentCode || r.component_code || entityRef;
+  } else if (et === "role_permission") {
+    entityType = "Permission (Role)";
+    logType = "permissions";
+    entityRef = p.subject?.roleName || entityRef;
+  } else if (et === "rank") {
+    entityType = "Rank";
+    logType = "permissions";
+    entityRef = p.subject?.rankName || entityRef;
+  } else if (et === "retention_setting") {
+    entityType = "Retention Setting";
+    logType = "permissions";
+    entityRef = p.subject?.label || entityRef;
+  } else if (et === "retention_disposition") {
+    entityType = "Disposition";
+    logType = "permissions";
+    entityRef = p.subject?.label || entityRef;
+  } else {
+    entityType = humanize(et);
+  }
+  let oldValue = toStr(r.oldValue ?? r.old_value);
+  let newValue = toStr(r.newValue ?? r.new_value);
+  let changes = null;
+  if (p.changedFields && typeof p.changedFields === "object") {
+    const parts = Object.entries(p.changedFields).map(([f, v]) => `${f}: ${toStr(v?.old) ?? "\u2205"} \u2192 ${toStr(v?.new) ?? "\u2205"}`);
+    if (parts.length) changes = parts.join("; ");
+  } else if (Array.isArray(p.changedMenus)) {
+    changes = `${p.changedMenus.length} permission(s) changed`;
+  } else if (p.before !== void 0 || p.after !== void 0) {
+    oldValue = oldValue ?? toStr(p.before?.label ?? p.before);
+    newValue = newValue ?? toStr(p.after?.label ?? p.after);
+  }
+  const remarks = toStr(p.rejectionComments ?? p.remarks ?? p.status ?? (p.generated ? "system-generated" : null));
+  const ts = r.timestamp instanceof Date ? r.timestamp.toISOString() : new Date(r.timestamp).toISOString();
+  return {
+    id: `audit_log:${r.id}`,
+    whenTs: ts,
+    when: ts,
+    who: p.actorLabel || r.userId || r.user_id || "system",
+    whoType: p.actorType ?? null,
+    action: humanize(r.actionType ?? r.action_type),
+    entityType,
+    entityRef: entityRef ?? "",
+    oldValue,
+    newValue,
+    changes,
+    logType,
+    remarks,
+    source: r.source ?? null
+  };
+}
+function mapRhRow(r) {
+  const ts = new Date(r.entered_at_utc ?? r.created_at).toISOString();
+  return {
+    id: `running_hours_audit:${r.rhauuid ?? r.id}`,
+    whenTs: ts,
+    when: ts,
+    who: r.actor_label || r.user_id || "system",
+    whoType: null,
+    action: "Running Hours Update",
+    entityType: "Running Hours",
+    entityRef: r.component_name ? `${r.component_name}${r.component_code ? ` (${r.component_code})` : ""}` : r.component_code || r.component_id || "",
+    oldValue: toStr(r.previous_rh),
+    newValue: toStr(r.new_rh),
+    changes: `RH: ${toStr(r.previous_rh) ?? "\u2205"} \u2192 ${toStr(r.new_rh) ?? "\u2205"}`,
+    logType: "running_hours",
+    remarks: toStr(r.notes),
+    source: r.source ?? null
+  };
+}
+function mapPostponementRow(r) {
+  const status = r.status ?? "";
+  let action = `Postpone ${humanize(status)}`;
+  let who = r.created_by_uuid || "Requester";
+  let whenSrc = r.submitted_date || r.created_at;
+  const decided = /approved/i.test(status) || /rejected/i.test(status);
+  if (decided) {
+    action = /approved/i.test(status) ? "Postpone Approved" : "Postpone Rejected";
+    who = r.approved_by || r.authorized_by || r.approver || who;
+    whenSrc = r.approved_date || whenSrc;
+  } else {
+    action = "Postpone Requested";
+  }
+  const tsKey = new Date(r.created_at).toISOString();
+  const displayDate = whenSrc ? new Date(whenSrc).toISOString() : tsKey;
+  const remarks = [r.postponement_reason, r.postponement_remarks, r.approval_remarks].filter(Boolean).join(" \u2014 ") || null;
+  return {
+    id: `work_order_postponements:${r.id}`,
+    whenTs: tsKey,
+    when: displayDate,
+    who,
+    whoType: null,
+    action,
+    entityType: "Postponement",
+    entityRef: r.work_order_no || r.work_order_id || "",
+    oldValue: toStr(r.original_due_date),
+    newValue: toStr(r.new_due_date),
+    changes: `Due: ${toStr(r.original_due_date) ?? "\u2205"} \u2192 ${toStr(r.new_due_date) ?? "\u2205"}`,
+    logType: "postponements",
+    remarks,
+    source: "postponement"
+  };
+}
+async function fetchAuditLog(f, take) {
+  const entityTypes = f.logType && f.logType !== "all" && AUDIT_LOG_ENTITY_TYPES_FOR[f.logType] || void 0;
+  const base = {
+    entityTypes,
+    actionType: f.actionType,
+    actor: f.actor,
+    entityCode: f.entityCode,
+    startDate: f.startDate,
+    endDate: f.endDate
+  };
+  const [rows, total] = await Promise.all([
+    storage.getAuditLogs({ ...base, limit: take, offset: 0 }),
+    storage.countAuditLogs(base)
+  ]);
+  return { rows: rows.map(mapAuditLogRow), total };
+}
+async function fetchRunningHours(f, take) {
+  const pool2 = await getPool();
+  const conds = ["(is_deleted IS DISTINCT FROM true)"];
+  const vals = [];
+  if (f.startDate) {
+    vals.push(f.startDate.toISOString());
+    conds.push(`entered_at_utc >= $${vals.length}`);
+  }
+  if (f.endDate) {
+    vals.push(f.endDate.toISOString());
+    conds.push(`entered_at_utc <= $${vals.length}`);
+  }
+  if (f.actor) {
+    vals.push(`%${f.actor}%`);
+    conds.push(`(actor_label ILIKE $${vals.length} OR user_id ILIKE $${vals.length})`);
+  }
+  if (f.entityCode) {
+    vals.push(`%${f.entityCode}%`);
+    conds.push(`(component_code ILIKE $${vals.length} OR component_name ILIKE $${vals.length})`);
+  }
+  if (f.actionType && !/running|rh/i.test(f.actionType)) {
+    conds.push("1=0");
+  }
+  const where = `WHERE ${conds.join(" AND ")}`;
+  const countRes = await pool2.query(`SELECT count(*)::int n FROM running_hours_audit ${where}`, vals);
+  const rowsRes = await pool2.query(
+    `SELECT rhauuid, id, entered_at_utc, created_at, actor_label, user_id, previous_rh, new_rh, component_name, component_code, component_id, source, notes
+     FROM running_hours_audit ${where} ORDER BY entered_at_utc DESC LIMIT ${take}`,
+    vals
+  );
+  return { rows: rowsRes.rows.map(mapRhRow), total: Number(countRes.rows[0]?.n ?? 0) };
+}
+async function fetchPostponements(f, take) {
+  const pool2 = await getPool();
+  const conds = ["(p.is_deleted IS DISTINCT FROM true)", "p.disposed_at IS NULL"];
+  const vals = [];
+  if (f.startDate) {
+    vals.push(f.startDate.toISOString());
+    conds.push(`p.created_at >= $${vals.length}`);
+  }
+  if (f.endDate) {
+    vals.push(f.endDate.toISOString());
+    conds.push(`p.created_at <= $${vals.length}`);
+  }
+  if (f.actor) {
+    vals.push(`%${f.actor}%`);
+    conds.push(`(p.approved_by ILIKE $${vals.length} OR p.authorized_by ILIKE $${vals.length} OR p.approver ILIKE $${vals.length} OR p.created_by_uuid ILIKE $${vals.length})`);
+  }
+  if (f.entityCode) {
+    vals.push(`%${f.entityCode}%`);
+    conds.push(`(w.work_order_no ILIKE $${vals.length} OR p.work_order_id ILIKE $${vals.length})`);
+  }
+  if (f.actionType && !/postpone/i.test(f.actionType)) {
+    conds.push("1=0");
+  }
+  const where = `WHERE ${conds.join(" AND ")}`;
+  const countRes = await pool2.query(`SELECT count(*)::int n FROM work_order_postponements p LEFT JOIN work_orders w ON w.wouuid = p.work_order_id ${where}`, vals);
+  const rowsRes = await pool2.query(
+    `SELECT p.id, p.created_at, p.submitted_date, p.approved_date, p.status, p.approver, p.approved_by, p.authorized_by,
+            p.created_by_uuid, p.original_due_date, p.new_due_date, p.postponement_reason, p.postponement_remarks,
+            p.approval_remarks, p.work_order_id, w.work_order_no
+     FROM work_order_postponements p LEFT JOIN work_orders w ON w.wouuid = p.work_order_id
+     ${where} ORDER BY p.created_at DESC LIMIT ${take}`,
+    vals
+  );
+  return { rows: rowsRes.rows.map(mapPostponementRow), total: Number(countRes.rows[0]?.n ?? 0) };
+}
+function sourcesFor(logType) {
+  switch (logType) {
+    case "work_orders":
+    case "components":
+    case "permissions":
+      return ["audit_log"];
+    case "running_hours":
+      return ["running_hours"];
+    case "postponements":
+      return ["postponements"];
+    case "all":
+    default:
+      return ["audit_log", "running_hours", "postponements"];
+  }
+}
+async function getAuditTrail(f, page) {
+  const logType = f.logType || "all";
+  const take = page.offset + page.limit;
+  const sources = sourcesFor(logType);
+  const results = await Promise.all(sources.map((s) => {
+    if (s === "audit_log") return fetchAuditLog(f, take);
+    if (s === "running_hours") return fetchRunningHours(f, take);
+    return fetchPostponements(f, take);
+  }));
+  const merged = results.flatMap((r) => r.rows).sort((a, b) => a.whenTs < b.whenTs ? 1 : a.whenTs > b.whenTs ? -1 : 0);
+  const total = results.reduce((sum2, r) => sum2 + r.total, 0);
+  const rows = merged.slice(page.offset, page.offset + page.limit);
+  return { rows, total, limit: page.limit, offset: page.offset };
+}
+async function getAuditTrailForExport(f, cap = 1e4) {
+  const sources = sourcesFor(f.logType || "all");
+  const results = await Promise.all(sources.map((s) => {
+    if (s === "audit_log") return fetchAuditLog(f, cap);
+    if (s === "running_hours") return fetchRunningHours(f, cap);
+    return fetchPostponements(f, cap);
+  }));
+  const total = results.reduce((sum2, r) => sum2 + r.total, 0);
+  const merged = results.flatMap((r) => r.rows).sort((a, b) => a.whenTs < b.whenTs ? 1 : a.whenTs > b.whenTs ? -1 : 0);
+  return { rows: merged.slice(0, cap), capped: total > cap };
+}
+
+// server/modules/audit/excel.ts
+import ExcelJS10 from "exceljs";
+var HEADER_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E5A8E" } };
+var HEADER_FONT = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+var COLUMNS = [
+  { header: "When (UTC)", key: "whenLabel", width: 22 },
+  { header: "Who", key: "who", width: 26 },
+  { header: "Actor Type", key: "whoType", width: 12 },
+  { header: "Action", key: "action", width: 22 },
+  { header: "Entity", key: "entityType", width: 18 },
+  { header: "Entity Ref", key: "entityRef", width: 24 },
+  { header: "Old Value", key: "oldValue", width: 22 },
+  { header: "New Value", key: "newValue", width: 22 },
+  { header: "Changes", key: "changes", width: 50 },
+  { header: "Log Type", key: "logType", width: 16 },
+  { header: "Remarks/Status", key: "remarks", width: 30 }
+];
+async function buildAuditTrailWorkbook(rows, meta) {
+  const wb = new ExcelJS10.Workbook();
+  const ws = wb.addWorksheet("Audit Trail");
+  const title = ws.addRow(["SAIL PMS \u2014 Audit Trail"]);
+  title.font = { bold: true, size: 14 };
+  ws.mergeCells(`A1:${String.fromCharCode(64 + COLUMNS.length)}1`);
+  const sub = ws.addRow([`Generated (UTC): ${meta.generatedAtUtc} | ${meta.filterSummary} | Records: ${rows.length}${meta.capped ? " (capped at 10,000 \u2014 refine filters)" : ""}`]);
+  sub.font = { italic: true, size: 10, color: { argb: "FF555555" } };
+  ws.mergeCells(`A2:${String.fromCharCode(64 + COLUMNS.length)}2`);
+  ws.addRow([]);
+  const headerRow = ws.addRow(COLUMNS.map((c) => c.header));
+  headerRow.eachCell((cell) => {
+    cell.fill = HEADER_FILL;
+    cell.font = HEADER_FONT;
+  });
+  COLUMNS.forEach((c, i) => {
+    ws.getColumn(i + 1).width = c.width;
+  });
+  for (const r of rows) {
+    ws.addRow(COLUMNS.map((c) => {
+      if (c.key === "whenLabel") return r.when;
+      const v = r[c.key];
+      return v === null || v === void 0 ? "" : String(v);
+    }));
+  }
+  const buf = await wb.xlsx.writeBuffer();
+  return Buffer.from(buf);
+}
+
+// server/modules/audit/controller.ts
+var VALID_LOG_TYPES = ["all", "work_orders", "components", "running_hours", "permissions", "postponements"];
+function parseFilters(src) {
+  const logType = VALID_LOG_TYPES.includes(src.logType) ? src.logType : "all";
+  const parseDate5 = (v) => {
+    if (!v) return void 0;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? void 0 : d;
+  };
+  const str = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
+  return {
+    logType,
+    startDate: parseDate5(src.startDate),
+    endDate: parseDate5(src.endDate),
+    actor: str(src.actor),
+    entityCode: str(src.entityCode),
+    actionType: str(src.actionType)
+  };
+}
+function filterSummary(f) {
+  const parts = [`Log type: ${f.logType}`];
+  if (f.startDate) parts.push(`From: ${f.startDate.toISOString().slice(0, 10)}`);
+  if (f.endDate) parts.push(`To: ${f.endDate.toISOString().slice(0, 10)}`);
+  if (f.actor) parts.push(`Actor: ${f.actor}`);
+  if (f.entityCode) parts.push(`Entity: ${f.entityCode}`);
+  if (f.actionType) parts.push(`Action: ${f.actionType}`);
+  return parts.join(" | ");
+}
+async function getAuditTrail2(req, res) {
+  try {
+    const f = parseFilters(req.query);
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "50"), 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+    const result = await getAuditTrail(f, { limit, offset });
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching audit trail:", error);
+    res.status(500).json({ error: "Failed to fetch audit trail", details: error.message });
+  }
+}
+async function exportAuditTrailExcel(req, res) {
+  try {
+    const f = parseFilters({ ...req.query, ...req.body });
+    const { rows, capped } = await getAuditTrailForExport(f, 1e4);
+    const buffer = await buildAuditTrailWorkbook(rows, {
+      generatedAtUtc: (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").slice(0, 19),
+      filterSummary: filterSummary(f),
+      capped
+    });
+    const filename = `audit-trail-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error exporting audit trail:", error);
+    res.status(500).json({ error: "Failed to export audit trail", details: error.message });
+  }
+}
+
+// server/modules/audit/routes.ts
+var router20 = Router20();
+router20.get("/admin/audit-trail", requirePMSAdmin, asyncHandler(getAuditTrail2));
+router20.post("/admin/audit-trail/excel", requirePMSAdmin, asyncHandler(exportAuditTrailExcel));
+router20.get("/admin/audit-trail/excel", requirePMSAdmin, asyncHandler(exportAuditTrailExcel));
+var routes_default20 = router20;
+
+// server/modules/retention/routes.ts
+init_middleware();
+import { Router as Router21 } from "express";
+
+// server/modules/retention/service.ts
+init_db();
+init_storage();
+var CATEGORY_TARGETS = {
+  maintenance: [
+    { table: "audit_log", ageColumn: "timestamp", entityTypes: ["work_order"] },
+    { table: "component_maintenance_history", ageColumn: "created_at" }
+  ],
+  approval: [
+    { table: "work_order_postponements", ageColumn: "created_at" }
+  ],
+  audit_general: [
+    { table: "audit_log", ageColumn: "timestamp", entityTypesNotIn: ["work_order", "role_permission", "rank", "retention_setting", "retention_disposition"] }
+  ],
+  user_access: [
+    { table: "audit_log", ageColumn: "timestamp", entityTypes: ["role_permission", "rank", "retention_setting", "retention_disposition"] }
+  ]
+};
+var VALID_UNITS = ["days", "months", "years", "forever"];
+function periodToDays(value, unit) {
+  if (unit === "forever") return null;
+  if (unit === "days") return value;
+  if (unit === "months") return Math.round(value * 30.44);
+  if (unit === "years") return value * 365;
+  return null;
+}
+function rowToSetting(r) {
+  return {
+    id: r.id,
+    category: r.category,
+    label: r.label,
+    retentionValue: r.retention_value,
+    retentionUnit: r.retention_unit,
+    enabled: r.enabled,
+    isProtected: r.is_protected,
+    minValue: r.min_value,
+    minUnit: r.min_unit,
+    description: r.description,
+    updatedAt: r.updated_at instanceof Date ? r.updated_at.toISOString() : String(r.updated_at),
+    updatedByUuid: r.updated_by_uuid
+  };
+}
+async function getAllSettings2() {
+  const pool2 = await getPool();
+  const r = await pool2.query("SELECT * FROM retention_settings ORDER BY id");
+  return r.rows.map(rowToSetting);
+}
+async function getSetting2(category) {
+  const pool2 = await getPool();
+  const r = await pool2.query("SELECT * FROM retention_settings WHERE category = $1 LIMIT 1", [category]);
+  return r.rows[0] ? rowToSetting(r.rows[0]) : null;
+}
+function buildEligibleWhere(t, days, startIdx) {
+  const params = [];
+  const conds = ["disposed_at IS NULL", `${t.ageColumn} < NOW() - INTERVAL '1 day' * $${startIdx + params.push(days)}`];
+  if (t.entityTypes) conds.push(`entity_type = ANY($${startIdx + params.push(t.entityTypes)})`);
+  if (t.entityTypesNotIn) conds.push(`entity_type <> ALL($${startIdx + params.push(t.entityTypesNotIn)})`);
+  return { sql: conds.join(" AND "), params };
+}
+async function getEligibility() {
+  const pool2 = await getPool();
+  const settings = await getAllSettings2();
+  const out = {};
+  for (const s of settings) {
+    const targets = CATEGORY_TARGETS[s.category];
+    if (!targets) {
+      out[s.category] = { eligible: 0, disposed: 0 };
+      continue;
+    }
+    const days = periodToDays(s.retentionValue, s.retentionUnit);
+    let eligible = 0, disposed = 0;
+    for (const t of targets) {
+      if (days !== null && s.enabled) {
+        const w = buildEligibleWhere(t, days, 0);
+        const er = await pool2.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${w.sql}`, w.params);
+        eligible += Number(er.rows[0]?.n ?? 0);
+      }
+      const dParams = [];
+      let dWhere = "disposed_at IS NOT NULL";
+      if (t.entityTypes) dWhere += ` AND entity_type = ANY($${dParams.push(t.entityTypes)})`;
+      else if (t.entityTypesNotIn) dWhere += ` AND entity_type <> ALL($${dParams.push(t.entityTypesNotIn)})`;
+      const dr = await pool2.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${dWhere}`, dParams);
+      disposed += Number(dr.rows[0]?.n ?? 0);
+    }
+    out[s.category] = { eligible, disposed };
+  }
+  return out;
+}
+var RetentionError = class extends Error {
+  statusCode;
+  constructor(message, statusCode = 400) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+};
+async function updateSetting2(category, patch, actorUuid2) {
+  const existing = await getSetting2(category);
+  if (!existing) throw new RetentionError(`Unknown retention category: ${category}`, 404);
+  const newValue = patch.retentionValue ?? existing.retentionValue;
+  const newUnit = patch.retentionUnit ?? existing.retentionUnit;
+  const newEnabled = patch.enabled ?? existing.enabled;
+  if (!VALID_UNITS.includes(newUnit)) throw new RetentionError(`Invalid unit: ${newUnit}`);
+  if (newUnit !== "forever" && (!Number.isInteger(newValue) || newValue < 0)) {
+    throw new RetentionError("Retention value must be a non-negative integer");
+  }
+  if (existing.isProtected && newUnit !== "forever") {
+    const minDays = periodToDays(existing.minValue, existing.minUnit);
+    const newDays = periodToDays(newValue, newUnit);
+    if (minDays !== null && newDays !== null && newDays < minDays) {
+      throw new RetentionError(
+        `'${existing.label}' is a protected category \u2014 its retention cannot be set below the committed minimum of ${existing.minValue} ${existing.minUnit}.`
+      );
+    }
+  }
+  const pool2 = await getPool();
+  await pool2.query(
+    `UPDATE retention_settings SET retention_value=$1, retention_unit=$2, enabled=$3, updated_at=NOW(), updated_by_uuid=$4 WHERE category=$5`,
+    [newValue, newUnit, newEnabled, actorUuid2, category]
+  );
+  await safeAudit({
+    actionType: "retention_change",
+    entityType: "retention_setting",
+    entityId: category,
+    payload: {
+      subject: { category, label: existing.label },
+      from: { value: existing.retentionValue, unit: existing.retentionUnit, enabled: existing.enabled },
+      to: { value: newValue, unit: newUnit, enabled: newEnabled }
+    }
+  });
+  return await getSetting2(category);
+}
+async function dispose(category, actorUuid2) {
+  const setting = await getSetting2(category);
+  if (!setting) throw new RetentionError(`Unknown retention category: ${category}`, 404);
+  const targets = CATEGORY_TARGETS[category];
+  if (!targets) throw new RetentionError(`Category '${category}' has no disposition flow (forever / auto-prune).`);
+  const days = periodToDays(setting.retentionValue, setting.retentionUnit);
+  if (days === null) throw new RetentionError(`Category '${setting.label}' is retained forever and cannot be disposed.`);
+  const pool2 = await getPool();
+  let count2 = 0;
+  for (const t of targets) {
+    const w = buildEligibleWhere(t, days, 1);
+    const res = await pool2.query(
+      `UPDATE ${t.table} SET disposed_at = NOW(), disposed_by_uuid = $1 WHERE ${w.sql}`,
+      [actorUuid2, ...w.params]
+    );
+    count2 += res.rowCount ?? 0;
+  }
+  await safeAudit({
+    actionType: "dispose",
+    entityType: "retention_disposition",
+    entityId: category,
+    payload: { subject: { category, label: setting.label }, decision: "dispose", count: count2, periodAtDecision: `${setting.retentionValue} ${setting.retentionUnit}` }
+  });
+  return { count: count2 };
+}
+async function retain(category, _actorUuid) {
+  const setting = await getSetting2(category);
+  if (!setting) throw new RetentionError(`Unknown retention category: ${category}`, 404);
+  await safeAudit({
+    actionType: "retain",
+    entityType: "retention_disposition",
+    entityId: category,
+    payload: { subject: { category, label: setting.label }, decision: "retain", periodAtDecision: `${setting.retentionValue} ${setting.retentionUnit}` }
+  });
+  return { ok: true };
+}
+async function revert(category, _actorUuid) {
+  const setting = await getSetting2(category);
+  if (!setting) throw new RetentionError(`Unknown retention category: ${category}`, 404);
+  const targets = CATEGORY_TARGETS[category];
+  if (!targets) throw new RetentionError(`Category '${category}' has no disposition flow.`);
+  const pool2 = await getPool();
+  let count2 = 0;
+  for (const t of targets) {
+    const params = [];
+    let where = "disposed_at IS NOT NULL";
+    if (t.entityTypes) where += ` AND entity_type = ANY($${params.push(t.entityTypes)})`;
+    else if (t.entityTypesNotIn) where += ` AND entity_type <> ALL($${params.push(t.entityTypesNotIn)})`;
+    const res = await pool2.query(`UPDATE ${t.table} SET disposed_at = NULL, disposed_by_uuid = NULL WHERE ${where}`, params);
+    count2 += res.rowCount ?? 0;
+  }
+  await safeAudit({
+    actionType: "revert",
+    entityType: "retention_disposition",
+    entityId: category,
+    payload: { subject: { category, label: setting.label }, decision: "revert", count: count2 }
+  });
+  return { count: count2 };
+}
+async function safeAudit(data) {
+  try {
+    await storage.createAuditLog({
+      entityType: data.entityType,
+      entityId: data.entityId,
+      actionType: data.actionType,
+      source: "web_ui",
+      vesselCode: null,
+      componentCode: null,
+      payload: data.payload
+    });
+  } catch (e) {
+    console.error(`[Audit] retention ${data.actionType} log failed:`, e?.message);
+  }
+}
+
+// server/modules/retention/controller.ts
+init_requestContext();
+function actorUuid() {
+  const a = getAuditActor();
+  return a?.actorId && a.actorId !== "system" ? a.actorId : null;
+}
+async function getRetentionSettings(_req, res) {
+  try {
+    const [settings, eligibility] = await Promise.all([getAllSettings2(), getEligibility()]);
+    res.json({ settings, eligibility });
+  } catch (e) {
+    console.error("Error fetching retention settings:", e);
+    res.status(500).json({ error: "Failed to fetch retention settings", details: e.message });
+  }
+}
+async function updateRetentionSetting(req, res) {
+  try {
+    const updated = await updateSetting2(req.params.category, {
+      retentionValue: req.body.retentionValue,
+      retentionUnit: req.body.retentionUnit,
+      enabled: req.body.enabled
+    }, actorUuid());
+    res.json({ success: true, setting: updated });
+  } catch (e) {
+    if (e instanceof RetentionError) return res.status(e.statusCode).json({ error: e.message });
+    console.error("Error updating retention setting:", e);
+    res.status(500).json({ error: "Failed to update retention setting", details: e.message });
+  }
+}
+async function disposeCategory(req, res) {
+  try {
+    const result = await dispose(req.params.category, actorUuid());
+    res.json({ success: true, ...result });
+  } catch (e) {
+    if (e instanceof RetentionError) return res.status(e.statusCode).json({ error: e.message });
+    console.error("Error disposing category:", e);
+    res.status(500).json({ error: "Failed to dispose records", details: e.message });
+  }
+}
+async function retainCategory(req, res) {
+  try {
+    const result = await retain(req.params.category, actorUuid());
+    res.json({ success: true, ...result });
+  } catch (e) {
+    if (e instanceof RetentionError) return res.status(e.statusCode).json({ error: e.message });
+    console.error("Error retaining category:", e);
+    res.status(500).json({ error: "Failed to record retain decision", details: e.message });
+  }
+}
+async function revertCategory(req, res) {
+  try {
+    const result = await revert(req.params.category, actorUuid());
+    res.json({ success: true, ...result });
+  } catch (e) {
+    if (e instanceof RetentionError) return res.status(e.statusCode).json({ error: e.message });
+    console.error("Error reverting disposition:", e);
+    res.status(500).json({ error: "Failed to revert disposition", details: e.message });
+  }
+}
+
+// server/modules/retention/routes.ts
+var router21 = Router21();
+router21.get("/admin/retention-settings", requirePMSAdmin, asyncHandler(getRetentionSettings));
+router21.put("/admin/retention-settings/:category", requirePMSAdmin, asyncHandler(updateRetentionSetting));
+router21.post("/admin/retention-settings/:category/dispose", requirePMSAdmin, asyncHandler(disposeCategory));
+router21.post("/admin/retention-settings/:category/retain", requirePMSAdmin, asyncHandler(retainCategory));
+router21.post("/admin/retention-settings/:category/revert", requirePMSAdmin, asyncHandler(revertCategory));
+var routes_default21 = router21;
+
+// server/modules/ranks/routes.ts
+init_middleware();
+import { Router as Router22 } from "express";
 
 // server/modules/ranks/controller.ts
 init_service2();
@@ -65741,29 +67867,29 @@ async function getHierarchyScope(req, res) {
 }
 
 // server/modules/ranks/routes.ts
-var router20 = Router20();
-router20.get("/admin/available-ranks", asyncHandler(getRanks));
-router20.get("/admin/available-ranks/:rankId", asyncHandler(getRankById));
-router20.post("/admin/available-ranks", asyncHandler(saveRanks2));
-router20.put("/admin/available-ranks/:rankId", asyncHandler(updateRank2));
-router20.delete("/admin/available-ranks/:rankId", asyncHandler(deleteRank2));
-router20.get("/admin/vessel-org-chart", asyncHandler(getOrgChart));
-router20.get("/admin/vessel-org-chart/:id", asyncHandler(getOrgChartById3));
-router20.post("/admin/vessel-org-chart", asyncHandler(saveOrgChart2));
-router20.put("/admin/vessel-org-chart/:id", asyncHandler(updateOrgChartEntry2));
-router20.delete("/admin/vessel-org-chart/:id", asyncHandler(deleteOrgChartEntry2));
-router20.get("/admin/vessel-org-chart-nodes/:vesselId", asyncHandler(getVesselOrgChartNodes3));
-router20.get("/admin/vessel-department-config/:vesselId", asyncHandler(getVesselDepartmentConfig3));
-router20.get("/hierarchy-scope/:vesselId", asyncHandler(getHierarchyScope));
-router20.get("/hod/:vesselId/:department", asyncHandler(resolveHod));
-var routes_default20 = router20;
+var router22 = Router22();
+router22.get("/admin/available-ranks", asyncHandler(getRanks));
+router22.get("/admin/available-ranks/:rankId", asyncHandler(getRankById));
+router22.post("/admin/available-ranks", asyncHandler(saveRanks2));
+router22.put("/admin/available-ranks/:rankId", asyncHandler(updateRank2));
+router22.delete("/admin/available-ranks/:rankId", asyncHandler(deleteRank2));
+router22.get("/admin/vessel-org-chart", asyncHandler(getOrgChart));
+router22.get("/admin/vessel-org-chart/:id", asyncHandler(getOrgChartById3));
+router22.post("/admin/vessel-org-chart", asyncHandler(saveOrgChart2));
+router22.put("/admin/vessel-org-chart/:id", asyncHandler(updateOrgChartEntry2));
+router22.delete("/admin/vessel-org-chart/:id", asyncHandler(deleteOrgChartEntry2));
+router22.get("/admin/vessel-org-chart-nodes/:vesselId", asyncHandler(getVesselOrgChartNodes3));
+router22.get("/admin/vessel-department-config/:vesselId", asyncHandler(getVesselDepartmentConfig3));
+router22.get("/hierarchy-scope/:vesselId", asyncHandler(getHierarchyScope));
+router22.get("/hod/:vesselId/:department", asyncHandler(resolveHod));
+var routes_default22 = router22;
 
 // server/modules/index.ts
 init_routes();
 
 // server/modules/dashboard/routes.ts
 init_middleware();
-import { Router as Router21 } from "express";
+import { Router as Router23 } from "express";
 
 // server/modules/dashboard/services/maintenanceTrendService.ts
 init_storage();
@@ -66254,8 +68380,8 @@ async function getWoStatusByPeriod(options) {
 }
 
 // server/modules/dashboard/routes.ts
-var router21 = Router21();
-router21.get("/dashboard/maintenance-trend", asyncHandler(async (req, res) => {
+var router23 = Router23();
+router23.get("/dashboard/maintenance-trend", asyncHandler(async (req, res) => {
   const vesselId = req.query.vesselId || "all";
   const yearParam = req.query.year ? parseInt(String(req.query.year), 10) : void 0;
   const monthParam = req.query.month ? parseInt(String(req.query.month), 10) : void 0;
@@ -66275,18 +68401,18 @@ router21.get("/dashboard/maintenance-trend", asyncHandler(async (req, res) => {
   const result = await getMaintenanceTrend({ vesselId, vesselIds, endMonth });
   res.json(result);
 }));
-router21.get("/dashboard/wo-status-by-period", asyncHandler(async (req, res) => {
+router23.get("/dashboard/wo-status-by-period", asyncHandler(async (req, res) => {
   const vesselId = req.query.vesselId || "all";
   const fromStr = req.query.from;
-  const toStr = req.query.to;
+  const toStr2 = req.query.to;
   let from = null;
   let to = null;
-  if (fromStr || toStr) {
-    if (!fromStr || !toStr) {
+  if (fromStr || toStr2) {
+    if (!fromStr || !toStr2) {
       return res.status(400).json({ error: "from and to must both be provided, or both omitted for all-time" });
     }
     from = new Date(fromStr);
-    to = new Date(toStr);
+    to = new Date(toStr2);
     if (isNaN(from.getTime()) || isNaN(to.getTime())) {
       return res.status(400).json({ error: "invalid from or to date" });
     }
@@ -66299,11 +68425,11 @@ router21.get("/dashboard/wo-status-by-period", asyncHandler(async (req, res) => 
   const result = await getWoStatusByPeriod({ vesselId, vesselIds, from, to });
   res.json(result);
 }));
-var routes_default21 = router21;
+var routes_default23 = router23;
 
 // server/modules/shipskart/routes.ts
 init_middleware();
-import { Router as Router22 } from "express";
+import { Router as Router24 } from "express";
 
 // server/modules/shipskart/services/shipskartSsoService.ts
 init_errors();
@@ -66357,11 +68483,11 @@ function maskUrl2(url) {
 function computeHmacSignature(raw, hmacSecret) {
   return crypto4.createHmac("sha256", hmacSecret).update(raw, "utf8").digest("hex");
 }
-async function signedPost(path14, body) {
+async function signedPost(path13, body) {
   const cfg = getShipskartConfig();
   const raw = JSON.stringify(body);
   const signature = computeHmacSignature(raw, cfg.hmacSecret);
-  const url = `${cfg.baseUrl}${path14}`;
+  const url = `${cfg.baseUrl}${path13}`;
   let response;
   try {
     response = await fetch(url, {
@@ -66377,7 +68503,7 @@ async function signedPost(path14, body) {
     });
   } catch (err) {
     const code = err?.cause?.code ? ` (${err.cause.code})` : "";
-    throw new AppError(502, `[Shipskart] Network error calling ${path14}${code}: ${err?.message || err}`);
+    throw new AppError(502, `[Shipskart] Network error calling ${path13}${code}: ${err?.message || err}`);
   }
   let payload = null;
   try {
@@ -66386,7 +68512,7 @@ async function signedPost(path14, body) {
   }
   if (!response.ok || payload && payload.success === false) {
     const errorCode = payload?.errorCode || `HTTP_${response.status}`;
-    const message = payload?.message || `Shipskart ${path14} failed with status ${response.status}`;
+    const message = payload?.message || `Shipskart ${path13} failed with status ${response.status}`;
     const retryable = payload?.retryable === true;
     throw new AppError(response.status || 502, `[Shipskart] ${errorCode}: ${message}`, {
       errorCode,
@@ -66467,13 +68593,13 @@ async function logoutHandler(req, res) {
 }
 
 // server/modules/shipskart/routes.ts
-var router22 = Router22();
-router22.post("/shipskart/sso/initiate", asyncHandler(initiateHandler));
-router22.post("/shipskart/sso/logout", asyncHandler(logoutHandler));
-var routes_default22 = router22;
+var router24 = Router24();
+router24.post("/shipskart/sso/initiate", asyncHandler(initiateHandler));
+router24.post("/shipskart/sso/logout", asyncHandler(logoutHandler));
+var routes_default24 = router24;
 
 // server/modules/noon-report/routes.ts
-import { Router as Router23 } from "express";
+import { Router as Router25 } from "express";
 
 // server/modules/noon-report/config.ts
 var NOON_MODULE_ENABLED = false;
@@ -67533,38 +69659,38 @@ async function emailNoonReport(req, res) {
 }
 
 // server/modules/noon-report/routes.ts
-var router23 = Router23();
+var router25 = Router25();
 if (!NOON_MODULE_ENABLED) {
-  router23.all("/nr-*", (_req, res) => res.status(404).json({ error: "Noon Report module is disabled" }));
+  router25.all("/nr-*", (_req, res) => res.status(404).json({ error: "Noon Report module is disabled" }));
 } else {
-  router23.get("/nr-reports", asyncHandler(getNoonReports3));
-  router23.post("/nr-reports", asyncHandler(createNoonReport2));
-  router23.get("/nr-reports/:id", asyncHandler(getNoonReport2));
-  router23.patch("/nr-reports/:id", asyncHandler(updateNoonReport2));
-  router23.patch("/nr-reports/:id/draft", asyncHandler(saveDraft3));
-  router23.post("/nr-reports/:id/submit", asyncHandler(submitNoonReport2));
-  router23.delete("/nr-reports/:id", asyncHandler(deleteNoonReport2));
-  router23.get("/nr-fuel-rob", asyncHandler(getFuelRob2));
-  router23.get("/nr-kpis", asyncHandler(getVesselKPIs2));
-  router23.get("/nr-fuel-dashboard/:vesselId", asyncHandler(getFuelDashboard2));
-  router23.get("/nr-alerts/:vesselId/count", asyncHandler(getActiveAlertCount2));
-  router23.get("/nr-alerts/:vesselId/all", asyncHandler(getAllAlerts2));
-  router23.get("/nr-alerts/:vesselId", asyncHandler(getActiveAlerts2));
-  router23.patch("/nr-alerts/:alertId/acknowledge", requireOfficeOrAdmin, asyncHandler(acknowledgeAlert2));
-  router23.get("/nr-bunker", asyncHandler(getBunkerRecords3));
-  router23.post("/nr-bunker", asyncHandler(createBunkerRecord3));
-  router23.get("/nr-bunker-cost", asyncHandler(getBunkerCostSummary3));
-  router23.get("/nr-bunker/:id", asyncHandler(getBunkerRecord2));
-  router23.patch("/nr-bunker/:id", asyncHandler(updateBunkerRecord3));
-  router23.delete("/nr-bunker/:id", asyncHandler(deleteBunkerRecord3));
-  router23.get("/nr-fleet-summary", asyncHandler(getFleetSummary2));
-  router23.get("/nr-smtp-status", asyncHandler(getSmtpStatus));
-  router23.post("/nr-reports/:id/email", asyncHandler(emailNoonReport));
+  router25.get("/nr-reports", asyncHandler(getNoonReports3));
+  router25.post("/nr-reports", asyncHandler(createNoonReport2));
+  router25.get("/nr-reports/:id", asyncHandler(getNoonReport2));
+  router25.patch("/nr-reports/:id", asyncHandler(updateNoonReport2));
+  router25.patch("/nr-reports/:id/draft", asyncHandler(saveDraft3));
+  router25.post("/nr-reports/:id/submit", asyncHandler(submitNoonReport2));
+  router25.delete("/nr-reports/:id", asyncHandler(deleteNoonReport2));
+  router25.get("/nr-fuel-rob", asyncHandler(getFuelRob2));
+  router25.get("/nr-kpis", asyncHandler(getVesselKPIs2));
+  router25.get("/nr-fuel-dashboard/:vesselId", asyncHandler(getFuelDashboard2));
+  router25.get("/nr-alerts/:vesselId/count", asyncHandler(getActiveAlertCount2));
+  router25.get("/nr-alerts/:vesselId/all", asyncHandler(getAllAlerts2));
+  router25.get("/nr-alerts/:vesselId", asyncHandler(getActiveAlerts2));
+  router25.patch("/nr-alerts/:alertId/acknowledge", requireOfficeOrAdmin, asyncHandler(acknowledgeAlert2));
+  router25.get("/nr-bunker", asyncHandler(getBunkerRecords3));
+  router25.post("/nr-bunker", asyncHandler(createBunkerRecord3));
+  router25.get("/nr-bunker-cost", asyncHandler(getBunkerCostSummary3));
+  router25.get("/nr-bunker/:id", asyncHandler(getBunkerRecord2));
+  router25.patch("/nr-bunker/:id", asyncHandler(updateBunkerRecord3));
+  router25.delete("/nr-bunker/:id", asyncHandler(deleteBunkerRecord3));
+  router25.get("/nr-fleet-summary", asyncHandler(getFleetSummary2));
+  router25.get("/nr-smtp-status", asyncHandler(getSmtpStatus));
+  router25.post("/nr-reports/:id/email", asyncHandler(emailNoonReport));
 }
-var routes_default23 = router23;
+var routes_default25 = router25;
 
 // server/modules/index.ts
-var moduleRouter = Router24();
+var moduleRouter = Router26();
 moduleRouter.use(routes_default2);
 moduleRouter.use(routes_default3);
 moduleRouter.use(routes_default4);
@@ -67584,10 +69710,12 @@ moduleRouter.use(routes_default17);
 moduleRouter.use(routes_default18);
 moduleRouter.use(routes_default19);
 moduleRouter.use(routes_default20);
-moduleRouter.use(routes_default);
 moduleRouter.use(routes_default21);
 moduleRouter.use(routes_default22);
+moduleRouter.use(routes_default);
 moduleRouter.use(routes_default23);
+moduleRouter.use(routes_default24);
+moduleRouter.use(routes_default25);
 var modules_default = moduleRouter;
 
 // server/routes.ts
@@ -68836,6 +70964,36 @@ async function registerRoutes(app2) {
   app2.use("/technical/api", requestContextMiddleware);
   console.log("\u{1F512} Mock authentication enabled for /technical/api/* routes");
   app2.use("/technical/api", modules_default);
+  app2.get("/technical/api/admin/local-approvers", async (req, res) => {
+    try {
+      const rows = await storage.getLocalApprovers();
+      return res.json(rows);
+    } catch (error) {
+      console.error("[LocalApprovers] Failed to fetch:", error.message);
+      return res.status(500).json({ error: "Failed to fetch local approvers" });
+    }
+  });
+  app2.get("/technical/api/admin/approvers", async (req, res) => {
+    const domain = req.query.domain;
+    if (!domain || domain.trim().length === 0) {
+      return res.status(400).json({ error: 'Missing required "domain" query parameter.' });
+    }
+    try {
+      const { getExternalMasterDataBaseUrl: getExternalMasterDataBaseUrl2 } = await Promise.resolve().then(() => (init_externalApi(), externalApi_exports));
+      const baseUrl = getExternalMasterDataBaseUrl2();
+      const url = `${baseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
+      const apiResponse = await fetch(url, { method: "GET", headers: { "accept": "*/*" } });
+      if (!apiResponse.ok) {
+        return res.status(apiResponse.status).json({ error: `External API returned ${apiResponse.status}` });
+      }
+      const data = await apiResponse.json();
+      const approvers = Array.isArray(data) ? data : data.mocapprovers || [];
+      return res.json({ mocapprovers: approvers });
+    } catch (error) {
+      console.error("[ApproversProxy] Failed to fetch:", error.message);
+      return res.status(502).json({ error: "Failed to fetch approvers from external API" });
+    }
+  });
   const ALLOWED_EXTERNAL_ENDPOINTS = [
     "nationalities",
     "vessels",
@@ -68849,7 +71007,8 @@ async function registerRoutes(app2) {
     "manningagents",
     "crewpools",
     "appraisaltypes",
-    "users"
+    "users",
+    "mocapprovers"
   ];
   app2.get("/technical/api/external/master-data/:endpoint", async (req, res) => {
     const { endpoint } = req.params;
@@ -68885,8 +71044,8 @@ async function registerRoutes(app2) {
     if (!allowedFiles.includes(filename)) {
       return res.status(404).json({ error: "File not found" });
     }
-    const filePath = path9.resolve(process.cwd(), filename);
-    if (fs7.existsSync(filePath)) {
+    const filePath = path8.resolve(process.cwd(), filename);
+    if (fs6.existsSync(filePath)) {
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "text/markdown");
       res.sendFile(filePath);
@@ -69018,6 +71177,28 @@ async function registerRoutes(app2) {
       }
     });
   }
+  app2.get("/technical/api/admin/approval-workflow-config", async (_req, res) => {
+    try {
+      const rows = await storage.getApprovalWorkflowConfig();
+      res.json({ success: true, data: rows });
+    } catch (err) {
+      console.error("[ApprovalWorkflowConfig] GET error:", err);
+      res.status(500).json({ success: false, error: "Failed to fetch approval workflow config" });
+    }
+  });
+  app2.put("/technical/api/admin/approval-workflow-config", async (req, res) => {
+    try {
+      const { rows } = req.body;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ success: false, error: "rows array required" });
+      }
+      const updated = await storage.upsertApprovalWorkflowConfig(rows);
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      console.error("[ApprovalWorkflowConfig] PUT error:", err);
+      res.status(500).json({ success: false, error: "Failed to save approval workflow config" });
+    }
+  });
   const httpServer = createServer(app2);
   storage.recalculateAllRecurringDefects().then(() => {
     console.log("\u2705 Recurring defects recalculated successfully");
@@ -69218,19 +71399,22 @@ async function registerRoutes(app2) {
   };
   process.on("SIGTERM", stopAllSchedulers);
   process.on("SIGINT", stopAllSchedulers);
+  app2.use("/technical/api", (req, res) => {
+    res.status(404).json({ error: "API route not found", path: req.path });
+  });
   return httpServer;
 }
 
 // server/vite.ts
 import express from "express";
-import fs8 from "fs";
-import path11 from "path";
+import fs7 from "fs";
+import path10 from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 
 // vite.config.ts
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import path10 from "path";
+import path9 from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 var BASE_PATH = process.env.NODE_ENV === "production" ? "/technical/" : "/";
 var vite_config_default = defineConfig({
@@ -69241,15 +71425,15 @@ var vite_config_default = defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path10.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path10.resolve(import.meta.dirname, "shared"),
-      "@assets": path10.resolve(import.meta.dirname, "attached_assets")
+      "@": path9.resolve(import.meta.dirname, "client", "src"),
+      "@shared": path9.resolve(import.meta.dirname, "shared"),
+      "@assets": path9.resolve(import.meta.dirname, "attached_assets")
     }
   },
-  root: path10.resolve(import.meta.dirname, "client"),
-  envDir: path10.resolve(import.meta.dirname),
+  root: path9.resolve(import.meta.dirname, "client"),
+  envDir: path9.resolve(import.meta.dirname),
   build: {
-    outDir: path10.resolve(import.meta.dirname, "dist/public"),
+    outDir: path9.resolve(import.meta.dirname, "dist/public"),
     assetsDir: "assets",
     emptyOutDir: true
   },
@@ -69296,13 +71480,13 @@ async function setupVite(app2, server) {
   app2.use("*", async (req, res, next) => {
     const url = req.originalUrl;
     try {
-      const clientTemplate = path11.resolve(
+      const clientTemplate = path10.resolve(
         import.meta.dirname,
         "..",
         "client",
         "index.html"
       );
-      let template = await fs8.promises.readFile(clientTemplate, "utf-8");
+      let template = await fs7.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`
@@ -69316,15 +71500,15 @@ async function setupVite(app2, server) {
   });
 }
 function serveStatic(app2) {
-  const distPath = path11.resolve(import.meta.dirname, "public");
-  if (!fs8.existsSync(distPath)) {
+  const distPath = path10.resolve(import.meta.dirname, "public");
+  if (!fs7.existsSync(distPath)) {
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
   app2.use(express.static(distPath));
   app2.use("*", (_req, res) => {
-    res.sendFile(path11.resolve(distPath, "index.html"));
+    res.sendFile(path10.resolve(distPath, "index.html"));
   });
 }
 
@@ -69336,8 +71520,8 @@ init_postgresClient();
 import { sql as sql21 } from "drizzle-orm";
 import { exec } from "child_process";
 import { promisify } from "util";
-import * as fs9 from "fs";
-import * as path12 from "path";
+import * as fs8 from "fs";
+import * as path11 from "path";
 var execAsync = promisify(exec);
 var migrations = [
   {
@@ -72389,20 +74573,20 @@ async function createDatabaseBackup() {
     return null;
   }
   try {
-    const backupDir = path12.join(process.cwd(), "backup");
-    if (!fs9.existsSync(backupDir)) {
-      fs9.mkdirSync(backupDir, { recursive: true });
+    const backupDir = path11.join(process.cwd(), "backup");
+    if (!fs8.existsSync(backupDir)) {
+      fs8.mkdirSync(backupDir, { recursive: true });
     }
-    const recentBackupMs = fs9.readdirSync(backupDir).filter((f) => f.startsWith("backup_") && f.endsWith(".sql")).map((f) => fs9.statSync(path12.join(backupDir, f)).mtime.getTime());
+    const recentBackupMs = fs8.readdirSync(backupDir).filter((f) => f.startsWith("backup_") && f.endsWith(".sql")).map((f) => fs8.statSync(path11.join(backupDir, f)).mtime.getTime());
     if (recentBackupMs.length > 0 && Date.now() - Math.max(...recentBackupMs) < 24 * 60 * 60 * 1e3) {
       console.log("\u23ED\uFE0F  Skipping startup backup \u2014 recent backup exists (<24h old)");
       return null;
     }
     const timestamp4 = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-    const backupFile = path12.join(backupDir, `backup_${timestamp4}.sql`);
+    const backupFile = path11.join(backupDir, `backup_${timestamp4}.sql`);
     const command = `pg_dump "${databaseUrl}" --no-owner --no-acl > "${backupFile}"`;
     await execAsync(command);
-    const stats = fs9.statSync(backupFile);
+    const stats = fs8.statSync(backupFile);
     const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
     console.log(`\u2705 Database backup created: ${backupFile} (${sizeMB} MB)`);
     await cleanupOldBackups(backupDir, 5);
@@ -72414,11 +74598,11 @@ async function createDatabaseBackup() {
 }
 async function cleanupOldBackups(backupDir, keepCount) {
   try {
-    const files = fs9.readdirSync(backupDir).filter((f) => f.startsWith("backup_") && f.endsWith(".sql")).map((f) => ({ name: f, path: path12.join(backupDir, f), mtime: fs9.statSync(path12.join(backupDir, f)).mtime })).sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+    const files = fs8.readdirSync(backupDir).filter((f) => f.startsWith("backup_") && f.endsWith(".sql")).map((f) => ({ name: f, path: path11.join(backupDir, f), mtime: fs8.statSync(path11.join(backupDir, f)).mtime })).sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
     if (files.length > keepCount) {
       const toDelete = files.slice(keepCount);
       for (const file of toDelete) {
-        fs9.unlinkSync(file.path);
+        fs8.unlinkSync(file.path);
         console.log(`\u{1F5D1}\uFE0F  Deleted old backup: ${file.name}`);
       }
     }
@@ -72527,13 +74711,13 @@ async function runDrizzleMigrations() {
     return { applied: 0, skipped: 0 };
   }
   const { db: db2 } = postgres;
-  const migrationsFolder = path12.join(process.cwd(), "migrations");
-  if (!fs9.existsSync(migrationsFolder)) {
+  const migrationsFolder = path11.join(process.cwd(), "migrations");
+  if (!fs8.existsSync(migrationsFolder)) {
     console.log("\u23ED\uFE0F  Skipping Drizzle migrations - migrations folder not found");
     return { applied: 0, skipped: 0 };
   }
   await ensureMigrationsTable(db2);
-  const sqlFiles = fs9.readdirSync(migrationsFolder).filter((file) => file.endsWith(".sql")).sort();
+  const sqlFiles = fs8.readdirSync(migrationsFolder).filter((file) => file.endsWith(".sql")).sort();
   let applied = 0;
   let skipped = 0;
   for (const sqlFile of sqlFiles) {
@@ -72543,8 +74727,8 @@ async function runDrizzleMigrations() {
       skipped++;
       continue;
     }
-    const filePath = path12.join(migrationsFolder, sqlFile);
-    const sqlContent = fs9.readFileSync(filePath, "utf-8");
+    const filePath = path11.join(migrationsFolder, sqlFile);
+    const sqlContent = fs8.readFileSync(filePath, "utf-8");
     if (!sqlContent.trim()) {
       console.log(`  \u23ED\uFE0F  Skipping empty migration: ${migrationId}`);
       skipped++;
@@ -72651,7 +74835,7 @@ app.use(express2.json({ limit: "50mb" }));
 app.use(express2.urlencoded({ extended: false, limit: "50mb" }));
 app.use((req, res, next) => {
   const start = Date.now();
-  const path14 = req.path;
+  const path13 = req.path;
   let capturedJsonResponse = void 0;
   const originalResJson = res.json;
   res.json = function(bodyJson, ...args) {
@@ -72660,8 +74844,8 @@ app.use((req, res, next) => {
   };
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path14.startsWith("/api")) {
-      let logLine = `${req.method} ${path14} ${res.statusCode} in ${duration}ms`;
+    if (path13.startsWith("/api")) {
+      let logLine = `${req.method} ${path13} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -72705,8 +74889,8 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
     throw err;
   });
-  const clientIndexHtml = path13.resolve(import.meta.dirname, "..", "client", "index.html");
-  const isDevelopment = app.get("env") === "development" && fs10.existsSync(clientIndexHtml);
+  const clientIndexHtml = path12.resolve(import.meta.dirname, "..", "client", "index.html");
+  const isDevelopment = app.get("env") === "development" && fs9.existsSync(clientIndexHtml);
   if (isDevelopment) {
     await setupVite(app, server);
   } else {
