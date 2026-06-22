@@ -489,13 +489,15 @@ export class FileSyncProcessor {
         else priority = 1; // >1MB — low
       }
 
-      // Calculate file hash if file exists locally
+      // Calculate file hash if file exists locally + record local readability.
       let fileHash: string | null = null;
+      let readable = false;
       try {
         const resolvedPath = fileKey.startsWith('local://')
           ? path.join(getStorageDir(tableName), fileKey.replace('local://', ''))
           : fileKey;
         if (fs.existsSync(resolvedPath)) {
+          readable = true;
           const buffer = fs.readFileSync(resolvedPath);
           fileHash = crypto
             .createHash('sha256')
@@ -504,6 +506,18 @@ export class FileSyncProcessor {
         }
       } catch {
         // Hash calculation is best-effort
+      }
+
+      // B-P1.2 pre-flight: a SHIP-side file that isn't readable in local storage can
+      // never be pushed (object-backed or missing on disk). Enqueue it as terminal
+      // 'unsendable' with a clear reason instead of letting it sit 'pending' and silently
+      // retry to 'failed'. Shore behavior is unchanged (only ship_to_shore is gated).
+      let status: string | undefined;
+      let lastError: string | undefined;
+      if (direction === 'ship_to_shore' && !readable) {
+        status = 'unsendable';
+        lastError = 'File not readable in local storage at enqueue (object-backed or missing) — cannot push to shore.';
+        console.warn(`[FileSyncProcessor] UNSENDABLE at enqueue: ${fileName || fileKey} (${tableName}) — not locally readable`);
       }
 
       // Calculate total chunks
@@ -523,6 +537,8 @@ export class FileSyncProcessor {
         instanceId,
         totalChunks,
         priority,
+        status,
+        lastError,
       });
 
       console.log(

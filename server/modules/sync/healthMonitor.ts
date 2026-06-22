@@ -141,29 +141,37 @@ async function checkStuckFiles(thresholds: HealthThresholds): Promise<HealthChec
     return { status: 'warning', message: 'Database not available', value: 0, threshold: thresholds.stuckFileHours };
   }
 
+  // Aged pending/in_progress = stuck; failed/unsendable = needs operator attention (any age).
+  // B-P1.1: surface both so a stuck or failed file alerts instead of sitting silently.
   const result = await pool.query(
-    `SELECT COUNT(*)::int AS count
+    `SELECT
+       COUNT(*) FILTER (WHERE status IN ('pending','in_progress')
+                          AND created_at < NOW() - INTERVAL '1 hour' * $1)::int AS stuck,
+       COUNT(*) FILTER (WHERE status IN ('failed','unsendable'))::int AS failed
      FROM sync_file_queue
-     WHERE status IN ('pending', 'in_progress')
-       AND is_deleted = false
-       AND created_at < NOW() - INTERVAL '1 hour' * $1`,
+     WHERE is_deleted = false`,
     [thresholds.stuckFileHours]
   );
-  const stuckFiles = result.rows[0]?.count ?? 0;
+  const stuckFiles = result.rows[0]?.stuck ?? 0;
+  const failedFiles = result.rows[0]?.failed ?? 0;
+  const total = stuckFiles + failedFiles;
 
-  if (stuckFiles === 0) {
+  if (total === 0) {
     return {
       status: 'ok',
-      message: 'No stuck file transfers',
+      message: 'No stuck or failed file transfers',
       value: 0,
       threshold: thresholds.stuckFileHours,
     };
   }
 
+  const parts: string[] = [];
+  if (stuckFiles > 0) parts.push(`${stuckFiles} stuck > ${thresholds.stuckFileHours}h`);
+  if (failedFiles > 0) parts.push(`${failedFiles} failed/unsendable`);
   return {
-    status: stuckFiles > 5 ? 'critical' : 'warning',
-    message: `${stuckFiles} file transfer(s) stuck for over ${thresholds.stuckFileHours} hours`,
-    value: stuckFiles,
+    status: total > 5 || failedFiles > 0 ? 'critical' : 'warning',
+    message: `File transfers need attention: ${parts.join(', ')}`,
+    value: total,
     threshold: thresholds.stuckFileHours,
   };
 }
