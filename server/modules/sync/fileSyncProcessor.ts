@@ -39,6 +39,11 @@ const MAX_FILE_RETRIES = 3;
 // (seconds) are unaffected — only a slow/stuck file on a degraded link is bounded.
 const CHUNK_TIMEOUT_MS = parseInt(process.env.SYNC_FILE_CHUNK_TIMEOUT_MS || '', 10) || 30000; // A3: per 256KB chunk upload
 const FILE_MAX_MS = parseInt(process.env.SYNC_FILE_MAX_MS || '', 10) || 120000;               // B-P0.1: per-file overall budget
+// B-P2.2: optional size-based deferral (0 = off ⇒ no deferral) and inter-chunk pacing
+// (0 = no delay ⇒ byte-identical send cadence). Both default-preserving. Chunk SIZE is never
+// adaptive (it would break chunk_offset resume) — only the cadence (delay) is tunable.
+const DEFER_BYTES = parseInt(process.env.SYNC_FILE_DEFER_BYTES || '', 10) || 0;
+const CHUNK_DELAY_MS = parseInt(process.env.SYNC_FILE_CHUNK_DELAY_MS || '', 10) || 0;
 const TEMP_DIR = path.resolve(process.cwd(), '.private', 'sync-temp');
 
 // Storage base directories (match the app's conventions)
@@ -127,67 +132,101 @@ export class FileSyncProcessor {
         syncDiag(`FILE-SYNC PROCESS: ${fileEntry.tableName}/${fileEntry.fileKey} (${fileEntry.fileSizeBytes || '?'} bytes) status=${fileEntry.status}`);
         await syncRepo.updateFileStatus(fileEntry.queueUuid, 'in_progress');
 
-        // Read the file from local storage
-        const fileBuffer = await this.readLocalFile(
-          fileEntry.fileKey,
-          fileEntry.tableName
-        );
-        if (!fileBuffer) {
-          throw new Error(`File not found: ${fileEntry.fileKey}`);
+        // B-P2.1 / B-P2.3: resolve the local file. null = object-backed (no local copy) OR
+        // deleted from disk after enqueue → mark TERMINAL 'unsendable' with a reason (surfaced
+        // on the dashboard + health alert), NOT a silent retry-to-failed. This covers files that
+        // become unreadable AFTER enqueue too (the enqueue-time guard is B-P1.2).
+        const filePath = this.resolveLocalPath(fileEntry.fileKey, fileEntry.tableName);
+        if (!filePath) {
+          await syncRepo.updateFileStatus(
+            fileEntry.queueUuid,
+            'unsendable',
+            fileEntry.chunkOffset || 0,
+            'File not found in local storage at transfer (object-backed or deleted from disk)'
+          );
+          filesFailed++;
+          syncDiag(`FILE-SYNC UNSENDABLE: ${fileEntry.fileKey} — not found in local storage`);
+          console.warn(`[FileSyncProcessor] UNSENDABLE: ${fileEntry.fileName || fileEntry.fileKey} — file missing from local storage`);
+          continue;
         }
 
-        // Calculate hash for verification
-        const hash = crypto
-          .createHash('sha256')
-          .update(fileBuffer)
-          .digest('hex');
+        const fileSize = (await fs.promises.stat(filePath)).size;
 
-        // Split into chunks
-        const totalChunks = Math.ceil(fileBuffer.length / CHUNK_SIZE_BYTES);
+        // B-P2.2: defer files over the (optional) size threshold to a later cycle. Default off
+        // (0) ⇒ no deferral. Deferred = stays 'pending'/resumable, never 'failed'.
+        if (DEFER_BYTES > 0 && fileSize > DEFER_BYTES) {
+          await syncRepo.updateFileStatus(fileEntry.queueUuid, 'pending', fileEntry.chunkOffset || 0);
+          syncDiag(`FILE-SYNC DEFER (size): ${fileEntry.fileKey} ${fileSize}B > ${DEFER_BYTES}B threshold — deferred to a later cycle`);
+          continue;
+        }
+
+        // Chunk size is FIXED (CHUNK_SIZE_BYTES, never adaptive) so chunk_offset resume stays
+        // valid across cycles. Stream with one open fd: bounded memory (one chunk), not the
+        // whole file.
+        const totalChunks = Math.ceil(fileSize / CHUNK_SIZE_BYTES);
         const startChunk = fileEntry.chunkOffset || 0; // Resume from last successful chunk
         const fileStart = Date.now();
         let deferred = false;
 
-        for (let i = startChunk; i < totalChunks; i++) {
-          // B-P0.1: per-file overall deadline. On exceed, DEFER (not fail) — persist the
-          // resume offset, leave status 'pending', and move to the next file. This is NOT
-          // counted as a retry, so a large file on a thin link keeps resuming across cycles
-          // instead of burning its retry budget and going to 'failed'.
-          if (Date.now() - fileStart > FILE_MAX_MS) {
-            await syncRepo.updateFileStatus(fileEntry.queueUuid, 'pending', i);
-            syncDiag(`FILE-SYNC DEFER: ${fileEntry.fileKey} exceeded ${FILE_MAX_MS}ms — resuming from chunk ${i}/${totalChunks} next cycle`);
-            deferred = true;
-            break;
+        const fh = await fs.promises.open(filePath, 'r');
+        try {
+          // Pass 1: SHA-256 over the ENTIRE file, streamed. Byte-identical to the prior
+          // whole-buffer hash, so the receiver's post-reassembly integrity check is unchanged.
+          const hasher = crypto.createHash('sha256');
+          const hbuf = Buffer.allocUnsafe(CHUNK_SIZE_BYTES);
+          let hpos = 0;
+          for (;;) {
+            const { bytesRead } = await fh.read(hbuf, 0, CHUNK_SIZE_BYTES, hpos);
+            if (bytesRead <= 0) break;
+            hasher.update(hbuf.subarray(0, bytesRead));
+            hpos += bytesRead;
           }
-          const start = i * CHUNK_SIZE_BYTES;
-          const end = Math.min(start + CHUNK_SIZE_BYTES, fileBuffer.length);
-          const chunkData = fileBuffer.subarray(start, end).toString('base64');
+          const hash = hasher.digest('hex');
 
-          const chunk: FileChunk = {
-            queueUuid: fileEntry.queueUuid,
-            chunkIndex: i,
-            totalChunks,
-            data: chunkData,
-            fileHash: hash,
-            // Include file metadata so the RECEIVING side can save the file
-            fileKey: fileEntry.fileKey,
-            tableName: fileEntry.tableName,
-            fileName: fileEntry.fileName ?? null,
-            fileSizeBytes: fileEntry.fileSizeBytes ?? null,
-            vesselId: fileEntry.vesselId ?? null,
-          };
+          // Pass 2: send chunks from startChunk, reading each at its fixed offset.
+          const cbuf = Buffer.allocUnsafe(CHUNK_SIZE_BYTES);
+          for (let i = startChunk; i < totalChunks; i++) {
+            // B-P0.1: per-file overall deadline. On exceed, DEFER (not fail) — persist the
+            // resume offset, leave status 'pending', and move to the next file.
+            if (Date.now() - fileStart > FILE_MAX_MS) {
+              await syncRepo.updateFileStatus(fileEntry.queueUuid, 'pending', i);
+              syncDiag(`FILE-SYNC DEFER: ${fileEntry.fileKey} exceeded ${FILE_MAX_MS}ms — resuming from chunk ${i}/${totalChunks} next cycle`);
+              deferred = true;
+              break;
+            }
+            const start = i * CHUNK_SIZE_BYTES;
+            const want = Math.min(CHUNK_SIZE_BYTES, fileSize - start);
+            const { bytesRead } = await fh.read(cbuf, 0, want, start);
+            const chunkData = cbuf.subarray(0, bytesRead).toString('base64');
 
-          // Send chunk (via sync API or local mode)
-          await this.sendChunk(chunk);
+            const chunk: FileChunk = {
+              queueUuid: fileEntry.queueUuid,
+              chunkIndex: i,
+              totalChunks,
+              data: chunkData,
+              fileHash: hash,
+              // Include file metadata so the RECEIVING side can save the file
+              fileKey: fileEntry.fileKey,
+              tableName: fileEntry.tableName,
+              fileName: fileEntry.fileName ?? null,
+              fileSizeBytes: fileEntry.fileSizeBytes ?? null,
+              vesselId: fileEntry.vesselId ?? null,
+            };
 
-          // Update progress
-          await syncRepo.updateFileStatus(
-            fileEntry.queueUuid,
-            'in_progress',
-            i + 1 // chunk_offset = next chunk to send
-          );
+            // Send chunk (via sync API or local mode)
+            await this.sendChunk(chunk);
 
-          bytesTransferred += end - start;
+            // Update progress (chunk_offset = next chunk to send)
+            await syncRepo.updateFileStatus(fileEntry.queueUuid, 'in_progress', i + 1);
+            bytesTransferred += bytesRead;
+
+            // B-P2.2: optional gentle inter-chunk pacing for thin links (default 0 ⇒ no delay).
+            if (CHUNK_DELAY_MS > 0 && i + 1 < totalChunks) {
+              await new Promise((r) => setTimeout(r, CHUNK_DELAY_MS));
+            }
+          }
+        } finally {
+          await fh.close();
         }
 
         if (deferred) continue; // per-file deadline hit — not completed, not failed; resumes next cycle
@@ -195,9 +234,9 @@ export class FileSyncProcessor {
         // Mark completed
         await syncRepo.markFileCompleted(fileEntry.queueUuid);
         filesProcessed++;
-        syncDiag(`FILE-SYNC OK: ${fileEntry.fileKey} — transferred ${fileBuffer.length} bytes in ${totalChunks} chunks`);
+        syncDiag(`FILE-SYNC OK: ${fileEntry.fileKey} — transferred ${fileSize} bytes in ${totalChunks} chunks (streamed)`);
         console.log(
-          `[FileSyncProcessor] Completed: ${fileEntry.fileName || fileEntry.fileKey} (${totalChunks} chunks, ${fileBuffer.length} bytes)`
+          `[FileSyncProcessor] Completed: ${fileEntry.fileName || fileEntry.fileKey} (${totalChunks} chunks, ${fileSize} bytes)`
         );
       } catch (error: any) {
         filesFailed++;
@@ -360,46 +399,24 @@ export class FileSyncProcessor {
   }
 
   /**
-   * Read a file from local storage.
-   * Adapts based on tableName and the app's dual-backend storage.
+   * Resolve a queued file to its existing LOCAL path (mirrors the prior dual-backend
+   * resolution). Returns the absolute path, or null when the file is not present locally —
+   * i.e. object-backed (no local copy) OR deleted from disk after enqueue. Transfer streams
+   * from this path instead of loading the whole file into memory. No object-storage fetch
+   * (decided B-P2.1: ship files are local; a non-local file is flagged terminal upstream).
    */
-  private async readLocalFile(
-    fileKey: string,
-    tableName: string
-  ): Promise<Buffer | null> {
-    // WO docs use local:// prefix for local storage
+  private resolveLocalPath(fileKey: string, tableName: string): string | null {
     if (fileKey.startsWith('local://')) {
-      const relativePath = fileKey.replace('local://', '');
-      const baseDir = getStorageDir(tableName);
-      const fullPath = path.join(baseDir, relativePath);
-      if (fs.existsSync(fullPath)) {
-        return fs.readFileSync(fullPath);
-      }
+      const fullPath = path.join(getStorageDir(tableName), fileKey.replace('local://', ''));
+      if (fs.existsSync(fullPath)) return fullPath;
     }
-
-    // Try as a plain relative key under the appropriate directory
     const primaryDir = getStorageDir(tableName);
     const dirs = [primaryDir, ...[WO_DOCS_DIR, COMPONENT_DOCS_DIR, DEFECT_DOCS_DIR, CR_DOCS_DIR].filter(d => d !== primaryDir)];
-
     for (const dir of dirs) {
       const fullPath = path.join(dir, fileKey);
-      if (fs.existsSync(fullPath)) {
-        return fs.readFileSync(fullPath);
-      }
+      if (fs.existsSync(fullPath)) return fullPath;
     }
-
-    // Try absolute path
-    if (fs.existsSync(fileKey)) {
-      return fs.readFileSync(fileKey);
-    }
-
-    // Object Storage files cannot be read locally without the GCS client.
-    // In production, the file would need to be downloaded from Object Storage first.
-    // For now, skip cloud-stored files and log a warning.
-    console.warn(
-      `[FileSyncProcessor] File not found locally: ${fileKey} (table: ${tableName}). ` +
-        `If stored in Object Storage, cloud-to-cloud transfer is not yet implemented.`
-    );
+    if (fs.existsSync(fileKey)) return fileKey;
     return null;
   }
 
