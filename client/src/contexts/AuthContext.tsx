@@ -76,10 +76,10 @@ function resolveDomain(): string | null {
 
 const DEFAULT_USER: PublicUser = {
   id: 1,
-  username: "Jeevan Admin",
-  fullName: "Jeevan SuperAdmin",
-  email: "jeevan.naik@safe-lanes.com",
-  role: "Super Admin",
+  username: "replit",
+  fullName: "replit",
+  email: "replit.naik@safe-lanes.com",
+  role: "Sail Admin",
   userType: "Office",
   vesselId: null,
   department: null,

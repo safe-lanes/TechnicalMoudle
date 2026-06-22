@@ -37,7 +37,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
   selectedSubModule, 
   onSubModuleChange 
 }) => {
-  const { hasAnyChildAccess, canViewMenu, isLoading: permissionsLoading } = usePermissions();
+  const { hasAnyChildAccess, isLoading: permissionsLoading } = usePermissions();
   const { isSailAdmin } = useUIRole();
 
   const menuItems = [
@@ -68,13 +68,12 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       icon: Shield,
     },
     // ====== PURCHASING NAV LINK (Shipskart SSO) — START ======
-    // Visible only when can_view=true for the "purchasing" RBAC menu entry.
-    // Gated via hasAnyChildAccess("purchasing") like all other top-nav items.
+    // Always visible to all logged-in users — not controlled by RBAC.
     {
       id: "purchasing",
       label: "Purchasing",
       icon: ShoppingCart,
-      directMenuName: "purchasing",
+      alwaysVisible: true,
     },
     // ====== PURCHASING NAV LINK (Shipskart SSO) — END ======
     // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
@@ -101,7 +100,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
         
         {menuItems.filter((item) => {
           if (item.isModule) return true;
-          if (item.directMenuName) return canViewMenu(item.directMenuName);
+          if (item.alwaysVisible) return true;
           return hasAnyChildAccess(item.id);
         }).map((item) => {
           const Icon = item.icon;

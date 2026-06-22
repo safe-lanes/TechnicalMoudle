@@ -117,12 +117,7 @@ export default function AccessControl() {
     };
   };
 
-  const READONLY_MENU_NAMES = new Set(["purchasing"]);
-
-  const isReadOnlyMenu = (menuName: string): boolean => READONLY_MENU_NAMES.has(menuName);
-
   const updatePermission = (muid: string, field: keyof Permission, value: boolean, menuName?: string) => {
-    if (menuName && isReadOnlyMenu(menuName) && field !== "canView") return;
     const current = getPermission(muid);
     const updated = { ...current, menuMuid: muid, [field]: value };
     const newPerms = { ...effectivePermissions, [muid]: updated };
@@ -131,15 +126,14 @@ export default function AccessControl() {
   };
 
   const toggleSelectAll = (muid: string, checked: boolean, menuName?: string) => {
-    const readOnly = menuName ? isReadOnlyMenu(menuName) : false;
     const current = getPermission(muid);
     const updated = {
       ...current,
       menuMuid: muid,
       canView: checked,
-      canCreate: readOnly ? false : checked,
-      canEdit: readOnly ? false : checked,
-      canDelete: readOnly ? false : checked,
+      canCreate: checked,
+      canEdit: checked,
+      canDelete: checked,
     };
     const newPerms = { ...effectivePermissions, [muid]: updated };
     setPermissions(newPerms);
@@ -303,20 +297,17 @@ export default function AccessControl() {
                               />
                             </div>
                             {(["canView", "canCreate", "canEdit", "canDelete"] as const).map((field) => {
-                              const writeDisabled = field !== "canView" && isReadOnlyMenu(node.name);
                               return (
                                 <div
                                   key={field}
                                   className="flex justify-center"
                                   onClick={(e) => e.stopPropagation()}
-                                  title={writeDisabled ? "Purchasing is read-only (third-party API)" : undefined}
                                 >
                                   <Checkbox
-                                    checked={writeDisabled ? false : getPermission(node.muid)[field]}
+                                    checked={getPermission(node.muid)[field]}
                                     onCheckedChange={(checked) => updatePermission(node.muid, field, !!checked, node.name)}
-                                    disabled={writeDisabled}
                                     data-testid={`checkbox-${field}-${node.name}`}
-                                    className={writeDisabled ? "opacity-30 cursor-not-allowed" : ""}
+                                    className=""
                                   />
                                 </div>
                               );
