@@ -38,7 +38,15 @@ import { isShipInstanceId } from './syncRole';
 const CHUNK_SIZE = 200;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [5000, 15000, 45000]; // Exponential backoff (ms)
-const REQUEST_TIMEOUT = 30000;
+// Env-tunable sync limits. Defaults preserve the prior hardcoded behavior exactly
+// (no env set ⇒ byte-identical to before). Set per-instance (ship-only) to tune a
+// vessel on a degraded link without affecting other instances.
+const REQUEST_TIMEOUT = parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || '', 10) || 30000; // A2: per /sync/push attempt
+const PUSH_BATCH_SIZE = parseInt(process.env.SYNC_PUSH_BATCH_SIZE || '', 10) || 1000;      // A1: field-log rows per push
+// B-P0.2: overall budget for the file-transfer phase so a slow/stuck file can never
+// hang the sync cycle. Healthy file syncs finish in seconds and are unaffected; only
+// a runaway phase is cut (files remain pending/resumable). 0 / unset ⇒ default below.
+const FILE_PHASE_MAX_MS = parseInt(process.env.SYNC_FILE_PHASE_MAX_MS || '', 10) || 120000;
 
 // ── Types ──
 
@@ -232,7 +240,10 @@ export class SyncEngine {
       let filesFailedCount = 0;
       try {
         const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl);
-        const fileResult = await fileProcessor.processQueue(vesselId, batchUuid!);
+        // B-P0.2: bound the file phase so it cannot hang the cycle. processQueue returns
+        // cleanly once the budget is exceeded (remaining files stay pending/resumable).
+        // Field-data success is already independent of files (this block is non-fatal).
+        const fileResult = await fileProcessor.processQueue(vesselId, batchUuid!, FILE_PHASE_MAX_MS);
         filesProcessedCount = fileResult.filesProcessed;
         filesFailedCount = fileResult.filesFailed;
         console.log(
@@ -343,7 +354,7 @@ export class SyncEngine {
     const vesselCode = await this.getVesselCode(vesselId);
     syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
     const fieldLogs = isShip
-      ? await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode)
+      ? await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, PUSH_BATCH_SIZE)
       : [];
     syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip ? ' (shore skips field log push)' : ''}`);
     // Table breakdown

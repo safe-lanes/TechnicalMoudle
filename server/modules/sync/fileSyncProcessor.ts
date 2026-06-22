@@ -35,6 +35,10 @@ import { isShipInstanceId } from './syncRole';
 
 const CHUNK_SIZE_BYTES = 256 * 1024; // 256KB per chunk
 const MAX_FILE_RETRIES = 3;
+// Env-tunable file-sync limits. Defaults preserve prior behavior; healthy transfers
+// (seconds) are unaffected — only a slow/stuck file on a degraded link is bounded.
+const CHUNK_TIMEOUT_MS = parseInt(process.env.SYNC_FILE_CHUNK_TIMEOUT_MS || '', 10) || 30000; // A3: per 256KB chunk upload
+const FILE_MAX_MS = parseInt(process.env.SYNC_FILE_MAX_MS || '', 10) || 120000;               // B-P0.1: per-file overall budget
 const TEMP_DIR = path.resolve(process.cwd(), '.private', 'sync-temp');
 
 // Storage base directories (match the app's conventions)
@@ -89,7 +93,8 @@ export class FileSyncProcessor {
    */
   async processQueue(
     vesselId: string,
-    _syncBatchId: string
+    _syncBatchId: string,
+    phaseDeadlineMs?: number
   ): Promise<{
     filesProcessed: number;
     filesFailed: number;
@@ -98,6 +103,7 @@ export class FileSyncProcessor {
     let filesProcessed = 0;
     let filesFailed = 0;
     let bytesTransferred = 0;
+    const phaseStart = Date.now();
 
     // Determine direction based on instance identity
     const direction = isShipInstanceId(this.instanceId)
@@ -111,6 +117,12 @@ export class FileSyncProcessor {
     );
 
     for (const fileEntry of pendingFiles) {
+      // B-P0.2: stop cleanly once the file-phase budget is exceeded — remaining files
+      // stay 'pending' (resumable next cycle) and the sync cycle proceeds to completion.
+      if (phaseDeadlineMs && Date.now() - phaseStart > phaseDeadlineMs) {
+        syncDiag(`FILE-SYNC PHASE BUDGET HIT: stopping after ${filesProcessed} processed / ${filesFailed} failed; remaining files left pending (resumable)`);
+        break;
+      }
       try {
         syncDiag(`FILE-SYNC PROCESS: ${fileEntry.tableName}/${fileEntry.fileKey} (${fileEntry.fileSizeBytes || '?'} bytes) status=${fileEntry.status}`);
         await syncRepo.updateFileStatus(fileEntry.queueUuid, 'in_progress');
@@ -133,8 +145,20 @@ export class FileSyncProcessor {
         // Split into chunks
         const totalChunks = Math.ceil(fileBuffer.length / CHUNK_SIZE_BYTES);
         const startChunk = fileEntry.chunkOffset || 0; // Resume from last successful chunk
+        const fileStart = Date.now();
+        let deferred = false;
 
         for (let i = startChunk; i < totalChunks; i++) {
+          // B-P0.1: per-file overall deadline. On exceed, DEFER (not fail) — persist the
+          // resume offset, leave status 'pending', and move to the next file. This is NOT
+          // counted as a retry, so a large file on a thin link keeps resuming across cycles
+          // instead of burning its retry budget and going to 'failed'.
+          if (Date.now() - fileStart > FILE_MAX_MS) {
+            await syncRepo.updateFileStatus(fileEntry.queueUuid, 'pending', i);
+            syncDiag(`FILE-SYNC DEFER: ${fileEntry.fileKey} exceeded ${FILE_MAX_MS}ms — resuming from chunk ${i}/${totalChunks} next cycle`);
+            deferred = true;
+            break;
+          }
           const start = i * CHUNK_SIZE_BYTES;
           const end = Math.min(start + CHUNK_SIZE_BYTES, fileBuffer.length);
           const chunkData = fileBuffer.subarray(start, end).toString('base64');
@@ -165,6 +189,8 @@ export class FileSyncProcessor {
 
           bytesTransferred += end - start;
         }
+
+        if (deferred) continue; // per-file deadline hit — not completed, not failed; resumes next cycle
 
         // Mark completed
         await syncRepo.markFileCompleted(fileEntry.queueUuid);
@@ -427,7 +453,7 @@ export class FileSyncProcessor {
         'X-Sync-Instance-Id': this.instanceId,
       },
       body: JSON.stringify(chunk),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(CHUNK_TIMEOUT_MS),
     });
 
     if (!response.ok) {
