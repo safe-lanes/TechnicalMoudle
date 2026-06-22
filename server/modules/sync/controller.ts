@@ -231,22 +231,77 @@ export async function uploadChunkHandler(req: Request, res: Response) {
 
 // ── GET /sync/file/queue ──
 
+// Friendly module label per source table — the operator sees which area a file belongs
+// to without exposing any file path / storage key.
+const FILE_CATEGORY_LABELS: Record<string, string> = {
+  work_order_documents: 'Work Order',
+  component_documents: 'Component',
+  defect_attachments: 'Defect',
+  change_request_attachment: 'Change Request',
+};
+function fileCategoryLabel(tableName: string): string {
+  return FILE_CATEGORY_LABELS[tableName]
+    || tableName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export async function fileQueueHandler(req: Request, res: Response) {
   try {
     const vesselId = (req.query.vesselId as string) || '';
-    const direction = (req.query.direction as string) || 'ship_to_shore';
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limit = parseInt(req.query.limit as string) || 100;
 
     if (!vesselId) {
       return res.status(400).json({ error: 'vesselId query param is required' });
     }
 
-    const files = await syncRepo.getPendingFiles(vesselId, direction, limit);
+    // B-P1.1: surface pending/in_progress/failed/unsendable/skipped files with a friendly
+    // category + reason. NEVER expose file_key / file path.
+    const rows = await syncRepo.getFileQueueForDashboard(vesselId, limit);
+    const files = rows.map((f: any) => ({
+      queueUuid: f.queueUuid,
+      category: fileCategoryLabel(f.tableName),
+      fileName: f.fileName,
+      fileSize: f.fileSizeBytes,
+      direction: f.direction,
+      status: f.status,
+      chunkOffset: f.chunkOffset ?? 0,
+      totalChunks: f.totalChunks,
+      retryCount: f.retryCount ?? 0,
+      lastError: f.lastError ?? null,
+      createdAt: f.createdAt,
+    }));
     res.json({ files, count: files.length });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] file-queue error:', error);
     res.status(500).json({ error: 'Failed to get file queue' });
+  }
+}
+
+// ── POST /sync/file/:queueUuid/retry ──  (B-P1.1)
+export async function retryFileHandler(req: Request, res: Response) {
+  try {
+    const { queueUuid } = req.params;
+    if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
+    const updated = await syncRepo.retryFileQueueEntry(queueUuid);
+    if (!updated) return res.status(404).json({ error: 'File queue entry not found' });
+    res.json({ success: true, status: updated.status });
+  } catch (error: any) {
+    console.error('[Sync] file retry error:', error);
+    res.status(500).json({ error: 'Failed to retry file' });
+  }
+}
+
+// ── POST /sync/file/:queueUuid/skip ──  (B-P1.1)
+export async function skipFileHandler(req: Request, res: Response) {
+  try {
+    const { queueUuid } = req.params;
+    if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
+    const updated = await syncRepo.skipFileQueueEntry(queueUuid);
+    if (!updated) return res.status(404).json({ error: 'File queue entry not found' });
+    res.json({ success: true, status: updated.status });
+  } catch (error: any) {
+    console.error('[Sync] file skip error:', error);
+    res.status(500).json({ error: 'Failed to skip file' });
   }
 }
 

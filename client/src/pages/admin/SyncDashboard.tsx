@@ -87,9 +87,8 @@ interface SyncConflict {
 }
 
 interface FileQueueItem {
-  id: number;
   queueUuid: string;
-  sourceTable: string;
+  category: string;        // friendly module label (e.g. "Work Order") — never a path/key
   fileName: string;
   fileSize: number | null;
   direction: string;
@@ -97,6 +96,8 @@ interface FileQueueItem {
   chunkOffset: number;
   totalChunks: number | null;
   retryCount: number;
+  lastError: string | null;
+  createdAt: string | null;
 }
 
 interface SyncTriggerResult {
@@ -117,6 +118,17 @@ function formatDuration(ms: number | null): string {
   const absMs = Math.abs(ms);
   if (absMs < 1000) return `${absMs}ms`;
   return `${(absMs / 1000).toFixed(1)}s`;
+}
+
+function formatAge(iso: string | null): string {
+  if (!iso) return "-";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (isNaN(ms) || ms < 0) return "-";
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
 }
 
 function formatDateTime(iso: string | null): string {
@@ -226,6 +238,26 @@ export default function SyncDashboard() {
     },
     enabled: !!selectedVesselId,
     refetchInterval: 30_000,
+  });
+
+  // ── File queue actions (B-P1.1): Retry re-queues (resumes from chunk_offset); Skip stops retrying ──
+  const fileActionMutation = useMutation({
+    mutationFn: async ({ queueUuid, action }: { queueUuid: string; action: "retry" | "skip" }) => {
+      const res = await apiRequest("POST", `/technical/api/sync/file/${queueUuid}/${action}`, {});
+      return res.json();
+    },
+    onSuccess: (_data, vars) => {
+      toast({
+        title: vars.action === "retry" ? "File re-queued" : "File skipped",
+        description: vars.action === "retry"
+          ? "Will resume on the next sync cycle."
+          : "Marked handled; it will no longer retry.",
+      });
+      fileQueueQuery.refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Action failed", description: err?.message || "Could not update the file.", variant: "destructive" });
+    },
   });
 
   // ── Combined Conflict Count (from conflict review endpoint) ──
@@ -436,7 +468,9 @@ export default function SyncDashboard() {
               <FileText className="h-4 w-4" />
               File Queue
             </div>
-            <div className="text-lg font-semibold mt-1">{fileQueue.length} pending</div>
+            <div className="text-lg font-semibold mt-1">
+              {fileQueue.length} {fileQueue.length === 1 ? "file" : "files"}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -746,51 +780,60 @@ export default function SyncDashboard() {
             {fileQueue.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <CheckCircle className="h-10 w-10 mx-auto mb-2 text-green-300" />
-                <p>No pending file transfers</p>
+                <p>No files awaiting transfer</p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Source</TableHead>
                     <TableHead>File Name</TableHead>
-                    <TableHead>Table</TableHead>
-                    <TableHead>Direction</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead className="text-right">Retry</TableHead>
+                    <TableHead className="text-right">Retries</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead className="text-right">Age</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {fileQueue.map((f) => (
-                    <TableRow key={f.queueUuid || f.id}>
-                      <TableCell className="text-sm max-w-[200px] truncate">{f.fileName}</TableCell>
-                      <TableCell className="font-mono text-xs">{f.sourceTable}</TableCell>
+                    <TableRow key={f.queueUuid}>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {f.direction === "ship_to_shore" ? "Ship\u2192Shore" : "Shore\u2192Ship"}
-                        </Badge>
+                        <Badge variant="outline" className="text-xs">{f.category}</Badge>
                       </TableCell>
+                      <TableCell className="text-sm max-w-[200px] truncate" title={f.fileName}>{f.fileName}</TableCell>
                       <TableCell className="text-sm">
                         {f.fileSize ? `${(f.fileSize / 1024).toFixed(0)} KB` : "-"}
                       </TableCell>
                       <TableCell>{statusBadge(f.status)}</TableCell>
-                      <TableCell>
-                        {f.totalChunks ? (
-                          <div className="flex items-center gap-2">
-                            <Progress
-                              value={(f.chunkOffset / f.totalChunks) * 100}
-                              className="h-2 w-16"
-                            />
-                            <span className="text-xs text-muted-foreground">
-                              {f.chunkOffset}/{f.totalChunks}
-                            </span>
-                          </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
                       <TableCell className="text-right font-mono text-sm">{f.retryCount}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate" title={f.lastError ?? ""}>
+                        {f.lastError ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">{formatAge(f.createdAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={fileActionMutation.isPending}
+                            onClick={() => fileActionMutation.mutate({ queueUuid: f.queueUuid, action: "retry" })}
+                            title="Re-queue (resumes from last sent chunk)"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={fileActionMutation.isPending || f.status === "skipped"}
+                            onClick={() => fileActionMutation.mutate({ queueUuid: f.queueUuid, action: "skip" })}
+                            title="Stop retrying this file"
+                          >
+                            <XCircle className="h-3.5 w-3.5 mr-1" /> Skip
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

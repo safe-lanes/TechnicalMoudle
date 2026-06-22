@@ -297,6 +297,8 @@ export async function queueFile(data: {
   syncBatchId?: string | null;
   totalChunks?: number | null;
   priority?: number | null;
+  status?: string;        // B-P1.2: enqueue as 'unsendable' when not locally readable; defaults to 'pending'
+  lastError?: string | null;
 }): Promise<SyncFileQueue> {
   const db = await getDb();
   const result = await db.insert(syncFileQueue).values(data).returning();
@@ -366,8 +368,54 @@ export async function getPendingFiles(
       eq(syncFileQueue.direction, direction),
       eq(syncFileQueue.status, 'pending'),
     ))
-    .orderBy(desc(syncFileQueue.priority), asc(syncFileQueue.createdAt))
+    // B-P1.3: small files first (within a priority band) so one large file doesn't block
+    // many small ones behind it. NULL sizes sort last (Postgres ASC NULLS LAST).
+    .orderBy(desc(syncFileQueue.priority), asc(syncFileQueue.fileSizeBytes), asc(syncFileQueue.createdAt))
     .limit(limit);
+}
+
+/**
+ * B-P1.1: All non-completed files for a vessel (pending / in_progress / failed /
+ * unsendable / skipped) for the Sync Dashboard file panel. Read-only; newest activity first.
+ */
+export async function getFileQueueForDashboard(
+  vesselId: string,
+  limit: number = 100
+): Promise<SyncFileQueue[]> {
+  const db = await getDb();
+  return db.select().from(syncFileQueue)
+    .where(and(
+      eq(syncFileQueue.vesselId, vesselId),
+      eq(syncFileQueue.isDeleted, false),
+      ne(syncFileQueue.status, 'completed'),
+    ))
+    .orderBy(desc(syncFileQueue.updatedAt))
+    .limit(limit);
+}
+
+/**
+ * B-P1.1 Retry: re-queue a file so it pushes next cycle, RESUMING from its saved
+ * chunk_offset. Clears the error and resets the retry counter for a fresh attempt.
+ */
+export async function retryFileQueueEntry(queueUuid: string): Promise<SyncFileQueue | undefined> {
+  const db = await getDb();
+  const result = await db.update(syncFileQueue)
+    .set({ status: 'pending', retryCount: 0, lastError: null, updatedAt: new Date() })
+    .where(eq(syncFileQueue.queueUuid, queueUuid))
+    .returning();
+  return result[0];
+}
+
+/**
+ * B-P1.1 Skip: mark a file terminally handled so it stops retrying.
+ */
+export async function skipFileQueueEntry(queueUuid: string): Promise<SyncFileQueue | undefined> {
+  const db = await getDb();
+  const result = await db.update(syncFileQueue)
+    .set({ status: 'skipped', lastError: 'Skipped by operator', completedAt: new Date(), updatedAt: new Date() })
+    .where(eq(syncFileQueue.queueUuid, queueUuid))
+    .returning();
+  return result[0];
 }
 
 export async function updateFileStatus(

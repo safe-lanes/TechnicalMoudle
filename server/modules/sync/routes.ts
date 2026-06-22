@@ -33,6 +33,8 @@ router.post('/sync/trigger', asyncHandler(syncController.triggerSyncHandler));
 // File sync endpoints
 router.post('/sync/file/upload-chunk', asyncHandler(syncController.uploadChunkHandler));
 router.get('/sync/file/queue', asyncHandler(syncController.fileQueueHandler));
+router.post('/sync/file/:queueUuid/retry', asyncHandler(syncController.retryFileHandler));
+router.post('/sync/file/:queueUuid/skip', asyncHandler(syncController.skipFileHandler));
 
 // Pruning & Health endpoints
 router.post('/sync/prune', requireOfflineAdmin, asyncHandler(syncController.pruneHandler));
