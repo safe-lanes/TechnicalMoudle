@@ -38,7 +38,19 @@ router.get('/admin/role-by-name/:roleName', async (req: Request, res: Response) 
 router.get('/admin/access-control/:roleRuid', async (req: Request, res: Response) => {
   try {
     const { roleRuid } = req.params;
-    const permissions = await storage.getRoleMenuPermissions(roleRuid);
+    const rawPermissions = await storage.getRoleMenuPermissions(roleRuid);
+
+    // Hard-lock: Purchasing is a read-only third-party embed. Regardless of what
+    // the DB row says, always return canCreate/canEdit/canDelete as false for it.
+    const menuItems: Array<{ muid: string; name: string }> = await storage.getActiveMenuItems();
+    const purchasingMuid = menuItems.find((m: { muid: string; name: string }) => m.name === 'purchasing')?.muid ?? null;
+    const permissions = rawPermissions.map((p: any) => {
+      if (purchasingMuid && p.menuMuid === purchasingMuid) {
+        return { ...p, canCreate: false, canEdit: false, canDelete: false };
+      }
+      return p;
+    });
+
     res.json(permissions);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to fetch permissions', details: error.message });

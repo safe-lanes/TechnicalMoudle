@@ -117,7 +117,12 @@ export default function AccessControl() {
     };
   };
 
-  const updatePermission = (muid: string, field: keyof Permission, value: boolean) => {
+  const READONLY_MENU_NAMES = new Set(["purchasing"]);
+
+  const isReadOnlyMenu = (menuName: string): boolean => READONLY_MENU_NAMES.has(menuName);
+
+  const updatePermission = (muid: string, field: keyof Permission, value: boolean, menuName?: string) => {
+    if (menuName && isReadOnlyMenu(menuName) && field !== "canView") return;
     const current = getPermission(muid);
     const updated = { ...current, menuMuid: muid, [field]: value };
     const newPerms = { ...effectivePermissions, [muid]: updated };
@@ -125,15 +130,16 @@ export default function AccessControl() {
     setIsDirty(true);
   };
 
-  const toggleSelectAll = (muid: string, checked: boolean) => {
+  const toggleSelectAll = (muid: string, checked: boolean, menuName?: string) => {
+    const readOnly = menuName ? isReadOnlyMenu(menuName) : false;
     const current = getPermission(muid);
     const updated = {
       ...current,
       menuMuid: muid,
       canView: checked,
-      canCreate: checked,
-      canEdit: checked,
-      canDelete: checked,
+      canCreate: readOnly ? false : checked,
+      canEdit: readOnly ? false : checked,
+      canDelete: readOnly ? false : checked,
     };
     const newPerms = { ...effectivePermissions, [muid]: updated };
     setPermissions(newPerms);
@@ -292,19 +298,29 @@ export default function AccessControl() {
                             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
                               <Checkbox
                                 checked={isAllChecked(node.muid) ? true : isSomeChecked(node.muid) ? "indeterminate" : false}
-                                onCheckedChange={(checked) => toggleSelectAll(node.muid, !!checked)}
+                                onCheckedChange={(checked) => toggleSelectAll(node.muid, !!checked, node.name)}
                                 data-testid={`checkbox-selectall-${node.name}`}
                               />
                             </div>
-                            {(["canView", "canCreate", "canEdit", "canDelete"] as const).map((field) => (
-                              <div key={field} className="flex justify-center" onClick={(e) => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={getPermission(node.muid)[field]}
-                                  onCheckedChange={(checked) => updatePermission(node.muid, field, !!checked)}
-                                  data-testid={`checkbox-${field}-${node.name}`}
-                                />
-                              </div>
-                            ))}
+                            {(["canView", "canCreate", "canEdit", "canDelete"] as const).map((field) => {
+                              const writeDisabled = field !== "canView" && isReadOnlyMenu(node.name);
+                              return (
+                                <div
+                                  key={field}
+                                  className="flex justify-center"
+                                  onClick={(e) => e.stopPropagation()}
+                                  title={writeDisabled ? "Purchasing is read-only (third-party embed)" : undefined}
+                                >
+                                  <Checkbox
+                                    checked={writeDisabled ? false : getPermission(node.muid)[field]}
+                                    onCheckedChange={(checked) => updatePermission(node.muid, field, !!checked, node.name)}
+                                    disabled={writeDisabled}
+                                    data-testid={`checkbox-${field}-${node.name}`}
+                                    className={writeDisabled ? "opacity-30 cursor-not-allowed" : ""}
+                                  />
+                                </div>
+                              );
+                            })}
                           </div>
                           {hasChildren && isExpanded && node.children.map((child) => renderNode(child, depth + 1))}
                         </div>

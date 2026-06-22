@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   ClipboardList,
   Clock,
@@ -133,6 +134,7 @@ interface SelectedLeaf {
 
 export default function ApprovalWorkflow() {
   const { toast } = useToast();
+  const { canViewMenu, canEdit: canEditMenu, isConfigured } = usePermissions();
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set(["pms"]));
   const [expandedSubModules, setExpandedSubModules] = useState<Set<string>>(new Set());
   const [activeModuleId, setActiveModuleId] = useState<string>("pms");
@@ -140,7 +142,7 @@ export default function ApprovalWorkflow() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
   const [checkboxState, setCheckboxState] = useState<Record<string, { level1: boolean; level2: boolean }>>({});
-  const savedCheckboxStateRef = useRef<Record<string, { level1: boolean; level2: boolean }>>({});
+  const savedCheckboxStateRef = useRef<Record<string, { level1: boolean; level2: boolean }>>({}); 
 
   // Load config from server on mount
   const { data: configData } = useQuery<{ success: boolean; data: Array<{
@@ -178,7 +180,7 @@ export default function ApprovalWorkflow() {
         level1Enabled: boolean;
         level2Enabled: boolean;
       }> = [];
-      for (const mod of APPROVAL_MODULES) {
+      for (const mod of visibleModules) {
         for (const sub of mod.subModules) {
           for (const fn of sub.functions) {
             for (const variableName of (CONFIG_ROWS[fn.id] || [])) {
@@ -208,12 +210,31 @@ export default function ApprovalWorkflow() {
     },
   });
 
+  // Permission-filtered module list. When RBAC is not yet configured
+  // (isConfigured=false) all modules remain visible (no restriction).
+  const visibleModules = useMemo(() => {
+    if (!isConfigured) return APPROVAL_MODULES;
+    return APPROVAL_MODULES.filter((m) => {
+      if (m.id === "pms") return canViewMenu("approval-workflow-pms");
+      if (m.id === "defects") return canViewMenu("approval-workflow-defects");
+      return true;
+    });
+  }, [isConfigured, canViewMenu]);
+
+  // Whether the currently-active module allows edit operations.
+  const canEditActiveModule = useMemo(() => {
+    if (!isConfigured) return true;
+    if (activeModuleId === "pms") return canEditMenu("approval-workflow-pms");
+    if (activeModuleId === "defects") return canEditMenu("approval-workflow-defects");
+    return false;
+  }, [isConfigured, canEditMenu, activeModuleId]);
+
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const isSearching = normalizedQuery.length > 0;
 
   const matchedSubModuleIds = useMemo(() => {
     if (!isSearching) return null;
-    const activeMod = APPROVAL_MODULES.find((m) => m.id === activeModuleId);
+    const activeMod = visibleModules.find((m) => m.id === activeModuleId);
     if (!activeMod) return new Set<string>();
     const ids = new Set<string>();
     for (const sub of activeMod.subModules) {
@@ -275,8 +296,8 @@ export default function ApprovalWorkflow() {
   };
 
   const expandAll = () => {
-    setExpandedModules(new Set(APPROVAL_MODULES.map((m) => m.id)));
-    setExpandedSubModules(new Set(APPROVAL_MODULES.flatMap((m) => m.subModules.map((s) => s.id))));
+    setExpandedModules(new Set(visibleModules.map((m) => m.id)));
+    setExpandedSubModules(new Set(visibleModules.flatMap((m) => m.subModules.map((s) => s.id))));
   };
 
   const collapseAll = () => {
@@ -286,12 +307,12 @@ export default function ApprovalWorkflow() {
 
   const selectedDetails = useMemo(() => {
     if (!selected) return null;
-    const mod = APPROVAL_MODULES.find((m) => m.id === selected.moduleId);
+    const mod = visibleModules.find((m) => m.id === selected.moduleId);
     const sub = mod?.subModules.find((s) => s.id === selected.subModuleId);
     const fn = sub?.functions.find((f) => f.id === selected.functionId);
     if (!mod || !sub || !fn) return null;
     return { module: mod, subModule: sub, fn };
-  }, [selected]);
+  }, [selected, visibleModules]);
 
   const toggleCheckbox = (leafId: string, rowLabel: string, level: "level1" | "level2") => {
     if (!isEditMode) return;
@@ -375,7 +396,7 @@ export default function ApprovalWorkflow() {
               </div>
             )}
 
-            {APPROVAL_MODULES.map((mod) => {
+            {visibleModules.map((mod) => {
               if (isSearching && mod.id !== activeModuleId) return null;
               const ModIcon = mod.icon;
               const modExpanded = isModuleExpanded(mod.id);
@@ -536,6 +557,8 @@ export default function ApprovalWorkflow() {
                       savedCheckboxStateRef.current = structuredClone(checkboxState);
                       setIsEditMode(true);
                     }}
+                    disabled={!canEditActiveModule}
+                    title={!canEditActiveModule ? "You do not have permission to edit this module's approval workflow" : undefined}
                     data-testid="button-edit-approval-config"
                   >
                     <Pencil className="h-4 w-4 mr-1" />
