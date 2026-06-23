@@ -16,7 +16,7 @@ const updateRHConfigSchema = z.object({
 
 const updateMasterRHSchema = z.object({
   newRHValue: z.number().nonnegative("Running hours must be non-negative"),
-  updateSource: z.enum(['MANUAL', 'IMPORT', 'AUTOMATION']).optional().default('MANUAL'),
+  updateSource: z.enum(['MANUAL', 'IMPORT', 'AUTOMATION', 'WORKORDER']).optional().default('MANUAL'),
   userId: z.string().optional().default('system'),
   userUuid: z.string().optional(),
   userRole: z.string().optional().default('Ship'),
@@ -630,8 +630,9 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     throw new ValidationError('Running hours can only be updated for MASTER counter type components');
   }
 
-  // Validate running hours increase against daily limits (only for MANUAL updates)
-  if (updateSource === 'MANUAL') {
+  // Validate running hours increase against daily limits (MANUAL and WORKORDER updates).
+  // IMPORT and AUTOMATION bypass this check — they carry pre-validated bulk data.
+  if (updateSource === 'MANUAL' || updateSource === 'WORKORDER') {
     const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
     const lastUpdate = resolveLastUpdated(component);
     const validation = validateRunningHoursIncrease({
@@ -773,4 +774,12 @@ export async function propagateAll(vesselId: string, userId: string) {
 
 export async function getRunningHoursHistory(query: RHHistoryQuery): Promise<RHHistoryResult> {
   return repo.getRunningHoursHistory(query);
+}
+
+// ══════════════════════════════════════════════════════════
+// Meter Replacement History
+// ══════════════════════════════════════════════════════════
+
+export async function getMeterReplacementHistory(componentId: string) {
+  return repo.getMeterReplacementHistory(componentId);
 }

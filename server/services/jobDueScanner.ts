@@ -271,8 +271,16 @@ export class JobDueScannerService {
       if (rhCounterType === 'MASTER') {
         rhEffectiveCurrent = parseFloat(component.rhCurrentMaster || '0');
       } else {
-        // INHERITED - use cached value from master
-        rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || '0');
+        // INHERITED — if the child's meter was replaced, its own post-reset counter
+        // (currentCumulativeRH) is the correct base for job-due calculations.
+        // rhCurrentInheritedCached holds the master's absolute value and would
+        // produce a falsely large "already past due" reading for a fresh component.
+        const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || '0');
+        if (meterReplacedLastRh > 0) {
+          rhEffectiveCurrent = parseFloat(component.currentCumulativeRH || '0');
+        } else {
+          rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || '0');
+        }
       }
 
       // F = frequency_rh
@@ -337,7 +345,14 @@ export class JobDueScannerService {
           if (lcCounterType === 'MASTER') {
             componentCurrentRH = parseFloat(linkedComp.rhCurrentMaster || '0');
           } else if (lcCounterType === 'INHERITED') {
-            componentCurrentRH = parseFloat(linkedComp.rhCurrentInheritedCached || '0');
+            // After a meter replacement, use the child's own post-reset counter rather
+            // than the inherited master value (which would be falsely large).
+            const lcMeterReplacedLastRh = parseFloat(linkedComp.meterReplacedLastRh || '0');
+            if (lcMeterReplacedLastRh > 0) {
+              componentCurrentRH = parseFloat(linkedComp.currentCumulativeRH || '0');
+            } else {
+              componentCurrentRH = parseFloat(linkedComp.rhCurrentInheritedCached || '0');
+            }
           }
         }
 
@@ -541,7 +556,13 @@ export class JobDueScannerService {
       if (rhCounterType === 'MASTER') {
         rhEffectiveCurrent = parseFloat(component.rhCurrentMaster || '0');
       } else {
-        rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || '0');
+        // After a meter replacement, use the child's own post-reset counter.
+        const dualMeterReplacedLastRh = parseFloat(component.meterReplacedLastRh || '0');
+        if (dualMeterReplacedLastRh > 0) {
+          rhEffectiveCurrent = parseFloat(component.currentCumulativeRH || '0');
+        } else {
+          rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || '0');
+        }
       }
       const frequencyRH = job.intervalRunningHour || 0;
       const rhLastDone = parseFloat(job.lastDoneRH || '0');

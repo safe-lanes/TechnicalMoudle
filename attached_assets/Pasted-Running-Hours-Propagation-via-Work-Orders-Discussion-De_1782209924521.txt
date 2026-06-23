@@ -1,0 +1,140 @@
+Running Hours Propagation via Work Orders — Discussion & Design Record
+Topic: When Running Hours (RH) are updated through a Work Order (WO) Form, the value must reflect in the Running Hours section AND auto-propagate to the linked MASTER component and all sibling INHERITED components. Every WO RH update must be stored in history for next-due calculation.
+
+Status: Analysis / design agreed in Plan mode. Not yet implemented.
+
+1. Problem statement
+Components have an RH Counter Type: MASTER, INHERITED, or NOT_RH_DRIVEN.
+MASTER owns the absolute RH counter. Updating it cascades the delta (the change) to all inherited children.
+INHERITED today: a WO completion records only its own audit snapshot + its job's next-due. It does NOT update the master or sibling inherited components. This is the gap to fix.
+Goal: an INHERITED WO completion should behave like a MASTER update — propagate the entered RH to the master and every sibling — while preserving meter-replacement divergence, and store every WO RH entry in history for next-due.
+
+2. Counter model (agreed)
+Keep the existing delta-based model — NOT "force all linked components to the same absolute number".
+
+A WO RH entry is treated as the master's new reading; the master is set to it and the difference (delta) is applied to every linked child.
+When nothing has been replaced, all linked components read identically.
+After a meter replacement, the renewed child is reset to 0 and carries its own count (0 + subsequent master deltas). It does NOT snap back to the master's value.
+3. The 10 edge-case questions and answers
+#	Question	Answer	Resulting behavior
+1	Renewed/reset child: force to master value, or keep own count?	Reset to 0; record replacement date + RH-at-replacement; show "Last meter reset at…" + history in Update RH popup; child keeps own count via delta	Keep delta cascade; persist + surface replacement event
+2	RH entry lower than current?	Reject	RH can only increase or stay equal
+3	Last-Updated date on linked components?	Yes — WO completion date	All linked components stamp the completion date, not the system clock
+4	Per-component history granularity?	One entry, WO number in remark	Single RH-history entry per WO update, tagged with WO number
+5	Validation for inherited WOs?	Same as master	25 hrs/day cap + Sail-Admin override applies to inherited WOs too
+6	Backdated/out-of-order across the family?	Validation error	Reject entries that conflict with a later reading in the family
+7	Sibling auto-generation of WOs?	Each job stores own last-done; WO generates when last-done + frequency ≤ current RH	Sibling WOs generating is correct, not suppressed
+8	Broken/missing master link?	Record on that component only	Don't block completion, don't propagate; safe fallback
+9	Ship vs shore?	Yes — ship-side only	Shore receives values via normal sync
+10	NOT_RH_DRIVEN components?	Out of scope	Calendar/condition components untouched
+4. Worked examples
+Family used in examples
+Main Engine            — MASTER
+ ├─ ME Valves           — INHERITED
+ ├─ ME Fuel Pumps       — INHERITED
+ └─ ME Liners           — INHERITED
+
+Starting state (all in sync): all = 2000 RH, Last Updated 15-01-2025. Jobs (each stores its OWN last-done):
+
+ME Valves overhaul — freq 300, last done @ 2000 → next due 2300
+ME Fuel Pumps check — freq 500, last done @ 2000 → next due 2500
+Example 1 — WO on MASTER (Answer #3)
+Complete Main Engine WO: enter 2500, completion 15-02-2025, freq 500. Delta = +500 applied to all:
+
+Component	RH	Last Updated
+Main Engine	2500	15-02-2025
+ME Valves	2500	15-02-2025
+ME Fuel Pumps	2500	15-02-2025
+ME Liners	2500	15-02-2025
+This job: done @ 2500, next due = 3000.
+One history entry, remark carries WO number.
+Side-effect (Answer #7): ME Fuel Pumps check (due 2500) reached → its own WO auto-generates.
+Example 2 — WO on INHERITED (new behavior; Answers #3, #4, #5)
+Complete ME Valves WO: enter 2800, completion 10-03-2025, freq 300. Resolve master (Main Engine), propagate delta = +300 to whole family:
+
+Component	RH	Last Updated
+Main Engine	2800	10-03-2025
+ME Valves	2800	10-03-2025
+ME Fuel Pumps	2800	10-03-2025
+ME Liners	2800	10-03-2025
+ME Valves overhaul: done @ 2800, next due = 3100.
+Validation = master's rules (2500→2800 over 23 days ≈ 13 hrs/day → passes, no override).
+One history entry, WO number in remark.
+"Becomes due": Main Engine reaching 3000 → Example 1 WO due; reaching 3100 → Example 2 WO due.
+Example 3 — Decrease rejected (Answer #2)
+Family at 2800, enter 2700 → delta −100 → rejected. Nothing changes.
+
+Example 4 — Backdated/out-of-order rejected (Answer #6)
+Family at 2800 (10-03-2025). ME Fuel Pumps WO dated 01-03-2025 with 2750 → conflicts with later 2800 reading → validation error.
+
+Example 5 — 25 hrs/day cap + Sail-Admin override (Answer #5)
+Enter 3600 on 12-03-2025 vs last 2800 on 10-03-2025 = 2 days → +800 = 400 hrs/day. Normal ship user blocked (override required); Sail Admin can override → applies and cascades +800. NOTE: this is new strictness for inherited WOs.
+
+Example 6 — Meter replacement / divergence (Answer #1) ⭐
+ME Valves physically renewed while family at 3000:
+
+ME Valves reset to 0; record Replaced on 20-03-2025, RH at replacement = 3000.
+Popup shows "Last meter reset on 20-03-2025 (previous reading 3000)" + history.
+After replacement:
+
+Component	Own RH
+Main Engine	3000
+ME Valves	0 (renewed)
+ME Fuel Pumps	3000
+ME Liners	3000
+Then Main Engine WO enter 3100 (delta +100):
+
+Component	Own RH
+Main Engine	3100
+ME Valves	100 (0 + 100)
+ME Fuel Pumps	3100
+ME Liners	3100
+ME Valves keeps its own count (100), does NOT jump to 3100. A new ME Valves job (freq 300) set after replacement is due at 400 in the valves' OWN counter.
+
+Example 7 — Broken/missing master link (Answer #8)
+ME Liners has bad/empty master link. ME Liners WO enter 3200 → record on ME Liners only (own counter + its job next-due + one history entry with WO number). Not blocked, nothing cascades.
+
+Scope reminders
+Ship-side only (Answer #9); office copy via normal sync.
+NOT_RH_DRIVEN out of scope (Answer #10).
+5. Meter-replacement record — what is stored (already exists)
+On the component (components table)
+meterReplacedLastRh — cumulative total RH at the moment of replacement (the "replaced at" reading).
+meterReplacedDate — when replaced.
+Formula: Total RH = meterReplacedLastRh + currentCumulativeRH (old life + new-meter life).
+In history (running_hours_audit table)
+isRenewalReset = true
+renewalActionType — Renewed | Replaced | Overhauled
+renewalReason (mandatory), renewalReference (optional), renewalEvidenceUrls (optional)
+oldMeterFinal (old part final reading), newMeterStart (new meter start)
+snapshot trio previousRH / newRH / cumulativeRH, plus dateUpdatedLocal
+Example 6 mapping: meterReplacedLastRh = 3000, meterReplacedDate = 20-03-2025, audit isRenewalReset = true, renewalActionType = Replaced, oldMeterFinal / previousRH = 3000, newMeterStart / newRH = 0.
+
+6. What's already built vs new work
+Already in place
+Delta cascade master → children.
+25 hrs/day + Sail-Admin override validation on the master path.
+Decrease / backdate timeline rejection.
+Meter-replacement confirmation flow + columns (component + audit).
+Per-job last-done storage.
+Ship-only gating; vessel-scoped cascade.
+New work required
+Route INHERITED WO completion through the master propagation path (with completion date); fall back to child-only when there is no valid master (Answer #8).
+Stamp completion date on all cascaded children's Last Updated (Answer #3) — today children get stamped "now".
+Single history entry tagged with the WO number (Answer #4).
+Surface reset/replacement history ("Last meter reset at…") in the Update RH popup (Answer #1).
+Ensure a replaced child's display + job-due use its OWN counter, not the cached-master value (Answers #1, #7) — the one subtle scanner change.
+7. Behavioral consequences to keep in mind
+Inherited WO completion becomes stricter (may require Sail-Admin override on large jumps).
+The family now shares one timeline → backdated inherited completions can be rejected against a sibling's later reading (by design).
+Completing one WO can legitimately generate WOs on siblings now due (expected).
+A wrong/low entry cannot corrupt the family because decreases are rejected.
+8. Key code locations (reference for implementation)
+server/modules/work-orders/services/workOrderCompletionService.ts — RH branch (MASTER / INHERITED / NOT_RH_DRIVEN).
+server/modules/work-orders/services/workOrderService.ts — PATCH approval RH path (the live completion path used by the UI).
+server/modules/running-hours/services/runningHoursService.ts — updateMasterRH (validates + runs job-due scan).
+server/postgresStorage.ts — updateMasterRunningHours (delta cascade), meter-reset path.
+server/modules/running-hours/services/rhTimelineValidationService.ts — validateRHEntry.
+server/services/jobDueScanner.ts — INHERITED due currently reads rhCurrentInheritedCached (cached master); needs to use child's own counter for replaced children.
+Client: client/src/components/MeterReplacedConfirmationDialog.tsx, client/src/pages/pms/RunningHours.tsx, client/src/components/RunningHoursConditionPanel.tsx.
+Schema: shared/schema.ts — running_hours_audit (~156), components RH + meter replacement fields (~349-374).

@@ -186,64 +186,103 @@ export async function completeWorkOrder(
         }
       }
     } else {
-      // INHERITED: validate the component's own timeline (forward/backward, 25 hrs/day) for its audit
-      // history, but drop the flat ceiling that over-blocked legitimate entries. The job's last-done /
-      // next-due RH cycle is written to the jobs row further below; the master counter is untouched.
-      const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
+      // INHERITED: route through the master propagation path so the 25 hrs/day cap, decrease
+      // rejection, cascade to all sibling INHERITED components, and WO completion date stamp all
+      // apply exactly as they do for a MASTER WO completion.
+      // Fallback: if the master link is missing or resolves to no MASTER component, record only
+      // on this child (timeline-validated) and do not block completion (safe fallback per design).
+      if (!alreadySynced) {
+        const vesselIdForLookup = workOrder.vesselId || component.vesselId;
+        let masterComp: any = null;
 
-      if (!validation.isValid) {
-        throw new ValidationError(validation.errorMessage, {
-          code: validation.validationStatus,
-          validRange: validation.validRange,
-          previousEntry: validation.previousEntry,
-          nextEntry: validation.nextEntry,
-          utilizationRate: validation.utilizationRate,
-          daysBetweenPrevious: validation.daysBetweenPrevious,
-          daysBetweenNext: validation.daysBetweenNext,
-          maxPossibleIncrease: validation.maxPossibleIncrease,
-          actualIncrease: validation.actualIncrease
-        });
-      }
+        if (component.rhMasterComponentId && vesselIdForLookup) {
+          const allVesselComps = await repo.findComponents(vesselIdForLookup);
+          masterComp = allVesselComps.find((c: any) =>
+            c.rhCounterType === 'MASTER' && (
+              c.cuuid === component.rhMasterComponentId ||
+              String(c.id) === component.rhMasterComponentId ||
+              c.componentCode === component.rhMasterComponentId
+            )
+          ) ?? null;
+        }
 
-      // If high utilization, require justification
-      if (validation.requiresJustification && !body.rhJustification) {
-        throw new ValidationError(
-          `High machinery utilization detected (${validation.utilizationRate.toFixed(1)} hrs/day). Justification is required.`,
-          {
-            code: 'HIGH_UTILIZATION',
+        if (masterComp) {
+          // Master resolved: advance its counter, which cascades the delta to every sibling
+          // INHERITED component and stamps them all with the WO completion date.
+          const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
+          try {
+            await updateMasterRH(masterComp.cuuid, {
+              newRHValue: newRH,
+              updateSource: 'WORKORDER',
+              userId: bodyUserId || executionData.performedBy || 'system',
+              userUuid: bodyUserUuid,
+              userRole: userRole || 'Ship',
+              adminOverride: adminOverride || false,
+              comments: `WO ${workOrder.workOrderNo} (INHERITED → cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+              dateUpdated: completionDateForValidation
+            });
+            console.log(`✅ [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
+          } catch (masterErr: any) {
+            if (masterErr instanceof ValidationError) {
+              const det: any = masterErr.details || {};
+              throw new ValidationError(masterErr.message, {
+                code: 'RH_OVERRIDE_REQUIRED',
+                ...det,
+                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                canOverride: det.validation?.canOverride ?? false,
+                componentId: masterComp.cuuid,
+                componentCode: masterComp.componentCode || workOrder.componentCode,
+                rhCounterType: 'INHERITED'
+              });
+            }
+            throw masterErr;
+          }
+        } else {
+          // No valid master link: timeline-validate and record on this child only.
+          const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
+          if (!validation.isValid) {
+            throw new ValidationError(validation.errorMessage, {
+              code: validation.validationStatus,
+              validRange: validation.validRange,
+              previousEntry: validation.previousEntry,
+              nextEntry: validation.nextEntry,
+              utilizationRate: validation.utilizationRate,
+              daysBetweenPrevious: validation.daysBetweenPrevious,
+              daysBetweenNext: validation.daysBetweenNext,
+              maxPossibleIncrease: validation.maxPossibleIncrease,
+              actualIncrease: validation.actualIncrease
+            });
+          }
+          if (validation.requiresJustification && !body.rhJustification) {
+            throw new ValidationError(
+              `High machinery utilization detected (${validation.utilizationRate.toFixed(1)} hrs/day). Justification is required.`,
+              { code: 'HIGH_UTILIZATION', validRange: validation.validRange, utilizationRate: validation.utilizationRate, requiresJustification: true }
+            );
+          }
+          rhValidationDetails = {
+            isValid: validation.isValid,
+            validationDate: new Date().toISOString(),
             validRange: validation.validRange,
             utilizationRate: validation.utilizationRate,
-            requiresJustification: true
-          }
-        );
-      }
-
-      rhValidationDetails = {
-        isValid: validation.isValid,
-        validationDate: new Date().toISOString(),
-        validRange: validation.validRange,
-        utilizationRate: validation.utilizationRate,
-        requiresJustification: validation.requiresJustification,
-        validationErrors: validation.anomalyFlags
-      };
-
-      // Record audit-trail snapshot (INHERITED rides a master counter — this does NOT modify the
-      // RH Module master value). Guarded so a replay does not duplicate the snapshot.
-      if (!alreadySynced) {
-        await repo.createRunningHoursAudit({
-          componentId: component.cuuid,
-          vesselId: componentVesselId,
-          previousRH: previousRH.toString(),
-          newRH: newRH.toString(),
-          cumulativeRH: newRH.toString(),
-          dateUpdatedLocal: completionDateForValidation,
-          dateUpdatedTZ: 'UTC',
-          enteredAtUTC: new Date(),
-          userId: executionData.performedBy || 'System',
-          source: 'workorder',
-          notes: `RH snapshot via work order completion: ${workOrder.templateCode} (INHERITED — records own cycle, does not modify master)`,
-          meterReplaced: false
-        });
+            requiresJustification: validation.requiresJustification,
+            validationErrors: validation.anomalyFlags
+          };
+          await repo.createRunningHoursAudit({
+            componentId: component.cuuid,
+            vesselId: componentVesselId,
+            previousRH: previousRH.toString(),
+            newRH: newRH.toString(),
+            cumulativeRH: newRH.toString(),
+            dateUpdatedLocal: completionDateForValidation,
+            dateUpdatedTZ: 'UTC',
+            enteredAtUTC: new Date(),
+            userId: executionData.performedBy || 'System',
+            source: 'workorder',
+            notes: `WO ${workOrder.workOrderNo} (INHERITED — no master link, child-only record)`,
+            meterReplaced: false
+          });
+          console.warn(`⚠️ [RH Sync] INHERITED component ${component.componentCode || component.cuuid} has no valid master link — recorded on child only (WO ${workOrder.workOrderNo})`);
+        }
       }
       rhReadingApplied = true;
     }
