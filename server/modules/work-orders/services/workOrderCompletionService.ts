@@ -213,7 +213,7 @@ export async function completeWorkOrder(
           try {
             await updateMasterRH(masterComp.cuuid, {
               newRHValue: newRH,
-              updateSource: 'MANUAL',
+              updateSource: 'WORKORDER',
               userId: bodyUserId || executionData.performedBy || 'system',
               userUuid: bodyUserUuid,
               userRole: userRole || 'Ship',

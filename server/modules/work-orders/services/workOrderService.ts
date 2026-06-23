@@ -1450,7 +1450,7 @@ export async function updateWorkOrder(id: string, body: any) {
           try {
             await updateMasterRH(masterComp.cuuid, {
               newRHValue: rhValue,
-              updateSource: 'MANUAL',
+              updateSource: 'WORKORDER',
               userId: body.userId || existingWO.performedBy || 'system',
               userUuid: body.userUuid,
               userRole: body.userRole || 'Ship',
