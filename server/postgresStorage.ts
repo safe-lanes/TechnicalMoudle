@@ -1558,8 +1558,10 @@ export class PostgresStorage {
             // one-time propagate-all fixer reuses this path and must not collapse the cache.
             rhCurrentInheritedCached: (parseFloat(component.meterReplacedLastRh || '0') + params.newRHValue).toString(),
             currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
-            rhInheritedUpdatedAt: now,
-            lastUpdated: now.toISOString(),
+            // Stamp the reading date (WO completion date / RH section date), not the server
+            // clock, so the family's Last Updated reflects when the hours were observed.
+            rhInheritedUpdatedAt: readingDate,
+            lastUpdated: readingDate.toISOString(),
             updatedAt: now,
           })
           .where(eq(components.cuuid, inherited.cuuid));

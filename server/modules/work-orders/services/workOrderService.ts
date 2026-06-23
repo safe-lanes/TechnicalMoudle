@@ -1426,50 +1426,94 @@ export async function updateWorkOrder(id: string, body: any) {
           throw masterErr;
         }
       } else if (rhComp && rhCounterType === 'INHERITED' && !isNaN(rhValue)) {
-        // INHERITED: records its OWN maintenance cycle (the jobs-row last-done/next-due write happens
-        // further below). It rides a master counter, so we NEVER advance the master here — only write
-        // a read-only audit snapshot for history. Timeline validation is the sole governor (no flat
-        // current-RH or exceeds-master ceiling).
-        // Task #252: this live PATCH approval path previously skipped timeline validation entirely, so a
-        // backdated completion (Completion Date before the component's RH baseline) could be persisted by
-        // bypassing the client check. Enforce the authoritative "no real RH entry on/before completion
-        // date" rule here too, gated narrowly to INVALID_BACKDATED so other timeline outcomes keep their
-        // existing (non-blocking on this path) behavior.
-        if (completionDateNorm) {
-          const { validateRHEntry } = await import('../../running-hours/services/rhTimelineValidationService');
-          const backdateCheck = await validateRHEntry(rhComp.cuuid, completionDateNorm, rhValue);
-          if (!backdateCheck.isValid && backdateCheck.validationStatus === 'INVALID_BACKDATED') {
-            throw new ValidationError(backdateCheck.errorMessage, {
-              code: 'INVALID_BACKDATED',
-              validRange: backdateCheck.validRange,
-              previousEntry: backdateCheck.previousEntry,
-              nextEntry: backdateCheck.nextEntry,
-              componentId: rhComp.cuuid,
-              componentCode: rhComp.componentCode || existingWO.componentCode,
-              rhCounterType: 'INHERITED'
+        // INHERITED: route through master propagation so the 25 hrs/day cap, cascade to all
+        // sibling INHERITED components, and WO completion date stamp apply exactly as for MASTER.
+        // Fallback: if the master link is missing or unresolvable, timeline-validate and record
+        // on this child only — never block completion (safe fallback per design).
+        const vesselIdForLookup = existingWO.vesselId || rhComp.vesselId;
+        let masterComp: any = null;
+
+        if (rhComp.rhMasterComponentId && vesselIdForLookup) {
+          const allVesselComps = await repo.findComponents(vesselIdForLookup);
+          masterComp = allVesselComps.find((c: any) =>
+            c.rhCounterType === 'MASTER' && (
+              c.cuuid === rhComp.rhMasterComponentId ||
+              String(c.id) === rhComp.rhMasterComponentId ||
+              c.componentCode === rhComp.rhMasterComponentId
+            )
+          ) ?? null;
+        }
+
+        if (masterComp) {
+          // Master resolved: advance its counter, cascading delta + completion date to all siblings.
+          const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
+          try {
+            await updateMasterRH(masterComp.cuuid, {
+              newRHValue: rhValue,
+              updateSource: 'MANUAL',
+              userId: body.userId || existingWO.performedBy || 'system',
+              userUuid: body.userUuid,
+              userRole: body.userRole || 'Ship',
+              adminOverride: body.adminOverride || false,
+              comments: `WO ${existingWO.workOrderNo} (INHERITED → cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+              dateUpdated: completionDateNorm
             });
+            updateData.rhSyncedAt = new Date();
+            console.log(`✅ [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO.workOrderNo}`);
+          } catch (masterErr: any) {
+            if (masterErr instanceof ValidationError) {
+              const det: any = masterErr.details || {};
+              throw new ValidationError(masterErr.message, {
+                code: 'RH_OVERRIDE_REQUIRED',
+                ...det,
+                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                canOverride: det.validation?.canOverride ?? false,
+                componentId: masterComp.cuuid,
+                componentCode: masterComp.componentCode || existingWO.componentCode,
+                rhCounterType: 'INHERITED'
+              });
+            }
+            throw masterErr;
           }
+        } else {
+          // No valid master link: timeline-validate and record on this child only.
+          if (completionDateNorm) {
+            const { validateRHEntry } = await import('../../running-hours/services/rhTimelineValidationService');
+            const backdateCheck = await validateRHEntry(rhComp.cuuid, completionDateNorm, rhValue);
+            if (!backdateCheck.isValid && backdateCheck.validationStatus === 'INVALID_BACKDATED') {
+              throw new ValidationError(backdateCheck.errorMessage, {
+                code: 'INVALID_BACKDATED',
+                validRange: backdateCheck.validRange,
+                previousEntry: backdateCheck.previousEntry,
+                nextEntry: backdateCheck.nextEntry,
+                componentId: rhComp.cuuid,
+                componentCode: rhComp.componentCode || existingWO.componentCode,
+                rhCounterType: 'INHERITED'
+              });
+            }
+          }
+          try {
+            const prevRH = parseInt(rhComp.currentCumulativeRH || '0');
+            await repo.createRunningHoursAudit({
+              componentId: rhComp.cuuid,
+              vesselId: existingWO.vesselId || rhComp.vesselId || 'V001',
+              previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
+              newRH: rhValue.toString(),
+              cumulativeRH: rhValue.toString(),
+              dateUpdatedLocal: completionDateNorm || new Date().toISOString().split('T')[0],
+              dateUpdatedTZ: 'UTC',
+              enteredAtUTC: new Date(),
+              userId: body.userId || existingWO.performedBy || 'System',
+              source: 'workorder',
+              notes: `WO ${existingWO.workOrderNo} (INHERITED — no master link, child-only record)`,
+              meterReplaced: false
+            });
+          } catch (auditErr) {
+            console.error('[RH Sync] Failed to write INHERITED audit snapshot:', auditErr);
+          }
+          updateData.rhSyncedAt = new Date();
+          console.warn(`⚠️ [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} has no valid master link — recorded on child only (WO ${existingWO.workOrderNo})`);
         }
-        try {
-          const prevRH = parseInt(rhComp.currentCumulativeRH || '0');
-          await repo.createRunningHoursAudit({
-            componentId: rhComp.cuuid,
-            vesselId: existingWO.vesselId || rhComp.vesselId || 'V001',
-            previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
-            newRH: rhValue.toString(),
-            cumulativeRH: rhValue.toString(),
-            dateUpdatedLocal: completionDateNorm || new Date().toISOString().split('T')[0],
-            dateUpdatedTZ: 'UTC',
-            enteredAtUTC: new Date(),
-            userId: body.userId || existingWO.performedBy || 'System',
-            source: 'workorder',
-            notes: `RH snapshot via work order completion ${existingWO.workOrderNo} (INHERITED — records own cycle, does not modify master)`,
-            meterReplaced: false
-          });
-        } catch (auditErr) {
-          console.error('[RH Sync] Failed to write INHERITED audit snapshot:', auditErr);
-        }
-        updateData.rhSyncedAt = new Date();
       }
       // NOT_RH_DRIVEN: never write any RH value — fall through with no RH sync.
     }
