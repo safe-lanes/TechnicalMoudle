@@ -775,3 +775,11 @@ export async function propagateAll(vesselId: string, userId: string) {
 export async function getRunningHoursHistory(query: RHHistoryQuery): Promise<RHHistoryResult> {
   return repo.getRunningHoursHistory(query);
 }
+
+// ══════════════════════════════════════════════════════════
+// Meter Replacement History
+// ══════════════════════════════════════════════════════════
+
+export async function getMeterReplacementHistory(componentId: string) {
+  return repo.getMeterReplacementHistory(componentId);
+}

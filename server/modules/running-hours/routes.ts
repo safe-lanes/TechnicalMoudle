@@ -52,6 +52,9 @@ router.post('/running-hours/reset-child/:componentId', requirePMSAdmin, asyncHan
 // POST /running-hours/propagate-all — one-time propagation of all MASTER -> INHERITED
 router.post('/running-hours/propagate-all', requirePMSAdmin, asyncHandler(rhCtrl.propagateAll));
 
+// GET  /running-hours/replacement-history/:componentId — meter replacement events for component
+router.get('/running-hours/replacement-history/:componentId', requireAuth, asyncHandler(rhCtrl.getMeterReplacementHistory));
+
 // GET  /running-hours/:componentId — get audits for component (CATCH-ALL — must be last)
 router.get('/running-hours/:componentId', requireAuth, asyncHandler(rhCtrl.getAudits));
 

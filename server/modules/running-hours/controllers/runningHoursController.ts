@@ -321,6 +321,18 @@ export async function propagateAll(req: Request, res: Response) {
   }
 }
 
+// ── Meter Replacement History ──
+
+export async function getMeterReplacementHistory(req: Request, res: Response) {
+  try {
+    const result = await rhService.getMeterReplacementHistory(req.params.componentId);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching meter replacement history:", error);
+    res.status(500).json({ error: "Failed to fetch meter replacement history" });
+  }
+}
+
 // ── Running Hours History ──
 
 export async function getHistory(req: Request, res: Response) {

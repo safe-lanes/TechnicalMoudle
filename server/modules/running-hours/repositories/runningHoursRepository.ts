@@ -237,6 +237,67 @@ export async function createRunningHoursAudit(audit: InsertRunningHoursAudit): P
   return storage.createRunningHoursAudit(audit);
 }
 
+export interface MeterReplacementEvent {
+  id: number;
+  enteredAtUTC: Date | null;
+  dateUpdatedLocal: string;
+  renewalActionType: string | null;
+  renewalReason: string | null;
+  renewalReference: string | null;
+  oldMeterFinal: string | null;
+  newMeterStart: string | null;
+  userId: string;
+  notes: string | null;
+}
+
+export async function getMeterReplacementHistory(componentId: string): Promise<MeterReplacementEvent[]> {
+  const db = await getDb();
+  // Resolve componentId to cuuid so legacy rows stored by non-cuuid id are found too
+  const comp = await storage.getComponent(componentId);
+  const resolvedId = comp?.cuuid || componentId;
+
+  const rows = await db
+    .select({
+      id: runningHoursAudit.id,
+      enteredAtUTC: runningHoursAudit.enteredAtUTC,
+      dateUpdatedLocal: runningHoursAudit.dateUpdatedLocal,
+      renewalActionType: runningHoursAudit.renewalActionType,
+      renewalReason: runningHoursAudit.renewalReason,
+      renewalReference: runningHoursAudit.renewalReference,
+      oldMeterFinal: runningHoursAudit.oldMeterFinal,
+      newMeterStart: runningHoursAudit.newMeterStart,
+      userId: runningHoursAudit.userId,
+      notes: runningHoursAudit.notes,
+    })
+    .from(runningHoursAudit)
+    .where(
+      and(
+        or(
+          eq(runningHoursAudit.componentId, resolvedId),
+          eq(runningHoursAudit.componentId, componentId)
+        ),
+        or(
+          eq(runningHoursAudit.meterReplaced, true),
+          eq(runningHoursAudit.isRenewalReset, true)
+        )
+      )
+    )
+    .orderBy(desc(runningHoursAudit.enteredAtUTC));
+
+  return rows.map(r => ({
+    id: r.id,
+    enteredAtUTC: r.enteredAtUTC,
+    dateUpdatedLocal: r.dateUpdatedLocal,
+    renewalActionType: r.renewalActionType,
+    renewalReason: r.renewalReason,
+    renewalReference: r.renewalReference,
+    oldMeterFinal: r.oldMeterFinal ? String(r.oldMeterFinal) : null,
+    newMeterStart: r.newMeterStart ? String(r.newMeterStart) : null,
+    userId: r.userId,
+    notes: r.notes,
+  }));
+}
+
 // ── Cascade ──
 
 export async function cascadeRunningHoursUpdate(params: {
