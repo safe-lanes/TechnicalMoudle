@@ -367,8 +367,10 @@ export async function validateData(type: string, data: any[], mode: string, vess
   const existingDbSpareCompositeKeys = new Set<string>();
   // Vessel components map for Component Code validation and name auto-fill (spares block)
   const vesselComponentsByCode = new Map<string, any>();
+  let vesselComponentsLoaded = false; // true only when the DB fetch succeeded
   // Vessel location name set for Location A/B reference validation (spares block)
   const vesselLocationNameSet = new Set<string>();
+  let vesselLocationsLoaded = false; // true only when the DB fetch succeeded
 
   if (type === 'spares') {
     if (vesselId) {
@@ -395,6 +397,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
             vesselComponentsByCode.set(String(c.componentCode).trim(), c);
           }
         });
+        vesselComponentsLoaded = true;
         console.log(`📋 Loaded ${vesselComponentsByCode.size} components for spares validation`);
       } catch (err) {
         console.warn('⚠️ Could not load vessel components for spares validation:', err);
@@ -408,6 +411,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
             vesselLocationNameSet.add(String(loc.locationName).trim().toLowerCase());
           }
         });
+        vesselLocationsLoaded = true;
         console.log(`📋 Loaded ${vesselLocationNameSet.size} locations for spares validation`);
       } catch (err) {
         console.warn('⚠️ Could not load vessel locations for spares validation:', err);
@@ -893,7 +897,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
         normalized['Component Code'] = componentCode;
 
         const matchedComponent = vesselComponentsByCode.get(componentCode);
-        if (vesselComponentsByCode.size > 0 && !matchedComponent) {
+        if (vesselComponentsLoaded && !matchedComponent) {
           errors.push(`Row ${rowNum}: Component Code does not exist for the selected vessel.`);
         } else if (matchedComponent) {
           // Always source Component Name from the DB; file-supplied value is discarded
@@ -902,14 +906,16 @@ export async function validateData(type: string, data: any[], mode: string, vess
       }
 
       // Composite duplicate check (Part Code + Component Code + Vessel Code)
+      // ALL rows in a duplicated group are rejected (including the first occurrence).
       const _sparePartCodeForDup = row['Part Code'] ? String(row['Part Code']).trim() : null;
       const _spareCompCodeForDup = normalized['Component Code'] || null;
       if (_sparePartCodeForDup && _spareCompCodeForDup) {
         const _vessel = (vesselId ?? '').toUpperCase();
         const _ck = `${_sparePartCodeForDup.toUpperCase()}|${_spareCompCodeForDup.toUpperCase()}|${_vessel}`;
         const _inFile = spareCompositeOccurrences.get(_ck);
-        if (_inFile && _inFile.length > 1 && rowNum !== _inFile[0]) {
-          errors.push(`Row ${rowNum}: Duplicate spare — Part Code '${_sparePartCodeForDup}' linked to Component Code '${_spareCompCodeForDup}' already appears in row ${_inFile[0]} of this upload.`);
+        if (_inFile && _inFile.length > 1) {
+          const _others = _inFile.filter(r => r !== rowNum);
+          errors.push(`Row ${rowNum}: Duplicate spare — Part Code '${_sparePartCodeForDup}' linked to Component Code '${_spareCompCodeForDup}' also appears in row(s) ${_others.join(', ')} of this upload. All duplicate rows are rejected.`);
         }
         if (mode === 'add' && existingDbSpareCompositeKeys.has(_ck)) {
           errors.push(`Row ${rowNum}: Spare with Part Code '${_sparePartCodeForDup}' linked to Component Code '${_spareCompCodeForDup}' already exists in the vessel register.`);
@@ -1032,18 +1038,14 @@ export async function validateData(type: string, data: any[], mode: string, vess
 
       if (_locARobPresent && _locAName === '') {
         errors.push(`Row ${rowNum}: Location A is mandatory when Location A ROB is entered.`);
-      } else if (_locAName !== '') {
-        if (vesselLocationNameSet.size > 0 && !vesselLocationNameSet.has(_locAName.toLowerCase())) {
-          errors.push(`Row ${rowNum}: Invalid Location A.`);
-        }
+      } else if (_locAName !== '' && vesselLocationsLoaded && !vesselLocationNameSet.has(_locAName.toLowerCase())) {
+        errors.push(`Row ${rowNum}: Invalid Location A.`);
       }
 
       if (_locBRobPresent && _locBName === '') {
         errors.push(`Row ${rowNum}: Location B is mandatory when Location B ROB is entered.`);
-      } else if (_locBName !== '') {
-        if (vesselLocationNameSet.size > 0 && !vesselLocationNameSet.has(_locBName.toLowerCase())) {
-          errors.push(`Row ${rowNum}: Invalid Location B.`);
-        }
+      } else if (_locBName !== '' && vesselLocationsLoaded && !vesselLocationNameSet.has(_locBName.toLowerCase())) {
+        errors.push(`Row ${rowNum}: Invalid Location B.`);
       }
 
       // Fleet Equipment Code - accept as-is, no master data lookup
