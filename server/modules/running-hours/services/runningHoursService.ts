@@ -630,8 +630,9 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     throw new ValidationError('Running hours can only be updated for MASTER counter type components');
   }
 
-  // Validate running hours increase against daily limits (only for MANUAL updates)
-  if (updateSource === 'MANUAL') {
+  // Validate running hours increase against daily limits (MANUAL and WORKORDER updates).
+  // IMPORT and AUTOMATION bypass this check — they carry pre-validated bulk data.
+  if (updateSource === 'MANUAL' || updateSource === 'WORKORDER') {
     const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
     const lastUpdate = resolveLastUpdated(component);
     const validation = validateRunningHoursIncrease({
