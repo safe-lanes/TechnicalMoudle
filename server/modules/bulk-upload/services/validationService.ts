@@ -362,6 +362,73 @@ export async function validateData(type: string, data: any[], mode: string, vess
     });
   }
   
+  // Track duplicate Spares by composite key (Part Code + Component Code + Vessel Code) - case-insensitive
+  const spareCompositeOccurrences = new Map<string, number[]>();
+  const existingDbSpareCompositeKeys = new Set<string>();
+  // Vessel components map for Component Code validation and name auto-fill (spares block)
+  const vesselComponentsByCode = new Map<string, any>();
+  // Vessel location name set for Location A/B reference validation (spares block)
+  const vesselLocationNameSet = new Set<string>();
+
+  if (type === 'spares') {
+    if (vesselId) {
+      // Load existing spares for DB composite-key duplicate check
+      try {
+        const existingSparesList = await storage.getSpares(vesselId);
+        existingSparesList.forEach((s: any) => {
+          if (s.partCode && s.componentCode) {
+            const vessel = (s.vesselId ?? vesselId ?? '').toUpperCase();
+            const ck = `${String(s.partCode).trim().toUpperCase()}|${String(s.componentCode).trim().toUpperCase()}|${vessel}`;
+            existingDbSpareCompositeKeys.add(ck);
+          }
+        });
+        console.log(`📋 Loaded ${existingDbSpareCompositeKeys.size} existing spare composite keys from database`);
+      } catch (err) {
+        console.warn('⚠️ Could not load existing spare composite keys:', err);
+      }
+
+      // Load vessel components for Component Code validation and name auto-fill
+      try {
+        const vesselComponents = await storage.getComponents(vesselId);
+        vesselComponents.forEach((c: any) => {
+          if (c.componentCode) {
+            vesselComponentsByCode.set(String(c.componentCode).trim(), c);
+          }
+        });
+        console.log(`📋 Loaded ${vesselComponentsByCode.size} components for spares validation`);
+      } catch (err) {
+        console.warn('⚠️ Could not load vessel components for spares validation:', err);
+      }
+
+      // Load vessel locations for Location A/B reference validation
+      try {
+        const vesselLocations = await storage.getLocations(vesselId);
+        vesselLocations.forEach((loc: any) => {
+          if (loc.locationName) {
+            vesselLocationNameSet.add(String(loc.locationName).trim().toLowerCase());
+          }
+        });
+        console.log(`📋 Loaded ${vesselLocationNameSet.size} locations for spares validation`);
+      } catch (err) {
+        console.warn('⚠️ Could not load vessel locations for spares validation:', err);
+      }
+    }
+
+    // Track in-file composite key occurrences
+    filteredData.forEach((row: any, index: number) => {
+      const partCode = row['Part Code'];
+      const componentCode = row['Component Code'];
+      if (partCode && componentCode) {
+        const vessel = (vesselId ?? '').toUpperCase();
+        const ck = `${String(partCode).trim().toUpperCase()}|${String(componentCode).trim().toUpperCase()}|${vessel}`;
+        if (!spareCompositeOccurrences.has(ck)) {
+          spareCompositeOccurrences.set(ck, []);
+        }
+        spareCompositeOccurrences.get(ck)!.push(index + 2);
+      }
+    });
+  }
+
   // Track duplicate Jobs by composite key (Job Code + Component Code + Vessel Code) - case-insensitive.
   // Job Code is optional (auto-generated and therefore unique), so duplicate detection only
   // applies to rows that actually supply a Job Code AND a Component Code. Only importable rows
@@ -815,36 +882,48 @@ export async function validateData(type: string, data: any[], mode: string, vess
           normalized['Vessel Code'] = rowVesselCode;
         }
       } else if (vesselId && !row['Vessel Code']) {
-        // Auto-populate Vessel Code if missing
         normalized['Vessel Code'] = vesselId;
       }
 
-      // Validate Component Code (required, must exist in system)
-      if (!row['Component Code']) {
-        errors.push(`Row ${rowNum}: Component Code is required`);
+      // Validate Component Code — mandatory + vessel-scoped existence check
+      if (!row['Component Code'] || String(row['Component Code']).trim() === '') {
+        errors.push(`Row ${rowNum}: Component Code is mandatory.`);
       } else {
         const componentCode = String(row['Component Code']).trim();
         normalized['Component Code'] = componentCode;
-        
-        // Validate that Component Code exists in the system
-        // Note: This check will be performed during import, not during dry-run
-        // to avoid loading all components into memory for validation
+
+        const matchedComponent = vesselComponentsByCode.get(componentCode);
+        if (vesselComponentsByCode.size > 0 && !matchedComponent) {
+          errors.push(`Row ${rowNum}: Component Code does not exist for the selected vessel.`);
+        } else if (matchedComponent) {
+          // Always source Component Name from the DB; file-supplied value is discarded
+          normalized['Component Name'] = matchedComponent.name || '';
+        }
       }
 
-      // Component Name - auto-filled or provided
-      if (row['Component Name']) {
-        normalized['Component Name'] = String(row['Component Name']).trim();
+      // Composite duplicate check (Part Code + Component Code + Vessel Code)
+      const _sparePartCodeForDup = row['Part Code'] ? String(row['Part Code']).trim() : null;
+      const _spareCompCodeForDup = normalized['Component Code'] || null;
+      if (_sparePartCodeForDup && _spareCompCodeForDup) {
+        const _vessel = (vesselId ?? '').toUpperCase();
+        const _ck = `${_sparePartCodeForDup.toUpperCase()}|${_spareCompCodeForDup.toUpperCase()}|${_vessel}`;
+        const _inFile = spareCompositeOccurrences.get(_ck);
+        if (_inFile && _inFile.length > 1 && rowNum !== _inFile[0]) {
+          errors.push(`Row ${rowNum}: Duplicate spare — Part Code '${_sparePartCodeForDup}' linked to Component Code '${_spareCompCodeForDup}' already appears in row ${_inFile[0]} of this upload.`);
+        }
+        if (mode === 'add' && existingDbSpareCompositeKeys.has(_ck)) {
+          errors.push(`Row ${rowNum}: Spare with Part Code '${_sparePartCodeForDup}' linked to Component Code '${_spareCompCodeForDup}' already exists in the vessel register.`);
+        }
       }
 
-      // Part Code - can be auto-generated or manually entered
+      // Part Code - optional, auto-generated during import if blank
       if (row['Part Code'] && String(row['Part Code']).trim()) {
         normalized['Part Code'] = String(row['Part Code']).trim();
       }
-      // Note: Part Code will be auto-generated during import if not provided
 
       // Part Name - required
-      if (!row['Part Name']) {
-        errors.push(`Row ${rowNum}: Part Name is required`);
+      if (!row['Part Name'] || String(row['Part Name']).trim() === '') {
+        errors.push(`Row ${rowNum}: Part Name is mandatory.`);
       } else {
         normalized['Part Name'] = String(row['Part Name']).trim();
       }
@@ -865,15 +944,13 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
 
-      // Validate numeric fields - support new field names
-      // Total ROB, Location A - ROB, Location B - ROB, Minimum Stock
+      // Validate numeric fields
       const numericFieldMappings = [
         { source: 'Total ROB', target: 'Total ROB' },
         { source: 'Location A - ROB', target: 'Location A - ROB' },
         { source: 'Location B - ROB', target: 'Location B - ROB' },
         { source: 'Minimum Stock', target: 'Minimum Stock' }
       ];
-      
       numericFieldMappings.forEach(({ source, target }) => {
         if (row[source] !== undefined && row[source] !== null && row[source] !== '') {
           const num = parseInt(row[source]);
@@ -885,49 +962,87 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       });
 
-      // Validate Criticality - Support new format and legacy formats
-      const criticalField = row['Criticality'] ?? row['Critical Yes/No'] ?? row['Criticality (Yes/No)'];
+      // Validate Criticality (optional Yes/No)
       {
-        const { error, normalized: normCritical } = validateYesNoField(criticalField, 'Criticality', rowNum);
-        if (error) {
-          errors.push(error);
-        } else if (normCritical !== undefined) {
-          normalized['Criticality'] = normCritical;
+        const rawVal = row['Criticality'] ?? row['Critical Yes/No'] ?? row['Criticality (Yes/No)'];
+        const isBlank = rawVal === undefined || rawVal === null || String(rawVal).trim() === '';
+        if (!isBlank) {
+          const val = String(rawVal).toLowerCase().trim();
+          if (!YES_NO_SYNONYMS.includes(val)) {
+            errors.push(`Row ${rowNum}: Invalid Criticality value.`);
+          } else {
+            normalized['Criticality'] = ['yes', 'y', 'true', '1'].includes(val) ? 'Yes' : 'No';
+          }
         }
       }
 
-      // Validate Is Active - mandatory
-      const isActiveField = row['Is Active'] ?? row['IS Active'];
+      // Validate Is Active (required Yes/No)
       {
-        const { error, normalized: normActive } = validateYesNoField(isActiveField, 'Is Active', rowNum, { required: true });
-        if (error) {
-          errors.push(error);
-        } else if (normActive !== undefined) {
-          normalized['Is Active'] = normActive;
+        const rawVal = row['Is Active'] ?? row['IS Active'];
+        const isBlank = rawVal === undefined || rawVal === null || String(rawVal).trim() === '';
+        if (isBlank) {
+          errors.push(`Row ${rowNum}: Is Active is required`);
+        } else {
+          const val = String(rawVal).toLowerCase().trim();
+          if (!YES_NO_SYNONYMS.includes(val)) {
+            errors.push(`Row ${rowNum}: Invalid Is Active value.`);
+          } else {
+            normalized['Is Active'] = ['yes', 'y', 'true', '1'].includes(val) ? 'Yes' : 'No';
+          }
         }
       }
 
-      // Validate IHM (Inventory of Hazardous Materials)
-      const ihmField = row['IHM (Inventory of Hazardous Materials)'];
-      if (ihmField) {
-        const value = String(ihmField).toLowerCase().trim();
-        if (!['yes', 'no', 'y', 'n'].includes(value)) {
-          errors.push(`Row ${rowNum}: IHM must be Yes or No`);
-        } else {
-          normalized['IHM (Inventory of Hazardous Materials)'] = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
+      // Validate IHM (optional Yes/No)
+      {
+        const rawVal = row['IHM (Inventory of Hazardous Materials)'];
+        const isBlank = rawVal === undefined || rawVal === null || String(rawVal).trim() === '';
+        if (!isBlank) {
+          const val = String(rawVal).toLowerCase().trim();
+          if (!YES_NO_SYNONYMS.includes(val)) {
+            errors.push(`Row ${rowNum}: Invalid IHM value.`);
+          } else {
+            normalized['IHM (Inventory of Hazardous Materials)'] = ['yes', 'y', 'true', '1'].includes(val) ? 'Yes' : 'No';
+          }
         }
       }
 
-      // Validate Rotation Item (optional boolean: blank | Yes/Y/true/1 | No/N/false/0)
-      const rotationField = row['Rotation Item'];
-      const rawRotation = typeof rotationField === 'boolean'
-        ? (rotationField ? 'yes' : 'no')
-        : (rotationField === undefined || rotationField === null ? '' : String(rotationField).toLowerCase().trim());
-      if (rawRotation !== '') {
-        if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(rawRotation)) {
-          errors.push(`Row ${rowNum}: Rotation Item must be Yes or No`);
-        } else {
-          normalized['Rotation Item'] = ['yes', 'y', 'true', '1'].includes(rawRotation) ? 'Yes' : 'No';
+      // Validate Rotation Item (optional Yes/No)
+      {
+        const rawVal = row['Rotation Item'];
+        const isBlank = rawVal === undefined || rawVal === null || String(rawVal).trim() === '';
+        if (!isBlank) {
+          const val = typeof rawVal === 'boolean'
+            ? (rawVal ? 'yes' : 'no')
+            : String(rawVal).toLowerCase().trim();
+          if (!YES_NO_SYNONYMS.includes(val)) {
+            errors.push(`Row ${rowNum}: Invalid Rotation Item value.`);
+          } else {
+            normalized['Rotation Item'] = ['yes', 'y', 'true', '1'].includes(val) ? 'Yes' : 'No';
+          }
+        }
+      }
+
+      // Location A/B — conditional presence + vessel-scoped reference validation
+      const _locAName = row['Location A'] ? String(row['Location A']).trim() : '';
+      const _locBName = row['Location B'] ? String(row['Location B']).trim() : '';
+      const _locARaw = row['Location A - ROB'];
+      const _locBRaw = row['Location B - ROB'];
+      const _locARobPresent = _locARaw !== undefined && _locARaw !== null && String(_locARaw).trim() !== '';
+      const _locBRobPresent = _locBRaw !== undefined && _locBRaw !== null && String(_locBRaw).trim() !== '';
+
+      if (_locARobPresent && _locAName === '') {
+        errors.push(`Row ${rowNum}: Location A is mandatory when Location A ROB is entered.`);
+      } else if (_locAName !== '') {
+        if (vesselLocationNameSet.size > 0 && !vesselLocationNameSet.has(_locAName.toLowerCase())) {
+          errors.push(`Row ${rowNum}: Invalid Location A.`);
+        }
+      }
+
+      if (_locBRobPresent && _locBName === '') {
+        errors.push(`Row ${rowNum}: Location B is mandatory when Location B ROB is entered.`);
+      } else if (_locBName !== '') {
+        if (vesselLocationNameSet.size > 0 && !vesselLocationNameSet.has(_locBName.toLowerCase())) {
+          errors.push(`Row ${rowNum}: Invalid Location B.`);
         }
       }
 
@@ -935,24 +1050,33 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (row['Fleet Equipment Code']) {
         normalized['Fleet Equipment Code'] = String(row['Fleet Equipment Code']).trim();
       }
-      
-      // Copy text fields directly - new template fields
+
+      // Copy text fields directly
       const textFields = [
         'Fleet Equipment Name', 'Drawing Number', 'Position Number', 'Note',
         'Specification', 'Maker', 'Maker Code', 'Manual Name', 'Page Number',
         'Location A', 'Location B', 'Evidence Type'
       ];
-      
       textFields.forEach(field => {
         if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
           normalized[field] = String(row[field]).trim();
         }
       });
 
+      // Validate Maker Code reference (spec: "Invalid Maker Code.")
       if (makerListLoaded) {
-        const rowMakerCode = normalized['Maker Code'] || null;
-        const rowMakerName = normalized['Maker'] || null;
-        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
+        const _makerCode = normalized['Maker Code'] != null ? String(normalized['Maker Code']).trim() : '';
+        const _makerName = normalized['Maker'] != null ? String(normalized['Maker']).trim() : '';
+        if (_makerCode) {
+          const master = existingMakersByCode.get(_makerCode.toLowerCase());
+          if (!master) {
+            errors.push(`Row ${rowNum}: Invalid Maker Code.`);
+          } else if (_makerName && String(master.makerName ?? '').trim().toLowerCase() !== _makerName.toLowerCase()) {
+            errors.push(`Row ${rowNum}: Invalid Maker Code.`);
+          }
+        } else if (_makerName) {
+          errors.push(`Row ${rowNum}: Invalid Maker Code.`);
+        }
       }
     } else if (type === 'stores') {
       // Validate stores (11-column format per user specification)
