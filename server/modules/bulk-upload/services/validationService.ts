@@ -14,10 +14,12 @@ import {
   STORES_CATEGORIES,
   DEPARTMENTS,
   RESPONSIBLE_RANKS,
+  JOB_ASSIGNED_TO_RANKS,
   SCHEDULE_TYPES,
   INTERVAL_UNITS
 } from './helpers';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '@shared/dateUtils';
+import { getAllRanks } from '../../ranks/service';
 
 /**
  * Validate a row's Maker Code / Maker Name reference against the Maker List master.
@@ -211,6 +213,20 @@ export async function validateData(type: string, data: any[], mode: string, vess
       return true;
     }
 
+    // For jobs: Job Code is OPTIONAL (auto-generated on import), so it cannot be the
+    // gate for which rows are "real". Keep any row that has meaningful job data so the
+    // per-row validator can run — most importantly so a row with data but a blank
+    // WO Title surfaces the "WO Title is mandatory." error instead of being silently
+    // dropped. Only genuinely empty rows (no data in any relevant field) are skipped.
+    if (type === 'jobs') {
+      const jobsDataFields = ['WO Title', 'Component Code', 'Job Code', 'Maintenance Basis', 'Interval Value', 'Task Type', 'Assigned To'];
+      const hasJobData = jobsDataFields.some(f => {
+        const v = row[f];
+        return v !== undefined && v !== null && String(v).trim() !== '';
+      });
+      return hasJobData;
+    }
+
     if (!fieldValue) {
       console.log(`[${type}] Row ${index + 2}: Skipping - no ${primaryField} value`);
       return false; // Skip empty rows
@@ -346,6 +362,72 @@ export async function validateData(type: string, data: any[], mode: string, vess
     });
   }
   
+  // Track duplicate Jobs by composite key (Job Code + Component Code + Vessel Code) - case-insensitive.
+  // Job Code is optional (auto-generated and therefore unique), so duplicate detection only
+  // applies to rows that actually supply a Job Code AND a Component Code. Only importable rows
+  // (non-blank WO Title) participate, so a rejected/blank row never "claims" a composite key.
+  const jobCompositeOccurrences = new Map<string, number[]>();
+  const existingDbJobCompositeKeys = new Set<string>();
+
+  // Allowed Approver values come from the Rank Master (admAvailableRanks), loaded via the
+  // ranks module service layer. Case-insensitive set keyed on rank name (and label),
+  // mapping to the canonical name for normalization. Null => rank master unavailable.
+  let approverRankMaster: Map<string, string> | null = null;
+  if (type === 'jobs') {
+    try {
+      const ranks = await getAllRanks();
+      if (ranks) {
+        approverRankMaster = new Map<string, string>();
+        for (const r of ranks as any[]) {
+          const canonical = r?.name ? String(r.name).trim() : '';
+          if (canonical) {
+            approverRankMaster.set(canonical.toLowerCase(), canonical);
+            if (r?.label && String(r.label).trim() !== '') {
+              approverRankMaster.set(String(r.label).trim().toLowerCase(), canonical);
+            }
+          }
+        }
+      }
+      console.log(`📋 Loaded ${approverRankMaster?.size ?? 0} Rank Master entries for Approver validation`);
+    } catch (err) {
+      console.error('Failed to fetch Rank Master for Approver validation:', err);
+    }
+  }
+
+  if (type === 'jobs') {
+    try {
+      const existingJobs = await storage.getJobs(vesselId);
+      existingJobs.forEach((j: any) => {
+        if (j.jobNo && j.componentCode) {
+          const vesselPart = String(j.vesselCode || vesselId || '').trim().toUpperCase();
+          const compositeKey = `${String(j.jobNo).trim().toUpperCase()}|${String(j.componentCode).trim().toUpperCase()}|${vesselPart}`;
+          existingDbJobCompositeKeys.add(compositeKey);
+        }
+      });
+      console.log(`📋 Loaded ${existingDbJobCompositeKeys.size} existing job composite keys for vessel '${vesselId}'`);
+    } catch (err) {
+      console.error('Failed to fetch existing jobs for duplicate validation:', err);
+    }
+
+    filteredData.forEach((row: any, index: number) => {
+      const woTitle = row['WO Title'];
+      const jobCode = row['Job Code'];
+      const componentCode = row['Component Code'];
+      const vesselCode = row['Vessel Code'];
+      const hasWoTitle = woTitle !== undefined && woTitle !== null && String(woTitle).trim() !== '';
+      const hasJobCode = jobCode !== undefined && jobCode !== null && String(jobCode).trim() !== '';
+      const hasComponentCode = componentCode !== undefined && componentCode !== null && String(componentCode).trim() !== '';
+      if (hasWoTitle && hasJobCode && hasComponentCode) {
+        const vesselPart = String(vesselCode || vesselId || '').trim().toUpperCase();
+        const compositeKey = `${String(jobCode).trim().toUpperCase()}|${String(componentCode).trim().toUpperCase()}|${vesselPart}`;
+        if (!jobCompositeOccurrences.has(compositeKey)) {
+          jobCompositeOccurrences.set(compositeKey, []);
+        }
+        jobCompositeOccurrences.get(compositeKey)!.push(index + 2);
+      }
+    });
+  }
+
   // Pre-load vessel spares for spare-history Part Code validation
   const vesselSparesByPartCode = new Map<string, any>();
   if (type === 'spare-history' && vesselId) {
@@ -1283,9 +1365,17 @@ export async function validateData(type: string, data: any[], mode: string, vess
 
     } else if (type === 'jobs') {
       // Validate jobs (21-column specification format)
-      // Skip rows that don't have WO Title - user only fills in components they want jobs for
+      // WO Title is mandatory (spec item 2). The top-level filter already dropped
+      // genuinely empty rows, so a blank WO Title here means a row with data but no
+      // title — surface it as an error in the Import Summary instead of silently skipping.
       if (!row['WO Title'] || String(row['WO Title']).trim() === '') {
-        // Skip empty rows (component without job) - don't add to results
+        results.summary.errors++;
+        results.rows.push({
+          row: rowNum,
+          status: 'error',
+          errors: [`Row ${rowNum}: WO Title is mandatory.`],
+          normalized: { __meta: { rowNumber: rowNum } }
+        });
         continue;
       }
       
@@ -1299,9 +1389,10 @@ export async function validateData(type: string, data: any[], mode: string, vess
         normalized['Vessel Code'] = String(row['Vessel Code']).trim();
       }
       
-      // Component Code - required and must exist in vessel
-      if (!row['Component Code']) {
-        errors.push(`Row ${rowNum}: Component Code is required`);
+      // Component Code - mandatory and must exist in the selected vessel (spec item 3)
+      let resolvedComponent: any = null;
+      if (!row['Component Code'] || String(row['Component Code']).trim() === '') {
+        errors.push(`Row ${rowNum}: Component Code is mandatory.`);
       } else {
         const componentCode = String(row['Component Code']).trim();
         normalized['Component Code'] = componentCode;
@@ -1309,21 +1400,39 @@ export async function validateData(type: string, data: any[], mode: string, vess
         // Validate that Component Code exists in the vessel
         const vesselCode = row['Vessel Code'] ? String(row['Vessel Code']).trim() : null;
         if (vesselCode) {
-          const component = await storage.getComponentByCode(componentCode, vesselCode);
-          if (!component) {
-            errors.push(`Row ${rowNum}: Component Code '${componentCode}' not found in vessel '${vesselCode}'. Job cannot be linked.`);
+          resolvedComponent = await storage.getComponentByCode(componentCode, vesselCode);
+          if (!resolvedComponent) {
+            errors.push(`Row ${rowNum}: Component Code does not exist for the selected vessel.`);
           }
         }
       }
 
-      // Component Name is often auto-filled, but validate if provided
-      if (row['Component Name']) {
-        normalized['Component Name'] = String(row['Component Name']).trim();
-      }
+      // Component Name (spec item 4): any value in the file is ignored. The system
+      // auto-populates the name from the Component master via Component Code. The
+      // authoritative override is applied after the "Copy other fields" loop below so
+      // the file value can never win.
 
       // Job Code is optional (will be auto-generated)
       if (row['Job Code']) {
         normalized['Job Code'] = String(row['Job Code']).trim();
+      }
+
+      // Duplicate Job (spec item 1): the combination Job Code + Component Code + Vessel Code
+      // must be unique. The first occurrence imports; the second and later are rejected.
+      // Only enforced when a Job Code is supplied (blank Job Codes auto-generate uniquely).
+      {
+        const jobCodeVal = row['Job Code'] ? String(row['Job Code']).trim() : '';
+        const compCodeVal = row['Component Code'] ? String(row['Component Code']).trim() : '';
+        if (jobCodeVal && compCodeVal) {
+          const vesselPart = String(row['Vessel Code'] ? String(row['Vessel Code']).trim() : (vesselId || '')).toUpperCase();
+          const compositeKey = `${jobCodeVal.toUpperCase()}|${compCodeVal.toUpperCase()}|${vesselPart}`;
+          const occ = jobCompositeOccurrences.get(compositeKey);
+          const isInFileDuplicate = !!occ && occ.length > 1 && rowNum !== occ[0];
+          const isDbDuplicate = mode === 'add' && existingDbJobCompositeKeys.has(compositeKey);
+          if (isInFileDuplicate || isDbDuplicate) {
+            errors.push(`Row ${rowNum}: Duplicate Job Code and Component Code combination.`);
+          }
+        }
       }
       
       // Fleet Equipment Code is optional (fleet linkage will be done later)
@@ -1342,7 +1451,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (!row['Maintenance Basis']) {
         errors.push(`Row ${rowNum}: Maintenance Basis is required (must be 'Calendar', 'Running Hours', or 'Dual Frequency')`);
       } else if (!validMaintenanceBasis.includes(row['Maintenance Basis'])) {
-        errors.push(`Row ${rowNum}: Invalid Maintenance Basis '${row['Maintenance Basis']}'. Must be 'Calendar', 'Running Hours', or 'Dual Frequency'`);
+        errors.push(`Row ${rowNum}: Invalid Maintenance Basis.`);
       } else {
         normalized['Maintenance Basis'] = row['Maintenance Basis'];
       }
@@ -1356,7 +1465,9 @@ export async function validateData(type: string, data: any[], mode: string, vess
         errors.push(`Row ${rowNum}: Interval Value is REQUIRED - this drives the entire PMS scheduling system`);
       } else {
         const interval = parseFloat(row['Interval Value']);
-        if (isNaN(interval) || interval <= 0) {
+        if (isNaN(interval)) {
+          errors.push(`Row ${rowNum}: Interval Value must be numeric.`);
+        } else if (interval <= 0) {
           errors.push(`Row ${rowNum}: Interval Value must be a positive number (got: '${row['Interval Value']}')`);
         } else {
           normalized['Interval Value'] = String(interval);
@@ -1428,37 +1539,66 @@ export async function validateData(type: string, data: any[], mode: string, vess
         normalized['Task Type'] = row['Task Type'];
       }
 
-      // Assigned To is optional
-      if (row['Assigned To']) {
-        normalized['Assigned To'] = String(row['Assigned To']).trim();
-      }
-      
-      // Approver is optional
-      if (row['Approver']) {
-        normalized['Approver'] = String(row['Approver']).trim();
+      // Assigned To - must match one of the valid configured ranks (spec item 7)
+      let assignedToNormalized: string | null = null;
+      if (row['Assigned To'] && String(row['Assigned To']).trim() !== '') {
+        const assignedToVal = String(row['Assigned To']).trim();
+        const matchedRank = JOB_ASSIGNED_TO_RANKS.find(r => r.toLowerCase() === assignedToVal.toLowerCase());
+        if (!matchedRank) {
+          errors.push(`Row ${rowNum}: Invalid Assigned To value.`);
+        } else {
+          assignedToNormalized = matchedRank;
+          normalized['Assigned To'] = matchedRank;
+        }
       }
 
-      // Job Priority is optional
-      const validJobPriorities = ['Low', 'Medium', 'High', 'Critical'];
+      // Approver - mandatory; allowed values come from the Rank Master (admAvailableRanks).
+      // No longer coupled to Assigned To. Blank -> error; a value not in the Rank Master ->
+      // error; a valid value is normalized to the canonical Rank Master name.
+      if (!row['Approver'] || String(row['Approver']).trim() === '') {
+        errors.push(`Row ${rowNum}: Approver is mandatory.`);
+      } else {
+        const approverVal = String(row['Approver']).trim();
+        if (approverRankMaster) {
+          const canonical = approverRankMaster.get(approverVal.toLowerCase());
+          if (!canonical) {
+            errors.push(`Row ${rowNum}: Invalid Approver value.`);
+          } else {
+            normalized['Approver'] = canonical;
+          }
+        } else {
+          // Rank Master unavailable (DB down) - accept the provided value rather than
+          // blocking the whole import on an infrastructure failure.
+          normalized['Approver'] = approverVal;
+        }
+      }
+
+      // Job Priority - allowed values High/Medium/Low only (spec item 9)
+      const validJobPriorities = ['Low', 'Medium', 'High'];
       if (row['Job Priority'] && !validJobPriorities.includes(row['Job Priority'])) {
-        errors.push(`Row ${rowNum}: Invalid Job Priority. Allowed: ${validJobPriorities.join(', ')}`);
+        errors.push(`Row ${rowNum}: Invalid Job Priority.`);
       } else if (row['Job Priority']) {
         normalized['Job Priority'] = row['Job Priority'];
       }
 
-      // Class Related - optional yes/no
-      if (row['Class Related']) {
-        const value = row['Class Related'].toString().toLowerCase();
-        if (!['yes', 'no'].includes(value)) {
-          errors.push(`Row ${rowNum}: Class Related must be Yes or No`);
-        } else {
-          normalized['Class Related'] = value;
+      // Class Related - optional, accepts Yes/No, Y/N, True/False, 1/0 (spec item 10)
+      {
+        const classRelatedResult = validateYesNoField(row['Class Related'], 'Class Related', rowNum);
+        if (classRelatedResult.error) {
+          errors.push(`Row ${rowNum}: Invalid Class Related value.`);
+        } else if (classRelatedResult.normalized) {
+          normalized['Class Related'] = classRelatedResult.normalized;
         }
       }
       
-      // Last Done Date is optional
-      if (row['Last Done Date']) {
-        normalized['Last Done Date'] = String(row['Last Done Date']).trim();
+      // Last Done Date - optional, no format validation.
+      // Excel auto-converts typed dates to serial numbers, so a strict DD-MM-YYYY
+      // text check would reject valid dates. The import step normalizes whatever
+      // value is provided (Excel serials and mixed date strings), so pass it through.
+      {
+        if (row['Last Done Date'] !== undefined && row['Last Done Date'] !== null && String(row['Last Done Date']).trim() !== '') {
+          normalized['Last Done Date'] = row['Last Done Date'];
+        }
       }
       
       // Brief Work Description is optional
@@ -1474,29 +1614,29 @@ export async function validateData(type: string, data: any[], mode: string, vess
         normalized['Department'] = row['Department'];
       }
       
-      // Critical Yes/No - Support both template format and legacy format
-      const criticalJobField = row['Critical Yes/No'] ?? row['Criticality'];
-      if (criticalJobField) {
-        const value = criticalJobField.toString().toLowerCase();
-        if (!['yes', 'no', 'y', 'n'].includes(value)) {
-          errors.push(`Row ${rowNum}: Critical must be Yes or No`);
-        } else {
-          const normalizedCritical = ['yes', 'y'].includes(value) ? 'yes' : 'no';
-          normalized['Critical Yes/No'] = normalizedCritical;
-          normalized['Criticality'] = normalizedCritical;
+      // Criticality - accepts Yes/No, Y/N, True/False, 1/0 (spec item 12).
+      // Supports both template format ('Critical Yes/No') and legacy format ('Criticality').
+      {
+        const criticalJobField = row['Critical Yes/No'] ?? row['Criticality'];
+        const criticalityResult = validateYesNoField(criticalJobField, 'Criticality', rowNum);
+        if (criticalityResult.error) {
+          errors.push(`Row ${rowNum}: Invalid Criticality value.`);
+        } else if (criticalityResult.normalized) {
+          normalized['Critical Yes/No'] = criticalityResult.normalized;
+          normalized['Criticality'] = criticalityResult.normalized;
         }
       }
       
-      // Is Active - optional yes/no (defaults to Yes if not provided)
-      if (row['Is Active']) {
-        const value = row['Is Active'].toString().toLowerCase();
-        if (!['yes', 'no'].includes(value)) {
-          errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
+      // Is Active - accepts Yes/No, Y/N, True/False, 1/0; defaults to Yes when blank (spec item 13)
+      {
+        const isActiveResult = validateYesNoField(row['Is Active'], 'Is Active', rowNum);
+        if (isActiveResult.error) {
+          errors.push(`Row ${rowNum}: Invalid Is Active value.`);
+        } else if (isActiveResult.normalized) {
+          normalized['Is Active'] = isActiveResult.normalized;
         } else {
-          normalized['Is Active'] = value;
+          normalized['Is Active'] = 'Yes';  // Default to active
         }
-      } else {
-        normalized['Is Active'] = 'yes';  // Default to active
       }
 
       // Copy other fields
@@ -1505,6 +1645,10 @@ export async function validateData(type: string, data: any[], mode: string, vess
           normalized[key] = row[key];
         }
       });
+
+      // Component Name (spec item 4): enforce the master value AFTER the copy loop so any
+      // value carried over from the file is overwritten. Null when the component is unknown.
+      normalized['Component Name'] = resolvedComponent?.name ?? null;
     } else if (type === 'makers') {
       // Validate makers - matches maker_list database schema (makerCode, makerName, address, isActive)
       

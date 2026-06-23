@@ -3056,9 +3056,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         isActive: templateData.isActive === 'Yes',
         intervalRunningHour: templateData.maintenanceBasis === 'Dual Frequency'
           ? parseInt(templateData.intervalRunningHour, 10)
-          : undefined,
+          : templateData.maintenanceBasis === 'Running Hours'
+            ? parseInt(normalizedFrequency, 10)
+            : undefined,
         level2ReviewerRankId: (templateData as any).level2ReviewerRankId || null,
-        lastDoneRH: (templateData as any).lastDoneRH ? parseInt((templateData as any).lastDoneRH, 10) : null,
+        lastDoneRH: (templateData as any).lastDoneRH ? String((templateData as any).lastDoneRH).trim() : null,
         lastCompletedOn: (templateData as any).lastCompletedOn || null,
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
       };

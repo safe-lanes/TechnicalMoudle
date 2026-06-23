@@ -1939,6 +1939,13 @@ export async function performImport(
       const row = data[_jobIdx];
       const _jobRowNum = row['__meta']?.rowNumber || (_jobIdx + 1);
       try {
+      // Spec item 2: WO Title is mandatory — never import a row without it.
+      if (!row['WO Title'] || String(row['WO Title']).trim() === '') {
+        result.skipped++;
+        const _jobCodeWO = row['Job Code'] ? String(row['Job Code']).trim() : `row-${_jobRowNum}`;
+        result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCodeWO, action: 'skipped', error: 'WO Title is mandatory.' });
+        continue;
+      }
       const componentCode = String(row['Component Code']).trim();
       const vesselCodeFromExcel = String(row['Vessel Code']).trim();
       
@@ -2129,7 +2136,8 @@ export async function performImport(
       const componentFields = {
         componentId: component.cuuid,          // DEPRECATED: FK reference to component (UUID)
         componentCode: componentCode,       // DEPRECATED: Display/tracking field (SFI code)
-        componentName: row['Component Name'] || component.name || null, // DEPRECATED
+        // Spec item 4: ignore any Component Name from the file; always use the master value.
+        componentName: component.name || null, // DEPRECATED
       };
       
       const jobData: any = {
@@ -2148,25 +2156,34 @@ export async function performImport(
         jobDescription: row['Brief Work Description'] || null,
         briefWorkDescription: row['Brief Work Description'] || null,  // Store in both fields for compatibility
         assignedTo: row['Assigned To'] || null,
+        // Approver is validated against the Rank Master (admAvailableRanks); persist the
+        // file's Approver value (no longer copied from Assigned To).
         approver: row['Approver'] || null,
         level2ReviewerRankId: row['Reviewer Rank'] ? String(row['Reviewer Rank']).trim() || null : null,
         jobPriority: row['Job Priority'] || null,
-        // Schema expects text 'Yes'/'No', not boolean
-        classRelated: row['Class Related'] ? (row['Class Related'].toString().toLowerCase() === 'yes' ? 'Yes' : 'No') : null,
         lastDoneDate: lastDoneDate,         // Store Last Done date (for Calendar jobs)
         nextDueDate: nextDueDate,           // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar jobs)
         lastDoneRH: lastDoneRH,             // Store Last Done RH (for RH jobs)
         nextDueRH: nextDueRH,               // Calculated: lastDoneRH + intervalRunningHour (for RH jobs)
         department: row['Department'] || null,
+        // Schema expects text 'Yes'/'No', not boolean. Accept the full synonym set
+        // (Yes/No, Y/N, True/False, 1/0) validated upstream so they store correctly.
+        classRelated: (() => {
+          const v = row['Class Related'];
+          if (v === undefined || v === null || String(v).trim() === '') return null;
+          return ['yes', 'y', 'true', '1'].includes(String(v).toLowerCase().trim()) ? 'Yes' : 'No';
+        })(),
         // Support both template format (Critical Yes/No) and legacy format (Criticality)
-        // Schema expects text 'Yes'/'No', not boolean
         criticality: (() => {
           const critVal = row['Critical Yes/No'] ?? row['Criticality'];
-          if (!critVal) return null;
-          const isYes = critVal === true || critVal.toString().toLowerCase() === 'yes' || critVal.toString().toLowerCase() === 'y';
-          return isYes ? 'Yes' : 'No';
+          if (critVal === undefined || critVal === null || String(critVal).trim() === '') return null;
+          return ['yes', 'y', 'true', '1'].includes(String(critVal).toLowerCase().trim()) ? 'Yes' : 'No';
         })(),
-        isActive: row['Is Active'] ? (row['Is Active'].toString().toLowerCase() === 'yes') : true,
+        isActive: (() => {
+          const v = row['Is Active'];
+          if (v === undefined || v === null || String(v).trim() === '') return true; // default active
+          return ['yes', 'y', 'true', '1'].includes(String(v).toLowerCase().trim());
+        })(),
         // Part A fields - Required Spare Parts, Tools, and Safety Requirements
         // Spare parts and tools are parsed into structured objects matching schema
         requiredSpareParts: parseSpareParts(row['Required Spare Parts']),

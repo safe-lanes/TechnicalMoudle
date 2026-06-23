@@ -862,6 +862,17 @@ export const RESPONSIBLE_RANKS = [
   'Electrician', 'Bosun', 'Fitter'
 ];
 
+// Valid ranks accepted for the Job Import "Assigned To" field (spec item 7).
+// Scoped to job-import validation only — do NOT reuse for reviewer-rank or template
+// dropdowns, which intentionally rely on RESPONSIBLE_RANKS.
+export const JOB_ASSIGNED_TO_RANKS = [
+  'Master', 'Chief Officer', '2nd Officer', '3rd Officer',
+  'Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer',
+  '5th Engineer', 'Electrical Officer', 'Gas Engineer', 'Deck Cadet',
+  'Engine Cadet', 'Bosun', 'AB', 'OS', 'Pumpman', 'Fitter',
+  'Motorman', 'Oiler', 'Wiper', 'Chief Cook', 'Messman', 'Junior Officer'
+];
+
 // Schedule types
 export const SCHEDULE_TYPES = ['Running Hours', 'Calendar', 'Dual Frequency'];
 
