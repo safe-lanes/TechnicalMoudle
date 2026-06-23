@@ -29,7 +29,7 @@ export function mapLoggedRoleToUIRole(userType: string | undefined | null, profi
   }
 
   if (userType === "Ship") {
-    if (profileRole === "Vessel Admin") return "Head_of_Dept";
+    if (profileRole === "Vessel Admin" || profileRole === "Vessel User 3") return "Head_of_Dept";
     return "Vessel";
   }
 
