@@ -1,0 +1,112 @@
+<svg width="680" height="786" viewBox="0 0 680 786" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Maritime PMS multi-tenancy plan — tenant routing, ship-shore sync, and build order</title>
+<desc>How every request resolves its own tenant database via the verified SAILERP domain claim, how ship-to-shore sync routes fail-closed, and the flag-gated build phases 0 to 6.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<style>
+text{font-family:Arial,Helvetica,sans-serif}
+.th{font-size:14px;font-weight:500}
+.t{font-size:14px;font-weight:400}
+.ts{font-size:12px;font-weight:400;fill:#5F5E5A}
+.arr{stroke:#888780;stroke-width:1.5px;fill:none}
+.reg{fill:none;stroke:#B4B2A9;stroke-dasharray:4 4}
+</style>
+</defs>
+<rect x="0" y="0" width="680" height="786" fill="#ffffff"/>
+
+<rect class="reg" x="30" y="40" width="620" height="300" rx="8"/>
+<text class="ts" x="44" y="60">Tenant routing — every request resolves its own database</text>
+
+<rect x="60" y="78" width="250" height="48" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text class="th" x="185" y="99" text-anchor="middle" fill="#3C3489">SAILERP JWT (verified)</text>
+<text class="ts" x="185" y="116" text-anchor="middle" fill="#534AB7">id · domain · userType</text>
+<line class="arr" x1="185" y1="126" x2="185" y2="140" marker-end="url(#arrow)"/>
+<rect x="60" y="140" width="250" height="48" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text class="th" x="185" y="161" text-anchor="middle" fill="#085041">tenantMiddleware</text>
+<text class="ts" x="185" y="178" text-anchor="middle" fill="#0F6E56">verify token, read domain</text>
+<line class="arr" x1="185" y1="188" x2="185" y2="202" marker-end="url(#arrow)"/>
+<rect x="60" y="202" width="250" height="54" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text class="th" x="185" y="223" text-anchor="middle" fill="#085041">ALS-aware accessors</text>
+<text class="ts" x="185" y="241" text-anchor="middle" fill="#0F6E56">getDb · getPool · getPostgresClient</text>
+<line class="arr" x1="185" y1="256" x2="185" y2="272" marker-end="url(#arrow)"/>
+<rect x="60" y="272" width="250" height="48" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="185" y="293" text-anchor="middle" fill="#444441">Tenant DB</text>
+<text class="ts" x="185" y="310" text-anchor="middle" fill="#5F5E5A">this company's database</text>
+
+<line class="arr" x1="310" y1="164" x2="370" y2="164" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<rect x="370" y="140" width="250" height="48" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="495" y="161" text-anchor="middle" fill="#444441">Master registry · tenants</text>
+<text class="ts" x="495" y="178" text-anchor="middle" fill="#5F5E5A">domain → tuid → database_name</text>
+<rect x="370" y="272" width="250" height="48" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5" stroke-dasharray="4 4"/>
+<text class="th" x="495" y="293" text-anchor="middle" fill="#444441">Single-tenant fallback</text>
+<text class="ts" x="495" y="310" text-anchor="middle" fill="#5F5E5A">flag off ⇒ unchanged</text>
+
+<rect class="reg" x="30" y="360" width="620" height="252" rx="8"/>
+<text class="ts" x="44" y="380">Ship to shore sync — fail-closed routing</text>
+
+<rect x="55" y="405" width="165" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text class="th" x="137" y="426" text-anchor="middle" fill="#3C3489">Ship</text>
+<text class="ts" x="137" y="443" text-anchor="middle" fill="#534AB7">local SAILERP + domain</text>
+<line class="arr" x1="220" y1="431" x2="250" y2="431" marker-end="url(#arrow)"/>
+<rect x="250" y="405" width="165" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text class="th" x="332" y="426" text-anchor="middle" fill="#085041">Sync push</text>
+<text class="ts" x="332" y="443" text-anchor="middle" fill="#0F6E56">X-Sync-Domain header</text>
+<line class="arr" x1="415" y1="431" x2="445" y2="431" marker-end="url(#arrow)"/>
+<rect x="445" y="405" width="165" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text class="th" x="527" y="426" text-anchor="middle" fill="#085041">Shore validates</text>
+<text class="ts" x="527" y="443" text-anchor="middle" fill="#0F6E56">against domain map</text>
+
+<line class="arr" x1="510" y1="457" x2="400" y2="520" marker-end="url(#arrow)"/>
+<line class="arr" x1="545" y1="457" x2="572" y2="520" marker-end="url(#arrow)"/>
+<rect x="300" y="520" width="180" height="48" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="390" y="541" text-anchor="middle" fill="#444441">Write tenant DB</text>
+<text class="ts" x="390" y="558" text-anchor="middle" fill="#5F5E5A">domain matches</text>
+<rect x="500" y="520" width="140" height="48" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text class="th" x="570" y="541" text-anchor="middle" fill="#712B13">403 · no write</text>
+<text class="ts" x="570" y="558" text-anchor="middle" fill="#993C1D">mismatch or absent</text>
+
+<line class="arr" x1="150" y1="520" x2="140" y2="457" marker-end="url(#arrow)"/>
+<rect x="55" y="520" width="190" height="48" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="150" y="541" text-anchor="middle" fill="#444441">Provisioning import</text>
+<text class="ts" x="150" y="558" text-anchor="middle" fill="#5F5E5A">seeds domain + tunables</text>
+
+<rect class="reg" x="30" y="630" width="620" height="92" rx="8"/>
+<text class="ts" x="44" y="650">Build order — flag-gated · each phase tsc ≤ 368</text>
+
+<rect x="42" y="662" width="80" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="82" y="683" text-anchor="middle" fill="#444441">P0</text>
+<text class="ts" x="82" y="700" text-anchor="middle" fill="#5F5E5A">Foundations</text>
+<line class="arr" x1="122" y1="688" x2="128" y2="688" marker-end="url(#arrow)"/>
+<rect x="128" y="662" width="80" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="168" y="683" text-anchor="middle" fill="#444441">P1</text>
+<text class="ts" x="168" y="700" text-anchor="middle" fill="#5F5E5A">Registry+ALS</text>
+<line class="arr" x1="208" y1="688" x2="214" y2="688" marker-end="url(#arrow)"/>
+<rect x="214" y="662" width="80" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="254" y="683" text-anchor="middle" fill="#444441">P2</text>
+<text class="ts" x="254" y="700" text-anchor="middle" fill="#5F5E5A">Auth</text>
+<line class="arr" x1="294" y1="688" x2="300" y2="688" marker-end="url(#arrow)"/>
+<rect x="300" y="662" width="80" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="340" y="683" text-anchor="middle" fill="#444441">P3</text>
+<text class="ts" x="340" y="700" text-anchor="middle" fill="#5F5E5A">Frontend</text>
+<line class="arr" x1="380" y1="688" x2="386" y2="688" marker-end="url(#arrow)"/>
+<rect x="386" y="662" width="80" height="52" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text class="th" x="426" y="683" text-anchor="middle" fill="#712B13">P4</text>
+<text class="ts" x="426" y="700" text-anchor="middle" fill="#993C1D">Sync G3</text>
+<line class="arr" x1="466" y1="688" x2="472" y2="688" marker-end="url(#arrow)"/>
+<rect x="472" y="662" width="80" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="512" y="683" text-anchor="middle" fill="#444441">P5</text>
+<text class="ts" x="512" y="700" text-anchor="middle" fill="#5F5E5A">Schedulers</text>
+<line class="arr" x1="552" y1="688" x2="558" y2="688" marker-end="url(#arrow)"/>
+<rect x="558" y="662" width="80" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="th" x="598" y="683" text-anchor="middle" fill="#444441">P6</text>
+<text class="ts" x="598" y="700" text-anchor="middle" fill="#5F5E5A">Cut-over</text>
+
+<rect x="44" y="748" width="12" height="12" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text class="ts" x="62" y="758">SAILERP identity</text>
+<rect x="190" y="748" width="12" height="12" rx="2" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text class="ts" x="208" y="758">tenant routing</text>
+<rect x="326" y="748" width="12" height="12" rx="2" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="ts" x="344" y="758">data / registry</text>
+<rect x="470" y="748" width="12" height="12" rx="2" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text class="ts" x="488" y="758">fail-closed / highest risk</text>
+</svg>
