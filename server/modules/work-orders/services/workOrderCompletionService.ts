@@ -122,6 +122,9 @@ export async function completeWorkOrder(
   let rhValidationDetails: any = null;
   let completionRHSource = 'MANUAL_ENTRY';
   let rhReadingApplied = false;
+  let rhBackdatedSkipped = false;
+  let rhBackdatedLatestRH: number | null = null;
+  let rhBackdatedLatestRHDate: string | null = null;
 
   // SHIP-ONLY RH sync (Jeevan): the master RH counter advances on the ship/HOD approval, NEVER
   // office-side; INHERITED snapshots likewise originate on the ship and reach shore via sync.
@@ -154,35 +157,58 @@ export async function completeWorkOrder(
       if (alreadySynced) {
         console.log(`ℹ️ [RH Sync] WO ${workOrder.workOrderNo} already synced (rh_synced_at set) — skipping MASTER cascade (double-sync guard)`);
       } else {
-        const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
-        try {
-          await updateMasterRH(component.cuuid, {
-            newRHValue: newRH,
-            updateSource: 'MANUAL',
-            userId: bodyUserId || executionData.performedBy || 'system',
-            userUuid: bodyUserUuid,
-            userRole: userRole || 'Ship',
-            adminOverride: adminOverride || false,
-            comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ''})`,
-            dateUpdated: completionDateForValidation
-          });
-          rhReadingApplied = true;
-          console.log(`✅ [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
-        } catch (masterErr: any) {
-          // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
-          if (masterErr instanceof ValidationError) {
-            const det: any = masterErr.details || {};
-            throw new ValidationError(masterErr.message, {
-              code: 'RH_OVERRIDE_REQUIRED',
-              ...det,
-              requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-              canOverride: det.validation?.canOverride ?? false,
-              componentId: component.cuuid,
-              componentCode: component.componentCode || workOrder.componentCode,
-              rhCounterType: 'MASTER'
-            });
+        // Pre-flight: detect back-dated lower entry.
+        // If the completion date predates the master's last RH update AND the entered RH is not
+        // greater than the current master RH, skip the RH module write. The WO still completes
+        // normally; the reading is saved for scheduling / next-due calculation only.
+        const masterCurrentRH = parseFloat((component.rhCurrentMaster ?? component.currentCumulativeRH) || '0');
+        if (newRH <= masterCurrentRH) {
+          const masterUpdRaw: any = component.rhMasterUpdatedAt ?? (component.lastUpdated ? new Date(component.lastUpdated) : null);
+          const masterUpdDate: Date | null = masterUpdRaw instanceof Date ? masterUpdRaw : (masterUpdRaw ? new Date(masterUpdRaw) : null);
+          if (masterUpdDate && !isNaN(masterUpdDate.getTime())) {
+            const woCompletionDate = new Date(completionDateForValidation);
+            const masterDay = Date.UTC(masterUpdDate.getUTCFullYear(), masterUpdDate.getUTCMonth(), masterUpdDate.getUTCDate());
+            const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
+            if (woDay < masterDay) {
+              rhBackdatedSkipped = true;
+              rhBackdatedLatestRH = masterCurrentRH;
+              rhBackdatedLatestRHDate = masterUpdDate.toISOString().split('T')[0];
+              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master current ${masterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated — reading saved to WO for scheduling only.`);
+            }
           }
-          throw masterErr;
+        }
+
+        if (!rhBackdatedSkipped) {
+          const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
+          try {
+            await updateMasterRH(component.cuuid, {
+              newRHValue: newRH,
+              updateSource: 'MANUAL',
+              userId: bodyUserId || executionData.performedBy || 'system',
+              userUuid: bodyUserUuid,
+              userRole: userRole || 'Ship',
+              adminOverride: adminOverride || false,
+              comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ''})`,
+              dateUpdated: completionDateForValidation
+            });
+            rhReadingApplied = true;
+            console.log(`✅ [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
+          } catch (masterErr: any) {
+            // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
+            if (masterErr instanceof ValidationError) {
+              const det: any = masterErr.details || {};
+              throw new ValidationError(masterErr.message, {
+                code: 'RH_OVERRIDE_REQUIRED',
+                ...det,
+                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                canOverride: det.validation?.canOverride ?? false,
+                componentId: component.cuuid,
+                componentCode: component.componentCode || workOrder.componentCode,
+                rhCounterType: 'MASTER'
+              });
+            }
+            throw masterErr;
+          }
         }
       }
     } else {
@@ -207,6 +233,25 @@ export async function completeWorkOrder(
         }
 
         if (masterComp) {
+          // INHERITED pre-flight: detect back-dated lower entry against the master component.
+          const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || '0');
+          if (newRH <= inhMasterCurrentRH) {
+            const inhMasterUpdRaw: any = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
+            const inhMasterUpdDate: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
+            if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
+              const woCompletionDate = new Date(completionDateForValidation);
+              const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
+              const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
+              if (woDay < masterDay) {
+                rhBackdatedSkipped = true;
+                rhBackdatedLatestRH = inhMasterCurrentRH;
+                rhBackdatedLatestRHDate = inhMasterUpdDate.toISOString().split('T')[0];
+                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated — reading saved to WO for scheduling only.`);
+              }
+            }
+          }
+
+          if (!rhBackdatedSkipped) {
           // Master resolved: advance its counter, which cascades the delta to every sibling
           // INHERITED component and stamps them all with the WO completion date.
           const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
@@ -237,6 +282,7 @@ export async function completeWorkOrder(
             }
             throw masterErr;
           }
+          } // end if (!rhBackdatedSkipped) — INHERITED branch
         } else {
           // No valid master link: timeline-validate and record on this child only.
           const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
@@ -284,7 +330,9 @@ export async function completeWorkOrder(
           console.warn(`⚠️ [RH Sync] INHERITED component ${component.componentCode || component.cuuid} has no valid master link — recorded on child only (WO ${workOrder.workOrderNo})`);
         }
       }
-      rhReadingApplied = true;
+      if (!rhBackdatedSkipped) {
+        rhReadingApplied = true;
+      }
     }
   }
 
@@ -371,7 +419,8 @@ export async function completeWorkOrder(
     rhJustificationDate: body.rhJustification ? new Date() : undefined,
     // Double-sync guard: stamp when a completion reading was applied this run (MASTER cascade or
     // INHERITED cycle). Leaves an existing stamp intact on replay.
-    rhSyncedAt: rhReadingApplied ? new Date() : undefined
+    rhSyncedAt: rhReadingApplied ? new Date() : undefined,
+    rhBackdatedEntry: rhBackdatedSkipped ? true : undefined
   });
 
   // Sync field logging — log completion UPDATE
@@ -767,7 +816,12 @@ export async function completeWorkOrder(
     success: true,
     workOrder: updatedWorkOrder,
     runningHoursUpdated: !!runningHours,
-    missedCycles
+    missedCycles,
+    rhBackdated: rhBackdatedSkipped,
+    ...(rhBackdatedSkipped && {
+      latestRH: rhBackdatedLatestRH,
+      latestRHDate: rhBackdatedLatestRHDate
+    })
   };
 }
 
