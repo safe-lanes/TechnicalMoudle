@@ -7067,6 +7067,7 @@ __export(repository_exports, {
   getFieldLogCount: () => getFieldLogCount,
   getFieldLogsSinceCheckpoint: () => getFieldLogsSinceCheckpoint,
   getFileQueueEntry: () => getFileQueueEntry,
+  getFileQueueForDashboard: () => getFileQueueForDashboard,
   getInstanceMetadata: () => getInstanceMetadata,
   getPendingFileCount: () => getPendingFileCount,
   getPendingFiles: () => getPendingFiles,
@@ -7083,13 +7084,15 @@ __export(repository_exports, {
   queueFile: () => queueFile,
   queueFileWithUuid: () => queueFileWithUuid,
   resolveConflict: () => resolveConflict,
+  retryFileQueueEntry: () => retryFileQueueEntry,
+  skipFileQueueEntry: () => skipFileQueueEntry,
   updateBatch: () => updateBatch,
   updateFileStatus: () => updateFileStatus,
   updateSetting: () => updateSetting,
   updateSettings: () => updateSettings,
   upsertInstanceMetadata: () => upsertInstanceMetadata
 });
-import { eq, and, desc, asc, inArray, isNull, sql as sql4 } from "drizzle-orm";
+import { eq, and, ne, desc, asc, inArray, isNull, sql as sql4 } from "drizzle-orm";
 async function getInstanceMetadata(instanceId) {
   const db2 = await getDb();
   const rows = await db2.select().from(syncMetadata).where(eq(syncMetadata.instanceId, instanceId)).limit(1);
@@ -7290,7 +7293,25 @@ async function getPendingFiles(vesselId, direction, limit = 100) {
     eq(syncFileQueue.vesselId, vesselId),
     eq(syncFileQueue.direction, direction),
     eq(syncFileQueue.status, "pending")
-  )).orderBy(desc(syncFileQueue.priority), asc(syncFileQueue.createdAt)).limit(limit);
+  )).orderBy(desc(syncFileQueue.priority), asc(syncFileQueue.fileSizeBytes), asc(syncFileQueue.createdAt)).limit(limit);
+}
+async function getFileQueueForDashboard(vesselId, limit = 100) {
+  const db2 = await getDb();
+  return db2.select().from(syncFileQueue).where(and(
+    eq(syncFileQueue.vesselId, vesselId),
+    eq(syncFileQueue.isDeleted, false),
+    ne(syncFileQueue.status, "completed")
+  )).orderBy(desc(syncFileQueue.updatedAt)).limit(limit);
+}
+async function retryFileQueueEntry(queueUuid) {
+  const db2 = await getDb();
+  const result = await db2.update(syncFileQueue).set({ status: "pending", retryCount: 0, lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq(syncFileQueue.queueUuid, queueUuid)).returning();
+  return result[0];
+}
+async function skipFileQueueEntry(queueUuid) {
+  const db2 = await getDb();
+  const result = await db2.update(syncFileQueue).set({ status: "skipped", lastError: "Skipped by operator", completedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq(syncFileQueue.queueUuid, queueUuid)).returning();
+  return result[0];
 }
 async function updateFileStatus(queueUuid, status, chunkOffset, lastError) {
   const db2 = await getDb();
@@ -7729,7 +7750,7 @@ function getStorageDir(tableName) {
       return WO_DOCS_DIR;
   }
 }
-var CHUNK_SIZE_BYTES, MAX_FILE_RETRIES, TEMP_DIR, WO_DOCS_DIR, COMPONENT_DOCS_DIR, DEFECT_DOCS_DIR, CR_DOCS_DIR, FileSyncProcessor;
+var CHUNK_SIZE_BYTES, MAX_FILE_RETRIES, CHUNK_TIMEOUT_MS, FILE_MAX_MS, DEFER_BYTES, CHUNK_DELAY_MS, TEMP_DIR, WO_DOCS_DIR, COMPONENT_DOCS_DIR, DEFECT_DOCS_DIR, CR_DOCS_DIR, FileSyncProcessor;
 var init_fileSyncProcessor = __esm({
   "server/modules/sync/fileSyncProcessor.ts"() {
     "use strict";
@@ -7738,6 +7759,10 @@ var init_fileSyncProcessor = __esm({
     init_syncRole();
     CHUNK_SIZE_BYTES = 256 * 1024;
     MAX_FILE_RETRIES = 3;
+    CHUNK_TIMEOUT_MS = parseInt(process.env.SYNC_FILE_CHUNK_TIMEOUT_MS || "", 10) || 3e4;
+    FILE_MAX_MS = parseInt(process.env.SYNC_FILE_MAX_MS || "", 10) || 12e4;
+    DEFER_BYTES = parseInt(process.env.SYNC_FILE_DEFER_BYTES || "", 10) || 0;
+    CHUNK_DELAY_MS = parseInt(process.env.SYNC_FILE_CHUNK_DELAY_MS || "", 10) || 0;
     TEMP_DIR = path2.resolve(process.cwd(), ".private", "sync-temp");
     WO_DOCS_DIR = path2.resolve(process.cwd(), ".private", "wo-docs");
     COMPONENT_DOCS_DIR = path2.resolve(process.cwd(), ".private", "component-docs");
@@ -7757,10 +7782,11 @@ var init_fileSyncProcessor = __esm({
        * Process all pending file transfers for a vessel.
        * Called AFTER field data sync is complete.
        */
-      async processQueue(vesselId, _syncBatchId) {
+      async processQueue(vesselId, _syncBatchId, phaseDeadlineMs) {
         let filesProcessed = 0;
         let filesFailed = 0;
         let bytesTransferred = 0;
+        const phaseStart = Date.now();
         const direction = isShipInstanceId(this.instanceId) ? "ship_to_shore" : "shore_to_ship";
         const pendingFiles = await getPendingFiles(vesselId, direction, 50);
         syncDiag(`FILE-SYNC START: ${pendingFiles.length} pending files for vessel=${vesselId}, direction=${direction}`);
@@ -7768,50 +7794,89 @@ var init_fileSyncProcessor = __esm({
           `[FileSyncProcessor] ${pendingFiles.length} pending files for vessel ${vesselId} (${direction})`
         );
         for (const fileEntry of pendingFiles) {
+          if (phaseDeadlineMs && Date.now() - phaseStart > phaseDeadlineMs) {
+            syncDiag(`FILE-SYNC PHASE BUDGET HIT: stopping after ${filesProcessed} processed / ${filesFailed} failed; remaining files left pending (resumable)`);
+            break;
+          }
           try {
             syncDiag(`FILE-SYNC PROCESS: ${fileEntry.tableName}/${fileEntry.fileKey} (${fileEntry.fileSizeBytes || "?"} bytes) status=${fileEntry.status}`);
             await updateFileStatus(fileEntry.queueUuid, "in_progress");
-            const fileBuffer = await this.readLocalFile(
-              fileEntry.fileKey,
-              fileEntry.tableName
-            );
-            if (!fileBuffer) {
-              throw new Error(`File not found: ${fileEntry.fileKey}`);
-            }
-            const hash = crypto2.createHash("sha256").update(fileBuffer).digest("hex");
-            const totalChunks = Math.ceil(fileBuffer.length / CHUNK_SIZE_BYTES);
-            const startChunk = fileEntry.chunkOffset || 0;
-            for (let i = startChunk; i < totalChunks; i++) {
-              const start = i * CHUNK_SIZE_BYTES;
-              const end = Math.min(start + CHUNK_SIZE_BYTES, fileBuffer.length);
-              const chunkData = fileBuffer.subarray(start, end).toString("base64");
-              const chunk = {
-                queueUuid: fileEntry.queueUuid,
-                chunkIndex: i,
-                totalChunks,
-                data: chunkData,
-                fileHash: hash,
-                // Include file metadata so the RECEIVING side can save the file
-                fileKey: fileEntry.fileKey,
-                tableName: fileEntry.tableName,
-                fileName: fileEntry.fileName ?? null,
-                fileSizeBytes: fileEntry.fileSizeBytes ?? null,
-                vesselId: fileEntry.vesselId ?? null
-              };
-              await this.sendChunk(chunk);
+            const filePath = this.resolveLocalPath(fileEntry.fileKey, fileEntry.tableName);
+            if (!filePath) {
               await updateFileStatus(
                 fileEntry.queueUuid,
-                "in_progress",
-                i + 1
-                // chunk_offset = next chunk to send
+                "unsendable",
+                fileEntry.chunkOffset || 0,
+                "File not found in local storage at transfer (object-backed or deleted from disk)"
               );
-              bytesTransferred += end - start;
+              filesFailed++;
+              syncDiag(`FILE-SYNC UNSENDABLE: ${fileEntry.fileKey} \u2014 not found in local storage`);
+              console.warn(`[FileSyncProcessor] UNSENDABLE: ${fileEntry.fileName || fileEntry.fileKey} \u2014 file missing from local storage`);
+              continue;
             }
+            const fileSize = (await fs2.promises.stat(filePath)).size;
+            if (DEFER_BYTES > 0 && fileSize > DEFER_BYTES) {
+              await updateFileStatus(fileEntry.queueUuid, "pending", fileEntry.chunkOffset || 0);
+              syncDiag(`FILE-SYNC DEFER (size): ${fileEntry.fileKey} ${fileSize}B > ${DEFER_BYTES}B threshold \u2014 deferred to a later cycle`);
+              continue;
+            }
+            const totalChunks = Math.ceil(fileSize / CHUNK_SIZE_BYTES);
+            const startChunk = fileEntry.chunkOffset || 0;
+            const fileStart = Date.now();
+            let deferred = false;
+            const fh = await fs2.promises.open(filePath, "r");
+            try {
+              const hasher = crypto2.createHash("sha256");
+              const hbuf = Buffer.allocUnsafe(CHUNK_SIZE_BYTES);
+              let hpos = 0;
+              for (; ; ) {
+                const { bytesRead } = await fh.read(hbuf, 0, CHUNK_SIZE_BYTES, hpos);
+                if (bytesRead <= 0) break;
+                hasher.update(hbuf.subarray(0, bytesRead));
+                hpos += bytesRead;
+              }
+              const hash = hasher.digest("hex");
+              const cbuf = Buffer.allocUnsafe(CHUNK_SIZE_BYTES);
+              for (let i = startChunk; i < totalChunks; i++) {
+                if (Date.now() - fileStart > FILE_MAX_MS) {
+                  await updateFileStatus(fileEntry.queueUuid, "pending", i);
+                  syncDiag(`FILE-SYNC DEFER: ${fileEntry.fileKey} exceeded ${FILE_MAX_MS}ms \u2014 resuming from chunk ${i}/${totalChunks} next cycle`);
+                  deferred = true;
+                  break;
+                }
+                const start = i * CHUNK_SIZE_BYTES;
+                const want = Math.min(CHUNK_SIZE_BYTES, fileSize - start);
+                const { bytesRead } = await fh.read(cbuf, 0, want, start);
+                const chunkData = cbuf.subarray(0, bytesRead).toString("base64");
+                const chunk = {
+                  queueUuid: fileEntry.queueUuid,
+                  chunkIndex: i,
+                  totalChunks,
+                  data: chunkData,
+                  fileHash: hash,
+                  // Include file metadata so the RECEIVING side can save the file
+                  fileKey: fileEntry.fileKey,
+                  tableName: fileEntry.tableName,
+                  fileName: fileEntry.fileName ?? null,
+                  fileSizeBytes: fileEntry.fileSizeBytes ?? null,
+                  vesselId: fileEntry.vesselId ?? null
+                };
+                await this.sendChunk(chunk);
+                await updateFileStatus(fileEntry.queueUuid, "in_progress", i + 1);
+                bytesTransferred += bytesRead;
+                if (CHUNK_DELAY_MS > 0 && i + 1 < totalChunks) {
+                  await new Promise((r) => setTimeout(r, CHUNK_DELAY_MS));
+                }
+              }
+            } finally {
+              await fh.close();
+            }
+            if (deferred) continue;
             await markFileCompleted(fileEntry.queueUuid);
             filesProcessed++;
-            syncDiag(`FILE-SYNC OK: ${fileEntry.fileKey} \u2014 transferred ${fileBuffer.length} bytes in ${totalChunks} chunks`);
+            syncDiag(`FILE-SYNC OK: ${fileEntry.fileKey} \u2014 transferred ${fileSize} bytes in ${totalChunks} chunks (streamed)`);
             console.log(
-              `[FileSyncProcessor] Completed: ${fileEntry.fileName || fileEntry.fileKey} (${totalChunks} chunks, ${fileBuffer.length} bytes)`
+              `[FileSyncProcessor] Completed: ${fileEntry.fileName || fileEntry.fileKey} (${totalChunks} chunks, ${fileSize} bytes)`
             );
           } catch (error) {
             filesFailed++;
@@ -7932,32 +7997,24 @@ var init_fileSyncProcessor = __esm({
         return Buffer.concat(buffers);
       }
       /**
-       * Read a file from local storage.
-       * Adapts based on tableName and the app's dual-backend storage.
+       * Resolve a queued file to its existing LOCAL path (mirrors the prior dual-backend
+       * resolution). Returns the absolute path, or null when the file is not present locally —
+       * i.e. object-backed (no local copy) OR deleted from disk after enqueue. Transfer streams
+       * from this path instead of loading the whole file into memory. No object-storage fetch
+       * (decided B-P2.1: ship files are local; a non-local file is flagged terminal upstream).
        */
-      async readLocalFile(fileKey, tableName) {
+      resolveLocalPath(fileKey, tableName) {
         if (fileKey.startsWith("local://")) {
-          const relativePath = fileKey.replace("local://", "");
-          const baseDir = getStorageDir(tableName);
-          const fullPath = path2.join(baseDir, relativePath);
-          if (fs2.existsSync(fullPath)) {
-            return fs2.readFileSync(fullPath);
-          }
+          const fullPath = path2.join(getStorageDir(tableName), fileKey.replace("local://", ""));
+          if (fs2.existsSync(fullPath)) return fullPath;
         }
         const primaryDir = getStorageDir(tableName);
         const dirs = [primaryDir, ...[WO_DOCS_DIR, COMPONENT_DOCS_DIR, DEFECT_DOCS_DIR, CR_DOCS_DIR].filter((d) => d !== primaryDir)];
         for (const dir of dirs) {
           const fullPath = path2.join(dir, fileKey);
-          if (fs2.existsSync(fullPath)) {
-            return fs2.readFileSync(fullPath);
-          }
+          if (fs2.existsSync(fullPath)) return fullPath;
         }
-        if (fs2.existsSync(fileKey)) {
-          return fs2.readFileSync(fileKey);
-        }
-        console.warn(
-          `[FileSyncProcessor] File not found locally: ${fileKey} (table: ${tableName}). If stored in Object Storage, cloud-to-cloud transfer is not yet implemented.`
-        );
+        if (fs2.existsSync(fileKey)) return fileKey;
         return null;
       }
       /**
@@ -7999,7 +8056,7 @@ var init_fileSyncProcessor = __esm({
             "X-Sync-Instance-Id": this.instanceId
           },
           body: JSON.stringify(chunk),
-          signal: AbortSignal.timeout(3e4)
+          signal: AbortSignal.timeout(CHUNK_TIMEOUT_MS)
         });
         if (!response.ok) {
           throw new Error(`Chunk upload failed: ${response.status}`);
@@ -8022,13 +8079,22 @@ var init_fileSyncProcessor = __esm({
             else priority = 1;
           }
           let fileHash = null;
+          let readable = false;
           try {
             const resolvedPath = fileKey.startsWith("local://") ? path2.join(getStorageDir(tableName), fileKey.replace("local://", "")) : fileKey;
             if (fs2.existsSync(resolvedPath)) {
+              readable = true;
               const buffer = fs2.readFileSync(resolvedPath);
               fileHash = crypto2.createHash("sha256").update(buffer).digest("hex");
             }
           } catch {
+          }
+          let status;
+          let lastError;
+          if (direction === "ship_to_shore" && !readable) {
+            status = "unsendable";
+            lastError = "File not readable in local storage at enqueue (object-backed or missing) \u2014 cannot push to shore.";
+            console.warn(`[FileSyncProcessor] UNSENDABLE at enqueue: ${fileName || fileKey} (${tableName}) \u2014 not locally readable`);
           }
           const totalChunks = fileSizeBytes ? Math.ceil(fileSizeBytes / CHUNK_SIZE_BYTES) : null;
           await queueFile({
@@ -8042,7 +8108,9 @@ var init_fileSyncProcessor = __esm({
             vesselId,
             instanceId,
             totalChunks,
-            priority
+            priority,
+            status,
+            lastError
           });
           console.log(
             `[FileSyncProcessor] Queued for sync: ${fileName || fileKey} (${direction}, priority ${priority})`
@@ -8211,26 +8279,32 @@ async function checkStuckFiles(thresholds) {
     return { status: "warning", message: "Database not available", value: 0, threshold: thresholds.stuckFileHours };
   }
   const result = await pool2.query(
-    `SELECT COUNT(*)::int AS count
+    `SELECT
+       COUNT(*) FILTER (WHERE status IN ('pending','in_progress')
+                          AND created_at < NOW() - INTERVAL '1 hour' * $1)::int AS stuck,
+       COUNT(*) FILTER (WHERE status IN ('failed','unsendable'))::int AS failed
      FROM sync_file_queue
-     WHERE status IN ('pending', 'in_progress')
-       AND is_deleted = false
-       AND created_at < NOW() - INTERVAL '1 hour' * $1`,
+     WHERE is_deleted = false`,
     [thresholds.stuckFileHours]
   );
-  const stuckFiles = result.rows[0]?.count ?? 0;
-  if (stuckFiles === 0) {
+  const stuckFiles = result.rows[0]?.stuck ?? 0;
+  const failedFiles = result.rows[0]?.failed ?? 0;
+  const total = stuckFiles + failedFiles;
+  if (total === 0) {
     return {
       status: "ok",
-      message: "No stuck file transfers",
+      message: "No stuck or failed file transfers",
       value: 0,
       threshold: thresholds.stuckFileHours
     };
   }
+  const parts = [];
+  if (stuckFiles > 0) parts.push(`${stuckFiles} stuck > ${thresholds.stuckFileHours}h`);
+  if (failedFiles > 0) parts.push(`${failedFiles} failed/unsendable`);
   return {
-    status: stuckFiles > 5 ? "critical" : "warning",
-    message: `${stuckFiles} file transfer(s) stuck for over ${thresholds.stuckFileHours} hours`,
-    value: stuckFiles,
+    status: total > 5 || failedFiles > 0 ? "critical" : "warning",
+    message: `File transfers need attention: ${parts.join(", ")}`,
+    value: total,
     threshold: thresholds.stuckFileHours
   };
 }
@@ -10489,7 +10563,7 @@ function getSyncEngine() {
 function camelToSnake(str) {
   return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 }
-var CHUNK_SIZE, MAX_RETRIES, RETRY_DELAYS, REQUEST_TIMEOUT, SyncEngine, engineInstance;
+var CHUNK_SIZE, MAX_RETRIES, RETRY_DELAYS, REQUEST_TIMEOUT, PUSH_BATCH_SIZE, FILE_PHASE_MAX_MS, SyncEngine, engineInstance;
 var init_syncEngine = __esm({
   "server/modules/sync/syncEngine.ts"() {
     "use strict";
@@ -10503,7 +10577,9 @@ var init_syncEngine = __esm({
     CHUNK_SIZE = 200;
     MAX_RETRIES = 3;
     RETRY_DELAYS = [5e3, 15e3, 45e3];
-    REQUEST_TIMEOUT = 3e4;
+    REQUEST_TIMEOUT = parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || "", 10) || 3e4;
+    PUSH_BATCH_SIZE = parseInt(process.env.SYNC_PUSH_BATCH_SIZE || "", 10) || 1e3;
+    FILE_PHASE_MAX_MS = parseInt(process.env.SYNC_FILE_PHASE_MAX_MS || "", 10) || 12e4;
     SyncEngine = class {
       instanceId;
       shoreBaseUrl;
@@ -10634,7 +10710,7 @@ var init_syncEngine = __esm({
           let filesFailedCount = 0;
           try {
             const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl);
-            const fileResult = await fileProcessor.processQueue(vesselId, batchUuid);
+            const fileResult = await fileProcessor.processQueue(vesselId, batchUuid, FILE_PHASE_MAX_MS);
             filesProcessedCount = fileResult.filesProcessed;
             filesFailedCount = fileResult.filesFailed;
             console.log(
@@ -10718,7 +10794,7 @@ var init_syncEngine = __esm({
         const isShip = isShipInstanceId(this.instanceId);
         const vesselCode = await this.getVesselCode(vesselId);
         syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
-        const fieldLogs = isShip ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode) : [];
+        const fieldLogs = isShip ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, PUSH_BATCH_SIZE) : [];
         syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip ? " (shore skips field log push)" : ""}`);
         const pushTables = {};
         fieldLogs.forEach((l) => {
@@ -11709,20 +11785,59 @@ async function uploadChunkHandler(req, res) {
     res.status(500).json({ error: "Failed to receive file chunk" });
   }
 }
+function fileCategoryLabel(tableName) {
+  return FILE_CATEGORY_LABELS[tableName] || tableName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 async function fileQueueHandler(req, res) {
   try {
     const vesselId = req.query.vesselId || "";
-    const direction = req.query.direction || "ship_to_shore";
-    const limit = parseInt(req.query.limit) || 50;
+    const limit = parseInt(req.query.limit) || 100;
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId query param is required" });
     }
-    const files = await getPendingFiles(vesselId, direction, limit);
+    const rows = await getFileQueueForDashboard(vesselId, limit);
+    const files = rows.map((f) => ({
+      queueUuid: f.queueUuid,
+      category: fileCategoryLabel(f.tableName),
+      fileName: f.fileName,
+      fileSize: f.fileSizeBytes,
+      direction: f.direction,
+      status: f.status,
+      chunkOffset: f.chunkOffset ?? 0,
+      totalChunks: f.totalChunks,
+      retryCount: f.retryCount ?? 0,
+      lastError: f.lastError ?? null,
+      createdAt: f.createdAt
+    }));
     res.json({ files, count: files.length });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("[Sync] file-queue error:", error);
     res.status(500).json({ error: "Failed to get file queue" });
+  }
+}
+async function retryFileHandler(req, res) {
+  try {
+    const { queueUuid } = req.params;
+    if (!queueUuid) return res.status(400).json({ error: "queueUuid is required" });
+    const updated = await retryFileQueueEntry(queueUuid);
+    if (!updated) return res.status(404).json({ error: "File queue entry not found" });
+    res.json({ success: true, status: updated.status });
+  } catch (error) {
+    console.error("[Sync] file retry error:", error);
+    res.status(500).json({ error: "Failed to retry file" });
+  }
+}
+async function skipFileHandler(req, res) {
+  try {
+    const { queueUuid } = req.params;
+    if (!queueUuid) return res.status(400).json({ error: "queueUuid is required" });
+    const updated = await skipFileQueueEntry(queueUuid);
+    if (!updated) return res.status(404).json({ error: "File queue entry not found" });
+    res.json({ success: true, status: updated.status });
+  } catch (error) {
+    console.error("[Sync] file skip error:", error);
+    res.status(500).json({ error: "Failed to skip file" });
   }
 }
 async function generateProvisionHandler(req, res) {
@@ -11983,6 +12098,7 @@ async function diagLogsListHandler(req, res) {
     res.status(500).json({ error: "Failed to list diagnostic logs" });
   }
 }
+var FILE_CATEGORY_LABELS;
 var init_controller = __esm({
   "server/modules/sync/controller.ts"() {
     "use strict";
@@ -11996,6 +12112,12 @@ var init_controller = __esm({
     init_healthMonitor();
     init_syncRole();
     init_syncDiagLogger();
+    FILE_CATEGORY_LABELS = {
+      work_order_documents: "Work Order",
+      component_documents: "Component",
+      defect_attachments: "Defect",
+      change_request_attachment: "Change Request"
+    };
   }
 });
 
@@ -12154,6 +12276,8 @@ var init_routes = __esm({
     router.post("/sync/trigger", asyncHandler(triggerSyncHandler));
     router.post("/sync/file/upload-chunk", asyncHandler(uploadChunkHandler));
     router.get("/sync/file/queue", asyncHandler(fileQueueHandler));
+    router.post("/sync/file/:queueUuid/retry", asyncHandler(retryFileHandler));
+    router.post("/sync/file/:queueUuid/skip", asyncHandler(skipFileHandler));
     router.post("/sync/prune", requireOfflineAdmin, asyncHandler(pruneHandler));
     router.get("/sync/health", asyncHandler(healthCheckHandler));
     router.get("/sync/table-stats", asyncHandler(tableStatsHandler));
@@ -13345,14 +13469,43 @@ var init_postgresStorage = __esm({
             const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || "0");
             const newChildRH = Math.max(0, currentChildRH + delta);
             await tx.update(components).set({
-              rhCurrentInheritedCached: params.newRHValue.toString(),
-              // Cache master's absolute value
+              // Cache the master's TOTAL (meterReplacedLastRh + new reading) so the inherited
+              // display stays correct for masters that have undergone a meter replacement; the
+              // one-time propagate-all fixer reuses this path and must not collapse the cache.
+              rhCurrentInheritedCached: (parseFloat(component.meterReplacedLastRh || "0") + params.newRHValue).toString(),
               currentCumulativeRH: newChildRH.toString(),
               // Child's actual RH with delta applied
-              rhInheritedUpdatedAt: now,
-              lastUpdated: now.toISOString(),
+              // Stamp the reading date (WO completion date / RH section date), not the server
+              // clock, so the family's Last Updated reflects when the hours were observed.
+              rhInheritedUpdatedAt: readingDate,
+              lastUpdated: readingDate.toISOString(),
               updatedAt: now
             }).where(eq2(components.cuuid, inherited.cuuid));
+            const childNotes = params.comments ? `${params.comments} (cascade from master ${masterComponentCode})` : `Cascade from master ${masterComponentCode}`;
+            const childRhaResult = await tx.insert(runningHoursAudit).values({
+              vesselId: inherited.vesselId || masterVesselId,
+              componentId: inherited.cuuid,
+              previousRH: currentChildRH.toFixed(2),
+              newRH: newChildRH.toFixed(2),
+              cumulativeRH: newChildRH.toFixed(2),
+              dateUpdatedLocal: readingDateLocal,
+              dateUpdatedTZ: "UTC",
+              enteredAtUTC: now,
+              userId: params.userId,
+              actorLabel: getAuditActor().actorLabel,
+              updatedByUuid: params.userUuid || null,
+              source: params.updateSource.toLowerCase(),
+              notes: childNotes,
+              meterReplaced: false,
+              version: 1,
+              componentCode: inherited.componentCode || null,
+              componentName: inherited.name || null
+            }).returning();
+            try {
+              await logFieldChanges("running_hours_audit", childRhaResult[0].rhauuid, inherited.vesselId || masterVesselId, null, childRhaResult[0], params.userId);
+            } catch (e) {
+              console.error("[FieldLogger] rha cascade create:", e);
+            }
             inheritedUpdated++;
           }
           return { masterUpdated: masterResult[0], inheritedUpdated };
@@ -17621,6 +17774,7 @@ var init_postgresStorage = __esm({
         let inheritedComponents = [];
         let inheritedDelta = 0;
         let currentRH = 0;
+        let masterTotalRH = 0;
         if (parentResult.length > 0) {
           const parent = parentResult[0];
           currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || "0");
@@ -17671,6 +17825,7 @@ var init_postgresStorage = __esm({
             updateData.rhMasterUpdateSource = "MANUAL";
           }
           const totalCumulativeRH = meterReplaced ? previousTotalForReplacement + newRH : parseFloat(parent.meterReplacedLastRh || "0") + newRH;
+          masterTotalRH = totalCumulativeRH;
           parentAuditValues = {
             vesselId: parent.vesselId || "unknown",
             componentId: resolvedParentId,
@@ -17711,7 +17866,7 @@ var init_postgresStorage = __esm({
                   eq2(components.rhCounterSource, masterComponentCode)
                 )
               ));
-              inheritedDelta = newRH - currentRH;
+              inheritedDelta = meterReplaced ? newRH : newRH - currentRH;
             }
           }
         }
@@ -17731,9 +17886,11 @@ var init_postgresStorage = __esm({
             auditsCreated++;
             for (const inherited of inheritedComponents) {
               const inheritedCurrentRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || "0");
-              const newInheritedRH = inheritedCurrentRH + inheritedDelta;
+              const newInheritedRH = Math.max(0, inheritedCurrentRH + inheritedDelta);
               await tx.update(components).set({
-                rhCurrentInheritedCached: newRH.toString(),
+                // Cache the master's TOTAL (meterReplacedLastRh + newRH), not the raw new meter
+                // reading, so the inherited display matches the master after a meter replacement.
+                rhCurrentInheritedCached: masterTotalRH.toString(),
                 rhInheritedUpdatedAt: now,
                 currentCumulativeRH: newInheritedRH.toString(),
                 lastUpdated: dateUpdated,
@@ -17764,7 +17921,9 @@ var init_postgresStorage = __esm({
               auditsCreated++;
             }
           }
+          const inheritedCuuidSet = new Set(inheritedComponents.map((i) => i.cuuid));
           for (const child of children) {
+            if (inheritedCuuidSet.has(child.cuuid)) continue;
             const childCurrentRH = parseFloat(child.currentCumulativeRH || "0");
             const childNewRH = childCurrentRH + structuralDelta;
             const childUpdateData = {
@@ -17777,7 +17936,7 @@ var init_postgresStorage = __esm({
               childUpdateData.rhMasterUpdatedAt = now;
             }
             if (child.rhCounterType === "INHERITED" && child.rhMasterComponentId === parentComponentId) {
-              childUpdateData.rhCurrentInheritedCached = newRH.toString();
+              childUpdateData.rhCurrentInheritedCached = masterTotalRH.toString();
               childUpdateData.rhInheritedUpdatedAt = now;
             }
             await tx.update(components).set(childUpdateData).where(eq2(components.cuuid, child.cuuid));
@@ -20860,6 +21019,46 @@ async function getLatestCompletedDateBatch(masters) {
 async function createRunningHoursAudit(audit) {
   return storage.createRunningHoursAudit(audit);
 }
+async function getMeterReplacementHistory(componentId) {
+  const db2 = await getDb();
+  const comp = await storage.getComponent(componentId);
+  const resolvedId = comp?.cuuid || componentId;
+  const rows = await db2.select({
+    id: runningHoursAudit.id,
+    enteredAtUTC: runningHoursAudit.enteredAtUTC,
+    dateUpdatedLocal: runningHoursAudit.dateUpdatedLocal,
+    renewalActionType: runningHoursAudit.renewalActionType,
+    renewalReason: runningHoursAudit.renewalReason,
+    renewalReference: runningHoursAudit.renewalReference,
+    oldMeterFinal: runningHoursAudit.oldMeterFinal,
+    newMeterStart: runningHoursAudit.newMeterStart,
+    userId: runningHoursAudit.userId,
+    notes: runningHoursAudit.notes
+  }).from(runningHoursAudit).where(
+    and4(
+      or2(
+        eq5(runningHoursAudit.componentId, resolvedId),
+        eq5(runningHoursAudit.componentId, componentId)
+      ),
+      or2(
+        eq5(runningHoursAudit.meterReplaced, true),
+        eq5(runningHoursAudit.isRenewalReset, true)
+      )
+    )
+  ).orderBy(desc3(runningHoursAudit.enteredAtUTC));
+  return rows.map((r) => ({
+    id: r.id,
+    enteredAtUTC: r.enteredAtUTC,
+    dateUpdatedLocal: r.dateUpdatedLocal,
+    renewalActionType: r.renewalActionType,
+    renewalReason: r.renewalReason,
+    renewalReference: r.renewalReference,
+    oldMeterFinal: r.oldMeterFinal ? String(r.oldMeterFinal) : null,
+    newMeterStart: r.newMeterStart ? String(r.newMeterStart) : null,
+    userId: r.userId,
+    notes: r.notes
+  }));
+}
 async function cascadeRunningHoursUpdate(params) {
   return storage.cascadeRunningHoursUpdate(params);
 }
@@ -21961,7 +22160,12 @@ var init_jobDueScanner = __esm({
           if (rhCounterType === "MASTER") {
             rhEffectiveCurrent = parseFloat(component.rhCurrentMaster || "0");
           } else {
-            rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || "0");
+            const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || "0");
+            if (meterReplacedLastRh > 0) {
+              rhEffectiveCurrent = parseFloat(component.currentCumulativeRH || "0");
+            } else {
+              rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || "0");
+            }
           }
           const frequencyRH = job.intervalRunningHour || 0;
           if (frequencyRH <= 0) continue;
@@ -22005,7 +22209,12 @@ var init_jobDueScanner = __esm({
               if (lcCounterType === "MASTER") {
                 componentCurrentRH = parseFloat(linkedComp.rhCurrentMaster || "0");
               } else if (lcCounterType === "INHERITED") {
-                componentCurrentRH = parseFloat(linkedComp.rhCurrentInheritedCached || "0");
+                const lcMeterReplacedLastRh = parseFloat(linkedComp.meterReplacedLastRh || "0");
+                if (lcMeterReplacedLastRh > 0) {
+                  componentCurrentRH = parseFloat(linkedComp.currentCumulativeRH || "0");
+                } else {
+                  componentCurrentRH = parseFloat(linkedComp.rhCurrentInheritedCached || "0");
+                }
               }
             }
             const rhDue = rhLastDone + frequencyRH;
@@ -22168,7 +22377,12 @@ var init_jobDueScanner = __esm({
           if (rhCounterType === "MASTER") {
             rhEffectiveCurrent = parseFloat(component.rhCurrentMaster || "0");
           } else {
-            rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || "0");
+            const dualMeterReplacedLastRh = parseFloat(component.meterReplacedLastRh || "0");
+            if (dualMeterReplacedLastRh > 0) {
+              rhEffectiveCurrent = parseFloat(component.currentCumulativeRH || "0");
+            } else {
+              rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || "0");
+            }
           }
           const frequencyRH = job.intervalRunningHour || 0;
           const rhLastDone = parseFloat(job.lastDoneRH || "0");
@@ -24106,6 +24320,7 @@ __export(runningHoursService_exports, {
   cascadeUpdate: () => cascadeUpdate,
   createAudit: () => createAudit,
   getAuditsForComponent: () => getAuditsForComponent,
+  getMeterReplacementHistory: () => getMeterReplacementHistory2,
   getRHConfig: () => getRHConfig,
   getRunningHoursHistory: () => getRunningHoursHistory2,
   listChildren: () => listChildren,
@@ -24540,7 +24755,7 @@ async function updateMasterRH(componentId, body) {
   if (component.rhCounterType !== "MASTER") {
     throw new ValidationError("Running hours can only be updated for MASTER counter type components");
   }
-  if (updateSource === "MANUAL") {
+  if (updateSource === "MANUAL" || updateSource === "WORKORDER") {
     const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || "0");
     const lastUpdate = resolveLastUpdated(component);
     const validation = validateRunningHoursIncrease({
@@ -24650,6 +24865,9 @@ async function propagateAll(vesselId, userId) {
 async function getRunningHoursHistory2(query) {
   return getRunningHoursHistory(query);
 }
+async function getMeterReplacementHistory2(componentId) {
+  return getMeterReplacementHistory(componentId);
+}
 var updateRHConfigSchema2, updateMasterRHSchema2;
 var init_runningHoursService = __esm({
   "server/modules/running-hours/services/runningHoursService.ts"() {
@@ -24665,7 +24883,7 @@ var init_runningHoursService = __esm({
     });
     updateMasterRHSchema2 = z2.object({
       newRHValue: z2.number().nonnegative("Running hours must be non-negative"),
-      updateSource: z2.enum(["MANUAL", "IMPORT", "AUTOMATION"]).optional().default("MANUAL"),
+      updateSource: z2.enum(["MANUAL", "IMPORT", "AUTOMATION", "WORKORDER"]).optional().default("MANUAL"),
       userId: z2.string().optional().default("system"),
       userUuid: z2.string().optional(),
       userRole: z2.string().optional().default("Ship"),
@@ -25882,41 +26100,82 @@ async function updateWorkOrder(id, body) {
           throw masterErr;
         }
       } else if (rhComp && rhCounterType === "INHERITED" && !isNaN(rhValue)) {
-        if (completionDateNorm) {
-          const { validateRHEntry: validateRHEntry3 } = await Promise.resolve().then(() => (init_rhTimelineValidationService(), rhTimelineValidationService_exports));
-          const backdateCheck = await validateRHEntry3(rhComp.cuuid, completionDateNorm, rhValue);
-          if (!backdateCheck.isValid && backdateCheck.validationStatus === "INVALID_BACKDATED") {
-            throw new ValidationError(backdateCheck.errorMessage, {
-              code: "INVALID_BACKDATED",
-              validRange: backdateCheck.validRange,
-              previousEntry: backdateCheck.previousEntry,
-              nextEntry: backdateCheck.nextEntry,
-              componentId: rhComp.cuuid,
-              componentCode: rhComp.componentCode || existingWO2.componentCode,
-              rhCounterType: "INHERITED"
+        const vesselIdForLookup = existingWO2.vesselId || rhComp.vesselId;
+        let masterComp = null;
+        if (rhComp.rhMasterComponentId && vesselIdForLookup) {
+          const allVesselComps = await findComponents2(vesselIdForLookup);
+          masterComp = allVesselComps.find(
+            (c) => c.rhCounterType === "MASTER" && (c.cuuid === rhComp.rhMasterComponentId || String(c.id) === rhComp.rhMasterComponentId || c.componentCode === rhComp.rhMasterComponentId)
+          ) ?? null;
+        }
+        if (masterComp) {
+          const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+          try {
+            await updateMasterRH3(masterComp.cuuid, {
+              newRHValue: rhValue,
+              updateSource: "WORKORDER",
+              userId: body.userId || existingWO2.performedBy || "system",
+              userUuid: body.userUuid,
+              userRole: body.userRole || "Ship",
+              adminOverride: body.adminOverride || false,
+              comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+              dateUpdated: completionDateNorm
             });
+            updateData.rhSyncedAt = /* @__PURE__ */ new Date();
+            console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO2.workOrderNo}`);
+          } catch (masterErr) {
+            if (masterErr instanceof ValidationError) {
+              const det = masterErr.details || {};
+              throw new ValidationError(masterErr.message, {
+                code: "RH_OVERRIDE_REQUIRED",
+                ...det,
+                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                canOverride: det.validation?.canOverride ?? false,
+                componentId: masterComp.cuuid,
+                componentCode: masterComp.componentCode || existingWO2.componentCode,
+                rhCounterType: "INHERITED"
+              });
+            }
+            throw masterErr;
           }
+        } else {
+          if (completionDateNorm) {
+            const { validateRHEntry: validateRHEntry3 } = await Promise.resolve().then(() => (init_rhTimelineValidationService(), rhTimelineValidationService_exports));
+            const backdateCheck = await validateRHEntry3(rhComp.cuuid, completionDateNorm, rhValue);
+            if (!backdateCheck.isValid && backdateCheck.validationStatus === "INVALID_BACKDATED") {
+              throw new ValidationError(backdateCheck.errorMessage, {
+                code: "INVALID_BACKDATED",
+                validRange: backdateCheck.validRange,
+                previousEntry: backdateCheck.previousEntry,
+                nextEntry: backdateCheck.nextEntry,
+                componentId: rhComp.cuuid,
+                componentCode: rhComp.componentCode || existingWO2.componentCode,
+                rhCounterType: "INHERITED"
+              });
+            }
+          }
+          try {
+            const prevRH = parseInt(rhComp.currentCumulativeRH || "0");
+            await createRunningHoursAudit2({
+              componentId: rhComp.cuuid,
+              vesselId: existingWO2.vesselId || rhComp.vesselId || "V001",
+              previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
+              newRH: rhValue.toString(),
+              cumulativeRH: rhValue.toString(),
+              dateUpdatedLocal: completionDateNorm || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+              dateUpdatedTZ: "UTC",
+              enteredAtUTC: /* @__PURE__ */ new Date(),
+              userId: body.userId || existingWO2.performedBy || "System",
+              source: "workorder",
+              notes: `WO ${existingWO2.workOrderNo} (INHERITED \u2014 no master link, child-only record)`,
+              meterReplaced: false
+            });
+          } catch (auditErr) {
+            console.error("[RH Sync] Failed to write INHERITED audit snapshot:", auditErr);
+          }
+          updateData.rhSyncedAt = /* @__PURE__ */ new Date();
+          console.warn(`\u26A0\uFE0F [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} has no valid master link \u2014 recorded on child only (WO ${existingWO2.workOrderNo})`);
         }
-        try {
-          const prevRH = parseInt(rhComp.currentCumulativeRH || "0");
-          await createRunningHoursAudit2({
-            componentId: rhComp.cuuid,
-            vesselId: existingWO2.vesselId || rhComp.vesselId || "V001",
-            previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
-            newRH: rhValue.toString(),
-            cumulativeRH: rhValue.toString(),
-            dateUpdatedLocal: completionDateNorm || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-            dateUpdatedTZ: "UTC",
-            enteredAtUTC: /* @__PURE__ */ new Date(),
-            userId: body.userId || existingWO2.performedBy || "System",
-            source: "workorder",
-            notes: `RH snapshot via work order completion ${existingWO2.workOrderNo} (INHERITED \u2014 records own cycle, does not modify master)`,
-            meterReplaced: false
-          });
-        } catch (auditErr) {
-          console.error("[RH Sync] Failed to write INHERITED audit snapshot:", auditErr);
-        }
-        updateData.rhSyncedAt = /* @__PURE__ */ new Date();
       }
     }
   }
@@ -33283,54 +33542,89 @@ async function completeWorkOrder(workOrderId, body) {
         }
       }
     } else {
-      const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
-      if (!validation.isValid) {
-        throw new ValidationError(validation.errorMessage, {
-          code: validation.validationStatus,
-          validRange: validation.validRange,
-          previousEntry: validation.previousEntry,
-          nextEntry: validation.nextEntry,
-          utilizationRate: validation.utilizationRate,
-          daysBetweenPrevious: validation.daysBetweenPrevious,
-          daysBetweenNext: validation.daysBetweenNext,
-          maxPossibleIncrease: validation.maxPossibleIncrease,
-          actualIncrease: validation.actualIncrease
-        });
-      }
-      if (validation.requiresJustification && !body.rhJustification) {
-        throw new ValidationError(
-          `High machinery utilization detected (${validation.utilizationRate.toFixed(1)} hrs/day). Justification is required.`,
-          {
-            code: "HIGH_UTILIZATION",
+      if (!alreadySynced) {
+        const vesselIdForLookup = workOrder.vesselId || component.vesselId;
+        let masterComp = null;
+        if (component.rhMasterComponentId && vesselIdForLookup) {
+          const allVesselComps = await findComponents2(vesselIdForLookup);
+          masterComp = allVesselComps.find(
+            (c) => c.rhCounterType === "MASTER" && (c.cuuid === component.rhMasterComponentId || String(c.id) === component.rhMasterComponentId || c.componentCode === component.rhMasterComponentId)
+          ) ?? null;
+        }
+        if (masterComp) {
+          const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+          try {
+            await updateMasterRH3(masterComp.cuuid, {
+              newRHValue: newRH,
+              updateSource: "WORKORDER",
+              userId: bodyUserId || executionData.performedBy || "system",
+              userUuid: bodyUserUuid,
+              userRole: userRole || "Ship",
+              adminOverride: adminOverride || false,
+              comments: `WO ${workOrder.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+              dateUpdated: completionDateForValidation
+            });
+            console.log(`\u2705 [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
+          } catch (masterErr) {
+            if (masterErr instanceof ValidationError) {
+              const det = masterErr.details || {};
+              throw new ValidationError(masterErr.message, {
+                code: "RH_OVERRIDE_REQUIRED",
+                ...det,
+                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                canOverride: det.validation?.canOverride ?? false,
+                componentId: masterComp.cuuid,
+                componentCode: masterComp.componentCode || workOrder.componentCode,
+                rhCounterType: "INHERITED"
+              });
+            }
+            throw masterErr;
+          }
+        } else {
+          const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
+          if (!validation.isValid) {
+            throw new ValidationError(validation.errorMessage, {
+              code: validation.validationStatus,
+              validRange: validation.validRange,
+              previousEntry: validation.previousEntry,
+              nextEntry: validation.nextEntry,
+              utilizationRate: validation.utilizationRate,
+              daysBetweenPrevious: validation.daysBetweenPrevious,
+              daysBetweenNext: validation.daysBetweenNext,
+              maxPossibleIncrease: validation.maxPossibleIncrease,
+              actualIncrease: validation.actualIncrease
+            });
+          }
+          if (validation.requiresJustification && !body.rhJustification) {
+            throw new ValidationError(
+              `High machinery utilization detected (${validation.utilizationRate.toFixed(1)} hrs/day). Justification is required.`,
+              { code: "HIGH_UTILIZATION", validRange: validation.validRange, utilizationRate: validation.utilizationRate, requiresJustification: true }
+            );
+          }
+          rhValidationDetails = {
+            isValid: validation.isValid,
+            validationDate: (/* @__PURE__ */ new Date()).toISOString(),
             validRange: validation.validRange,
             utilizationRate: validation.utilizationRate,
-            requiresJustification: true
-          }
-        );
-      }
-      rhValidationDetails = {
-        isValid: validation.isValid,
-        validationDate: (/* @__PURE__ */ new Date()).toISOString(),
-        validRange: validation.validRange,
-        utilizationRate: validation.utilizationRate,
-        requiresJustification: validation.requiresJustification,
-        validationErrors: validation.anomalyFlags
-      };
-      if (!alreadySynced) {
-        await createRunningHoursAudit2({
-          componentId: component.cuuid,
-          vesselId: componentVesselId,
-          previousRH: previousRH.toString(),
-          newRH: newRH.toString(),
-          cumulativeRH: newRH.toString(),
-          dateUpdatedLocal: completionDateForValidation,
-          dateUpdatedTZ: "UTC",
-          enteredAtUTC: /* @__PURE__ */ new Date(),
-          userId: executionData.performedBy || "System",
-          source: "workorder",
-          notes: `RH snapshot via work order completion: ${workOrder.templateCode} (INHERITED \u2014 records own cycle, does not modify master)`,
-          meterReplaced: false
-        });
+            requiresJustification: validation.requiresJustification,
+            validationErrors: validation.anomalyFlags
+          };
+          await createRunningHoursAudit2({
+            componentId: component.cuuid,
+            vesselId: componentVesselId,
+            previousRH: previousRH.toString(),
+            newRH: newRH.toString(),
+            cumulativeRH: newRH.toString(),
+            dateUpdatedLocal: completionDateForValidation,
+            dateUpdatedTZ: "UTC",
+            enteredAtUTC: /* @__PURE__ */ new Date(),
+            userId: executionData.performedBy || "System",
+            source: "workorder",
+            notes: `WO ${workOrder.workOrderNo} (INHERITED \u2014 no master link, child-only record)`,
+            meterReplaced: false
+          });
+          console.warn(`\u26A0\uFE0F [RH Sync] INHERITED component ${component.componentCode || component.cuuid} has no valid master link \u2014 recorded on child only (WO ${workOrder.workOrderNo})`);
+        }
       }
       rhReadingApplied = true;
     }
@@ -36340,6 +36634,15 @@ async function propagateAll2(req, res) {
     res.status(500).json({ error: "Failed to propagate running hours" });
   }
 }
+async function getMeterReplacementHistory3(req, res) {
+  try {
+    const result = await getMeterReplacementHistory2(req.params.componentId);
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching meter replacement history:", error);
+    res.status(500).json({ error: "Failed to fetch meter replacement history" });
+  }
+}
 async function getHistory(req, res) {
   try {
     const vesselId = req.query.vesselId || "";
@@ -36424,6 +36727,7 @@ router6.post("/running-hours", requirePMSAdmin, asyncHandler(createAudit2));
 router6.post("/running-hours/cascade", requirePMSAdmin, asyncHandler(cascadeUpdate2));
 router6.post("/running-hours/reset-child/:componentId", requirePMSAdmin, asyncHandler(resetChildRH2));
 router6.post("/running-hours/propagate-all", requirePMSAdmin, asyncHandler(propagateAll2));
+router6.get("/running-hours/replacement-history/:componentId", requireAuth, asyncHandler(getMeterReplacementHistory3));
 router6.get("/running-hours/:componentId", requireAuth, asyncHandler(getAudits));
 router6.get("/rh-config/master-components/:vesselId", requireAuth, asyncHandler(listMasterComponents2));
 router6.get("/rh-config/inherited/:masterComponentId", requireAuth, asyncHandler(listInheritedComponents2));
@@ -55275,6 +55579,32 @@ var RESPONSIBLE_RANKS = [
   "Bosun",
   "Fitter"
 ];
+var JOB_ASSIGNED_TO_RANKS = [
+  "Master",
+  "Chief Officer",
+  "2nd Officer",
+  "3rd Officer",
+  "Chief Engineer",
+  "2nd Engineer",
+  "3rd Engineer",
+  "4th Engineer",
+  "5th Engineer",
+  "Electrical Officer",
+  "Gas Engineer",
+  "Deck Cadet",
+  "Engine Cadet",
+  "Bosun",
+  "AB",
+  "OS",
+  "Pumpman",
+  "Fitter",
+  "Motorman",
+  "Oiler",
+  "Wiper",
+  "Chief Cook",
+  "Messman",
+  "Junior Officer"
+];
 var SCHEDULE_TYPES = ["Running Hours", "Calendar", "Dual Frequency"];
 var INTERVAL_UNITS = ["Days", "Weeks", "Months", "Years"];
 function getTypeFromSheetName(sheetName) {
@@ -56430,6 +56760,7 @@ async function generateSpareHistoryTemplate() {
 
 // server/modules/bulk-upload/services/validationService.ts
 init_storage();
+init_service2();
 function validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum) {
   const errs = [];
   const trimmedCode = rowMakerCode != null ? String(rowMakerCode).trim() : "";
@@ -56557,6 +56888,14 @@ async function validateData(type, data, mode, vesselId) {
       }
       return true;
     }
+    if (type === "jobs") {
+      const jobsDataFields = ["WO Title", "Component Code", "Job Code", "Maintenance Basis", "Interval Value", "Task Type", "Assigned To"];
+      const hasJobData = jobsDataFields.some((f) => {
+        const v = row[f];
+        return v !== void 0 && v !== null && String(v).trim() !== "";
+      });
+      return hasJobData;
+    }
     if (!fieldValue) {
       console.log(`[${type}] Row ${index3 + 2}: Skipping - no ${primaryField} value`);
       return false;
@@ -56657,6 +56996,120 @@ async function validateData(type, data, mode, vesselId) {
           fleetSpareCompositeOccurrences.set(compositeKey, []);
         }
         fleetSpareCompositeOccurrences.get(compositeKey).push(index3 + 2);
+      }
+    });
+  }
+  const spareCompositeOccurrences = /* @__PURE__ */ new Map();
+  const existingDbSpareCompositeKeys = /* @__PURE__ */ new Set();
+  const vesselComponentsByCode = /* @__PURE__ */ new Map();
+  let vesselComponentsLoaded = false;
+  const vesselLocationNameSet = /* @__PURE__ */ new Set();
+  let vesselLocationsLoaded = false;
+  if (type === "spares") {
+    if (vesselId) {
+      try {
+        const existingSparesList = await storage.getSpares(vesselId);
+        existingSparesList.forEach((s) => {
+          if (s.partCode && s.componentCode) {
+            const vessel = (s.vesselId ?? vesselId ?? "").toUpperCase();
+            const ck = `${String(s.partCode).trim().toUpperCase()}|${String(s.componentCode).trim().toUpperCase()}|${vessel}`;
+            existingDbSpareCompositeKeys.add(ck);
+          }
+        });
+        console.log(`\u{1F4CB} Loaded ${existingDbSpareCompositeKeys.size} existing spare composite keys from database`);
+      } catch (err) {
+        console.warn("\u26A0\uFE0F Could not load existing spare composite keys:", err);
+      }
+      try {
+        const vesselComponents = await storage.getComponents(vesselId);
+        vesselComponents.forEach((c) => {
+          if (c.componentCode) {
+            vesselComponentsByCode.set(String(c.componentCode).trim(), c);
+          }
+        });
+        vesselComponentsLoaded = true;
+        console.log(`\u{1F4CB} Loaded ${vesselComponentsByCode.size} components for spares validation`);
+      } catch (err) {
+        console.warn("\u26A0\uFE0F Could not load vessel components for spares validation:", err);
+      }
+      try {
+        const vesselLocations = await storage.getLocations(vesselId);
+        vesselLocations.forEach((loc) => {
+          if (loc.locationName) {
+            vesselLocationNameSet.add(String(loc.locationName).trim().toLowerCase());
+          }
+        });
+        vesselLocationsLoaded = true;
+        console.log(`\u{1F4CB} Loaded ${vesselLocationNameSet.size} locations for spares validation`);
+      } catch (err) {
+        console.warn("\u26A0\uFE0F Could not load vessel locations for spares validation:", err);
+      }
+    }
+    filteredData.forEach((row, index3) => {
+      const partCode = row["Part Code"];
+      const componentCode = row["Component Code"];
+      if (partCode && componentCode) {
+        const vessel = (vesselId ?? "").toUpperCase();
+        const ck = `${String(partCode).trim().toUpperCase()}|${String(componentCode).trim().toUpperCase()}|${vessel}`;
+        if (!spareCompositeOccurrences.has(ck)) {
+          spareCompositeOccurrences.set(ck, []);
+        }
+        spareCompositeOccurrences.get(ck).push(index3 + 2);
+      }
+    });
+  }
+  const jobCompositeOccurrences = /* @__PURE__ */ new Map();
+  const existingDbJobCompositeKeys = /* @__PURE__ */ new Set();
+  let approverRankMaster = null;
+  if (type === "jobs") {
+    try {
+      const ranks = await getAllRanks2();
+      if (ranks) {
+        approverRankMaster = /* @__PURE__ */ new Map();
+        for (const r of ranks) {
+          const canonical = r?.name ? String(r.name).trim() : "";
+          if (canonical) {
+            approverRankMaster.set(canonical.toLowerCase(), canonical);
+            if (r?.label && String(r.label).trim() !== "") {
+              approverRankMaster.set(String(r.label).trim().toLowerCase(), canonical);
+            }
+          }
+        }
+      }
+      console.log(`\u{1F4CB} Loaded ${approverRankMaster?.size ?? 0} Rank Master entries for Approver validation`);
+    } catch (err) {
+      console.error("Failed to fetch Rank Master for Approver validation:", err);
+    }
+  }
+  if (type === "jobs") {
+    try {
+      const existingJobs = await storage.getJobs(vesselId);
+      existingJobs.forEach((j) => {
+        if (j.jobNo && j.componentCode) {
+          const vesselPart = String(j.vesselCode || vesselId || "").trim().toUpperCase();
+          const compositeKey = `${String(j.jobNo).trim().toUpperCase()}|${String(j.componentCode).trim().toUpperCase()}|${vesselPart}`;
+          existingDbJobCompositeKeys.add(compositeKey);
+        }
+      });
+      console.log(`\u{1F4CB} Loaded ${existingDbJobCompositeKeys.size} existing job composite keys for vessel '${vesselId}'`);
+    } catch (err) {
+      console.error("Failed to fetch existing jobs for duplicate validation:", err);
+    }
+    filteredData.forEach((row, index3) => {
+      const woTitle = row["WO Title"];
+      const jobCode = row["Job Code"];
+      const componentCode = row["Component Code"];
+      const vesselCode = row["Vessel Code"];
+      const hasWoTitle = woTitle !== void 0 && woTitle !== null && String(woTitle).trim() !== "";
+      const hasJobCode = jobCode !== void 0 && jobCode !== null && String(jobCode).trim() !== "";
+      const hasComponentCode = componentCode !== void 0 && componentCode !== null && String(componentCode).trim() !== "";
+      if (hasWoTitle && hasJobCode && hasComponentCode) {
+        const vesselPart = String(vesselCode || vesselId || "").trim().toUpperCase();
+        const compositeKey = `${String(jobCode).trim().toUpperCase()}|${String(componentCode).trim().toUpperCase()}|${vesselPart}`;
+        if (!jobCompositeOccurrences.has(compositeKey)) {
+          jobCompositeOccurrences.set(compositeKey, []);
+        }
+        jobCompositeOccurrences.get(compositeKey).push(index3 + 2);
       }
     });
   }
@@ -56965,20 +57418,37 @@ async function validateData(type, data, mode, vesselId) {
       } else if (vesselId && !row["Vessel Code"]) {
         normalized["Vessel Code"] = vesselId;
       }
-      if (!row["Component Code"]) {
-        errors.push(`Row ${rowNum}: Component Code is required`);
+      if (!row["Component Code"] || String(row["Component Code"]).trim() === "") {
+        errors.push(`Row ${rowNum}: Component Code is mandatory.`);
       } else {
         const componentCode = String(row["Component Code"]).trim();
         normalized["Component Code"] = componentCode;
+        const matchedComponent = vesselComponentsByCode.get(componentCode);
+        if (vesselComponentsLoaded && !matchedComponent) {
+          errors.push(`Row ${rowNum}: Component Code does not exist for the selected vessel.`);
+        } else if (matchedComponent) {
+          normalized["Component Name"] = matchedComponent.name || "";
+        }
       }
-      if (row["Component Name"]) {
-        normalized["Component Name"] = String(row["Component Name"]).trim();
+      const _sparePartCodeForDup = row["Part Code"] ? String(row["Part Code"]).trim() : null;
+      const _spareCompCodeForDup = normalized["Component Code"] || null;
+      if (_sparePartCodeForDup && _spareCompCodeForDup) {
+        const _vessel = (vesselId ?? "").toUpperCase();
+        const _ck = `${_sparePartCodeForDup.toUpperCase()}|${_spareCompCodeForDup.toUpperCase()}|${_vessel}`;
+        const _inFile = spareCompositeOccurrences.get(_ck);
+        if (_inFile && _inFile.length > 1) {
+          const _others = _inFile.filter((r) => r !== rowNum);
+          errors.push(`Row ${rowNum}: Duplicate spare \u2014 Part Code '${_sparePartCodeForDup}' linked to Component Code '${_spareCompCodeForDup}' also appears in row(s) ${_others.join(", ")} of this upload. All duplicate rows are rejected.`);
+        }
+        if (mode === "add" && existingDbSpareCompositeKeys.has(_ck)) {
+          errors.push(`Row ${rowNum}: Spare with Part Code '${_sparePartCodeForDup}' linked to Component Code '${_spareCompCodeForDup}' already exists in the vessel register.`);
+        }
       }
       if (row["Part Code"] && String(row["Part Code"]).trim()) {
         normalized["Part Code"] = String(row["Part Code"]).trim();
       }
-      if (!row["Part Name"]) {
-        errors.push(`Row ${rowNum}: Part Name is required`);
+      if (!row["Part Name"] || String(row["Part Name"]).trim() === "") {
+        errors.push(`Row ${rowNum}: Part Name is mandatory.`);
       } else {
         normalized["Part Name"] = String(row["Part Name"]).trim();
       }
@@ -57010,41 +57480,71 @@ async function validateData(type, data, mode, vesselId) {
           }
         }
       });
-      const criticalField = row["Criticality"] ?? row["Critical Yes/No"] ?? row["Criticality (Yes/No)"];
       {
-        const { error, normalized: normCritical } = validateYesNoField(criticalField, "Criticality", rowNum);
-        if (error) {
-          errors.push(error);
-        } else if (normCritical !== void 0) {
-          normalized["Criticality"] = normCritical;
+        const rawVal = row["Criticality"] ?? row["Critical Yes/No"] ?? row["Criticality (Yes/No)"];
+        const isBlank = rawVal === void 0 || rawVal === null || String(rawVal).trim() === "";
+        if (!isBlank) {
+          const val = String(rawVal).toLowerCase().trim();
+          if (!YES_NO_SYNONYMS.includes(val)) {
+            errors.push(`Row ${rowNum}: Invalid Criticality value.`);
+          } else {
+            normalized["Criticality"] = ["yes", "y", "true", "1"].includes(val) ? "Yes" : "No";
+          }
         }
       }
-      const isActiveField = row["Is Active"] ?? row["IS Active"];
       {
-        const { error, normalized: normActive } = validateYesNoField(isActiveField, "Is Active", rowNum, { required: true });
-        if (error) {
-          errors.push(error);
-        } else if (normActive !== void 0) {
-          normalized["Is Active"] = normActive;
+        const rawVal = row["Is Active"] ?? row["IS Active"];
+        const isBlank = rawVal === void 0 || rawVal === null || String(rawVal).trim() === "";
+        if (isBlank) {
+          errors.push(`Row ${rowNum}: Is Active is required`);
+        } else {
+          const val = String(rawVal).toLowerCase().trim();
+          if (!YES_NO_SYNONYMS.includes(val)) {
+            errors.push(`Row ${rowNum}: Invalid Is Active value.`);
+          } else {
+            normalized["Is Active"] = ["yes", "y", "true", "1"].includes(val) ? "Yes" : "No";
+          }
         }
       }
-      const ihmField = row["IHM (Inventory of Hazardous Materials)"];
-      if (ihmField) {
-        const value = String(ihmField).toLowerCase().trim();
-        if (!["yes", "no", "y", "n"].includes(value)) {
-          errors.push(`Row ${rowNum}: IHM must be Yes or No`);
-        } else {
-          normalized["IHM (Inventory of Hazardous Materials)"] = ["yes", "y"].includes(value) ? "Yes" : "No";
+      {
+        const rawVal = row["IHM (Inventory of Hazardous Materials)"];
+        const isBlank = rawVal === void 0 || rawVal === null || String(rawVal).trim() === "";
+        if (!isBlank) {
+          const val = String(rawVal).toLowerCase().trim();
+          if (!YES_NO_SYNONYMS.includes(val)) {
+            errors.push(`Row ${rowNum}: Invalid IHM value.`);
+          } else {
+            normalized["IHM (Inventory of Hazardous Materials)"] = ["yes", "y", "true", "1"].includes(val) ? "Yes" : "No";
+          }
         }
       }
-      const rotationField = row["Rotation Item"];
-      const rawRotation = typeof rotationField === "boolean" ? rotationField ? "yes" : "no" : rotationField === void 0 || rotationField === null ? "" : String(rotationField).toLowerCase().trim();
-      if (rawRotation !== "") {
-        if (!["yes", "no", "y", "n", "true", "false", "1", "0"].includes(rawRotation)) {
-          errors.push(`Row ${rowNum}: Rotation Item must be Yes or No`);
-        } else {
-          normalized["Rotation Item"] = ["yes", "y", "true", "1"].includes(rawRotation) ? "Yes" : "No";
+      {
+        const rawVal = row["Rotation Item"];
+        const isBlank = rawVal === void 0 || rawVal === null || String(rawVal).trim() === "";
+        if (!isBlank) {
+          const val = typeof rawVal === "boolean" ? rawVal ? "yes" : "no" : String(rawVal).toLowerCase().trim();
+          if (!YES_NO_SYNONYMS.includes(val)) {
+            errors.push(`Row ${rowNum}: Invalid Rotation Item value.`);
+          } else {
+            normalized["Rotation Item"] = ["yes", "y", "true", "1"].includes(val) ? "Yes" : "No";
+          }
         }
+      }
+      const _locAName = row["Location A"] ? String(row["Location A"]).trim() : "";
+      const _locBName = row["Location B"] ? String(row["Location B"]).trim() : "";
+      const _locARaw = row["Location A - ROB"];
+      const _locBRaw = row["Location B - ROB"];
+      const _locARobPresent = _locARaw !== void 0 && _locARaw !== null && String(_locARaw).trim() !== "";
+      const _locBRobPresent = _locBRaw !== void 0 && _locBRaw !== null && String(_locBRaw).trim() !== "";
+      if (_locARobPresent && _locAName === "") {
+        errors.push(`Row ${rowNum}: Location A is mandatory when Location A ROB is entered.`);
+      } else if (_locAName !== "" && vesselLocationsLoaded && !vesselLocationNameSet.has(_locAName.toLowerCase())) {
+        errors.push(`Row ${rowNum}: Invalid Location A.`);
+      }
+      if (_locBRobPresent && _locBName === "") {
+        errors.push(`Row ${rowNum}: Location B is mandatory when Location B ROB is entered.`);
+      } else if (_locBName !== "" && vesselLocationsLoaded && !vesselLocationNameSet.has(_locBName.toLowerCase())) {
+        errors.push(`Row ${rowNum}: Invalid Location B.`);
       }
       if (row["Fleet Equipment Code"]) {
         normalized["Fleet Equipment Code"] = String(row["Fleet Equipment Code"]).trim();
@@ -57069,9 +57569,18 @@ async function validateData(type, data, mode, vesselId) {
         }
       });
       if (makerListLoaded) {
-        const rowMakerCode = normalized["Maker Code"] || null;
-        const rowMakerName = normalized["Maker"] || null;
-        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
+        const _makerCode = normalized["Maker Code"] != null ? String(normalized["Maker Code"]).trim() : "";
+        const _makerName = normalized["Maker"] != null ? String(normalized["Maker"]).trim() : "";
+        if (_makerCode) {
+          const master = existingMakersByCode.get(_makerCode.toLowerCase());
+          if (!master) {
+            errors.push(`Row ${rowNum}: Invalid Maker Code.`);
+          } else if (_makerName && String(master.makerName ?? "").trim().toLowerCase() !== _makerName.toLowerCase()) {
+            errors.push(`Row ${rowNum}: Invalid Maker Code.`);
+          }
+        } else if (_makerName) {
+          errors.push(`Row ${rowNum}: Invalid Maker Code.`);
+        }
       }
     } else if (type === "stores") {
       if (!row["Item Code"]) {
@@ -57412,6 +57921,13 @@ async function validateData(type, data, mode, vesselId) {
       }
     } else if (type === "jobs") {
       if (!row["WO Title"] || String(row["WO Title"]).trim() === "") {
+        results.summary.errors++;
+        results.rows.push({
+          row: rowNum,
+          status: "error",
+          errors: [`Row ${rowNum}: WO Title is mandatory.`],
+          normalized: { __meta: { rowNumber: rowNum } }
+        });
         continue;
       }
       normalized["WO Title"] = String(row["WO Title"]).trim();
@@ -57420,24 +57936,36 @@ async function validateData(type, data, mode, vesselId) {
       } else {
         normalized["Vessel Code"] = String(row["Vessel Code"]).trim();
       }
-      if (!row["Component Code"]) {
-        errors.push(`Row ${rowNum}: Component Code is required`);
+      let resolvedComponent = null;
+      if (!row["Component Code"] || String(row["Component Code"]).trim() === "") {
+        errors.push(`Row ${rowNum}: Component Code is mandatory.`);
       } else {
         const componentCode = String(row["Component Code"]).trim();
         normalized["Component Code"] = componentCode;
         const vesselCode = row["Vessel Code"] ? String(row["Vessel Code"]).trim() : null;
         if (vesselCode) {
-          const component = await storage.getComponentByCode(componentCode, vesselCode);
-          if (!component) {
-            errors.push(`Row ${rowNum}: Component Code '${componentCode}' not found in vessel '${vesselCode}'. Job cannot be linked.`);
+          resolvedComponent = await storage.getComponentByCode(componentCode, vesselCode);
+          if (!resolvedComponent) {
+            errors.push(`Row ${rowNum}: Component Code does not exist for the selected vessel.`);
           }
         }
       }
-      if (row["Component Name"]) {
-        normalized["Component Name"] = String(row["Component Name"]).trim();
-      }
       if (row["Job Code"]) {
         normalized["Job Code"] = String(row["Job Code"]).trim();
+      }
+      {
+        const jobCodeVal = row["Job Code"] ? String(row["Job Code"]).trim() : "";
+        const compCodeVal = row["Component Code"] ? String(row["Component Code"]).trim() : "";
+        if (jobCodeVal && compCodeVal) {
+          const vesselPart = String(row["Vessel Code"] ? String(row["Vessel Code"]).trim() : vesselId || "").toUpperCase();
+          const compositeKey = `${jobCodeVal.toUpperCase()}|${compCodeVal.toUpperCase()}|${vesselPart}`;
+          const occ = jobCompositeOccurrences.get(compositeKey);
+          const isInFileDuplicate = !!occ && occ.length > 1 && rowNum !== occ[0];
+          const isDbDuplicate = mode === "add" && existingDbJobCompositeKeys.has(compositeKey);
+          if (isInFileDuplicate || isDbDuplicate) {
+            errors.push(`Row ${rowNum}: Duplicate Job Code and Component Code combination.`);
+          }
+        }
       }
       if (row["Fleet Equipment Code"]) {
         normalized["Fleet Equipment Code"] = String(row["Fleet Equipment Code"]).trim();
@@ -57449,7 +57977,7 @@ async function validateData(type, data, mode, vesselId) {
       if (!row["Maintenance Basis"]) {
         errors.push(`Row ${rowNum}: Maintenance Basis is required (must be 'Calendar', 'Running Hours', or 'Dual Frequency')`);
       } else if (!validMaintenanceBasis.includes(row["Maintenance Basis"])) {
-        errors.push(`Row ${rowNum}: Invalid Maintenance Basis '${row["Maintenance Basis"]}'. Must be 'Calendar', 'Running Hours', or 'Dual Frequency'`);
+        errors.push(`Row ${rowNum}: Invalid Maintenance Basis.`);
       } else {
         normalized["Maintenance Basis"] = row["Maintenance Basis"];
       }
@@ -57458,7 +57986,9 @@ async function validateData(type, data, mode, vesselId) {
         errors.push(`Row ${rowNum}: Interval Value is REQUIRED - this drives the entire PMS scheduling system`);
       } else {
         const interval = parseFloat(row["Interval Value"]);
-        if (isNaN(interval) || interval <= 0) {
+        if (isNaN(interval)) {
+          errors.push(`Row ${rowNum}: Interval Value must be numeric.`);
+        } else if (interval <= 0) {
           errors.push(`Row ${rowNum}: Interval Value must be a positive number (got: '${row["Interval Value"]}')`);
         } else {
           normalized["Interval Value"] = String(interval);
@@ -57515,28 +58045,50 @@ async function validateData(type, data, mode, vesselId) {
       } else {
         normalized["Task Type"] = row["Task Type"];
       }
-      if (row["Assigned To"]) {
-        normalized["Assigned To"] = String(row["Assigned To"]).trim();
+      let assignedToNormalized = null;
+      if (row["Assigned To"] && String(row["Assigned To"]).trim() !== "") {
+        const assignedToVal = String(row["Assigned To"]).trim();
+        const matchedRank = JOB_ASSIGNED_TO_RANKS.find((r) => r.toLowerCase() === assignedToVal.toLowerCase());
+        if (!matchedRank) {
+          errors.push(`Row ${rowNum}: Invalid Assigned To value.`);
+        } else {
+          assignedToNormalized = matchedRank;
+          normalized["Assigned To"] = matchedRank;
+        }
       }
-      if (row["Approver"]) {
-        normalized["Approver"] = String(row["Approver"]).trim();
+      if (!row["Approver"] || String(row["Approver"]).trim() === "") {
+        errors.push(`Row ${rowNum}: Approver is mandatory.`);
+      } else {
+        const approverVal = String(row["Approver"]).trim();
+        if (approverRankMaster) {
+          const canonical = approverRankMaster.get(approverVal.toLowerCase());
+          if (!canonical) {
+            errors.push(`Row ${rowNum}: Invalid Approver value.`);
+          } else {
+            normalized["Approver"] = canonical;
+          }
+        } else {
+          normalized["Approver"] = approverVal;
+        }
       }
-      const validJobPriorities = ["Low", "Medium", "High", "Critical"];
+      const validJobPriorities = ["Low", "Medium", "High"];
       if (row["Job Priority"] && !validJobPriorities.includes(row["Job Priority"])) {
-        errors.push(`Row ${rowNum}: Invalid Job Priority. Allowed: ${validJobPriorities.join(", ")}`);
+        errors.push(`Row ${rowNum}: Invalid Job Priority.`);
       } else if (row["Job Priority"]) {
         normalized["Job Priority"] = row["Job Priority"];
       }
-      if (row["Class Related"]) {
-        const value = row["Class Related"].toString().toLowerCase();
-        if (!["yes", "no"].includes(value)) {
-          errors.push(`Row ${rowNum}: Class Related must be Yes or No`);
-        } else {
-          normalized["Class Related"] = value;
+      {
+        const classRelatedResult = validateYesNoField(row["Class Related"], "Class Related", rowNum);
+        if (classRelatedResult.error) {
+          errors.push(`Row ${rowNum}: Invalid Class Related value.`);
+        } else if (classRelatedResult.normalized) {
+          normalized["Class Related"] = classRelatedResult.normalized;
         }
       }
-      if (row["Last Done Date"]) {
-        normalized["Last Done Date"] = String(row["Last Done Date"]).trim();
+      {
+        if (row["Last Done Date"] !== void 0 && row["Last Done Date"] !== null && String(row["Last Done Date"]).trim() !== "") {
+          normalized["Last Done Date"] = row["Last Done Date"];
+        }
       }
       if (row["Brief Work Description"]) {
         normalized["Brief Work Description"] = String(row["Brief Work Description"]).trim();
@@ -57547,32 +58099,32 @@ async function validateData(type, data, mode, vesselId) {
       } else if (row["Department"]) {
         normalized["Department"] = row["Department"];
       }
-      const criticalJobField = row["Critical Yes/No"] ?? row["Criticality"];
-      if (criticalJobField) {
-        const value = criticalJobField.toString().toLowerCase();
-        if (!["yes", "no", "y", "n"].includes(value)) {
-          errors.push(`Row ${rowNum}: Critical must be Yes or No`);
-        } else {
-          const normalizedCritical = ["yes", "y"].includes(value) ? "yes" : "no";
-          normalized["Critical Yes/No"] = normalizedCritical;
-          normalized["Criticality"] = normalizedCritical;
+      {
+        const criticalJobField = row["Critical Yes/No"] ?? row["Criticality"];
+        const criticalityResult = validateYesNoField(criticalJobField, "Criticality", rowNum);
+        if (criticalityResult.error) {
+          errors.push(`Row ${rowNum}: Invalid Criticality value.`);
+        } else if (criticalityResult.normalized) {
+          normalized["Critical Yes/No"] = criticalityResult.normalized;
+          normalized["Criticality"] = criticalityResult.normalized;
         }
       }
-      if (row["Is Active"]) {
-        const value = row["Is Active"].toString().toLowerCase();
-        if (!["yes", "no"].includes(value)) {
-          errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
+      {
+        const isActiveResult = validateYesNoField(row["Is Active"], "Is Active", rowNum);
+        if (isActiveResult.error) {
+          errors.push(`Row ${rowNum}: Invalid Is Active value.`);
+        } else if (isActiveResult.normalized) {
+          normalized["Is Active"] = isActiveResult.normalized;
         } else {
-          normalized["Is Active"] = value;
+          normalized["Is Active"] = "Yes";
         }
-      } else {
-        normalized["Is Active"] = "yes";
       }
       Object.keys(row).forEach((key) => {
         if (!normalized[key]) {
           normalized[key] = row[key];
         }
       });
+      normalized["Component Name"] = resolvedComponent?.name ?? null;
     } else if (type === "makers") {
       const makerCode = row["Maker Code"];
       if (makerCode === void 0 || makerCode === null || String(makerCode).trim() === "") {
@@ -59551,6 +60103,12 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
       const row = data[_jobIdx];
       const _jobRowNum = row["__meta"]?.rowNumber || _jobIdx + 1;
       try {
+        if (!row["WO Title"] || String(row["WO Title"]).trim() === "") {
+          result.skipped++;
+          const _jobCodeWO = row["Job Code"] ? String(row["Job Code"]).trim() : `row-${_jobRowNum}`;
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCodeWO, action: "skipped", error: "WO Title is mandatory." });
+          continue;
+        }
         const componentCode = String(row["Component Code"]).trim();
         const vesselCodeFromExcel = String(row["Vessel Code"]).trim();
         const component = componentsByCode.get(componentCode);
@@ -59688,7 +60246,8 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           // DEPRECATED: FK reference to component (UUID)
           componentCode,
           // DEPRECATED: Display/tracking field (SFI code)
-          componentName: row["Component Name"] || component.name || null
+          // Spec item 4: ignore any Component Name from the file; always use the master value.
+          componentName: component.name || null
           // DEPRECATED
         };
         const jobData = {
@@ -59712,11 +60271,11 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           briefWorkDescription: row["Brief Work Description"] || null,
           // Store in both fields for compatibility
           assignedTo: row["Assigned To"] || null,
+          // Approver is validated against the Rank Master (admAvailableRanks); persist the
+          // file's Approver value (no longer copied from Assigned To).
           approver: row["Approver"] || null,
           level2ReviewerRankId: row["Reviewer Rank"] ? String(row["Reviewer Rank"]).trim() || null : null,
           jobPriority: row["Job Priority"] || null,
-          // Schema expects text 'Yes'/'No', not boolean
-          classRelated: row["Class Related"] ? row["Class Related"].toString().toLowerCase() === "yes" ? "Yes" : "No" : null,
           lastDoneDate,
           // Store Last Done date (for Calendar jobs)
           nextDueDate,
@@ -59726,15 +60285,24 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           nextDueRH,
           // Calculated: lastDoneRH + intervalRunningHour (for RH jobs)
           department: row["Department"] || null,
+          // Schema expects text 'Yes'/'No', not boolean. Accept the full synonym set
+          // (Yes/No, Y/N, True/False, 1/0) validated upstream so they store correctly.
+          classRelated: (() => {
+            const v = row["Class Related"];
+            if (v === void 0 || v === null || String(v).trim() === "") return null;
+            return ["yes", "y", "true", "1"].includes(String(v).toLowerCase().trim()) ? "Yes" : "No";
+          })(),
           // Support both template format (Critical Yes/No) and legacy format (Criticality)
-          // Schema expects text 'Yes'/'No', not boolean
           criticality: (() => {
             const critVal = row["Critical Yes/No"] ?? row["Criticality"];
-            if (!critVal) return null;
-            const isYes = critVal === true || critVal.toString().toLowerCase() === "yes" || critVal.toString().toLowerCase() === "y";
-            return isYes ? "Yes" : "No";
+            if (critVal === void 0 || critVal === null || String(critVal).trim() === "") return null;
+            return ["yes", "y", "true", "1"].includes(String(critVal).toLowerCase().trim()) ? "Yes" : "No";
           })(),
-          isActive: row["Is Active"] ? row["Is Active"].toString().toLowerCase() === "yes" : true,
+          isActive: (() => {
+            const v = row["Is Active"];
+            if (v === void 0 || v === null || String(v).trim() === "") return true;
+            return ["yes", "y", "true", "1"].includes(String(v).toLowerCase().trim());
+          })(),
           // Part A fields - Required Spare Parts, Tools, and Safety Requirements
           // Spare parts and tools are parsed into structured objects matching schema
           requiredSpareParts: parseSpareParts(row["Required Spare Parts"]),
