@@ -2082,17 +2082,17 @@ const RunningHours = () => {
               <div className="space-y-2">
                 <div className="mb-4 p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    <strong>Inherited Running Hours:</strong> These components inherit running hours from the master component. 
-                    Click the pencil icon to edit individual component running hours.
+                    <strong>Inherited Running Hours:</strong> These components inherit running hours from the master component.
+                    {isSailAdmin && " Click the pencil icon to edit individual component running hours."}
                   </p>
                 </div>
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-gray-100 px-4 py-2 grid grid-cols-[1fr_auto_100px_120px_60px] gap-4 text-sm font-medium text-gray-700">
+                  <div className={`bg-gray-100 px-4 py-2 grid ${isSailAdmin ? 'grid-cols-[1fr_auto_100px_120px_60px]' : 'grid-cols-[1fr_auto_100px_120px]'} gap-4 text-sm font-medium text-gray-700`}>
                     <div>Component Name</div>
                     <div>Component Code</div>
                     <div className="text-right">Running Hours</div>
                     <div>Last Updated</div>
-                    <div className="text-center">Edit</div>
+                    {isSailAdmin && <div className="text-center">Edit</div>}
                   </div>
                   <div className="divide-y max-h-[400px] overflow-y-auto">
                     {childrenRHData.children.map((child) => (
@@ -2151,7 +2151,7 @@ const RunningHours = () => {
                             </div>
                           </div>
                         ) : (
-                          <div className="grid grid-cols-[1fr_auto_100px_120px_60px] gap-4 text-sm items-center">
+                          <div className={`grid ${isSailAdmin ? 'grid-cols-[1fr_auto_100px_120px_60px]' : 'grid-cols-[1fr_auto_100px_120px]'} gap-4 text-sm items-center`}>
                             <div className="text-gray-900">{child.name}</div>
                             <div className="text-gray-600">{child.componentCode}</div>
                             <div className="text-right font-medium text-gray-900">
@@ -2160,20 +2160,22 @@ const RunningHours = () => {
                             <div className="text-gray-600 text-xs">
                               {child.lastUpdated !== '-' ? formatProfessionalDateTime(child.lastUpdated) : '-'}
                             </div>
-                            <div className="flex justify-center">
-                              {canEditRH && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
-                                onClick={() => startEditingChild(child)}
-                                title="Edit Running Hours"
-                                data-testid={`button-edit-child-rh-${child.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              )}
-                            </div>
+                            {isSailAdmin && (
+                              <div className="flex justify-center">
+                                {canEditRH && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+                                    onClick={() => startEditingChild(child)}
+                                    title="Edit Running Hours"
+                                    data-testid={`button-edit-child-rh-${child.id}`}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

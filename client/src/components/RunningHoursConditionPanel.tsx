@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Save, RefreshCw, Check, ChevronsUpDown } from "lucide-react";
+import { ChevronDown, ChevronRight, Save, RefreshCw, Check, ChevronsUpDown, History, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatProfessionalDate } from "@/lib/dateUtils";
@@ -38,6 +38,19 @@ interface RHConfig {
   rhCurrentValue: string | null;
   rhLastUpdated: string | null;
   rhUpdateSource: string | null;
+}
+
+interface MeterReplacementEvent {
+  id: number;
+  enteredAtUTC: string | null;
+  dateUpdatedLocal: string;
+  renewalActionType: string | null;
+  renewalReason: string | null;
+  renewalReference: string | null;
+  oldMeterFinal: string | null;
+  newMeterStart: string | null;
+  userId: string;
+  notes: string | null;
 }
 
 interface RunningHoursConditionPanelProps {
@@ -91,6 +104,19 @@ export default function RunningHoursConditionPanel({
     enabled: !!vesselId && (pendingCounterType === "INHERITED" || rhConfig?.rhCounterType === "INHERITED"),
     staleTime: 0, // Always refetch on mount to get latest values
   });
+
+  const { data: replacementHistory = [] } = useQuery<MeterReplacementEvent[]>({
+    queryKey: ["/technical/api/running-hours/replacement-history", componentId],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/running-hours/replacement-history/${componentId}`);
+      if (!res.ok) throw new Error("Failed to fetch replacement history");
+      return res.json();
+    },
+    enabled: !!componentId,
+    staleTime: 30000,
+  });
+
+  const [replacementHistoryExpanded, setReplacementHistoryExpanded] = useState(false);
 
   useEffect(() => {
     if (rhConfig) {
@@ -370,6 +396,85 @@ export default function RunningHoursConditionPanel({
     </p>
   );
 
+  const latestReset = replacementHistory.length > 0 ? replacementHistory[0] : null;
+
+  const replacementBanner = latestReset ? (
+    <div className="mt-3" data-testid="meter-replacement-banner">
+      <button
+        type="button"
+        onClick={() => setReplacementHistoryExpanded(prev => !prev)}
+        className="w-full flex items-start justify-between gap-2 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-left hover:bg-amber-100 transition-colors"
+        data-testid="button-toggle-replacement-history"
+      >
+        <span className="flex items-start gap-2 min-w-0">
+          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <span className="text-xs text-amber-800">
+            <span className="font-medium">Last meter reset: </span>
+            {latestReset.enteredAtUTC
+              ? formatProfessionalDate(latestReset.enteredAtUTC)
+              : latestReset.dateUpdatedLocal}
+            {latestReset.oldMeterFinal
+              ? ` (previous reading: ${parseFloat(latestReset.oldMeterFinal).toLocaleString()} hrs)`
+              : ""}
+            {latestReset.renewalActionType
+              ? ` — ${latestReset.renewalActionType}`
+              : ""}
+          </span>
+        </span>
+        <span className="flex items-center gap-1 flex-shrink-0 text-xs text-amber-600 font-medium">
+          <History className="h-3.5 w-3.5" />
+          {replacementHistory.length}
+          {replacementHistoryExpanded
+            ? <ChevronDown className="h-3 w-3" />
+            : <ChevronRight className="h-3 w-3" />}
+        </span>
+      </button>
+
+      {replacementHistoryExpanded && (
+        <div className="mt-1 border border-amber-200 rounded-md overflow-hidden" data-testid="replacement-history-list">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-amber-100 text-amber-900">
+                <th className="p-2 text-left font-medium border-r border-amber-200">Date</th>
+                <th className="p-2 text-left font-medium border-r border-amber-200">Action</th>
+                <th className="p-2 text-left font-medium border-r border-amber-200">Prev. Reading</th>
+                <th className="p-2 text-left font-medium border-r border-amber-200">New Start</th>
+                <th className="p-2 text-left font-medium">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {replacementHistory.map((event, idx) => (
+                <tr key={event.id} className={idx % 2 === 0 ? "bg-white" : "bg-amber-50"} data-testid={`replacement-event-${event.id}`}>
+                  <td className="p-2 border-r border-amber-100 whitespace-nowrap">
+                    {event.enteredAtUTC
+                      ? formatProfessionalDate(event.enteredAtUTC)
+                      : event.dateUpdatedLocal}
+                  </td>
+                  <td className="p-2 border-r border-amber-100">
+                    {event.renewalActionType || "Reset"}
+                  </td>
+                  <td className="p-2 border-r border-amber-100">
+                    {event.oldMeterFinal
+                      ? `${parseFloat(event.oldMeterFinal).toLocaleString()} hrs`
+                      : "—"}
+                  </td>
+                  <td className="p-2 border-r border-amber-100">
+                    {event.newMeterStart !== null && event.newMeterStart !== undefined
+                      ? `${parseFloat(event.newMeterStart).toLocaleString()} hrs`
+                      : "0 hrs"}
+                  </td>
+                  <td className="p-2 text-gray-600 max-w-[200px] truncate" title={event.renewalReason || event.notes || ""}>
+                    {event.renewalReason || event.notes || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  ) : null;
+
   // Embedded mode: render table directly without Collapsible wrapper
   if (embedded) {
     return (
@@ -377,6 +482,7 @@ export default function RunningHoursConditionPanel({
         <div className="p-4 bg-white rounded-lg">
           {tableContent}
           {inheritedNote}
+          {replacementBanner}
         </div>
       </div>
     );
@@ -404,6 +510,7 @@ export default function RunningHoursConditionPanel({
           <div className="p-4 bg-white rounded-b-lg">
             {tableContent}
             {inheritedNote}
+            {replacementBanner}
           </div>
         </CollapsibleContent>
       </div>

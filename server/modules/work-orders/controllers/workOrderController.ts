@@ -173,8 +173,12 @@ export async function updateWorkOrder(req: Request, res: Response) {
     // from the body, but the server-side role is what decides whether the override is honored.
     body.userRole = authReq.user?.role;
     body.userUuid = authReq.user?.userUuid ?? body.userUuid;
-    const workOrder = await woService.updateWorkOrder(req.params.id, body);
-    res.json(workOrder);
+    const result = await woService.updateWorkOrder(req.params.id, body);
+    const workOrder = (result as any).workOrder ?? result;
+    const rhBackdated = (result as any).rhBackdated ?? !!workOrder.rhBackdatedEntry;
+    const latestRH = (result as any).latestRH ?? null;
+    const latestRHDate = (result as any).latestRHDate ?? null;
+    res.json({ ...workOrder, rhBackdated, latestRH, latestRHDate });
   } catch (error: any) {
     console.error('❌ Work order update error:', error);
     if (error.name === 'ZodError') {

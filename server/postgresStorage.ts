@@ -1454,7 +1454,7 @@ export class PostgresStorage {
   async updateMasterRunningHours(params: {
     componentId: string;
     newRHValue: number;
-    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
+    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'WORKORDER';
     userId: string;
     userUuid?: string;
     comments?: string;
@@ -1558,11 +1558,39 @@ export class PostgresStorage {
             // one-time propagate-all fixer reuses this path and must not collapse the cache.
             rhCurrentInheritedCached: (parseFloat(component.meterReplacedLastRh || '0') + params.newRHValue).toString(),
             currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
-            rhInheritedUpdatedAt: now,
-            lastUpdated: now.toISOString(),
+            // Stamp the reading date (WO completion date / RH section date), not the server
+            // clock, so the family's Last Updated reflects when the hours were observed.
+            rhInheritedUpdatedAt: readingDate,
+            lastUpdated: readingDate.toISOString(),
             updatedAt: now,
           })
           .where(eq(components.cuuid, inherited.cuuid));
+
+        // Insert one audit row per inherited component so the per-component RH timeline is
+        // complete (WO number in notes, source='workorder' for WO-driven updates).
+        const childNotes = params.comments
+          ? `${params.comments} (cascade from master ${masterComponentCode})`
+          : `Cascade from master ${masterComponentCode}`;
+        const childRhaResult = await tx.insert(runningHoursAudit).values({
+          vesselId: inherited.vesselId || masterVesselId,
+          componentId: inherited.cuuid,
+          previousRH: currentChildRH.toFixed(2),
+          newRH: newChildRH.toFixed(2),
+          cumulativeRH: newChildRH.toFixed(2),
+          dateUpdatedLocal: readingDateLocal,
+          dateUpdatedTZ: 'UTC',
+          enteredAtUTC: now,
+          userId: params.userId,
+          actorLabel: getAuditActor().actorLabel,
+          updatedByUuid: params.userUuid || null,
+          source: params.updateSource.toLowerCase(),
+          notes: childNotes,
+          meterReplaced: false,
+          version: 1,
+          componentCode: inherited.componentCode || null,
+          componentName: inherited.name || null,
+        }).returning();
+        try { await logFieldChanges('running_hours_audit', childRhaResult[0].rhauuid, inherited.vesselId || masterVesselId, null, childRhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha cascade create:', e); }
 
         inheritedUpdated++;
       }

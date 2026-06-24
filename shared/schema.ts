@@ -1283,6 +1283,13 @@ export const workOrders = pgTable("work_orders", {
   // or INHERITED cycle write). Prevents re-applying the same reading on re-save/replay.
   rhSyncedAt: timestamp("rh_synced_at"),
 
+  // === Back-dated WO RH Protection ===
+  // Set to TRUE when a WO completion RH reading is back-dated (completion date earlier
+  // than the component's last RH update) AND the entered RH is lower than the current
+  // master RH. In this case the RH module is NOT updated; the reading is saved to the
+  // WO only for job scheduling / next-due calculation.
+  rhBackdatedEntry: boolean("rh_backdated_entry"),
+
   // === Postponement Approval Fields (Plan B) ===
   postponeRequestedDate: text("postpone_requested_date"), // Ship's requested new due date (populated on postpone-request submit)
   postponeApprover: text("postpone_approver"), // Static "Office" value stored at request time

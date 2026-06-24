@@ -917,6 +917,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [rhJustificationModalOpen, setRhJustificationModalOpen] = useState(false);
   const [rhJustificationText, setRhJustificationText] = useState('');
   const [rhJustificationConfirmed, setRhJustificationConfirmed] = useState(false);
+  const [rhBackdatedBanner, setRhBackdatedBanner] = useState(false);
   const [rhErrorModalOpen, setRhErrorModalOpen] = useState(false);
   const [rhErrorDetails, setRhErrorDetails] = useState<any>(null);
   const [rhTimelineOpen, setRhTimelineOpen] = useState(false);
@@ -1438,6 +1439,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     const lastUpdatedMs = toUTCDay(componentActualRHLastUpdated);
     if (isNaN(completionMs) || isNaN(lastUpdatedMs)) return null;
     if (completionMs >= lastUpdatedMs) return null; // same-day or later is fine
+    // Back-dated LOWER: the backend will silently skip the RH module update and flag the WO.
+    // Do not block submission — the amber banner will explain the outcome after save.
+    const enteredRHNum = executionData.currentReading ? Number(executionData.currentReading) : NaN;
+    const componentCurrentRH = rhValidation.componentActualRH;
+    if (!isNaN(enteredRHNum) && componentCurrentRH !== null && enteredRHNum <= componentCurrentRH) return null;
     // Backdated before the latest reading. Allow only if a real prior RH entry exists on/before the
     // completion date (legitimate between-entries backdating, per the server timeline result).
     const prev = rhValidation.previousEntry;
@@ -1450,7 +1456,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
     };
     return `Completion Date (${fmt(completionStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
-  }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, executionData.completionDateTime, executionData.dateOfCompletion, rhValidation.previousEntry]);
+  }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, executionData.completionDateTime, executionData.dateOfCompletion, executionData.currentReading, rhValidation.previousEntry, rhValidation.componentActualRH]);
 
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {
@@ -2938,6 +2944,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       await queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
       await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      if (result.rhBackdated || result.rhBackdatedEntry) setRhBackdatedBanner(true);
       if (hasConsumedSparesData && vesselId) {
         await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
         await queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
@@ -3610,12 +3617,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         throw new Error(result.error || 'Failed to approve work order');
       }
 
+      if (result.rhBackdated || result.rhBackdatedEntry) {
+        setRhBackdatedBanner(true);
+      }
       setCurrentWorkOrderStatus('Completed');
       toast({
         title: "Approved",
-        description: "Work order has been approved and marked as completed",
+        description: result.rhBackdated
+          ? "Work order approved. Note: Running hours were not updated (back-dated entry — see the Running Hours section below)."
+          : "Work order has been approved and marked as completed",
       });
-      navigate("/pms/work-orders");
+      if (!result.rhBackdated) {
+        navigate("/pms/work-orders");
+      } else {
+        // Stay on page so the amber banner is visible; refresh the WO context.
+        await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -5999,6 +6016,33 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </p>
                   </div>
                 )}
+                {(rhBackdatedBanner || !!(workOrderContext as any)?.executionData?.rhBackdatedEntry) && (() => {
+                  const fmt = (s: string) => {
+                    if (!s) return '';
+                    const d = new Date(s);
+                    return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
+                  };
+                  const enteredRH = executionData.currentReading || '';
+                  const enteredDate = (executionData.completionDateTime || executionData.dateOfCompletion || '').split('T')[0];
+                  const latestRH = rhValidation.componentActualRH;
+                  const latestRHDate = componentActualRHLastUpdated || '';
+                  return (
+                    <div className="mt-2 p-3 bg-amber-50 border border-amber-300 rounded-md" data-testid="text-rh-backdated-banner">
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-800 mb-1">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" /> Running Hours Not Updated
+                      </div>
+                      <p className="text-xs text-amber-700">
+                        {enteredDate && enteredRH
+                          ? `The Completion Date (${fmt(enteredDate)}) and RH reading (${enteredRH} hrs) are older and lower than the component's current RH state`
+                          : "The entered Completion Date and RH reading are older and lower than the component's current RH state"}
+                        {latestRH !== null && latestRHDate
+                          ? ` (${latestRH} hrs as of ${fmt(latestRHDate)}).`
+                          : '.'}
+                        {' '}The RH module has <strong>not</strong> been updated — this reading is saved to the work order for scheduling continuity only. To correct the RH module, use the Running Hours page directly.
+                      </p>
+                    </div>
+                  );
+                })()}
                 {rhValidation.status === 'warning' && (
                   <div className="text-xs text-orange-600 flex items-center gap-1" data-testid="text-rh-warning">
                     <AlertTriangle className="h-3 w-3" /> High utilization: {rhValidation.utilizationRate.toFixed(1)} hrs/day — justification required
