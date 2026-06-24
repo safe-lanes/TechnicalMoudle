@@ -6,6 +6,7 @@ export interface RHValidationResult {
   lastUpdateDate: string | null;
   message: string;
   requiresAdminOverride: boolean;
+  backdatedLower?: boolean; // true when date is older AND RH is lower/equal than current
 }
 
 export interface RHValidationInput {
@@ -45,18 +46,9 @@ export function validateRunningHoursIncrease(
 
   const requestedIncrease = newRH - currentRH;
 
-  if (requestedIncrease <= 0) {
-    return {
-      allowed: true,
-      maxAllowedIncrease: 0,
-      requestedIncrease,
-      daysSinceLastUpdate: 0,
-      lastUpdateDate: componentLastUpdated,
-      message: 'No increase or decrease - no validation needed',
-      requiresAdminOverride: false
-    };
-  }
-
+  // === Date comparison runs BEFORE the no-increase early-return ===
+  // This ensures back-dated LOWER entries are caught here rather than silently
+  // allowed through (which would let stale readings overwrite the RH module).
   let daysSinceLastUpdate = 0;
   let sameDayUpdate = false;
 
@@ -67,9 +59,10 @@ export function validateRunningHoursIncrease(
     daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
 
     if (daysSinceLastUpdate < 0) {
-      // The new reading is dated BEFORE the component's last running-hours update. This is a
-      // backdated entry, NOT a same-day duplicate — recording running hours before the latest
-      // known reading corrupts the timeline. Reject with a clear, distinct message.
+      // The new reading is dated BEFORE the component's last running-hours update.
+      // When the entered RH is also lower/equal (backdatedLower), the WO completion
+      // service skips the RH module write rather than throwing. For direct RH entry
+      // (non-WO callers) this is a hard block regardless of the RH direction.
       const canOverride = userRole === 'Sail Admin' && adminOverride === true;
       return {
         allowed: canOverride,
@@ -77,6 +70,7 @@ export function validateRunningHoursIncrease(
         requestedIncrease,
         daysSinceLastUpdate,
         lastUpdateDate: componentLastUpdated,
+        backdatedLower: requestedIncrease <= 0,
         message: canOverride
           ? 'Sail Admin override applied for backdated running-hours entry.'
           : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated)}). Running hours can only be recorded on or after the latest reading.`,
@@ -89,6 +83,19 @@ export function validateRunningHoursIncrease(
     }
   } else {
     daysSinceLastUpdate = 1;
+  }
+
+  // No date issue — handle the no-increase / decrease case (same-day-or-later lower reading is fine)
+  if (requestedIncrease <= 0) {
+    return {
+      allowed: true,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: 'No increase or decrease - no validation needed',
+      requiresAdminOverride: false
+    };
   }
 
   let maxAllowedIncrease: number;

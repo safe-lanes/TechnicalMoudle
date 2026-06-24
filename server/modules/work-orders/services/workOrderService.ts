@@ -1394,6 +1394,27 @@ export async function updateWorkOrder(id: string, body: any) {
       const completionDateNorm = normRhDate(existingWO.completionDateTime || existingWO.dateCompleted || updateData.completionDateTime);
 
       if (rhComp && rhCounterType === 'MASTER' && !isNaN(rhValue)) {
+        // MASTER pre-flight: detect back-dated lower entry.
+        // If the completion date predates the master's last RH update AND the entered RH is not
+        // greater than the current master RH, skip the RH module write. The WO still completes.
+        let rhBackdatedSkippedApproval = false;
+        const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || '0');
+        if (rhValue <= masterCurrentRHApproval && completionDateNorm) {
+          const masterUpdRawApproval: any = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
+          const masterUpdDateApproval: Date | null = masterUpdRawApproval instanceof Date ? masterUpdRawApproval : (masterUpdRawApproval ? new Date(masterUpdRawApproval) : null);
+          if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
+            const approvalCompletionDate = new Date(completionDateNorm);
+            const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
+            const woDay = Date.UTC(approvalCompletionDate.getUTCFullYear(), approvalCompletionDate.getUTCMonth(), approvalCompletionDate.getUTCDate());
+            if (woDay < masterDay) {
+              rhBackdatedSkippedApproval = true;
+              updateData.rhBackdatedEntry = true;
+              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${masterUpdDateApproval.toISOString().split('T')[0]}). RH module NOT updated.`);
+            }
+          }
+        }
+
+        if (!rhBackdatedSkippedApproval) {
         // MASTER: completion reading is source of truth — advance master counter + cascade.
         const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
         try {
@@ -1425,6 +1446,7 @@ export async function updateWorkOrder(id: string, body: any) {
           }
           throw masterErr;
         }
+        } // end if (!rhBackdatedSkippedApproval) — MASTER branch
       } else if (rhComp && rhCounterType === 'INHERITED' && !isNaN(rhValue)) {
         // INHERITED: route through master propagation so the 25 hrs/day cap, cascade to all
         // sibling INHERITED components, and WO completion date stamp apply exactly as for MASTER.
@@ -1445,6 +1467,25 @@ export async function updateWorkOrder(id: string, body: any) {
         }
 
         if (masterComp) {
+          // INHERITED pre-flight: detect back-dated lower entry against the master.
+          let rhBackdatedSkippedInherited = false;
+          const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || '0');
+          if (rhValue <= inhMasterCurrentRH && completionDateNorm) {
+            const inhMasterUpdRaw: any = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
+            const inhMasterUpdDate: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
+            if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
+              const inhCompletionDate = new Date(completionDateNorm);
+              const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
+              const woDay = Date.UTC(inhCompletionDate.getUTCFullYear(), inhCompletionDate.getUTCMonth(), inhCompletionDate.getUTCDate());
+              if (woDay < masterDay) {
+                rhBackdatedSkippedInherited = true;
+                updateData.rhBackdatedEntry = true;
+                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${inhMasterUpdDate.toISOString().split('T')[0]}). RH module NOT updated.`);
+              }
+            }
+          }
+
+          if (!rhBackdatedSkippedInherited) {
           // Master resolved: advance its counter, cascading delta + completion date to all siblings.
           const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
           try {
@@ -1475,6 +1516,7 @@ export async function updateWorkOrder(id: string, body: any) {
             }
             throw masterErr;
           }
+          } // end if (!rhBackdatedSkippedInherited) — INHERITED branch
         } else {
           // No valid master link: timeline-validate and record on this child only.
           if (completionDateNorm) {

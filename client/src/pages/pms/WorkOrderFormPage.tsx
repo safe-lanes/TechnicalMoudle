@@ -917,6 +917,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [rhJustificationModalOpen, setRhJustificationModalOpen] = useState(false);
   const [rhJustificationText, setRhJustificationText] = useState('');
   const [rhJustificationConfirmed, setRhJustificationConfirmed] = useState(false);
+  const [rhBackdatedBanner, setRhBackdatedBanner] = useState(false);
   const [rhErrorModalOpen, setRhErrorModalOpen] = useState(false);
   const [rhErrorDetails, setRhErrorDetails] = useState<any>(null);
   const [rhTimelineOpen, setRhTimelineOpen] = useState(false);
@@ -1438,6 +1439,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     const lastUpdatedMs = toUTCDay(componentActualRHLastUpdated);
     if (isNaN(completionMs) || isNaN(lastUpdatedMs)) return null;
     if (completionMs >= lastUpdatedMs) return null; // same-day or later is fine
+    // Back-dated LOWER: the backend will silently skip the RH module update and flag the WO.
+    // Do not block submission — the amber banner will explain the outcome after save.
+    const enteredRHNum = executionData.currentReading ? Number(executionData.currentReading) : NaN;
+    const componentCurrentRH = rhValidation.componentActualRH;
+    if (!isNaN(enteredRHNum) && componentCurrentRH !== null && enteredRHNum <= componentCurrentRH) return null;
     // Backdated before the latest reading. Allow only if a real prior RH entry exists on/before the
     // completion date (legitimate between-entries backdating, per the server timeline result).
     const prev = rhValidation.previousEntry;
@@ -1450,7 +1456,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
     };
     return `Completion Date (${fmt(completionStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
-  }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, executionData.completionDateTime, executionData.dateOfCompletion, rhValidation.previousEntry]);
+  }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, executionData.completionDateTime, executionData.dateOfCompletion, executionData.currentReading, rhValidation.previousEntry, rhValidation.componentActualRH]);
 
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {
@@ -2938,6 +2944,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       await queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
       await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      if (result.rhBackdatedEntry) setRhBackdatedBanner(true);
       if (hasConsumedSparesData && vesselId) {
         await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
         await queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
@@ -5996,6 +6003,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </div>
                     <p className="text-xs text-red-700">
                       {rhBackdateError || rhValidation.message}
+                    </p>
+                  </div>
+                )}
+                {(rhBackdatedBanner || !!(workOrderContext as any)?.executionData?.rhBackdatedEntry) && (
+                  <div className="mt-2 p-3 bg-amber-50 border border-amber-300 rounded-md" data-testid="text-rh-backdated-banner">
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-800 mb-1">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" /> Running Hours Not Updated
+                    </div>
+                    <p className="text-xs text-amber-700">
+                      The entered Completion Date and Running Hours reading are older and lower than the component's current RH state. The RH module has <strong>not</strong> been updated — this reading is saved to the work order for scheduling continuity only. To correct the RH module, use the Running Hours page directly.
                     </p>
                   </div>
                 )}
