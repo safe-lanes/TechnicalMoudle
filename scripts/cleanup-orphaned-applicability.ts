@@ -25,7 +25,7 @@
  *   npx tsx scripts/cleanup-orphaned-applicability.ts --apply  # actually delete
  */
 
-import { db } from "../server/db";
+import { getDb } from "../server/db";
 import { sql } from "drizzle-orm";
 
 const APPLY = process.argv.includes("--apply");
@@ -65,6 +65,7 @@ interface DeletedRow {
 }
 
 async function reportSurveyCounts(): Promise<CountRow> {
+  const db = await getDb();
   const r = await db.execute<CountRow>(sql`
     SELECT
       COUNT(*) FILTER (WHERE is_deleted = false)::int AS live,
@@ -76,6 +77,7 @@ async function reportSurveyCounts(): Promise<CountRow> {
 }
 
 async function reportCertCounts(): Promise<CountRow> {
+  const db = await getDb();
   const r = await db.execute<CountRow>(sql`
     SELECT
       COUNT(*) FILTER (WHERE is_deleted = false)::int AS live,
@@ -87,6 +89,7 @@ async function reportCertCounts(): Promise<CountRow> {
 }
 
 async function bucketSurveys(): Promise<BucketRow[]> {
+  const db = await getDb();
   const r = await db.execute<BucketRow>(sql`
     SELECT
       CASE
@@ -110,6 +113,7 @@ async function bucketSurveys(): Promise<BucketRow[]> {
 }
 
 async function bucketCerts(): Promise<BucketRow[]> {
+  const db = await getDb();
   const r = await db.execute<BucketRow>(sql`
     SELECT
       CASE
@@ -131,6 +135,7 @@ async function bucketCerts(): Promise<BucketRow[]> {
 }
 
 async function perMasterBreakdown(): Promise<PerMasterRow[]> {
+  const db = await getDb();
   const r = await db.execute<PerMasterRow>(sql`
     SELECT
       a.master_id,
@@ -150,6 +155,7 @@ async function perMasterBreakdown(): Promise<PerMasterRow[]> {
 }
 
 async function perVesselBreakdown(): Promise<PerVesselRow[]> {
+  const db = await getDb();
   const r = await db.execute<PerVesselRow>(sql`
     SELECT
       a.vessel_id,
@@ -165,6 +171,7 @@ async function perVesselBreakdown(): Promise<PerVesselRow[]> {
 }
 
 async function applyDelete(): Promise<DeletedRow> {
+  const db = await getDb();
   const r = await db.execute<DeletedRow>(sql`
     WITH deleted AS (
       DELETE FROM vessel_survey_applicability a

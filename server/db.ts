@@ -4,9 +4,12 @@ import * as schema from "@shared/schema";
 import { resolvePostgres, getPostgresClient } from './postgresClient';
 
 /**
- * DEPRECATED: Use getDb() or getPool() instead
- * Legacy eager initialization kept for backward compatibility
- * Will be removed once all importers are updated to use lazy helpers
+ * @deprecated Use getDb() / getPool() instead. Legacy eager singletons kept only
+ * for backward compatibility; scheduled for removal in the Phase 5 multi-tenant
+ * decommission. Phase 0 (seam refactor) migrated all module importers to the lazy
+ * accessors so these are no longer imported anywhere on the live path. Importing
+ * `db`/`pool` directly bypasses the tenant-aware seam introduced in later phases —
+ * `scripts/check-direct-db-imports.sh` enforces zero direct imports.
  */
 let pool: Pool | undefined;
 let db: ReturnType<typeof drizzle> | undefined;

@@ -1,4 +1,4 @@
-import { pool } from '../server/db';
+import { getPool } from '../server/db';
 
 const VESSEL_ID = process.argv[2];
 
@@ -9,9 +9,7 @@ if (!VESSEL_ID) {
 }
 
 async function deleteVesselSpares(vesselId: string) {
-  if (!pool) {
-    throw new Error('Database pool not available — DATABASE_URL not configured');
-  }
+  const pool = await getPool();
   const client = await pool.connect();
 
   try {

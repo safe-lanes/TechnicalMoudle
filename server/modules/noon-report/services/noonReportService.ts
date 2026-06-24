@@ -1,5 +1,5 @@
 import * as repo from '../repositories/noonReportRepository';
-import { db } from '../../../db';
+import { getDb } from '../../../db';
 import { nrNoonReports, nrFuelRob, nrCiiTracking, nrAlerts } from '@shared/schema';
 import type { InsertNrNoonReport, NrNoonReport } from '@shared/schema';
 import { eq, and, desc, asc, isNull, count } from 'drizzle-orm';
@@ -98,6 +98,7 @@ async function updateFuelRobFromReport(report: NrNoonReport): Promise<void> {
 // ── Fuel Dashboard ────────────────────────────────────────────────────────────
 
 export async function getFuelDashboard(vesselId: string) {
+  const db = await getDb();
   // Fetch ROB records (includes averages from calculation engine)
   const robRecords = await db.select()
     .from(nrFuelRob)
@@ -262,6 +263,7 @@ export async function getVesselKPIs(vesselId: string) {
 
 /** Active (unacknowledged) alerts for a vessel, newest first. */
 export async function getActiveAlerts(vesselId: string) {
+  const db = await getDb();
   return db.select()
     .from(nrAlerts)
     .where(and(eq(nrAlerts.vesselId, vesselId), isNull(nrAlerts.acknowledgedAt)))
@@ -270,6 +272,7 @@ export async function getActiveAlerts(vesselId: string) {
 
 /** Paginated alert history for a vessel (all alerts, including acknowledged). */
 export async function getAllAlerts(vesselId: string, page: number, limit: number) {
+  const db = await getDb();
   const safeLimit = Math.min(Math.max(1, limit), 100);
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * safeLimit;
@@ -298,6 +301,7 @@ export async function getAllAlerts(vesselId: string, page: number, limit: number
 
 /** Unacknowledged alert count for a vessel (used by sidebar badge). */
 export async function getActiveAlertCount(vesselId: string): Promise<number> {
+  const db = await getDb();
   const rows = await db.select({ total: count() })
     .from(nrAlerts)
     .where(and(eq(nrAlerts.vesselId, vesselId), isNull(nrAlerts.acknowledgedAt)));
@@ -306,6 +310,7 @@ export async function getActiveAlertCount(vesselId: string): Promise<number> {
 
 /** Acknowledge a single alert by id. Returns 404 if not found. */
 export async function acknowledgeAlert(alertId: number, acknowledgedBy: string) {
+  const db = await getDb();
   const existing = await db.select({ id: nrAlerts.id })
     .from(nrAlerts)
     .where(eq(nrAlerts.id, alertId))
@@ -341,6 +346,7 @@ export interface VesselFleetSummary {
 }
 
 export async function getFleetSummary(vesselIds: string[]): Promise<VesselFleetSummary[]> {
+  const db = await getDb();
   const results: VesselFleetSummary[] = [];
 
   for (const vesselId of vesselIds) {

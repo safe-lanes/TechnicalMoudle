@@ -8,7 +8,7 @@ import { promises as fsPromises } from 'fs';
 import { storage, calculateRecordChecksum, sortObjectKeys } from '../../../storage';
 import { masterLists } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { db } from '../../../db';
+import { getDb } from '../../../db';
 import { ObjectStorageService, ObjectNotFoundError } from '../../../objectStorage';
 import {
   saveImportHistory,
@@ -781,6 +781,7 @@ export async function dryRun(req: Request, res: Response) {
     }
 
     try {
+      const db = await getDb();
       const mlItems = await db.select({ listKey: masterLists.listKey, listValue: masterLists.listValue })
         .from(masterLists)
         .where(and(eq(masterLists.listType, 'componentCategory'), eq(masterLists.isActive, true)));
