@@ -1,4 +1,7 @@
 import { sql } from 'drizzle-orm';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import * as schema from "@shared/schema";
 import { resolvePostgres } from './postgresClient';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -3159,10 +3162,12 @@ async function markMigrationComplete(db: any, migration: Migration): Promise<voi
   `);
 }
 
-export async function runMigrations(): Promise<{ applied: number; skipped: number }> {
+export async function runMigrations(poolArg?: Pool): Promise<{ applied: number; skipped: number }> {
   console.log('🔄 Running database migrations...');
-  
-  const postgres = await resolvePostgres();
+
+  // Phase-1 Part E: when a Pool is passed (per-tenant lazy migration) run against it;
+  // otherwise resolve the single/default client exactly as before (no-arg = unchanged).
+  const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
   if (!postgres) {
     console.log('⏭️  Skipping migrations - DATABASE_URL not configured');
     return { applied: 0, skipped: 0 };
@@ -3300,10 +3305,10 @@ export async function generateDrizzleMigrations(): Promise<boolean> {
   }
 }
 
-export async function runDrizzleMigrations(): Promise<{ applied: number; skipped: number }> {
+export async function runDrizzleMigrations(poolArg?: Pool): Promise<{ applied: number; skipped: number }> {
   console.log('🔄 Running Drizzle file-based SQL migrations (unified tracking)...');
-  
-  const postgres = await resolvePostgres();
+
+  const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
   if (!postgres) {
     console.log('⏭️  Skipping Drizzle migrations - DATABASE_URL not configured');
     return { applied: 0, skipped: 0 };
@@ -3458,10 +3463,12 @@ async function cleanupDuplicateFleetComponentMappings(): Promise<void> {
   }
 }
 
-export async function runBackupAndMigrations(): Promise<void> {
-  await createDatabaseBackup();
-  await runMigrations();
-  await cleanupDuplicateFleetComponentMappings();
+export async function runBackupAndMigrations(poolArg?: Pool): Promise<void> {
+  // Backup + duplicate-mapping cleanup are single/default-DB maintenance; skip them
+  // when migrating a specific tenant pool. No-arg path is byte-identical to before.
+  if (!poolArg) await createDatabaseBackup();
+  await runMigrations(poolArg);
+  if (!poolArg) await cleanupDuplicateFleetComponentMappings();
   // NOTE: generateDrizzleMigrations() is intentionally NOT called here.
   // Runtime auto-generation caused race conditions (duplicate-numbered files
   // when multiple devs generated concurrently) and silently produced migration
@@ -3471,5 +3478,5 @@ export async function runBackupAndMigrations(): Promise<void> {
   // never creates them. Dev workflow: edit shared/schema.ts, run
   // `npm run db:generate` manually, review + commit the resulting SQL file.
   // This applies universally — Replit forks, DEV, and PROD alike.
-  await runDrizzleMigrations();
+  await runDrizzleMigrations(poolArg);
 }

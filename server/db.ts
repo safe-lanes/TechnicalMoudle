@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
 import { resolvePostgres, getPostgresClient } from './postgresClient';
+import { getCurrentTenantContext } from './utils/asyncLocalStorage';
 
 /**
  * @deprecated Use getDb() / getPool() instead. Legacy eager singletons kept only
@@ -34,6 +35,12 @@ export { pool, db };
  * Preferred over importing db directly
  */
 export async function getDb() {
+  // Multi-tenant: inside a tenant request, return that tenant's db. When
+  // MASTER_DATABASE_URL is unset no context is ever entered, so this is undefined
+  // and we fall through to the legacy single-pool path (byte-identical to today).
+  const ctx = getCurrentTenantContext();
+  if (ctx) return ctx.db;
+
   const postgres = await resolvePostgres();
   if (!postgres) {
     throw new Error('PostgreSQL is not available (DATABASE_URL not configured)');
@@ -46,6 +53,9 @@ export async function getDb() {
  * Preferred over importing pool directly
  */
 export async function getPool() {
+  const ctx = getCurrentTenantContext();
+  if (ctx) return ctx.pool;
+
   const postgres = await resolvePostgres();
   if (!postgres) {
     throw new Error('PostgreSQL is not available (DATABASE_URL not configured)');

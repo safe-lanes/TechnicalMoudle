@@ -1,4 +1,7 @@
 import { sql } from 'drizzle-orm';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import * as schema from "@shared/schema";
 import { resolvePostgres } from './postgresClient';
 import { POSTPONEMENT_REASONS } from '../shared/postponementReasons';
 import { OVERDUE_REASONS } from '../shared/overdueReasons';
@@ -14,12 +17,12 @@ import { OVERDUE_REASONS } from '../shared/overdueReasons';
  * IMPORTANT: This function throws if trigger creation fails in PostgreSQL mode
  * to ensure immutability is enforced before serving traffic.
  */
-export async function ensureMaintenanceHistoryImmutability(): Promise<void> {
+export async function ensureMaintenanceHistoryImmutability(poolArg?: Pool): Promise<void> {
   console.log('🔒 Ensuring immutability trigger for component_maintenance_history...');
-  
-  // Attempt to resolve PostgreSQL client
-  const postgres = await resolvePostgres();
-  
+
+  // Phase-1 Part E: optional per-tenant pool; no-arg path resolves the single client as before.
+  const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
+
   if (!postgres) {
     console.log('⚠️  Skipping immutability trigger setup - PostgreSQL connection unavailable');
     return;
@@ -420,10 +423,10 @@ async function runIndexMigrations(db: any): Promise<void> {
   }
 }
 
-export async function initializeDatabase() {
+export async function initializeDatabase(poolArg?: Pool) {
   try {
-    // Lazy load database client using resolver
-    const postgres = await resolvePostgres();
+    // Phase-1 Part E: optional per-tenant pool; no-arg path resolves the single client as before.
+    const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
     if (!postgres) {
       console.log('⏭️  Skipping database initialization - DATABASE_URL not configured');
       return false;

@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import * as schema from "@shared/schema";
+import { getCurrentTenantContext } from './utils/asyncLocalStorage';
 
 // Cached PostgreSQL client to avoid connection pool leaks
 let cachedPostgres: { db: ReturnType<typeof drizzle>, pool: Pool } | null = null;
@@ -74,6 +75,13 @@ export async function resolvePostgres(): Promise<{ db: ReturnType<typeof drizzle
  * Use this for code that requires PostgreSQL to be active
  */
 export function getPostgresClient() {
+  // Multi-tenant: inside a tenant request return that tenant's { db, pool }. The
+  // tenant pool is pre-resolved + cached by tenantMiddleware (Phase 2) before the
+  // request runs, so this sync accessor can read it directly. Outside any tenant
+  // context (and always when MASTER_DATABASE_URL is unset) → legacy cached client.
+  const ctx = getCurrentTenantContext();
+  if (ctx) return { db: ctx.db, pool: ctx.pool };
+
   if (!cacheInitialized) {
     throw new Error('PostgreSQL client not initialized. Call resolvePostgres() first.');
   }

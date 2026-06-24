@@ -7,6 +7,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initStorage } from "./storage";
 import { initializeDatabase } from "./initDb";
 import { runBackupAndMigrations } from "./migrations";
+import { tenantConnectionManager } from "./utils/tenantConnectionManager";
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -51,6 +52,11 @@ app.use((req, res, next) => {
   
   // Run database migrations (adds new columns, tables, updates data format)
   await initializeDatabase();
+
+  // Multi-tenant: initialize the tenant connection manager. No-op + single-tenant
+  // mode when MASTER_DATABASE_URL is unset (byte-identical boot to today); when set,
+  // connects the master DB and applies migrations/master/*.sql.
+  await tenantConnectionManager.init();
 
   // Resolve the sync instance identity BEFORE anything can write (schedulers
   // and startup tasks inside registerRoutes field-log their writes). The
