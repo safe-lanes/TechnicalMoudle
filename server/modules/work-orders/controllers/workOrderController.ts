@@ -174,7 +174,7 @@ export async function updateWorkOrder(req: Request, res: Response) {
     body.userRole = authReq.user?.role;
     body.userUuid = authReq.user?.userUuid ?? body.userUuid;
     const workOrder = await woService.updateWorkOrder(req.params.id, body);
-    res.json(workOrder);
+    res.json({ ...workOrder, rhBackdated: !!workOrder.rhBackdatedEntry });
   } catch (error: any) {
     console.error('❌ Work order update error:', error);
     if (error.name === 'ZodError') {

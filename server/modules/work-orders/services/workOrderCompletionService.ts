@@ -123,6 +123,8 @@ export async function completeWorkOrder(
   let completionRHSource = 'MANUAL_ENTRY';
   let rhReadingApplied = false;
   let rhBackdatedSkipped = false;
+  let rhBackdatedLatestRH: number | null = null;
+  let rhBackdatedLatestRHDate: string | null = null;
 
   // SHIP-ONLY RH sync (Jeevan): the master RH counter advances on the ship/HOD approval, NEVER
   // office-side; INHERITED snapshots likewise originate on the ship and reach shore via sync.
@@ -169,7 +171,9 @@ export async function completeWorkOrder(
             const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
             if (woDay < masterDay) {
               rhBackdatedSkipped = true;
-              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master current ${masterCurrentRH} (${masterUpdDate.toISOString().split('T')[0]}). RH module NOT updated — reading saved to WO for scheduling only.`);
+              rhBackdatedLatestRH = masterCurrentRH;
+              rhBackdatedLatestRHDate = masterUpdDate.toISOString().split('T')[0];
+              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master current ${masterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated — reading saved to WO for scheduling only.`);
             }
           }
         }
@@ -240,7 +244,9 @@ export async function completeWorkOrder(
               const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
               if (woDay < masterDay) {
                 rhBackdatedSkipped = true;
-                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${inhMasterUpdDate.toISOString().split('T')[0]}). RH module NOT updated — reading saved to WO for scheduling only.`);
+                rhBackdatedLatestRH = inhMasterCurrentRH;
+                rhBackdatedLatestRHDate = inhMasterUpdDate.toISOString().split('T')[0];
+                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated — reading saved to WO for scheduling only.`);
               }
             }
           }
@@ -324,7 +330,9 @@ export async function completeWorkOrder(
           console.warn(`⚠️ [RH Sync] INHERITED component ${component.componentCode || component.cuuid} has no valid master link — recorded on child only (WO ${workOrder.workOrderNo})`);
         }
       }
-      rhReadingApplied = true;
+      if (!rhBackdatedSkipped) {
+        rhReadingApplied = true;
+      }
     }
   }
 
@@ -809,7 +817,11 @@ export async function completeWorkOrder(
     workOrder: updatedWorkOrder,
     runningHoursUpdated: !!runningHours,
     missedCycles,
-    rhBackdated: rhBackdatedSkipped
+    rhBackdated: rhBackdatedSkipped,
+    ...(rhBackdatedSkipped && {
+      latestRH: rhBackdatedLatestRH,
+      latestRHDate: rhBackdatedLatestRHDate
+    })
   };
 }
 
