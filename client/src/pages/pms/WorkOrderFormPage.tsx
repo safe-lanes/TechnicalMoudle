@@ -3617,12 +3617,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         throw new Error(result.error || 'Failed to approve work order');
       }
 
+      if (result.rhBackdated || result.rhBackdatedEntry) {
+        setRhBackdatedBanner(true);
+      }
       setCurrentWorkOrderStatus('Completed');
       toast({
         title: "Approved",
-        description: "Work order has been approved and marked as completed",
+        description: result.rhBackdated
+          ? "Work order approved. Note: Running hours were not updated (back-dated entry — see the Running Hours section below)."
+          : "Work order has been approved and marked as completed",
       });
-      navigate("/pms/work-orders");
+      if (!result.rhBackdated) {
+        navigate("/pms/work-orders");
+      } else {
+        // Stay on page so the amber banner is visible; refresh the WO context.
+        await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      }
     } catch (error: any) {
       toast({
         title: "Error",

@@ -924,6 +924,10 @@ export async function createWorkOrder(body: any) {
 export async function updateWorkOrder(id: string, body: any) {
   // Log incoming data for debugging
   console.log('📝 PATCH work order request body keys:', Object.keys(body));
+  // Tracks whether the approval RH sync was skipped due to a back-dated lower entry.
+  let rhBackdatedApproval = false;
+  let latestRHApproval: number | null = null;
+  let latestRHDateApproval: string | null = null;
 
   // RULE: Completed WOs are immutable except for specific fields
   const existingWO = await repo.findById(id);
@@ -1409,7 +1413,10 @@ export async function updateWorkOrder(id: string, body: any) {
             if (woDay < masterDay) {
               rhBackdatedSkippedApproval = true;
               updateData.rhBackdatedEntry = true;
-              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${masterUpdDateApproval.toISOString().split('T')[0]}). RH module NOT updated.`);
+              rhBackdatedApproval = true;
+              latestRHApproval = masterCurrentRHApproval;
+              latestRHDateApproval = masterUpdDateApproval.toISOString().split('T')[0];
+              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
             }
           }
         }
@@ -1480,7 +1487,10 @@ export async function updateWorkOrder(id: string, body: any) {
               if (woDay < masterDay) {
                 rhBackdatedSkippedInherited = true;
                 updateData.rhBackdatedEntry = true;
-                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${inhMasterUpdDate.toISOString().split('T')[0]}). RH module NOT updated.`);
+                rhBackdatedApproval = true;
+                latestRHApproval = inhMasterCurrentRH;
+                latestRHDateApproval = inhMasterUpdDate.toISOString().split('T')[0];
+                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
               }
             }
           }
@@ -2205,7 +2215,12 @@ export async function updateWorkOrder(id: string, body: any) {
 
   invalidateComplianceCache();
 
-  return workOrder;
+  return {
+    workOrder,
+    rhBackdated: rhBackdatedApproval,
+    latestRH: latestRHApproval,
+    latestRHDate: latestRHDateApproval
+  };
 }
 
 // ── Delete Work Order ──
