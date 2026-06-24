@@ -29,3 +29,26 @@ Re-run the inventory:
 ```
 grep -rc "getPostgresClient(" server/ --include="*.ts" | grep -v ":0" | grep -v "postgresClient.ts"
 ```
+
+---
+
+## tsc baseline for `feature/multi-tenancy` = **292** (NEW, adopted after Phase 0)
+
+`npx tsc --noEmit 2>&1 | grep -c "error TS"`
+
+| Branch / state | Baseline |
+|---|---|
+| `replit_dev` / pre-Phase-0 `feature/multi-tenancy` | 369 |
+| **`feature/multi-tenancy` from Phase 0 (`4a6e875e0`) onward** | **292** |
+
+**Why it dropped (not a mystery):** Phase 0 added **zero** new errors (verified by a normalized
+diff of the error sets — empty "new" set). The 369→292 drop is **77 `TS18048: 'db' is possibly
+'undefined'` eliminations**: the eager `db` export in `server/db.ts` is typed `… | undefined`, so
+every `db.select()/insert()/update()` on it was flagged possibly-undefined. Routing through
+`await getDb()` (which returns a non-undefined db, throwing if unavailable) makes the type
+accurate and those errors vanish. Runtime is byte-identical — same single cached pool.
+
+**Rule for subsequent phases (1–6) on this branch:** verify against **292**, not 369. Any phase
+that pushes the count **above 292** has introduced a real error to investigate — it no longer
+hides in old `db`-undefined noise. (Flag-off must still hold ≤ 292; flag-on tenant code is
+additive and must not regress it.)
