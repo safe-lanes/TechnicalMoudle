@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import moduleRouter from "./modules";
 import { mockAuthMiddleware, initMockAuthRankId } from "./middleware/auth";
+import { tenantMiddleware } from "./middleware/tenantMiddleware";
 import { requestContextMiddleware } from "./middleware/requestContext";
 import { ensureMaintenanceHistoryImmutability, ensureCertApplicabilityIndex } from "./initDb";
 import { getSeedDefectsData, ALL_SEED_IDS } from "./modules/defects/services/seedData";
@@ -34,6 +35,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply mock authentication middleware for all API routes during development
   // This populates req.user with an admin user for testing purposes
   await initMockAuthRankId();
+  // Phase 2 (multi-tenant): verify the SAILERP Bearer → resolve tenant from the
+  // `domain` claim → run the request in the tenant ALS context. INERT when
+  // MASTER_DATABASE_URL is unset (returns next() immediately) so the mock chain
+  // below is byte-identical to today. Does NOT touch req.user/role — that stays
+  // with mockAuthMiddleware. Mounted BEFORE it so the whole chain runs in-context.
+  app.use('/technical/api', tenantMiddleware);
   app.use('/technical/api', mockAuthMiddleware);
   app.use('/technical/api', requestContextMiddleware);
   console.log('🔒 Mock authentication enabled for /technical/api/* routes');
