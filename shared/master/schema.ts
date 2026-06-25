@@ -40,6 +40,9 @@ export const tenantInstances = pgTable("tenant_instances", {
   instanceId: text("instance_id").primaryKey(),
   vesselId: text("vessel_id"),
   domain: text("domain").notNull(),
+  // Phase 4b: per-tenant sync key, validated shore-side at the MASTER level before
+  // any tenant DB is opened (fail-closed front door). Set at onboarding alongside domain.
+  syncApiKey: text("sync_api_key"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -364,9 +364,10 @@ export async function downloadProvisionHandler(req: Request, res: Response) {
     }
 
     const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
-    // Phase 4a: persist=true mints/stores the per-ship sync key (shore-side) and
-    // (when the verified domain is available — 4b) the instance->domain map.
-    const domain = (req as any).user?.domain || undefined;
+    // Phase 4b: persist=true mints/stores the per-ship sync key + the instance->domain
+    // map row (master). Domain is the verified tenant domain (set by tenantMiddleware,
+    // since provisioning routes are no longer exempt). No-op when multi-tenant disabled.
+    const domain = (req as any).tenantDomain || undefined;
     const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, { domain, persist: true });
 
     const fileName = `provision_${vesselId}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
@@ -389,11 +390,9 @@ export async function importProvisionHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Invalid bundle format. Must contain manifest and data.' });
     }
 
-    // Phase 4a (W2 interim): the ship's tenant domain is client-forwarded
-    // (AuthContext.domain) since the verified domain isn't on req on the exempt
-    // /sync route yet. Used only to conditional-seed sync_settings.domain.
-    const domain = (req.body?.domain as string) || (req as any).user?.domain || undefined;
-    const result = await provisioningService.importProvisioningBundle(bundle, { domain });
+    // Phase 4b: the ship no longer declares a domain — shore is the sole authority
+    // via the master instance->domain map. Import just seeds the per-ship key + tunables.
+    const result = await provisioningService.importProvisioningBundle(bundle);
     res.json(result);
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });

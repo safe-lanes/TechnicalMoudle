@@ -72,6 +72,11 @@ export function tenantMiddleware(req: Request, res: Response, next: NextFunction
     return;
   }
 
+  // Expose the verified domain on req so downstream handlers that need it (e.g.
+  // provisioning writing the onboarding tenant_instances map row) can read it
+  // without re-verifying. Identity/role still stay with mockAuthMiddleware.
+  (req as any).tenantDomain = domain;
+
   tenantConnectionManager
     .resolveTenant(domain)
     .then((tenant) =>

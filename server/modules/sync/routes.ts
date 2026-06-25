@@ -3,15 +3,19 @@ import { asyncHandler } from '../shared/middleware';
 import * as syncController from './controller';
 import * as conflictReviewCtrl from './conflictReviewController';
 import { requireOfflineAdmin } from './middleware';
+import { syncTenantGuard } from '../../middleware/syncTenantGuard';
 
 const router = Router();
 
-// Sync protocol endpoints
-router.post('/sync/initiate', asyncHandler(syncController.initiateSyncHandler));
-router.post('/sync/push', asyncHandler(syncController.pushHandler));
-router.post('/sync/pull', asyncHandler(syncController.pullHandler));
+// Sync protocol endpoints (server-to-server, ship->shore). syncTenantGuard routes
+// these fail-closed by X-Sync-Instance-Id + per-tenant X-Sync-Api-Key (Phase 4b);
+// it is inert when MASTER_DATABASE_URL is unset (dev/ship) — byte-identical to today.
+// (resolve-conflict is a BROWSER route — it routes via tenantMiddleware, not the guard.)
+router.post('/sync/initiate', syncTenantGuard, asyncHandler(syncController.initiateSyncHandler));
+router.post('/sync/push', syncTenantGuard, asyncHandler(syncController.pushHandler));
+router.post('/sync/pull', syncTenantGuard, asyncHandler(syncController.pullHandler));
 router.post('/sync/resolve-conflict', asyncHandler(syncController.resolveConflictHandler));
-router.post('/sync/complete', asyncHandler(syncController.completeSyncHandler));
+router.post('/sync/complete', syncTenantGuard, asyncHandler(syncController.completeSyncHandler));
 router.get('/sync/status', asyncHandler(syncController.statusHandler));
 
 // Sync admin endpoints (for shore-side management)
@@ -31,7 +35,7 @@ router.post('/sync/conflicts/review/:id/dismiss', asyncHandler(conflictReviewCtr
 router.post('/sync/trigger', asyncHandler(syncController.triggerSyncHandler));
 
 // File sync endpoints
-router.post('/sync/file/upload-chunk', asyncHandler(syncController.uploadChunkHandler));
+router.post('/sync/file/upload-chunk', syncTenantGuard, asyncHandler(syncController.uploadChunkHandler));
 router.get('/sync/file/queue', asyncHandler(syncController.fileQueueHandler));
 router.post('/sync/file/:queueUuid/retry', asyncHandler(syncController.retryFileHandler));
 router.post('/sync/file/:queueUuid/skip', asyncHandler(syncController.skipFileHandler));

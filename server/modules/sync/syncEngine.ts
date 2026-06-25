@@ -94,7 +94,9 @@ export class SyncEngine {
 
       this.instanceId = settings['instance_id'] || process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
       this.shoreBaseUrl = settings['shore_url'] || process.env.SYNC_SHORE_URL || '';
-      this.syncApiKey = process.env.SYNC_API_KEY || '';
+      // Phase 4b: per-tenant key from sync_settings (seeded at provisioning),
+      // env fallback so legacy/unseeded ships behave exactly as today.
+      this.syncApiKey = settings['sync_api_key'] || process.env.SYNC_API_KEY || '';
 
       // Phase 4a: DB-then-env-then-default. Empty/invalid DB value ⇒ env ⇒ hardcoded
       // default (1000 / 30000) — identical to today when the new keys are unseeded.
@@ -254,7 +256,7 @@ export class SyncEngine {
       let filesProcessedCount = 0;
       let filesFailedCount = 0;
       try {
-        const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl);
+        const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl, this.instanceId, this.syncApiKey);
         // B-P0.2: bound the file phase so it cannot hang the cycle. processQueue returns
         // cleanly once the budget is exceeded (remaining files stay pending/resumable).
         // Field-data success is already independent of files (this block is non-fatal).

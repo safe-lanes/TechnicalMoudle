@@ -84,8 +84,9 @@ export async function generateProvisioningBundle(
   // Only on a real (persisted) generation — previews don't mint/persist state.
   // NEW ships use the convention instance id SHIP-<vesselCode> (W1; existing
   // production ships keep their running ids — see Phase 6 backfill note).
-  // ALL of this is DORMANT in 4a: the key column + map are written but read by
-  // nothing yet (validation is 4b). Single-tenant: upsertTenantInstance no-ops.
+  // Onboarding write: store the per-ship key + instance->domain map row so shore
+  // can authenticate this ship at the master level (Phase 4b). The ship gets the
+  // SAME key via the bundle (manifest.syncApiKey) -> its sync_settings on import.
   if (opts?.persist && vesselCode) {
     const convInstanceId = `SHIP-${vesselCode}`;
     try {
@@ -94,12 +95,12 @@ export async function generateProvisioningBundle(
       const syncApiKey = (existingMeta as any)?.syncApiKey || crypto.randomBytes(32).toString('hex');
       await syncRepo.upsertInstanceMetadata({ instanceId: convInstanceId, vesselId, syncApiKey });
       bundle.manifest.syncApiKey = syncApiKey;
-      // Populate the instance->domain map when the (verified) domain is known.
-      // In 4a the domain is sourced from req.user.domain, which is not yet set on
-      // the exempt /sync/provision route — so this stays dormant until 4b; the
-      // call is wired so it activates with zero further edits. No-op single-tenant.
+      // Master map row = instance -> { domain, syncApiKey } (the fail-closed front
+      // door shore validates against). Domain is the verified tenant domain on req
+      // (set by tenantMiddleware once provisioning routes are un-exempted in 4b).
+      // No-op when multi-tenant is disabled (no master DB).
       if (opts.domain) {
-        await tenantConnectionManager.upsertTenantInstance(convInstanceId, vesselId, opts.domain);
+        await tenantConnectionManager.upsertTenantInstance(convInstanceId, vesselId, opts.domain, syncApiKey);
       }
     } catch (keyErr: any) {
       console.warn(`[Provisioning] sync key / instance-map seed skipped: ${keyErr.message}`);
@@ -255,8 +256,7 @@ function topologicalSort(
 }
 
 export async function importProvisioningBundle(
-  bundle: ProvisioningBundle,
-  opts?: { domain?: string }
+  bundle: ProvisioningBundle
 ): Promise<{
   success: boolean;
   tablesImported: number;
@@ -590,18 +590,16 @@ export async function importProvisioningBundle(
     errors.push(`sync_metadata: ${metaErr.message}`);
   }
 
-  // ── Phase 4a: conditional-seed the ship's sync_settings (additive, dormant) ──
-  // Idempotent + no-overwrite-if-set (seedSettingIfEmpty): re-import never clobbers
-  // an operator-set value. Rows are pre-seeded EMPTY by migration 132.
-  //   * domain                  — the ship's tenant domain (client-forwarded
-  //                               AuthContext.domain — W2 interim). X-Sync-Domain source in 4b.
+  // ── Conditional-seed the ship's sync_settings (idempotent, no-overwrite-if-set) ──
+  // Rows are pre-seeded EMPTY by migration 132; re-import never clobbers an
+  // operator-set value.
   //   * sync_api_key            — per-ship key minted shore-side, carried in the bundle.
+  //                               The ship sends it as X-Sync-Api-Key (Phase 4b).
   //   * sync_push_batch_size /  — fleet/per-vessel tunables (default-preserving when absent).
   //     sync_request_timeout_ms
-  // None of these change the running sync flow in 4a: domain/sync_api_key are read by
-  // nothing yet (4b); the tunables resolve to the same env/defaults when unseeded.
+  // The ship never declares a domain (Phase 4b: shore is the sole authority via the
+  // master instance->domain map), so no domain is seeded here.
   try {
-    if (opts?.domain) await syncRepo.seedSettingIfEmpty('domain', opts.domain.trim());
     if (bundle.manifest.syncApiKey) await syncRepo.seedSettingIfEmpty('sync_api_key', bundle.manifest.syncApiKey);
     const env = bundle.manifest.envSettings;
     const pushBatch = env?.syncPushBatchSize ?? 200;

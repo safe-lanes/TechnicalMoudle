@@ -16,7 +16,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { VesselContext } from "@/contexts/VesselContext";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -91,7 +90,6 @@ function getCategoryColor(category: string): string {
 
 export default function SyncProvisioning() {
   const { toast } = useToast();
-  const { domain } = useAuth();
   const vesselCtx = useContext(VesselContext);
   const vessels = vesselCtx?.vessels ?? [];
 
@@ -166,11 +164,7 @@ export default function SyncProvisioning() {
   // ── Import Bundle ──
   const importMutation = useMutation({
     mutationFn: async (bundle: any) => {
-      // Phase 4a (W2 interim): forward the ship's tenant domain alongside the
-      // bundle so the server can conditional-seed sync_settings.domain. Harmless
-      // in single-tenant (server ignores it); the bundle's manifest/data are unchanged.
-      const payload = domain ? { ...bundle, domain } : bundle;
-      const res = await apiRequest("POST", "/technical/api/sync/provision/import", payload);
+      const res = await apiRequest("POST", "/technical/api/sync/provision/import", bundle);
       return res.json();
     },
     onSuccess: (data: ImportResult) => {

@@ -168,20 +168,46 @@ class TenantConnectionManager {
   }
 
   /**
-   * Upsert the ship-instance -> domain map row (master DB). Called at provisioning
-   * (Phase 4a). Idempotent: re-provisioning the same instance updates vessel/domain.
+   * Upsert the ship-instance -> { domain, syncApiKey } map row (master DB). Called at
+   * onboarding/provisioning. Idempotent: re-provisioning updates vessel/domain/key.
    * No-op when multi-tenant is disabled (single-tenant deploys have no master DB).
-   * NOTE: 4a only POPULATES this map; fail-closed validation against it is Phase 4b.
+   * `syncApiKey` is omitted (left unchanged) when undefined.
    */
-  async upsertTenantInstance(instanceId: string, vesselId: string | null, domain: string): Promise<void> {
+  async upsertTenantInstance(
+    instanceId: string,
+    vesselId: string | null,
+    domain: string,
+    syncApiKey?: string | null,
+  ): Promise<void> {
     if (!this._isMultiTenantEnabled || !this.masterDb) return;
     await this.masterDb
       .insert(tenantInstances)
-      .values({ instanceId, vesselId, domain })
+      .values({ instanceId, vesselId, domain, syncApiKey: syncApiKey ?? null })
       .onConflictDoUpdate({
         target: tenantInstances.instanceId,
-        set: { vesselId, domain, updatedAt: new Date() },
+        set: {
+          vesselId,
+          domain,
+          ...(syncApiKey !== undefined ? { syncApiKey } : {}),
+          updatedAt: new Date(),
+        },
       });
+  }
+
+  /**
+   * Phase 4b — fail-closed front door. Resolve an incoming ship instance id to its
+   * { domain, syncApiKey } from the master map, WITHOUT opening any tenant DB. Returns
+   * null when the instance is not registered (=> shore rejects 403, never default-routes).
+   */
+  async resolveInstanceDomain(instanceId: string): Promise<{ domain: string; syncApiKey: string | null } | null> {
+    if (!this._isMultiTenantEnabled || !this.masterDb) return null;
+    const rows = await this.masterDb
+      .select({ domain: tenantInstances.domain, syncApiKey: tenantInstances.syncApiKey })
+      .from(tenantInstances)
+      .where(eq(tenantInstances.instanceId, instanceId))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return { domain: rows[0].domain, syncApiKey: rows[0].syncApiKey ?? null };
   }
 
   async getActiveTenants(): Promise<Array<{ tuid: string; databaseName: string }>> {
