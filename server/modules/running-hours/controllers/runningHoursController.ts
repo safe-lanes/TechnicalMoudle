@@ -242,13 +242,6 @@ export async function validateRHEntry(req: Request, res: Response) {
     const isNotRhDriven = rhCounterType === 'NOT_RH_DRIVEN';
     const exceedsComponentRH = false;
 
-    const prevReading = previousReading !== undefined && previousReading !== null ? Number(previousReading) : null;
-
-    let adjustedMin = result.validRange ? result.validRange.min : 0;
-    if (prevReading !== null && !isNaN(prevReading) && result.validRange && prevReading < result.validRange.min) {
-      adjustedMin = prevReading;
-    }
-
     // Never cap the displayed max at the current reading — show the true timeline range.
     // An unbounded upper limit is represented internally as Infinity, which JSON.stringify
     // silently converts to null. Emit an explicit null sentinel so the client has a stable
@@ -257,8 +250,13 @@ export async function validateRHEntry(req: Request, res: Response) {
       ? result.validRange.max
       : null;
 
+    // The valid range minimum is the audit-trail-based minimum computed by the timeline
+    // service — always use it as-is. The previousReading from the WO request body is NOT
+    // used to influence the min: it reflects the RH at WO generation time, which may be
+    // stale (component RH was updated after the WO was created), so substituting it would
+    // show a misleadingly low floor (e.g. 20) when the real minimum is higher (e.g. 80).
     const cappedValidRange = result.validRange
-      ? { ...result.validRange, min: adjustedMin, max: adjustedMax }
+      ? { ...result.validRange, max: adjustedMax }
       : result.validRange;
 
     res.json({

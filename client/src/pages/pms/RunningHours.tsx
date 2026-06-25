@@ -203,12 +203,9 @@ const RunningHours = () => {
     sfiCode: parent.sfiCode || '',
     componentCategory: parent.category || '',
     runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
-    // For MASTER counter components the "Last Updated" column shows the last
-    // completed date (most recent approved work-order completion); fall back to
-    // the counter's last-updated timestamp when there is no completion history.
-    lastUpdated: parent.lastCompletedDate
-      ? formatProfessionalDate(parent.lastCompletedDate)
-      : formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
+    // "Last Updated" shows the MAX of RH-specific sources (audit date, last_updated,
+    // rh_master_updated_at) — computed server-side and sent as latestUpdate.
+    lastUpdated: formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
     lastUpdatedRaw: parent.latestUpdate || parent.lastUpdated || null,
     utilizationRate: parent.utilizationRate ?? 0,
     periodRunningHours: parent.periodRunningHours ?? 0,

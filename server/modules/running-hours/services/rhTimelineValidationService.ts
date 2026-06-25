@@ -1,7 +1,7 @@
 import * as repo from '../repositories/runningHoursRepository';
 import { storage } from '../../../storage';
 
-const MAX_HOURS_PER_DAY = 24;
+const MAX_HOURS_PER_DAY = 25;
 const HIGH_UTILIZATION_THRESHOLD = 20;
 
 export interface RHTimelineEntry {

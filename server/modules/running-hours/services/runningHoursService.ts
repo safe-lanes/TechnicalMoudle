@@ -1,6 +1,6 @@
 import * as repo from '../repositories/runningHoursRepository';
 import type { RHHistoryQuery, RHHistoryResult } from '../repositories/runningHoursRepository';
-import { validateRunningHoursIncrease, canAdminOverride } from '../utils/rhValidation';
+import { validateRunningHoursIncrease, canAdminOverride, safeParseDate } from '../utils/rhValidation';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { z } from 'zod';
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema } from '@shared/schema';
@@ -179,9 +179,6 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
   const startEntries = await repo.getRunningHoursAtDateBatch(masterRefs, periodStartDate);
   const endEntries = periodEndDate ? await repo.getRunningHoursAtDateBatch(masterRefs, periodEndDate) : null;
   const lastUpdatedByMap = await repo.getLatestAuditUserBatch(masterRefs);
-  // Latest approved completion date per master (component_maintenance_history).
-  // Used to drive the Overview "Last Updated" column for MASTER rows.
-  const lastCompletedMap = await repo.getLatestCompletedDateBatch(masterRefs);
 
   const parentsWithCounts = masterComponents.map((component) => {
       // Under 'all'/'my' aggregate, vesselId is 'all' — scope inherited lookup to the
@@ -246,18 +243,29 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
         ? Math.round((periodRunningHours / periodDays) * 10) / 10
         : 0;
 
-      const lastUpdatedBy = lastUpdatedByMap.get(component.cuuid) ?? null;
-      // Only MASTER components surface the last completed date (the Overview grid
-      // is MASTER-only, but branch explicitly to enforce the intent). ISO string.
-      const lastCompletedDate = component.rhCounterType === 'MASTER'
-        ? (lastCompletedMap.get(component.cuuid) ?? null)
+      const auditEntry = lastUpdatedByMap.get(component.cuuid) ?? null;
+      const lastUpdatedBy = auditEntry?.userId ?? null;
+
+      // Compute the most recent RH-specific "Last Updated" date as MAX of three
+      // sources that are only written when Running Hours actually change:
+      //   1. running_hours_audit.dateUpdatedLocal — the user's entered reading date
+      //   2. components.last_updated              — written on every RH update
+      //   3. components.rh_master_updated_at      — explicit RH timestamp
+      // Nulls and unparseable values are filtered out before the comparison.
+      const auditDateParsed = safeParseDate(auditEntry?.auditDate);
+      const lastUpdatedParsed = safeParseDate((component as any).lastUpdated);
+      const rhMasterUpdatedParsed = safeParseDate((component as any).rhMasterUpdatedAt);
+      const rhDates = [auditDateParsed, lastUpdatedParsed, rhMasterUpdatedParsed].filter((d): d is Date => d !== null);
+      const latestRHDate = rhDates.length > 0
+        ? new Date(Math.max(...rhDates.map(d => d.getTime())))
         : null;
 
       return {
         ...component,
         sfiCode: component.componentCode || '',
-        latestUpdate: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt || new Date().toISOString(),
-        lastCompletedDate,
+        latestUpdate: latestRHDate
+          ? latestRHDate.toISOString()
+          : ((component as any).lastUpdated || (component as any).rhMasterUpdatedAt || null),
         currentCumulativeRH: totalCumulativeRH.toFixed(2),
         currentMeterRH: currentMeterRH.toFixed(2),
         meterReplacedLastRh: meterReplacedLastRh > 0 ? meterReplacedLastRh.toFixed(2) : null,
@@ -386,11 +394,19 @@ export async function updateChildRH(componentId: string, body: {
 
   // Update component RH - only update currentCumulativeRH (child's actual hours)
   // Do NOT update rhCurrentInheritedCached as it stores the master's value
+  // Use user's entered reading date for last_updated (not server time) so the
+  // overview grid MAX logic shows the correct reading date, not today's date.
   await repo.updateComponent(componentId, {
     currentCumulativeRH: newRHFormatted,
     runningHours: newRHFormatted,
-    lastUpdated: new Date().toISOString()
+    lastUpdated: dateUpdated || new Date().toISOString()
   });
+
+  // dateUpdatedLocal must also use the user's entered date so the audit-based
+  // MAX in listParents reads the correct reading date, not the server save time.
+  const auditDateLocal = dateUpdated
+    ? dateUpdated.split('T')[0]
+    : new Date().toISOString().split('T')[0];
 
   await repo.createRunningHoursAudit({
     vesselId: component.vesselId || '',
@@ -398,7 +414,7 @@ export async function updateChildRH(componentId: string, body: {
     previousRH: previousRH,
     newRH: newRHFormatted,
     cumulativeRH: newRHFormatted,
-    dateUpdatedLocal: new Date().toISOString().split('T')[0],
+    dateUpdatedLocal: auditDateLocal,
     dateUpdatedTZ: 'UTC',
     enteredAtUTC: new Date(),
     userId: userId || 'system',

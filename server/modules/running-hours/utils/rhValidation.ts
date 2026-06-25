@@ -150,3 +150,38 @@ export function validateRunningHoursIncrease(
 export function canAdminOverride(userRole: string): boolean {
   return userRole === 'Sail Admin';
 }
+
+/**
+ * Safely parse any date value (string, Date, null, undefined) into a Date object.
+ * Returns null for invalid, unparseable, or missing values instead of throwing or
+ * returning an Invalid Date — guards against mixed text formats (DD-MMM-YYYY, ISO,
+ * timestamp strings) that appear across different columns.
+ */
+export function safeParseDate(value: string | Date | null | undefined): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) return d;
+  // Try DD-MMM-YYYY or DD-MMM-YYYY HH:mm
+  const months: Record<string, number> = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+  };
+  const match = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if (match) {
+    const [, day, mon, year, hh = '0', mm = '0'] = match;
+    const month = months[mon.toLowerCase()];
+    if (month !== undefined) {
+      const parsed = new Date(
+        parseInt(year), month, parseInt(day),
+        parseInt(hh), parseInt(mm)
+      );
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+  return null;
+}

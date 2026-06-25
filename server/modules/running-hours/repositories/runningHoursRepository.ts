@@ -164,10 +164,15 @@ export async function getRunningHoursAtDateBatch(
 // Latest audit userId per component (mirrors storage.getRunningHoursAudits(id, 1)
 // reading audits[0].userId) in a single round-trip. Accepts dual identifiers per
 // master and returns a Map keyed by master cuuid.
+export interface AuditUserEntry {
+  userId: string | null;
+  auditDate: string | null;
+}
+
 export async function getLatestAuditUserBatch(
   masters: MasterRef[]
-): Promise<Map<string, string | null>> {
-  const result = new Map<string, string | null>();
+): Promise<Map<string, AuditUserEntry>> {
+  const result = new Map<string, AuditUserEntry>();
   if (masters.length === 0) return result;
   const db = await getDb();
   const { identifiers, idToCuuid } = buildIdentifierIndex(masters);
@@ -178,6 +183,7 @@ export async function getLatestAuditUserBatch(
       componentId: runningHoursAudit.componentId,
       userId: runningHoursAudit.userId,
       enteredAtUTC: runningHoursAudit.enteredAtUTC,
+      dateUpdatedLocal: runningHoursAudit.dateUpdatedLocal,
     })
     .from(runningHoursAudit)
     .where(inArray(runningHoursAudit.componentId, identifiers))
@@ -193,7 +199,10 @@ export async function getLatestAuditUserBatch(
     const existing = latestTimes.get(cuuid);
     if (existing === undefined || t >= existing) {
       latestTimes.set(cuuid, t);
-      result.set(cuuid, row.userId || null);
+      result.set(cuuid, {
+        userId: row.userId || null,
+        auditDate: row.dateUpdatedLocal || null,
+      });
     }
   }
 
