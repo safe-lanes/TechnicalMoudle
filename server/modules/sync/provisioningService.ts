@@ -13,7 +13,9 @@
  * getSyncPhaseOrder() from syncConfig.
  */
 
+import * as crypto from 'crypto';
 import { getPool } from '../../db';
+import { tenantConnectionManager } from '../../utils/tenantConnectionManager';
 import * as syncRepo from './repository';
 import {
   getTablesByCategory,
@@ -34,6 +36,11 @@ export interface ProvisioningManifest {
   tables: { tableName: string; rowCount: number; category: string }[];
   totalRows: number;
   version: string;
+  // Phase 4a (optional, additive — absent in pre-4a bundles):
+  // per-tenant sync key the ship seeds into its sync_settings on import (dormant until 4b).
+  syncApiKey?: string;
+  // fleet/per-vessel sync tunables seeded on import (default-preserving when absent).
+  envSettings?: { syncPushBatchSize?: number; syncRequestTimeoutMs?: number };
 }
 
 export interface ProvisioningBundle {
@@ -45,7 +52,8 @@ export interface ProvisioningBundle {
 
 export async function generateProvisioningBundle(
   vesselId: string,
-  generatedBy: string
+  generatedBy: string,
+  opts?: { domain?: string; persist?: boolean }
 ): Promise<ProvisioningBundle> {
   const pool = await getPool();
 
@@ -71,6 +79,32 @@ export async function generateProvisioningBundle(
     },
     data: [],
   };
+
+  // ── Phase 4a: per-tenant sync key + instance->domain map (shore side) ──
+  // Only on a real (persisted) generation — previews don't mint/persist state.
+  // NEW ships use the convention instance id SHIP-<vesselCode> (W1; existing
+  // production ships keep their running ids — see Phase 6 backfill note).
+  // ALL of this is DORMANT in 4a: the key column + map are written but read by
+  // nothing yet (validation is 4b). Single-tenant: upsertTenantInstance no-ops.
+  if (opts?.persist && vesselCode) {
+    const convInstanceId = `SHIP-${vesselCode}`;
+    try {
+      // Stable per-ship key: reuse an existing one, else mint a new one.
+      const existingMeta = await syncRepo.getInstanceMetadata(convInstanceId);
+      const syncApiKey = (existingMeta as any)?.syncApiKey || crypto.randomBytes(32).toString('hex');
+      await syncRepo.upsertInstanceMetadata({ instanceId: convInstanceId, vesselId, syncApiKey });
+      bundle.manifest.syncApiKey = syncApiKey;
+      // Populate the instance->domain map when the (verified) domain is known.
+      // In 4a the domain is sourced from req.user.domain, which is not yet set on
+      // the exempt /sync/provision route — so this stays dormant until 4b; the
+      // call is wired so it activates with zero further edits. No-op single-tenant.
+      if (opts.domain) {
+        await tenantConnectionManager.upsertTenantInstance(convInstanceId, vesselId, opts.domain);
+      }
+    } catch (keyErr: any) {
+      console.warn(`[Provisioning] sync key / instance-map seed skipped: ${keyErr.message}`);
+    }
+  }
 
   // Phase 0: Export the vessel row FIRST — almost every other table has
   // a FK to vessels.vuuid, so it must exist before anything else on import.
@@ -221,7 +255,8 @@ function topologicalSort(
 }
 
 export async function importProvisioningBundle(
-  bundle: ProvisioningBundle
+  bundle: ProvisioningBundle,
+  opts?: { domain?: string }
 ): Promise<{
   success: boolean;
   tablesImported: number;
@@ -553,6 +588,28 @@ export async function importProvisioningBundle(
     });
   } catch (metaErr: any) {
     errors.push(`sync_metadata: ${metaErr.message}`);
+  }
+
+  // ── Phase 4a: conditional-seed the ship's sync_settings (additive, dormant) ──
+  // Idempotent + no-overwrite-if-set (seedSettingIfEmpty): re-import never clobbers
+  // an operator-set value. Rows are pre-seeded EMPTY by migration 132.
+  //   * domain                  — the ship's tenant domain (client-forwarded
+  //                               AuthContext.domain — W2 interim). X-Sync-Domain source in 4b.
+  //   * sync_api_key            — per-ship key minted shore-side, carried in the bundle.
+  //   * sync_push_batch_size /  — fleet/per-vessel tunables (default-preserving when absent).
+  //     sync_request_timeout_ms
+  // None of these change the running sync flow in 4a: domain/sync_api_key are read by
+  // nothing yet (4b); the tunables resolve to the same env/defaults when unseeded.
+  try {
+    if (opts?.domain) await syncRepo.seedSettingIfEmpty('domain', opts.domain.trim());
+    if (bundle.manifest.syncApiKey) await syncRepo.seedSettingIfEmpty('sync_api_key', bundle.manifest.syncApiKey);
+    const env = bundle.manifest.envSettings;
+    const pushBatch = env?.syncPushBatchSize ?? 200;
+    const reqTimeout = env?.syncRequestTimeoutMs ?? 120000;
+    await syncRepo.seedSettingIfEmpty('sync_push_batch_size', String(pushBatch));
+    await syncRepo.seedSettingIfEmpty('sync_request_timeout_ms', String(reqTimeout));
+  } catch (seedErr: any) {
+    errors.push(`sync_settings seed: ${seedErr.message}`);
   }
 
   console.log(

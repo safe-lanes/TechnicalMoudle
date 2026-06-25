@@ -27,3 +27,23 @@ export const tenants = pgTable("tenants", {
 export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Tenant = typeof tenants.$inferSelect;
+
+/**
+ * Ship-instance -> domain map (multi-tenant mode only). Lives in the MASTER database.
+ *
+ * Phase 4: shore recovers the incoming ship's instance id (batch.initiatedByInstance)
+ * and resolves the owning tenant `domain` here, to validate the ship-declared
+ * X-Sync-Domain against the map it owns. Keyed on instance_id (the wire identity).
+ * Populated at provisioning (4a); enforcement/validation is Phase 4b.
+ */
+export const tenantInstances = pgTable("tenant_instances", {
+  instanceId: text("instance_id").primaryKey(),
+  vesselId: text("vessel_id"),
+  domain: text("domain").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertTenantInstanceSchema = createInsertSchema(tenantInstances).omit({ createdAt: true, updatedAt: true });
+export type InsertTenantInstance = z.infer<typeof insertTenantInstanceSchema>;
+export type TenantInstance = typeof tenantInstances.$inferSelect;

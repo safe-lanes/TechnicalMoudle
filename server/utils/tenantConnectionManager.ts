@@ -4,7 +4,7 @@ import { eq, and } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import * as schema from "@shared/schema";
-import { tenants } from "@shared/master/schema";
+import { tenants, tenantInstances } from "@shared/master/schema";
 import { tenantStorage, getCurrentTenantContext, type TenantContext } from "./asyncLocalStorage";
 import { runMigrations, runDrizzleMigrations } from "../migrations";
 import { initializeDatabase, ensureMaintenanceHistoryImmutability } from "../initDb";
@@ -165,6 +165,23 @@ class TenantConnectionManager {
       .where(and(eq(tenants.tuid, tuid), eq(tenants.isActive, true)))
       .limit(1);
     return rows.length > 0;
+  }
+
+  /**
+   * Upsert the ship-instance -> domain map row (master DB). Called at provisioning
+   * (Phase 4a). Idempotent: re-provisioning the same instance updates vessel/domain.
+   * No-op when multi-tenant is disabled (single-tenant deploys have no master DB).
+   * NOTE: 4a only POPULATES this map; fail-closed validation against it is Phase 4b.
+   */
+  async upsertTenantInstance(instanceId: string, vesselId: string | null, domain: string): Promise<void> {
+    if (!this._isMultiTenantEnabled || !this.masterDb) return;
+    await this.masterDb
+      .insert(tenantInstances)
+      .values({ instanceId, vesselId, domain })
+      .onConflictDoUpdate({
+        target: tenantInstances.instanceId,
+        set: { vesselId, domain, updatedAt: new Date() },
+      });
   }
 
   async getActiveTenants(): Promise<Array<{ tuid: string; databaseName: string }>> {

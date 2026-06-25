@@ -364,7 +364,10 @@ export async function downloadProvisionHandler(req: Request, res: Response) {
     }
 
     const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
-    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId);
+    // Phase 4a: persist=true mints/stores the per-ship sync key (shore-side) and
+    // (when the verified domain is available — 4b) the instance->domain map.
+    const domain = (req as any).user?.domain || undefined;
+    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, { domain, persist: true });
 
     const fileName = `provision_${vesselId}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     res.setHeader('Content-Type', 'application/json');
@@ -386,7 +389,11 @@ export async function importProvisionHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Invalid bundle format. Must contain manifest and data.' });
     }
 
-    const result = await provisioningService.importProvisioningBundle(bundle);
+    // Phase 4a (W2 interim): the ship's tenant domain is client-forwarded
+    // (AuthContext.domain) since the verified domain isn't on req on the exempt
+    // /sync route yet. Used only to conditional-seed sync_settings.domain.
+    const domain = (req.body?.domain as string) || (req as any).user?.domain || undefined;
+    const result = await provisioningService.importProvisioningBundle(bundle, { domain });
     res.json(result);
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
