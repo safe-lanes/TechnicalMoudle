@@ -25,6 +25,10 @@ import { getPool } from "../db";
  * DB) are unchanged; no header is consumed, no map lookup happens.
  */
 
+// Phase 6 transition tolerance (default OFF). When 'true', a KNOWN instance may also
+// authenticate with the legacy shared SYNC_API_KEY during the per-tenant-key migration.
+const LEGACY_KEY_TOLERANCE = process.env.SYNC_LEGACY_KEY_TOLERANCE === "true";
+
 function header(req: Request, name: string): string {
   const raw = req.headers[name];
   const v = Array.isArray(raw) ? raw[0] : raw;
@@ -64,9 +68,25 @@ export function syncTenantGuard(req: Request, res: Response, next: NextFunction)
         return;
       }
       // 3. Per-tenant key validation at the MASTER level, BEFORE opening any tenant DB.
-      if (!entry.syncApiKey || apiKey !== entry.syncApiKey) {
+      //    Transition tolerance (Phase 6, SYNC_LEGACY_KEY_TOLERANCE, default OFF): for a
+      //    KNOWN instance only, also accept the legacy shared SYNC_API_KEY — bridges the
+      //    window where the 3 existing WK ships still send the legacy key (the per-tenant
+      //    key is a DB value, not deployed code). Unknown instances still 403 above
+      //    (fail-closed preserved). Tightening path: set each ship's per-tenant key (the
+      //    ship auto-prefers it via loadSettings); once all are migrated, set
+      //    SYNC_LEGACY_KEY_TOLERANCE=false → legacy rejected → full per-tenant auth, no outage.
+      const perTenantOk = !!entry.syncApiKey && apiKey === entry.syncApiKey;
+      const legacyOk =
+        LEGACY_KEY_TOLERANCE && !!process.env.SYNC_API_KEY && apiKey === process.env.SYNC_API_KEY;
+      if (!perTenantOk && !legacyOk) {
         res.status(403).json({ error: "invalid_sync_key", message: "Sync key rejected" });
         return;
+      }
+      if (!perTenantOk && legacyOk) {
+        console.warn(
+          `[syncTenantGuard] LEGACY-KEY TOLERANCE: instance '${instanceId}' authenticated on the ` +
+          `shared SYNC_API_KEY (per-tenant key not yet set). Migrate it, then disable SYNC_LEGACY_KEY_TOLERANCE.`,
+        );
       }
       // 4. Authenticated — resolve the tenant DB and run the handler inside its context.
       return tenantConnectionManager.resolveTenant(entry.domain).then((tenant) =>

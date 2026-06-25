@@ -3162,6 +3162,37 @@ async function markMigrationComplete(db: any, migration: Migration): Promise<voi
   `);
 }
 
+/**
+ * Phase 6 — READ-ONLY dry-run: list migrations the runner WOULD apply (inline ids +
+ * migrations/*.sql filenames not yet in schema_migrations). Applies NOTHING. Used by
+ * the WK promotion gate to prove "zero pending" before adopting the DB as tenant #1.
+ * Returns [] when the DB is fully migrated.
+ */
+export async function getPendingMigrations(poolArg?: Pool): Promise<string[]> {
+  const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
+  if (!postgres) return [];
+  const { db } = postgres;
+  await ensureMigrationsTable(db);
+
+  const pending: string[] = [];
+  // (1) inline custom-SQL migrations
+  for (const migration of migrations) {
+    if (!(await getMigrationStatus(db, migration.id))) pending.push(migration.id);
+  }
+  // (2) migrations/*.sql files (tracked by filename minus .sql) — skip empty files (runner does too)
+  const migrationsFolder = path.join(process.cwd(), 'migrations');
+  if (fs.existsSync(migrationsFolder)) {
+    const sqlFiles = fs.readdirSync(migrationsFolder).filter((f) => f.endsWith('.sql')).sort();
+    for (const sqlFile of sqlFiles) {
+      const id = sqlFile.replace('.sql', '');
+      const content = fs.readFileSync(path.join(migrationsFolder, sqlFile), 'utf-8');
+      if (!content.trim()) continue;
+      if (!(await getMigrationStatus(db, id))) pending.push(id);
+    }
+  }
+  return pending;
+}
+
 export async function runMigrations(poolArg?: Pool): Promise<{ applied: number; skipped: number }> {
   console.log('🔄 Running database migrations...');
 
