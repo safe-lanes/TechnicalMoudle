@@ -7212,6 +7212,11 @@ export class PostgresStorage {
     const db = await getDb();
     const { parentComponentId, mode, value, dateUpdated, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
     const now = new Date();
+    // Reading date: when the hours were actually observed (user-entered date), not when
+    // the row is written. Falls back to "now" only when omitted or unparseable.
+    // enteredAtUTC and updatedAt stay "now" — they are the server-write audit trail.
+    const parsedReadingDate = dateUpdated ? new Date(dateUpdated) : null;
+    const readingDate = parsedReadingDate && !isNaN(parsedReadingDate.getTime()) ? parsedReadingDate : now;
 
     // ── Phase 1: Reads + Validation (outside transaction) ──
 
@@ -7310,7 +7315,7 @@ export class PostgresStorage {
       // If this component is a MASTER type, also update rhCurrentMaster
       if (parent.rhCounterType === 'MASTER') {
         updateData.rhCurrentMaster = newRH.toString();
-        updateData.rhMasterUpdatedAt = now;
+        updateData.rhMasterUpdatedAt = readingDate;
         updateData.rhMasterUpdateSource = 'MANUAL';
       }
 
@@ -7409,7 +7414,7 @@ export class PostgresStorage {
               // Cache the master's TOTAL (meterReplacedLastRh + newRH), not the raw new meter
               // reading, so the inherited display matches the master after a meter replacement.
               rhCurrentInheritedCached: masterTotalRH.toString(),
-              rhInheritedUpdatedAt: now,
+              rhInheritedUpdatedAt: readingDate,
               currentCumulativeRH: newInheritedRH.toString(),
               lastUpdated: dateUpdated,
               updatedAt: now
