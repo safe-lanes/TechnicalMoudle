@@ -165,20 +165,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // and the readers that filtered the persisted band (overdue-alert query,
   // equipment report) were retargeted to the computed band.
 
-  // Start PMS Alert Engine - evaluates alert policies and creates alert events
-  const { pmsAlertEngine } = await import("./modules/alerts/services/pmsAlertEngine");
-  pmsAlertEngine.start(5 * 60 * 1000); // Run every 5 minutes
-  console.log('[PmsAlertEngine] Alert scanner started - will evaluate overdue jobs, low spares, skipped cycles');
-
-  // Start Sync Pruning Scheduler - cleans up old sync data every 24 hours
-  const { syncPruningScheduler } = await import("./modules/sync/pruningService");
-  syncPruningScheduler.start(24 * 60 * 60 * 1000); // Run every 24 hours
-  console.log('[SyncPruning] Scheduler started - will prune old sync logs, batches, file queue, conflicts');
-
-  // Start Sync Health Monitor - checks sync health every 6 hours
-  const { syncHealthScheduler } = await import("./modules/sync/healthMonitor");
-  syncHealthScheduler.start(6 * 60 * 60 * 1000); // Run every 6 hours
-  console.log('[SyncHealth] Health monitor started - will check stale syncs, conflicts, stuck files, log overflow');
+  // Start the Shore Maintenance Orchestrator — drives pmsAlertEngine (5m) +
+  // syncHealth (6h) + syncPruning (24h). Single-tenant (incl. every ship): each task
+  // runs once per tick against the single DB with NO tenant context = today's behavior.
+  // Multi-tenant: loops getActiveTenants() in per-tenant context with bounded
+  // concurrency, per-(task,tenant) guards, jitter, and per-run timeouts.
+  const { maintenanceOrchestrator } = await import("./services/maintenanceOrchestrator");
+  maintenanceOrchestrator.start();
+  console.log('[Maint] Orchestrator started — alerts (5m), sync-health (6h), sync-pruning (24h)');
 
   // Start Auto-Sync Scheduler - autonomous ship-shore sync (GAP 1 + GAP 4)
   // Ship-only: sync is always ship-initiated. Shore is the responder.
@@ -607,9 +601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const stopAllSchedulers = () => {
     console.log('Cleaning up scheduled tasks...');
     jobDueScanner.stop();
-    pmsAlertEngine.stop();
-    syncPruningScheduler.stop();
-    syncHealthScheduler.stop();
+    maintenanceOrchestrator.stop(); // stops alerts + sync-health + sync-pruning timers
     syncAutoScheduler.stop();
   };
   process.on('SIGTERM', stopAllSchedulers);

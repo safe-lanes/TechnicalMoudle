@@ -28,11 +28,16 @@ import {
   evaluateDefectCoc,
 } from '../evaluators/defectEvaluators';
 import type { AlertPolicy } from '@shared/schema';
+import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage';
 
 export class PmsAlertEngine {
   private isRunning = false;
   private intervalId: NodeJS.Timeout | null = null;
   private scanIntervalMs = 5 * 60 * 1000; // 5 minutes
+  // Phase 5: per-tenant-context re-entrancy guard. Keyed on the resolved tenant
+  // (tuid) so a slow scan in one tenant never overlaps ITSELF, while different
+  // tenants still scan concurrently. '__single__' covers single-tenant/ship.
+  private scanInProgress = new Map<string, boolean>();
 
   start(intervalMs?: number): void {
     if (this.isRunning) {
@@ -84,6 +89,19 @@ export class PmsAlertEngine {
     defectCocAlerts: number;
     totalCreated: number;
   }> {
+    // Re-entrancy guard (per tenant context): skip if a scan for this context is
+    // still running, so a scan exceeding its interval can never overlap itself.
+    const ctxKey = getCurrentTenantContext()?.tuid ?? '__single__';
+    if (this.scanInProgress.get(ctxKey)) {
+      console.log(`[PmsAlertEngine] Scan already in progress for '${ctxKey}' — skipping this tick (no overlap)`);
+      return {
+        overdueAlerts: 0, lowSpareAlerts: 0, skippedCycleAlerts: 0,
+        certExpiringAlerts: 0, certExpiredAlerts: 0,
+        surveyDueSoonAlerts: 0, surveyWindowClosingAlerts: 0, surveyOverdueAlerts: 0,
+        defectOverdueAlerts: 0, defectCocAlerts: 0, totalCreated: 0,
+      };
+    }
+    this.scanInProgress.set(ctxKey, true);
     console.log('[PmsAlertEngine] Starting alert evaluation scan...');
 
     const results = {
@@ -295,6 +313,8 @@ export class PmsAlertEngine {
       );
     } catch (error) {
       console.error('[PmsAlertEngine] Scan failed:', error);
+    } finally {
+      this.scanInProgress.delete(ctxKey);
     }
 
     return results;
