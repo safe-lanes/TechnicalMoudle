@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
+import { downloadAuthedFile } from "@/lib/authedDownload";
 import { useVessels } from "@/hooks/useVessels";
 import { useDepartmentOptions, useMasterListOptions } from "@/hooks/useDepartments";
 import type { ComponentDocument } from "@shared/schema";
@@ -413,7 +414,7 @@ export default function ComponentRegisterAddEdit({
 
   const handleViewDocument = async (docId: number) => {
     try {
-      window.open(`/technical/api/component-documents/${docId}/download`, '_blank');
+      await downloadAuthedFile(`/technical/api/component-documents/${docId}/download`);
     } catch (error) {
       toast({
         title: "Error",

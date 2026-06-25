@@ -30,6 +30,7 @@ import {
 import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
 import { useVessel } from "@/contexts/VesselContext";
 import { useToast } from "@/hooks/use-toast";
+import { viewAuthedDocument } from "@/lib/authedDownload";
 
 const OTHER_REASON = "Other Reason";
 const DOC_TYPE = "postponement";
@@ -463,7 +464,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     }
   };
 
-  const handleRAViewClick = () => {
+  const handleRAViewClick = async () => {
     if (!riskAssessmentDoc) {
       toast({
         title: "No Risk Assessment attached",
@@ -471,11 +472,17 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       });
       return;
     }
-    window.open(
-      `/technical/api/work-order-documents/${riskAssessmentDoc.id}/download`,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    try {
+      await viewAuthedDocument(
+        `/technical/api/work-order-documents/${riskAssessmentDoc.id}/download`,
+      );
+    } catch (error) {
+      toast({
+        title: "View failed",
+        description: "Failed to open the Risk Assessment. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteDoc = async (docId: string) => {

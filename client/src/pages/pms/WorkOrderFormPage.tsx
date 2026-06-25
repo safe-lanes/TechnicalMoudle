@@ -52,6 +52,7 @@ import { useRanks, ensureRankInOptions } from "@/hooks/useRanks";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { viewAuthedDocument } from "@/lib/authedDownload";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { PeriodPicker } from "@/components/filters/PeriodPicker";
 import type { PeriodValue } from "@/components/filters/PeriodPicker";
@@ -2140,27 +2141,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
     if (fetchUrl) {
       try {
-        const response = await fetch(fetchUrl);
-        if (!response.ok) throw new Error('Failed to retrieve document');
-        const result = await response.json();
-        const dataUrl = result.dataUrl || result.url;
-        if (dataUrl && dataUrl.startsWith('data:')) {
-          const [header, base64Data] = dataUrl.split(',');
-          const mimeMatch = header.match(/data:([^;]+)/);
-          const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-          const byteChars = atob(base64Data);
-          const byteArray = new Uint8Array(byteChars.length);
-          for (let i = 0; i < byteChars.length; i++) {
-            byteArray[i] = byteChars.charCodeAt(i);
-          }
-          const blob = new Blob([byteArray], { type: mime });
-          const blobUrl = URL.createObjectURL(blob);
-          window.open(blobUrl, '_blank');
-        } else if (dataUrl) {
-          window.open(dataUrl, '_blank');
-        } else {
-          window.open(fetchUrl, '_blank');
-        }
+        // viewAuthedDocument fetches with the Bearer (via the global interceptor),
+        // handles the JSON {dataUrl}/{url} and raw-stream shapes, and opens an
+        // in-memory blob URL. This replaces the prior inline logic whose final
+        // `window.open(fetchUrl)` fallback was a direct navigation that would 401
+        // under multi-tenant mode (no Authorization header).
+        await viewAuthedDocument(fetchUrl);
       } catch (error) {
         console.error('View error:', error);
         toast({
