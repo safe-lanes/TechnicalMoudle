@@ -5958,7 +5958,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* RH Valid Range Helper */}
                 {rhValidation.validRange && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
-                    Valid range: {(() => { const vr = rhValidation.validRange!; const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < vr.min ? prevR : vr.min; const minStr = Number.isFinite(displayMin) ? displayMin.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `${minStr} to ${maxStr}`; })()} hours
+                    Valid range: {(() => { const vr = rhValidation.validRange!; const minStr = Number.isFinite(vr.min) ? vr.min.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `${minStr} to ${maxStr}`; })()} hours
                     {rhValidation.previousEntry && (
                       <span className="ml-1 text-blue-500">
                         | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -6003,7 +6003,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 )}
                 {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus !== 'EXCEEDS_COMPONENT_RH' && rhValidation.validationDetails?.validationStatus !== 'INVALID_BACKDATED' && (
                   <div className="text-xs text-red-600 flex items-center gap-1" data-testid="text-rh-invalid">
-                    <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? (() => { const vr = rhValidation.validRange!; const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < vr.min ? prevR : vr.min; const minStr = Number.isFinite(displayMin) ? displayMin.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `Valid range: ${minStr} to ${maxStr} hours`; })() : rhValidation.message}
+                    <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? (() => { const vr = rhValidation.validRange!; const minStr = Number.isFinite(vr.min) ? vr.min.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `Valid range: ${minStr} to ${maxStr} hours`; })() : rhValidation.message}
                   </div>
                 )}
                 {(rhBackdateError || (rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus === 'INVALID_BACKDATED')) && (
