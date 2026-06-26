@@ -22,6 +22,7 @@ import { getTableStats } from './healthMonitor';
 import { syncDiag } from './syncDiagLogger';
 import * as alertsRepo from '../alerts/repositories/alertsRepository';
 import { getFieldDisplayName } from './conflictReviewRepository';
+import { safeParseDate } from '../running-hours/utils/rhValidation';
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER — Vessel UUID ↔ vessel_code lookup
@@ -487,9 +488,14 @@ export async function receivePushData(
                   // IMPORTANT: Vessel sets last_updated = date_updated_local (user-selected date, e.g. "13-May-2026 10:30").
                   // We must use the same field here — NOT entered_at_utc which is a system timestamp.
                   const lastUpdatedText = auditRow.rows[0].date_updated_local || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
+                  // rh_master_updated_at must be the USER's reading date (date_updated_local),
+                  // NOT entered_at_utc (the system write time). It feeds the "Last Updated"
+                  // MAX() and the WO-approval back-dated check; using the system time made
+                  // shore show the sync time (Issue 1) and made WO approval skip RH (Issue 2).
+                  const rhMasterUpdatedAtVal = safeParseDate(auditRow.rows[0].date_updated_local) || rhUpdatedAt;
                   await client.query(
                     `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
-                    [String(valueToApply), compId, rhUpdatedAt, lastUpdatedText]
+                    [String(valueToApply), compId, rhMasterUpdatedAtVal, lastUpdatedText]
                   );
                   syncDiag(`RH-APPLY UPDATE: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply}, last_updated=${lastUpdatedText} from audit row ${log.rowUuid}`);
                 }

@@ -11,6 +11,7 @@
 import { getPool } from '../../db';
 import { getTableSyncConfig, getIdentityColumn } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
+import { safeParseDate } from '../running-hours/utils/rhValidation';
 
 interface ApplyResult {
   inserted: number;
@@ -632,9 +633,13 @@ export async function applyFieldLogInserts(
             // We must use the same field here — NOT entered_at_utc which is a system timestamp.
             const rhUpdatedAt = rowData['entered_at_utc'] || new Date();
             const lastUpdatedText = rowData['date_updated_local'] || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
+            // rh_master_updated_at must be the USER's reading date (date_updated_local),
+            // NOT entered_at_utc (system write time) — feeds "Last Updated" MAX() and the
+            // WO-approval back-dated check (Issues 1 & 2).
+            const rhMasterUpdatedAtVal = safeParseDate(rowData['date_updated_local']) || rhUpdatedAt;
             await pool.query(
               `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
-              [String(newRH), compId, rhUpdatedAt, lastUpdatedText]
+              [String(newRH), compId, rhMasterUpdatedAtVal, lastUpdatedText]
             );
             syncDiag(`RH-APPLY INSERT: component=${compId} current_cumulative_rh updated from ${oldVal} to ${newRH}, last_updated=${lastUpdatedText} from audit row ${rowUuid}`);
           }

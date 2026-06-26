@@ -2,6 +2,7 @@ import { storage } from '../../../storage';
 import { v4 as uuidv4 } from 'uuid';
 import { getSFIName } from '../../../utils/sfiLookup';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '@shared/dateUtils';
+import { safeParseDate } from '../../running-hours/utils/rhValidation';
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from '../../../utils/workOrderNumbering';
 import {
   getComponentCategory,
@@ -2885,12 +2886,14 @@ export async function createComponentFromRow(row: any, vesselId?: string) {
   if (rhCounterType === 'MASTER') {
     // MASTER components maintain their own RH value
     rhCurrentMaster = runningHoursValue;
-    rhMasterUpdatedAt = new Date();
+    // Use the imported reading date ("Last Updated" column), not the import-run time —
+    // rhMasterUpdatedAt must hold the user date (feeds "Last Updated" + WO back-dated check).
+    rhMasterUpdatedAt = safeParseDate(lastUpdatedValue) || new Date();
     rhMasterUpdateSource = 'IMPORT';
   } else if (rhCounterType === 'INHERITED') {
     // INHERITED components cache the RH value and reference a MASTER component
     rhCurrentInheritedCached = runningHoursValue;
-    rhInheritedUpdatedAt = new Date();
+    rhInheritedUpdatedAt = safeParseDate(lastUpdatedValue) || new Date();
     // RH Counter Source for INHERITED should be the MASTER component's code (not 'SELF')
     rhMasterComponentId = rhCounterSource && rhCounterSource !== 'SELF' ? rhCounterSource : null;
   }
@@ -3050,14 +3053,19 @@ export async function updateComponentFromRow(componentCode: string, row: any, ve
     updateData.currentCumulativeRH = runningHoursValue;
   }
   
+  // Imported reading date ("Last Updated" column), parsed to a timestamp — used for
+  // rh*UpdatedAt so they hold the USER date, not the import-run time. Fallback to now
+  // only when the column is absent/unparseable.
+  const importedRhUpdatedAt = (row['Last Updated'] && safeParseDate(normalizeDateToDDMMMYYYY(row['Last Updated']))) || new Date();
+
   if (rhCounterType) {
     updateData.rhCounterType = rhCounterType;
-    
+
     if (rhCounterType === 'MASTER') {
       // MASTER components maintain their own RH value
       if (runningHoursValue !== null) {
         updateData.rhCurrentMaster = runningHoursValue;
-        updateData.rhMasterUpdatedAt = new Date();
+        updateData.rhMasterUpdatedAt = importedRhUpdatedAt;
         updateData.rhMasterUpdateSource = 'IMPORT';
       }
       // Clear INHERITED fields
@@ -3068,7 +3076,7 @@ export async function updateComponentFromRow(componentCode: string, row: any, ve
       // INHERITED components cache the RH value and reference a MASTER component
       if (runningHoursValue !== null) {
         updateData.rhCurrentInheritedCached = runningHoursValue;
-        updateData.rhInheritedUpdatedAt = new Date();
+        updateData.rhInheritedUpdatedAt = importedRhUpdatedAt;
       }
       // RH Counter Source for INHERITED should be the MASTER component's code
       if (rhCounterSource && rhCounterSource !== 'SELF') {
