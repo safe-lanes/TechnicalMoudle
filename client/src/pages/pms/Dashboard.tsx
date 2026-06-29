@@ -2423,7 +2423,7 @@ const Dashboard = () => {
       field: 'vesselId',
       minWidth: 140,
       flex: 1,
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       valueGetter: (p: any) => (p.data?.vesselId && vesselNameById.get(String(p.data.vesselId))) || '—',
       cellRenderer: (p: any) => <span className="font-medium">{p.value || '—'}</span>,
     };
@@ -2434,7 +2434,7 @@ const Dashboard = () => {
         field: 'title',
         minWidth: 220,
         flex: 2,
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         tooltipValueGetter: (p: any) => p.data?.title || '',
         cellRenderer: (p: any) => (
           <span className="font-medium text-gray-900">{p.data?.title || '—'}</span>
@@ -2445,7 +2445,7 @@ const Dashboard = () => {
         field: 'requestedByUserId',
         minWidth: 140,
         flex: 1,
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         valueGetter: (p: any) => formatRequestedBy(p.data?.requestedByUserId),
       },
       {
