@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useVessels } from "@/hooks/useVessels";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, MapPin } from "lucide-react";
+import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, MapPin, ChevronRight } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -16,11 +13,10 @@ import FleetVesselMapping from "./FleetVesselMapping";
 import PmsVesselSettingsManagement from "./PmsVesselSettingsManagement";
 import FleetEquipmentTreeView from "./FleetEquipmentTreeView";
 import FleetVesselManager from "./FleetVesselManager";
-import FleetDataView from "./FleetDataView";
 import LocationManagement from "./LocationManagement";
 import type { PmsVesselSettings, Fleet } from "@shared/schema";
 
-type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data' | 'locations';
+type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'locations';
 
 export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?: (isSubView: boolean) => void }) {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -73,292 +69,287 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
   const configuredPmsSettings = Array.isArray(pmsSettingsData) ? pmsSettingsData.length : 0;
 
   const stats = dashboardStats || null;
+  const pct = (v: number, max: number) => (max > 0 ? Math.round((v / max) * 100) : 0);
 
   const handleBackToDashboard = () => setCurrentView('dashboard');
 
-  if (currentView === 'makers') {
-    return <MakerManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'master-lists') {
-    return <MasterListsManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'master-data') {
-    return <MasterDataManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'master-data-table') {
-    return <MasterDataTableView onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'components') {
-    return <FleetComponentsManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'jobs') {
-    return <FleetJobsManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'spares') {
-    return <FleetSparesManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'vessel-mapping') {
-    return <FleetVesselMapping onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'pms-settings') {
-    return <PmsVesselSettingsManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'equipment-tree') {
-    return <FleetEquipmentTreeView onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'fleet-vessel-manager') {
-    return <FleetVesselManager onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'fleet-data') {
-    return <FleetDataView onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'locations') {
-    return <LocationManagement onBack={handleBackToDashboard} />;
-  }
-
-  const ProgressBar = ({ value, max, color }: { value: number; max: number; color: string }) => {
-    const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-    return (
-      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-        <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-    );
-  };
+  if (currentView === 'makers') return <MakerManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'master-lists') return <MasterListsManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'master-data') return <MasterDataManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'master-data-table') return <MasterDataTableView onBack={handleBackToDashboard} />;
+  if (currentView === 'components') return <FleetComponentsManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'jobs') return <FleetJobsManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'spares') return <FleetSparesManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'vessel-mapping') return <FleetVesselMapping onBack={handleBackToDashboard} />;
+  if (currentView === 'pms-settings') return <PmsVesselSettingsManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'equipment-tree') return <FleetEquipmentTreeView onBack={handleBackToDashboard} />;
+  if (currentView === 'fleet-vessel-manager') return <FleetVesselManager onBack={handleBackToDashboard} />;
+  if (currentView === 'locations') return <LocationManagement onBack={handleBackToDashboard} />;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="px-6 py-4 border-b">
-          <h1 className="text-2xl font-semibold" data-testid="text-master-data-title">Master Data</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage fleet-level master data including makers, components, jobs, spares, and configurations</p>
+    <div className="space-y-5" data-testid="text-master-data-title">
+
+      {/* ── Section 1: Fleet Level Data ── */}
+      <div className="rounded-lg shadow-sm overflow-hidden border border-gray-200">
+        <div className="bg-[#52BAF3] text-white px-5 py-3 font-semibold text-sm tracking-wide uppercase">
+          Fleet Level Data
         </div>
+        <div className="bg-white p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
 
-        <div className="p-6 space-y-6">
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Fleet Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-makers">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2 bg-gray-100 rounded-lg">
-                      <Building2 className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentView('makers')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-makers">
-                      View
-                    </Button>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-makers">{isMakersLoading ? '...' : totalMakers}</div>
-                  <p className="text-xs text-gray-500 mt-0.5">Total Makers</p>
-                  {stats?.makers && (
-                    <div className="mt-3 flex gap-2 flex-wrap">
-                      <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">{stats.makers.linked} linked</Badge>
-                      {stats.makers.unlinked > 0 && <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-500">{stats.makers.unlinked} unused</Badge>}
-                    </div>
-                  )}
+            {/* Maker List */}
+            <button
+              onClick={() => setCurrentView('makers')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-blue-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-makers"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <Building2 className="h-5 w-5 text-blue-600" />
                 </div>
-
-                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-components">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2 bg-gray-100 rounded-lg">
-                      <Box className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentView('components')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-components">
-                      View
-                    </Button>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-components">{isComponentsLoading ? '...' : totalComponents}</div>
-                  <p className="text-xs text-gray-500 mt-0.5">Fleet Components</p>
-                  {stats?.components && (
-                    <>
-                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                        <span>{stats.components.withMaker} with maker</span>
-                        <span className="text-gray-300">|</span>
-                        <span className={stats.components.withoutMaker > 0 ? 'text-amber-600' : ''}>{stats.components.withoutMaker} without</span>
-                      </div>
-                      <ProgressBar value={stats.components.withMaker} max={stats.components.total} color="bg-blue-500" />
-                    </>
-                  )}
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-jobs">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2 bg-gray-100 rounded-lg">
-                      <Wrench className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentView('jobs')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-jobs">
-                      View
-                    </Button>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-jobs">{isJobsLoading ? '...' : totalJobs}</div>
-                  <p className="text-xs text-gray-500 mt-0.5">Fleet Jobs</p>
-                  {stats?.jobs && (
-                    <>
-                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                        <span>{stats.jobs.withValidComponent} linked</span>
-                        <span className="text-gray-300">|</span>
-                        <span className={stats.jobs.withInvalidComponent > 0 ? 'text-amber-600' : ''}>{stats.jobs.withInvalidComponent} unlinked</span>
-                      </div>
-                      <ProgressBar value={stats.jobs.withValidComponent} max={stats.jobs.total} color="bg-blue-500" />
-                    </>
-                  )}
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-spares">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2 bg-gray-100 rounded-lg">
-                      <Package className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentView('spares')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-spares">
-                      View
-                    </Button>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-spares">{isSparesLoading ? '...' : totalSpares}</div>
-                  <p className="text-xs text-gray-500 mt-0.5">Fleet Spares</p>
-                  {stats?.spares && (
-                    <>
-                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                        <span>{stats.spares.withValidComponent} linked</span>
-                        <span className="text-gray-300">|</span>
-                        <span className={stats.spares.withInvalidComponent > 0 ? 'text-amber-600' : ''}>{stats.spares.withInvalidComponent} unlinked</span>
-                      </div>
-                      <ProgressBar value={stats.spares.withValidComponent} max={stats.spares.total} color="bg-blue-500" />
-                    </>
-                  )}
-                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
               </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <List className="h-4 w-4 text-gray-600" />
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-makers">
+                  {isMakersLoading ? <span className="text-gray-400 text-base">—</span> : totalMakers}
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentView('master-lists')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-master-lists">
-                  View
-                </Button>
+                <p className="text-sm text-gray-500 mt-0.5">Maker List</p>
               </div>
-              <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-lists">{isMasterListsLoading ? '...' : totalMasterLists}</div>
-              <p className="text-xs text-gray-500 mt-0.5">Master Lists</p>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <FileCode2 className="h-4 w-4 text-gray-600" />
+              {stats?.makers && (
+                <div className="mt-3 flex gap-2 flex-wrap">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600 border border-blue-200">{stats.makers.linked} linked</span>
+                  {stats.makers.unlinked > 0 && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-50 text-gray-500 border border-gray-200">{stats.makers.unlinked} unused</span>}
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentView('master-data-table')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-master-data">
-                  View
-                </Button>
-              </div>
-              <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-data">{isComponentsLoading ? '...' : totalComponents}</div>
-              <p className="text-xs text-gray-500 mt-0.5">Equipment Codes</p>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Clock className="h-4 w-4 text-gray-600" />
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentView('pms-settings')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-pms-settings">
-                  Configure
-                </Button>
-              </div>
-              <div className="text-2xl font-bold text-gray-900" data-testid="widget-pms-settings">{isPmsSettingsLoading || isVesselsLoading ? '...' : `${configuredPmsSettings}/${totalVessels}`}</div>
-              <p className="text-xs text-gray-500 mt-0.5">Lead Time & Grace</p>
-              {!isPmsSettingsLoading && !isVesselsLoading && totalVessels > 0 && (
-                <ProgressBar value={configuredPmsSettings} max={totalVessels} color="bg-blue-500" />
               )}
-            </div>
+            </button>
 
-            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Anchor className="h-4 w-4 text-gray-600" />
+            {/* Fleet Data → FleetComponentsManagement (SFI tree) */}
+            <button
+              onClick={() => setCurrentView('components')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-sky-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-fleet-data"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-sky-100">
+                  <Box className="h-5 w-5 text-sky-600" />
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentView('fleet-vessel-manager')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-fleet-vessel">
-                  Manage
-                </Button>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
               </div>
-              <div className="text-2xl font-bold text-gray-900" data-testid="widget-fleet-vessel">{isFleetsLoading || isVesselsLoading ? '...' : `${totalFleets} / ${totalVessels}`}</div>
-              <p className="text-xs text-gray-500 mt-0.5">Fleets / Vessels</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Fleet Data</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                  {[
-                    { view: 'makers' as ViewType, icon: Building2, label: 'Makers' },
-                    { view: 'components' as ViewType, icon: Box, label: 'Components' },
-                    { view: 'jobs' as ViewType, icon: Wrench, label: 'Jobs' },
-                    { view: 'spares' as ViewType, icon: Package, label: 'Spares' },
-                    { view: 'master-lists' as ViewType, icon: List, label: 'Master Lists' },
-                    { view: 'fleet-data' as ViewType, icon: Database, label: 'Fleet Data' },
-                  ].map(link => (
-                    <button
-                      key={link.view}
-                      onClick={() => setCurrentView(link.view)}
-                      className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-left"
-                      data-testid={`link-${link.view}`}
-                    >
-                      <link.icon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <span className="text-xs font-medium text-gray-700 truncate">{link.label}</span>
-                    </button>
-                  ))}
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-components">
+                  {isComponentsLoading ? <span className="text-gray-400 text-base">—</span> : totalComponents}
                 </div>
-              </CardContent>
-            </Card>
+                <p className="text-sm text-gray-500 mt-0.5">Fleet Data</p>
+              </div>
+            </button>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Configuration & Mapping</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { view: 'vessel-mapping' as ViewType, icon: Ship, label: 'Vessel Mapping' },
-                    { view: 'fleet-vessel-manager' as ViewType, icon: Anchor, label: 'Fleet & Vessel' },
-                    { view: 'pms-settings' as ViewType, icon: Clock, label: 'Lead Time & Grace' },
-                    { view: 'master-data-table' as ViewType, icon: Database, label: 'Master Data' },
-                    { view: 'locations' as ViewType, icon: MapPin, label: 'Locations' },
-                  ].map(link => (
-                    <button
-                      key={link.view}
-                      onClick={() => setCurrentView(link.view)}
-                      className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-left"
-                      data-testid={`link-${link.view}`}
-                    >
-                      <link.icon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <span className="text-xs font-medium text-gray-700 truncate">{link.label}</span>
-                    </button>
-                  ))}
+            {/* Fleet Jobs */}
+            <button
+              onClick={() => setCurrentView('jobs')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-green-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-jobs"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-green-100">
+                  <Wrench className="h-5 w-5 text-green-600" />
                 </div>
-              </CardContent>
-            </Card>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-jobs">
+                  {isJobsLoading ? <span className="text-gray-400 text-base">—</span> : totalJobs}
+                </div>
+                <p className="text-sm text-gray-500 mt-0.5">Fleet Jobs</p>
+              </div>
+              {stats?.jobs && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>{stats.jobs.withValidComponent} linked</span>
+                    {stats.jobs.withInvalidComponent > 0 && <span className="text-amber-600">{stats.jobs.withInvalidComponent} unlinked</span>}
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5">
+                    <div className="h-1.5 rounded-full bg-[#52BAF3]" style={{ width: `${pct(stats.jobs.withValidComponent, stats.jobs.total)}%` }} />
+                  </div>
+                </div>
+              )}
+            </button>
+
+            {/* Fleet Spares */}
+            <button
+              onClick={() => setCurrentView('spares')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-orange-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-spares"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-orange-100">
+                  <Package className="h-5 w-5 text-orange-600" />
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-spares">
+                  {isSparesLoading ? <span className="text-gray-400 text-base">—</span> : totalSpares}
+                </div>
+                <p className="text-sm text-gray-500 mt-0.5">Fleet Spares</p>
+              </div>
+              {stats?.spares && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>{stats.spares.withValidComponent} linked</span>
+                    {stats.spares.withInvalidComponent > 0 && <span className="text-amber-600">{stats.spares.withInvalidComponent} unlinked</span>}
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5">
+                    <div className="h-1.5 rounded-full bg-[#52BAF3]" style={{ width: `${pct(stats.spares.withValidComponent, stats.spares.total)}%` }} />
+                  </div>
+                </div>
+              )}
+            </button>
+
+            {/* Master Lists */}
+            <button
+              onClick={() => setCurrentView('master-lists')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-purple-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-master-lists"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-purple-100">
+                  <List className="h-5 w-5 text-purple-600" />
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-lists">
+                  {isMasterListsLoading ? <span className="text-gray-400 text-base">—</span> : totalMasterLists}
+                </div>
+                <p className="text-sm text-gray-500 mt-0.5">Master Lists</p>
+              </div>
+            </button>
+
+            {/* Locations */}
+            <button
+              onClick={() => setCurrentView('locations')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-teal-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-locations"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-teal-100">
+                  <MapPin className="h-5 w-5 text-teal-600" />
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900">—</div>
+                <p className="text-sm text-gray-500 mt-0.5">Locations</p>
+              </div>
+            </button>
+
+            {/* Master Data */}
+            <button
+              onClick={() => setCurrentView('master-data-table')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-indigo-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-master-data"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-indigo-100">
+                  <FileCode2 className="h-5 w-5 text-indigo-600" />
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-data">
+                  {isComponentsLoading ? <span className="text-gray-400 text-base">—</span> : totalComponents}
+                </div>
+                <p className="text-sm text-gray-500 mt-0.5">Master Data</p>
+              </div>
+            </button>
+
           </div>
         </div>
       </div>
+
+      {/* ── Section 2: Configuration & Mapping ── */}
+      <div className="rounded-lg shadow-sm overflow-hidden border border-gray-200">
+        <div className="bg-[#52BAF3] text-white px-5 py-3 font-semibold text-sm tracking-wide uppercase">
+          Configuration &amp; Mapping
+        </div>
+        <div className="bg-white p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+
+            {/* Vessel Mapping */}
+            <button
+              onClick={() => setCurrentView('vessel-mapping')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-blue-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-vessel-mapping"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <Ship className="h-5 w-5 text-blue-600" />
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-vessel-mapping">
+                  {isVesselsLoading ? <span className="text-gray-400 text-base">—</span> : totalVessels}
+                </div>
+                <p className="text-sm text-gray-500 mt-0.5">Vessel Mapping</p>
+              </div>
+            </button>
+
+            {/* Fleet & Vessel */}
+            <button
+              onClick={() => setCurrentView('fleet-vessel-manager')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-indigo-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-fleet-vessel"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-indigo-100">
+                  <Anchor className="h-5 w-5 text-indigo-600" />
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-fleet-vessel">
+                  {isFleetsLoading || isVesselsLoading ? <span className="text-gray-400 text-base">—</span> : `${totalFleets} / ${totalVessels}`}
+                </div>
+                <p className="text-sm text-gray-500 mt-0.5">Fleet &amp; Vessel</p>
+              </div>
+            </button>
+
+            {/* Lead Time & Grace */}
+            <button
+              onClick={() => setCurrentView('pms-settings')}
+              className="text-left bg-white border border-gray-200 border-l-4 border-l-amber-500 rounded-lg p-4 hover:shadow-md transition-all group"
+              data-testid="card-lead-time"
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-lg bg-amber-100">
+                  <Clock className="h-5 w-5 text-amber-600" />
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#52BAF3] transition-colors mt-1" />
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-pms-settings">
+                  {isPmsSettingsLoading || isVesselsLoading ? <span className="text-gray-400 text-base">—</span> : `${configuredPmsSettings} / ${totalVessels}`}
+                </div>
+                <p className="text-sm text-gray-500 mt-0.5">Lead Time &amp; Grace</p>
+              </div>
+              {!isPmsSettingsLoading && !isVesselsLoading && totalVessels > 0 && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>{configuredPmsSettings} configured</span>
+                    <span>{totalVessels - configuredPmsSettings} pending</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5">
+                    <div className="h-1.5 rounded-full bg-[#52BAF3]" style={{ width: `${pct(configuredPmsSettings, totalVessels)}%` }} />
+                  </div>
+                </div>
+              )}
+            </button>
+
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }
