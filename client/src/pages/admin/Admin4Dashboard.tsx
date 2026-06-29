@@ -13,10 +13,11 @@ import FleetVesselMapping from "./FleetVesselMapping";
 import PmsVesselSettingsManagement from "./PmsVesselSettingsManagement";
 import FleetEquipmentTreeView from "./FleetEquipmentTreeView";
 import FleetVesselManager from "./FleetVesselManager";
+import FleetDataView from "./FleetDataView";
 import LocationManagement from "./LocationManagement";
 import type { PmsVesselSettings, Fleet } from "@shared/schema";
 
-type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'locations';
+type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data' | 'locations';
 
 export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?: (isSubView: boolean) => void }) {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -84,6 +85,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
   if (currentView === 'pms-settings') return <PmsVesselSettingsManagement onBack={handleBackToDashboard} />;
   if (currentView === 'equipment-tree') return <FleetEquipmentTreeView onBack={handleBackToDashboard} />;
   if (currentView === 'fleet-vessel-manager') return <FleetVesselManager onBack={handleBackToDashboard} />;
+  if (currentView === 'fleet-data') return <FleetDataView onBack={handleBackToDashboard} />;
   if (currentView === 'locations') return <LocationManagement onBack={handleBackToDashboard} />;
 
   return (
@@ -123,9 +125,9 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
               )}
             </button>
 
-            {/* Fleet Data → FleetComponentsManagement (SFI tree) */}
+            {/* Fleet Data → FleetDataView (FLEET COMPONENTS SFI tree) */}
             <button
-              onClick={() => setCurrentView('components')}
+              onClick={() => setCurrentView('fleet-data')}
               className="text-left bg-white border border-gray-200 border-l-4 border-l-sky-500 rounded-lg p-4 hover:shadow-md transition-all group"
               data-testid="card-fleet-data"
             >
