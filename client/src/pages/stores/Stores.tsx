@@ -1923,7 +1923,12 @@ const Stores: React.FC = () => {
         flex: 1.1,
         minWidth: 130,
         sortable: false,
-        filter: false,
+        filter: 'agTextColumnFilter',
+        valueGetter: (params: any) => {
+          const item = params.data as StoreItem;
+          if (!item) return '';
+          return `@ ${item.robLocationA ?? 0} / ${item.robLocationB ?? 0}`;
+        },
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '17')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '17')} /></span>Location
