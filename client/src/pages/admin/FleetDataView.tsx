@@ -774,7 +774,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       nodes.flatMap(node => {
         const selfMatch =
           node.code.toLowerCase().includes(query) ||
-          (node.data.fleetEquipmentName || "").toLowerCase().includes(query);
+          (node.data?.fleetEquipmentName || "").toLowerCase().includes(query);
         const filteredChildren = filterNodes(node.children || []);
         if (selfMatch || filteredChildren.length > 0) {
           return [{ ...node, children: filteredChildren }];
@@ -1531,7 +1531,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                       variant="outline"
                       size="sm"
                       onClick={onBack}
-                      data-testid="button-back-to-dashboard"
+                      data-testid="button-back-to-dashboard-right"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
                       Back to Dashboard
@@ -1846,7 +1846,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   variant="outline"
                   size="sm"
                   onClick={onBack}
-                  data-testid="button-back-to-dashboard"
+                  data-testid="button-back-to-dashboard-empty"
                 >
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Back to Dashboard
