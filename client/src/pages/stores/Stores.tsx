@@ -478,12 +478,8 @@ const Stores: React.FC = () => {
   const [historyEventFilter, setHistoryEventFilter] = useState("all");
 
   // Pagination state
-  const [inventoryPage, setInventoryPage] = useState(1);
-  const [inventoryItemsPerPage, setInventoryItemsPerPage] = useState(10);
   const [locationPage, setLocationPage] = useState(1);
   const [locationItemsPerPage, setLocationItemsPerPage] = useState(10);
-  const [historyPage, setHistoryPage] = useState(1);
-  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
   
   const handleOpenLocationDialog = (item: StoreItem) => {
     setLocationDialogItem(item);
@@ -1815,7 +1811,7 @@ const Stores: React.FC = () => {
         flex: 1.4,
         minWidth: 130,
         tooltipField: 'storesCategory',
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '12')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '12')} /></span>
@@ -1837,7 +1833,7 @@ const Stores: React.FC = () => {
         headerName: 'UOM',
         flex: 0.6,
         minWidth: 70,
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '13')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '13')} /></span>UOM
@@ -1902,7 +1898,7 @@ const Stores: React.FC = () => {
         headerName: 'Stock',
         flex: 0.7,
         minWidth: 80,
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '16')}>
@@ -2156,15 +2152,6 @@ const Stores: React.FC = () => {
   // ============================================================
   // Pagination calculations
   // ============================================================
-  const inventoryTotalPages = Math.max(1, Math.ceil(filteredItems.length / inventoryItemsPerPage));
-  const paginatedInventoryItems = useMemo(() => {
-    const start = (inventoryPage - 1) * inventoryItemsPerPage;
-    return filteredItems.slice(start, start + inventoryItemsPerPage);
-  }, [filteredItems, inventoryPage, inventoryItemsPerPage]);
-  const goToInventoryPage = (page: number) => {
-    setInventoryPage(Math.max(1, Math.min(page, inventoryTotalPages)));
-  };
-
   const locationTotalPages = Math.max(1, Math.ceil(locationItems.length / locationItemsPerPage));
   const paginatedLocationItems = useMemo(() => {
     const start = (locationPage - 1) * locationItemsPerPage;
@@ -2174,30 +2161,13 @@ const Stores: React.FC = () => {
     setLocationPage(Math.max(1, Math.min(page, locationTotalPages)));
   };
 
-  const historyTotalPages = Math.max(1, Math.ceil(filteredHistoryItems.length / historyItemsPerPage));
-  const paginatedHistoryItems = useMemo(() => {
-    const start = (historyPage - 1) * historyItemsPerPage;
-    return filteredHistoryItems.slice(start, start + historyItemsPerPage);
-  }, [filteredHistoryItems, historyPage, historyItemsPerPage]);
-  const goToHistoryPage = (page: number) => {
-    setHistoryPage(Math.max(1, Math.min(page, historyTotalPages)));
-  };
-
   // Reset pages when filters/dataset change
-  useEffect(() => { setInventoryPage(1); }, [searchTerm, categoryFilter, stockFilter, vesselId, inventoryItemsPerPage]);
   useEffect(() => { setLocationPage(1); }, [selectedLocationName, vesselId, locationItemsPerPage]);
-  useEffect(() => { setHistoryPage(1); }, [historySearch, historyEventFilter, historyPeriodFilter, vesselId, historyItemsPerPage]);
 
   // Clamp pages when totalPages shrinks
   useEffect(() => {
-    if (inventoryPage > inventoryTotalPages) setInventoryPage(inventoryTotalPages);
-  }, [inventoryTotalPages, inventoryPage]);
-  useEffect(() => {
     if (locationPage > locationTotalPages) setLocationPage(locationTotalPages);
   }, [locationTotalPages, locationPage]);
-  useEffect(() => {
-    if (historyPage > historyTotalPages) setHistoryPage(historyTotalPages);
-  }, [historyTotalPages, historyPage]);
 
   const locationColumnDefs: ColDef[] = useMemo(() => {
     const cols: ColDef[] = [
@@ -2950,63 +2920,14 @@ const Stores: React.FC = () => {
             <div className="flex-1 min-h-[400px]">
               <WOAgGridTable
                 columnDefs={inventoryColumnDefs}
-                rowData={paginatedInventoryItems}
+                rowData={filteredItems}
                 getRowClass={inventoryGetRowClass}
                 noRowsMessage="No items found. Try adjusting your filters."
                 testId="stores-inventory-grid"
+                pagination={true}
+                paginationPageSize={25}
               />
             </div>
-            {filteredItems.length > 0 && (
-              <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="stores-inventory-pagination-footer">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span>Show</span>
-                  <Select value={String(inventoryItemsPerPage)} onValueChange={(val) => { setInventoryItemsPerPage(Number(val)); setInventoryPage(1); }}>
-                    <SelectTrigger className="w-20 h-8" data-testid="select-stores-inventory-items-per-page">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="25">25</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <span>items per page</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="stores-inventory-pagination-info">
-                  <span>
-                    Showing {((inventoryPage - 1) * inventoryItemsPerPage) + 1} - {Math.min(inventoryPage * inventoryItemsPerPage, filteredItems.length)} of {filteredItems.length} items
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="sm" onClick={() => goToInventoryPage(1)} disabled={inventoryPage === 1} className="h-8 w-8 p-0" data-testid="stores-inventory-pagination-first">
-                    <ChevronsLeft className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => goToInventoryPage(inventoryPage - 1)} disabled={inventoryPage === 1} className="h-8 w-8 p-0" data-testid="stores-inventory-pagination-prev">
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <div className="flex items-center gap-1 px-2">
-                    <span className="text-sm text-gray-600">Page</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={inventoryTotalPages || 1}
-                      value={inventoryPage}
-                      onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) goToInventoryPage(v); }}
-                      className="w-14 h-8 text-center"
-                      data-testid="input-stores-inventory-page-number"
-                    />
-                    <span className="text-sm text-gray-600">of {inventoryTotalPages || 1}</span>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => goToInventoryPage(inventoryPage + 1)} disabled={inventoryPage >= inventoryTotalPages} className="h-8 w-8 p-0" data-testid="stores-inventory-pagination-next">
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => goToInventoryPage(inventoryTotalPages)} disabled={inventoryPage >= inventoryTotalPages} className="h-8 w-8 p-0" data-testid="stores-inventory-pagination-last">
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
       ) : viewMode === "location" ? (
       /* Location View - Left Panel + Right Table */
@@ -3155,62 +3076,13 @@ const Stores: React.FC = () => {
           <div className="flex-1 min-h-[400px]">
             <WOAgGridTable
               columnDefs={historyColumnDefs}
-              rowData={paginatedHistoryItems}
+              rowData={filteredHistoryItems}
               noRowsMessage="No history entries found. Actions like Receive, Consume, and Archive will appear here."
               testId="stores-history-grid"
+              pagination={true}
+              paginationPageSize={25}
             />
           </div>
-          {filteredHistoryItems.length > 0 && (
-            <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="stores-history-pagination-footer">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span>Show</span>
-                <Select value={String(historyItemsPerPage)} onValueChange={(val) => { setHistoryItemsPerPage(Number(val)); setHistoryPage(1); }}>
-                  <SelectTrigger className="w-20 h-8" data-testid="select-stores-history-items-per-page">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span>items per page</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="stores-history-pagination-info">
-                <span>
-                  Showing {((historyPage - 1) * historyItemsPerPage) + 1} - {Math.min(historyPage * historyItemsPerPage, filteredHistoryItems.length)} of {filteredHistoryItems.length} entries
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" onClick={() => goToHistoryPage(1)} disabled={historyPage === 1} className="h-8 w-8 p-0" data-testid="stores-history-pagination-first">
-                  <ChevronsLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => goToHistoryPage(historyPage - 1)} disabled={historyPage === 1} className="h-8 w-8 p-0" data-testid="stores-history-pagination-prev">
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="flex items-center gap-1 px-2">
-                  <span className="text-sm text-gray-600">Page</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={historyTotalPages || 1}
-                    value={historyPage}
-                    onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) goToHistoryPage(v); }}
-                    className="w-14 h-8 text-center"
-                    data-testid="input-stores-history-page-number"
-                  />
-                  <span className="text-sm text-gray-600">of {historyTotalPages || 1}</span>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => goToHistoryPage(historyPage + 1)} disabled={historyPage >= historyTotalPages} className="h-8 w-8 p-0" data-testid="stores-history-pagination-next">
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => goToHistoryPage(historyTotalPages)} disabled={historyPage >= historyTotalPages} className="h-8 w-8 p-0" data-testid="stores-history-pagination-last">
-                  <ChevronsRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
         )}
 

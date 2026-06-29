@@ -75,6 +75,8 @@ interface WOAgGridTableProps {
   loading?: boolean;
   isRowSelectable?: IsRowSelectable;
   onGridReady?: (event: GridReadyEvent) => void;
+  pagination?: boolean;
+  paginationPageSize?: number;
 }
 
 const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
@@ -97,6 +99,8 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   loading,
   isRowSelectable,
   onGridReady: onGridReadyProp,
+  pagination = false,
+  paginationPageSize,
 }) => {
   const gridApiRef = useRef<GridApi | null>(null);
 
@@ -185,6 +189,8 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
         reactiveCustomComponents={true}
         overlayNoRowsTemplate={overlayNoRowsTemplate}
         theme="legacy"
+        pagination={pagination}
+        paginationPageSize={paginationPageSize}
       />
     </div>
   );
