@@ -2138,9 +2138,12 @@ const Stores: React.FC = () => {
         headerName: 'Item Code',
         flex: 1,
         minWidth: 110,
-        filter: 'agTextColumnFilter',
-        headerComponent: () => <span data-testid="stores-loc-col-item-code">Item Code</span>,
-        cellRenderer: (params: ICellRendererParams) => <span className="text-gray-900">{params.value}</span>,
+        filter: 'agSetColumnFilter',
+        cellRenderer: (params: ICellRendererParams) => (
+          <span className="text-gray-900" data-testid={params.node.rowIndex === 0 ? 'stores-loc-col-item-code' : undefined}>
+            {params.value}
+          </span>
+        ),
       },
       {
         field: 'itemName',
@@ -2148,27 +2151,36 @@ const Stores: React.FC = () => {
         flex: 1.6,
         minWidth: 180,
         tooltipField: 'itemName',
-        filter: 'agTextColumnFilter',
-        headerComponent: () => <span data-testid="stores-loc-col-item-name">Item Name</span>,
-        cellRenderer: (params: ICellRendererParams) => <span className="text-gray-700 truncate">{params.value}</span>,
+        filter: 'agSetColumnFilter',
+        cellRenderer: (params: ICellRendererParams) => (
+          <span className="text-gray-700 truncate" data-testid={params.node.rowIndex === 0 ? 'stores-loc-col-item-name' : undefined}>
+            {params.value}
+          </span>
+        ),
       },
       {
         field: 'storesCategory',
         headerName: 'Stores Category',
         flex: 1.2,
         minWidth: 140,
-        filter: 'agTextColumnFilter',
-        headerComponent: () => <span data-testid="stores-loc-col-category">Stores Category</span>,
-        cellRenderer: (params: ICellRendererParams) => <span className="text-gray-700 truncate">{params.value}</span>,
+        filter: 'agSetColumnFilter',
+        cellRenderer: (params: ICellRendererParams) => (
+          <span className="text-gray-700 truncate" data-testid={params.node.rowIndex === 0 ? 'stores-loc-col-category' : undefined}>
+            {params.value}
+          </span>
+        ),
       },
       {
         field: 'uom',
         headerName: 'UOM',
         flex: 0.6,
         minWidth: 70,
-        filter: 'agTextColumnFilter',
-        headerComponent: () => <span data-testid="stores-loc-col-uom">UOM</span>,
-        cellRenderer: (params: ICellRendererParams) => <span className="text-gray-500">{params.value || '-'}</span>,
+        filter: 'agSetColumnFilter',
+        cellRenderer: (params: ICellRendererParams) => (
+          <span className="text-gray-500" data-testid={params.node.rowIndex === 0 ? 'stores-loc-col-uom' : undefined}>
+            {params.value || '-'}
+          </span>
+        ),
       },
       {
         field: 'rob',
@@ -2177,7 +2189,11 @@ const Stores: React.FC = () => {
         minWidth: 70,
         filter: 'agNumberColumnFilter',
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-        headerComponent: () => <span data-testid="stores-loc-col-rob">ROB</span>,
+        cellRenderer: (params: ICellRendererParams) => (
+          <span data-testid={params.node.rowIndex === 0 ? 'stores-loc-col-rob' : undefined}>
+            {params.value}
+          </span>
+        ),
       },
       {
         field: 'min',
@@ -2186,20 +2202,23 @@ const Stores: React.FC = () => {
         minWidth: 70,
         filter: 'agNumberColumnFilter',
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-        headerComponent: () => <span data-testid="stores-loc-col-min">Min</span>,
+        cellRenderer: (params: ICellRendererParams) => (
+          <span data-testid={params.node.rowIndex === 0 ? 'stores-loc-col-min' : undefined}>
+            {params.value}
+          </span>
+        ),
       },
       {
         field: 'stock',
         headerName: 'Stock',
         flex: 0.7,
         minWidth: 80,
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-        headerComponent: () => <span data-testid="stores-loc-col-stock">Stock</span>,
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem;
           return (
-            <span className={`px-2 py-1 rounded text-xs ${getStockColor(item.stock)}`}>
+            <span className={`px-2 py-1 rounded text-xs ${getStockColor(item.stock)}`} data-testid={params.node.rowIndex === 0 ? 'stores-loc-col-stock' : undefined}>
               {item.stock}
             </span>
           );
@@ -2212,20 +2231,21 @@ const Stores: React.FC = () => {
         minWidth: 160,
         sortable: false,
         filter: false,
-        headerComponent: () => <span data-testid="stores-loc-col-location">Location</span>,
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem & { _locName: string };
           const locName = item._locName;
           const inactive = item.isActive === false;
           return (
-            <LocationSearchDropdown
-              vesselId={vesselId}
-              value={locName}
-              onChange={(name) => { if (name && name !== locName) handleChangeStoreLocation(item, name); }}
-              disabled={isChangingStoreLocation || !canEditStore || inactive}
-              triggerClassName="h-7 px-2 text-xs"
-              data-testid={`store-location-${item.id}`}
-            />
+            <span data-testid={params.node.rowIndex === 0 ? 'stores-loc-col-location' : undefined}>
+              <LocationSearchDropdown
+                vesselId={vesselId}
+                value={locName}
+                onChange={(name) => { if (name && name !== locName) handleChangeStoreLocation(item, name); }}
+                disabled={isChangingStoreLocation || !canEditStore || inactive}
+                triggerClassName="h-7 px-2 text-xs"
+                data-testid={`store-location-${item.id}`}
+              />
+            </span>
           );
         },
       },
@@ -2235,12 +2255,13 @@ const Stores: React.FC = () => {
         flex: 0.8,
         minWidth: 90,
         filter: 'agNumberColumnFilter',
-        headerComponent: () => <span data-testid="stores-loc-col-loc-rob">Loc ROB</span>,
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem & { _side: 'A' | 'B'; _locRob: number; _editKey: string };
           const editingLocRobVal = editingLocRobValues[item._editKey];
           return (
-            <input
+            <>
+              {params.node.rowIndex === 0 && <span data-testid="stores-loc-col-loc-rob" style={{ display: 'none' }} />}
+              <input
               type="number"
               min="0"
               className="w-full text-center border border-gray-200 rounded-md px-2 py-1 text-sm outline-none focus:border-blue-400"
@@ -2263,6 +2284,7 @@ const Stores: React.FC = () => {
               disabled={!canEditStore || item.isActive === false}
               data-testid={`input-loc-rob-${item.id}`}
             />
+            </>
           );
         },
       },
@@ -2276,12 +2298,18 @@ const Stores: React.FC = () => {
         minWidth: 60,
         sortable: false,
         filter: false,
-        headerComponent: () => <span data-testid="stores-loc-col-ihm">IHM</span>,
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem;
-          if (item.ihmPresence === 'Present') return <div title="IHM Present"><AlertCircle className="h-4 w-4 text-red-500" /></div>;
-          if (item.ihmPresence === 'Not Present') return <div title="IHM Not Present"><CheckCircle className="h-4 w-4 text-green-500" /></div>;
-          return <div title="IHM Unknown"><HelpCircle className="h-4 w-4 text-gray-400" /></div>;
+          const icon = item.ihmPresence === 'Present'
+            ? <div title="IHM Present"><AlertCircle className="h-4 w-4 text-red-500" /></div>
+            : item.ihmPresence === 'Not Present'
+            ? <div title="IHM Not Present"><CheckCircle className="h-4 w-4 text-green-500" /></div>
+            : <div title="IHM Unknown"><HelpCircle className="h-4 w-4 text-gray-400" /></div>;
+          return (
+            <span data-testid={params.node.rowIndex === 0 ? 'stores-loc-col-ihm' : undefined}>
+              {icon}
+            </span>
+          );
         },
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
       });
