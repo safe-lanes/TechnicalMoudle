@@ -9,7 +9,7 @@ import { storage, calculateRecordChecksum, sortObjectKeys } from '../../../stora
 import { masterLists } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { getDb } from '../../../db';
-import { captureTenant } from '../../../utils/tenantConnectionManager';
+import { captureTenant, captureTenantFromReq } from '../../../utils/tenantConnectionManager';
 import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
 import { ObjectStorageService, ObjectNotFoundError } from '../../../objectStorage';
 import {
@@ -706,6 +706,9 @@ export async function getSheets(req: Request, res: Response) {
 
 // ── Dry Run ──
 export async function dryRun(req: Request, res: Response) {
+  // TEMP-TRACE: domain is stashed on req by tenantMiddleware (survives multer);
+  // tuid reads the ALS context. domain present + tuid=NONE ⇒ context dropped at multer.
+  console.log('[TRACE-d] dryRun entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE') + ' reqDomain=' + ((req as any).tenantDomain ?? 'NONE')); // TEMP-TRACE
   try {
     const { type: requestedType, mode, archiveMissing, vesselId, sheetName } = req.body;
     const file = req.file;
@@ -800,8 +803,12 @@ export async function dryRun(req: Request, res: Response) {
       console.warn('⚠️ Could not load component categories from master list — category validation will be skipped');
     }
 
-    // Validate data
-    const results = await validateData(type, data, mode, vesselId);
+    // Validate data — re-enter the tenant context (multer broke the ALS chain, so
+    // getCurrentTenantContext() is undefined here; req.tenantTuid was stashed pre-multer).
+    const results = await captureTenantFromReq(req)(() => {
+      console.log('[TRACE-d2] dryRun inside re-entry (pre-validateData) tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE') + ' reqTuid=' + ((req as any).tenantTuid ?? 'NONE')); // TEMP-TRACE
+      return validateData(type, data, mode, vesselId);
+    });
     console.log(`✅ Validation complete: ${results.summary.ok} valid, ${results.summary.errors} errors, ${results.rows.length} total rows`);
     
     // Generate file token
@@ -1106,9 +1113,10 @@ export async function doImportStream(req: Request, res: Response) {
 
 // ── SSE Streaming Locations Import ──
 export async function doLocationsImportStream(req: Request, res: Response) {
-  console.log('[TRACE-a] doLocationsImportStream entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
-  // Capture the tenant context HERE so the streamed location writes below re-enter it.
-  const runInTenant = captureTenant();
+  console.log('[TRACE-a] doLocationsImportStream entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE') + ' reqTuid=' + ((req as any).tenantTuid ?? 'NONE')); // TEMP-TRACE
+  // multer ran before this handler and broke the ALS chain (tuid=NONE here), so
+  // re-enter from the tuid stashed on req (pre-multer) — captureTenant() would capture NONE.
+  const runInTenant = captureTenantFromReq(req);
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -1895,10 +1903,12 @@ export async function post_makers_import(req: Request, res: Response) {
       errors: [] as string[]
     };
     
+    // Re-enter tenant context broken by multer (req.tenantTuid stashed pre-multer).
+    await captureTenantFromReq(req)(async () => {
     for (let i = 0; i < data.length; i++) {
       const row: any = data[i];
       const rowNum = i + 2; // Excel row number (1-indexed + header)
-      
+
       const makerCode = row['Maker Code'];
       const makerName = row['Maker Name'];
       const address = row['Address'] || null;
@@ -1948,7 +1958,8 @@ export async function post_makers_import(req: Request, res: Response) {
         results.skipped++;
       }
     }
-    
+    }); // end captureTenantFromReq re-entry
+
     console.log(`✅ Makers import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
     res.json(results);
   } catch (error: any) {
@@ -2085,10 +2096,12 @@ export async function post_sfi_details_import(req: Request, res: Response) {
       errors: [] as string[]
     };
     
+    // Re-enter tenant context broken by multer (req.tenantTuid stashed pre-multer).
+    await captureTenantFromReq(req)(async () => {
     for (let i = 0; i < data.length; i++) {
       const row: any = data[i];
       const rowNum = i + 2; // Excel row number (1-indexed + header)
-      
+
       const componentCode = row['Component Code'];
       const componentName = row['Component Name'];
       const description = row['Description'] || null;
@@ -2120,7 +2133,8 @@ export async function post_sfi_details_import(req: Request, res: Response) {
         results.skipped++;
       }
     }
-    
+    }); // end captureTenantFromReq re-entry
+
     console.log(`✅ SFI details import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
     res.json(results);
   } catch (error: any) {
@@ -2185,6 +2199,8 @@ export async function post_locations_import(req: Request, res: Response) {
 
     const seenNames = new Set<string>();
 
+    // Re-enter tenant context broken by multer (req.tenantTuid stashed pre-multer).
+    await captureTenantFromReq(req)(async () => {
     for (let i = 0; i < data.length; i++) {
       const row: any = data[i];
       const rowNum = i + 2;
@@ -2233,6 +2249,7 @@ export async function post_locations_import(req: Request, res: Response) {
         results.skipped++;
       }
     }
+    }); // end captureTenantFromReq re-entry
 
     console.log(`Locations import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
     res.json(results);

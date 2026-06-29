@@ -402,3 +402,18 @@ export function captureTenant(): <T>(fn: () => Promise<T>) => Promise<T> {
   return <T>(fn: () => Promise<T>): Promise<T> =>
     tuid ? tenantConnectionManager.runInTenantContext(tuid, fn) : fn();
 }
+
+/**
+ * Re-enter the tenant context AFTER a body-parser (multer/busboy) has broken the
+ * ALS chain — using the tuid stashed on req by tenantMiddleware (which set it
+ * before next(), i.e. before any route-level multer). Use this in multipart
+ * (upload.single) handlers where getCurrentTenantContext() is already undefined.
+ *
+ * No-op in single-tenant mode (no tenantTuid on req) → runs fn directly,
+ * byte-identical to today.
+ */
+export function captureTenantFromReq(req: any): <T>(fn: () => Promise<T>) => Promise<T> {
+  const tuid = req?.tenantTuid;
+  return <T>(fn: () => Promise<T>): Promise<T> =>
+    tuid ? tenantConnectionManager.runInTenantContext(tuid, fn) : fn();
+}

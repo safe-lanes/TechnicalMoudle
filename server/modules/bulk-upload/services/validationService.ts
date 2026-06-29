@@ -1,4 +1,5 @@
 import { storage } from '../../../storage';
+import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
 import { getSFIName } from '../../../utils/sfiLookup';
 import {
   normalizeColumnNames,
@@ -391,6 +392,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
 
       // Load vessel components for Component Code validation and name auto-fill
       try {
+        console.log('[TRACE-e] validateData pre-getComponents (spares) tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
         const vesselComponents = await storage.getComponents(vesselId);
         vesselComponents.forEach((c: any) => {
           if (c.componentCode) {

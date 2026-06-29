@@ -90,6 +90,12 @@ export function tenantMiddleware(req: Request, res: Response, next: NextFunction
             res.on("finish", resolve);
             res.on("close", resolve);
             res.on("error", reject);
+            // Stash the resolved tuid on req (a plain property, set before next() and
+            // thus before any route-level multer). It survives body-parsers that break
+            // the ALS chain (multer/busboy consume the request stream on the socket's
+            // pre-context async resource), so multipart handlers can re-enter the tenant
+            // context via captureTenantFromReq(req).
+            (req as any).tenantTuid = tenant.tuid;
             next();
           }),
       ),
