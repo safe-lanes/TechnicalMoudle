@@ -222,7 +222,62 @@ async function runIndexMigrations(db: any): Promise<void> {
     // Drop old constraint (without vessel_id) and create new index (with vessel_id)
     await db.execute(sql`ALTER TABLE work_orders DROP CONSTRAINT IF EXISTS unique_fleet_job_code`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_job_code_vessel ON work_orders(fleet_job_code, data_scope, vessel_id)`);
-    
+
+    // Migration: ensure unique_spare_component_link is the 3-column form (spare_id, component_id, vessel_id).
+    // The Drizzle baseline (migrations/0000) creates it as 2-col (spare_id, component_id), and the inline
+    // migrations 070/071/072 that fix it run BEFORE the table exists on the per-tenant lazy-migration path
+    // (runMigrations before runDrizzleMigrations), so fresh tenant DBs stay 2-col. That mismatches the code's
+    // onConflictDoNothing target (3-col) → Postgres 42P10 → spare-component link inserts throw (silently dropped).
+    // This step runs in initializeDatabase, AFTER the table exists, so it repairs the constraint regardless of
+    // migration ordering. Fully idempotent: no-op when already 3-col (RSMS / single-tenant pms_arch); on a 2-col
+    // DB it dedups colliding rows first, then drops the wrong constraint and adds the correct 3-col UNIQUE.
+    try {
+      await db.execute(sql`
+        DO $$
+        DECLARE
+          scl_cols text;
+        BEGIN
+          -- to_regclass returns NULL (does not throw) if the table is absent.
+          IF to_regclass('public.spare_component_links') IS NULL THEN
+            RETURN;
+          END IF;
+
+          SELECT string_agg(a.attname, ',' ORDER BY array_position(c.conkey, a.attnum)) INTO scl_cols
+          FROM pg_constraint c
+          JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+          WHERE c.conname = 'unique_spare_component_link' AND c.conrelid = 'spare_component_links'::regclass;
+
+          IF scl_cols = 'spare_id,component_id,vessel_id' THEN
+            RETURN; -- already correct — no-op
+          END IF;
+
+          -- Drop any non-3-col constraint or stray index of the same name.
+          IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
+            ALTER TABLE spare_component_links DROP CONSTRAINT unique_spare_component_link;
+          END IF;
+          IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'unique_spare_component_link' AND tablename = 'spare_component_links') THEN
+            DROP INDEX unique_spare_component_link;
+          END IF;
+
+          -- Dedup rows that would violate the 3-col uniqueness (keep newest id) so ADD CONSTRAINT can't fail.
+          WITH ranked AS (
+            SELECT id, ROW_NUMBER() OVER (
+              PARTITION BY spare_id, component_id, vessel_id
+              ORDER BY id DESC
+            ) AS rn
+            FROM spare_component_links
+          )
+          DELETE FROM spare_component_links WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+
+          ALTER TABLE spare_component_links ADD CONSTRAINT unique_spare_component_link UNIQUE (spare_id, component_id, vessel_id);
+          RAISE NOTICE 'Repaired unique_spare_component_link to 3-column form (spare_id, component_id, vessel_id)';
+        END $$;
+      `);
+    } catch (sclErr: any) {
+      // Never block initialization — log loudly and continue.
+      console.error('⚠️  Failed to ensure 3-col unique_spare_component_link constraint:', sclErr?.message || sclErr);
+    }
+
     // Migration: Add vessel_sequence column to vessels table for defect ID generation
     await db.execute(sql`ALTER TABLE vessels ADD COLUMN IF NOT EXISTS vessel_sequence INTEGER`);
     
