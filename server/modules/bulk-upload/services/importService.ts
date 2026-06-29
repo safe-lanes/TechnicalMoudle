@@ -20,6 +20,7 @@ import { saveImportHistory } from '../../../services/fileBasedImportHistory';
 import { applyAssignmentSync } from '../../work-orders/services/workOrderService';
 import * as woRepo from '../../work-orders/repositories/workOrderRepository';
 import { logFieldChangesBatch, logFieldChanges } from '../../sync';
+import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
 
 
 export interface SpareInventoryResult {
@@ -525,6 +526,7 @@ export async function performImport(
     console.log(`🚀 Starting spares import: ${data.length} rows, mode: ${mode}, vesselId: ${sparesVesselId}`);
     
     // Step 1: Fetch all components for validation
+    console.log('[TRACE-b] importSpares pre-getComponents tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
     const allComponents = await storage.getComponents(sparesVesselId);
     const componentsByCode = new Map(allComponents.map(c => [c.componentCode, c]));
     console.log(`📋 Loaded ${allComponents.length} components for validation`);

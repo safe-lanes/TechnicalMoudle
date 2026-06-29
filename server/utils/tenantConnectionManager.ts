@@ -385,3 +385,20 @@ class TenantConnectionManager {
 }
 
 export const tenantConnectionManager = new TenantConnectionManager();
+
+/**
+ * Snapshot the current tenant (call WHERE context still exists — e.g. an SSE
+ * handler's first line) and return a wrapper that RE-ENTERS that tenant's ALS
+ * context for deferred/streamed work. AsyncLocalStorage survives inline awaits
+ * but can be lost across streaming/response boundaries; wrapping the work in the
+ * returned function forces getDb()/getPool() back onto the tenant DB.
+ *
+ * No-op in single-tenant mode (no tuid in context) → the wrapper runs fn
+ * directly, byte-identical to today. Re-entry hits the already-cached tenant
+ * pool, so it does not re-migrate or add latency.
+ */
+export function captureTenant(): <T>(fn: () => Promise<T>) => Promise<T> {
+  const tuid = getCurrentTenantContext()?.tuid;
+  return <T>(fn: () => Promise<T>): Promise<T> =>
+    tuid ? tenantConnectionManager.runInTenantContext(tuid, fn) : fn();
+}

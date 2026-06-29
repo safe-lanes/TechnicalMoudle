@@ -9,6 +9,8 @@ import { storage, calculateRecordChecksum, sortObjectKeys } from '../../../stora
 import { masterLists } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { getDb } from '../../../db';
+import { captureTenant } from '../../../utils/tenantConnectionManager';
+import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
 import { ObjectStorageService, ObjectNotFoundError } from '../../../objectStorage';
 import {
   saveImportHistory,
@@ -962,6 +964,10 @@ export async function doImport(req: Request, res: Response) {
 // ── SSE Streaming Import ──
 export async function doImportStream(req: Request, res: Response) {
   console.log(`📦 [IMPORT_STREAM] Request received at ${new Date().toISOString()}`);
+  console.log('[TRACE-a] doImportStream entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
+  // Capture the tenant context HERE (while it exists) so the streamed import work
+  // below re-enters it — AsyncLocalStorage can be lost across the SSE boundary.
+  const runInTenant = captureTenant();
   const historyId = uuidv4();
   const startedAt = new Date();
 
@@ -980,6 +986,7 @@ export async function doImportStream(req: Request, res: Response) {
   // (lines starting with ':') are ignored by the EventSource spec on the
   // client but keep the TCP connection warm.
   const heartbeat = setInterval(() => {
+    console.log('[TRACE-c] doImportStream heartbeat tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
     try {
       res.write(`: keepalive ${Date.now()}\n\n`);
     } catch (_e) {
@@ -1038,22 +1045,25 @@ export async function doImportStream(req: Request, res: Response) {
     console.log(`📦 [IMPORT_STREAM] Starting performImport: ${totalRows} rows, type=${effectiveType}, mode=${mode}`);
     const importStartTime = Date.now();
 
-    const importResult = await performImport(
-      effectiveType,
-      dataToImport,
-      mode,
-      archiveMissing,
-      vesselId,
-      (req as any).user?.id || 'system',
-      undefined,
-      storeType,
-      (info) => {
-        const percent = totalRows > 0 ? Math.round((info.processed / totalRows) * 100) : 0;
-        const remaining = totalRows - info.processed;
-        const status = info.processed >= totalRows ? 'Finalizing…' : info.status;
-        sendEvent('progress', { processed: info.processed, total: totalRows, remaining, percent, status, errors: info.errors });
-      }
-    );
+    const importResult = await runInTenant(() => {
+      console.log('[TRACE-a2] doImportStream inside re-entry (pre-performImport) tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
+      return performImport(
+        effectiveType,
+        dataToImport,
+        mode,
+        archiveMissing,
+        vesselId,
+        (req as any).user?.id || 'system',
+        undefined,
+        storeType,
+        (info) => {
+          const percent = totalRows > 0 ? Math.round((info.processed / totalRows) * 100) : 0;
+          const remaining = totalRows - info.processed;
+          const status = info.processed >= totalRows ? 'Finalizing…' : info.status;
+          sendEvent('progress', { processed: info.processed, total: totalRows, remaining, percent, status, errors: info.errors });
+        }
+      );
+    });
 
     const importDuration = ((Date.now() - importStartTime) / 1000).toFixed(1);
     console.log(`📦 [IMPORT_STREAM] performImport complete in ${importDuration}s — created=${importResult.created}, updated=${importResult.updated}, skipped=${importResult.skipped}`);
@@ -1096,6 +1106,9 @@ export async function doImportStream(req: Request, res: Response) {
 
 // ── SSE Streaming Locations Import ──
 export async function doLocationsImportStream(req: Request, res: Response) {
+  console.log('[TRACE-a] doLocationsImportStream entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
+  // Capture the tenant context HERE so the streamed location writes below re-enter it.
+  const runInTenant = captureTenant();
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -1107,6 +1120,7 @@ export async function doLocationsImportStream(req: Request, res: Response) {
   };
 
   const heartbeat = setInterval(() => {
+    console.log('[TRACE-c] doLocationsImportStream heartbeat tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
     try {
       res.write(`: keepalive ${Date.now()}\n\n`);
     } catch (_e) {
@@ -1144,6 +1158,9 @@ export async function doLocationsImportStream(req: Request, res: Response) {
     const results = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
     const seenNames = new Set<string>();
 
+    // Re-enter the captured tenant context for the location writes (SSE boundary).
+    await runInTenant(async () => {
+    console.log('[TRACE-a2] doLocationsImportStream inside re-entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
     for (let i = 0; i < data.length; i++) {
       const row: any = data[i];
       const rowNum = i + 2;
@@ -1196,6 +1213,7 @@ export async function doLocationsImportStream(req: Request, res: Response) {
 
       sendEvent('progress', { processed: i + 1, total: totalRows, remaining: totalRows - (i + 1), percent: Math.round(((i + 1) / totalRows) * 100), status: 'Processing Locations…', errors: results.errors.length });
     }
+    }); // end runInTenant re-entry
 
     sendEvent('complete', { created: results.created, updated: results.updated, skipped: results.skipped, failed: results.errors.length, errors: results.errors });
     res.end();
