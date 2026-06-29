@@ -521,7 +521,7 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
     'part_code': 'Part Code',
     'part code': 'Part Code',
     'fleetequipmentcode': 'Fleet Equipment Code',
-    'fleet_equipment_code': 'Fleet Equipment Code',
+    'fleet_equipment_code': 'Fleet EqCan this uipment Code',
     'fleet equipment code': 'Fleet Equipment Code',
     'fleetequipmentname': 'Fleet Equipment Name',
     'fleet_equipment_name': 'Fleet Equipment Name',
