@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useVessels } from "@/hooks/useVessels";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, MapPin } from "lucide-react";
+import { Building2, List, Box, Wrench, Package, Clock, FileCode2, Anchor } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -333,30 +333,6 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
             testIdCard="card-fleet-vessel" testIdCount="widget-fleet-vessel" testIdBtn="button-view-fleet-vessel"
           />
 
-        </div>
-      </div>
-
-      {/* ── QUICK ACCESS (sub-views without a stat card) ── */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="bg-[#52BAF3] text-white px-4 py-2 font-semibold text-sm uppercase tracking-wide">
-          Quick Access
-        </div>
-        <div className="p-4 flex flex-wrap gap-2">
-          {[
-            { view: 'vessel-mapping' as ViewType, icon: Ship, label: 'Vessel Mapping' },
-            { view: 'fleet-data' as ViewType, icon: Database, label: 'Fleet Data' },
-            { view: 'locations' as ViewType, icon: MapPin, label: 'Locations' },
-          ].map(link => (
-            <button
-              key={link.view}
-              onClick={() => setCurrentView(link.view)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#52BAF3] text-[#52BAF3] hover:bg-blue-50 transition-colors text-sm font-medium"
-              data-testid={`link-${link.view}`}
-            >
-              <link.icon className="h-4 w-4" />
-              {link.label}
-            </button>
-          ))}
         </div>
       </div>
 
