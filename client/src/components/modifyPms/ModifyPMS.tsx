@@ -284,11 +284,23 @@ export function ModifyPMS() {
       minWidth: 120,
       filter: 'agDateColumnFilter',
       valueGetter: (p: any) => {
-        const d = p.data?.submittedAt || p.data?.createdAt;
-        if (!d) return '—';
+        const raw = p.data?.submittedAt || p.data?.createdAt;
+        if (!raw) return null;
+        const d = new Date(raw);
+        return isNaN(d.getTime()) ? null : d;
+      },
+      valueFormatter: (p: any) => {
+        if (!p.value) return '—';
         try {
-          return new Date(d).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ');
+          return (p.value as Date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ');
         } catch { return '—'; }
+      },
+      cellRenderer: (p: any) => {
+        if (!p.value) return <span className="text-gray-500">—</span>;
+        try {
+          const label = (p.value as Date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ');
+          return <span className="text-gray-700">{label}</span>;
+        } catch { return <span className="text-gray-500">—</span>; }
       },
     },
     {
