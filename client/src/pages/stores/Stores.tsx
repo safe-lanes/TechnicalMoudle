@@ -1765,7 +1765,7 @@ const Stores: React.FC = () => {
         flex: 1.4,
         minWidth: 130,
         tooltipField: 'itemCode',
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem;
           return (
@@ -1783,7 +1783,7 @@ const Stores: React.FC = () => {
         flex: 1.6,
         minWidth: 160,
         tooltipField: 'itemName',
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem;
           return (
@@ -1892,7 +1892,7 @@ const Stores: React.FC = () => {
         flex: 1.1,
         minWidth: 130,
         sortable: false,
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         valueGetter: (params: any) => {
           const item = params.data as StoreItem;
           if (!item) return '';
@@ -1926,7 +1926,7 @@ const Stores: React.FC = () => {
           headerName: 'Expiry',
           flex: 0.8,
           minWidth: 90,
-          filter: 'agTextColumnFilter',
+          filter: 'agSetColumnFilter',
           cellRenderer: (params: ICellRendererParams) => {
             const item = params.data as StoreItem;
             if (!item.expiryDate) return <span className="text-xs">-</span>;
@@ -1946,7 +1946,7 @@ const Stores: React.FC = () => {
           headerName: 'Batch #',
           flex: 0.8,
           minWidth: 90,
-          filter: 'agTextColumnFilter',
+          filter: 'agSetColumnFilter',
           cellRenderer: (params: ICellRendererParams) => {
             const item = params.data as StoreItem;
             return <span className="text-xs truncate">{item.batchNumber || '-'}</span>;
@@ -1957,7 +1957,7 @@ const Stores: React.FC = () => {
           headerName: 'Hazard',
           flex: 0.8,
           minWidth: 100,
-          filter: 'agTextColumnFilter',
+          filter: 'agSetColumnFilter',
           cellRenderer: (params: ICellRendererParams) => {
             const item = params.data as StoreItem;
             if (!item.hazardClassification || item.hazardClassification === 'None') return <span>-</span>;
@@ -2305,7 +2305,7 @@ const Stores: React.FC = () => {
       headerName: 'Date',
       flex: 1.2,
       minWidth: 130,
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       cellRenderer: (params: ICellRendererParams) => (
         <span className="text-gray-700">
           {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '2.14')} />}
@@ -2318,7 +2318,7 @@ const Stores: React.FC = () => {
       headerName: 'Event',
       flex: 0.8,
       minWidth: 100,
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       cellRenderer: (params: ICellRendererParams) => {
         const item = params.data as StoresHistoryItem;
         const colorClass =
@@ -2340,7 +2340,7 @@ const Stores: React.FC = () => {
       flex: 1.8,
       minWidth: 160,
       tooltipField: 'itemName',
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       cellRenderer: (params: ICellRendererParams) => (
         <span className="text-gray-700 truncate">
           {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '2.16')} />}
@@ -2353,7 +2353,7 @@ const Stores: React.FC = () => {
       headerName: 'Part Code',
       flex: 0.9,
       minWidth: 100,
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       cellRenderer: (params: ICellRendererParams) => (
         <span className="text-gray-600">
           {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '2.17')} />}
@@ -2366,7 +2366,7 @@ const Stores: React.FC = () => {
       headerName: 'UOM',
       flex: 0.6,
       minWidth: 70,
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       cellRenderer: (params: ICellRendererParams) => (
         <span className="text-gray-600">
           {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '2.18')} />}
@@ -2410,7 +2410,7 @@ const Stores: React.FC = () => {
       headerName: 'Place',
       flex: 0.9,
       minWidth: 100,
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       cellRenderer: (params: ICellRendererParams) => (
         <span className="text-gray-600">
           {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '2.21')} />}
@@ -2423,7 +2423,7 @@ const Stores: React.FC = () => {
       headerName: 'User',
       flex: 0.9,
       minWidth: 100,
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       cellRenderer: (params: ICellRendererParams) => (
         <span className="text-gray-600">
           {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '2.22')} />}
@@ -2436,7 +2436,7 @@ const Stores: React.FC = () => {
       colId: 'remarks',
       flex: 1.2,
       minWidth: 130,
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       cellRenderer: (params: ICellRendererParams) => {
         const item = params.data as StoresHistoryItem;
         const text = item.remarks || item.ref || '-';
