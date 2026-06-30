@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Marker } from "@/components/Marker";
@@ -177,6 +178,7 @@ const Stores: React.FC = () => {
   // invalidation patterns stay unchanged.
   const storesScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
+  const { isOfficeUser } = useAuth();
   const { canCreate, canEdit, canDelete } = usePermissions();
   const canCreateStore = canCreate("pms-stores");
   const canEditStore = canEdit("pms-stores");
@@ -2683,7 +2685,7 @@ const Stores: React.FC = () => {
       {/* Filters - Show different filters based on view mode */}
       {viewMode === "location" ? (
       <div className="flex gap-3 items-center">
-        {(isSailAdmin || isClientAdmin || isChangeMode) && (
+        {(isOfficeUser || isChangeMode) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
             <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
@@ -2767,8 +2769,8 @@ const Stores: React.FC = () => {
       </div>
       ) : viewMode === "inventory" ? (
       <div className="flex gap-3 items-center">
-        {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
-        {(isSailAdmin || isClientAdmin || isChangeMode) && (
+        {/* Vessel selector - visible for all Office users, or in change mode */}
+        {(isOfficeUser || isChangeMode) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
             <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>

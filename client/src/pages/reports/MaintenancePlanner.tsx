@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useVessel } from "@/contexts/VesselContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format as formatDate } from "date-fns";
 import { Marker } from "@/components/Marker";
@@ -131,6 +132,7 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { isOfficeUser } = useAuth();
 
   const [jobType, setJobType] = useState<string>("BOTH");
   const [dateWindow, setDateWindow] = useState<string>("30");
@@ -387,8 +389,8 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Vessel Selector - Only visible for Client Admin */}
-            {isClientAdmin && (
+            {/* Vessel Selector - Visible for all Office users */}
+            {isOfficeUser && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
                 <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>

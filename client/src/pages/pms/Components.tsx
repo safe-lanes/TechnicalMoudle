@@ -2318,6 +2318,7 @@ const Components: React.FC = () => {
   const { vesselId, setVesselId, pickerVessels, myVesselsEmpty } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept, isExternal } = useUIRole();
+  const { isOfficeUser } = useAuth();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
   const canCreateComponent = canCreatePerm("pms-components");
   const canEditComponent = canEditPerm("pms-components");
@@ -3553,7 +3554,7 @@ const Components: React.FC = () => {
         
         {/* Filters Row */}
         <div className="flex items-center gap-3 flex-wrap">
-          {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isChangeRequestMode) && (
+          {(isOfficeUser || isChangeMode || isChangeRequestMode) && (
           <div className="flex items-center gap-2" data-testid="B2">
             <Marker id="B2" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>
