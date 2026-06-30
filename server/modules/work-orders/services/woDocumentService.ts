@@ -16,9 +16,11 @@ const ALLOWED_FILE_TYPES = [
   'image/jpeg',
   'image/png',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'text/csv',
 ];
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.xlsx'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.csv'];
 
 const MAX_RAW_FILE_SIZE = 25 * 1024 * 1024;
 const TARGET_FILE_SIZE = 10 * 1024 * 1024;

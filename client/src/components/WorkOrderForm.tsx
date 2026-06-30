@@ -629,11 +629,20 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.csv', '.doc', '.docx'];
     const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
-      toast({ title: "Invalid file type", description: "Only PDF, JPG, and PNG files are allowed.", variant: "destructive" });
+      toast({ title: "Invalid file type", description: "Only PDF, JPG, PNG, Excel, CSV, and Word files are allowed.", variant: "destructive" });
       event.target.value = '';
       return;
     }
@@ -2599,7 +2608,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           <input
                             ref={riskAssessmentFileRef}
                             type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
+                            accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.doc,.docx"
                             onChange={(e) => handleFileSelected(e, 'riskAssessment')}
                             className="hidden"
                           />
@@ -2665,7 +2674,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           <input
                             ref={safetyChecklistFileRef}
                             type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
+                            accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.doc,.docx"
                             onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
                             className="hidden"
                           />
@@ -2731,7 +2740,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           <input
                             ref={operationalFormFileRef}
                             type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
+                            accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.doc,.docx"
                             onChange={(e) => handleFileSelected(e, 'operationalForm')}
                             className="hidden"
                           />

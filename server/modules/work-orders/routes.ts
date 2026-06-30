@@ -18,6 +18,8 @@ const upload = multer({
       'image/jpeg',
       'image/png',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv',
     ];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
