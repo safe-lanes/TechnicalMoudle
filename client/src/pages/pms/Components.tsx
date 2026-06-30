@@ -1847,7 +1847,20 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
 
   const MAX_FILES_PER_TYPE = 5;
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [activeDocId, setActiveDocId] = useState<number | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  useEffect(() => {
+    if (activeDocId === null) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-doc-popup]')) {
+        setActiveDocId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeDocId]);
 
   const documentTypes = [
     { id: "1", type: "Equipment Drawing", fileType: "Drawing" },
@@ -2059,24 +2072,32 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
             <span className="text-sm text-gray-700 shrink-0 w-[180px]">{docType.type}</span>
             <div className="flex items-center gap-1 flex-1 min-w-0 justify-end mr-2 flex-wrap">
               {existingDocs.map((doc: any) => (
-                <div key={doc.id} className="relative group/doc" data-testid={`doc-icon-${doc.id}`}>
-                  <div className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors">
+                <div
+                  key={doc.id}
+                  className="relative"
+                  data-doc-popup
+                  data-testid={`doc-icon-${doc.id}`}
+                  onClick={(e) => { e.stopPropagation(); setActiveDocId(activeDocId === doc.id ? null : doc.id); }}
+                >
+                  <div className={`p-1.5 rounded border cursor-pointer transition-colors ${activeDocId === doc.id ? 'bg-blue-50 border-blue-300 text-blue-600' : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600'}`}>
                     {getFileIcon(doc.fileName)}
                   </div>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc:flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]">
-                    <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={doc.fileName}>{doc.fileName}</span>
-                    <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(doc.fileSize)}</span>
-                    <div className="flex items-center gap-1 w-full">
-                      <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => handleViewDocument(doc.id)} data-testid={`btn-view-document-${doc.id}`}>
-                        <Eye className="h-3.5 w-3.5 mr-1" /> Preview
-                      </Button>
-                      {canUpload && (
-                        <Button variant="outline" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300" onClick={() => handleDeleteDocument(doc.id, doc.fileName)} data-testid={`btn-delete-document-${doc.id}`}>
-                          <Trash2 className="h-3.5 w-3.5" />
+                  {activeDocId === doc.id && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]" data-doc-popup>
+                      <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={doc.fileName}>{doc.fileName}</span>
+                      <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(doc.fileSize)}</span>
+                      <div className="flex items-center gap-1 w-full">
+                        <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={(e) => { e.stopPropagation(); handleViewDocument(doc.id); }} data-testid={`btn-view-document-${doc.id}`}>
+                          <Eye className="h-3.5 w-3.5 mr-1" /> Preview
                         </Button>
-                      )}
+                        {canUpload && (
+                          <Button variant="outline" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300" onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id, doc.fileName); }} data-testid={`btn-delete-document-${doc.id}`}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
