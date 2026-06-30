@@ -1949,12 +1949,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    const allowedTypes = documentType === 'other'
-      ? ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
-      : ['application/pdf', 'image/jpeg', 'image/png'];
-    const allowedExtensions = documentType === 'other'
-      ? ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xlsx']
-      : ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowedTypes = [
+      'application/pdf', 'image/jpeg', 'image/png',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel', 'text/csv',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.csv', '.doc', '.docx'];
     const maxSizeBytes = 5 * 1024 * 1024;
 
     // ── Pending mode: WO not saved yet — queue files locally ──────────────────
@@ -5351,7 +5353,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="hidden"
                       multiple
                       onChange={(e) => handleFileSelected(e, 'riskAssessment')}
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.doc,.docx"
                     />
                     <span className="text-xs text-gray-400">{getEffectiveDocCount('riskAssessment')}/5</span>
                   </div>
@@ -5424,7 +5426,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="hidden"
                       multiple
                       onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.doc,.docx"
                     />
                     <span className="text-xs text-gray-400">{getEffectiveDocCount('safetyChecklist')}/5</span>
                   </div>
@@ -5497,7 +5499,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="hidden"
                       multiple
                       onChange={(e) => handleFileSelected(e, 'operationalForm')}
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.doc,.docx"
                     />
                     <span className="text-xs text-gray-400">{getEffectiveDocCount('operationalForm')}/5</span>
                   </div>
