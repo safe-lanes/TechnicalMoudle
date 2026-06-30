@@ -79,7 +79,7 @@ const DEFAULT_USER: PublicUser = {
   username: "Jeevan Admin",
   fullName: "Jeevan SuperAdmin",
   email: "jeevan.naik@safe-lanes.com",
-  role: "Sail AdminW",
+  role: "Sail Admin",
   userType: "Office",
   vesselId: null,
   department: null,
