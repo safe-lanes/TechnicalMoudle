@@ -155,6 +155,9 @@ export async function createFleetComponent(req: Request, res: Response) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
+    }
     if (error.statusCode === 409) {
       return res.status(409).json({ error: error.message });
     }
@@ -169,6 +172,9 @@ export async function updateFleetComponent(req: Request, res: Response) {
     const updated = await adminService.updateFleetComponent(id, req.body);
     res.json(updated);
   } catch (error: any) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
+    }
     if (error.statusCode === 404) {
       return res.status(404).json({ error: error.message });
     }
