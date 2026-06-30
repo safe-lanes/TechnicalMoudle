@@ -3535,7 +3535,7 @@ const Components: React.FC = () => {
                 Export
               </Button>
             )}
-            {(isSailAdmin || isClientAdmin || isExternal) && !isChangeRequestMode && !isChangeMode && canCreateComponent && (
+            {isOfficeUser && !isChangeRequestMode && !isChangeMode && canCreateComponent && (
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 size="sm"
@@ -3700,7 +3700,7 @@ const Components: React.FC = () => {
                   <h3 className="text-lg font-semibold text-[#15569e]" data-testid="B7.1">
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
-                  {(isSailAdmin || isClientAdmin || isExternal) && !isChangeRequestMode && !isChangeMode && (canEditComponent || canDeleteComponent) && (
+                  {isOfficeUser && !isChangeRequestMode && !isChangeMode && (canEditComponent || canDeleteComponent) && (
                     <div className="flex items-center gap-2">
                       {canEditComponent && (
                       <Button

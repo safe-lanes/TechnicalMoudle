@@ -3049,7 +3049,7 @@ const Spares: React.FC = () => {
                 {isFirstRow && <Marker id="E34" />}
                 <Info className="h-4 w-4 text-blue-600" />
               </Button>
-              {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isModifyMode) && canEditSpare && (
+              {(isOfficeUser || isChangeMode || isModifyMode) && canEditSpare && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -3072,7 +3072,7 @@ const Spares: React.FC = () => {
                   <Settings2 className="h-4 w-4 text-orange-500" />
                 </Button>
               )}
-              {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && !isInactive && canDeleteSpare && (
+              {(isOfficeUser || isChangeMode) && !isInactive && canDeleteSpare && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -3084,7 +3084,7 @@ const Spares: React.FC = () => {
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
               )}
-              {(isSailAdmin || isClientAdmin || isExternal) && isInactive && canEditSpare && (
+              {isOfficeUser && isInactive && canEditSpare && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -3518,7 +3518,7 @@ const Spares: React.FC = () => {
             </>
           ) : (
             <>
-              {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && canCreateSpare && (
+              {(isOfficeUser || isChangeMode) && canCreateSpare && (
                 <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
                   <Marker id="E10" />
                   + Add Spare
