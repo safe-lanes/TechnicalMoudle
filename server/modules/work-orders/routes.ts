@@ -116,6 +116,9 @@ router.post('/work-orders/:id/reopen-completion',
   asyncHandler(woCtrl.reopenCompletion)
 );
 
+// POST /work-orders/bulk-superintendent-acknowledge — must be before /:id route
+router.post('/work-orders/bulk-superintendent-acknowledge', asyncHandler(woCtrl.bulkSuperintendentAcknowledge));
+
 // POST /work-orders/:id/superintendent-acknowledge
 router.post('/work-orders/:id/superintendent-acknowledge', asyncHandler(woCtrl.superintendentAcknowledge));
 

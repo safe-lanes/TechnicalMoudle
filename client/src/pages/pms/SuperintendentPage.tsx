@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ExternalLink, Check, ArrowLeft } from "lucide-react";
+import { ExternalLink, Check, ArrowLeft, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import WOAgGridTable from "@/components/WOAgGridTable";
 
 function formatDate(dateStr: string | null | undefined) {
@@ -41,10 +41,19 @@ function getTierBadge(tier: string | null | undefined, approver?: string | null)
 export default function SuperintendentPage() {
   const [, setLocation] = useLocation();
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; notification: any | null }>({ open: false, notification: null });
+  const [selectedRows, setSelectedRows] = useState<any[]>([]);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
 
   const { data: allNotifications = [], isLoading } = useQuery<any[]>({
     queryKey: ["/technical/api/superintendent/notifications/all"],
   });
+
+  const invalidateNotifications = () => {
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/all"] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/summary"] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/work-orders"] });
+  };
 
   const acknowledgeMutation = useMutation({
     mutationFn: async (workOrderId: string) => {
@@ -52,11 +61,20 @@ export default function SuperintendentPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/summary"] });
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/work-orders"] });
+      invalidateNotifications();
       setConfirmDialog({ open: false, notification: null });
+    },
+  });
+
+  const bulkAcknowledgeMutation = useMutation({
+    mutationFn: async (workOrderIds: string[]) => {
+      const res = await apiRequest("POST", "/technical/api/work-orders/bulk-superintendent-acknowledge", { workOrderIds });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateNotifications();
+      setSelectedRows([]);
+      setBulkConfirmOpen(false);
     },
   });
 
@@ -67,7 +85,34 @@ export default function SuperintendentPage() {
     (n: any) => n.isAcknowledged && n.acknowledgedAt && new Date(n.acknowledgedAt) >= startOfMonth
   ).length;
 
+  const isRowSelectable = useCallback((params: any) => {
+    const n = params.data;
+    return !!(n && n.approvalTier === 'superintendent_locked' && !n.isAcknowledged);
+  }, []);
+
+  const onSelectionChanged = useCallback((event: SelectionChangedEvent) => {
+    setSelectedRows(event.api.getSelectedRows());
+  }, []);
+
+  const eligibleSelected = selectedRows.filter(
+    (n) => n.approvalTier === 'superintendent_locked' && !n.isAcknowledged
+  );
+
   const columnDefs: ColDef[] = useMemo(() => [
+    {
+      headerName: "",
+      field: "__select__",
+      headerCheckboxSelection: true,
+      checkboxSelection: true,
+      maxWidth: 50,
+      minWidth: 50,
+      lockPosition: true,
+      suppressMovable: true,
+      filter: false as any,
+      sortable: false,
+      resizable: false,
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    } as ColDef,
     {
       headerName: "Work Order Code",
       field: "workOrderCode",
@@ -279,15 +324,38 @@ export default function SuperintendentPage() {
       </div>
 
       <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50">
+          <span className="text-sm text-gray-500">
+            {eligibleSelected.length > 0
+              ? `${eligibleSelected.length} WO${eligibleSelected.length !== 1 ? 's' : ''} selected`
+              : "Select locked WOs using checkboxes to bulk acknowledge"}
+          </span>
+          <Button
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={eligibleSelected.length === 0 || bulkAcknowledgeMutation.isPending}
+            onClick={() => setBulkConfirmOpen(true)}
+            data-testid="button-bulk-acknowledge"
+          >
+            <CheckSquare className="h-4 w-4 mr-1.5" />
+            {eligibleSelected.length > 0
+              ? `Bulk Acknowledge (${eligibleSelected.length})`
+              : "Bulk Acknowledge"}
+          </Button>
+        </div>
+
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading notifications...</div>
         ) : (
-          <div style={{ height: 'calc(100vh - 320px)', minHeight: '420px' }} data-testid="table-notifications">
+          <div style={{ height: 'calc(100vh - 360px)', minHeight: '400px' }} data-testid="table-notifications">
             <WOAgGridTable
               columnDefs={columnDefs}
               rowData={allNotifications}
               height="100%"
               suppressRowClickSelection
+              rowSelection="multiple"
+              onSelectionChanged={onSelectionChanged}
+              isRowSelectable={isRowSelectable}
               noRowsMessage="No superintendent notifications found."
               testId="ag-grid-superintendent-notifications"
               getRowClass={(params) => params.data?.id ? `row-notification-${params.data.id}` : undefined}
@@ -296,6 +364,7 @@ export default function SuperintendentPage() {
         )}
       </div>
 
+      {/* Single acknowledge confirm dialog */}
       <Dialog open={confirmDialog.open} onOpenChange={(open) => { if (!open) setConfirmDialog({ open: false, notification: null }); }}>
         <DialogContent data-testid="dialog-confirm-acknowledge">
           <DialogHeader>
@@ -326,6 +395,36 @@ export default function SuperintendentPage() {
               data-testid="button-confirm-acknowledge"
             >
               {acknowledgeMutation.isPending ? "Acknowledging..." : "Confirm Acknowledge"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk acknowledge confirm dialog */}
+      <Dialog open={bulkConfirmOpen} onOpenChange={(open) => { if (!open) setBulkConfirmOpen(false); }}>
+        <DialogContent data-testid="dialog-bulk-acknowledge">
+          <DialogHeader>
+            <DialogTitle>Bulk Acknowledge Work Orders</DialogTitle>
+            <DialogDescription>
+              You are about to acknowledge <strong>{eligibleSelected.length}</strong> locked work order{eligibleSelected.length !== 1 ? 's' : ''}.
+              This will allow the respective Head of Department to proceed with approval for each WO.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)} data-testid="button-cancel-bulk-acknowledge">
+              Cancel
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                const ids = eligibleSelected.map((n) => n.workOrderId);
+                bulkAcknowledgeMutation.mutate(ids);
+              }}
+              disabled={bulkAcknowledgeMutation.isPending}
+              data-testid="button-confirm-bulk-acknowledge"
+            >
+              {bulkAcknowledgeMutation.isPending ? "Acknowledging..." : `Acknowledge ${eligibleSelected.length} WO${eligibleSelected.length !== 1 ? 's' : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>

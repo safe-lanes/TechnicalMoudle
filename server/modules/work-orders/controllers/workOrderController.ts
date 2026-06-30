@@ -467,6 +467,51 @@ export async function updateExecution(req: Request, res: Response) {
 
 // ── Superintendent Endpoints (Layer 5) ──
 
+export async function bulkSuperintendentAcknowledge(req: Request, res: Response) {
+  try {
+    const { workOrderIds } = req.body as { workOrderIds: string[] };
+    if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
+      return res.status(400).json({ error: 'workOrderIds must be a non-empty array' });
+    }
+
+    const results: { id: string; success: boolean; error?: string }[] = [];
+
+    for (const id of workOrderIds) {
+      try {
+        const wo = await woService.getWorkOrder(id);
+        if (!wo) { results.push({ id, success: false, error: 'Not found' }); continue; }
+        if (wo.approvalTier !== 'superintendent_locked') { results.push({ id, success: false, error: 'Not locked' }); continue; }
+
+        await woService.updateWorkOrder(id, {
+          superintendentAcknowledged: true,
+          superintendentAcknowledgedAt: new Date().toISOString(),
+          approvalTier: 'ce_with_justification',
+          approvalBlockReason: null,
+        });
+
+        const notifications = await storage.getAllSuperintendentNotifications();
+        const matchingNotification = notifications.find(
+          (n: any) => (n.workOrderId === wo.wouuid || n.workOrderId === wo.id) && !n.isAcknowledged
+        );
+        if (matchingNotification) {
+          await storage.acknowledgeSuperintendentNotification(matchingNotification.id);
+        }
+
+        results.push({ id, success: true });
+      } catch (err: any) {
+        results.push({ id, success: false, error: err.message || 'Unknown error' });
+      }
+    }
+
+    const succeeded = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    res.json({ success: true, succeeded, failed, results });
+  } catch (error: any) {
+    console.error('Bulk superintendent acknowledge error:', error);
+    throw error;
+  }
+}
+
 export async function superintendentAcknowledge(req: Request, res: Response) {
   try {
     const wo = await woService.getWorkOrder(req.params.id);
