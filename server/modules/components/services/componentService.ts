@@ -208,6 +208,16 @@ export async function create(data: any): Promise<Component> {
     }
   }
 
+  // Duplicate component name check
+  if (data.name && data.vesselId) {
+    const existingByName = await repo.findByNameAndVessel(data.name, data.vesselId);
+    if (existingByName) {
+      throw new ValidationError(
+        `Component Name '${data.name}' already exists for this vessel. Please use a unique name.`
+      );
+    }
+  }
+
   // Parent Component Code validation (parity with bulk-import dry-run):
   // valid SFI format, not self-referencing, and must exist in the same vessel.
   await validateParentComponentCode(data.componentCode, data.parentId, data.vesselId);
@@ -329,6 +339,19 @@ export async function update(id: string, data: any, userId: string): Promise<Com
       if (duplicate) {
         throw new ValidationError(
           `Component Code '${data.componentCode}' already exists for this vessel. Please use a unique code.`
+        );
+      }
+    }
+  }
+
+  // Duplicate component name check (only when name is actually changing)
+  if (data.name && data.name !== existingComponent.name) {
+    const vesselId = existingComponent.vesselId ?? data.vesselId;
+    if (vesselId) {
+      const duplicateByName = await repo.findByNameAndVessel(data.name, vesselId, id);
+      if (duplicateByName) {
+        throw new ValidationError(
+          `Component Name '${data.name}' already exists for this vessel. Please use a unique name.`
         );
       }
     }
