@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useLocation } from "wouter";
@@ -166,6 +167,7 @@ const Spares: React.FC = () => {
   
   // UI Role context for role-based visibility
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
+  const { isOfficeUser } = useAuth();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
   const canCreateSpare = canCreatePerm("pms-spares");
   const canEditSpare = canEditPerm("pms-spares");
@@ -3047,7 +3049,7 @@ const Spares: React.FC = () => {
                 {isFirstRow && <Marker id="E34" />}
                 <Info className="h-4 w-4 text-blue-600" />
               </Button>
-              {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isModifyMode) && canEditSpare && (
+              {(isOfficeUser || isChangeMode || isModifyMode) && canEditSpare && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -3070,7 +3072,7 @@ const Spares: React.FC = () => {
                   <Settings2 className="h-4 w-4 text-orange-500" />
                 </Button>
               )}
-              {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && !isInactive && canDeleteSpare && (
+              {(isOfficeUser || isChangeMode) && !isInactive && canDeleteSpare && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -3082,7 +3084,7 @@ const Spares: React.FC = () => {
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
               )}
-              {(isSailAdmin || isClientAdmin || isExternal) && isInactive && canEditSpare && (
+              {isOfficeUser && isInactive && canEditSpare && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -3516,7 +3518,7 @@ const Spares: React.FC = () => {
             </>
           ) : (
             <>
-              {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && canCreateSpare && (
+              {(isOfficeUser || isChangeMode) && canCreateSpare && (
                 <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
                   <Marker id="E10" />
                   + Add Spare
@@ -3580,8 +3582,8 @@ const Spares: React.FC = () => {
       </div>
       ) : (
       <div className="flex gap-3 items-center">
-        {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
-        {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && (
+        {/* Vessel selector - visible for all Office users, or in change mode */}
+        {(isOfficeUser || isChangeMode) && (
           <div className="flex items-center gap-2" data-testid="E4">
             <Marker id="E4" />
             <span className="text-sm font-medium text-gray-600">Vessel:</span>

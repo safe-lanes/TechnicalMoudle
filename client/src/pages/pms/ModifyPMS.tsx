@@ -131,7 +131,7 @@ export default function ModifyPMS() {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
-  const { currentUser } = useAuth();
+  const { currentUser, isOfficeUser } = useAuth();
   const { data: vessels = [] } = useVessels();
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -508,7 +508,7 @@ export default function ModifyPMS() {
 
       {/* Filters Row: Vessel + Search + Clear */}
       <div className="flex items-center gap-3">
-        {(isSailAdmin || isClientAdmin) && (
+        {isOfficeUser && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
             <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>

@@ -77,6 +77,21 @@ export async function findByCodeAndVessel(
   return results.find(c => c.componentCode === componentCode && c.isActive !== false);
 }
 
+export async function findByNameAndVessel(
+  name: string,
+  vesselId: string,
+  excludeId?: string
+): Promise<Component | undefined> {
+  const results = await storage.getComponents(vesselId);
+  const normalised = name.trim().toLowerCase();
+  return results.find(
+    c =>
+      c.name?.trim().toLowerCase() === normalised &&
+      c.isActive !== false &&
+      c.id !== excludeId
+  );
+}
+
 export async function update(id: string, data: Partial<Component>): Promise<Component> {
   return storage.updateComponent(id, data);
 }

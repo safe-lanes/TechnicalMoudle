@@ -18,6 +18,8 @@ const upload = multer({
       'image/jpeg',
       'image/png',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv',
     ];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
@@ -115,6 +117,9 @@ router.post('/work-orders/:id/reopen-completion',
   requireRole(['Office', 'PMS Admin', 'Sail Admin']),
   asyncHandler(woCtrl.reopenCompletion)
 );
+
+// POST /work-orders/bulk-superintendent-acknowledge — must be before /:id route
+router.post('/work-orders/bulk-superintendent-acknowledge', asyncHandler(woCtrl.bulkSuperintendentAcknowledge));
 
 // POST /work-orders/:id/superintendent-acknowledge
 router.post('/work-orders/:id/superintendent-acknowledge', asyncHandler(woCtrl.superintendentAcknowledge));

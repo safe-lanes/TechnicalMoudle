@@ -69,6 +69,17 @@ export async function getFleetComponentByCode(code: string) {
   return storage.getFleetComponentByCode(code);
 }
 
+export async function getFleetComponentByName(name: string, excludeId?: number) {
+  const all = await storage.getFleetComponents();
+  const normalised = name.trim().toLowerCase();
+  return all.find(
+    (c: any) =>
+      c.fleetEquipmentName?.trim().toLowerCase() === normalised &&
+      c.isActive !== false &&
+      c.id !== excludeId
+  );
+}
+
 export async function createFleetComponent(data: any) {
   return storage.createFleetComponent(data);
 }

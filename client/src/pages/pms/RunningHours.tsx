@@ -67,7 +67,7 @@ interface RunningHoursData {
 
 const RunningHours = () => {
   const [, navigate] = useLocation();
-  const { currentUser } = useAuth();
+  const { currentUser, isOfficeUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
@@ -1443,7 +1443,7 @@ const RunningHours = () => {
         {/* Filters - Single Row - Main Tab */}
         {activeTab === 'main' && (
           <div className="flex items-center gap-3 flex-wrap">
-            {(isSailAdmin || isClientAdmin || isExternal) && (
+            {isOfficeUser && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
                 <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>

@@ -10,19 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wrench, Package, FileText, Archive, ArrowLeft, Eye, Check, X, Search, Plus } from 'lucide-react';
+import { Wrench, Package, FileText, Archive, Eye, Check, X, Plus } from 'lucide-react';
+import type { ColDef } from 'ag-grid-community';
+import WOAgGridTable from '@/components/WOAgGridTable';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -41,7 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 
 interface ModifyOption {
   id: string;
@@ -104,12 +95,10 @@ interface ChangeRequest {
 
 export function ModifyPMS() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
   const [viewingRequest, setViewingRequest] = useState<ChangeRequest | null>(null);
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId, setVesselId, applyVesselScope, pickerVessels, myVesselsEmpty, assignedVesselIds } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
@@ -144,15 +133,6 @@ export function ModifyPMS() {
     enabled: !!vesselId
   });
 
-  const filteredRequests = useMemo(() => {
-    return requests.filter((request: ChangeRequest) => {
-      const matchesSearch = searchQuery === '' ||
-        request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        request.status.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [requests, searchQuery, statusFilter]);
 
   // Approval steps for the currently viewed request (gating logic)
   const { data: approvalSteps = [], isError: stepsError, isLoading: stepsLoading } = useQuery({
@@ -270,33 +250,92 @@ export function ModifyPMS() {
     setViewingRequest(request);
   };
 
+  const formatRequestedBy = (uid: string | null | undefined): string => {
+    if (uid === 'current_user') return 'Chief Engineer';
+    if (uid === '2nd_engineer') return '2nd Engineer';
+    if (uid === '3rd_engineer') return '3rd Engineer';
+    return uid || '—';
+  };
+
+  const columnDefs: ColDef[] = useMemo(() => [
+    {
+      headerName: 'Request Title',
+      field: 'title',
+      flex: 2,
+      minWidth: 220,
+      filter: 'agSetColumnFilter',
+      tooltipField: 'title',
+      cellRenderer: (p: any) => (
+        <span className="font-medium text-gray-900">{p.data?.title || '—'}</span>
+      ),
+    },
+    {
+      headerName: 'Requested By',
+      field: 'requestedByUserId',
+      flex: 1,
+      minWidth: 140,
+      filter: 'agSetColumnFilter',
+      valueGetter: (p: any) => formatRequestedBy(p.data?.requestedByUserId),
+    },
+    {
+      headerName: 'Date',
+      field: 'submittedAt',
+      flex: 0.8,
+      minWidth: 120,
+      filter: 'agDateColumnFilter',
+      valueGetter: (p: any) => {
+        const raw = p.data?.submittedAt || p.data?.createdAt;
+        if (!raw) return null;
+        const d = new Date(raw);
+        return isNaN(d.getTime()) ? null : d;
+      },
+      valueFormatter: (p: any) => {
+        if (!p.value) return '—';
+        try {
+          return (p.value as Date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ');
+        } catch { return '—'; }
+      },
+      cellRenderer: (p: any) => {
+        if (!p.value) return <span className="text-gray-500">—</span>;
+        try {
+          const label = (p.value as Date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ');
+          return <span className="text-gray-700">{label}</span>;
+        } catch { return <span className="text-gray-500">—</span>; }
+      },
+    },
+    {
+      headerName: 'Status',
+      field: 'status',
+      flex: 0.8,
+      minWidth: 130,
+      filter: 'agSetColumnFilter',
+      valueGetter: (p: any) => {
+        const st = p.data?.status;
+        if (st === 'submitted') return 'Pending Approval';
+        if (st === 'approved') return 'Approved';
+        if (st === 'rejected') return 'Rejected';
+        if (st === 'draft') return 'Draft';
+        if (st === 'returned') return 'Returned';
+        return st || '—';
+      },
+      cellRenderer: (p: any) => {
+        const st = p.data?.status;
+        if (st === 'submitted') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#52BAF3] text-white">Pending Approval</span>;
+        if (st === 'approved') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500 text-white">Approved</span>;
+        if (st === 'rejected') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-500 text-white">Rejected</span>;
+        if (st === 'draft') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-500 text-white">Draft</span>;
+        if (st === 'returned') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-500 text-white">Returned</span>;
+        return <span className="text-gray-500">{st || '—'}</span>;
+      },
+    },
+  ], []);
+
   return (
     <>
     <div className="space-y-4">
       {/* Header with Title, Centered Tabs, and Button */}
       <div className="flex items-center justify-between relative">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Modify PMS - Change Requests</h1>
-        <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1" data-testid="status-filter-tabs">
-          {[
-            { label: 'All', value: 'all' },
-            { label: 'Pending Approval', value: 'submitted' },
-            { label: 'Approved', value: 'approved' },
-            { label: 'Rejected', value: 'rejected' },
-          ].map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setStatusFilter(tab.value)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                statusFilter === tab.value
-                  ? 'bg-[#52baf3] text-white'
-                  : 'text-gray-700 hover:bg-gray-200'
-              }`}
-              data-testid={`btn-filter-${tab.value}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
         {!isVessel && (
           <Button 
             className="bg-[#5dc86f] hover:bg-[#4db85f] text-white px-6"
@@ -333,25 +372,11 @@ export function ModifyPMS() {
             </Select>
           </div>
         )}
-        <div className="relative w-72">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search change requests..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-status"
-          />
-        </div>
         <PeriodFilter value={periodFilter} onChange={setPeriodFilter} className="w-[200px]" />
         <Button
           variant="outline"
           className="text-gray-600"
-          onClick={() => {
-            setSearchQuery("");
-            setStatusFilter("all");
-            setPeriodFilter(null);
-          }}
+          onClick={() => setPeriodFilter(null)}
           data-testid="button-clear-filters-modify"
         >
           Clear
@@ -413,91 +438,17 @@ export function ModifyPMS() {
 
         {/* Right Panel - Change Requests Table */}
         <div className="flex-1">
-          <div className="bg-white rounded-lg shadow-sm h-full">
-            {isLoading ? (
-              <div className="text-center py-12 text-gray-500">Loading...</div>
-            ) : filteredRequests.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                No change requests found. Click "New Change Request" to create one.
-              </div>
-            ) : (
-              <div className="h-full flex flex-col">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-[#52BAF3] hover:bg-[#52BAF3] border-b-0">
-                      <TableHead className="text-white font-medium py-3 px-4">Request Title</TableHead>
-                      <TableHead className="text-white font-medium py-3 px-4">Requested By</TableHead>
-                      <TableHead className="text-white font-medium py-3 px-4">Date</TableHead>
-                      <TableHead className="text-white font-medium py-3 px-4">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRequests.map((request: ChangeRequest) => (
-                      <TableRow 
-                        key={request.id} 
-                        className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => handleRowClick(request)}
-                      >
-                        <TableCell className="py-3 px-4">
-                          <div className="font-medium text-gray-900">{request.title}</div>
-                        </TableCell>
-                        <TableCell className="py-3 px-4 text-gray-700">
-                          {request.requestedByUserId === 'current_user' ? 'Chief Engineer' : 
-                           request.requestedByUserId === '2nd_engineer' ? '2nd Engineer' : 
-                           request.requestedByUserId === '3rd_engineer' ? '3rd Engineer' : 
-                           request.requestedByUserId}
-                        </TableCell>
-                        <TableCell className="py-3 px-4 text-gray-700">
-                          {request.submittedAt 
-                            ? new Date(request.submittedAt).toLocaleDateString('en-GB', { 
-                                year: 'numeric', 
-                                month: '2-digit', 
-                                day: '2-digit' 
-                              }).replace(/\//g, ' ')
-                            : new Date(request.createdAt).toLocaleDateString('en-GB', { 
-                                year: 'numeric', 
-                                month: '2-digit', 
-                                day: '2-digit' 
-                              }).replace(/\//g, ' ')}
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          {request.status === 'submitted' && (
-                            <Badge className="bg-[#52BAF3] text-white px-3 py-1 text-xs rounded-full">
-                              Pending Approval
-                            </Badge>
-                          )}
-                          {request.status === 'approved' && (
-                            <Badge className="bg-green-500 text-white px-3 py-1 text-xs rounded-full">
-                              Approved
-                            </Badge>
-                          )}
-                          {request.status === 'rejected' && (
-                            <Badge className="bg-red-500 text-white px-3 py-1 text-xs rounded-full">
-                              Rejected
-                            </Badge>
-                          )}
-                          {request.status === 'draft' && (
-                            <Badge className="bg-gray-500 text-white px-3 py-1 text-xs rounded-full">
-                              Draft
-                            </Badge>
-                          )}
-                          {request.status === 'returned' && (
-                            <Badge className="bg-yellow-500 text-white px-3 py-1 text-xs rounded-full">
-                              Returned
-                            </Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                
-                {/* Pagination info at bottom */}
-                <div className="mt-auto px-6 py-4 border-t border-gray-200 text-sm text-gray-500">
-                  {filteredRequests.length > 0 ? `0 to ${filteredRequests.length} of ${filteredRequests.length}` : '0 to 0 of 0'}
-                </div>
-              </div>
-            )}
+          <div className="bg-white rounded-lg shadow-sm h-full overflow-hidden">
+            <WOAgGridTable
+              columnDefs={columnDefs}
+              rowData={requests}
+              height="100%"
+              loading={isLoading}
+              suppressRowClickSelection
+              onRowClicked={(params) => { if (params.data) handleRowClick(params.data as ChangeRequest); }}
+              noRowsMessage="No change requests found. Click 'New Change Request' to create one."
+              testId="ag-grid-modify-pms"
+            />
           </div>
         </div>
       </div>

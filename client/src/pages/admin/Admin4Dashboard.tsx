@@ -1,10 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useVessels } from "@/hooks/useVessels";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, MapPin } from "lucide-react";
+import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, MapPin, ChevronRight } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -18,7 +13,6 @@ import FleetEquipmentTreeView from "./FleetEquipmentTreeView";
 import FleetVesselManager from "./FleetVesselManager";
 import FleetDataView from "./FleetDataView";
 import LocationManagement from "./LocationManagement";
-import type { PmsVesselSettings, Fleet } from "@shared/schema";
 
 type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data' | 'locations';
 
@@ -29,336 +23,180 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
     onSubViewChange?.(currentView !== 'dashboard');
   }, [currentView, onSubViewChange]);
 
-  const { data: makersData, isLoading: isMakersLoading } = useQuery({
-    queryKey: ['/technical/api/fleet/makers'],
-  });
-
-  const { data: masterListsData, isLoading: isMasterListsLoading } = useQuery({
-    queryKey: ['/technical/api/fleet/master-lists'],
-  });
-
-  const { data: componentsData, isLoading: isComponentsLoading } = useQuery({
-    queryKey: ['/technical/api/fleet-admin/fleet-components'],
-  });
-
-  const { data: jobsData, isLoading: isJobsLoading } = useQuery({
-    queryKey: ['/technical/api/fleet/jobs'],
-  });
-
-  const { data: sparesData, isLoading: isSparesLoading } = useQuery({
-    queryKey: ['/technical/api/fleet/spares'],
-  });
-
-  const { data: pmsSettingsData, isLoading: isPmsSettingsLoading } = useQuery<PmsVesselSettings[]>({
-    queryKey: ['/technical/api/pms-vessel-settings'],
-  });
-
-  const { data: vesselsData, isLoading: isVesselsLoading } = useVessels();
-
-  const { data: fleetsData, isLoading: isFleetsLoading } = useQuery<Fleet[]>({
-    queryKey: ['/technical/api/fleets'],
-  });
-
-  const { data: dashboardStats } = useQuery<any>({
-    queryKey: ['/technical/api/fleet-admin/dashboard-stats'],
-  });
-
-  const totalMakers = Array.isArray(makersData) ? makersData.length : 0;
-  const totalMasterLists = Array.isArray(masterListsData) ? masterListsData.length : 0;
-  const totalComponents = Array.isArray(componentsData) ? componentsData.filter((c: any) => c.fleetEquipmentCode?.length === 10).length : 0;
-  const totalJobs = Array.isArray(jobsData) ? jobsData.length : 0;
-  const totalSpares = Array.isArray(sparesData) ? sparesData.length : 0;
-  const totalVessels = Array.isArray(vesselsData) ? vesselsData.length : 0;
-  const totalFleets = Array.isArray(fleetsData) ? fleetsData.length : 0;
-  const configuredPmsSettings = Array.isArray(pmsSettingsData) ? pmsSettingsData.length : 0;
-
-  const stats = dashboardStats || null;
-
   const handleBackToDashboard = () => setCurrentView('dashboard');
 
-  if (currentView === 'makers') {
-    return <MakerManagement onBack={handleBackToDashboard} />;
-  }
+  if (currentView === 'makers') return <MakerManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'master-lists') return <MasterListsManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'master-data') return <MasterDataManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'master-data-table') return <MasterDataTableView onBack={handleBackToDashboard} />;
+  if (currentView === 'components') return <FleetComponentsManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'jobs') return <FleetJobsManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'spares') return <FleetSparesManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'vessel-mapping') return <FleetVesselMapping onBack={handleBackToDashboard} />;
+  if (currentView === 'pms-settings') return <PmsVesselSettingsManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'equipment-tree') return <FleetEquipmentTreeView onBack={handleBackToDashboard} />;
+  if (currentView === 'fleet-vessel-manager') return <FleetVesselManager onBack={handleBackToDashboard} />;
+  if (currentView === 'fleet-data') return <FleetDataView onBack={handleBackToDashboard} />;
+  if (currentView === 'locations') return <LocationManagement onBack={handleBackToDashboard} />;
 
-  if (currentView === 'master-lists') {
-    return <MasterListsManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'master-data') {
-    return <MasterDataManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'master-data-table') {
-    return <MasterDataTableView onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'components') {
-    return <FleetComponentsManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'jobs') {
-    return <FleetJobsManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'spares') {
-    return <FleetSparesManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'vessel-mapping') {
-    return <FleetVesselMapping onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'pms-settings') {
-    return <PmsVesselSettingsManagement onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'equipment-tree') {
-    return <FleetEquipmentTreeView onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'fleet-vessel-manager') {
-    return <FleetVesselManager onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'fleet-data') {
-    return <FleetDataView onBack={handleBackToDashboard} />;
-  }
-
-  if (currentView === 'locations') {
-    return <LocationManagement onBack={handleBackToDashboard} />;
-  }
-
-  const ProgressBar = ({ value, max, color }: { value: number; max: number; color: string }) => {
-    const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-    return (
-      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-        <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+  /* ── Section 1 card ── */
+  const Card1 = ({
+    view, icon: Icon, label, description,
+    colorIcon, colorUnderline, colorBg, colorChevron, testId,
+  }: {
+    view: ViewType; icon: React.ElementType; label: string; description: string;
+    colorIcon: string; colorUnderline: string; colorBg: string; colorChevron: string; testId: string;
+  }) => (
+    <button
+      onClick={() => setCurrentView(view)}
+      className="text-left bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-all group flex items-start gap-4"
+      data-testid={testId}
+    >
+      <div className={`p-3 rounded-xl flex-shrink-0 ${colorBg}`}>
+        <Icon className={`h-8 w-8 ${colorIcon}`} />
       </div>
-    );
-  };
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-base font-semibold text-gray-900">{label}</span>
+          <ChevronRight className={`h-5 w-5 text-gray-300 ${colorChevron} transition-colors flex-shrink-0 mt-0.5`} />
+        </div>
+        <div className={`w-8 h-0.5 ${colorUnderline} mt-1.5 mb-2 rounded-full`} />
+        <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
+      </div>
+    </button>
+  );
+
+  /* ── Section 2 card ── */
+  const Card2 = ({
+    view, icon: Icon, label, description,
+    colorIcon, colorUnderline, colorIconBg, colorCardBg, colorBorder, colorChevron, testId,
+  }: {
+    view: ViewType; icon: React.ElementType; label: string; description: string;
+    colorIcon: string; colorUnderline: string; colorIconBg: string;
+    colorCardBg: string; colorBorder: string; colorChevron: string; testId: string;
+  }) => (
+    <button
+      onClick={() => setCurrentView(view)}
+      className={`relative overflow-hidden text-left rounded-xl p-6 hover:shadow-md transition-all group border ${colorBorder} ${colorCardBg}`}
+      data-testid={testId}
+    >
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.07) 1px, transparent 1px)',
+          backgroundSize: '18px 18px',
+        }}
+      />
+      <div className="relative flex items-start gap-4">
+        <div className={`p-3 rounded-xl flex-shrink-0 ${colorIconBg}`}>
+          <Icon className={`h-9 w-9 ${colorIcon}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <span className="text-base font-semibold text-gray-900">{label}</span>
+            <ChevronRight className={`h-5 w-5 text-gray-300 ${colorChevron} transition-colors flex-shrink-0 mt-0.5`} />
+          </div>
+          <div className={`w-8 h-0.5 ${colorUnderline} mt-1.5 mb-2 rounded-full`} />
+          <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
+        </div>
+      </div>
+    </button>
+  );
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="px-6 py-4 border-b">
-          <h1 className="text-2xl font-semibold" data-testid="text-master-data-title">Master Data</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage fleet-level master data including makers, components, jobs, spares, and configurations</p>
-        </div>
+    <div>
 
-        <div className="p-6 space-y-6">
+      {/* ── Page header ── */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="text-master-data-title">Master Data</h1>
+        <p className="text-sm text-gray-500 mt-1">Manage and maintain key master data for PMS.</p>
+      </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Fleet Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-makers">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2 bg-gray-100 rounded-lg">
-                      <Building2 className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentView('makers')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-makers">
-                      View
-                    </Button>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-makers">{isMakersLoading ? '...' : totalMakers}</div>
-                  <p className="text-xs text-gray-500 mt-0.5">Total Makers</p>
-                  {stats?.makers && (
-                    <div className="mt-3 flex gap-2 flex-wrap">
-                      <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">{stats.makers.linked} linked</Badge>
-                      {stats.makers.unlinked > 0 && <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-500">{stats.makers.unlinked} unused</Badge>}
-                    </div>
-                  )}
-                </div>
+      {/* ── Section 1: 7 cards, no bar header ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card1
+          view="makers" icon={Building2} label="Maker List"
+          description="Manage and maintain maker information."
+          colorBg="bg-blue-50" colorIcon="text-blue-500" colorUnderline="bg-blue-400"
+          colorChevron="group-hover:text-blue-400"
+          testId="card-makers"
+        />
+        <Card1
+          view="fleet-data" icon={Box} label="Fleet Data"
+          description="Manage fleet and vessel related master data."
+          colorBg="bg-teal-50" colorIcon="text-teal-500" colorUnderline="bg-teal-400"
+          colorChevron="group-hover:text-teal-400"
+          testId="card-fleet-data"
+        />
+        <Card1
+          view="jobs" icon={Wrench} label="Fleet Jobs"
+          description="Manage and maintain fleet job master data."
+          colorBg="bg-green-50" colorIcon="text-green-500" colorUnderline="bg-green-400"
+          colorChevron="group-hover:text-green-400"
+          testId="card-jobs"
+        />
+        <Card1
+          view="spares" icon={Package} label="Fleet Spares"
+          description="Manage and maintain fleet spare data."
+          colorBg="bg-orange-50" colorIcon="text-orange-500" colorUnderline="bg-orange-400"
+          colorChevron="group-hover:text-orange-400"
+          testId="card-spares"
+        />
+        <Card1
+          view="master-lists" icon={List} label="Master Lists"
+          description="Manage system master lists and values."
+          colorBg="bg-purple-50" colorIcon="text-purple-500" colorUnderline="bg-purple-400"
+          colorChevron="group-hover:text-purple-400"
+          testId="card-master-lists"
+        />
+        <Card1
+          view="locations" icon={MapPin} label="Locations"
+          description="Manage and maintain location master data."
+          colorBg="bg-emerald-50" colorIcon="text-emerald-500" colorUnderline="bg-emerald-400"
+          colorChevron="group-hover:text-emerald-400"
+          testId="card-locations"
+        />
+        <Card1
+          view="master-data-table" icon={FileCode2} label="Master Data"
+          description="Central hub for all master data modules."
+          colorBg="bg-indigo-50" colorIcon="text-indigo-500" colorUnderline="bg-indigo-400"
+          colorChevron="group-hover:text-indigo-400"
+          testId="card-master-data"
+        />
+      </div>
 
-                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-components">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2 bg-gray-100 rounded-lg">
-                      <Box className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentView('components')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-components">
-                      View
-                    </Button>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-components">{isComponentsLoading ? '...' : totalComponents}</div>
-                  <p className="text-xs text-gray-500 mt-0.5">Fleet Components</p>
-                  {stats?.components && (
-                    <>
-                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                        <span>{stats.components.withMaker} with maker</span>
-                        <span className="text-gray-300">|</span>
-                        <span className={stats.components.withoutMaker > 0 ? 'text-amber-600' : ''}>{stats.components.withoutMaker} without</span>
-                      </div>
-                      <ProgressBar value={stats.components.withMaker} max={stats.components.total} color="bg-blue-500" />
-                    </>
-                  )}
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-jobs">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2 bg-gray-100 rounded-lg">
-                      <Wrench className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentView('jobs')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-jobs">
-                      View
-                    </Button>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-jobs">{isJobsLoading ? '...' : totalJobs}</div>
-                  <p className="text-xs text-gray-500 mt-0.5">Fleet Jobs</p>
-                  {stats?.jobs && (
-                    <>
-                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                        <span>{stats.jobs.withValidComponent} linked</span>
-                        <span className="text-gray-300">|</span>
-                        <span className={stats.jobs.withInvalidComponent > 0 ? 'text-amber-600' : ''}>{stats.jobs.withInvalidComponent} unlinked</span>
-                      </div>
-                      <ProgressBar value={stats.jobs.withValidComponent} max={stats.jobs.total} color="bg-blue-500" />
-                    </>
-                  )}
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-spares">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2 bg-gray-100 rounded-lg">
-                      <Package className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentView('spares')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-spares">
-                      View
-                    </Button>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-spares">{isSparesLoading ? '...' : totalSpares}</div>
-                  <p className="text-xs text-gray-500 mt-0.5">Fleet Spares</p>
-                  {stats?.spares && (
-                    <>
-                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                        <span>{stats.spares.withValidComponent} linked</span>
-                        <span className="text-gray-300">|</span>
-                        <span className={stats.spares.withInvalidComponent > 0 ? 'text-amber-600' : ''}>{stats.spares.withInvalidComponent} unlinked</span>
-                      </div>
-                      <ProgressBar value={stats.spares.withValidComponent} max={stats.spares.total} color="bg-blue-500" />
-                    </>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <List className="h-4 w-4 text-gray-600" />
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentView('master-lists')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-master-lists">
-                  View
-                </Button>
-              </div>
-              <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-lists">{isMasterListsLoading ? '...' : totalMasterLists}</div>
-              <p className="text-xs text-gray-500 mt-0.5">Master Lists</p>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <FileCode2 className="h-4 w-4 text-gray-600" />
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentView('master-data-table')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-master-data">
-                  View
-                </Button>
-              </div>
-              <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-data">{isComponentsLoading ? '...' : totalComponents}</div>
-              <p className="text-xs text-gray-500 mt-0.5">Equipment Codes</p>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Clock className="h-4 w-4 text-gray-600" />
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentView('pms-settings')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-pms-settings">
-                  Configure
-                </Button>
-              </div>
-              <div className="text-2xl font-bold text-gray-900" data-testid="widget-pms-settings">{isPmsSettingsLoading || isVesselsLoading ? '...' : `${configuredPmsSettings}/${totalVessels}`}</div>
-              <p className="text-xs text-gray-500 mt-0.5">Lead Time & Grace</p>
-              {!isPmsSettingsLoading && !isVesselsLoading && totalVessels > 0 && (
-                <ProgressBar value={configuredPmsSettings} max={totalVessels} color="bg-blue-500" />
-              )}
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Anchor className="h-4 w-4 text-gray-600" />
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentView('fleet-vessel-manager')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-fleet-vessel">
-                  Manage
-                </Button>
-              </div>
-              <div className="text-2xl font-bold text-gray-900" data-testid="widget-fleet-vessel">{isFleetsLoading || isVesselsLoading ? '...' : `${totalFleets} / ${totalVessels}`}</div>
-              <p className="text-xs text-gray-500 mt-0.5">Fleets / Vessels</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Fleet Data</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                  {[
-                    { view: 'makers' as ViewType, icon: Building2, label: 'Makers' },
-                    { view: 'components' as ViewType, icon: Box, label: 'Components' },
-                    { view: 'jobs' as ViewType, icon: Wrench, label: 'Jobs' },
-                    { view: 'spares' as ViewType, icon: Package, label: 'Spares' },
-                    { view: 'master-lists' as ViewType, icon: List, label: 'Master Lists' },
-                    { view: 'fleet-data' as ViewType, icon: Database, label: 'Fleet Data' },
-                  ].map(link => (
-                    <button
-                      key={link.view}
-                      onClick={() => setCurrentView(link.view)}
-                      className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-left"
-                      data-testid={`link-${link.view}`}
-                    >
-                      <link.icon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <span className="text-xs font-medium text-gray-700 truncate">{link.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Configuration & Mapping</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { view: 'vessel-mapping' as ViewType, icon: Ship, label: 'Vessel Mapping' },
-                    { view: 'fleet-vessel-manager' as ViewType, icon: Anchor, label: 'Fleet & Vessel' },
-                    { view: 'pms-settings' as ViewType, icon: Clock, label: 'Lead Time & Grace' },
-                    { view: 'master-data-table' as ViewType, icon: Database, label: 'Master Data' },
-                    { view: 'locations' as ViewType, icon: MapPin, label: 'Locations' },
-                  ].map(link => (
-                    <button
-                      key={link.view}
-                      onClick={() => setCurrentView(link.view)}
-                      className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-left"
-                      data-testid={`link-${link.view}`}
-                    >
-                      <link.icon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <span className="text-xs font-medium text-gray-700 truncate">{link.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      {/* ── Section 2: Configuration & Mapping ── */}
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-gray-900">Configuration &amp; Mapping</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Maintain system configuration and mapping for smooth operations.</p>
+        <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card2
+            view="vessel-mapping" icon={Ship} label="Vessel Mapping"
+            description="Configure and manage vessel mapping across the system."
+            colorCardBg="bg-blue-50/60" colorBorder="border-blue-100"
+            colorIconBg="bg-blue-100" colorIcon="text-blue-500"
+            colorUnderline="bg-blue-400" colorChevron="group-hover:text-blue-400"
+            testId="card-vessel-mapping"
+          />
+          <Card2
+            view="fleet-vessel-manager" icon={Anchor} label="Fleet &amp; Vessel"
+            description="Map and maintain fleets with respective vessels."
+            colorCardBg="bg-indigo-50/60" colorBorder="border-indigo-100"
+            colorIconBg="bg-indigo-100" colorIcon="text-indigo-500"
+            colorUnderline="bg-indigo-400" colorChevron="group-hover:text-indigo-400"
+            testId="card-fleet-vessel"
+          />
+          <Card2
+            view="pms-settings" icon={Clock} label="Lead Time &amp; Grace"
+            description="Configure lead time and grace period settings."
+            colorCardBg="bg-amber-50/60" colorBorder="border-amber-100"
+            colorIconBg="bg-amber-100" colorIcon="text-amber-500"
+            colorUnderline="bg-amber-400" colorChevron="group-hover:text-amber-400"
+            testId="card-lead-time"
+          />
         </div>
       </div>
+
     </div>
   );
 }
