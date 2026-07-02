@@ -1,13 +1,18 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import * as schema from "@shared/schema";
-import { tenants, tenantInstances } from "@shared/master/schema";
+import { tenants, tenantInstances, chatbotInteractions, type InsertChatbotInteraction } from "@shared/master/schema";
 import { tenantStorage, getCurrentTenantContext, type TenantContext } from "./asyncLocalStorage";
 import { runMigrations, runDrizzleMigrations } from "../migrations";
 import { initializeDatabase, ensureMaintenanceHistoryImmutability } from "../initDb";
+import { resolvePostgres } from "../postgresClient";
+
+// Chatbot Stage A: ensure the central chatbot_interactions table exists once per process
+// (covers single-tenant, where the master migration does not run).
+let chatLogTableEnsured = false;
 
 /**
  * Tenant connection manager (multi-tenant mode). Mirrors the Crewing pattern,
@@ -154,6 +159,69 @@ class TenantConnectionManager {
     const out = { tuid: rows[0].tuid, databaseName: rows[0].databaseName };
     this.tenantCache.set(domain, { ...out, expiresAt: Date.now() + CACHE_TTL_MS });
     return out;
+  }
+
+  /**
+   * Chatbot Stage A: per-tenant AI assistant on/off (multi-tenant mode). Defaults TRUE
+   * (fail-open) so a missing column or a lookup hiccup never silently breaks the working
+   * chatbot. Single-tenant mode does not call this — the controller uses the CHATBOT_ENABLED env.
+   */
+  async isTenantAiEnabled(domain: string): Promise<boolean> {
+    if (!this._isMultiTenantEnabled || !this.masterDb || !domain) return true;
+    try {
+      const rows = await this.masterDb
+        .select({ aiEnabled: tenants.aiEnabled })
+        .from(tenants)
+        .where(eq(tenants.domain, domain))
+        .limit(1);
+      if (rows.length === 0) return true; // domain gating already done by resolveTenant
+      return rows[0].aiEnabled !== false;
+    } catch {
+      return true; // fail-open — never block the chatbot on a flag-read error
+    }
+  }
+
+  /**
+   * Chatbot Stage A: write ONE central, tenant-tagged interaction row. Multi-tenant → the
+   * MASTER database; single-tenant → the single/default database (tuid null). NEVER writes a
+   * tenant DB (uses masterDb / resolvePostgres explicitly, not the ALS getDb). The table is
+   * ensured once per process (covers single-tenant, where the master migration doesn't run).
+   * Callers MUST invoke this fire-and-forget AFTER the response and .catch() any error — a
+   * logging failure must never slow or break the answer.
+   */
+  async logChatInteraction(row: InsertChatbotInteraction): Promise<void> {
+    const opsDb = (this._isMultiTenantEnabled && this.masterDb)
+      ? this.masterDb
+      : (await resolvePostgres())?.db;
+    if (!opsDb) return;
+    if (!chatLogTableEnsured) {
+      await opsDb.execute(sql`
+        CREATE TABLE IF NOT EXISTS chatbot_interactions (
+          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tuid            TEXT,
+          domain          TEXT,
+          user_id         TEXT,
+          user_name       TEXT,
+          user_role       TEXT,
+          vessel_id       TEXT,
+          conversation_id TEXT,
+          question        TEXT NOT NULL,
+          answer          TEXT NOT NULL,
+          tools_used      JSONB,
+          docs_retrieved  JSONB,
+          tokens_in       INTEGER,
+          tokens_out      INTEGER,
+          latency_ms      INTEGER,
+          model           TEXT,
+          provider        TEXT,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await opsDb.execute(sql`CREATE INDEX IF NOT EXISTS idx_chatbot_interactions_tuid ON chatbot_interactions (tuid)`);
+      await opsDb.execute(sql`CREATE INDEX IF NOT EXISTS idx_chatbot_interactions_created_at ON chatbot_interactions (created_at)`);
+      chatLogTableEnsured = true;
+    }
+    await opsDb.insert(chatbotInteractions).values(row);
   }
 
   /** True if the tuid maps to an active tenant (used by the optional x-tenant-id header path, Phase 2). */

@@ -66,6 +66,25 @@ export const requireVesselAccess = (req: AuthenticatedRequest, res: Response, ne
   next();
 };
 
+/**
+ * Pure predicate mirroring requireVesselAccess's rule, for callers that can't use the
+ * middleware (e.g. the chatbot, where the vesselId is chosen per tool call by the LLM).
+ * Office / PMS Admin / Sail Admin → any vessel; Ship → only their assigned vesselId.
+ * Returns false when no vessel is supplied for a role that requires one.
+ */
+export function canAccessVessel(
+  user: { role?: string; vesselId?: string | null } | undefined,
+  vesselId: string | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (user.role === "PMS Admin" || user.role === "Sail Admin" || user.role === "Office") return true;
+  if (user.role === "Ship") {
+    if (!vesselId) return false;
+    return user.vesselId === vesselId;
+  }
+  return false;
+}
+
 export async function initMockAuthRankId() {
   console.log(
     `✅ Mock auth resolves rank_name per-request (x-rank header → body.rank → "${DEFAULT_MOCK_RANK_NAME}")`,

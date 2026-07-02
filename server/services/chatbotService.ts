@@ -3,6 +3,7 @@ import type { IStorage } from "../storage";
 import { getDb } from "../db";
 import { vessels as vesselsTable, vesselCertificateData, vesselSurveyData, shipCertificatesMaster, shipSurveysMaster } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { canAccessVessel } from "../middleware/auth";
 
 let openaiClient: OpenAI | null = null;
 
@@ -795,9 +796,26 @@ const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 async function executeTool(
   toolName: string,
   args: any,
-  storage: IStorage
+  storage: IStorage,
+  access?: VesselAccess
 ): Promise<any> {
   try {
+    // Stage A — vessel-scope enforcement: the LLM supplies args.vesselId with no inherent
+    // access check. Verify the caller may see the requested vessel before any DB read.
+    // Gated by CHATBOT_ENFORCE_VESSEL_SCOPE (default on); no-op for Office/Admin/Sail Admin
+    // (so current single-user/admin behavior is unchanged).
+    if (access && process.env.CHATBOT_ENFORCE_VESSEL_SCOPE !== "false") {
+      if (toolName === "get_fleet_overview") {
+        if (access.role === "Ship") {
+          return { error: "Fleet-wide data isn't available for your role. Ask about your assigned vessel instead." };
+        }
+      } else if (typeof args?.vesselId === "string" && args.vesselId && args.vesselId !== "all") {
+        if (!canAccessVessel(access, args.vesselId)) {
+          return { error: `You don't have access to vessel '${args.vesselId}'. You can only view data for your assigned vessel.` };
+        }
+      }
+    }
+
     switch (toolName) {
       case "get_work_orders": {
         const workOrders = await storage.getWorkOrders(args.vesselId);
@@ -2767,19 +2785,36 @@ export interface ChatContext {
   userRole: string;
 }
 
+// Stage A: the caller's vessel-access identity, used to enforce that the LLM-supplied
+// args.vesselId is one the user may actually see. Optional — when omitted, no enforcement.
+export interface VesselAccess {
+  role: string;
+  vesselId: string | null;
+}
+
 export interface ChatResponse {
   response: string;
   toolsUsed: string[];
   conversationHistory: ChatMessage[];
+  // Stage A: token usage for the central log / cost view (best-effort; omitted on error paths).
+  usage?: { tokensIn: number; tokensOut: number };
 }
 
 export async function processChatMessage(
   message: string,
   conversationHistory: ChatMessage[],
   context: ChatContext,
-  storage: IStorage
+  storage: IStorage,
+  access?: VesselAccess
 ): Promise<ChatResponse> {
   const toolsUsed: string[] = [];
+  // Stage A — reliability: per-LLM-call timeout + an overall tool-loop wall-clock budget so a
+  // hung call fails gracefully and the loop can't run unbounded. Generous defaults → byte-identical.
+  const LLM_TIMEOUT_MS = parseInt(process.env.LLM_TIMEOUT_MS || "", 10) || 60_000;
+  const TOTAL_BUDGET_MS = parseInt(process.env.LLM_TOTAL_BUDGET_MS || "", 10) || 120_000;
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  let tokensIn = 0;
+  let tokensOut = 0;
 
   try {
     const systemPrompt = buildSystemPrompt(context);
@@ -2815,7 +2850,9 @@ export async function processChatMessage(
       tool_choice: "auto",
       temperature: 0.4,
       max_tokens: 4000,
-    });
+    }, { timeout: LLM_TIMEOUT_MS });
+    tokensIn += response.usage?.prompt_tokens ?? 0;
+    tokensOut += response.usage?.completion_tokens ?? 0;
 
     let assistantMessage = response.choices[0].message;
     let iterations = 0;
@@ -2824,7 +2861,8 @@ export async function processChatMessage(
     while (
       assistantMessage.tool_calls &&
       assistantMessage.tool_calls.length > 0 &&
-      iterations < maxIterations
+      iterations < maxIterations &&
+      Date.now() < deadline
     ) {
       iterations++;
 
@@ -2836,7 +2874,7 @@ export async function processChatMessage(
         toolsUsed.push(toolName);
 
         console.log(`[Chatbot] Executing tool: ${toolName}`, toolArgs);
-        const result = await executeTool(toolName, toolArgs, storage);
+        const result = await executeTool(toolName, toolArgs, storage, access);
 
         messages.push({
           role: "tool",
@@ -2852,7 +2890,9 @@ export async function processChatMessage(
         tool_choice: "auto",
         temperature: 0.4,
         max_tokens: 4000,
-      });
+      }, { timeout: LLM_TIMEOUT_MS });
+      tokensIn += response.usage?.prompt_tokens ?? 0;
+      tokensOut += response.usage?.completion_tokens ?? 0;
 
       assistantMessage = response.choices[0].message;
     }
@@ -2870,6 +2910,7 @@ export async function processChatMessage(
       response: assistantContent,
       toolsUsed: Array.from(new Set(toolsUsed)),
       conversationHistory: updatedHistory,
+      usage: { tokensIn, tokensOut },
     };
   } catch (error: any) {
     console.error("[Chatbot] Error processing message:", error);
