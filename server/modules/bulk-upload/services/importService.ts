@@ -28,6 +28,9 @@ export interface SpareInventoryResult {
   stockRowsCreated: number;
   stockRowsUpdated: number;
   txCreated: number;
+  // Set when the location/stock step failed but was not fatal (spare + link already done).
+  // Surfaced to the import summary's warnings instead of being silently swallowed.
+  locationStockError?: string | null;
 }
 
 async function writeOneLocation(
@@ -156,6 +159,9 @@ export async function processSpareInventory(params: {
     }
   } catch (error: any) {
     console.error(`⚠️ Error processing location/stock for spare ${spareId} (link was ${out.linkCreated ? 'created' : 'skipped'}):`, error.message);
+    // Surface (don't silently swallow): the spare + link may have succeeded, but stock/location
+    // distribution did not. Recorded on the result so the import summary shows a warning.
+    out.locationStockError = error?.message || 'Unknown location/stock error';
   }
   return out;
 }
@@ -571,6 +577,10 @@ export async function performImport(
       result.spareLocationStockRowsCreated += r.stockRowsCreated;
       result.spareLocationStockRowsUpdated += r.stockRowsUpdated;
       result.inventoryTransactionsCreated += r.txCreated;
+      // Surface a non-fatal location/stock failure to the summary (was previously only console-logged).
+      if (r.locationStockError) {
+        result.warnings.push(`Location/stock distribution failed for a spare (spare and component link were still processed): ${r.locationStockError}`);
+      }
     };
 
     for (let _spareIdx = 0; _spareIdx < data.length; _spareIdx++) {

@@ -2820,10 +2820,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           return;
         }
 
-        if (!isNaN(currentRH) && !isNaN(previousRH) && (currentRH - previousRH) > 2000 && !currentReadingWarningAcknowledged) {
+        // Warning-only: compute the "large jump" against the component's ACTUAL current RH, not a
+        // previousReading that can still be 0/empty on the first submit (which produced a false
+        // "0 → 9500" jump). Prefer previousReading when it holds a real value; otherwise fall back to
+        // the already-loaded component RH (lastCompletedCurrentReading / currentCumulativeRH), which is
+        // available before the first submit. Skip the warning if no valid baseline exists rather than
+        // compute against 0. Does NOT affect the save or the range validation above.
+        const jumpBaselineRaw =
+          (executionData.previousReading && parseFloat(executionData.previousReading) > 0)
+            ? executionData.previousReading
+            : ((workOrderContext as any)?.templateData?.lastCompletedCurrentReading
+                ?? ((workOrderContext as any)?.component?.currentCumulativeRH != null
+                     ? String((workOrderContext as any).component.currentCumulativeRH)
+                     : undefined));
+        const jumpBaseline = jumpBaselineRaw != null ? parseFloat(jumpBaselineRaw) : NaN;
+
+        if (!isNaN(currentRH) && !isNaN(jumpBaseline) && jumpBaseline > 0 && (currentRH - jumpBaseline) > 2000 && !currentReadingWarningAcknowledged) {
           toast({
             title: "Warning — Large Reading Jump",
-            description: `Current Reading (${currentRH}) exceeds Previous Reading (${previousRH}) by ${(currentRH - previousRH).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
+            description: `Current Reading (${currentRH}) exceeds Previous Reading (${jumpBaseline}) by ${(currentRH - jumpBaseline).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
             variant: "destructive",
           });
           setCurrentReadingWarningAcknowledged(true);
@@ -3410,10 +3425,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      if (!isNaN(currentRH) && !isNaN(previousRH) && (currentRH - previousRH) > 2000 && !currentReadingWarningAcknowledged) {
+      // Warning-only: compute the "large jump" against the component's ACTUAL current RH, not a
+      // previousReading that can still be 0/empty on the first submit (false "0 → 9500" jump). Prefer
+      // previousReading when it holds a real value; otherwise fall back to the already-loaded component
+      // RH. Skip the warning if no valid baseline exists rather than compute against 0. Does NOT affect
+      // the save or the range validation above.
+      const jumpBaselineRaw =
+        (executionData.previousReading && parseFloat(executionData.previousReading) > 0)
+          ? executionData.previousReading
+          : ((workOrderContext as any)?.templateData?.lastCompletedCurrentReading
+              ?? ((workOrderContext as any)?.component?.currentCumulativeRH != null
+                   ? String((workOrderContext as any).component.currentCumulativeRH)
+                   : undefined));
+      const jumpBaseline = jumpBaselineRaw != null ? parseFloat(jumpBaselineRaw) : NaN;
+
+      if (!isNaN(currentRH) && !isNaN(jumpBaseline) && jumpBaseline > 0 && (currentRH - jumpBaseline) > 2000 && !currentReadingWarningAcknowledged) {
         toast({
           title: 'Warning — Large Reading Jump',
-          description: `Current Reading (${currentRH}) exceeds Previous Reading (${previousRH}) by ${(currentRH - previousRH).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
+          description: `Current Reading (${currentRH}) exceeds Previous Reading (${jumpBaseline}) by ${(currentRH - jumpBaseline).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
           variant: 'destructive',
         });
         setCurrentReadingWarningAcknowledged(true);
