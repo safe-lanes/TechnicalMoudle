@@ -1,0 +1,41 @@
+## Work Order Locking Configuration Screen
+
+I would like to build a **Work Order Locking Configuration** screen under **Admin → Master Data**, placed **next to the Lead Time & Grace KPI Configuration** page. The screen should have a similar layout and behavior to the existing Lead Time & Grace KPI configuration.
+
+### Configuration Criteria
+
+| Criteria               | HOD Remarks Required (`ce_with_justification`)     | Superintendent Notified (`superintendent_notification`) | Locked (`superintendent_locked`) |
+| ---------------------- | -------------------------------------------------- | ------------------------------------------------------- | -------------------------------- |
+| **Days Late**          | 7–13 days                                          | 14–20 days                                              | 21+ days                         |
+| **Missed Cycles**      | 1 cycle                                            | 2 cycles                                                | 3+ cycles                        |
+| **Backdating**         | 1–2 days                                           | 3–6 days                                                | 7+ days                          |
+| **Standard (No Flag)** | Less than 7 days / 0 missed cycles / No backdating | –                                                       | –                                |
+
+### Required Features
+
+1. **Company-Level Configuration**
+
+   * Configure a default Work Order Locking policy for the entire company.
+   * This configuration should act as the default for all vessels.
+
+2. **Vessel-Level Configuration**
+
+   * Allow each vessel to have its own configuration if required.
+   * Provide an option to apply the company default configuration to any selected vessel.
+   * Allow vessel-specific settings to override the company default.
+
+3. **Enable/Disable Control**
+
+   * Provide an option to enable or disable the Work Order Locking feature for each vessel independently.
+   * When disabled, the vessel should follow the standard Work Order workflow without applying any locking rules.
+
+4. **Configuration Management**
+
+   * Users should be able to create, edit, and save threshold values for each criterion.
+   * The screen should clearly indicate whether a vessel is using the **Company Default** configuration or a **Vessel-Specific** configuration.
+
+### Screen Location
+
+**Admin → Master Data → Work Order Locking Configuration**
+
+This screen should be placed **next to the existing Lead Time & Grace KPI Configuration** page for consistency with the current system design.

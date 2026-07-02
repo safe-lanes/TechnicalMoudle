@@ -1009,7 +1009,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId } = useVessel();
-  const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept, isExternal } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isTechSuperintendent, isVessel, isHeadOfDept, isExternal } = useUIRole();
   const { isChangeRequestMode } = useChangeRequest();
   const { isChangeMode } = useChangeMode();
   
@@ -1099,7 +1099,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   return (
     <>
       <div className="overflow-x-auto">
-        {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
+        {(isSailAdmin || isClientAdmin || isTechSuperintendent || isExternal || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
         <div className="flex justify-end mb-3">
           <Button
             onClick={handleAddWorkOrder}
