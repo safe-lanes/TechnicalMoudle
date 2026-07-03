@@ -496,7 +496,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [woDocuments, setWoDocuments] = useState<Array<{id: string, workOrderId: string, documentType: string, fileName: string, fileKey: string, fileType: string, fileSize: number, uploadedBy: string, uploadedAt: string}>>([]);
   const [previewDoc, setPreviewDoc] = useState<{id: string, fileName: string, fileType: string, fileSize?: number, fetchUrl?: string} | null>(null);
-  const [pendingAttachments, setPendingAttachments] = useState<Array<{file: File, documentType: string}>>([]);
+  // Pending attachments (Unplanned WO create): files queued BEFORE a WO id exists, then flushed at
+  // save. Each carries a stable temp `id`, and a ref mirror (`pendingAttachmentsRef`) holds the
+  // committed-latest queue so the async flush at submit reads the real set — not a stale render
+  // closure. This makes upload/match deterministic under fast/multiple uploads, slow responses and
+  // re-submits (no reliance on render timing or array index).
+  const [pendingAttachments, setPendingAttachments] = useState<Array<{id: string, file: File, documentType: string}>>([]);
+  const pendingAttachmentsRef = useRef<Array<{id: string, file: File, documentType: string}>>([]);
+  const pendingSeqRef = useRef(0);
   const [currentReadingWarningAcknowledged, setCurrentReadingWarningAcknowledged] = useState(false);
 
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
@@ -1945,6 +1952,69 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     getDocsByType(documentType).length +
     pendingAttachments.filter(p => p.documentType === documentType).length;
 
+  // ── Pending-attachment tracking (deterministic) ───────────────────────────────
+  // Queue files locally (Unplanned WO create, before a WO id exists). Writes the ref
+  // synchronously so a flush fired immediately after — even before React re-renders — sees them.
+  const queuePendingAttachments = (files: File[], documentType: string) => {
+    const added = files.map(file => ({ id: `pa-${++pendingSeqRef.current}`, file, documentType }));
+    const next = [...pendingAttachmentsRef.current, ...added];
+    pendingAttachmentsRef.current = next;   // synchronous — flush/counters read the true latest set
+    setPendingAttachments(next);            // UI mirror
+    added.forEach(a => console.log(`// TEMP-TRACE [pending-queue] queued temp=${a.id} type=${a.documentType} file="${a.file.name}" (WO not created yet)`));
+    return added;
+  };
+
+  const removePendingAttachment = (id: string) => {
+    const next = pendingAttachmentsRef.current.filter(a => a.id !== id);
+    pendingAttachmentsRef.current = next;
+    setPendingAttachments(next);
+  };
+
+  // Flush the queued attachments to a now-existing WO id. Reads the ref snapshot (deterministic),
+  // uploads each independently, and removes ONLY the ones that succeeded (by temp id) — so a
+  // re-submit after a partial failure safely retries just the failures and never double-uploads a
+  // success. Files queued during the await are retained. Never throws (upload failures are
+  // collected, not fatal to the WO save). Tenant-context handling on the endpoint is untouched.
+  const flushPendingAttachments = async (
+    targetWoId: string,
+    vesselIdForUpload: string,
+  ): Promise<{ attached: number; failed: string[] }> => {
+    const items = [...pendingAttachmentsRef.current];
+    console.log(`// TEMP-TRACE [pending-flush] WO=${targetWoId} looking for ${items.length} pending attachment(s): [${items.map(i => `${i.id}:${i.documentType}`).join(', ')}]`);
+    if (items.length === 0) return { attached: 0, failed: [] };
+
+    const succeededIds: string[] = [];
+    const failed: string[] = [];
+    for (const { id, file, documentType } of items) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('documentType', documentType);
+        formData.append('vesselId', vesselIdForUpload || '');
+        const uploadRes = await fetch(`/technical/api/work-orders/${targetWoId}/documents`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          const errBody = await uploadRes.json().catch(() => ({}));
+          throw new Error(errBody.message || errBody.error || `Upload failed for ${file.name}`);
+        }
+        succeededIds.push(id);
+        console.log(`// TEMP-TRACE [pending-flush] MATCHED+uploaded temp=${id} file="${file.name}" -> WO=${targetWoId}`);
+      } catch (uploadErr: any) {
+        failed.push(file.name);
+        console.error(`// TEMP-TRACE [pending-flush] FAILED temp=${id} file="${file.name}":`, uploadErr?.message || uploadErr);
+      }
+    }
+    // Remove only the successfully-uploaded ids from the live queue (keep failures for retry).
+    const succeeded = new Set(succeededIds);
+    const remaining = pendingAttachmentsRef.current.filter(a => !succeeded.has(a.id));
+    pendingAttachmentsRef.current = remaining;
+    setPendingAttachments(remaining);
+    console.log(`// TEMP-TRACE [pending-flush] done WO=${targetWoId}: attached=${succeededIds.length} failed=${failed.length} remaining=${remaining.length}`);
+    return { attached: succeededIds.length, failed };
+  };
+
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>, documentType: string) => {
     if (isReadOnly) return;
     const files = event.target.files;
@@ -1988,10 +2058,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       if (filesToQueue.length > 0) {
-        setPendingAttachments(prev => [...prev, ...filesToQueue.map(file => ({ file, documentType }))]);
+        queuePendingAttachments(filesToQueue, documentType);
         toast({
           title: filesToQueue.length === 1 ? "File queued" : `${filesToQueue.length} files queued`,
-          description: "Files will be attached automatically when you save the draft.",
+          description: "Files will be attached automatically when you save the work order.",
         });
       }
       event.target.value = '';
@@ -2313,11 +2383,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (items.length === 0) return null;
     return (
       <div className="mt-1 flex items-center gap-1 flex-wrap" data-testid={`pending-items-${documentType}`}>
-        {items.map(({ file, globalIdx }) => {
+        {items.map(({ id, file, globalIdx }) => {
           const popupKey = `${documentType}-${globalIdx}`;
           const isOpen = openPendingPopup === popupKey;
           return (
-            <div key={globalIdx} className="relative" data-testid={`pending-item-${documentType}-${globalIdx}`}>
+            <div key={id} className="relative" data-testid={`pending-item-${documentType}-${globalIdx}`}>
               <div
                 data-pending-icon={popupKey}
                 className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors"
@@ -2342,7 +2412,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300 w-full"
                       onClick={() => {
                         setOpenPendingPopup(null);
-                        setPendingAttachments(prev => prev.filter((_, i) => i !== globalIdx));
+                        removePendingAttachment(id);
                       }}
                       data-testid={`button-remove-pending-${documentType}-${globalIdx}`}
                     >
@@ -3156,42 +3226,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
         queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
 
-        // Upload any pending attachments now that we have a WO id
-        const currentVesselId = contextVesselId || '';
-        const failedFiles: string[] = [];
-        for (const { file, documentType } of pendingAttachments) {
-          try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('documentType', documentType);
-            formData.append('vesselId', currentVesselId);
-            const uploadRes = await fetch(`/technical/api/work-orders/${newWoId}/documents`, {
-              method: 'POST',
-              body: formData,
-            });
-            if (!uploadRes.ok) {
-              const errBody = await uploadRes.json().catch(() => ({}));
-              throw new Error(errBody.message || errBody.error || `Upload failed for ${file.name}`);
-            }
-          } catch (uploadErr: any) {
-            console.error('Pending attachment upload failed:', uploadErr);
-            failedFiles.push(file.name);
-          }
-        }
-        setPendingAttachments([]);
+        // Upload any pending attachments now that we have a WO id (deterministic flush from ref).
+        const { attached, failed } = await flushPendingAttachments(newWoId, contextVesselId || '');
 
-        if (failedFiles.length === 0) {
-          const attachedCount = pendingAttachments.length;
+        if (failed.length === 0) {
           toast({
             title: 'Draft Saved',
-            description: attachedCount > 0
-              ? `Unplanned work order saved as draft with ${attachedCount} file(s) attached. You can resume editing from the Unplanned tab.`
+            description: attached > 0
+              ? `Unplanned work order saved as draft with ${attached} file(s) attached. You can resume editing from the Unplanned tab.`
               : 'Unplanned work order saved as draft. You can resume editing from the Unplanned tab.',
           });
         } else {
           toast({
             title: 'Draft Saved (attachments partially failed)',
-            description: `Work order saved. ${pendingAttachments.length - failedFiles.length} file(s) attached. Failed: ${failedFiles.join(', ')}.`,
+            description: `Work order saved. ${attached} file(s) attached. Failed: ${failed.join(', ')}.`,
             variant: 'destructive',
           });
         }
@@ -3525,11 +3573,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         await apiRequest('PATCH', `/technical/api/work-orders/${newWoId}`, execPayload);
       }
 
+      // Attach files the user queued before this WO existed. This path (Submit / Create) previously
+      // never flushed the pending queue, so queued attachments were silently dropped on submit —
+      // the core "saved-then-rejected" bug. Flush deterministically from the ref BEFORE navigating
+      // away, so the association is persisted to the new WO regardless of upload/submit timing.
+      const { attached: pendingAttached, failed: pendingFailed } =
+        await flushPendingAttachments(newWoId, contextVesselId || '');
+
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
 
       if (isReadyForSubmission) {
-        toast({ title: 'Work Order Created', description: 'Unplanned work order submitted for approval.' });
+        toast({
+          title: 'Work Order Created',
+          description: pendingFailed.length > 0
+            ? `Unplanned work order submitted for approval. ${pendingAttached} file(s) attached; failed: ${pendingFailed.join(', ')}.`
+            : pendingAttached > 0
+              ? `Unplanned work order submitted for approval with ${pendingAttached} file(s) attached.`
+              : 'Unplanned work order submitted for approval.',
+          variant: pendingFailed.length > 0 ? 'destructive' : undefined,
+        });
         sessionStorage.setItem('workOrdersActiveTab', 'Pending Approval');
         navigate('/pms/work-orders');
       } else {
