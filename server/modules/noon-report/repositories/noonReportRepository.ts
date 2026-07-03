@@ -1,4 +1,4 @@
-import { db } from '../../../db';
+import { getDb } from '../../../db';
 import { nrNoonReports, nrFuelRob, nrVoyageLegs } from '@shared/schema';
 import type { InsertNrNoonReport, InsertNrFuelRob, InsertNrVoyageLeg } from '@shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
@@ -10,6 +10,7 @@ export async function getNoonReports(filters: {
   status?: string;
   limit?: number;
 }) {
+  const db = await getDb();
   let query = db.select().from(nrNoonReports).orderBy(desc(nrNoonReports.reportDate));
 
   const conditions = [];
@@ -31,11 +32,13 @@ export async function getNoonReports(filters: {
 }
 
 export async function getNoonReportById(id: number) {
+  const db = await getDb();
   const result = await db.select().from(nrNoonReports).where(eq(nrNoonReports.id, id)).limit(1);
   return result[0] || null;
 }
 
 export async function createNoonReport(data: InsertNrNoonReport) {
+  const db = await getDb();
   const result = await db.insert(nrNoonReports).values({
     ...data,
     draftSavedAt: new Date(),
@@ -44,6 +47,7 @@ export async function createNoonReport(data: InsertNrNoonReport) {
 }
 
 export async function updateNoonReport(id: number, data: Partial<InsertNrNoonReport>) {
+  const db = await getDb();
   const result = await db.update(nrNoonReports)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(nrNoonReports.id, id))
@@ -52,6 +56,7 @@ export async function updateNoonReport(id: number, data: Partial<InsertNrNoonRep
 }
 
 export async function submitNoonReport(id: number, submittedBy: string) {
+  const db = await getDb();
   const result = await db.update(nrNoonReports)
     .set({
       status: 'submitted',
@@ -65,10 +70,12 @@ export async function submitNoonReport(id: number, submittedBy: string) {
 }
 
 export async function deleteNoonReport(id: number) {
+  const db = await getDb();
   await db.delete(nrNoonReports).where(and(eq(nrNoonReports.id, id), eq(nrNoonReports.status, 'draft')));
 }
 
 export async function saveDraft(id: number, data: Partial<InsertNrNoonReport>) {
+  const db = await getDb();
   const result = await db.update(nrNoonReports)
     .set({ ...data, draftSavedAt: new Date(), updatedAt: new Date() })
     .where(eq(nrNoonReports.id, id))
@@ -79,10 +86,12 @@ export async function saveDraft(id: number, data: Partial<InsertNrNoonReport>) {
 // ── Fuel ROB ─────────────────────────────────────────────────────────────────
 
 export async function getFuelRobByVessel(vesselId: string) {
+  const db = await getDb();
   return db.select().from(nrFuelRob).where(eq(nrFuelRob.vesselId, vesselId));
 }
 
 export async function upsertFuelRob(vesselId: string, fuelType: string, currentRob: number, reportId: number) {
+  const db = await getDb();
   const existing = await db.select().from(nrFuelRob)
     .where(and(eq(nrFuelRob.vesselId, vesselId), eq(nrFuelRob.fuelType, fuelType)))
     .limit(1);
@@ -104,12 +113,14 @@ export async function upsertFuelRob(vesselId: string, fuelType: string, currentR
 // ── Voyage Legs ───────────────────────────────────────────────────────────────
 
 export async function getVoyageLegsByVessel(vesselId: string) {
+  const db = await getDb();
   return db.select().from(nrVoyageLegs)
     .where(eq(nrVoyageLegs.vesselId, vesselId))
     .orderBy(desc(nrVoyageLegs.createdAt));
 }
 
 export async function upsertVoyageLeg(data: InsertNrVoyageLeg) {
+  const db = await getDb();
   const existing = await db.select().from(nrVoyageLegs)
     .where(and(eq(nrVoyageLegs.vesselId, data.vesselId), eq(nrVoyageLegs.voyageNo, data.voyageNo!)))
     .limit(1);
@@ -129,6 +140,7 @@ export async function upsertVoyageLeg(data: InsertNrVoyageLeg) {
 // ── Analytics helpers ─────────────────────────────────────────────────────────
 
 export async function getLastNReports(vesselId: string, n: number) {
+  const db = await getDb();
   return db.select().from(nrNoonReports)
     .where(and(eq(nrNoonReports.vesselId, vesselId), eq(nrNoonReports.status, 'submitted')))
     .orderBy(desc(nrNoonReports.reportDate))

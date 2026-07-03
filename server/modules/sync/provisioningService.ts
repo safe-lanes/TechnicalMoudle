@@ -13,7 +13,9 @@
  * getSyncPhaseOrder() from syncConfig.
  */
 
+import * as crypto from 'crypto';
 import { getPool } from '../../db';
+import { tenantConnectionManager } from '../../utils/tenantConnectionManager';
 import * as syncRepo from './repository';
 import {
   getTablesByCategory,
@@ -34,6 +36,11 @@ export interface ProvisioningManifest {
   tables: { tableName: string; rowCount: number; category: string }[];
   totalRows: number;
   version: string;
+  // Phase 4a (optional, additive — absent in pre-4a bundles):
+  // per-tenant sync key the ship seeds into its sync_settings on import (dormant until 4b).
+  syncApiKey?: string;
+  // fleet/per-vessel sync tunables seeded on import (default-preserving when absent).
+  envSettings?: { syncPushBatchSize?: number; syncRequestTimeoutMs?: number };
 }
 
 export interface ProvisioningBundle {
@@ -45,7 +52,8 @@ export interface ProvisioningBundle {
 
 export async function generateProvisioningBundle(
   vesselId: string,
-  generatedBy: string
+  generatedBy: string,
+  opts?: { domain?: string; persist?: boolean }
 ): Promise<ProvisioningBundle> {
   const pool = await getPool();
 
@@ -71,6 +79,33 @@ export async function generateProvisioningBundle(
     },
     data: [],
   };
+
+  // ── Phase 4a: per-tenant sync key + instance->domain map (shore side) ──
+  // Only on a real (persisted) generation — previews don't mint/persist state.
+  // NEW ships use the convention instance id SHIP-<vesselCode> (W1; existing
+  // production ships keep their running ids — see Phase 6 backfill note).
+  // Onboarding write: store the per-ship key + instance->domain map row so shore
+  // can authenticate this ship at the master level (Phase 4b). The ship gets the
+  // SAME key via the bundle (manifest.syncApiKey) -> its sync_settings on import.
+  if (opts?.persist && vesselCode) {
+    const convInstanceId = `SHIP-${vesselCode}`;
+    try {
+      // Stable per-ship key: reuse an existing one, else mint a new one.
+      const existingMeta = await syncRepo.getInstanceMetadata(convInstanceId);
+      const syncApiKey = (existingMeta as any)?.syncApiKey || crypto.randomBytes(32).toString('hex');
+      await syncRepo.upsertInstanceMetadata({ instanceId: convInstanceId, vesselId, syncApiKey });
+      bundle.manifest.syncApiKey = syncApiKey;
+      // Master map row = instance -> { domain, syncApiKey } (the fail-closed front
+      // door shore validates against). Domain is the verified tenant domain on req
+      // (set by tenantMiddleware once provisioning routes are un-exempted in 4b).
+      // No-op when multi-tenant is disabled (no master DB).
+      if (opts.domain) {
+        await tenantConnectionManager.upsertTenantInstance(convInstanceId, vesselId, opts.domain, syncApiKey);
+      }
+    } catch (keyErr: any) {
+      console.warn(`[Provisioning] sync key / instance-map seed skipped: ${keyErr.message}`);
+    }
+  }
 
   // Phase 0: Export the vessel row FIRST — almost every other table has
   // a FK to vessels.vuuid, so it must exist before anything else on import.
@@ -553,6 +588,26 @@ export async function importProvisioningBundle(
     });
   } catch (metaErr: any) {
     errors.push(`sync_metadata: ${metaErr.message}`);
+  }
+
+  // ── Conditional-seed the ship's sync_settings (idempotent, no-overwrite-if-set) ──
+  // Rows are pre-seeded EMPTY by migration 132; re-import never clobbers an
+  // operator-set value.
+  //   * sync_api_key            — per-ship key minted shore-side, carried in the bundle.
+  //                               The ship sends it as X-Sync-Api-Key (Phase 4b).
+  //   * sync_push_batch_size /  — fleet/per-vessel tunables (default-preserving when absent).
+  //     sync_request_timeout_ms
+  // The ship never declares a domain (Phase 4b: shore is the sole authority via the
+  // master instance->domain map), so no domain is seeded here.
+  try {
+    if (bundle.manifest.syncApiKey) await syncRepo.seedSettingIfEmpty('sync_api_key', bundle.manifest.syncApiKey);
+    const env = bundle.manifest.envSettings;
+    const pushBatch = env?.syncPushBatchSize ?? 200;
+    const reqTimeout = env?.syncRequestTimeoutMs ?? 120000;
+    await syncRepo.seedSettingIfEmpty('sync_push_batch_size', String(pushBatch));
+    await syncRepo.seedSettingIfEmpty('sync_request_timeout_ms', String(reqTimeout));
+  } catch (seedErr: any) {
+    errors.push(`sync_settings seed: ${seedErr.message}`);
   }
 
   console.log(

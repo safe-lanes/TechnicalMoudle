@@ -7,6 +7,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initStorage } from "./storage";
 import { initializeDatabase } from "./initDb";
 import { runBackupAndMigrations } from "./migrations";
+import { tenantConnectionManager } from "./utils/tenantConnectionManager";
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -51,6 +52,25 @@ app.use((req, res, next) => {
   
   // Run database migrations (adds new columns, tables, updates data format)
   await initializeDatabase();
+
+  // Multi-tenant: initialize the tenant connection manager. No-op + single-tenant
+  // mode when MASTER_DATABASE_URL is unset (byte-identical boot to today); when set,
+  // connects the master DB and applies migrations/master/*.sql.
+  await tenantConnectionManager.init();
+
+  // Phase 2 fail-loud: in multi-tenant mode the SAILERP Bearer is verified with
+  // JWT_SECRET (must equal SAILERP's signing secret). If it's missing, EVERY
+  // /technical/api request would 401 — refuse to start so the misconfig is obvious
+  // rather than silent. (Dev AUTH_BYPASS skips verification, so it's exempt.)
+  {
+    const authBypassDev = process.env.AUTH_BYPASS === 'true' && process.env.NODE_ENV === 'development';
+    if (tenantConnectionManager.isMultiTenantEnabled && !process.env.JWT_SECRET && !authBypassDev) {
+      throw new Error(
+        'JWT_SECRET is required in multi-tenant mode — set it to the shared SAILERP signing secret. ' +
+        'Refusing to start: every /technical/api request would 401.',
+      );
+    }
+  }
 
   // Resolve the sync instance identity BEFORE anything can write (schedulers
   // and startup tasks inside registerRoutes field-log their writes). The

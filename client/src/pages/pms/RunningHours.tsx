@@ -12,6 +12,7 @@ import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange, getPeriodLabe
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { downloadAuthedFile } from "@/lib/authedDownload";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
@@ -694,7 +695,7 @@ const RunningHours = () => {
     setHistoryPage(p);
   };
 
-  const exportHistoryToCSV = () => {
+  const exportHistoryToCSV = async () => {
     const params = new URLSearchParams({
       vesselId: vesselId || '',
       sortOrder: historySortOrder,
@@ -705,7 +706,15 @@ const RunningHours = () => {
       params.set('dateTo', formatLocalDate(historyDateRange.to));
     }
     if (selectedHistoryComponent) params.set('componentId', selectedHistoryComponent.cuuid);
-    window.open(`/technical/api/running-hours/history/export?${params.toString()}`, '_blank');
+    try {
+      await downloadAuthedFile(`/technical/api/running-hours/history/export?${params.toString()}`);
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Failed to export running hours history. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const clearHistoryFilters = () => {

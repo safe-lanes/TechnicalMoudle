@@ -364,7 +364,11 @@ export async function downloadProvisionHandler(req: Request, res: Response) {
     }
 
     const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
-    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId);
+    // Phase 4b: persist=true mints/stores the per-ship sync key + the instance->domain
+    // map row (master). Domain is the verified tenant domain (set by tenantMiddleware,
+    // since provisioning routes are no longer exempt). No-op when multi-tenant disabled.
+    const domain = (req as any).tenantDomain || undefined;
+    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, { domain, persist: true });
 
     const fileName = `provision_${vesselId}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     res.setHeader('Content-Type', 'application/json');
@@ -386,6 +390,8 @@ export async function importProvisionHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Invalid bundle format. Must contain manifest and data.' });
     }
 
+    // Phase 4b: the ship no longer declares a domain — shore is the sole authority
+    // via the master instance->domain map. Import just seeds the per-ship key + tunables.
     const result = await provisioningService.importProvisioningBundle(bundle);
     res.json(result);
   } catch (error: any) {

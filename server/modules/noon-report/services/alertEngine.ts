@@ -3,7 +3,7 @@
 // Evaluates 7 rules against the newly submitted report and creates/auto-resolves
 // alerts in the nr_alerts table.
 
-import { db } from '../../../db';
+import { getDb } from '../../../db';
 import {
   nrNoonReports,
   nrFuelRob,
@@ -53,6 +53,7 @@ async function evaluateRules(report: NrNoonReport): Promise<void> {
 // nr_fuel_rob (written by Phase 1). Trigger if > +15% (warning) or > +25% (critical).
 
 async function ruleConsumptionSpike(report: NrNoonReport): Promise<void> {
+  const db = await getDb();
   // Sum today's total consumption from the report fields
   const todayTotal =
     (toNum(report.hfoConsumption) ?? 0) +
@@ -98,6 +99,7 @@ async function ruleConsumptionSpike(report: NrNoonReport): Promise<void> {
 // Trigger LOW_ROB if < 10 days; CRITICAL_ROB if < 5 days.
 
 async function ruleRobEndurance(report: NrNoonReport): Promise<void> {
+  const db = await getDb();
   const robRows = await db.select()
     .from(nrFuelRob)
     .where(eq(nrFuelRob.vesselId, report.vesselId));
@@ -132,6 +134,7 @@ async function ruleRobEndurance(report: NrNoonReport): Promise<void> {
 // Skip if fewer than aeMinDataPoints data points are available in the baseline.
 
 async function ruleAeHoursSpike(report: NrNoonReport): Promise<void> {
+  const db = await getDb();
   const currentAeHours = toNum(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
 
@@ -170,6 +173,7 @@ async function ruleAeHoursSpike(report: NrNoonReport): Promise<void> {
 // Reads previousCiiRating written by computeCiiTracking in Phase 1.
 
 async function ruleCiiBandDrop(report: NrNoonReport): Promise<void> {
+  const db = await getDb();
   const year = new Date(report.reportDate).getFullYear();
   const ciiRows = await db.select()
     .from(nrCiiTracking)
@@ -223,6 +227,7 @@ async function ruleNegativeRobRisk(report: NrNoonReport): Promise<void> {
 // when the triggering condition has cleared.
 
 async function autoResolveCleared(report: NrNoonReport): Promise<void> {
+  const db = await getDb();
   const robRows = await db.select()
     .from(nrFuelRob)
     .where(eq(nrFuelRob.vesselId, report.vesselId));
@@ -276,6 +281,7 @@ async function autoResolveCleared(report: NrNoonReport): Promise<void> {
 // Marks the alert as system-acknowledged without permanently deleting it.
 
 async function resolveOpenAlert(vesselId: string, alertType: AlertType): Promise<void> {
+  const db = await getDb();
   await db.update(nrAlerts)
     .set({ acknowledgedAt: new Date(), acknowledgedBy: 'system' })
     .where(and(
@@ -296,6 +302,7 @@ async function upsertAlert(
   metricValue: number | null,
   thresholdValue: number | null,
 ): Promise<void> {
+  const db = await getDb();
   // Check for an existing open (unacknowledged) alert of the same type for this vessel
   const existing = await db.select({ id: nrAlerts.id })
     .from(nrAlerts)

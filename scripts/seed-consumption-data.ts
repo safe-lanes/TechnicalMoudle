@@ -1,4 +1,4 @@
-import { db } from "../server/db";
+import { getDb } from "../server/db";
 import { storesLedger, storesItems } from "../shared/schema";
 import { eq } from "drizzle-orm";
 
@@ -89,6 +89,7 @@ interface ItemInfo {
 }
 
 async function seed() {
+  const db = await getDb();
   console.log("Fetching existing stores items for vessel...");
   const items = await db
     .select({

@@ -1,4 +1,7 @@
 import { sql } from 'drizzle-orm';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import * as schema from "@shared/schema";
 import { resolvePostgres } from './postgresClient';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -3159,10 +3162,43 @@ async function markMigrationComplete(db: any, migration: Migration): Promise<voi
   `);
 }
 
-export async function runMigrations(): Promise<{ applied: number; skipped: number }> {
+/**
+ * Phase 6 — READ-ONLY dry-run: list migrations the runner WOULD apply (inline ids +
+ * migrations/*.sql filenames not yet in schema_migrations). Applies NOTHING. Used by
+ * the WK promotion gate to prove "zero pending" before adopting the DB as tenant #1.
+ * Returns [] when the DB is fully migrated.
+ */
+export async function getPendingMigrations(poolArg?: Pool): Promise<string[]> {
+  const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
+  if (!postgres) return [];
+  const { db } = postgres;
+  await ensureMigrationsTable(db);
+
+  const pending: string[] = [];
+  // (1) inline custom-SQL migrations
+  for (const migration of migrations) {
+    if (!(await getMigrationStatus(db, migration.id))) pending.push(migration.id);
+  }
+  // (2) migrations/*.sql files (tracked by filename minus .sql) — skip empty files (runner does too)
+  const migrationsFolder = path.join(process.cwd(), 'migrations');
+  if (fs.existsSync(migrationsFolder)) {
+    const sqlFiles = fs.readdirSync(migrationsFolder).filter((f) => f.endsWith('.sql')).sort();
+    for (const sqlFile of sqlFiles) {
+      const id = sqlFile.replace('.sql', '');
+      const content = fs.readFileSync(path.join(migrationsFolder, sqlFile), 'utf-8');
+      if (!content.trim()) continue;
+      if (!(await getMigrationStatus(db, id))) pending.push(id);
+    }
+  }
+  return pending;
+}
+
+export async function runMigrations(poolArg?: Pool): Promise<{ applied: number; skipped: number }> {
   console.log('🔄 Running database migrations...');
-  
-  const postgres = await resolvePostgres();
+
+  // Phase-1 Part E: when a Pool is passed (per-tenant lazy migration) run against it;
+  // otherwise resolve the single/default client exactly as before (no-arg = unchanged).
+  const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
   if (!postgres) {
     console.log('⏭️  Skipping migrations - DATABASE_URL not configured');
     return { applied: 0, skipped: 0 };
@@ -3300,10 +3336,10 @@ export async function generateDrizzleMigrations(): Promise<boolean> {
   }
 }
 
-export async function runDrizzleMigrations(): Promise<{ applied: number; skipped: number }> {
+export async function runDrizzleMigrations(poolArg?: Pool): Promise<{ applied: number; skipped: number }> {
   console.log('🔄 Running Drizzle file-based SQL migrations (unified tracking)...');
-  
-  const postgres = await resolvePostgres();
+
+  const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
   if (!postgres) {
     console.log('⏭️  Skipping Drizzle migrations - DATABASE_URL not configured');
     return { applied: 0, skipped: 0 };
@@ -3458,10 +3494,12 @@ async function cleanupDuplicateFleetComponentMappings(): Promise<void> {
   }
 }
 
-export async function runBackupAndMigrations(): Promise<void> {
-  await createDatabaseBackup();
-  await runMigrations();
-  await cleanupDuplicateFleetComponentMappings();
+export async function runBackupAndMigrations(poolArg?: Pool): Promise<void> {
+  // Backup + duplicate-mapping cleanup are single/default-DB maintenance; skip them
+  // when migrating a specific tenant pool. No-arg path is byte-identical to before.
+  if (!poolArg) await createDatabaseBackup();
+  await runMigrations(poolArg);
+  if (!poolArg) await cleanupDuplicateFleetComponentMappings();
   // NOTE: generateDrizzleMigrations() is intentionally NOT called here.
   // Runtime auto-generation caused race conditions (duplicate-numbered files
   // when multiple devs generated concurrently) and silently produced migration
@@ -3471,5 +3509,5 @@ export async function runBackupAndMigrations(): Promise<void> {
   // never creates them. Dev workflow: edit shared/schema.ts, run
   // `npm run db:generate` manually, review + commit the resulting SQL file.
   // This applies universally — Replit forks, DEV, and PROD alike.
-  await runDrizzleMigrations();
+  await runDrizzleMigrations(poolArg);
 }

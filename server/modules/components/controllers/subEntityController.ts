@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as documentService from '../services/documentService';
 import * as subEntityService from '../services/subEntityService';
 import type { AuthenticatedRequest } from '../../../middleware/auth';
+import { captureTenantFromReq } from '../../../utils/tenantConnectionManager';
 
 function getUserInfo(req: Request) {
   const user = (req as AuthenticatedRequest).user!;
@@ -22,7 +23,8 @@ export async function createDocument(req: Request, res: Response) {
   }
   const user = getUserInfo(req);
   try {
-    const document = await documentService.createDocument(req.body, req.file, user);
+    // multer broke the ALS chain; re-enter the tenant context (req.tenantTuid stashed pre-multer).
+    const document = await captureTenantFromReq(req)(() => documentService.createDocument(req.body, req.file!, user));
     res.json(document);
   } catch (error: any) {
     if (error.name === 'ZodError') {

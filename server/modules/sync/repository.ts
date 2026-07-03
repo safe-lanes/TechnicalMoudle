@@ -37,6 +37,9 @@ export async function upsertInstanceMetadata(data: {
   lastSyncStatus?: string | null;
   lastSyncAt?: Date | null;
   syncDirection?: string | null;
+  // Phase 4a: per-ship sync key storage. Written here (dormant); shore-side
+  // validation against it is Phase 4b. Today nothing reads this column.
+  syncApiKey?: string | null;
 }): Promise<SyncMetadata> {
   const db = await getDb();
   const existing = await getInstanceMetadata(data.instanceId);
@@ -48,6 +51,7 @@ export async function upsertInstanceMetadata(data: {
         ...(data.lastSyncStatus !== undefined ? { lastSyncStatus: data.lastSyncStatus } : {}),
         ...(data.lastSyncAt !== undefined ? { lastSyncAt: data.lastSyncAt } : {}),
         ...(data.syncDirection !== undefined ? { syncDirection: data.syncDirection } : {}),
+        ...(data.syncApiKey !== undefined ? { syncApiKey: data.syncApiKey } : {}),
         updatedAt: new Date(),
       })
       .where(eq(syncMetadata.instanceId, data.instanceId))
@@ -62,6 +66,7 @@ export async function upsertInstanceMetadata(data: {
       lastSyncStatus: data.lastSyncStatus ?? null,
       lastSyncAt: data.lastSyncAt ?? null,
       syncDirection: data.syncDirection ?? null,
+      ...(data.syncApiKey !== undefined ? { syncApiKey: data.syncApiKey } : {}),
     })
     .returning();
   return result[0];
@@ -559,6 +564,23 @@ export async function updateSetting(key: string, value: string, userId?: string)
       ...(userId ? { updatedByUuid: userId } : {}),
     })
     .where(eq(syncSettings.settingKey, key));
+}
+
+/**
+ * Phase 4a: conditional seed — set a sync_settings value ONLY if the key's row is
+ * currently empty (NULL or ''). Never overwrites an operator/already-set value.
+ * The row must already exist (pre-seeded empty by migration 132); like updateSetting,
+ * this is UPDATE-only and no-ops if the key is absent. Used by provisioning import.
+ */
+export async function seedSettingIfEmpty(key: string, value: string): Promise<void> {
+  if (value === undefined || value === null || value === '') return;
+  const db = await getDb();
+  await db.update(syncSettings)
+    .set({ settingValue: value, updatedAt: new Date() })
+    .where(and(
+      eq(syncSettings.settingKey, key),
+      sql`COALESCE(${syncSettings.settingValue}, '') = ''`,
+    ));
 }
 
 export async function updateSettings(settings: Record<string, string>, userId?: string): Promise<void> {

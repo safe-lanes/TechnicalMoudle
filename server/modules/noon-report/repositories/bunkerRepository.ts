@@ -1,4 +1,4 @@
-import { db } from '../../../db';
+import { getDb } from '../../../db';
 import { nrBunkerRecords } from '@shared/schema';
 import type { InsertNrBunkerRecord, NrBunkerRecord } from '@shared/schema';
 import { eq, and, desc, sum } from 'drizzle-orm';
@@ -9,6 +9,7 @@ export async function getBunkerRecords(filters: {
   vesselId: string;
   voyageNo?: string;
 }): Promise<NrBunkerRecord[]> {
+  const db = await getDb();
   const conditions = [eq(nrBunkerRecords.vesselId, filters.vesselId)];
   if (filters.voyageNo) conditions.push(eq(nrBunkerRecords.voyageNo, filters.voyageNo));
   return db.select()
@@ -18,11 +19,13 @@ export async function getBunkerRecords(filters: {
 }
 
 export async function getBunkerRecordById(id: number): Promise<NrBunkerRecord | null> {
+  const db = await getDb();
   const rows = await db.select().from(nrBunkerRecords).where(eq(nrBunkerRecords.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
 export async function createBunkerRecord(data: InsertNrBunkerRecord): Promise<NrBunkerRecord> {
+  const db = await getDb();
   const rows = await db.insert(nrBunkerRecords).values(data).returning();
   return rows[0];
 }
@@ -31,6 +34,7 @@ export async function updateBunkerRecord(
   id: number,
   data: Partial<InsertNrBunkerRecord>,
 ): Promise<NrBunkerRecord | null> {
+  const db = await getDb();
   const rows = await db.update(nrBunkerRecords)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(nrBunkerRecords.id, id))
@@ -39,6 +43,7 @@ export async function updateBunkerRecord(
 }
 
 export async function deleteBunkerRecord(id: number): Promise<void> {
+  const db = await getDb();
   await db.delete(nrBunkerRecords).where(eq(nrBunkerRecords.id, id));
 }
 
@@ -47,6 +52,7 @@ export async function deleteBunkerRecord(id: number): Promise<void> {
 export async function getBunkerCostSummary(vesselId: string, voyageNo?: string): Promise<
   Array<{ fuelType: string; totalQuantityMt: string; totalCost: string }>
 > {
+  const db = await getDb();
   const conditions = [eq(nrBunkerRecords.vesselId, vesselId)];
   if (voyageNo) conditions.push(eq(nrBunkerRecords.voyageNo, voyageNo));
 

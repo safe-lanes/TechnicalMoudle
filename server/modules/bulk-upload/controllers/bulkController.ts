@@ -8,7 +8,9 @@ import { promises as fsPromises } from 'fs';
 import { storage, calculateRecordChecksum, sortObjectKeys } from '../../../storage';
 import { masterLists } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { db } from '../../../db';
+import { getDb } from '../../../db';
+import { captureTenant, captureTenantFromReq } from '../../../utils/tenantConnectionManager';
+import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
 import { ObjectStorageService, ObjectNotFoundError } from '../../../objectStorage';
 import {
   saveImportHistory,
@@ -704,6 +706,9 @@ export async function getSheets(req: Request, res: Response) {
 
 // ── Dry Run ──
 export async function dryRun(req: Request, res: Response) {
+  // TEMP-TRACE: domain is stashed on req by tenantMiddleware (survives multer);
+  // tuid reads the ALS context. domain present + tuid=NONE ⇒ context dropped at multer.
+  console.log('[TRACE-d] dryRun entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE') + ' reqDomain=' + ((req as any).tenantDomain ?? 'NONE')); // TEMP-TRACE
   try {
     const { type: requestedType, mode, archiveMissing, vesselId, sheetName } = req.body;
     const file = req.file;
@@ -781,6 +786,7 @@ export async function dryRun(req: Request, res: Response) {
     }
 
     try {
+      const db = await getDb();
       const mlItems = await db.select({ listKey: masterLists.listKey, listValue: masterLists.listValue })
         .from(masterLists)
         .where(and(eq(masterLists.listType, 'componentCategory'), eq(masterLists.isActive, true)));
@@ -797,8 +803,12 @@ export async function dryRun(req: Request, res: Response) {
       console.warn('⚠️ Could not load component categories from master list — category validation will be skipped');
     }
 
-    // Validate data
-    const results = await validateData(type, data, mode, vesselId);
+    // Validate data — re-enter the tenant context (multer broke the ALS chain, so
+    // getCurrentTenantContext() is undefined here; req.tenantTuid was stashed pre-multer).
+    const results = await captureTenantFromReq(req)(() => {
+      console.log('[TRACE-d2] dryRun inside re-entry (pre-validateData) tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE') + ' reqTuid=' + ((req as any).tenantTuid ?? 'NONE')); // TEMP-TRACE
+      return validateData(type, data, mode, vesselId);
+    });
     console.log(`✅ Validation complete: ${results.summary.ok} valid, ${results.summary.errors} errors, ${results.rows.length} total rows`);
     
     // Generate file token
@@ -961,6 +971,10 @@ export async function doImport(req: Request, res: Response) {
 // ── SSE Streaming Import ──
 export async function doImportStream(req: Request, res: Response) {
   console.log(`📦 [IMPORT_STREAM] Request received at ${new Date().toISOString()}`);
+  console.log('[TRACE-a] doImportStream entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
+  // Capture the tenant context HERE (while it exists) so the streamed import work
+  // below re-enters it — AsyncLocalStorage can be lost across the SSE boundary.
+  const runInTenant = captureTenant();
   const historyId = uuidv4();
   const startedAt = new Date();
 
@@ -979,6 +993,7 @@ export async function doImportStream(req: Request, res: Response) {
   // (lines starting with ':') are ignored by the EventSource spec on the
   // client but keep the TCP connection warm.
   const heartbeat = setInterval(() => {
+    console.log('[TRACE-c] doImportStream heartbeat tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
     try {
       res.write(`: keepalive ${Date.now()}\n\n`);
     } catch (_e) {
@@ -1037,22 +1052,25 @@ export async function doImportStream(req: Request, res: Response) {
     console.log(`📦 [IMPORT_STREAM] Starting performImport: ${totalRows} rows, type=${effectiveType}, mode=${mode}`);
     const importStartTime = Date.now();
 
-    const importResult = await performImport(
-      effectiveType,
-      dataToImport,
-      mode,
-      archiveMissing,
-      vesselId,
-      (req as any).user?.id || 'system',
-      undefined,
-      storeType,
-      (info) => {
-        const percent = totalRows > 0 ? Math.round((info.processed / totalRows) * 100) : 0;
-        const remaining = totalRows - info.processed;
-        const status = info.processed >= totalRows ? 'Finalizing…' : info.status;
-        sendEvent('progress', { processed: info.processed, total: totalRows, remaining, percent, status, errors: info.errors });
-      }
-    );
+    const importResult = await runInTenant(() => {
+      console.log('[TRACE-a2] doImportStream inside re-entry (pre-performImport) tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
+      return performImport(
+        effectiveType,
+        dataToImport,
+        mode,
+        archiveMissing,
+        vesselId,
+        (req as any).user?.id || 'system',
+        undefined,
+        storeType,
+        (info) => {
+          const percent = totalRows > 0 ? Math.round((info.processed / totalRows) * 100) : 0;
+          const remaining = totalRows - info.processed;
+          const status = info.processed >= totalRows ? 'Finalizing…' : info.status;
+          sendEvent('progress', { processed: info.processed, total: totalRows, remaining, percent, status, errors: info.errors });
+        }
+      );
+    });
 
     const importDuration = ((Date.now() - importStartTime) / 1000).toFixed(1);
     console.log(`📦 [IMPORT_STREAM] performImport complete in ${importDuration}s — created=${importResult.created}, updated=${importResult.updated}, skipped=${importResult.skipped}`);
@@ -1095,6 +1113,10 @@ export async function doImportStream(req: Request, res: Response) {
 
 // ── SSE Streaming Locations Import ──
 export async function doLocationsImportStream(req: Request, res: Response) {
+  console.log('[TRACE-a] doLocationsImportStream entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE') + ' reqTuid=' + ((req as any).tenantTuid ?? 'NONE')); // TEMP-TRACE
+  // multer ran before this handler and broke the ALS chain (tuid=NONE here), so
+  // re-enter from the tuid stashed on req (pre-multer) — captureTenant() would capture NONE.
+  const runInTenant = captureTenantFromReq(req);
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -1106,6 +1128,7 @@ export async function doLocationsImportStream(req: Request, res: Response) {
   };
 
   const heartbeat = setInterval(() => {
+    console.log('[TRACE-c] doLocationsImportStream heartbeat tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
     try {
       res.write(`: keepalive ${Date.now()}\n\n`);
     } catch (_e) {
@@ -1143,6 +1166,9 @@ export async function doLocationsImportStream(req: Request, res: Response) {
     const results = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
     const seenNames = new Set<string>();
 
+    // Re-enter the captured tenant context for the location writes (SSE boundary).
+    await runInTenant(async () => {
+    console.log('[TRACE-a2] doLocationsImportStream inside re-entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
     for (let i = 0; i < data.length; i++) {
       const row: any = data[i];
       const rowNum = i + 2;
@@ -1195,6 +1221,7 @@ export async function doLocationsImportStream(req: Request, res: Response) {
 
       sendEvent('progress', { processed: i + 1, total: totalRows, remaining: totalRows - (i + 1), percent: Math.round(((i + 1) / totalRows) * 100), status: 'Processing Locations…', errors: results.errors.length });
     }
+    }); // end runInTenant re-entry
 
     sendEvent('complete', { created: results.created, updated: results.updated, skipped: results.skipped, failed: results.errors.length, errors: results.errors });
     res.end();
@@ -1876,10 +1903,12 @@ export async function post_makers_import(req: Request, res: Response) {
       errors: [] as string[]
     };
     
+    // Re-enter tenant context broken by multer (req.tenantTuid stashed pre-multer).
+    await captureTenantFromReq(req)(async () => {
     for (let i = 0; i < data.length; i++) {
       const row: any = data[i];
       const rowNum = i + 2; // Excel row number (1-indexed + header)
-      
+
       const makerCode = row['Maker Code'];
       const makerName = row['Maker Name'];
       const address = row['Address'] || null;
@@ -1929,7 +1958,8 @@ export async function post_makers_import(req: Request, res: Response) {
         results.skipped++;
       }
     }
-    
+    }); // end captureTenantFromReq re-entry
+
     console.log(`✅ Makers import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
     res.json(results);
   } catch (error: any) {
@@ -2066,10 +2096,12 @@ export async function post_sfi_details_import(req: Request, res: Response) {
       errors: [] as string[]
     };
     
+    // Re-enter tenant context broken by multer (req.tenantTuid stashed pre-multer).
+    await captureTenantFromReq(req)(async () => {
     for (let i = 0; i < data.length; i++) {
       const row: any = data[i];
       const rowNum = i + 2; // Excel row number (1-indexed + header)
-      
+
       const componentCode = row['Component Code'];
       const componentName = row['Component Name'];
       const description = row['Description'] || null;
@@ -2101,7 +2133,8 @@ export async function post_sfi_details_import(req: Request, res: Response) {
         results.skipped++;
       }
     }
-    
+    }); // end captureTenantFromReq re-entry
+
     console.log(`✅ SFI details import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
     res.json(results);
   } catch (error: any) {
@@ -2166,6 +2199,8 @@ export async function post_locations_import(req: Request, res: Response) {
 
     const seenNames = new Set<string>();
 
+    // Re-enter tenant context broken by multer (req.tenantTuid stashed pre-multer).
+    await captureTenantFromReq(req)(async () => {
     for (let i = 0; i < data.length; i++) {
       const row: any = data[i];
       const rowNum = i + 2;
@@ -2214,6 +2249,7 @@ export async function post_locations_import(req: Request, res: Response) {
         results.skipped++;
       }
     }
+    }); // end captureTenantFromReq re-entry
 
     console.log(`Locations import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
     res.json(results);

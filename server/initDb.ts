@@ -1,4 +1,7 @@
 import { sql } from 'drizzle-orm';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import * as schema from "@shared/schema";
 import { resolvePostgres } from './postgresClient';
 import { POSTPONEMENT_REASONS } from '../shared/postponementReasons';
 import { OVERDUE_REASONS } from '../shared/overdueReasons';
@@ -14,12 +17,12 @@ import { OVERDUE_REASONS } from '../shared/overdueReasons';
  * IMPORTANT: This function throws if trigger creation fails in PostgreSQL mode
  * to ensure immutability is enforced before serving traffic.
  */
-export async function ensureMaintenanceHistoryImmutability(): Promise<void> {
+export async function ensureMaintenanceHistoryImmutability(poolArg?: Pool): Promise<void> {
   console.log('🔒 Ensuring immutability trigger for component_maintenance_history...');
-  
-  // Attempt to resolve PostgreSQL client
-  const postgres = await resolvePostgres();
-  
+
+  // Phase-1 Part E: optional per-tenant pool; no-arg path resolves the single client as before.
+  const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
+
   if (!postgres) {
     console.log('⚠️  Skipping immutability trigger setup - PostgreSQL connection unavailable');
     return;
@@ -221,14 +224,13 @@ async function runIndexMigrations(db: any): Promise<void> {
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_job_code_vessel ON work_orders(fleet_job_code, data_scope, vessel_id)`);
 
     // Migration: ensure unique_spare_component_link is the 3-column form (spare_id, component_id, vessel_id).
-    // The Drizzle baseline (migrations/0000) creates it as 2-col (spare_id, component_id); on some deployed
-    // databases the constraint stayed 2-col. That mismatches the spares-import linkage upsert, which uses an
-    // onConflictDoNothing target of 3 cols (spare_id, component_id, vessel_id) → Postgres 42P10 → the
-    // spare-component link insert throws and is swallowed (spare persists, linkage dropped).
-    // This step runs in initializeDatabase, AFTER the table exists, so it repairs the constraint on boot
-    // regardless of migration ordering. Fully idempotent: no-op when already 3-col; on a 2-col DB it dedups
-    // colliding rows first, then drops the wrong constraint and adds the correct 3-col UNIQUE. Self-heals the
-    // Dev server's existing 2-col constraint on deploy, is correct on fresh DBs, and never throws.
+    // The Drizzle baseline (migrations/0000) creates it as 2-col (spare_id, component_id), and the inline
+    // migrations 070/071/072 that fix it run BEFORE the table exists on the per-tenant lazy-migration path
+    // (runMigrations before runDrizzleMigrations), so fresh tenant DBs stay 2-col. That mismatches the code's
+    // onConflictDoNothing target (3-col) → Postgres 42P10 → spare-component link inserts throw (silently dropped).
+    // This step runs in initializeDatabase, AFTER the table exists, so it repairs the constraint regardless of
+    // migration ordering. Fully idempotent: no-op when already 3-col (RSMS / single-tenant pms_arch); on a 2-col
+    // DB it dedups colliding rows first, then drops the wrong constraint and adds the correct 3-col UNIQUE.
     try {
       await db.execute(sql`
         DO $$
@@ -476,10 +478,10 @@ async function runIndexMigrations(db: any): Promise<void> {
   }
 }
 
-export async function initializeDatabase() {
+export async function initializeDatabase(poolArg?: Pool) {
   try {
-    // Lazy load database client using resolver
-    const postgres = await resolvePostgres();
+    // Phase-1 Part E: optional per-tenant pool; no-arg path resolves the single client as before.
+    const postgres = poolArg ? { db: drizzle(poolArg, { schema }) } : await resolvePostgres();
     if (!postgres) {
       console.log('⏭️  Skipping database initialization - DATABASE_URL not configured');
       return false;

@@ -3,7 +3,7 @@ import { NotFoundError, ValidationError } from '../../shared/errors';
 import type { Component, InsertComponent } from '@shared/schema';
 import { makerList, masterLists } from '@shared/schema';
 import { eq, and, ilike } from 'drizzle-orm';
-import { db } from '../../../db';
+import { getDb } from '../../../db';
 import { validateSFICode, stripSFISuffix } from '@shared/utils/sfiCode';
 
 const ALLOWED_DEPARTMENTS = ['Engine', 'Deck', 'Electrical', 'Galley', 'LSA', 'FFA'];
@@ -99,6 +99,7 @@ async function auditComponent(params: {
 }
 
 async function getActiveComponentCategories(): Promise<string[]> {
+  const db = await getDb();
   const items = await db.select({ listValue: masterLists.listValue })
     .from(masterLists)
     .where(and(eq(masterLists.listType, 'componentCategory'), eq(masterLists.isActive, true)));
@@ -106,6 +107,7 @@ async function getActiveComponentCategories(): Promise<string[]> {
 }
 
 async function validateMaker(makerName?: string, makerCode?: string) {
+  const db = await getDb();
   const hasName = makerName && makerName.trim();
   const hasCode = makerCode && makerCode.trim();
   if (!hasName && !hasCode) return;

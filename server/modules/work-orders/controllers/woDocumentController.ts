@@ -4,6 +4,7 @@ import * as woRepo from '../repositories/workOrderRepository';
 import { findById as findDocById } from '../repositories/documentRepository';
 import { NotFoundError } from '../../shared/errors';
 import { isCompletedStatus } from '../../../utils/workOrderStatus';
+import { captureTenantFromReq } from '../../../utils/tenantConnectionManager';
 
 async function resolveWorkOrder(idOrUuid: string) {
   const wo = await woRepo.findById(idOrUuid);
@@ -31,24 +32,28 @@ export async function uploadDocument(req: Request, res: Response) {
     return res.status(400).json({ error: 'vesselId is required' });
   }
 
-  const wo = await resolveWorkOrder(req.params.workOrderId);
+  // multer broke the ALS chain; re-enter the tenant context (req.tenantTuid stashed pre-multer).
+  await captureTenantFromReq(req)(async () => {
+    const wo = await resolveWorkOrder(req.params.workOrderId);
 
-  if (isCompletedStatus(wo.status)) {
-    return res.status(403).json({ error: 'Editing is not allowed because the Work Order is completed.' });
-  }
+    if (isCompletedStatus(wo.status)) {
+      res.status(403).json({ error: 'Editing is not allowed because the Work Order is completed.' });
+      return;
+    }
 
-  const user = (req as any).user;
-  const uploadedBy = user?.username || user?.fullName || 'Unknown';
+    const user = (req as any).user;
+    const uploadedBy = user?.username || user?.fullName || 'Unknown';
 
-  const document = await woDocService.uploadDocument(
-    wo.wouuid,
-    vesselId,
-    documentType,
-    req.file,
-    uploadedBy
-  );
+    const document = await woDocService.uploadDocument(
+      wo.wouuid,
+      vesselId,
+      documentType,
+      req.file!,
+      uploadedBy
+    );
 
-  res.status(201).json(document);
+    res.status(201).json(document);
+  });
 }
 
 export async function downloadDocument(req: Request, res: Response) {

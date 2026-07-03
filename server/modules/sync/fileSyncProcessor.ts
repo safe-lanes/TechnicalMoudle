@@ -80,9 +80,13 @@ export interface FileChunk {
 export class FileSyncProcessor {
   private instanceId: string;
   private shoreUrl: string;
+  private syncApiKey: string;
 
-  constructor(shoreUrl?: string) {
-    this.instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+  constructor(shoreUrl?: string, instanceId?: string, syncApiKey?: string) {
+    // Identity + key are passed by the SyncEngine (which loads them from DB settings —
+    // Phase 4b per-tenant key); env fallback keeps legacy/unseeded behavior identical.
+    this.instanceId = instanceId || process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+    this.syncApiKey = syncApiKey || process.env.SYNC_API_KEY || '';
     // Shore URL can be passed by the SyncEngine (which loads from DB settings)
     // or fall back to the env var
     this.shoreUrl = shoreUrl || process.env.SYNC_SHORE_URL || '';
@@ -466,7 +470,7 @@ export class FileSyncProcessor {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Sync-Api-Key': process.env.SYNC_API_KEY || '',
+        'X-Sync-Api-Key': this.syncApiKey,
         'X-Sync-Instance-Id': this.instanceId,
       },
       body: JSON.stringify(chunk),

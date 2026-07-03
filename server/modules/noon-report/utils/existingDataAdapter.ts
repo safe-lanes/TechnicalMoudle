@@ -7,7 +7,7 @@
 // We access them via raw SQL template queries parameterised through Drizzle's
 // sql`` helper — safe from injection.
 
-import { db } from '../../../db';
+import { getDb } from '../../../db';
 import { users } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
 
@@ -30,6 +30,7 @@ export async function getVesselById(vesselId: string): Promise<{
   deadweight: number | null;
   grossTonnage: number | null;
 } | null> {
+  const db = await getDb();
   const result = await db.execute(
     sql`SELECT vuuid, name, imo_number, flag, vessel_type, deadweight, gross_tonnage
         FROM vessels WHERE vuuid = ${vesselId} LIMIT 1`
@@ -67,6 +68,7 @@ type AllVesselRow = {
 };
 
 export async function getAllVessels() {
+  const db = await getDb();
   const result = await db.execute(
     sql`SELECT vuuid, name, imo_number, flag, vessel_type FROM vessels ORDER BY name`
   );
@@ -82,6 +84,7 @@ export async function getAllVessels() {
 export async function getUserById(userId: string) {
   const numericId = parseInt(userId, 10);
   if (isNaN(numericId)) return null;
+  const db = await getDb();
   const result = await db.select({
     id: users.id,
     username: users.username,

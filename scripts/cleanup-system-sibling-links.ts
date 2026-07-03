@@ -1,6 +1,7 @@
-import { pool } from '../server/db';
+import { getPool } from '../server/db';
 
 async function cleanupSystemSiblingLinks() {
+  const pool = await getPool();
   const client = await pool.connect();
   try {
     console.log('=== Spare Component Link Cleanup: Remove bloated "System" sibling links ===\n');

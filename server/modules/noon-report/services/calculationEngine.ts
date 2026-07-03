@@ -2,7 +2,7 @@
 // Called automatically after every successful report submission.
 // Updates: nr_fuel_rob (averages, endurance), nr_cii_tracking (AER/CII), nr_voyage_legs (EEOI)
 
-import { db } from '../../../db';
+import { getDb } from '../../../db';
 import { nrNoonReports, nrFuelRob, nrVoyageLegs, nrCiiTracking } from '@shared/schema';
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
 import type { NrNoonReport } from '@shared/schema';
@@ -23,6 +23,7 @@ export async function adjustRobForBunker(
   fuelType: string,
   deltaMt: number,
 ): Promise<void> {
+  const db = await getDb();
   const rows = await db.select()
     .from(nrFuelRob)
     .where(and(eq(nrFuelRob.vesselId, vesselId), eq(nrFuelRob.fuelType, fuelType)))
@@ -92,6 +93,7 @@ export async function runCalculations(report: NrNoonReport): Promise<void> {
 // ── Rolling averages and endurance ───────────────────────────────────────────
 
 async function computeRollingAveragesAndEndurance(report: NrNoonReport): Promise<void> {
+  const db = await getDb();
   const [last7, last3] = await Promise.all([
     getLastNSubmitted(report.vesselId, 7),
     getLastNSubmitted(report.vesselId, 3),
@@ -158,6 +160,7 @@ async function computeRollingAveragesAndEndurance(report: NrNoonReport): Promise
 // ── CII tracking ─────────────────────────────────────────────────────────────
 
 async function computeCiiTracking(report: NrNoonReport): Promise<void> {
+  const db = await getDb();
   const year = new Date(report.reportDate).getFullYear();
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
@@ -241,6 +244,7 @@ async function computeCiiTracking(report: NrNoonReport): Promise<void> {
 // ── EEOI per voyage leg ───────────────────────────────────────────────────────
 
 async function computeEeoi(report: NrNoonReport): Promise<void> {
+  const db = await getDb();
   const voyageNo = report.voyageNo;
   if (!voyageNo) return;
 
@@ -299,6 +303,7 @@ function getReportConsumption(report: NrNoonReport, fuelType: typeof FUEL_TYPES[
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function getLastNSubmitted(vesselId: string, n: number): Promise<NrNoonReport[]> {
+  const db = await getDb();
   return db.select()
     .from(nrNoonReports)
     .where(and(eq(nrNoonReports.vesselId, vesselId), eq(nrNoonReports.status, 'submitted')))

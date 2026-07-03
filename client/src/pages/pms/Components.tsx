@@ -31,6 +31,7 @@ import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate } from "@/lib/dateUtils";
+import { downloadAuthedFile } from "@/lib/authedDownload";
 import {
   Select,
   SelectContent,
@@ -2019,8 +2020,16 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     }
   };
 
-  const handleViewDocument = (docId: number) => {
-    window.open(`/technical/api/component-documents/${docId}/download`, '_blank');
+  const handleViewDocument = async (docId: number) => {
+    try {
+      await downloadAuthedFile(`/technical/api/component-documents/${docId}/download`);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to open document",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteDocument = async (docId: number, docName: string) => {

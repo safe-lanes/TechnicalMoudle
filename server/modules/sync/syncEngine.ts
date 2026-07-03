@@ -38,11 +38,12 @@ import { isShipInstanceId } from './syncRole';
 const CHUNK_SIZE = 200;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [5000, 15000, 45000]; // Exponential backoff (ms)
-// Env-tunable sync limits. Defaults preserve the prior hardcoded behavior exactly
-// (no env set ⇒ byte-identical to before). Set per-instance (ship-only) to tune a
-// vessel on a degraded link without affecting other instances.
-const REQUEST_TIMEOUT = parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || '', 10) || 30000; // A2: per /sync/push attempt
-const PUSH_BATCH_SIZE = parseInt(process.env.SYNC_PUSH_BATCH_SIZE || '', 10) || 1000;      // A1: field-log rows per push
+// Tunable sync limits. Phase 4a moved these from module consts to per-instance
+// fields resolved DB-then-env in loadSettings() (mirroring instance_id/shore_url),
+// so a provisioned ship can carry per-vessel values. Defaults preserve the prior
+// hardcoded behavior EXACTLY: no DB row + no env ⇒ 30000 / 1000, byte-identical.
+const DEFAULT_REQUEST_TIMEOUT_MS = 30000; // A2: per /sync/push attempt
+const DEFAULT_PUSH_BATCH_SIZE = 1000;     // A1: field-log rows per push
 // B-P0.2: overall budget for the file-transfer phase so a slow/stuck file can never
 // hang the sync cycle. Healthy file syncs finish in seconds and are unaffected; only
 // a runaway phase is cut (files remain pending/resumable). 0 / unset ⇒ default below.
@@ -69,12 +70,19 @@ export class SyncEngine {
   private instanceId: string;
   private shoreBaseUrl: string;
   private syncApiKey: string;
+  // Phase 4a: per-instance tunables, resolved DB-then-env in loadSettings().
+  // Seeded from env (or hardcoded default) in the constructor so they are valid
+  // even before loadSettings runs — default-preserving.
+  private requestTimeoutMs: number;
+  private pushBatchSize: number;
   private settingsLoaded: boolean = false;
 
   constructor() {
     this.instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
     this.shoreBaseUrl = process.env.SYNC_SHORE_URL || '';
     this.syncApiKey = process.env.SYNC_API_KEY || '';
+    this.requestTimeoutMs = parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || '', 10) || DEFAULT_REQUEST_TIMEOUT_MS;
+    this.pushBatchSize = parseInt(process.env.SYNC_PUSH_BATCH_SIZE || '', 10) || DEFAULT_PUSH_BATCH_SIZE;
   }
 
   /** Load settings from DB (with env var fallback). Called once per sync cycle. */
@@ -86,7 +94,16 @@ export class SyncEngine {
 
       this.instanceId = settings['instance_id'] || process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
       this.shoreBaseUrl = settings['shore_url'] || process.env.SYNC_SHORE_URL || '';
-      this.syncApiKey = process.env.SYNC_API_KEY || '';
+      // Phase 4b: per-tenant key from sync_settings (seeded at provisioning),
+      // env fallback so legacy/unseeded ships behave exactly as today.
+      this.syncApiKey = settings['sync_api_key'] || process.env.SYNC_API_KEY || '';
+
+      // Phase 4a: DB-then-env-then-default. Empty/invalid DB value ⇒ env ⇒ hardcoded
+      // default (1000 / 30000) — identical to today when the new keys are unseeded.
+      const dbBatch = parseInt(settings['sync_push_batch_size'] || '', 10);
+      this.pushBatchSize = dbBatch || parseInt(process.env.SYNC_PUSH_BATCH_SIZE || '', 10) || DEFAULT_PUSH_BATCH_SIZE;
+      const dbTimeout = parseInt(settings['sync_request_timeout_ms'] || '', 10);
+      this.requestTimeoutMs = dbTimeout || parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || '', 10) || DEFAULT_REQUEST_TIMEOUT_MS;
 
       this.settingsLoaded = true;
       console.log(`[SyncEngine] Settings loaded from DB — instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || '(empty)'}, localMode=${this.isLocalMode()}`);
@@ -239,7 +256,7 @@ export class SyncEngine {
       let filesProcessedCount = 0;
       let filesFailedCount = 0;
       try {
-        const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl);
+        const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl, this.instanceId, this.syncApiKey);
         // B-P0.2: bound the file phase so it cannot hang the cycle. processQueue returns
         // cleanly once the budget is exceeded (remaining files stay pending/resumable).
         // Field-data success is already independent of files (this block is non-fatal).
@@ -354,7 +371,7 @@ export class SyncEngine {
     const vesselCode = await this.getVesselCode(vesselId);
     syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
     const fieldLogs = isShip
-      ? await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, PUSH_BATCH_SIZE)
+      ? await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, this.pushBatchSize)
       : [];
     syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip ? ' (shore skips field log push)' : ''}`);
     // Table breakdown
@@ -760,7 +777,7 @@ export class SyncEngine {
         'X-Sync-Instance-Id': this.instanceId,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
     });
 
     if (!response.ok) {
