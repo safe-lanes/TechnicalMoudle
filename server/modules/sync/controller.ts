@@ -117,12 +117,19 @@ export async function resolveConflictHandler(req: Request, res: Response) {
 
 export async function completeSyncHandler(req: Request, res: Response) {
   try {
-    const { batchUuid, vesselId, instanceId } = req.body;
+    const { batchUuid, vesselId, instanceId, appliedRowUuids } = req.body;
     if (!batchUuid || !vesselId || !instanceId) {
       return res.status(400).json({ error: 'batchUuid, vesselId, and instanceId are required' });
     }
 
-    const result = await syncService.completeSyncSession(batchUuid, vesselId, instanceId);
+    // appliedRowUuids is OPTIONAL — new ships send the rows they applied so the shore marks only
+    // those synced. Absent (old ship) → completeSyncSession falls back to today's behaviour.
+    const result = await syncService.completeSyncSession(
+      batchUuid,
+      vesselId,
+      instanceId,
+      Array.isArray(appliedRowUuids) ? appliedRowUuids : undefined
+    );
     res.json(result);
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });

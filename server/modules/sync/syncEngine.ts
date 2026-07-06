@@ -207,11 +207,13 @@ export class SyncEngine {
         console.warn(`[SyncEngine] ${pullResult.totalApplyErrors} apply errors during pull`);
       }
 
-      // Step 4: COMPLETE — Advance checkpoint
+      // Step 4: COMPLETE — Advance checkpoint. appliedRowUuids acks which pulled shore rows
+      // this ship applied, so the shore marks only those is_synced=true (Option 2, pull-side).
       const completeResult = await this.callSyncApi('POST', '/sync/complete', {
         batchUuid,
         vesselId,
         instanceId: this.instanceId,
+        appliedRowUuids: pullResult.appliedRowUuids,
       });
       console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
 
@@ -544,12 +546,17 @@ export class SyncEngine {
     conflictsFound: number;
     conflictsAutoResolved: number;
     errors: string[];
+    appliedRowUuids: string[];
   }> {
     let totalPulled = 0;
     let totalApplyErrors = 0;
     let conflictsFound = 0;
     let conflictsAutoResolved = 0;
     const allErrors: string[] = [];
+    // Option 2 (pull-side per-row ack): row_uuids the ship confirms it APPLIED, sent back in
+    // /sync/complete so the shore marks only these is_synced=true. Anything not acked stays
+    // is_synced=false and is re-offered next pull. Empty when there are no field logs to apply.
+    const appliedRowUuids: string[] = [];
 
     // A. Request remote changes
     const pullData = await this.callSyncApiWithRetry('POST', '/sync/pull', {
@@ -626,6 +633,11 @@ export class SyncEngine {
           allErrors.push(...insertResult.errors);
         }
 
+        // Track per-row apply failures for the /sync/complete ack. Row-atomic: a row counts as
+        // applied only if NONE of its logs failed (matches the complete-row batching contract).
+        // failedRowUuids from the INSERT phase is an existing return value (13c92f9de) — read-only.
+        const failedRowUuids = new Set<string>(insertResult.failedRowUuids || []);
+
         // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
         let updateApplied = 0;
         let updateErrors = 0;
@@ -637,11 +649,22 @@ export class SyncEngine {
           } catch (err: any) {
             totalApplyErrors++;
             updateErrors++;
+            if (log.rowUuid) failedRowUuids.add(log.rowUuid);
             allErrors.push(`${log.tableName}.${log.fieldName}: ${err.message}`);
             console.error(`[SyncEngine] Failed to apply field log ${log.tableName}.${log.fieldName}:`, err.message);
           }
         }
         syncDiag(`PULL FIELD-LOG UPDATE: total=${insertResult.updateLogs.length}, applied=${updateApplied}, errors=${updateErrors}`);
+
+        // Ack set: every distinct row in this pull payload whose logs all applied cleanly.
+        const seenRowUuids = new Set<string>();
+        for (const l of pullData.fieldLogs) {
+          const ru = l.rowUuid;
+          if (!ru || seenRowUuids.has(ru)) continue;
+          seenRowUuids.add(ru);
+          if (!failedRowUuids.has(ru)) appliedRowUuids.push(ru);
+        }
+        syncDiag(`PULL FIELD-LOG ACK: ${appliedRowUuids.length} rows applied, ${failedRowUuids.size} rows failed (re-offered next pull)`);
 
         await client.query('COMMIT');
       } catch (txErr: any) {
@@ -678,7 +701,7 @@ export class SyncEngine {
       }
     }
 
-    return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors };
+    return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids };
   }
 
   // ═══════════════════════════════════════════════════════════════

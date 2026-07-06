@@ -971,7 +971,8 @@ export async function resolveConflictAction(
 export async function completeSyncSession(
   batchUuid: string,
   vesselId: string,
-  instanceId: string
+  instanceId: string,
+  appliedRowUuids?: string[]
 ) {
   const batch = await repo.getBatch(batchUuid);
   if (!batch) {
@@ -1001,10 +1002,26 @@ export async function completeSyncSession(
     vesselCode
   );
   const shoreLogs = shoreLogsRaw.map(normalizeFieldLog);
-  syncDiag(`COMPLETE-SESSION: found ${shoreLogs.length} shore logs to mark synced`);
-  if (shoreLogs.length > 0) {
+
+  // Option 2 (pull-side per-row ack): mark synced ONLY rows the ship confirmed it applied.
+  //  - New ship sends appliedRowUuids → mark just those rows' logs; every unacked/undelivered
+  //    shore log stays is_synced=false and is re-offered on the next pull (is_synced-driven gather).
+  //    This also closes a latent hole: preparePullData sends only NON-conflicting logs, but the old
+  //    code marked ALL in-window logs synced (including conflict rows it never sent). Ack scoping
+  //    now leaves those correctly unsynced until resolved.
+  //  - BACKWARD-COMPAT: old ship omits appliedRowUuids (undefined) → mark the whole sent window,
+  //    exactly as today. Because the pull gather and this gather share LIMIT/order and both key on
+  //    is_synced=false, the sent set equals this set, so an old ship still drains and never strands
+  //    more than today.
+  let logsToMark = shoreLogs;
+  if (Array.isArray(appliedRowUuids)) {
+    const acked = new Set(appliedRowUuids);
+    logsToMark = shoreLogs.filter(l => acked.has(l.rowUuid));
+  }
+  syncDiag(`COMPLETE-SESSION: ${shoreLogs.length} shore logs in window; marking ${logsToMark.length} synced (ack=${Array.isArray(appliedRowUuids) ? appliedRowUuids.length : 'legacy-all'})`);
+  if (logsToMark.length > 0) {
     await repo.markFieldLogsSynced(
-      shoreLogs.map(l => l.logUuid),
+      logsToMark.map(l => l.logUuid),
       batchUuid
     );
   }

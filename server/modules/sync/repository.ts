@@ -145,10 +145,17 @@ export async function getFieldLogsSinceCheckpoint(
        AND is_synced = false`;
   const params: any[] = [...vesselValues, excludeInstanceId];
 
-  if (sinceTimestamp) {
-    whereClause += ` AND changed_at > $${++paramIdx}`;
-    params.push(sinceTimestamp);
-  }
+  // Resend gate is is_synced-driven, NOT checkpoint-gated — mirrors the push gather
+  // getUnsyncedFieldLogs. The `changed_at > $sinceTimestamp` filter was REMOVED: it let the
+  // pull checkpoint (advanced to wall-clock now() on session complete) move past shore rows
+  // that were never delivered/applied, permanently orphaning is_synced=false rows behind it
+  // (LIMIT-truncation of a burst + import commit-visibility skew). Keying purely on
+  // is_synced=false guarantees any undelivered row is re-offered until the ship acks it applied.
+  // `sinceTimestamp` is retained in the signature (callers still pass it; the one-way gather uses
+  // its own checkpoint) but is intentionally NOT applied to field logs. `changed_at` still drives
+  // the ORDER BY below for oldest-first drain. Ack scoping lives in completeSyncSession.
+  void sinceTimestamp;
+  void paramIdx;
   // Complete-row batching (Fix 1, pull path): identical guarantee to getUnsyncedFieldLogs —
   // never split a row's field-logs across a pull batch (LIMIT) boundary, or the receiving
   // ship drops the partial row on NOT-NULL. Take the oldest `limit` logs by changed_at, then
