@@ -96,13 +96,29 @@ export async function getUnsyncedFieldLogs(
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
 
   const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(', ');
+  // Complete-row batching (Fix 1): take the oldest `limit` field-logs by changed_at,
+  // then include ALL field-logs of every (table_name,row_uuid) appearing in that
+  // window — so one row's fields are NEVER split across a push batch. A split row
+  // arrives partial on the receiver and is dropped on NOT-NULL (component_id /
+  // date_updated_local / source), stranding that record's RH on office. Batch may
+  // exceed `limit` by straddling rows' remaining fields (bounded); throughput
+  // (~field-log count) otherwise unchanged. `limit` is a config integer, not input.
   const result = await pool.query(
-    `SELECT * FROM sync_field_log
-     WHERE instance_id = $1
-       AND vessel_id IN (${placeholders})
-       AND is_synced = false
-     ORDER BY changed_at ASC
-     LIMIT ${limit}`,
+    `WITH picked AS (
+       SELECT table_name, row_uuid
+       FROM (
+         SELECT table_name, row_uuid,
+                ROW_NUMBER() OVER (ORDER BY changed_at ASC, id ASC) AS rn
+         FROM sync_field_log
+         WHERE instance_id = $1 AND vessel_id IN (${placeholders}) AND is_synced = false
+       ) ranked
+       WHERE rn <= ${limit}
+       GROUP BY table_name, row_uuid
+     )
+     SELECT s.* FROM sync_field_log s
+     JOIN picked p ON s.table_name = p.table_name AND s.row_uuid = p.row_uuid
+     WHERE s.instance_id = $1 AND s.vessel_id IN (${placeholders}) AND s.is_synced = false
+     ORDER BY s.changed_at ASC, s.row_uuid, s.id`,
     [instanceId, ...vesselValues]
   );
   return result.rows;
@@ -124,17 +140,30 @@ export async function getFieldLogsSinceCheckpoint(
   const vesselPlaceholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
   let paramIdx = vesselValues.length;
 
-  let query = `SELECT * FROM sync_field_log
-     WHERE vessel_id IN (${vesselPlaceholders})
+  let whereClause = `vessel_id IN (${vesselPlaceholders})
        AND instance_id != $${++paramIdx}
        AND is_synced = false`;
   const params: any[] = [...vesselValues, excludeInstanceId];
 
   if (sinceTimestamp) {
-    query += ` AND changed_at > $${++paramIdx}`;
+    whereClause += ` AND changed_at > $${++paramIdx}`;
     params.push(sinceTimestamp);
   }
-  query += ` ORDER BY changed_at ASC LIMIT ${limit}`;
+  // Complete-row batching (Fix 1, pull path): identical guarantee to getUnsyncedFieldLogs —
+  // never split a row's field-logs across a pull batch (LIMIT) boundary, or the receiving
+  // ship drops the partial row on NOT-NULL. Take the oldest `limit` logs by changed_at, then
+  // ALL logs of those (table_name,row_uuid). Same where-clause/params reused in both scopes.
+  const query = `WITH picked AS (
+       SELECT table_name, row_uuid FROM (
+         SELECT table_name, row_uuid,
+                ROW_NUMBER() OVER (ORDER BY changed_at ASC, id ASC) AS rn
+         FROM sync_field_log WHERE ${whereClause}
+       ) ranked WHERE rn <= ${limit} GROUP BY table_name, row_uuid
+     )
+     SELECT s.* FROM sync_field_log s
+     JOIN picked p ON s.table_name = p.table_name AND s.row_uuid = p.row_uuid
+     WHERE ${whereClause}
+     ORDER BY s.changed_at ASC, s.row_uuid, s.id`;
 
   const result = await pool.query(query, params);
 

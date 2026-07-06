@@ -76,6 +76,11 @@ export class SyncEngine {
   private requestTimeoutMs: number;
   private pushBatchSize: number;
   private settingsLoaded: boolean = false;
+  // Fix 3 poison-row guard: consecutive times the shore has reported a row_uuid as dropped.
+  // After DEAD_LETTER_AFTER, we give up (mark it synced + loud alert) so a genuinely-bad row
+  // can't loop forever. In-memory on the (singleton) engine — persists across sync cycles in
+  // the running process; resets on restart (a poison row then gets a fresh K attempts + alerts).
+  private droppedRetryCount = new Map<string, number>();
 
   constructor() {
     this.instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
@@ -386,8 +391,10 @@ export class SyncEngine {
       const nv = l.newValue ?? l.new_value;
       syncDiag(`PUSH sample[${i}]: table=${tbl}, field=${fld}, row=${row}, oldNull=${(l.oldValue ?? l.old_value) === null}, newValue=${nv ? String(nv).substring(0, 80) : 'NULL'}`);
     });
-    // Capture logUuids so the caller can mark them as synced after COMPLETE succeeds
-    const pushedLogUuids = fieldLogs.map(l => l.logUuid ?? (l as any).log_uuid);
+    // Fix 3: row_uuids the shore reports it could NOT apply — accumulated across chunks
+    // below. Only logs whose row actually applied get marked synced; dropped rows stay
+    // is_synced=false and retry next cycle. `pushedLogUuids` is computed AFTER the loop.
+    const droppedRowUuids = new Set<string>();
 
     // C. Send in chunks
     //    Field logs may come from raw SQL (snake_case) or Drizzle (camelCase) — handle both
@@ -451,16 +458,38 @@ export class SyncEngine {
     }
 
     if (fieldLogPayloads.length > 0 || shipOnlyRows.length > 0) {
-      for (let i = 0; i < Math.max(fieldLogPayloads.length, 1); i += CHUNK_SIZE) {
-        const chunk = fieldLogPayloads.slice(i, i + CHUNK_SIZE);
+      // Fix 1b — row-aware chunking: never split one row_uuid across HTTP chunks (each chunk
+      // is a separate receivePushData/applyFieldLogInserts on shore). fieldLogPayloads is
+      // row-contiguous (Fix 1a gather returns a row's fields together), so start a new chunk
+      // only at a row boundary once the current chunk reaches CHUNK_SIZE. A chunk may exceed
+      // CHUNK_SIZE by one row's fields — acceptable. Empty payload → one empty chunk (preserves
+      // the "register the push step" call, and keeps shipOnlyRows on the first chunk).
+      const chunks: (typeof fieldLogPayloads)[] = [];
+      let current: typeof fieldLogPayloads = [];
+      let lastRow: string | null = null;
+      for (const p of fieldLogPayloads) {
+        if (p.rowUuid !== lastRow && current.length >= CHUNK_SIZE) {
+          chunks.push(current);
+          current = [];
+        }
+        current.push(p);
+        lastRow = p.rowUuid;
+      }
+      if (current.length > 0) chunks.push(current);
+      if (chunks.length === 0) chunks.push([]); // shipOnlyRows-only push (no field logs)
+
+      for (let idx = 0; idx < chunks.length; idx++) {
         const result = await this.callSyncApiWithRetry('POST', '/sync/push', {
           batchUuid,
           vesselId,
-          oneWayRows: i === 0 ? shipOnlyRows : [], // One-way rows with first chunk only
-          fieldLogs: chunk,
-          masterRecordHints: i === 0 ? masterRecordHints : [], // Hints with first chunk only
+          oneWayRows: idx === 0 ? shipOnlyRows : [], // One-way rows with first chunk only
+          fieldLogs: chunks[idx],
+          masterRecordHints: idx === 0 ? masterRecordHints : [], // Hints with first chunk only
         });
         totalPushed += result.received || 0;
+        // Fix 3: collect rows the shore could not apply (backward-compat: old shore omits the
+        // field → undefined → nothing collected → ship marks all synced = current behaviour).
+        (result.droppedRowUuids || []).forEach((r: string) => droppedRowUuids.add(r));
       }
     } else {
       // Empty push to register the push step
@@ -471,6 +500,32 @@ export class SyncEngine {
         fieldLogs: [],
       });
     }
+
+    // Fix 3 — mark synced ONLY rows the shore actually applied. Dropped rows stay unsynced
+    // and retry next cycle (after Fix 1 they arrive whole and apply). Poison-row guard: a row
+    // dropped DEAD_LETTER_AFTER cycles in a row is given up (marked synced + loud alert) so it
+    // can never loop forever. Rows that applied this cycle reset their counter.
+    const DEAD_LETTER_AFTER = 3;
+    const keepUnsynced = new Set<string>();
+    for (const r of Array.from(droppedRowUuids)) {
+      const n = (this.droppedRetryCount.get(r) || 0) + 1;
+      if (n >= DEAD_LETTER_AFTER) {
+        this.droppedRetryCount.delete(r);
+        syncDiag(`⚠️ DEAD-LETTER: row=${r} dropped by shore ${n}x in a row — marking synced to stop the loop. NEEDS MANUAL REVIEW (permanent apply failure).`);
+        console.error(`[SyncEngine] ⚠️ DEAD-LETTER row=${r} after ${n} failed apply attempts — marked synced (stop loop), needs manual review.`);
+      } else {
+        this.droppedRetryCount.set(r, n);
+        keepUnsynced.add(r);
+      }
+    }
+    // Reset the counter for any pushed row that was NOT dropped this cycle (it applied).
+    for (const l of fieldLogs) {
+      const ru = l.rowUuid ?? (l as any).row_uuid;
+      if (!droppedRowUuids.has(ru)) this.droppedRetryCount.delete(ru);
+    }
+    const pushedLogUuids = fieldLogs
+      .filter(l => !keepUnsynced.has(l.rowUuid ?? (l as any).row_uuid))
+      .map(l => l.logUuid ?? (l as any).log_uuid);
 
     return { totalPushed, pushedLogUuids };
   }

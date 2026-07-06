@@ -178,6 +178,10 @@ export async function receivePushData(
   let fieldLogsApplied = 0;
   let fieldLogApplyErrors = 0;
   let fieldLogRowMissing = 0; // UPDATEs that matched 0 rows (row absent on receiver) — must never be silent
+  // Fix 2/3: row_uuids the receiver could NOT apply (dropped INSERTs + UPDATE-against-missing-row).
+  // Returned in the push response so the ship keeps them is_synced=false and retries them next
+  // cycle (after Fix 1 they arrive whole and apply), instead of losing them permanently.
+  const droppedRowUuids = new Set<string>();
   if (payload.fieldLogs && payload.fieldLogs.length > 0) {
     // Validate business rules before accepting
     const acceptedLogs: typeof payload.fieldLogs = [];
@@ -234,6 +238,7 @@ export async function receivePushData(
         const insertResult = await applyFieldLogInserts(acceptedLogs, client);
         fieldLogsApplied += insertResult.insertedRows;
         fieldLogApplyErrors += insertResult.errors.length;
+        (insertResult.failedRowUuids || []).forEach(r => droppedRowUuids.add(r));
         if (insertResult.errors.length > 0) {
           // VISIBLE ALERT: a dropped INSERT means an incoming row could NOT be applied and is now
           // MISSING on this instance (the historical silent-drop that orphaned WOs / notifications).
@@ -458,6 +463,7 @@ export async function receivePushData(
             // it is loud and COUNTED so the batch result can never look clean.
             if (updateResult.rowCount === 0) {
               fieldLogRowMissing++;
+              droppedRowUuids.add(log.rowUuid); // Fix 2/3: keep unsynced so the ship retries once its INSERT lands
               console.warn(`[Sync Push] UPDATE skipped — row missing on receiver: ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} (change dropped; see FIELD-LOG-INSERT RECOVERY)`);
               syncDiag(`UPDATE-MISS: ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} — row not found, UPDATE had no effect`);
             }
@@ -737,6 +743,7 @@ export async function receivePushData(
     fieldLogsApplied,
     fieldLogApplyErrors,
     fieldLogRowMissing,
+    droppedRowUuids: Array.from(droppedRowUuids), // Fix 2/3: rows the ship must keep unsynced + retry
     oneWaySummary,
   };
 }

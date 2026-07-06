@@ -409,9 +409,10 @@ export async function applyFieldLogInserts(
   insertedRows: number;
   updateLogs: FieldLogEntry[];
   errors: string[];
+  failedRowUuids: string[];
 }> {
   if (fieldLogs.length === 0) {
-    return { insertedRows: 0, updateLogs: [], errors: [] };
+    return { insertedRows: 0, updateLogs: [], errors: [], failedRowUuids: [] };
   }
 
   syncDiag(`FIELD-LOG-INSERT START: ${fieldLogs.length} logs`);
@@ -420,6 +421,11 @@ export async function applyFieldLogInserts(
   let insertedRows = 0;
   const updateLogs: FieldLogEntry[] = [];
   const errors: string[] = [];
+  // Fix 2/3: row_uuids whose INSERT was DROPPED (not applied, not deferred-to-update).
+  // Returned so the push-ack can tell the ship to keep them is_synced=false and retry,
+  // instead of silently losing them. Populated ONLY at true drop sites (below), never at
+  // the defer-to-update sites (unknown table / row-exists / exist-check) which are not lost.
+  const failedRowUuids: string[] = [];
 
   // 1. Group by (tableName, rowUuid)
   const groups = new Map<string, FieldLogEntry[]>();
@@ -599,6 +605,7 @@ export async function applyFieldLogInserts(
 
       if (columns.length === 0) {
         errors.push(`${tableName}.${rowUuid}: no columns to insert`);
+        failedRowUuids.push(rowUuid);
         continue;
       }
 
@@ -807,9 +814,11 @@ export async function applyFieldLogInserts(
             // Could not find conflicting row — log as error
             syncDiag(`FIELD-LOG-INSERT CONFLICT FAILED: ${tableName} row=${rowUuid} — could not locate existing row despite 23505 conflict`);
             errors.push(`${tableName}.${rowUuid}: unique constraint conflict but could not find existing row`);
+            failedRowUuids.push(rowUuid);
           }
         } catch (fallbackErr: any) {
           errors.push(`${tableName}.${rowUuid}: conflict fallback failed: ${fallbackErr.message}`);
+          failedRowUuids.push(rowUuid);
           console.error(`[FieldLogInsert] Conflict fallback error for ${tableName}.${rowUuid}:`, fallbackErr.message);
         }
       } else if (err.code === '23503') {
@@ -889,19 +898,22 @@ export async function applyFieldLogInserts(
             }
             syncDiag(`FK-NULL RETRY FAIL: ${tableName} row=${rowUuid} — ${retryErr.message.substring(0, 150)}`);
             errors.push(`${tableName}.${rowUuid}: FK retry failed: ${retryErr.message}`);
+            failedRowUuids.push(rowUuid);
           }
         } else {
           syncDiag(`FIELD-LOG-INSERT FK-VIOLATION: ${tableName} row=${rowUuid} — could not identify FK column from constraint=${constraintName}`);
           errors.push(`${tableName}.${rowUuid}: FK violation: ${err.message}`);
+          failedRowUuids.push(rowUuid);
         }
       } else {
         syncDiag(`FIELD-LOG-INSERT FAIL: ${tableName} row=${rowUuid} — ${err.message.substring(0, 150)}`);
         errors.push(`${tableName}.${rowUuid}: ${err.message}`);
+        failedRowUuids.push(rowUuid);
         console.error(`[FieldLogInsert] Failed to insert ${tableName}.${rowUuid}:`, err.message);
       }
     }
   }
 
   syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${updateLogs.length}, errors=${errors.length}`);
-  return { insertedRows, updateLogs, errors };
+  return { insertedRows, updateLogs, errors, failedRowUuids };
 }
