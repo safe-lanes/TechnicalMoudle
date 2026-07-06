@@ -3067,6 +3067,12 @@ const migrations: Migration[] = [
       ALTER TABLE work_order_documents ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
       ALTER TABLE work_order_documents ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
     `
+  },
+  {
+    id: '092_spares_location_2_column',
+    name: 'Add location_2 column to spares',
+    description: 'spares.location_2 (second storage location) exists in the Drizzle baseline 0000 but never had a forward ALTER, so DBs migrated incrementally (some tenant DBs) are missing it. Sync of the location2 field then targeted a non-existent column. Idempotent via IF NOT EXISTS; nullable TEXT, no data change.',
+    sql: `ALTER TABLE spares ADD COLUMN IF NOT EXISTS location_2 TEXT`
   }
 ];
 

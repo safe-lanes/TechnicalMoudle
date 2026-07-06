@@ -23,7 +23,7 @@
  */
 
 import * as syncRepo from './repository';
-import { applyOneWayRows, getColumnMeta, applyFieldLogInserts } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, SYNC_COLUMN_ALIASES } from './oneWayApplier';
 import { FileSyncProcessor } from './fileSyncProcessor';
 import {
   getTablesByCategory,
@@ -738,7 +738,9 @@ export class SyncEngine {
     }
 
     const identityCol = config.identityColumn || 'id';
-    const fieldNameSnake = camelToSnake(log.fieldName);
+    // Honor column aliases (e.g. location2 → location_2) before camel→snake, which cannot insert
+    // an underscore before a digit. Keeps the UPDATE path consistent with the INSERT path.
+    const fieldNameSnake = SYNC_COLUMN_ALIASES[log.fieldName] ?? camelToSnake(log.fieldName);
 
     const conn = client || await getPool();
 
@@ -747,6 +749,12 @@ export class SyncEngine {
     // For json/jsonb columns, we must pass a parsed object so pg serializes it correctly,
     // OR pass the raw JSON string which pg accepts directly for json/jsonb types.
     const meta = await getColumnMeta(conn, log.tableName);
+    // Defense-in-depth: skip a column that doesn't exist on this table rather than issuing an
+    // UPDATE that throws 42703. Fail-open when allCols is unknown (empty).
+    if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+      syncDiag(`APPLY-FIELD-LOG SKIP unknown column ${log.tableName}.${fieldNameSnake}`);
+      return;
+    }
     let valueToApply: any = log.newValue;
     if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
       try {
