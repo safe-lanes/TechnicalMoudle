@@ -23,7 +23,7 @@
  */
 
 import * as syncRepo from './repository';
-import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, SYNC_COLUMN_ALIASES } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, SYNC_COLUMN_ALIASES, coerceArrayValue } from './oneWayApplier';
 import { FileSyncProcessor } from './fileSyncProcessor';
 import {
   getTablesByCategory,
@@ -766,6 +766,10 @@ export class SyncEngine {
         // Not valid JSON (corrupted legacy value like "[object Object]") — reset to empty
         valueToApply = '[]';
       }
+    } else if (valueToApply !== null && meta.arrayCols.has(fieldNameSnake)) {
+      // Postgres array column — parse the stored JSON string back to a JS array so pg serializes
+      // {...}; a JSON string would fail with "malformed array literal".
+      valueToApply = coerceArrayValue(valueToApply);
     }
 
     // Use the log's changedAt for updated_at — trigger bypass ensures it sticks.
