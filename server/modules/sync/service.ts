@@ -1056,10 +1056,15 @@ export async function completeSyncSession(
 
   console.log(`[Sync Complete] Batch ${batchUuid}: ${durationMs}ms, checkpoint advanced to ${now.toISOString()}`);
 
+  // Remaining office→ship backlog for this vessel (is_synced=false, instance != ship) AFTER this
+  // session's mark-synced — lets the ship's drain loop know whether the pull direction is drained.
+  const remainingPull = await repo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+
   return {
     completed: true,
     newCheckpoint: now.toISOString(),
     durationMs,
+    remainingPull,
   };
 }
 

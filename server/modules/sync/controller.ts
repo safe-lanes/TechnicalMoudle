@@ -208,7 +208,10 @@ export async function triggerSyncHandler(req: Request, res: Response) {
     }
 
     const engine = getSyncEngine();
-    const result = await engine.runSync(vesselId);
+    // Drain-to-zero: one "Sync Now" fully reconciles the vessel (push + pull) in this single
+    // action, looping whole cycles until both backlogs are 0 or a safety stop (cap / time budget /
+    // no-progress). Bounded so a large historical backlog drains a chunk without hanging the request.
+    const result = await engine.runSyncToCompletion(vesselId);
     res.json(result);
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });

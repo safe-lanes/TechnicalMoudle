@@ -705,3 +705,27 @@ export async function getUnsyncedFieldLogCount(
   );
   return result.rows[0]?.c ?? 0;
 }
+
+/**
+ * Count shore-authored rows still pending delivery to a ship for this vessel:
+ * is_synced=false AND instance_id != <ship>. Mirrors the pull gather's filter (minus LIMIT),
+ * so it's the exact "office→ship remaining" backlog — used by the drain loop's stop condition.
+ */
+export async function getShorePullRemainingCount(
+  vesselId: string,
+  excludeInstanceId: string,
+  vesselCode?: string | null,
+): Promise<number> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+  const result = await pool.query(
+    `SELECT count(*)::int AS c FROM sync_field_log
+     WHERE vessel_id IN (${placeholders})
+       AND instance_id != $${vesselValues.length + 1}
+       AND is_synced = false`,
+    [...vesselValues, excludeInstanceId]
+  );
+  return result.rows[0]?.c ?? 0;
+}

@@ -48,6 +48,11 @@ const DEFAULT_PUSH_BATCH_SIZE = 1000;     // A1: field-log rows per push
 // hang the sync cycle. Healthy file syncs finish in seconds and are unaffected; only
 // a runaway phase is cut (files remain pending/resumable). 0 / unset ⇒ default below.
 const FILE_PHASE_MAX_MS = parseInt(process.env.SYNC_FILE_PHASE_MAX_MS || '', 10) || 120000;
+// Drain-to-zero (manual "Sync Now"): repeat whole cycles until push+pull backlogs are 0 or a
+// safety stop fires. Cap = sync_settings.catch_up_max_cycles (same as the auto-scheduler); time
+// budget bounds one press so a huge historical backlog drains a chunk without hanging the button.
+const DEFAULT_DRAIN_MAX_CYCLES = 20;
+const SYNC_DRAIN_MAX_MS = parseInt(process.env.SYNC_DRAIN_MAX_MS || '', 10) || 60000;
 
 // ── Types ──
 
@@ -62,6 +67,8 @@ export interface SyncResult {
   durationMs: number;
   error: string | null;
   newCheckpoint: string | null;
+  remainingPush: number | null;   // ship is_synced=false for this instance/vessel after the cycle
+  remainingPull: number | null;   // shore is_synced=false for this vessel (instance != ship)
 }
 
 // ── Engine ──
@@ -75,7 +82,12 @@ export class SyncEngine {
   // even before loadSettings runs — default-preserving.
   private requestTimeoutMs: number;
   private pushBatchSize: number;
+  private catchUpMaxCycles: number = DEFAULT_DRAIN_MAX_CYCLES;
   private settingsLoaded: boolean = false;
+  // Shared re-entrancy guard (backend safety net): one drain/sync per vessel at a time across
+  // BOTH the manual "Sync Now" drain and the auto-scheduler tick. Released in try/finally so a
+  // thrown/failed cycle always clears it — a stuck guard would block all future syncs.
+  private inFlight = new Set<string>();
   // Fix 3 poison-row guard: consecutive times the shore has reported a row_uuid as dropped.
   // After DEAD_LETTER_AFTER, we give up (mark it synced + loud alert) so a genuinely-bad row
   // can't loop forever. In-memory on the (singleton) engine — persists across sync cycles in
@@ -109,6 +121,9 @@ export class SyncEngine {
       this.pushBatchSize = dbBatch || parseInt(process.env.SYNC_PUSH_BATCH_SIZE || '', 10) || DEFAULT_PUSH_BATCH_SIZE;
       const dbTimeout = parseInt(settings['sync_request_timeout_ms'] || '', 10);
       this.requestTimeoutMs = dbTimeout || parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || '', 10) || DEFAULT_REQUEST_TIMEOUT_MS;
+      // Drain cap — same sync_settings key the auto-scheduler uses; default 20 when unseeded.
+      const dbCatchUp = parseInt(settings['catch_up_max_cycles'] || '', 10);
+      this.catchUpMaxCycles = dbCatchUp || DEFAULT_DRAIN_MAX_CYCLES;
 
       this.settingsLoaded = true;
       console.log(`[SyncEngine] Settings loaded from DB — instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || '(empty)'}, localMode=${this.isLocalMode()}`);
@@ -291,7 +306,18 @@ export class SyncEngine {
       }
 
       const durationMs = Date.now() - startTime;
-      syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=success, pushed=${recordsPushed}, pulled=${recordsPulled}, conflicts=${conflictsFound}, files=${filesProcessedCount}+${filesFailedCount}`);
+      // Remaining backlog after this cycle — drives the drain loop's stop condition.
+      // Push: ship's own is_synced=false. Pull: shore-reported (from /sync/complete).
+      let remainingPush = 0;
+      if (isShip) {
+        try {
+          const vc = await this.getVesselCode(vesselId);
+          remainingPush = await syncRepo.getUnsyncedFieldLogCount(this.instanceId, vesselId, vc);
+        } catch (cntErr: any) {
+          console.warn(`[SyncEngine] Could not count remaining push rows: ${cntErr.message}`);
+        }
+      }
+      syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=success, pushed=${recordsPushed}, pulled=${recordsPulled}, conflicts=${conflictsFound}, files=${filesProcessedCount}+${filesFailedCount}, remainingPush=${remainingPush}, remainingPull=${completeResult.remainingPull ?? 0}`);
       return {
         success: true,
         batchUuid,
@@ -303,6 +329,8 @@ export class SyncEngine {
         durationMs,
         error: errorMessage,
         newCheckpoint: completeResult.newCheckpoint,
+        remainingPush,
+        remainingPull: completeResult.remainingPull ?? 0,
       };
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
@@ -336,8 +364,110 @@ export class SyncEngine {
         durationMs,
         error: errorDetail,
         newCheckpoint: null,
+        remainingPush: null,   // unknown on failure → drain loop stops
+        remainingPull: null,
       };
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // RE-ENTRANCY GUARD (shared: manual drain + auto-scheduler)
+  // ═══════════════════════════════════════════════════════════════
+
+  /** Try to claim a vessel for syncing. Returns false if a sync/drain is already running for it. */
+  tryAcquireVessel(vesselId: string): boolean {
+    if (this.inFlight.has(vesselId)) return false;
+    this.inFlight.add(vesselId);
+    return true;
+  }
+
+  /** Release a vessel claim. MUST be called in a finally so a thrown cycle can't leave it stuck. */
+  releaseVessel(vesselId: string): void {
+    this.inFlight.delete(vesselId);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // DRAIN — repeat whole cycles until push+pull backlogs hit 0 (or a safety stop)
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * One "Sync Now" = fully reconcile the vessel in a single user action: loop runSync (whole,
+   * unchanged cycles — per-batch limits and all fix internals intact) until BOTH the ship's
+   * unsynced backlog and the shore's pending-for-this-vessel backlog are zero, or a safety stop.
+   * Safety: DRAINED (remaining==0) | NO-PROGRESS (remaining didn't decrease — respects the
+   * dead-letter guard, so a poison row stops the loop rather than spinning) | CAP
+   * (catch_up_max_cycles) | TIME BUDGET (SYNC_DRAIN_MAX_MS) | FAILURE. Returns an aggregate
+   * SyncResult (summed pushed/pulled) plus cyclesRun.
+   */
+  async runSyncToCompletion(vesselId: string): Promise<SyncResult & { cyclesRun: number }> {
+    await this.loadSettings();
+
+    // Backend re-entrancy safety net (one drain per vessel across manual + scheduler).
+    if (!this.tryAcquireVessel(vesselId)) {
+      syncDiag(`DRAIN SKIP: sync already in progress for vessel=${vesselId}`);
+      return {
+        success: false, batchUuid: null, recordsPushed: 0, recordsPulled: 0,
+        conflictsFound: 0, conflictsAutoResolved: 0, filesQueued: 0, durationMs: 0,
+        error: 'A sync is already in progress for this vessel — please wait for it to finish.',
+        newCheckpoint: null, remainingPush: null, remainingPull: null, cyclesRun: 0,
+      };
+    }
+
+    const maxCycles = this.catchUpMaxCycles || DEFAULT_DRAIN_MAX_CYCLES;
+    const startMs = Date.now();
+    let cyclesRun = 0;
+    let prevRemaining = Number.POSITIVE_INFINITY;
+    let aggPushed = 0, aggPulled = 0, aggConflicts = 0, aggAuto = 0, aggFiles = 0;
+    let last!: SyncResult;
+
+    try {
+      for (;;) {
+        last = await this.runSync(vesselId); // unchanged single cycle (self-catches its errors)
+        cyclesRun++;
+        aggPushed += last.recordsPushed;
+        aggPulled += last.recordsPulled;
+        aggConflicts += last.conflictsFound;
+        aggAuto += last.conflictsAutoResolved;
+        aggFiles += last.filesQueued;
+
+        if (!last.success) break; // FAILURE → stop (counts unknown)
+
+        const remaining = (last.remainingPush ?? 0) + (last.remainingPull ?? 0);
+        if (remaining === 0) {
+          syncDiag(`DRAIN COMPLETE: vessel=${vesselId} fully reconciled in ${cyclesRun} cycle(s)`);
+          break; // FULLY DRAINED ✓
+        }
+        if (remaining >= prevRemaining) {
+          // NO-PROGRESS: nothing net-drained this cycle (e.g. poison/dead-letter rows). Stop rather
+          // than spin — the d8e88c679 dead-letter counter still advances and clears them over time.
+          syncDiag(`DRAIN NO-PROGRESS: vessel=${vesselId} remaining=${remaining} did not decrease — stopping (cycle ${cyclesRun})`);
+          console.warn(`[SyncEngine] Drain stopped (no progress): ${remaining} rows remain for vessel ${vesselId}. Poison/dead-letter rows persist for a later sync.`);
+          break;
+        }
+        prevRemaining = remaining;
+
+        if (cyclesRun >= maxCycles) {
+          console.warn(`[SyncEngine] Drain hit max cycles (${maxCycles}) for vessel ${vesselId}; ${remaining} rows remain — will finish on next Sync Now / auto-tick.`);
+          break; // CAP backstop
+        }
+        if (Date.now() - startMs >= SYNC_DRAIN_MAX_MS) {
+          console.warn(`[SyncEngine] Drain hit time budget (${SYNC_DRAIN_MAX_MS}ms) for vessel ${vesselId}; ${remaining} rows remain — will finish on next Sync Now / auto-tick.`);
+          break; // TIME BUDGET
+        }
+      }
+    } finally {
+      this.releaseVessel(vesselId); // always release — a stuck guard is worse than an overlap
+    }
+
+    return {
+      ...last,
+      recordsPushed: aggPushed,
+      recordsPulled: aggPulled,
+      conflictsFound: aggConflicts,
+      conflictsAutoResolved: aggAuto,
+      filesQueued: aggFiles,
+      cyclesRun,
+    };
   }
 
   // ═══════════════════════════════════════════════════════════════

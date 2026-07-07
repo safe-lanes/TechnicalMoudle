@@ -254,8 +254,10 @@ export class SyncAutoScheduler {
     vesselId: string,
     maxCatchUpCycles: number,
   ): Promise<void> {
-    // Re-entrancy guard
-    if (this.syncInProgress.get(vesselId)) {
+    // Re-entrancy guard — scheduler's own flag PLUS the engine's shared inFlight set, so an auto
+    // tick can never overlap a manual "Sync Now" drain (or vice-versa) on the same vessel.
+    const engine = getSyncEngine();
+    if (this.syncInProgress.get(vesselId) || !engine.tryAcquireVessel(vesselId)) {
       console.log(`[AutoSync] Sync already in progress for vessel ${vesselId} — skipping`);
       await syncRepo.insertConnectivityLog({
         instanceId,
@@ -282,7 +284,10 @@ export class SyncAutoScheduler {
       if (maxCatchUpCycles <= 0) return;
 
       const vesselCode = await getVesselCode(vesselId);
-      let remaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+      // Drain condition covers BOTH directions: ship's unsynced (push) + shore's pending for this
+      // vessel (pull). Without the pull term, office→ship large changes lagged across ticks.
+      let remaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode)
+        + await syncRepo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
 
       while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
         cycleNumber++;
@@ -296,17 +301,20 @@ export class SyncAutoScheduler {
           break;
         }
 
-        // Re-check remaining
-        remaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+        // Re-check remaining (push + pull)
+        remaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode)
+          + await syncRepo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
       }
 
       if (cycleNumber > 0) {
-        const finalRemaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+        const finalRemaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode)
+          + await syncRepo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
         console.log(`[AutoSync] Catch-up complete — ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced`);
       }
 
     } finally {
       this.syncInProgress.set(vesselId, false);
+      engine.releaseVessel(vesselId); // always release the shared guard
     }
   }
 
@@ -356,6 +364,8 @@ export class SyncAutoScheduler {
         durationMs: latencyMs,
         error: error.message,
         newCheckpoint: null,
+        remainingPush: null,
+        remainingPull: null,
       };
     }
 
