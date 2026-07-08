@@ -28,10 +28,22 @@ const EXEMPT_EXACT = [
   "/sync/pull",
   "/sync/complete",
   "/sync/file/upload-chunk",
+  // shore→ship file PULL (mirror of upload-chunk; also guarded by syncTenantGuard).
+  // Ships call these server-to-server with X-Sync-* (no SAILERP Bearer) — must bypass
+  // tenantMiddleware like the push, or they'd 401 before the guard runs.
+  "/sync/file/pending",
+  "/sync/file/download-chunk",
+];
+
+// Dynamic server-to-server routes: /sync/file/<queueUuid>/{complete,fail} (pull ack / dead-letter).
+// retry & skip are deliberately NOT here — they are authenticated operator/dashboard actions.
+const EXEMPT_PATTERNS: RegExp[] = [
+  /^\/sync\/file\/[^/]+\/(complete|fail)$/,
 ];
 
 /** `relPath` is the path relative to the /technical/api mount (Express req.path). */
 export function isExemptPath(relPath: string): boolean {
   const p = (relPath.split("?")[0] || "/").replace(/\/+$/, "") || "/";
-  return EXEMPT_EXACT.includes(p);
+  if (EXEMPT_EXACT.includes(p)) return true;
+  return EXEMPT_PATTERNS.some((re) => re.test(p));
 }

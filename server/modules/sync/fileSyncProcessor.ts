@@ -44,6 +44,16 @@ const FILE_MAX_MS = parseInt(process.env.SYNC_FILE_MAX_MS || '', 10) || 120000; 
 // adaptive (it would break chunk_offset resume) — only the cadence (delay) is tunable.
 const DEFER_BYTES = parseInt(process.env.SYNC_FILE_DEFER_BYTES || '', 10) || 0;
 const CHUNK_DELAY_MS = parseInt(process.env.SYNC_FILE_CHUNK_DELAY_MS || '', 10) || 0;
+// Size gate for the shore→ship pull drain: files <= this hold one "Sync Now" open until fully
+// pulled+verified (normal attachments arrive in one press); larger files still transfer each
+// cycle but don't block the drain's 0-condition. env fallback; the SyncEngine may override from
+// sync_settings.sync_file_drain_max_bytes and pass it into pullQueue. Default 10MB.
+export const DEFAULT_FILE_DRAIN_MAX_BYTES = parseInt(process.env.SYNC_FILE_DRAIN_MAX_BYTES || '', 10) || 10 * 1024 * 1024;
+// Pull-side dead-letter: a file that fails/hash-mismatches this many pull attempts in a row is
+// marked terminal 'failed' on the shore (not eternal pending-retry). Mirrors the push's
+// DEAD_LETTER_AFTER. A dead-lettered file leaves 'pending', so it also drops out of the drain's
+// size-gated 0-condition (a permanently-bad <=limit file can't hold Sync Now open).
+const FILE_PULL_DEAD_LETTER_AFTER = 3;
 const TEMP_DIR = path.resolve(process.cwd(), '.private', 'sync-temp');
 
 // Storage base directories (match the app's conventions)
@@ -83,6 +93,26 @@ function resolveLocalFilePath(fileKey: string, tableName: string): string | null
   }
   if (fs.existsSync(fileKey)) return fileKey;
   return null;
+}
+
+/** Streamed SHA-256 of a file (bounded memory) — same digest the push computes, so the pull's
+ *  receiver-side verify is identical. Fallback for legacy queue rows that lack a stored file_hash. */
+async function hashFileStreamed(filePath: string): Promise<string> {
+  const hasher = crypto.createHash('sha256');
+  const buf = Buffer.allocUnsafe(CHUNK_SIZE_BYTES);
+  const fh = await fs.promises.open(filePath, 'r');
+  try {
+    let pos = 0;
+    for (;;) {
+      const { bytesRead } = await fh.read(buf, 0, CHUNK_SIZE_BYTES, pos);
+      if (bytesRead <= 0) break;
+      hasher.update(buf.subarray(0, bytesRead));
+      pos += bytesRead;
+    }
+  } finally {
+    await fh.close();
+  }
+  return hasher.digest('hex');
 }
 
 export interface FileChunk {
@@ -494,6 +524,215 @@ export class FileSyncProcessor {
     if (!response.ok) {
       throw new Error(`Chunk upload failed: ${response.status}`);
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SHORE→SHIP PULL — mirror of the ship→shore push (processQueue), in reverse.
+  // The ship is the only sync initiator, so it PULLS shore_to_ship files. Reuses
+  // receiveChunk (temp-store + reassemble + SHA-256 verify + saveLocalFile + mark mirror
+  // completed) — no new transfer/hash/reassembly logic. Additive; the push path is untouched.
+  // ═══════════════════════════════════════════════════════════════
+
+  /** POST helper to the shore, reusing the exact auth headers the push (sendChunk) uses. */
+  private async callShore(pathStr: string, body: any): Promise<any> {
+    const response = await fetch(`${this.shoreUrl}${pathStr}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Sync-Api-Key': this.syncApiKey,
+        'X-Sync-Instance-Id': this.instanceId,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(CHUNK_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      const t = await response.text().catch(() => '');
+      throw new Error(`${pathStr} ${response.status}: ${t.substring(0, 200)}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * SHORE side: list shore_to_ship 'pending' files for a vessel whose local file is present,
+   * plus the count of pending files <= maxBytes (drives the size-gated drain). Read-only.
+   */
+  async listPendingForPull(
+    vesselId: string,
+    maxBytes: number
+  ): Promise<{ files: any[]; remainingSmallCount: number }> {
+    const pending = await syncRepo.getPendingFiles(vesselId, 'shore_to_ship', 50);
+    const files: any[] = [];
+    for (const f of pending) {
+      const local = resolveLocalFilePath(f.fileKey, f.tableName);
+      if (!local) continue; // not present on this side — can't serve; skip
+      const size = f.fileSizeBytes ?? (await fs.promises.stat(local)).size;
+      const totalChunks = f.totalChunks ?? Math.ceil(size / CHUNK_SIZE_BYTES);
+      let fileHash = f.fileHash;
+      if (!fileHash) fileHash = await hashFileStreamed(local); // legacy rows without a stored hash
+      files.push({
+        queueUuid: f.queueUuid, tableName: f.tableName, fileKey: f.fileKey,
+        fileName: f.fileName ?? null, fileSizeBytes: size, totalChunks, fileHash,
+      });
+    }
+    const remainingSmallCount = await syncRepo.getPendingFileCountBySize(vesselId, 'shore_to_ship', maxBytes);
+    return { files, remainingSmallCount };
+  }
+
+  /**
+   * SHORE side: read ONE chunk (fixed CHUNK_SIZE_BYTES offset) of a queued file. Mirror of the
+   * push read; streams one chunk, never the whole file into memory.
+   */
+  async readChunkForPull(
+    queueUuid: string,
+    chunkIndex: number
+  ): Promise<{ data: string; bytesRead: number } | null> {
+    const entry = await syncRepo.getFileQueueEntry(queueUuid);
+    if (!entry) return null;
+    const local = resolveLocalFilePath(entry.fileKey, entry.tableName);
+    if (!local) return null;
+    const size = (await fs.promises.stat(local)).size;
+    const start = chunkIndex * CHUNK_SIZE_BYTES;
+    if (start >= size) return { data: '', bytesRead: 0 };
+    const want = Math.min(CHUNK_SIZE_BYTES, size - start);
+    const fh = await fs.promises.open(local, 'r');
+    try {
+      const buf = Buffer.allocUnsafe(want);
+      const { bytesRead } = await fh.read(buf, 0, want, start);
+      return { data: buf.subarray(0, bytesRead).toString('base64'), bytesRead };
+    } finally {
+      await fh.close();
+    }
+  }
+
+  /**
+   * SHIP side: pull shore_to_ship files from the shore. For each: resume from the ship mirror's
+   * chunk_offset, download chunks, feed each into receiveChunk (reassemble + verify + save +
+   * mark mirror completed on the last chunk), then tell the shore to mark completed. A file is
+   * only saved/marked-done after its SHA-256 verifies — a partial/failed/mismatched download
+   * saves NO file and stays 'pending' to retry. Size gate: files <= maxBytes are counted into
+   * remainingSmall (hold the drain open); larger files still transfer each cycle but don't.
+   */
+  async pullQueue(
+    vesselId: string,
+    phaseDeadlineMs: number,
+    maxBytes: number = DEFAULT_FILE_DRAIN_MAX_BYTES,
+    retryCounts: Map<string, number> = new Map()
+  ): Promise<{ filesProcessed: number; filesFailed: number; bytesTransferred: number; remainingSmall: number }> {
+    // Only the ship pulls. Local mode: shore==ship share storage/DB → files already present;
+    // just mark local shore_to_ship pending entries completed (no transfer).
+    if (!isShipInstanceId(this.instanceId)) {
+      return { filesProcessed: 0, filesFailed: 0, bytesTransferred: 0, remainingSmall: 0 };
+    }
+    const localMode = process.env.SYNC_LOCAL_MODE === 'true' || !this.shoreUrl;
+    if (localMode) {
+      let done = 0;
+      const local = await syncRepo.getPendingFiles(vesselId, 'shore_to_ship', 50);
+      for (const f of local) {
+        if (resolveLocalFilePath(f.fileKey, f.tableName)) {
+          await syncRepo.markFileCompleted(f.queueUuid);
+          done++;
+        }
+      }
+      syncDiag(`FILE-PULL (local mode): marked ${done} shore→ship files present`);
+      return { filesProcessed: done, filesFailed: 0, bytesTransferred: 0, remainingSmall: 0 };
+    }
+
+    const phaseStart = Date.now();
+    let filesProcessed = 0, filesFailed = 0, bytesTransferred = 0, smallResolved = 0;
+    let remainingSmallCount = 0;
+
+    let listResp: { files: any[]; remainingSmallCount: number };
+    try {
+      listResp = await this.callShore('/sync/file/pending', { vesselId, maxBytes });
+    } catch (err: any) {
+      syncDiag(`FILE-PULL: list request failed — ${err.message}`);
+      return { filesProcessed, filesFailed, bytesTransferred, remainingSmall: 0 };
+    }
+    const files = listResp.files || [];
+    remainingSmallCount = listResp.remainingSmallCount || 0;
+    syncDiag(`FILE-PULL START: ${files.length} shore→ship file(s) for vessel=${vesselId} (remainingSmall=${remainingSmallCount}, maxBytes=${maxBytes})`);
+
+    for (const f of files) {
+      if (phaseDeadlineMs && Date.now() - phaseStart > phaseDeadlineMs) {
+        syncDiag(`FILE-PULL PHASE BUDGET HIT: remaining files stay pending (resumable)`);
+        break;
+      }
+      const isSmall = (f.fileSizeBytes ?? 0) <= maxBytes;
+      // Dead-letter after N consecutive failures (mirrors the push). Returns true if the file was
+      // dead-lettered (marked 'failed' on the shore) — then it leaves 'pending' and drops out of
+      // the size-gated drain count too. Returns false to keep retrying (stays 'pending').
+      const registerFailure = async (reason: string): Promise<boolean> => {
+        const n = (retryCounts.get(f.queueUuid) || 0) + 1;
+        if (n >= FILE_PULL_DEAD_LETTER_AFTER) {
+          retryCounts.delete(f.queueUuid);
+          try { await this.callShore(`/sync/file/${f.queueUuid}/fail`, { reason: `${reason} (x${n})` }); } catch { /* best-effort */ }
+          syncDiag(`⚠️ FILE-PULL DEAD-LETTER: ${f.fileKey} — ${n} failed pulls (${reason}); marked 'failed' on shore. NEEDS MANUAL REVIEW.`);
+          console.error(`[FileSyncProcessor] ⚠️ DEAD-LETTER pull ${f.fileName || f.fileKey} after ${n} attempts (${reason}) — marked failed, drops from drain.`);
+          return true;
+        }
+        retryCounts.set(f.queueUuid, n);
+        return false;
+      };
+      try {
+        syncDiag(`FILE-PULL PROCESS: ${f.tableName}/${f.fileKey} (${f.fileSizeBytes} bytes, ${f.totalChunks} chunks, ${isSmall ? 'small' : 'large'})`);
+        // Resume from the ship mirror entry's chunk_offset (mirrors the push's resume). The mirror
+        // is created by receiveChunk on the first chunk; on resume it already exists.
+        const mirror = await syncRepo.getFileQueueEntry(f.queueUuid);
+        const startChunk = mirror?.chunkOffset || 0;
+        const fileStart = Date.now();
+        let complete = false, deferred = false;
+
+        for (let i = startChunk; i < f.totalChunks; i++) {
+          if (Date.now() - fileStart > FILE_MAX_MS) {
+            // Per-file budget: DEFER (not fail) — offset persists, resumes next cycle so even a
+            // large file always makes progress and eventually completes; never deferred forever.
+            syncDiag(`FILE-PULL DEFER: ${f.fileKey} exceeded ${FILE_MAX_MS}ms — resume from chunk ${i}/${f.totalChunks} next cycle`);
+            deferred = true;
+            break;
+          }
+          const c = await this.callShore('/sync/file/download-chunk', { queueUuid: f.queueUuid, chunkIndex: i });
+          if (!c || c.data === undefined) throw new Error(`download-chunk ${i} returned no data`);
+          const chunk: FileChunk = {
+            queueUuid: f.queueUuid, chunkIndex: i, totalChunks: f.totalChunks,
+            data: c.data, fileHash: f.fileHash, fileKey: f.fileKey, tableName: f.tableName,
+            fileName: f.fileName ?? null, fileSizeBytes: f.fileSizeBytes ?? null, vesselId,
+          };
+          const res = await this.receiveChunk(chunk); // REUSE: temp-store; last chunk → verify+save+mark mirror
+          bytesTransferred += c.bytesRead || 0;
+          if (i < f.totalChunks - 1) {
+            await syncRepo.updateFileStatus(f.queueUuid, 'in_progress', i + 1); // resume tracking (non-last)
+          } else {
+            complete = res.complete; // receiveChunk already marked the mirror completed (if hash OK)
+          }
+        }
+
+        if (deferred) continue; // makes progress; not completed, not failed
+        if (complete) {
+          await this.callShore(`/sync/file/${f.queueUuid}/complete`, {}); // shore marks done → stops re-offering
+          retryCounts.delete(f.queueUuid);
+          filesProcessed++;
+          if (isSmall) smallResolved++;
+          syncDiag(`FILE-PULL OK: ${f.fileKey} — ${f.fileSizeBytes} bytes in ${f.totalChunks} chunks (hash verified)`);
+        } else {
+          // Hash mismatch — receiveChunk discarded temp and did NOT save/mark. Count a failure;
+          // dead-letter at N, else reset offset for a clean re-download (shore stays 'pending').
+          filesFailed++;
+          const deadLettered = await registerFailure('hash mismatch');
+          if (deadLettered) { if (isSmall) smallResolved++; }
+          else { await syncRepo.updateFileStatus(f.queueUuid, 'pending', 0, 'Hash mismatch on pull — will re-download'); }
+        }
+      } catch (err: any) {
+        filesFailed++;
+        // Network/download error — dead-letter at N, else leave offset for resume (shore stays 'pending').
+        const deadLettered = await registerFailure(err.message);
+        if (deadLettered && isSmall) smallResolved++;
+        syncDiag(`FILE-PULL FAIL: ${f.fileKey} — ${err.message}${deadLettered ? ' (dead-lettered)' : ' (offset preserved for resume; shore stays pending)'}`);
+      }
+    }
+
+    const remainingSmall = Math.max(0, remainingSmallCount - smallResolved);
+    syncDiag(`FILE-PULL DONE: processed=${filesProcessed}, failed=${filesFailed}, bytes=${bytesTransferred}, remainingSmall=${remainingSmall}`);
+    return { filesProcessed, filesFailed, bytesTransferred, remainingSmall };
   }
 
   /**

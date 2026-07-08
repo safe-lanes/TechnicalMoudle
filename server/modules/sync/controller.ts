@@ -10,7 +10,7 @@ import * as syncRepo from './repository';
 import * as provisioningService from './provisioningService';
 import { getSyncEngine } from './syncEngine';
 import { syncAutoScheduler } from './autoSyncScheduler';
-import { FileSyncProcessor } from './fileSyncProcessor';
+import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import { runPruning } from './pruningService';
 import { runHealthCheck, getTableStats } from './healthMonitor';
 import { getPool } from '../../db';
@@ -312,6 +312,70 @@ export async function skipFileHandler(req: Request, res: Response) {
   } catch (error: any) {
     console.error('[Sync] file skip error:', error);
     res.status(500).json({ error: 'Failed to skip file' });
+  }
+}
+
+// ── POST /sync/file/pending ──  shore→ship pull: list shore_to_ship pending for a vessel
+// Mirror of upload-chunk (server-to-server, syncTenantGuard). Ship calls this to discover files.
+export async function pendingFilesHandler(req: Request, res: Response) {
+  try {
+    const { vesselId, maxBytes } = req.body;
+    if (!vesselId) return res.status(400).json({ error: 'vesselId is required' });
+    const processor = new FileSyncProcessor();
+    const result = await processor.listPendingForPull(vesselId, Number(maxBytes) || DEFAULT_FILE_DRAIN_MAX_BYTES);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] file-pending error:', error);
+    res.status(500).json({ error: 'Failed to list pending files' });
+  }
+}
+
+// ── POST /sync/file/download-chunk ──  shore→ship pull: stream one chunk of a queued file
+export async function downloadChunkHandler(req: Request, res: Response) {
+  try {
+    const { queueUuid, chunkIndex } = req.body;
+    if (!queueUuid || chunkIndex === undefined) {
+      return res.status(400).json({ error: 'queueUuid and chunkIndex are required' });
+    }
+    const processor = new FileSyncProcessor();
+    const chunk = await processor.readChunkForPull(queueUuid, Number(chunkIndex));
+    if (!chunk) return res.status(404).json({ error: 'File not found in local storage' });
+    res.json(chunk);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] download-chunk error:', error);
+    res.status(500).json({ error: 'Failed to read file chunk' });
+  }
+}
+
+// ── POST /sync/file/:queueUuid/complete ──  shore→ship pull: ship confirms a verified file;
+// the shore marks its shore_to_ship entry completed so it stops re-offering it.
+export async function completeFileHandler(req: Request, res: Response) {
+  try {
+    const { queueUuid } = req.params;
+    if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
+    await syncRepo.markFileCompleted(queueUuid);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Sync] file complete error:', error);
+    res.status(500).json({ error: 'Failed to mark file completed' });
+  }
+}
+
+// ── POST /sync/file/:queueUuid/fail ──  shore→ship pull dead-letter: the ship gave up after 3
+// failed attempts; the shore marks its entry terminal 'failed' (leaves 'pending' → drops from the
+// drain count). Mirror of the push's dead-letter.
+export async function failFileHandler(req: Request, res: Response) {
+  try {
+    const { queueUuid } = req.params;
+    if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
+    const reason = (req.body?.reason as string) || 'Dead-lettered after repeated failed pull attempts';
+    await syncRepo.updateFileStatus(queueUuid, 'failed', undefined, reason);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Sync] file fail error:', error);
+    res.status(500).json({ error: 'Failed to mark file failed' });
   }
 }
 

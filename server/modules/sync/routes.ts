@@ -36,9 +36,15 @@ router.post('/sync/trigger', asyncHandler(syncController.triggerSyncHandler));
 
 // File sync endpoints
 router.post('/sync/file/upload-chunk', syncTenantGuard, asyncHandler(syncController.uploadChunkHandler));
+// Shore→ship pull (mirror of upload-chunk; same syncTenantGuard auth). Specific paths registered
+// before the /:queueUuid/* action routes below.
+router.post('/sync/file/pending', syncTenantGuard, asyncHandler(syncController.pendingFilesHandler));
+router.post('/sync/file/download-chunk', syncTenantGuard, asyncHandler(syncController.downloadChunkHandler));
 router.get('/sync/file/queue', asyncHandler(syncController.fileQueueHandler));
 router.post('/sync/file/:queueUuid/retry', asyncHandler(syncController.retryFileHandler));
 router.post('/sync/file/:queueUuid/skip', asyncHandler(syncController.skipFileHandler));
+router.post('/sync/file/:queueUuid/complete', syncTenantGuard, asyncHandler(syncController.completeFileHandler));
+router.post('/sync/file/:queueUuid/fail', syncTenantGuard, asyncHandler(syncController.failFileHandler));
 
 // Pruning & Health endpoints
 router.post('/sync/prune', requireOfflineAdmin, asyncHandler(syncController.pruneHandler));

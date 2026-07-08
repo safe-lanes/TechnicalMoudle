@@ -24,7 +24,7 @@
 
 import * as syncRepo from './repository';
 import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, SYNC_COLUMN_ALIASES, coerceArrayValue } from './oneWayApplier';
-import { FileSyncProcessor } from './fileSyncProcessor';
+import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import {
   getTablesByCategory,
   getTableSyncConfig,
@@ -69,6 +69,7 @@ export interface SyncResult {
   newCheckpoint: string | null;
   remainingPush: number | null;   // ship is_synced=false for this instance/vessel after the cycle
   remainingPull: number | null;   // shore is_synced=false for this vessel (instance != ship)
+  remainingFilePull: number | null; // shore→ship pending files <= size gate after the cycle
 }
 
 // ── Engine ──
@@ -83,6 +84,7 @@ export class SyncEngine {
   private requestTimeoutMs: number;
   private pushBatchSize: number;
   private catchUpMaxCycles: number = DEFAULT_DRAIN_MAX_CYCLES;
+  private fileDrainMaxBytes: number = DEFAULT_FILE_DRAIN_MAX_BYTES;
   private settingsLoaded: boolean = false;
   // Shared re-entrancy guard (backend safety net): one drain/sync per vessel at a time across
   // BOTH the manual "Sync Now" drain and the auto-scheduler tick. Released in try/finally so a
@@ -93,6 +95,9 @@ export class SyncEngine {
   // can't loop forever. In-memory on the (singleton) engine — persists across sync cycles in
   // the running process; resets on restart (a poison row then gets a fresh K attempts + alerts).
   private droppedRetryCount = new Map<string, number>();
+  // Pull-side file dead-letter counter (mirrors droppedRetryCount): consecutive failed pulls per
+  // file queueUuid. In-memory on the singleton engine so it persists across cycles within a run.
+  private filePullRetryCount = new Map<string, number>();
 
   constructor() {
     this.instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
@@ -124,6 +129,9 @@ export class SyncEngine {
       // Drain cap — same sync_settings key the auto-scheduler uses; default 20 when unseeded.
       const dbCatchUp = parseInt(settings['catch_up_max_cycles'] || '', 10);
       this.catchUpMaxCycles = dbCatchUp || DEFAULT_DRAIN_MAX_CYCLES;
+      // Size gate for the file-pull drain (bytes) — DB → env → 10MB default.
+      const dbFileMax = parseInt(settings['sync_file_drain_max_bytes'] || '', 10);
+      this.fileDrainMaxBytes = dbFileMax || DEFAULT_FILE_DRAIN_MAX_BYTES;
 
       this.settingsLoaded = true;
       console.log(`[SyncEngine] Settings loaded from DB — instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || '(empty)'}, localMode=${this.isLocalMode()}`);
@@ -277,6 +285,9 @@ export class SyncEngine {
       // Step 5: Process file queue (after field data is synced)
       let filesProcessedCount = 0;
       let filesFailedCount = 0;
+      // Remaining <= size-gate office→ship files after this cycle — feeds the drain's 0-condition
+      // so normal attachments fully arrive in one Sync Now (large files excluded, don't block).
+      let remainingFilePull = 0;
       try {
         const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl, this.instanceId, this.syncApiKey);
         // B-P0.2: bound the file phase so it cannot hang the cycle. processQueue returns
@@ -286,7 +297,18 @@ export class SyncEngine {
         filesProcessedCount = fileResult.filesProcessed;
         filesFailedCount = fileResult.filesFailed;
         console.log(
-          `[SyncEngine] Files: ${fileResult.filesProcessed} processed, ${fileResult.filesFailed} failed, ${fileResult.bytesTransferred} bytes`
+          `[SyncEngine] Files (push): ${fileResult.filesProcessed} processed, ${fileResult.filesFailed} failed, ${fileResult.bytesTransferred} bytes`
+        );
+
+        // NEW — shore→ship PULL (ship-only), AFTER the existing push. Additive; the push path is
+        // untouched. Reuses receiveChunk for reassembly/hash/save. Size-gated so one Sync Now
+        // completes normal attachments while large files drain over cycles.
+        const pullResult = await fileProcessor.pullQueue(vesselId, FILE_PHASE_MAX_MS, this.fileDrainMaxBytes, this.filePullRetryCount);
+        filesProcessedCount += pullResult.filesProcessed;
+        filesFailedCount += pullResult.filesFailed;
+        remainingFilePull = pullResult.remainingSmall;
+        console.log(
+          `[SyncEngine] Files (pull): ${pullResult.filesProcessed} processed, ${pullResult.filesFailed} failed, ${pullResult.bytesTransferred} bytes, remainingSmall=${pullResult.remainingSmall}`
         );
       } catch (fileError: any) {
         console.warn(`[SyncEngine] File sync failed (non-fatal): ${fileError.message}`);
@@ -331,6 +353,7 @@ export class SyncEngine {
         newCheckpoint: completeResult.newCheckpoint,
         remainingPush,
         remainingPull: completeResult.remainingPull ?? 0,
+        remainingFilePull,
       };
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
@@ -366,6 +389,7 @@ export class SyncEngine {
         newCheckpoint: null,
         remainingPush: null,   // unknown on failure → drain loop stops
         remainingPull: null,
+        remainingFilePull: null,
       };
     }
   }
@@ -409,7 +433,7 @@ export class SyncEngine {
         success: false, batchUuid: null, recordsPushed: 0, recordsPulled: 0,
         conflictsFound: 0, conflictsAutoResolved: 0, filesQueued: 0, durationMs: 0,
         error: 'A sync is already in progress for this vessel — please wait for it to finish.',
-        newCheckpoint: null, remainingPush: null, remainingPull: null, cyclesRun: 0,
+        newCheckpoint: null, remainingPush: null, remainingPull: null, remainingFilePull: null, cyclesRun: 0,
       };
     }
 
@@ -432,7 +456,10 @@ export class SyncEngine {
 
         if (!last.success) break; // FAILURE → stop (counts unknown)
 
-        const remaining = (last.remainingPush ?? 0) + (last.remainingPull ?? 0);
+        // Size-gated: field-log backlog (push+pull) + office→ship files <= the size gate. Large
+        // files are excluded from remainingFilePull, so they never hold Sync Now open — they still
+        // transfer each cycle and complete over time. No-progress + cap + time budget still bound it.
+        const remaining = (last.remainingPush ?? 0) + (last.remainingPull ?? 0) + (last.remainingFilePull ?? 0);
         if (remaining === 0) {
           syncDiag(`DRAIN COMPLETE: vessel=${vesselId} fully reconciled in ${cyclesRun} cycle(s)`);
           break; // FULLY DRAINED ✓

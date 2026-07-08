@@ -416,6 +416,26 @@ export async function getPendingFiles(
 }
 
 /**
+ * Count pending files for a vessel/direction that are <= maxBytes (unknown NULL size counts as
+ * small so it isn't stuck). Drives the size-gated drain: only these "small" files hold one
+ * "Sync Now" open until they fully arrive; larger files transfer over cycles without blocking.
+ */
+export async function getPendingFileCountBySize(
+  vesselId: string,
+  direction: string,
+  maxBytes: number,
+): Promise<number> {
+  const pool = await getPool();
+  const result = await pool.query(
+    `SELECT count(*)::int AS c FROM sync_file_queue
+     WHERE vessel_id = $1 AND direction = $2 AND status = 'pending'
+       AND (file_size_bytes IS NULL OR file_size_bytes <= $3)`,
+    [vesselId, direction, maxBytes]
+  );
+  return result.rows[0]?.c ?? 0;
+}
+
+/**
  * B-P1.1: All non-completed files for a vessel (pending / in_progress / failed /
  * unsendable / skipped) for the Sync Dashboard file panel. Read-only; newest activity first.
  */

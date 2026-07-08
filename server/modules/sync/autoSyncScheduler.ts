@@ -366,6 +366,7 @@ export class SyncAutoScheduler {
         newCheckpoint: null,
         remainingPush: null,
         remainingPull: null,
+        remainingFilePull: null,
       };
     }
 
