@@ -62,6 +62,29 @@ function getStorageDir(tableName: string): string {
   }
 }
 
+/**
+ * Resolve a queued file to its existing LOCAL absolute path, or null if not present locally.
+ * SINGLE SOURCE OF TRUTH — used by BOTH the enqueue readability pre-flight (queueFileForSync)
+ * and the actual transfer (resolveLocalPath), so they can never disagree. Handles: local://
+ * prefix (join storage dir), bare keys like "<code>/<file>" (join storage dir — the
+ * component_documents case that was falsely marked 'unsendable'), and a last-ditch raw path.
+ * Object-backed keys have no local copy → returns null (correctly stays 'unsendable').
+ */
+function resolveLocalFilePath(fileKey: string, tableName: string): string | null {
+  if (fileKey.startsWith('local://')) {
+    const fullPath = path.join(getStorageDir(tableName), fileKey.replace('local://', ''));
+    if (fs.existsSync(fullPath)) return fullPath;
+  }
+  const primaryDir = getStorageDir(tableName);
+  const dirs = [primaryDir, ...[WO_DOCS_DIR, COMPONENT_DOCS_DIR, DEFECT_DOCS_DIR, CR_DOCS_DIR].filter(d => d !== primaryDir)];
+  for (const dir of dirs) {
+    const fullPath = path.join(dir, fileKey);
+    if (fs.existsSync(fullPath)) return fullPath;
+  }
+  if (fs.existsSync(fileKey)) return fileKey;
+  return null;
+}
+
 export interface FileChunk {
   queueUuid: string;
   chunkIndex: number;
@@ -410,18 +433,9 @@ export class FileSyncProcessor {
    * (decided B-P2.1: ship files are local; a non-local file is flagged terminal upstream).
    */
   private resolveLocalPath(fileKey: string, tableName: string): string | null {
-    if (fileKey.startsWith('local://')) {
-      const fullPath = path.join(getStorageDir(tableName), fileKey.replace('local://', ''));
-      if (fs.existsSync(fullPath)) return fullPath;
-    }
-    const primaryDir = getStorageDir(tableName);
-    const dirs = [primaryDir, ...[WO_DOCS_DIR, COMPONENT_DOCS_DIR, DEFECT_DOCS_DIR, CR_DOCS_DIR].filter(d => d !== primaryDir)];
-    for (const dir of dirs) {
-      const fullPath = path.join(dir, fileKey);
-      if (fs.existsSync(fullPath)) return fullPath;
-    }
-    if (fs.existsSync(fileKey)) return fileKey;
-    return null;
+    // Delegates to the shared module-level resolver — behavior-identical, and guarantees the
+    // enqueue pre-flight (queueFileForSync) and this transfer path use the exact same resolution.
+    return resolveLocalFilePath(fileKey, tableName);
   }
 
   /**
@@ -511,13 +525,14 @@ export class FileSyncProcessor {
       }
 
       // Calculate file hash if file exists locally + record local readability.
+      // Use the SAME resolver as the actual transfer (resolveLocalFilePath) so a file that IS
+      // present is never falsely marked 'unsendable'. The old naive `: fileKey` branch missed
+      // bare component_documents keys ("<code>/<file>") that live under getStorageDir(tableName).
       let fileHash: string | null = null;
       let readable = false;
       try {
-        const resolvedPath = fileKey.startsWith('local://')
-          ? path.join(getStorageDir(tableName), fileKey.replace('local://', ''))
-          : fileKey;
-        if (fs.existsSync(resolvedPath)) {
+        const resolvedPath = resolveLocalFilePath(fileKey, tableName);
+        if (resolvedPath) {
           readable = true;
           const buffer = fs.readFileSync(resolvedPath);
           fileHash = crypto
