@@ -130,7 +130,9 @@ function vesselSyncStatus(v: FleetVessel): {
       icon: <XCircle className="h-3 w-3 mr-1" />,
     };
   }
-  if (hoursSince > 24 || v.pending_changes > 0) {
+  // Stale is TIME-BASED ONLY: a vessel that synced recently is not "stale" just because a
+  // residual backlog exists. pending_changes stays visible as its own info count elsewhere.
+  if (hoursSince > 24) {
     return {
       label: "Stale",
       color: "bg-amber-100 text-amber-700 border-amber-200",

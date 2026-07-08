@@ -1246,39 +1246,50 @@ export async function getFleetSyncOverview(): Promise<any[]> {
   const pool = await getPool();
   if (!pool) return [];
 
+  // A vessel accumulates MANY sync_metadata rows over its life (the shore's own instance +
+  // every ship instance_id it has ever used — the instance-id-orphaning issue). The badge/
+  // "x ago" must read the CURRENT (freshest) stamp, not an orphaned/never-synced row. So:
+  // DISTINCT ON (v.vuuid) ... ORDER BY sm.last_sync_at DESC NULLS LAST picks exactly the most
+  // recently-synced sync_metadata row per vessel (a NULL is chosen only if ALL rows are NULL →
+  // genuinely "Never Synced"). fl/sc/fq are per-vessel aggregates (one row each), so they don't
+  // fan out and are unaffected by the pick. The outer query re-sorts to the display order
+  // (most stale first). Collapsing to one row per vessel also removes duplicate vessel lines.
   const result = await pool.query(`
-    SELECT
-      v.vuuid AS vessel_id,
-      v.name AS vessel_name,
-      sm.instance_id,
-      sm.last_sync_at,
-      sm.last_sync_status,
-      sm.last_sync_checkpoint,
-      COALESCE(fl.pending_changes, 0)::int AS pending_changes,
-      COALESCE(sc.unresolved_conflicts, 0)::int AS unresolved_conflicts,
-      COALESCE(fq.pending_files, 0)::int AS pending_files
-    FROM vessels v
-    LEFT JOIN sync_metadata sm ON sm.vessel_id = v.vuuid AND sm.is_deleted = false
-    LEFT JOIN (
-      SELECT vessel_id, count(*) AS pending_changes
-      FROM sync_field_log
-      WHERE is_synced = false AND is_deleted = false
-      GROUP BY vessel_id
-    ) fl ON fl.vessel_id = v.vuuid
-    LEFT JOIN (
-      SELECT vessel_id, count(*) AS unresolved_conflicts
-      FROM sync_conflicts
-      WHERE resolution IS NULL AND is_deleted = false
-      GROUP BY vessel_id
-    ) sc ON sc.vessel_id = v.vuuid
-    LEFT JOIN (
-      SELECT vessel_id, count(*) AS pending_files
-      FROM sync_file_queue
-      WHERE status IN ('pending', 'in_progress') AND is_deleted = false
-      GROUP BY vessel_id
-    ) fq ON fq.vessel_id = v.vuuid
-    WHERE v.is_deleted = false
-    ORDER BY sm.last_sync_at ASC NULLS FIRST
+    SELECT * FROM (
+      SELECT DISTINCT ON (v.vuuid)
+        v.vuuid AS vessel_id,
+        v.name AS vessel_name,
+        sm.instance_id,
+        sm.last_sync_at,
+        sm.last_sync_status,
+        sm.last_sync_checkpoint,
+        COALESCE(fl.pending_changes, 0)::int AS pending_changes,
+        COALESCE(sc.unresolved_conflicts, 0)::int AS unresolved_conflicts,
+        COALESCE(fq.pending_files, 0)::int AS pending_files
+      FROM vessels v
+      LEFT JOIN sync_metadata sm ON sm.vessel_id = v.vuuid AND sm.is_deleted = false
+      LEFT JOIN (
+        SELECT vessel_id, count(*) AS pending_changes
+        FROM sync_field_log
+        WHERE is_synced = false AND is_deleted = false
+        GROUP BY vessel_id
+      ) fl ON fl.vessel_id = v.vuuid
+      LEFT JOIN (
+        SELECT vessel_id, count(*) AS unresolved_conflicts
+        FROM sync_conflicts
+        WHERE resolution IS NULL AND is_deleted = false
+        GROUP BY vessel_id
+      ) sc ON sc.vessel_id = v.vuuid
+      LEFT JOIN (
+        SELECT vessel_id, count(*) AS pending_files
+        FROM sync_file_queue
+        WHERE status IN ('pending', 'in_progress') AND is_deleted = false
+        GROUP BY vessel_id
+      ) fq ON fq.vessel_id = v.vuuid
+      WHERE v.is_deleted = false
+      ORDER BY v.vuuid, sm.last_sync_at DESC NULLS LAST
+    ) t
+    ORDER BY t.last_sync_at ASC NULLS FIRST
   `);
 
   return result.rows;
