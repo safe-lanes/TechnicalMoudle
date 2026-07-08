@@ -550,6 +550,12 @@ export async function applyFieldLogInserts(
 
     const identityCol = config.identityColumn || 'id';
 
+    // Part B: immutable (INSERT-only) tables carry a DB trigger that hard-rejects UPDATE. A
+    // re-delivered INSERT-origin log whose row already exists must NOT be downgraded to an UPDATE
+    // (which would raise and poison the batch) — it is ACKed as already-applied instead. Guarded
+    // by `&& row exists` at each site so a genuinely missing immutable row still INSERTs normally.
+    const isImmutable = !!config.immutable;
+
     // Part A: true only when we reach the INSERT build via the recovery fall-through
     // (an UPDATE-shaped group whose row is MISSING on the receiver). Genuine INSERT
     // groups keep this false so the NOT-NULL guard never touches complete-row inserts.
@@ -567,6 +573,11 @@ export async function applyFieldLogInserts(
       try {
         const exist = await pool.query(`SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [rowUuid]);
         if (exist.rows.length > 0) {
+          if (isImmutable) {
+            // Part B: immutable row already present — ACK (no UPDATE issued to an immutable table).
+            syncDiag(`FIELD-LOG-INSERT IMMUTABLE-ACK: ${tableName}.${rowUuid} exists on receiver — re-delivered log acked as already-applied (immutable; no UPDATE issued)`);
+            continue;
+          }
           updateLogs.push(...logs);
           continue;
         }
@@ -603,6 +614,17 @@ export async function applyFieldLogInserts(
       );
 
       if (existCheck.rows.length > 0) {
+        if (isImmutable) {
+          // Part B: immutable row already present — ACK as already-applied. This is the primary
+          // path for re-delivered component_maintenance_history INSERT-origin logs whose rows are
+          // bundle-seeded on the ship: never issue the forbidden UPDATE. Release the savepoint
+          // (only a SELECT ran under it) to keep the tx clean, then skip.
+          if (externalClient) {
+            try { await pool.query(`RELEASE SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+          }
+          syncDiag(`FIELD-LOG-INSERT IMMUTABLE-ACK: ${tableName}.${rowUuid} exists on receiver — re-delivered INSERT-origin log acked as already-applied (immutable; no UPDATE issued)`);
+          continue;
+        }
         // Row exists — treat as UPDATE (maybe a re-sync or partial previous apply)
         updateLogs.push(...logs);
         continue;

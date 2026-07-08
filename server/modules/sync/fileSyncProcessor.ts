@@ -564,7 +564,21 @@ export class FileSyncProcessor {
     const files: any[] = [];
     for (const f of pending) {
       const local = resolveLocalFilePath(f.fileKey, f.tableName);
-      if (!local) continue; // not present on this side — can't serve; skip
+      if (!local) {
+        // Part C: pending but the bytes don't resolve on THIS (serving) side — it can never be
+        // served, so it would inflate remainingSmallCount forever while never appearing in the
+        // list, wedging the file-drain 0-condition. Mark it 'unsendable' so it leaves the pending
+        // set (dropping it from the size-count below); loud log for manual review. (chunk_offset
+        // untouched — updateFileStatus only sets fields that are passed.)
+        try {
+          await syncRepo.updateFileStatus(f.queueUuid, 'unsendable', undefined, 'Not resolvable on serving side during pull-list');
+          syncDiag(`⚠️ FILE-PULL UNSERVABLE: ${f.tableName}/${f.fileKey} not present on serving side — marked 'unsendable' (dropped from pending). NEEDS MANUAL REVIEW.`);
+          console.error(`[FileSyncProcessor] ⚠️ Shore→ship file unservable (bytes missing on serving side): ${f.fileName || f.fileKey} — marked unsendable.`);
+        } catch (e: any) {
+          syncDiag(`FILE-PULL UNSERVABLE mark failed: ${f.fileKey} — ${e.message}`);
+        }
+        continue; // not present on this side — can't serve; skip
+      }
       const size = f.fileSizeBytes ?? (await fs.promises.stat(local)).size;
       const totalChunks = f.totalChunks ?? Math.ceil(size / CHUNK_SIZE_BYTES);
       let fileHash = f.fileHash;

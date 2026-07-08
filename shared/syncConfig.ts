@@ -39,6 +39,14 @@ export interface TableSyncConfig {
   businessRules: string | null;
   /** Brief description of why this classification was chosen */
   notes: string;
+  /**
+   * True ONLY for tables that carry a DB immutability trigger (INSERT-only; a BEFORE UPDATE
+   * trigger hard-rejects modifications, e.g. component_maintenance_history). The field-log
+   * appliers use this to ACK a re-delivered INSERT-origin log whose row already exists on the
+   * receiver instead of issuing the forbidden UPDATE (which would raise and poison the batch).
+   * Do NOT set this on ordinary tables — it must mirror an actual trigger.
+   */
+  immutable?: boolean;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -898,7 +906,8 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isGlobal: false,
     isConfigurable: true,
     businessRules: null,
-    notes: 'Component maintenance history. Uses vessel_code. Insert-only immutable table — UPDATE trigger blocks modifications.',
+    immutable: true,
+    notes: 'Component maintenance history. Uses vessel_code. Insert-only immutable table — UPDATE trigger (prevent_maintenance_history_update) hard-blocks modifications; immutable:true makes the field-log appliers ACK a re-delivered existing row instead of issuing the forbidden UPDATE.',
   },
 
   // ── Component Documents & Requisitions ──

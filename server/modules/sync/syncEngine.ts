@@ -798,17 +798,35 @@ export class SyncEngine {
         // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
         let updateApplied = 0;
         let updateErrors = 0;
+        let updSpIdx = 0;
         for (const log of insertResult.updateLogs) {
+          // Part A: per-row savepoint so one poison UPDATE (e.g. an immutable-table reject) can no
+          // longer 25P02-abort its siblings in this pull batch. Mirrors the INSERT-path savepoints
+          // (d8e88c679): RELEASE on success, ROLLBACK TO SAVEPOINT on failure.
+          const updSp = `pull_upd_${updSpIdx++}`;
+          try { await client.query(`SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
           try {
             await this.applyFieldLog(log, client);
+            try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
             totalPulled++;
             updateApplied++;
           } catch (err: any) {
+            try { await client.query(`ROLLBACK TO SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
             totalApplyErrors++;
             updateErrors++;
-            if (log.rowUuid) failedRowUuids.add(log.rowUuid);
             allErrors.push(`${log.tableName}.${log.fieldName}: ${err.message}`);
-            console.error(`[SyncEngine] Failed to apply field log ${log.tableName}.${log.fieldName}:`, err.message);
+            // Part B: an immutable-table UPDATE can never apply (INSERT-only + DB trigger). Treat it
+            // as TERMINAL — withhold from failedRowUuids so it ACKs and drops from the backlog
+            // instead of re-offering every cycle (mirrors the 6c8ff600e dead-letter mechanic).
+            const cfg = getTableSyncConfig(log.tableName);
+            const immutableReject = !!cfg?.immutable || /immutable/i.test(err.message || '');
+            if (immutableReject) {
+              syncDiag(`PULL FIELD-LOG IMMUTABLE-ACK (terminal): ${log.tableName}.${log.fieldName} row=${log.rowUuid} — ${(err.message || '').substring(0, 120)}`);
+              console.warn(`[SyncEngine] Immutable-table UPDATE rejected — acked as terminal (not retried): ${log.tableName}.${log.fieldName} row=${log.rowUuid}`);
+            } else {
+              if (log.rowUuid) failedRowUuids.add(log.rowUuid);
+              console.error(`[SyncEngine] Failed to apply field log ${log.tableName}.${log.fieldName}:`, err.message);
+            }
           }
         }
         syncDiag(`PULL FIELD-LOG UPDATE: total=${insertResult.updateLogs.length}, applied=${updateApplied}, errors=${updateErrors}`);

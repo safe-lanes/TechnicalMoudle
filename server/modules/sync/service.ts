@@ -286,12 +286,18 @@ export async function receivePushData(
           console.error('[Sync Push] CRITICAL: SYNC_INSTANCE_ID env var not configured — stale-skip guard cannot distinguish receiver-local edits');
         }
 
+        let pushUpdIdx = 0;
         for (const log of insertResult.updateLogs) {
           const config = getTableSyncConfig(log.tableName);
           if (!config) continue;
           const identityCol = config.identityColumn || 'id';
           const fieldNameSnake = toSnakeCase(log.fieldName);
 
+          // Part A: per-row savepoint so one poison UPDATE (e.g. an immutable-table reject) can no
+          // longer 25P02-abort its siblings in this receive batch (mirrors the INSERT-path savepoints,
+          // d8e88c679). RELEASE on success/conflict-skip, ROLLBACK TO SAVEPOINT on failure.
+          const pushSp = `push_upd_${pushUpdIdx++}`;
+          try { await client.query(`SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
           try {
             const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
             const isInsertLog = log.oldValue === null || log.oldValue === undefined;
@@ -403,6 +409,7 @@ export async function receivePushData(
                 }
 
                 syncDiag(`CONFLICT LOGGED: ${log.tableName}.${log.fieldName} row=${log.rowUuid} — incoming ${logChangedAt.toISOString()} rejected by receiver ${winnerChangedAt.toISOString()}`);
+                try { await client.query(`RELEASE SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
                 continue; // skip apply — receiver's edit wins
               }
               // No receiver-side conflict → fall through to apply
@@ -539,9 +546,20 @@ export async function receivePushData(
             }
 
             fieldLogsApplied++;
+            try { await client.query(`RELEASE SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
           } catch (err: any) {
+            try { await client.query(`ROLLBACK TO SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
             fieldLogApplyErrors++;
-            console.error(`[Sync Push] Failed to apply field log ${log.tableName}.${log.fieldName} for ${log.rowUuid}: ${err.message}`);
+            // Part B: an immutable-table UPDATE can never apply (INSERT-only + DB trigger) → terminal.
+            // The push catch already does NOT add to droppedRowUuids, so the row acks by default;
+            // just surface it distinctly instead of as a generic apply error.
+            const immutableReject = !!config.immutable || /immutable/i.test(err.message || '');
+            if (immutableReject) {
+              syncDiag(`RECEIVE UPDATE IMMUTABLE-ACK (terminal): ${log.tableName}.${log.fieldName} row=${log.rowUuid} — ${(err.message || '').substring(0, 120)}`);
+              console.warn(`[Sync Push] Immutable-table UPDATE rejected — acked as terminal (not retried): ${log.tableName}.${log.fieldName} row=${log.rowUuid}`);
+            } else {
+              console.error(`[Sync Push] Failed to apply field log ${log.tableName}.${log.fieldName} for ${log.rowUuid}: ${err.message}`);
+            }
           }
         }
 
