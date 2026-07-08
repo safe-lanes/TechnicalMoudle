@@ -749,3 +749,98 @@ export async function getShorePullRemainingCount(
   );
   return result.rows[0]?.c ?? 0;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Part B — re-provision delivery-state reset (office side)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Re-provision detection: does this vessel/instance carry any PRIOR delivery state?
+ * True when EITHER any sync_field_log row for the vessel is already is_synced=true (a
+ * prior ship pulled it) OR this instance has a non-null last_sync_checkpoint. A genuinely
+ * brand-new instance (never provisioned, never synced) returns false so the reset is skipped
+ * and provisioning behaves exactly as today.
+ * Runs in the caller's (vessel's) tenant context via getPool().
+ */
+export async function hasDeliveredSyncHistory(
+  vesselId: string,
+  instanceId: string,
+  vesselCode?: string | null,
+): Promise<boolean> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+  const delivered = await pool.query(
+    `SELECT 1 FROM sync_field_log
+      WHERE vessel_id IN (${placeholders}) AND is_synced = true LIMIT 1`,
+    vesselValues
+  );
+  if (delivered.rows.length > 0) return true;
+  const cp = await pool.query(
+    `SELECT 1 FROM sync_metadata
+      WHERE instance_id = $1 AND last_sync_checkpoint IS NOT NULL LIMIT 1`,
+    [instanceId]
+  );
+  return cp.rows.length > 0;
+}
+
+/**
+ * Re-provision reset: clear this vessel/instance's office-side DELIVERY state so a freshly
+ * provisioned ship on the SAME instance id receives the FULL shore-authored baseline again,
+ * instead of only post-checkpoint edits (which strand an edit-for-a-row-it-never-received —
+ * the fresh-provision spare_location_stock.spare_id NULL failure).
+ *
+ * SAFETY: every statement is scoped by vessel_id (a/b) or instance_id (b/c) — it is provably
+ * incapable of touching another vessel's or instance's rows, and it NEVER touches real data
+ * tables (spares, spare_location_stock, …). It only flips sync-machinery delivery flags and
+ * clears this instance's batch history. One instance id = one unique vessel (by design), so
+ * (a)'s vessel scope and (b/c)'s instance scope address the same single ship.
+ * Runs in the caller's (vessel's) tenant context via getPool().
+ */
+export async function resetInstanceDeliveryStateForReprovision(
+  vesselId: string,
+  instanceId: string,
+  vesselCode?: string | null,
+): Promise<{ fieldLogsReset: number; checkpointCleared: boolean; batchesDeleted: number }> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+
+  // (a) Re-queue the full shore-authored baseline: mirror the pull-gather filter EXACTLY
+  //     (vessel_id IN (...) AND instance_id != <ship>), flipping already-delivered rows back
+  //     to is_synced=false. `AND is_synced = true` makes this target only delivered rows so
+  //     rowCount is the true reset count; rows already false are untouched (no-op).
+  const fl = await pool.query(
+    `UPDATE sync_field_log SET is_synced = false
+      WHERE vessel_id IN (${placeholders})
+        AND instance_id != $${vesselValues.length + 1}
+        AND is_synced = true`,
+    [...vesselValues, instanceId]
+  );
+
+  // (b) Reset the pull checkpoint/watermark for THIS instance so one-way rows re-deliver from
+  //     scratch. Scoped by instance_id — cannot affect any other instance's watermark.
+  const cp = await pool.query(
+    `UPDATE sync_metadata SET last_sync_checkpoint = NULL, updated_at = NOW()
+      WHERE instance_id = $1 AND last_sync_checkpoint IS NOT NULL`,
+    [instanceId]
+  );
+
+  // (c) Drop stale/in-progress batches initiated by THIS instance so a leftover in_progress
+  //     batch can't interfere with the fresh ship's first /sync/initiate. Scoped by instance_id.
+  const batches = await pool.query(
+    `DELETE FROM sync_batches WHERE initiated_by_instance = $1`,
+    [instanceId]
+  );
+
+  const fieldLogsReset = fl.rowCount ?? 0;
+  const checkpointCleared = (cp.rowCount ?? 0) > 0;
+  const batchesDeleted = batches.rowCount ?? 0;
+  syncDiag(
+    `PROVISION-REPROVISION-RESET instance=${instanceId} vessel=${vesselId}: ` +
+    `fieldLogsReset=${fieldLogsReset} checkpointCleared=${checkpointCleared} batchesDeleted=${batchesDeleted}`
+  );
+  return { fieldLogsReset, checkpointCleared, batchesDeleted };
+}

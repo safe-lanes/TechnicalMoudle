@@ -106,6 +106,39 @@ export async function generateProvisioningBundle(
     } catch (keyErr: any) {
       console.warn(`[Provisioning] sync key / instance-map seed skipped: ${keyErr.message}`);
     }
+
+    // ── Part B: re-provision delivery-state reset ──
+    // Re-provisioning a ship on the SAME instance id leaves the office's prior "already
+    // delivered" state intact (is_synced=true field logs + a non-null pull checkpoint), so
+    // the office only re-sends LATER edits — and the fresh, empty ship gets an edit for a row
+    // it never received (the spare_location_stock.spare_id NULL failure). Fix at the source:
+    // on a real (persisted) re-provision, forget this ONE vessel/instance's delivery state so
+    // the fresh ship receives the FULL shore-authored baseline again. Brand-new instance with
+    // no delivered history → no-op (behaves exactly as today). Wrapped so a reset failure can
+    // NEVER abort bundle generation — surfaced loudly, then we proceed.
+    try {
+      const isReprovision = await syncRepo.hasDeliveredSyncHistory(vesselId, convInstanceId, vesselCode);
+      if (isReprovision) {
+        const r = await syncRepo.resetInstanceDeliveryStateForReprovision(vesselId, convInstanceId, vesselCode);
+        console.warn(
+          `[Provisioning] RE-PROVISION detected for ${convInstanceId} (vessel ${vesselCode}) — ` +
+          `reset office delivery state: fieldLogsReset=${r.fieldLogsReset}, ` +
+          `checkpointCleared=${r.checkpointCleared}, batchesDeleted=${r.batchesDeleted}. ` +
+          `Fresh ship will receive the FULL shore-authored baseline.`
+        );
+      } else {
+        console.log(
+          `[Provisioning] ${convInstanceId} (vessel ${vesselCode}) has no delivered history — ` +
+          `brand-new provision, no delivery-state reset needed.`
+        );
+      }
+    } catch (resetErr: any) {
+      console.error(
+        `[Provisioning] ⚠️ RE-PROVISION reset FAILED for ${convInstanceId} (vessel ${vesselCode}): ` +
+        `${resetErr.message}. Bundle generation continues; the fresh ship may not receive the full ` +
+        `baseline until this is resolved.`
+      );
+    }
   }
 
   // Phase 0: Export the vessel row FIRST — almost every other table has
