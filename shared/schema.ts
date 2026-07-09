@@ -3530,7 +3530,10 @@ export type VesselSurveyData = typeof vesselSurveyData.$inferSelect;
 
 // Work Order Postponements - History/Audit table to track multiple postponements over time
 export const workOrderPostponements = pgTable("work_order_postponements", {
-  id: text("id").primaryKey(),
+  // UUID default (migration 133): ship-created postponements are app-id'd today
+  // (pp-<wo>-<ts> / crypto.randomUUID) — the default guarantees global uniqueness
+  // for any future insert that omits id (defensive; id is the sync identity).
+  id: text("id").primaryKey().default(sql`gen_random_uuid()::text`),
   workOrderId: text("work_order_id").notNull().references(() => workOrders.wouuid), // FK → work_orders.wouuid
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // References vessels.vuuid
   postponementNumber: integer("postponement_number").notNull().default(1), // 1st, 2nd, 3rd postponement, etc.
@@ -4371,7 +4374,10 @@ export const mocApprovers = pgTable("moc_approvers", {
   isActive: integer("is_active").default(1),
   modulename: text("modulename"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // $onUpdateFn (defensive): the Sync-All writer stamps updatedAt explicitly on both its
+  // insert and soft-delete paths, but any future in-place Drizzle .update() must also bump
+  // updated_at or the ONE_WAY incremental gather (updated_at > checkpoint) would miss it.
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").notNull().default(false),

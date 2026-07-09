@@ -575,6 +575,33 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     notes: 'Class/regulatory data for components. Uses vessel_code. Integer PK, no UUID.',
   },
 
+  // ── Approval workflow: office-managed config + approver registry (global) ──
+
+  approval_workflow_config: {
+    tableName: 'approval_workflow_config',
+    category: 'ONE_WAY_SHORE_TO_SHIP',
+    direction: 'shore_to_ship',
+    identityColumn: 'awcuuid',
+    vesselScopeColumn: null,
+    vesselScopeJoinPath: null,
+    isGlobal: true,
+    isConfigurable: true,
+    businessRules: 'Approval level config is office-managed; ships read-only.',
+    notes: 'Per-function Level1/Level2 enable flags. Global, shore-mastered. SEEDED ON BOTH SIDES by migration 126 with per-instance awcuuid — applyOneWayRows matches it by natural key (function_id, variable_name) via FORCE_COMPOSITE (permanently: the seeded row keeps its local awcuuid; identity matching would 23505 on the natural unique every cycle). Provisioning import pre-clears local rows when the bundle carries this table, so fresh ships DO take shore awcuuids.',
+  },
+  moc_approvers: {
+    tableName: 'moc_approvers',
+    category: 'ONE_WAY_SHORE_TO_SHIP',
+    direction: 'shore_to_ship',
+    identityColumn: 'mauuid',
+    vesselScopeColumn: null,
+    vesselScopeJoinPath: null,
+    isGlobal: true,
+    isConfigurable: true,
+    businessRules: 'Approver master is office-managed; ships read-only.',
+    notes: 'Approvers (Level1/Level2 per module), refreshed shore-side by Sync-All (soft-delete-all + re-insert, both stamped). Global, shore-mastered.',
+  },
+
   // ══════════════════════════════════════════════════════════════════════════════
   // BOTH_EDITABLE — Both ship & office can edit, requires field-level change logging
   // ══════════════════════════════════════════════════════════════════════════════
@@ -621,13 +648,25 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     tableName: 'work_order_postponements',
     category: 'BOTH_EDITABLE',
     direction: 'bidirectional',
-    identityColumn: null,
+    identityColumn: 'id',
     vesselScopeColumn: 'vessel_id',
     vesselScopeJoinPath: null,
     isGlobal: false,
     isConfigurable: true,
     businessRules: null,
-    notes: 'WO postponement records. Text PK (id), no UUID identity column.',
+    notes: 'WO postponement records. Text PK (id) IS the sync identity — app-generated unique (pp-<wo>-<ts>/randomUUID) + gen_random_uuid default (migration 133). Explicit identityColumn (engine previously fell back to id).',
+  },
+  wo_postponement_approvals: {
+    tableName: 'wo_postponement_approvals',
+    category: 'BOTH_EDITABLE',
+    direction: 'bidirectional',
+    identityColumn: 'wpauuid',
+    vesselScopeColumn: null,
+    vesselScopeJoinPath: 'wo_postponement_approvals.postponement_id -> work_order_postponements.id -> work_order_postponements.vessel_id',
+    isGlobal: false,
+    isConfigurable: true,
+    businessRules: 'Ship creates approval steps on submit; office updates status on approve/reject.',
+    notes: 'WO postponement approval steps. Vessel scope resolved via parent work_order_postponements FK (write paths stamp parent vessel_id into field logs). postponement_id is TEXT and carries verbatim cross-instance (no remap needed). Phase 4 AFTER work_order_postponements (real FK).',
   },
   work_order_documents: {
     tableName: 'work_order_documents',
@@ -805,6 +844,18 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isConfigurable: true,
     businessRules: null,
     notes: 'CR attachments. Vessel scope resolved via parent change_request FK.',
+  },
+  change_request_approval: {
+    tableName: 'change_request_approval',
+    category: 'BOTH_EDITABLE',
+    direction: 'bidirectional',
+    identityColumn: 'crauuid',
+    vesselScopeColumn: null,
+    vesselScopeJoinPath: 'change_request_approval.change_request_id -> change_request.id -> change_request.vessel_id',
+    isGlobal: false,
+    isConfigurable: true,
+    businessRules: 'Ship creates approval steps on submit; office updates status on approve/reject.',
+    notes: 'CR approval steps. Vessel scope resolved via parent change_request FK (write paths stamp parent vessel_id into field logs). crauuid identity is table-scoped (shared name with change_request_attachment is safe — engine keys by table_name+value). change_request_id is a per-instance INTEGER: the applier remaps it from change_request_uuid post-INSERT (wrong-parent guard).',
   },
   change_request_comment: {
     tableName: 'change_request_comment',
@@ -1492,10 +1543,13 @@ export function getSyncPhaseOrder(): string[][] {
      'planner_dates', 'locations'],
     // Phase 4: Child entities (FK to parent rows in Phase 3)
     ['work_order_executions', 'work_order_execution_details', 'work_order_postponements',
+     // wo_postponement_approvals has a REAL FK to work_order_postponements(id) —
+     // it must import strictly AFTER its parent (migration 129).
+     'wo_postponement_approvals',
      'work_order_documents', 'defect_actions', 'defect_attachments',
      'spares_history', 'spare_location_stock', 'spare_component_links',
      'stores_ledger', 'inventory_transactions',
-     'change_request_attachment', 'change_request_comment',
+     'change_request_attachment', 'change_request_comment', 'change_request_approval',
      'ihm_maintenance_log', 'component_documents', 'component_requisitions',
      'superintendent_notifications'],
     // Phase 5: SHIP_ONLY tables

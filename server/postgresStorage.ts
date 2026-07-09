@@ -5338,19 +5338,62 @@ export class PostgresStorage {
       .orderBy(changeRequestApproval.approvalLevel);
   }
 
+  // ── Approval-sync parent-vessel helpers ─────────────────────────────────
+  // The BOTH_EDITABLE field-log gather is `WHERE vessel_id IN (...)` — a NULL
+  // vessel_id log row is silently dropped and NEVER syncs (the historic
+  // null-vessel trap). Every approval-step log below must stamp the PARENT's
+  // vessel_id, resolved via these best-effort lookups.
+
+  private async crVesselId(changeRequestId: number): Promise<string | null> {
+    try {
+      const db = await getDb();
+      const r = await db.select({ v: changeRequest.vesselId }).from(changeRequest)
+        .where(eq(changeRequest.id, changeRequestId)).limit(1);
+      return r[0]?.v ?? null;
+    } catch { return null; }
+  }
+
+  private async wopVesselId(postponementId: string): Promise<string | null> {
+    try {
+      const db = await getDb();
+      const r = await db.select({ v: workOrderPostponements.vesselId }).from(workOrderPostponements)
+        .where(eq(workOrderPostponements.id, postponementId)).limit(1);
+      return r[0]?.v ?? null;
+    } catch { return null; }
+  }
+
   async createChangeRequestApprovalStep(step: InsertChangeRequestApproval): Promise<ChangeRequestApproval> {
     const db = await getDb();
     const result = await db.insert(changeRequestApproval).values(step).returning();
+
+    // Sync field logging — CR approval step INSERT (parent-resolved vessel_id)
+    try {
+      const vId = await this.crVesselId(result[0].changeRequestId);
+      await logFieldChanges('change_request_approval', result[0].crauuid, vId, null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] CRApproval create:', e); }
+
     return result[0];
   }
 
   async updateChangeRequestApprovalStep(id: number, data: Partial<ChangeRequestApproval>): Promise<ChangeRequestApproval> {
     const db = await getDb();
+
+    // Fetch-before-update for sync field logging (diff old vs new)
+    const existing = (await db.select().from(changeRequestApproval)
+      .where(eq(changeRequestApproval.id, id)).limit(1))[0];
+
     const result = await db.update(changeRequestApproval)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(changeRequestApproval.id, id))
       .returning();
     if (!result[0]) throw new Error(`Approval step ${id} not found`);
+
+    // Sync field logging — CR approval step UPDATE (parent-resolved vessel_id)
+    try {
+      const vId = await this.crVesselId(result[0].changeRequestId);
+      await logFieldChanges('change_request_approval', result[0].crauuid, vId, existing ?? null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] CRApproval update:', e); }
+
     return result[0];
   }
 
@@ -5393,7 +5436,11 @@ export class PostgresStorage {
       const result = await db.transaction(async (tx) => {
         // Mark the final approval step as Approved inside the same transaction
         if (stepId !== null) {
-          await tx.update(changeRequestApproval)
+          // Fetch-before-update for sync field logging (diff old vs new, inside the tx)
+          const oldStep = (await tx.select().from(changeRequestApproval)
+            .where(eq(changeRequestApproval.id, stepId)).limit(1))[0];
+
+          const updatedStep = (await tx.update(changeRequestApproval)
             .set({
               status: 'Approved',
               actionByUserId: reviewerId,
@@ -5401,7 +5448,17 @@ export class PostgresStorage {
               remarks: comment,
               updatedAt: now
             })
-            .where(eq(changeRequestApproval.id, stepId));
+            .where(eq(changeRequestApproval.id, stepId))
+            .returning())[0];
+
+          // Sync field logging — final CR approval step (tx-scoped; parent CR is in scope
+          // so its vesselId is used directly, no lookup). Best-effort: never blocks the tx.
+          if (updatedStep) {
+            try {
+              await logFieldChanges('change_request_approval', updatedStep.crauuid,
+                existing.vesselId ?? null, oldStep ?? null, updatedStep, reviewerId, tx);
+            } catch (e) { console.error('[FieldLogger] CRApproval finalise:', e); }
+          }
         }
 
         const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existing);
@@ -7133,16 +7190,35 @@ export class PostgresStorage {
   async createWoPostponementApprovalStep(step: InsertWoPostponementApproval): Promise<WoPostponementApproval> {
     const db = await getDb();
     const result = await db.insert(woPostponementApprovals).values(step).returning();
+
+    // Sync field logging — WO postponement approval step INSERT (parent-resolved vessel_id)
+    try {
+      const vId = await this.wopVesselId(result[0].postponementId);
+      await logFieldChanges('wo_postponement_approvals', result[0].wpauuid, vId, null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] WOPApproval create:', e); }
+
     return result[0];
   }
 
   async updateWoPostponementApprovalStep(id: number, data: Partial<WoPostponementApproval>): Promise<WoPostponementApproval> {
     const db = await getDb();
+
+    // Fetch-before-update for sync field logging (diff old vs new)
+    const existing = (await db.select().from(woPostponementApprovals)
+      .where(eq(woPostponementApprovals.id, id)).limit(1))[0];
+
     const result = await db.update(woPostponementApprovals)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(woPostponementApprovals.id, id))
       .returning();
     if (!result[0]) throw new Error(`WO postponement approval step ${id} not found`);
+
+    // Sync field logging — WO postponement approval step UPDATE (parent-resolved vessel_id)
+    try {
+      const vId = await this.wopVesselId(result[0].postponementId);
+      await logFieldChanges('wo_postponement_approvals', result[0].wpauuid, vId, existing ?? null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] WOPApproval update:', e); }
+
     return result[0];
   }
 

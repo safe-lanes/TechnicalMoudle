@@ -184,9 +184,19 @@ export async function applyOneWayRows(
     alert_config: ['vessel_id'],
     // Component class regulatory — match by (component_id, survey_type, classification_society)
     component_class_regulatory: ['component_id', 'survey_type', 'classification_society'],
+    // Approval workflow config — UNIQUE (function_id, variable_name). SEEDED ON BOTH SIDES
+    // by migration 126 with per-instance random awcuuid, so identity (awcuuid) matching would
+    // MISS the ship's seeded row and the INSERT would 23505 on the natural unique EVERY cycle.
+    // Natural-key matching UPDATEs the seeded row's values instead (the local awcuuid is kept —
+    // buildUpdatePairs excludes the lookup column — so this table matches by natural key
+    // permanently). Requires FORCE_COMPOSITE below (table HAS an identityCol).
+    approval_workflow_config: ['function_id', 'variable_name'],
   };
+  // Tables that must use composite matching EVEN THOUGH they have a UUID identity column —
+  // because both sides seed the same natural rows with different UUIDs (see map notes above).
+  const FORCE_COMPOSITE = new Set(['approval_workflow_config']);
   const compositeKeys = COMPOSITE_KEY_TABLES[tableName] || null;
-  const useCompositeKey = compositeKeys !== null && !identityCol;
+  const useCompositeKey = compositeKeys !== null && (!identityCol || FORCE_COMPOSITE.has(tableName));
 
   const result: ApplyResult = { inserted: 0, updated: 0, softDeleted: 0, errors: [] };
 
@@ -821,6 +831,31 @@ export async function applyFieldLogInserts(
             syncDiag(`FK-REMAP INSERT: ${tableName} row=${rowUuid} location_uuid=${rowData['location_uuid']} → local location_id=${locLookup.rows[0].id}`);
           } else {
             syncDiag(`FK-REMAP INSERT DEFERRED: ${tableName} row=${rowUuid} location_uuid=${rowData['location_uuid']} — location not yet synced`);
+          }
+        } catch (fkErr: any) {
+          syncDiag(`FK-REMAP INSERT ERROR: ${tableName} row=${rowUuid}: ${fkErr.message}`);
+        }
+      }
+
+      // ── Post-INSERT: Cross-instance integer FK resolution for change_request_uuid → change_request_id ──
+      // change_request.id is a per-instance identity (cruuid is the sync key), so the sender's
+      // integer change_request_id is meaningless here — worse, it can silently MATCH a different
+      // local change_request (wrong-parent attach, no error). Resolve the authoritative parent via
+      // change_request_uuid and overwrite the integer FK (same pattern as the location_uuid remap).
+      if (tableName === 'change_request_approval' && rowData['change_request_uuid']) {
+        try {
+          const crLookup = await pool.query(
+            `SELECT id FROM change_request WHERE cruuid = $1 LIMIT 1`,
+            [rowData['change_request_uuid']]
+          );
+          if (crLookup.rows.length > 0) {
+            await pool.query(
+              `UPDATE "${tableName}" SET "change_request_id" = $1 WHERE "${identityCol}" = $2`,
+              [crLookup.rows[0].id, rowUuid]
+            );
+            syncDiag(`FK-REMAP INSERT: ${tableName} row=${rowUuid} change_request_uuid=${rowData['change_request_uuid']} → local change_request_id=${crLookup.rows[0].id}`);
+          } else {
+            syncDiag(`FK-REMAP INSERT DEFERRED: ${tableName} row=${rowUuid} change_request_uuid=${rowData['change_request_uuid']} — change_request not yet synced`);
           }
         } catch (fkErr: any) {
           syncDiag(`FK-REMAP INSERT ERROR: ${tableName} row=${rowUuid}: ${fkErr.message}`);

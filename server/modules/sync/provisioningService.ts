@@ -289,8 +289,13 @@ export async function verifyBundleExportIntegrity(
       shortfalls.push({ tableName: entry.tableName, written: entry.rowCount, dbCount: null, reason: 'export threw' });
       continue;
     }
+    // Phase-0 identity export: 'vessels' is INTENTIONALLY a single row (the provisioned vessel),
+    // while its syncConfig entry is global — a global COUNT(*) would false-fail every generation
+    // on a multi-vessel shore DB (vessels written=1 vs dbCount=<fleet size>). Skip it here; the
+    // ERROR-marker check above still covers a thrown vessels export.
+    if (entry.tableName === 'vessels') continue;
     const tc = getTableSyncConfig(entry.tableName);
-    if (!tc) continue; // vessels (identity self) / unknown → not strictly countable here
+    if (!tc) continue; // unknown → not strictly countable here
     // planner_dates + join-scoped tables export a filtered subset — error-marker check only.
     const looseOnly = entry.tableName === 'planner_dates' || (!!tc.vesselScopeJoinPath && !tc.vesselScopeColumn);
     if (looseOnly) continue;
@@ -452,6 +457,25 @@ export async function importProvisioningBundle(
       // Non-fatal: tables may not exist on all DBs
       console.warn(
         `[Provisioning] Ranks cleanup partial: ${cleanupErr.message}`
+      );
+    }
+  }
+
+  // ── Pre-import: clear seeded approval_workflow_config (same RBAC pattern) ──
+  // Migration 126 seeds ~20 rows on BOTH sides with per-instance random awcuuid and a
+  // UNIQUE (function_id, variable_name). Upserting shore's rows (different awcuuid) into
+  // the ship's seeds would 23505 on the natural unique. Delete local seeds first so the
+  // shore's authoritative rows (and their awcuuids) land cleanly. No FK children.
+  if (bundleTableNames.has('approval_workflow_config')) {
+    try {
+      const deletedAwc = await pool.query('DELETE FROM approval_workflow_config');
+      console.log(
+        `[Provisioning] approval_workflow_config cleanup: deleted ${deletedAwc.rowCount} seeded row(s) before import`
+      );
+    } catch (cleanupErr: any) {
+      // Non-fatal: table may not exist on older DBs
+      console.warn(
+        `[Provisioning] approval_workflow_config cleanup partial: ${cleanupErr.message}`
       );
     }
   }
@@ -986,7 +1010,8 @@ async function exportTableWithJoin(
 
     if (
       tableName === 'change_request_attachment' ||
-      tableName === 'change_request_comment'
+      tableName === 'change_request_comment' ||
+      tableName === 'change_request_approval'
     ) {
       const result = await pool.query(
         `SELECT a.* FROM "${tableName}" a JOIN change_request cr ON a.change_request_id = cr.id WHERE cr.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
@@ -995,7 +1020,17 @@ async function exportTableWithJoin(
       return result.rows;
     }
 
-    // Fallback — export all
+    if (tableName === 'wo_postponement_approvals') {
+      const result = await pool.query(
+        `SELECT a.* FROM "wo_postponement_approvals" a JOIN work_order_postponements p ON a.postponement_id = p.id WHERE p.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
+        [vesselId]
+      );
+      return result.rows;
+    }
+
+    // Fallback — export all. ⚠️ CROSS-VESSEL LEAK for vessel-scoped tables: any join-scoped
+    // table registered in syncConfig MUST have an explicit branch above (the approval tables
+    // do). Loud so a future registration without a branch is caught in the first test bundle.
     console.warn(
       `[Provisioning] Unknown join path for ${tableName}, exporting all rows`
     );
