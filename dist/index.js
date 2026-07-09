@@ -4094,7 +4094,10 @@ var init_schema = __esm({
       updatedAt: true
     });
     workOrderPostponements = pgTable2("work_order_postponements", {
-      id: text2("id").primaryKey(),
+      // UUID default (migration 133): ship-created postponements are app-id'd today
+      // (pp-<wo>-<ts> / crypto.randomUUID) — the default guarantees global uniqueness
+      // for any future insert that omits id (defensive; id is the sync identity).
+      id: text2("id").primaryKey().default(sql2`gen_random_uuid()::text`),
       workOrderId: text2("work_order_id").notNull().references(() => workOrders.wouuid),
       // FK → work_orders.wouuid
       vesselId: text2("vessel_id").notNull().references(() => vessels.vuuid),
@@ -4826,7 +4829,10 @@ var init_schema = __esm({
       isActive: integer2("is_active").default(1),
       modulename: text2("modulename"),
       createdAt: timestamp3("created_at").notNull().defaultNow(),
-      updatedAt: timestamp3("updated_at").notNull().defaultNow(),
+      // $onUpdateFn (defensive): the Sync-All writer stamps updatedAt explicitly on both its
+      // insert and soft-delete paths, but any future in-place Drizzle .update() must also bump
+      // updated_at or the ONE_WAY incremental gather (updated_at > checkpoint) would miss it.
+      updatedAt: timestamp3("updated_at").notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date()),
       createdByUuid: text2("created_by_uuid"),
       updatedByUuid: text2("updated_by_uuid"),
       isDeleted: boolean2("is_deleted").notNull().default(false),
@@ -5000,6 +5006,9 @@ function getSyncPhaseOrder() {
       "work_order_executions",
       "work_order_execution_details",
       "work_order_postponements",
+      // wo_postponement_approvals has a REAL FK to work_order_postponements(id) —
+      // it must import strictly AFTER its parent (migration 129).
+      "wo_postponement_approvals",
       "work_order_documents",
       "defect_actions",
       "defect_attachments",
@@ -5010,6 +5019,7 @@ function getSyncPhaseOrder() {
       "inventory_transactions",
       "change_request_attachment",
       "change_request_comment",
+      "change_request_approval",
       "ihm_maintenance_log",
       "component_documents",
       "component_requisitions",
@@ -5530,6 +5540,31 @@ var init_syncConfig = __esm({
         businessRules: null,
         notes: "Class/regulatory data for components. Uses vessel_code. Integer PK, no UUID."
       },
+      // ── Approval workflow: office-managed config + approver registry (global) ──
+      approval_workflow_config: {
+        tableName: "approval_workflow_config",
+        category: "ONE_WAY_SHORE_TO_SHIP",
+        direction: "shore_to_ship",
+        identityColumn: "awcuuid",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: true,
+        businessRules: "Approval level config is office-managed; ships read-only.",
+        notes: "Per-function Level1/Level2 enable flags. Global, shore-mastered. SEEDED ON BOTH SIDES by migration 126 with per-instance awcuuid \u2014 applyOneWayRows matches it by natural key (function_id, variable_name) via FORCE_COMPOSITE (permanently: the seeded row keeps its local awcuuid; identity matching would 23505 on the natural unique every cycle). Provisioning import pre-clears local rows when the bundle carries this table, so fresh ships DO take shore awcuuids."
+      },
+      moc_approvers: {
+        tableName: "moc_approvers",
+        category: "ONE_WAY_SHORE_TO_SHIP",
+        direction: "shore_to_ship",
+        identityColumn: "mauuid",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: true,
+        businessRules: "Approver master is office-managed; ships read-only.",
+        notes: "Approvers (Level1/Level2 per module), refreshed shore-side by Sync-All (soft-delete-all + re-insert, both stamped). Global, shore-mastered."
+      },
       // ══════════════════════════════════════════════════════════════════════════════
       // BOTH_EDITABLE — Both ship & office can edit, requires field-level change logging
       // ══════════════════════════════════════════════════════════════════════════════
@@ -5574,13 +5609,25 @@ var init_syncConfig = __esm({
         tableName: "work_order_postponements",
         category: "BOTH_EDITABLE",
         direction: "bidirectional",
-        identityColumn: null,
+        identityColumn: "id",
         vesselScopeColumn: "vessel_id",
         vesselScopeJoinPath: null,
         isGlobal: false,
         isConfigurable: true,
         businessRules: null,
-        notes: "WO postponement records. Text PK (id), no UUID identity column."
+        notes: "WO postponement records. Text PK (id) IS the sync identity \u2014 app-generated unique (pp-<wo>-<ts>/randomUUID) + gen_random_uuid default (migration 133). Explicit identityColumn (engine previously fell back to id)."
+      },
+      wo_postponement_approvals: {
+        tableName: "wo_postponement_approvals",
+        category: "BOTH_EDITABLE",
+        direction: "bidirectional",
+        identityColumn: "wpauuid",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: "wo_postponement_approvals.postponement_id -> work_order_postponements.id -> work_order_postponements.vessel_id",
+        isGlobal: false,
+        isConfigurable: true,
+        businessRules: "Ship creates approval steps on submit; office updates status on approve/reject.",
+        notes: "WO postponement approval steps. Vessel scope resolved via parent work_order_postponements FK (write paths stamp parent vessel_id into field logs). postponement_id is TEXT and carries verbatim cross-instance (no remap needed). Phase 4 AFTER work_order_postponements (real FK)."
       },
       work_order_documents: {
         tableName: "work_order_documents",
@@ -5752,6 +5799,18 @@ var init_syncConfig = __esm({
         isConfigurable: true,
         businessRules: null,
         notes: "CR attachments. Vessel scope resolved via parent change_request FK."
+      },
+      change_request_approval: {
+        tableName: "change_request_approval",
+        category: "BOTH_EDITABLE",
+        direction: "bidirectional",
+        identityColumn: "crauuid",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: "change_request_approval.change_request_id -> change_request.id -> change_request.vessel_id",
+        isGlobal: false,
+        isConfigurable: true,
+        businessRules: "Ship creates approval steps on submit; office updates status on approve/reject.",
+        notes: "CR approval steps. Vessel scope resolved via parent change_request FK (write paths stamp parent vessel_id into field logs). crauuid identity is table-scoped (shared name with change_request_attachment is safe \u2014 engine keys by table_name+value). change_request_id is a per-instance INTEGER: the applier remaps it from change_request_uuid post-INSERT (wrong-parent guard)."
       },
       change_request_comment: {
         tableName: "change_request_comment",
@@ -6719,10 +6778,18 @@ async function applyOneWayRows(tableName, rows) {
     // Alert config — one per vessel
     alert_config: ["vessel_id"],
     // Component class regulatory — match by (component_id, survey_type, classification_society)
-    component_class_regulatory: ["component_id", "survey_type", "classification_society"]
+    component_class_regulatory: ["component_id", "survey_type", "classification_society"],
+    // Approval workflow config — UNIQUE (function_id, variable_name). SEEDED ON BOTH SIDES
+    // by migration 126 with per-instance random awcuuid, so identity (awcuuid) matching would
+    // MISS the ship's seeded row and the INSERT would 23505 on the natural unique EVERY cycle.
+    // Natural-key matching UPDATEs the seeded row's values instead (the local awcuuid is kept —
+    // buildUpdatePairs excludes the lookup column — so this table matches by natural key
+    // permanently). Requires FORCE_COMPOSITE below (table HAS an identityCol).
+    approval_workflow_config: ["function_id", "variable_name"]
   };
+  const FORCE_COMPOSITE = /* @__PURE__ */ new Set(["approval_workflow_config"]);
   const compositeKeys = COMPOSITE_KEY_TABLES[tableName] || null;
-  const useCompositeKey = compositeKeys !== null && !identityCol;
+  const useCompositeKey = compositeKeys !== null && (!identityCol || FORCE_COMPOSITE.has(tableName));
   const result = { inserted: 0, updated: 0, softDeleted: 0, errors: [] };
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -7109,6 +7176,25 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
             syncDiag(`FK-REMAP INSERT: ${tableName} row=${rowUuid} location_uuid=${rowData["location_uuid"]} \u2192 local location_id=${locLookup.rows[0].id}`);
           } else {
             syncDiag(`FK-REMAP INSERT DEFERRED: ${tableName} row=${rowUuid} location_uuid=${rowData["location_uuid"]} \u2014 location not yet synced`);
+          }
+        } catch (fkErr) {
+          syncDiag(`FK-REMAP INSERT ERROR: ${tableName} row=${rowUuid}: ${fkErr.message}`);
+        }
+      }
+      if (tableName === "change_request_approval" && rowData["change_request_uuid"]) {
+        try {
+          const crLookup = await pool2.query(
+            `SELECT id FROM change_request WHERE cruuid = $1 LIMIT 1`,
+            [rowData["change_request_uuid"]]
+          );
+          if (crLookup.rows.length > 0) {
+            await pool2.query(
+              `UPDATE "${tableName}" SET "change_request_id" = $1 WHERE "${identityCol}" = $2`,
+              [crLookup.rows[0].id, rowUuid]
+            );
+            syncDiag(`FK-REMAP INSERT: ${tableName} row=${rowUuid} change_request_uuid=${rowData["change_request_uuid"]} \u2192 local change_request_id=${crLookup.rows[0].id}`);
+          } else {
+            syncDiag(`FK-REMAP INSERT DEFERRED: ${tableName} row=${rowUuid} change_request_uuid=${rowData["change_request_uuid"]} \u2014 change_request not yet synced`);
           }
         } catch (fkErr) {
           syncDiag(`FK-REMAP INSERT ERROR: ${tableName} row=${rowUuid}: ${fkErr.message}`);
@@ -15466,6 +15552,7 @@ async function verifyBundleExportIntegrity(pool2, vesselId, vesselCode, bundle) 
       shortfalls.push({ tableName: entry.tableName, written: entry.rowCount, dbCount: null, reason: "export threw" });
       continue;
     }
+    if (entry.tableName === "vessels") continue;
     const tc = getTableSyncConfig(entry.tableName);
     if (!tc) continue;
     const looseOnly = entry.tableName === "planner_dates" || !!tc.vesselScopeJoinPath && !tc.vesselScopeColumn;
@@ -15571,6 +15658,18 @@ async function importProvisioningBundle(bundle) {
     } catch (cleanupErr) {
       console.warn(
         `[Provisioning] Ranks cleanup partial: ${cleanupErr.message}`
+      );
+    }
+  }
+  if (bundleTableNames.has("approval_workflow_config")) {
+    try {
+      const deletedAwc = await pool2.query("DELETE FROM approval_workflow_config");
+      console.log(
+        `[Provisioning] approval_workflow_config cleanup: deleted ${deletedAwc.rowCount} seeded row(s) before import`
+      );
+    } catch (cleanupErr) {
+      console.warn(
+        `[Provisioning] approval_workflow_config cleanup partial: ${cleanupErr.message}`
       );
     }
   }
@@ -15953,9 +16052,16 @@ async function exportTableWithJoin(pool2, tableName, joinPath, vesselId) {
       );
       return result2.rows;
     }
-    if (tableName === "change_request_attachment" || tableName === "change_request_comment") {
+    if (tableName === "change_request_attachment" || tableName === "change_request_comment" || tableName === "change_request_approval") {
       const result2 = await pool2.query(
         `SELECT a.* FROM "${tableName}" a JOIN change_request cr ON a.change_request_id = cr.id WHERE cr.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
+        [vesselId]
+      );
+      return result2.rows;
+    }
+    if (tableName === "wo_postponement_approvals") {
+      const result2 = await pool2.query(
+        `SELECT a.* FROM "wo_postponement_approvals" a JOIN work_order_postponements p ON a.postponement_id = p.id WHERE p.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
         [vesselId]
       );
       return result2.rows;
@@ -21614,7 +21720,8 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(defectActions).values(action).returning();
         try {
-          await logFieldChanges("defect_actions", result[0].dauuid, null, null, result[0], "system");
+          const vId = await this.defVesselId(result[0].defectId);
+          await logFieldChanges("defect_actions", result[0].dauuid, vId, null, result[0], "system");
         } catch (e) {
           console.error("[FieldLogger] defectAction create:", e);
         }
@@ -21632,7 +21739,8 @@ var init_postgresStorage = __esm({
           throw new Error(`Defect action ${id} not found`);
         }
         try {
-          await logFieldChanges("defect_actions", existingAction.dauuid, null, existingAction, result[0], "system");
+          const vId = await this.defVesselId(existingAction.defectId);
+          await logFieldChanges("defect_actions", existingAction.dauuid, vId, existingAction, result[0], "system");
         } catch (e) {
           console.error("[FieldLogger] defectAction update:", e);
         }
@@ -21644,9 +21752,10 @@ var init_postgresStorage = __esm({
         if (!existing[0]) {
           throw new Error(`Defect action ${id} not found`);
         }
+        const vIdDel = await this.defVesselId(existing[0].defectId);
         await db2.delete(defectActions).where(eq3(defectActions.id, id));
         try {
-          await logFieldChanges("defect_actions", existing[0].dauuid, null, { is_deleted: false }, { is_deleted: true }, "system");
+          await logFieldChanges("defect_actions", existing[0].dauuid, vIdDel, { is_deleted: false }, { is_deleted: true }, "system");
         } catch (e) {
           console.error("[FieldLogger] defectAction delete:", e);
         }
@@ -22176,15 +22285,61 @@ var init_postgresStorage = __esm({
           eq3(changeRequestApproval.isDeleted, false)
         )).orderBy(changeRequestApproval.approvalLevel);
       }
+      // ── Approval-sync parent-vessel helpers ─────────────────────────────────
+      // The BOTH_EDITABLE field-log gather is `WHERE vessel_id IN (...)` — a NULL
+      // vessel_id log row is silently dropped and NEVER syncs (the historic
+      // null-vessel trap). Every approval-step log below must stamp the PARENT's
+      // vessel_id, resolved via these best-effort lookups.
+      async crVesselId(changeRequestId) {
+        try {
+          const db2 = await getDb();
+          const r = await db2.select({ v: changeRequest.vesselId }).from(changeRequest).where(eq3(changeRequest.id, changeRequestId)).limit(1);
+          return r[0]?.v ?? null;
+        } catch {
+          return null;
+        }
+      }
+      async wopVesselId(postponementId) {
+        try {
+          const db2 = await getDb();
+          const r = await db2.select({ v: workOrderPostponements.vesselId }).from(workOrderPostponements).where(eq3(workOrderPostponements.id, postponementId)).limit(1);
+          return r[0]?.v ?? null;
+        } catch {
+          return null;
+        }
+      }
+      // resolve defects.vessel_id for a defect action (defect_actions.defect_id → defects.duuid)
+      async defVesselId(defectDuuid) {
+        try {
+          const db2 = await getDb();
+          const r = await db2.select({ v: defects.vesselId }).from(defects).where(eq3(defects.duuid, defectDuuid)).limit(1);
+          return r[0]?.v ?? null;
+        } catch {
+          return null;
+        }
+      }
       async createChangeRequestApprovalStep(step) {
         const db2 = await getDb();
         const result = await db2.insert(changeRequestApproval).values(step).returning();
+        try {
+          const vId = await this.crVesselId(result[0].changeRequestId);
+          await logFieldChanges("change_request_approval", result[0].crauuid, vId, null, result[0], "system");
+        } catch (e) {
+          console.error("[FieldLogger] CRApproval create:", e);
+        }
         return result[0];
       }
       async updateChangeRequestApprovalStep(id, data) {
         const db2 = await getDb();
+        const existing = (await db2.select().from(changeRequestApproval).where(eq3(changeRequestApproval.id, id)).limit(1))[0];
         const result = await db2.update(changeRequestApproval).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(changeRequestApproval.id, id)).returning();
         if (!result[0]) throw new Error(`Approval step ${id} not found`);
+        try {
+          const vId = await this.crVesselId(result[0].changeRequestId);
+          await logFieldChanges("change_request_approval", result[0].crauuid, vId, existing ?? null, result[0], "system");
+        } catch (e) {
+          console.error("[FieldLogger] CRApproval update:", e);
+        }
         return result[0];
       }
       // ── Internal: verify a user is an active approver for a given level ──────
@@ -22211,13 +22366,29 @@ var init_postgresStorage = __esm({
         try {
           const result = await db2.transaction(async (tx) => {
             if (stepId !== null) {
-              await tx.update(changeRequestApproval).set({
+              const oldStep = (await tx.select().from(changeRequestApproval).where(eq3(changeRequestApproval.id, stepId)).limit(1))[0];
+              const updatedStep = (await tx.update(changeRequestApproval).set({
                 status: "Approved",
                 actionByUserId: reviewerId,
                 actionAt: now,
                 remarks: comment,
                 updatedAt: now
-              }).where(eq3(changeRequestApproval.id, stepId));
+              }).where(eq3(changeRequestApproval.id, stepId)).returning())[0];
+              if (updatedStep) {
+                try {
+                  await logFieldChanges(
+                    "change_request_approval",
+                    updatedStep.crauuid,
+                    existing.vesselId ?? null,
+                    oldStep ?? null,
+                    updatedStep,
+                    reviewerId,
+                    tx
+                  );
+                } catch (e) {
+                  console.error("[FieldLogger] CRApproval finalise:", e);
+                }
+              }
             }
             const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existing);
             const revisionHistoryEntry = {
@@ -22659,7 +22830,8 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(changeRequestAttachment).values(attachment).returning();
         const created = result[0];
         try {
-          await logFieldChanges("change_request_attachment", created.crauuid, null, null, created, "system");
+          const vId = await this.crVesselId(created.changeRequestId);
+          await logFieldChanges("change_request_attachment", created.crauuid, vId, null, created, "system");
         } catch (e) {
           console.error("[FieldLogger] CRAttach create:", e);
         }
@@ -22681,7 +22853,8 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(changeRequestComment).values(comment).returning();
         try {
-          await logFieldChanges("change_request_comment", result[0].crcuuid, null, null, result[0], "system");
+          const vId = await this.crVesselId(result[0].changeRequestId);
+          await logFieldChanges("change_request_comment", result[0].crcuuid, vId, null, result[0], "system");
         } catch (e) {
           console.error("[FieldLogger] CRComment create:", e);
         }
@@ -23525,12 +23698,25 @@ var init_postgresStorage = __esm({
       async createWoPostponementApprovalStep(step) {
         const db2 = await getDb();
         const result = await db2.insert(woPostponementApprovals).values(step).returning();
+        try {
+          const vId = await this.wopVesselId(result[0].postponementId);
+          await logFieldChanges("wo_postponement_approvals", result[0].wpauuid, vId, null, result[0], "system");
+        } catch (e) {
+          console.error("[FieldLogger] WOPApproval create:", e);
+        }
         return result[0];
       }
       async updateWoPostponementApprovalStep(id, data) {
         const db2 = await getDb();
+        const existing = (await db2.select().from(woPostponementApprovals).where(eq3(woPostponementApprovals.id, id)).limit(1))[0];
         const result = await db2.update(woPostponementApprovals).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(woPostponementApprovals.id, id)).returning();
         if (!result[0]) throw new Error(`WO postponement approval step ${id} not found`);
+        try {
+          const vId = await this.wopVesselId(result[0].postponementId);
+          await logFieldChanges("wo_postponement_approvals", result[0].wpauuid, vId, existing ?? null, result[0], "system");
+        } catch (e) {
+          console.error("[FieldLogger] WOPApproval update:", e);
+        }
         return result[0];
       }
       async getLatestAwaitingPostponement(workOrderId) {
