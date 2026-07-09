@@ -54,7 +54,7 @@ export interface ProvisioningBundle {
 export async function generateProvisioningBundle(
   vesselId: string,
   generatedBy: string,
-  opts?: { domain?: string; persist?: boolean }
+  opts?: { domain?: string; persist?: boolean; blunt?: boolean }
 ): Promise<ProvisioningBundle> {
   const pool = await getPool();
 
@@ -119,12 +119,23 @@ export async function generateProvisioningBundle(
     try {
       const isReprovision = await syncRepo.hasDeliveredSyncHistory(vesselId, convInstanceId, vesselCode);
       if (isReprovision) {
-        const r = await syncRepo.resetInstanceDeliveryStateForReprovision(vesselId, convInstanceId, vesselCode);
+        // T = the bundle's snapshot moment (export start). The SAME value the ship import writes
+        // as its local checkpoint (line ~647), so shore-threshold, ship-checkpoint, and manifest
+        // agree exactly. Partition the vessel's shore field logs at T (bundle IS the baseline);
+        // opts.blunt forces the old re-deliver-everything fallback (post import-verification failure).
+        const snapshotAt = new Date(bundle.manifest.generatedAt);
+        const r = await syncRepo.resetInstanceDeliveryStateForReprovision(
+          vesselId, convInstanceId, vesselCode,
+          { snapshotAt, blunt: opts?.blunt }
+        );
         console.warn(
           `[Provisioning] RE-PROVISION detected for ${convInstanceId} (vessel ${vesselCode}) — ` +
-          `reset office delivery state: fieldLogsReset=${r.fieldLogsReset}, ` +
-          `checkpointCleared=${r.checkpointCleared}, batchesDeleted=${r.batchesDeleted}. ` +
-          `Fresh ship will receive the FULL shore-authored baseline.`
+          `reset mode=${r.mode}: baselineMarkedSynced=${r.baselineMarkedSynced}, ` +
+          `postSnapshotUnsynced=${r.postSnapshotUnsynced}, batchesDeleted=${r.batchesDeleted}, ` +
+          `checkpoint=${r.checkpoint || 'NULL'}. ` +
+          (r.mode === 'partition'
+            ? `Fresh ship boots from the T=${snapshotAt.toISOString()} snapshot (remainingPull ≈ 0; only post-T edits flow).`
+            : `BLUNT re-delivery: fresh ship receives the FULL shore-authored baseline.`)
         );
       } else {
         console.log(
@@ -293,6 +304,8 @@ export async function importProvisioningBundle(
   bundle: ProvisioningBundle
 ): Promise<{
   success: boolean;
+  verified: boolean;
+  verifyMismatches: { tableName: string; expected: number; actual: number }[];
   tablesImported: number;
   rowsImported: number;
   errors: string[];
@@ -677,8 +690,40 @@ export async function importProvisioningBundle(
     `[Provisioning] Import complete: ${tablesImported} tables, ${rowsImported} rows, ${errors.length} errors`
   );
 
+  // ── Import verification (the trust condition for the snapshot-baseline reset) ──
+  // The shore marks pre-T field logs is_synced=true at GENERATION time, trusting the bundle as
+  // the delivered baseline. If a table silently under-imported here (per-table failures are
+  // caught + skipped above, not aborted), those rows are "delivered" but ABSENT on the ship —
+  // future edits would hit a missing row. So verify per-table row counts NOW and fail loudly.
+  // On mismatch the operator re-provisions with the blunt/full re-sync (?blunt=true).
+  let verified = true;
+  let verifyMismatches: { tableName: string; expected: number; actual: number }[] = [];
+  try {
+    const v = await verifyProvisioning(bundle.manifest);
+    verified = v.valid;
+    verifyMismatches = v.mismatches;
+    if (!v.valid) {
+      const summary = v.mismatches
+        .map((m) => `${m.tableName} expected=${m.expected} actual=${m.actual}`)
+        .join(' | ');
+      console.error(
+        `[Provisioning] ⚠️ IMPORT VERIFICATION FAILED — ${v.mismatches.length} table(s) short: ${summary}. ` +
+        `Ship is NOT a complete baseline; re-provision with blunt/full re-sync (?blunt=true) before going live.`
+      );
+      errors.push(`VERIFY: ${v.mismatches.length} table(s) short: ${summary}`);
+    } else {
+      console.log(`[Provisioning] Import verification PASSED (${bundle.manifest.tables.length} tables).`);
+    }
+  } catch (verErr: any) {
+    verified = false;
+    errors.push(`VERIFY failed to run: ${verErr.message}`);
+    console.error(`[Provisioning] ⚠️ IMPORT VERIFICATION could not run: ${verErr.message}`);
+  }
+
   return {
-    success: errors.length === 0,
+    success: errors.length === 0 && verified,
+    verified,
+    verifyMismatches,
     tablesImported,
     rowsImported,
     errors,

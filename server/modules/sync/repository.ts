@@ -786,61 +786,105 @@ export async function hasDeliveredSyncHistory(
 }
 
 /**
- * Re-provision reset: clear this vessel/instance's office-side DELIVERY state so a freshly
- * provisioned ship on the SAME instance id receives the FULL shore-authored baseline again,
- * instead of only post-checkpoint edits (which strand an edit-for-a-row-it-never-received —
- * the fresh-provision spare_location_stock.spare_id NULL failure).
+ * Re-provision reset: align this vessel/instance's office-side DELIVERY state with the
+ * provisioning bundle so a freshly provisioned ship on the SAME instance id does NOT re-drain
+ * the vessel's entire history — the bundle IS the baseline as of the snapshot moment T.
  *
- * SAFETY: every statement is scoped by vessel_id (a/b) or instance_id (b/c) — it is provably
+ * PARTITION mode (default, when a snapshot marker T is supplied): partition the shore-authored
+ * field logs at T = manifest.generatedAt (export start):
+ *   (a1) changed_at <= T  → is_synced=TRUE   — the bundle already delivered these; don't re-send.
+ *   (a2) changed_at >  T   → is_synced=FALSE  — post-snapshot edits the fresh ship still needs.
+ *   (b)  shore checkpoint  = T (tidy; not load-bearing — field-log pull is is_synced-driven and
+ *        the one-way gather uses the SHIP-sent checkpoint, which the import sets to generatedAt).
+ * Result: remainingPull ≈ 0 after import; only post-T rows flow; the edit-for-a-missing-row
+ * class stays impossible because baseline and bookmark agree exactly at T.
+ *
+ * BLUNT mode (opts.blunt, or when no T is supplied): today's behaviour — set ALL delivered
+ * shore logs back to is_synced=FALSE and clear the checkpoint (re-deliver everything). The
+ * guaranteed self-heal used when import verification fails or when explicitly requested.
+ *
+ * SAFETY: every statement is scoped by vessel_id (a1/a2) or instance_id (b/c) — provably
  * incapable of touching another vessel's or instance's rows, and it NEVER touches real data
  * tables (spares, spare_location_stock, …). It only flips sync-machinery delivery flags and
- * clears this instance's batch history. One instance id = one unique vessel (by design), so
- * (a)'s vessel scope and (b/c)'s instance scope address the same single ship.
+ * clears this instance's batch history. One instance id = one unique vessel (by design).
  * Runs in the caller's (vessel's) tenant context via getPool().
  */
 export async function resetInstanceDeliveryStateForReprovision(
   vesselId: string,
   instanceId: string,
   vesselCode?: string | null,
-): Promise<{ fieldLogsReset: number; checkpointCleared: boolean; batchesDeleted: number }> {
+  opts?: { snapshotAt?: Date | null; blunt?: boolean },
+): Promise<{
+  mode: 'partition' | 'blunt';
+  baselineMarkedSynced: number;
+  postSnapshotUnsynced: number;
+  batchesDeleted: number;
+  checkpoint: string | null;
+}> {
   const pool = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
-  const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+  const vp = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+  const ip = `$${vesselValues.length + 1}`;      // instance_id param
+  const tp = `$${vesselValues.length + 2}`;      // snapshot T param
 
-  // (a) Re-queue the full shore-authored baseline: mirror the pull-gather filter EXACTLY
-  //     (vessel_id IN (...) AND instance_id != <ship>), flipping already-delivered rows back
-  //     to is_synced=false. `AND is_synced = true` makes this target only delivered rows so
-  //     rowCount is the true reset count; rows already false are untouched (no-op).
-  const fl = await pool.query(
-    `UPDATE sync_field_log SET is_synced = false
-      WHERE vessel_id IN (${placeholders})
-        AND instance_id != $${vesselValues.length + 1}
-        AND is_synced = true`,
-    [...vesselValues, instanceId]
-  );
-
-  // (b) Reset the pull checkpoint/watermark for THIS instance so one-way rows re-deliver from
-  //     scratch. Scoped by instance_id — cannot affect any other instance's watermark.
-  const cp = await pool.query(
-    `UPDATE sync_metadata SET last_sync_checkpoint = NULL, updated_at = NOW()
-      WHERE instance_id = $1 AND last_sync_checkpoint IS NOT NULL`,
-    [instanceId]
-  );
-
-  // (c) Drop stale/in-progress batches initiated by THIS instance so a leftover in_progress
-  //     batch can't interfere with the fresh ship's first /sync/initiate. Scoped by instance_id.
+  // (c) Always: drop stale/in-progress batches initiated by THIS instance so a leftover
+  //     in_progress batch can't interfere with the fresh ship's first /sync/initiate.
   const batches = await pool.query(
     `DELETE FROM sync_batches WHERE initiated_by_instance = $1`,
     [instanceId]
   );
-
-  const fieldLogsReset = fl.rowCount ?? 0;
-  const checkpointCleared = (cp.rowCount ?? 0) > 0;
   const batchesDeleted = batches.rowCount ?? 0;
-  syncDiag(
-    `PROVISION-REPROVISION-RESET instance=${instanceId} vessel=${vesselId}: ` +
-    `fieldLogsReset=${fieldLogsReset} checkpointCleared=${checkpointCleared} batchesDeleted=${batchesDeleted}`
+
+  const T = opts?.snapshotAt ?? null;
+
+  if (opts?.blunt || !T) {
+    // BLUNT: re-deliver everything (today's behaviour). Guaranteed self-heal.
+    const fl = await pool.query(
+      `UPDATE sync_field_log SET is_synced = false
+        WHERE vessel_id IN (${vp}) AND instance_id != ${ip} AND is_synced = true`,
+      [...vesselValues, instanceId]
+    );
+    await pool.query(
+      `UPDATE sync_metadata SET last_sync_checkpoint = NULL, updated_at = NOW() WHERE instance_id = $1`,
+      [instanceId]
+    );
+    const postSnapshotUnsynced = fl.rowCount ?? 0;
+    syncDiag(
+      `PROVISION-REPROVISION-RESET (blunt) instance=${instanceId} vessel=${vesselId}: ` +
+      `allUnsynced=${postSnapshotUnsynced} batchesDeleted=${batchesDeleted}`
+    );
+    return { mode: 'blunt', baselineMarkedSynced: 0, postSnapshotUnsynced, batchesDeleted, checkpoint: null };
+  }
+
+  // PARTITION at T.
+  // (a1) baseline (<= T) is carried by the bundle → mark delivered (flip the not-yet-true ones).
+  const a1 = await pool.query(
+    `UPDATE sync_field_log SET is_synced = true
+      WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
+        AND changed_at <= ${tp} AND is_synced = false`,
+    [...vesselValues, instanceId, T]
   );
-  return { fieldLogsReset, checkpointCleared, batchesDeleted };
+  // (a2) post-snapshot edits (> T) must flow to the fresh ship → mark undelivered (flip any that
+  //      a prior sync had marked delivered to the OLD ship). Disjoint from (a1) by the T split.
+  const a2 = await pool.query(
+    `UPDATE sync_field_log SET is_synced = false
+      WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
+        AND changed_at > ${tp} AND is_synced = true`,
+    [...vesselValues, instanceId, T]
+  );
+  // (b) shore checkpoint = T (tidy). Row exists (upserted before the reset in provisioning).
+  //     This is its own statement with its own params, so T is $2 here.
+  await pool.query(
+    `UPDATE sync_metadata SET last_sync_checkpoint = $2, updated_at = NOW() WHERE instance_id = $1`,
+    [instanceId, T]
+  );
+
+  const baselineMarkedSynced = a1.rowCount ?? 0;
+  const postSnapshotUnsynced = a2.rowCount ?? 0;
+  syncDiag(
+    `PROVISION-REPROVISION-RESET (partition T=${T.toISOString()}) instance=${instanceId} vessel=${vesselId}: ` +
+    `baselineMarkedSynced=${baselineMarkedSynced} postSnapshotUnsynced=${postSnapshotUnsynced} batchesDeleted=${batchesDeleted}`
+  );
+  return { mode: 'partition', baselineMarkedSynced, postSnapshotUnsynced, batchesDeleted, checkpoint: T.toISOString() };
 }

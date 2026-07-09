@@ -442,7 +442,10 @@ export async function downloadProvisionHandler(req: Request, res: Response) {
     // map row (master). Domain is the verified tenant domain (set by tenantMiddleware,
     // since provisioning routes are no longer exempt). No-op when multi-tenant disabled.
     const domain = (req as any).tenantDomain || undefined;
-    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, { domain, persist: true });
+    // ?blunt=true forces the full re-deliver-everything reset (the guaranteed self-heal used
+    // when a prior import failed verification). Default = snapshot-baseline partition.
+    const blunt = req.query.blunt === 'true' || req.query.blunt === '1';
+    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, { domain, persist: true, blunt });
 
     const fileName = `provision_${vesselId}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     res.setHeader('Content-Type', 'application/json');
