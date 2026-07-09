@@ -106,50 +106,9 @@ export async function generateProvisioningBundle(
     } catch (keyErr: any) {
       console.warn(`[Provisioning] sync key / instance-map seed skipped: ${keyErr.message}`);
     }
-
-    // ── Part B: re-provision delivery-state reset ──
-    // Re-provisioning a ship on the SAME instance id leaves the office's prior "already
-    // delivered" state intact (is_synced=true field logs + a non-null pull checkpoint), so
-    // the office only re-sends LATER edits — and the fresh, empty ship gets an edit for a row
-    // it never received (the spare_location_stock.spare_id NULL failure). Fix at the source:
-    // on a real (persisted) re-provision, forget this ONE vessel/instance's delivery state so
-    // the fresh ship receives the FULL shore-authored baseline again. Brand-new instance with
-    // no delivered history → no-op (behaves exactly as today). Wrapped so a reset failure can
-    // NEVER abort bundle generation — surfaced loudly, then we proceed.
-    try {
-      const isReprovision = await syncRepo.hasDeliveredSyncHistory(vesselId, convInstanceId, vesselCode);
-      if (isReprovision) {
-        // T = the bundle's snapshot moment (export start). The SAME value the ship import writes
-        // as its local checkpoint (line ~647), so shore-threshold, ship-checkpoint, and manifest
-        // agree exactly. Partition the vessel's shore field logs at T (bundle IS the baseline);
-        // opts.blunt forces the old re-deliver-everything fallback (post import-verification failure).
-        const snapshotAt = new Date(bundle.manifest.generatedAt);
-        const r = await syncRepo.resetInstanceDeliveryStateForReprovision(
-          vesselId, convInstanceId, vesselCode,
-          { snapshotAt, blunt: opts?.blunt }
-        );
-        console.warn(
-          `[Provisioning] RE-PROVISION detected for ${convInstanceId} (vessel ${vesselCode}) — ` +
-          `reset mode=${r.mode}: baselineMarkedSynced=${r.baselineMarkedSynced}, ` +
-          `postSnapshotUnsynced=${r.postSnapshotUnsynced}, batchesDeleted=${r.batchesDeleted}, ` +
-          `checkpoint=${r.checkpoint || 'NULL'}. ` +
-          (r.mode === 'partition'
-            ? `Fresh ship boots from the T=${snapshotAt.toISOString()} snapshot (remainingPull ≈ 0; only post-T edits flow).`
-            : `BLUNT re-delivery: fresh ship receives the FULL shore-authored baseline.`)
-        );
-      } else {
-        console.log(
-          `[Provisioning] ${convInstanceId} (vessel ${vesselCode}) has no delivered history — ` +
-          `brand-new provision, no delivery-state reset needed.`
-        );
-      }
-    } catch (resetErr: any) {
-      console.error(
-        `[Provisioning] ⚠️ RE-PROVISION reset FAILED for ${convInstanceId} (vessel ${vesselCode}): ` +
-        `${resetErr.message}. Bundle generation continues; the fresh ship may not receive the full ` +
-        `baseline until this is resolved.`
-      );
-    }
+    // NOTE: the delivery-state partition (mark shore logs <= T synced) runs AFTER the export +
+    // export-integrity verification below — we only trust the bundle as "delivered" once we've
+    // proven it was written completely. See the persist block after the export phases.
   }
 
   // Phase 0: Export the vessel row FIRST — almost every other table has
@@ -252,7 +211,112 @@ export async function generateProvisioningBundle(
       `${bundle.manifest.totalRows} total rows across ${bundle.manifest.tables.length} tables`
   );
 
+  // ── Addition 2: export-integrity verification (integrity at birth) ──
+  // A bundle born incomplete (a per-table export that threw is degraded to rowCount:0 with an
+  // "ERROR:" marker in exportAndAdd) is otherwise only caught AFTER satellite transfer, at import.
+  // Verify NOW, shore-side: for each exported table re-COUNT(*) under the SAME export filter and
+  // fail the whole generation loudly on any shortfall — never return/persist a bad bundle. The
+  // per-table counts proven here ARE bundle.manifest.tables[].rowCount, the same numbers the ship's
+  // import verify re-checks, so the chain is: proven at birth → manifest → proven at landing.
+  const exportIntegrity = await verifyBundleExportIntegrity(pool, vesselId, vesselCode, bundle);
+  if (!exportIntegrity.ok) {
+    const summary = exportIntegrity.shortfalls
+      .map((s) => `${s.tableName} written=${s.written} dbCount=${s.dbCount}${s.reason ? ` (${s.reason})` : ''}`)
+      .join(' | ');
+    const msg =
+      `[Provisioning] ⚠️ EXPORT INTEGRITY FAILED for vessel ${vesselCode} — ${exportIntegrity.shortfalls.length} ` +
+      `table(s) under-exported: ${summary}. Bundle NOT generated (a complete baseline could not be produced).`;
+    console.error(msg);
+    throw Object.assign(new Error(msg), { statusCode: 500 });
+  }
+  console.log(`[Provisioning] Export integrity PASSED (${bundle.manifest.tables.length} tables).`);
+
+  // ── Addition 1: snapshot-baseline delivery-state partition (first + re-provision) ──
+  // On ANY persisted generation, once the export is proven complete, the bundle IS the delivered
+  // baseline as of T = manifest.generatedAt. Mark this vessel's shore field logs changed_at <= T
+  // is_synced=true (don't re-drain the history the bundle carries) and post-T logs false. This
+  // now applies to FIRST provisions too (Wah Kwong) — without it their shore-imported history
+  // full-drains after import. Blunt (?blunt=true) reverts to re-deliver-everything. Wrapped so a
+  // partition failure NEVER aborts an already-verified bundle — it only degrades to a full drain.
+  if (opts?.persist && vesselCode) {
+    const convInstanceId = `SHIP-${vesselCode}`;
+    try {
+      const snapshotAt = new Date(bundle.manifest.generatedAt);
+      const wasReprovision = await syncRepo.hasDeliveredSyncHistory(vesselId, convInstanceId, vesselCode);
+      const r = await syncRepo.resetInstanceDeliveryStateForReprovision(
+        vesselId, convInstanceId, vesselCode,
+        { snapshotAt, blunt: opts?.blunt }
+      );
+      console.warn(
+        `[Provisioning] ${wasReprovision ? 'RE-PROVISION' : 'FIRST-PROVISION'} delivery-state partition for ` +
+        `${convInstanceId} (vessel ${vesselCode}) — mode=${r.mode}: baselineMarkedSynced=${r.baselineMarkedSynced}, ` +
+        `postSnapshotUnsynced=${r.postSnapshotUnsynced}, batchesDeleted=${r.batchesDeleted}, checkpoint=${r.checkpoint || 'NULL'}. ` +
+        (r.mode === 'partition'
+          ? `Fresh ship boots from the T=${snapshotAt.toISOString()} snapshot (remainingPull ≈ 0; only post-T edits flow).`
+          : `BLUNT re-delivery: fresh ship receives the FULL shore-authored baseline.`)
+      );
+    } catch (resetErr: any) {
+      console.error(
+        `[Provisioning] ⚠️ delivery-state partition FAILED for ${convInstanceId} (vessel ${vesselCode}): ` +
+        `${resetErr.message}. Bundle is complete and returned; the fresh ship will re-drain the full baseline ` +
+        `(safe, just slower) until this is resolved.`
+      );
+    }
+  }
+
   return bundle;
+}
+
+/**
+ * Addition 2 helper — shore-side export-integrity check. For each exported table, re-COUNT(*)
+ * under the SAME filter exportAndAdd used and flag a shortfall when the DB has MORE rows than the
+ * bundle wrote (an under-export), plus any table whose export threw (category carries "ERROR:").
+ * planner_dates and join-scoped tables legitimately export a filtered subset, so they are checked
+ * for the export-error marker only (no strict count — a strict count would false-positive). A
+ * strict-count query that itself errors is skipped (logged) rather than false-failing a healthy
+ * export.
+ */
+export async function verifyBundleExportIntegrity(
+  pool: any,
+  vesselId: string,
+  vesselCode: string | null,
+  bundle: ProvisioningBundle,
+): Promise<{ ok: boolean; shortfalls: { tableName: string; written: number; dbCount: number | null; reason?: string }[] }> {
+  const shortfalls: { tableName: string; written: number; dbCount: number | null; reason?: string }[] = [];
+  for (const entry of bundle.manifest.tables) {
+    // (1) Any export that threw was degraded to rowCount:0 with an "ERROR:" marker → shortfall.
+    if (/ERROR:/.test(entry.category)) {
+      shortfalls.push({ tableName: entry.tableName, written: entry.rowCount, dbCount: null, reason: 'export threw' });
+      continue;
+    }
+    const tc = getTableSyncConfig(entry.tableName);
+    if (!tc) continue; // vessels (identity self) / unknown → not strictly countable here
+    // planner_dates + join-scoped tables export a filtered subset — error-marker check only.
+    const looseOnly = entry.tableName === 'planner_dates' || (!!tc.vesselScopeJoinPath && !tc.vesselScopeColumn);
+    if (looseOnly) continue;
+    try {
+      let dbCount: number;
+      if (tc.isGlobal || !tc.vesselScopeColumn) {
+        const res = await pool.query(`SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false`);
+        dbCount = res.rows[0]?.c ?? 0;
+      } else {
+        const scopeValue = tc.vesselScopeColumn === 'vessel_code' ? vesselCode : vesselId;
+        if (!scopeValue) continue;
+        const res = await pool.query(
+          `SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE "${tc.vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false`,
+          [scopeValue]
+        );
+        dbCount = res.rows[0]?.c ?? 0;
+      }
+      if (dbCount > entry.rowCount) {
+        shortfalls.push({ tableName: entry.tableName, written: entry.rowCount, dbCount, reason: 'db has more rows than exported' });
+      }
+    } catch (cErr: any) {
+      // Count query itself failed — do NOT false-fail a healthy export; log and skip this table.
+      console.warn(`[Provisioning] export-integrity count skipped for ${entry.tableName}: ${cErr.message}`);
+    }
+  }
+  return { ok: shortfalls.length === 0, shortfalls };
 }
 
 // ── Bundle Import (Ship side) ──
