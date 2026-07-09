@@ -4610,8 +4610,11 @@ export class PostgresStorage {
   async createDefectAction(action: InsertDefectAction): Promise<DefectAction> {
     const db = await getDb();
     const result = await db.insert(defectActions).values(action).returning();
-    // Sync field logging — INSERT (vesselId via parent defect lookup is deferred; log without vesselId)
-    try { await logFieldChanges('defect_actions', result[0].dauuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defectAction create:', e); }
+    // Sync field logging — INSERT (parent-resolved vessel_id: the gather drops null-vessel rows)
+    try {
+      const vId = await this.defVesselId(result[0].defectId);
+      await logFieldChanges('defect_actions', result[0].dauuid, vId, null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] defectAction create:', e); }
     return result[0];
   }
 
@@ -4631,8 +4634,11 @@ export class PostgresStorage {
     if (!result[0]) {
       throw new Error(`Defect action ${id} not found`);
     }
-    // Sync field logging — UPDATE
-    try { await logFieldChanges('defect_actions', existingAction.dauuid, null, existingAction, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defectAction update:', e); }
+    // Sync field logging — UPDATE (parent-resolved vessel_id)
+    try {
+      const vId = await this.defVesselId(existingAction.defectId);
+      await logFieldChanges('defect_actions', existingAction.dauuid, vId, existingAction, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] defectAction update:', e); }
     return result[0];
   }
 
@@ -4643,9 +4649,12 @@ export class PostgresStorage {
     if (!existing[0]) {
       throw new Error(`Defect action ${id} not found`);
     }
+    // Resolve parent vessel BEFORE the hard delete (the row's defect link is gone after)
+    const vIdDel = await this.defVesselId(existing[0].defectId);
     await db.delete(defectActions).where(eq(defectActions.id, id));
-    // Sync field logging — DELETE
-    try { await logFieldChanges('defect_actions', existing[0].dauuid, null, { is_deleted: false }, { is_deleted: true }, 'system'); } catch (e) { console.error('[FieldLogger] defectAction delete:', e); }
+    // Sync field logging — DELETE (parent-resolved vessel_id; hard delete + soft-delete log is
+    // the pre-existing semantics — receiver soft-deletes its copy)
+    try { await logFieldChanges('defect_actions', existing[0].dauuid, vIdDel, { is_deleted: false }, { is_deleted: true }, 'system'); } catch (e) { console.error('[FieldLogger] defectAction delete:', e); }
   }
 
   // ============= MODULE 9: DEFECT ATTACHMENTS =============
@@ -5362,6 +5371,16 @@ export class PostgresStorage {
     } catch { return null; }
   }
 
+  // resolve defects.vessel_id for a defect action (defect_actions.defect_id → defects.duuid)
+  private async defVesselId(defectDuuid: string): Promise<string | null> {
+    try {
+      const db = await getDb();
+      const r = await db.select({ v: defects.vesselId }).from(defects)
+        .where(eq(defects.duuid, defectDuuid)).limit(1);
+      return r[0]?.v ?? null;
+    } catch { return null; }
+  }
+
   async createChangeRequestApprovalStep(step: InsertChangeRequestApproval): Promise<ChangeRequestApproval> {
     const db = await getDb();
     const result = await db.insert(changeRequestApproval).values(step).returning();
@@ -6035,8 +6054,11 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(changeRequestAttachment).values(attachment).returning();
     const created = result[0];
-    // Sync field logging — INSERT
-    try { await logFieldChanges('change_request_attachment', created.crauuid, null, null, created, 'system'); } catch (e) { console.error('[FieldLogger] CRAttach create:', e); }
+    // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
+    try {
+      const vId = await this.crVesselId(created.changeRequestId);
+      await logFieldChanges('change_request_attachment', created.crauuid, vId, null, created, 'system');
+    } catch (e) { console.error('[FieldLogger] CRAttach create:', e); }
     // Queue binary file for sync if stored locally (not base64 data URIs or external URLs)
     if (created.url && (created.url.startsWith('local://') || created.url.startsWith('.private/'))) {
       try { await FileSyncProcessor.queueFileForSync('change_request_attachment', created.crauuid, created.url, created.filename, null, null); } catch (e) { console.error('[FileSyncQueue] CRAttach:', e); }
@@ -6056,8 +6078,11 @@ export class PostgresStorage {
   async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
     const db = await getDb();
     const result = await db.insert(changeRequestComment).values(comment).returning();
-    // Sync field logging — INSERT
-    try { await logFieldChanges('change_request_comment', result[0].crcuuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CRComment create:', e); }
+    // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
+    try {
+      const vId = await this.crVesselId(result[0].changeRequestId);
+      await logFieldChanges('change_request_comment', result[0].crcuuid, vId, null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] CRComment create:', e); }
     return result[0];
   }
 
