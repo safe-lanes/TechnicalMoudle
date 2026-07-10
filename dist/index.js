@@ -10525,7 +10525,7 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
   console.log(`[Sync Resolve] Conflict ${conflictUuid}: ${resolution} \u2192 "${winningValue}"`);
   return { resolved: true, resolution, resolvedValue: winningValue };
 }
-async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUuids) {
+async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUuids, failedOneWayTables) {
   const batch = await getBatch(batchUuid);
   if (!batch) {
     throw Object.assign(new Error(`Batch ${batchUuid} not found`), { statusCode: 404 });
@@ -10570,24 +10570,37 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
       batchUuid
     );
   }
+  const oneWayHoldback = Array.isArray(failedOneWayTables) && failedOneWayTables.length > 0;
+  const checkpointBefore = batch.checkpointBefore ? batch.checkpointBefore instanceof Date ? batch.checkpointBefore : new Date(batch.checkpointBefore) : null;
+  const effectiveCheckpoint = oneWayHoldback ? checkpointBefore : now;
+  if (oneWayHoldback) {
+    const held = effectiveCheckpoint ? effectiveCheckpoint.toISOString() : "NULL (full one-way resend)";
+    console.warn(
+      `[Sync Complete] \u26A0\uFE0F ONE-WAY HOLDBACK: ship reported failed one-way table(s) [${failedOneWayTables.join(", ")}] \u2014 checkpoint held at ${held}; their window re-offers next sync.`
+    );
+    syncDiag(`COMPLETE-SESSION ONE-WAY HOLDBACK: tables=[${failedOneWayTables.join(",")}] checkpoint held at ${held}`);
+  }
   await upsertInstanceMetadata({
     instanceId,
     vesselId,
-    lastSyncCheckpoint: now,
+    lastSyncCheckpoint: effectiveCheckpoint,
     lastSyncStatus: "success",
     lastSyncAt: now
   });
   await updateBatch(batchUuid, {
     status: "completed",
     completedAt: now,
-    checkpointAfter: now,
+    ...effectiveCheckpoint ? { checkpointAfter: effectiveCheckpoint } : {},
     durationMs
   });
-  console.log(`[Sync Complete] Batch ${batchUuid}: ${durationMs}ms, checkpoint advanced to ${now.toISOString()}`);
+  console.log(`[Sync Complete] Batch ${batchUuid}: ${durationMs}ms, checkpoint ${oneWayHoldback ? "HELD at" : "advanced to"} ${effectiveCheckpoint ? effectiveCheckpoint.toISOString() : "NULL"}`);
   const remainingPull = await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
   return {
     completed: true,
-    newCheckpoint: now.toISOString(),
+    // The EFFECTIVE checkpoint (held back on one-way failures) — the ship saves this
+    // locally, so ship and shore watermarks stay consistent. Null = full one-way resend.
+    newCheckpoint: effectiveCheckpoint ? effectiveCheckpoint.toISOString() : null,
+    oneWayHoldback,
     durationMs,
     remainingPull
   };
@@ -16252,7 +16265,11 @@ var init_syncEngine = __esm({
             batchUuid,
             vesselId,
             instanceId: this.instanceId,
-            appliedRowUuids: pullResult.appliedRowUuids
+            appliedRowUuids: pullResult.appliedRowUuids,
+            // One-way orphaning fix: tables whose one-way apply failed this cycle. The shore
+            // holds the checkpoint at checkpointBefore when non-empty, so the failed window
+            // is re-offered next sync (one-way applies are idempotent upserts).
+            failedOneWayTables: pullResult.failedOneWayTables
           });
           console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
           syncDiag(`SYNC COMPLETE: checkpoint=${completeResult.newCheckpoint}`);
@@ -16261,7 +16278,9 @@ var init_syncEngine = __esm({
               await upsertInstanceMetadata({
                 instanceId: this.instanceId,
                 vesselId,
-                lastSyncCheckpoint: new Date(completeResult.newCheckpoint),
+                // newCheckpoint can be null when the shore held the watermark back (failed
+                // one-way tables, or a held-back first sync) — save null, never new Date(null).
+                lastSyncCheckpoint: completeResult.newCheckpoint ? new Date(completeResult.newCheckpoint) : null,
                 lastSyncStatus: "success",
                 lastSyncAt: /* @__PURE__ */ new Date()
               });
@@ -16621,6 +16640,7 @@ var init_syncEngine = __esm({
         let conflictsFound = 0;
         let conflictsAutoResolved = 0;
         const allErrors = [];
+        const failedOneWayTables = [];
         const appliedRowUuids = [];
         const pullData = await this.callSyncApiWithRetry("POST", "/sync/pull", {
           batchUuid,
@@ -16647,6 +16667,7 @@ var init_syncEngine = __esm({
               totalPulled += result.inserted + result.updated + result.softDeleted;
               totalApplyErrors += result.errors.length;
               if (result.errors.length > 0) {
+                failedOneWayTables.push(tableData.tableName);
                 result.errors.slice(0, 3).forEach((e) => syncDiag(`PULL ONE-WAY ERROR: ${tableData.tableName}[${e.rowIndex}]: ${String(e.error).substring(0, 150)}`));
                 const errorSamples = result.errors.slice(0, 5).map(
                   (e) => `${tableData.tableName}[${e.rowIndex}]: ${e.error}`
@@ -16657,6 +16678,7 @@ var init_syncEngine = __esm({
                 allErrors.push(...errorSamples);
               }
             } catch (err) {
+              failedOneWayTables.push(tableData.tableName);
               syncDiag(`PULL ONE-WAY EXCEPTION: ${tableData.tableName}: ${err.message.substring(0, 150)}`);
               console.error(`[SyncEngine] Failed to apply one-way rows for ${tableData.tableName}:`, err.message);
               allErrors.push(`${tableData.tableName}: ${err.message}`);
@@ -16756,7 +16778,7 @@ var init_syncEngine = __esm({
             console.log(`[SyncEngine] ${conflictsFound} conflicts, ${conflictsAutoResolved} auto-resolved`);
           }
         }
-        return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids };
+        return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids, failedOneWayTables };
       }
       // ═══════════════════════════════════════════════════════════════
       // FIELD LOG APPLIER — Merge a single field change into local DB
@@ -16890,7 +16912,7 @@ var init_syncEngine = __esm({
               body.lastCheckpoint ? new Date(body.lastCheckpoint) : null
             );
           case "/sync/complete":
-            return svc.completeSyncSession(body.batchUuid, body.vesselId, body.instanceId);
+            return svc.completeSyncSession(body.batchUuid, body.vesselId, body.instanceId, void 0, body.failedOneWayTables);
           default:
             throw new Error(`Unknown sync path: ${path14}`);
         }
@@ -17463,11 +17485,13 @@ async function completeSyncHandler(req, res) {
     if (!batchUuid || !vesselId || !instanceId) {
       return res.status(400).json({ error: "batchUuid, vesselId, and instanceId are required" });
     }
+    const failedOneWayTables = Array.isArray(req.body.failedOneWayTables) ? req.body.failedOneWayTables.filter((t) => typeof t === "string") : void 0;
     const result = await completeSyncSession(
       batchUuid,
       vesselId,
       instanceId,
-      Array.isArray(appliedRowUuids) ? appliedRowUuids : void 0
+      Array.isArray(appliedRowUuids) ? appliedRowUuids : void 0,
+      failedOneWayTables
     );
     res.json(result);
   } catch (error) {
@@ -73358,43 +73382,10 @@ async function syncMasters(req, res) {
   }
   if (approverFetchSucceeded) {
     try {
-      await db2.update(mocApprovers).set({ isDeleted: true, updatedAt: now }).where(and23(eq26(mocApprovers.isSync, true), eq26(mocApprovers.isDeleted, false)));
+      await reconcileApprovers(fetchedApprovers, now, stats.approvers);
     } catch (e) {
-      console.error(`[syncMasters] Failed to soft-delete stale approvers: ${e.message}`);
-    }
-    const technicalApprovers = fetchedApprovers.filter(
-      (a) => (a.modulename || a.moduleName || "") === "Technical"
-    );
-    for (const a of technicalApprovers) {
-      try {
-        const userId = getFieldValue(a, ["userId", "user_id", "uid"]);
-        if (!userId) {
-          stats.approvers.skipped++;
-          continue;
-        }
-        const name = getFieldValue(a, ["name", "fullname", "fullName", "userName"]) || null;
-        const userUuid = getFieldValue(a, ["userUuid", "user_uuid", "uuid"]) || null;
-        const approverLevel = getFieldValue(a, ["approverLevel", "approver_level", "level"]) || null;
-        const emailId = getFieldValue(a, ["emailId", "email_id", "email"]) || null;
-        const modulename = getFieldValue(a, ["modulename", "moduleName"]) || "Technical";
-        const isActiveRaw = a.isActive ?? a.is_active;
-        const isActive = isActiveRaw === 1 || isActiveRaw === true ? 1 : 0;
-        await db2.insert(mocApprovers).values({
-          name,
-          userId,
-          userUuid,
-          approverLevel,
-          emailId,
-          isActive,
-          modulename,
-          isSync: true,
-          isDeleted: false,
-          updatedAt: now
-        });
-        stats.approvers.inserted++;
-      } catch (e) {
-        stats.approvers.errors.push(`Approver ${a.userId || a.user_id}: ${e.message}`);
-      }
+      console.error(`[syncMasters] Approver reconcile failed (state unchanged): ${e.message}`);
+      stats.approvers.errors.push(`Reconcile failed (rolled back): ${e.message}`);
     }
   }
   console.log("\u2705 Master data sync completed:", stats);
@@ -73403,6 +73394,78 @@ async function syncMasters(req, res) {
     message: "Master data sync completed successfully",
     statistics: stats
   });
+}
+async function reconcileApprovers(fetchedApprovers, now, stats) {
+  const getFieldValue = (entry, fields) => {
+    for (const field of fields) {
+      if (entry[field] !== void 0 && entry[field] !== null) return String(entry[field]);
+    }
+    return null;
+  };
+  const pool2 = await getPool();
+  const client = await pool2.connect();
+  const technical = fetchedApprovers.filter(
+    (a) => (a.modulename || a.moduleName || "") === "Technical"
+  );
+  const rows = [];
+  for (const a of technical) {
+    const userId = getFieldValue(a, ["userId", "user_id", "uid"]);
+    const approverLevel = getFieldValue(a, ["approverLevel", "approver_level", "level"]) || null;
+    if (!userId || !approverLevel) {
+      stats.skipped++;
+      continue;
+    }
+    const isActiveRaw = a.isActive ?? a.is_active;
+    rows.push({
+      name: getFieldValue(a, ["name", "fullname", "fullName", "userName"]) || null,
+      userId,
+      userUuid: getFieldValue(a, ["userUuid", "user_uuid", "uuid"]) || null,
+      approverLevel,
+      emailId: getFieldValue(a, ["emailId", "email_id", "email"]) || null,
+      modulename: getFieldValue(a, ["modulename", "moduleName"]) || "Technical",
+      isActive: isActiveRaw === 1 || isActiveRaw === true ? 1 : 0
+    });
+  }
+  try {
+    await client.query("BEGIN");
+    for (const r of rows) {
+      const res = await client.query(
+        `INSERT INTO moc_approvers
+           (name, user_id, user_uuid, approver_level, email_id, modulename, is_active, is_sync, is_deleted, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,true,false,$8)
+         ON CONFLICT (user_id, approver_level, modulename) WHERE is_deleted = false
+         DO UPDATE SET
+           name = EXCLUDED.name,
+           user_uuid = EXCLUDED.user_uuid,
+           email_id = EXCLUDED.email_id,
+           is_active = EXCLUDED.is_active,
+           is_sync = true,
+           updated_at = EXCLUDED.updated_at
+         RETURNING (xmax = 0) AS inserted`,
+        [r.name, r.userId, r.userUuid, r.approverLevel, r.emailId, r.modulename, r.isActive, now]
+      );
+      if (res.rows[0]?.inserted) stats.inserted++;
+      else stats.updated++;
+    }
+    let evictSql = `UPDATE moc_approvers SET is_deleted = true, updated_at = $1
+        WHERE is_sync = true AND is_deleted = false AND modulename = 'Technical'`;
+    const evictParams = [now];
+    if (rows.length > 0) {
+      const keyPlaceholders = rows.map((_, i) => `($${i * 2 + 2}, $${i * 2 + 3})`).join(", ");
+      evictSql += ` AND (user_id, approver_level) NOT IN (${keyPlaceholders})`;
+      rows.forEach((r) => evictParams.push(r.userId, r.approverLevel));
+    }
+    await client.query(evictSql, evictParams);
+    await client.query("COMMIT");
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 async function populatePostponementHistory(req, res) {
   const { vesselId } = req.body;
