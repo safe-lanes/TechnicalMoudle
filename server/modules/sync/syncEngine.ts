@@ -237,6 +237,10 @@ export class SyncEngine {
         vesselId,
         instanceId: this.instanceId,
         appliedRowUuids: pullResult.appliedRowUuids,
+        // One-way orphaning fix: tables whose one-way apply failed this cycle. The shore
+        // holds the checkpoint at checkpointBefore when non-empty, so the failed window
+        // is re-offered next sync (one-way applies are idempotent upserts).
+        failedOneWayTables: pullResult.failedOneWayTables,
       });
       console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
 
@@ -252,7 +256,9 @@ export class SyncEngine {
           await syncRepo.upsertInstanceMetadata({
             instanceId: this.instanceId,
             vesselId,
-            lastSyncCheckpoint: new Date(completeResult.newCheckpoint),
+            // newCheckpoint can be null when the shore held the watermark back (failed
+            // one-way tables, or a held-back first sync) — save null, never new Date(null).
+            lastSyncCheckpoint: completeResult.newCheckpoint ? new Date(completeResult.newCheckpoint) : null,
             lastSyncStatus: 'success',
             lastSyncAt: new Date(),
           });
@@ -704,12 +710,17 @@ export class SyncEngine {
     conflictsAutoResolved: number;
     errors: string[];
     appliedRowUuids: string[];
+    failedOneWayTables: string[];
   }> {
     let totalPulled = 0;
     let totalApplyErrors = 0;
     let conflictsFound = 0;
     let conflictsAutoResolved = 0;
     const allErrors: string[] = [];
+    // ONE-WAY tables whose apply had ANY error this cycle. Reported in /sync/complete so
+    // the shore holds the checkpoint back instead of advancing past undelivered rows
+    // (the one-way orphaning fix — field logs are is_synced-driven and unaffected).
+    const failedOneWayTables: string[] = [];
     // Option 2 (pull-side per-row ack): row_uuids the ship confirms it APPLIED, sent back in
     // /sync/complete so the shore marks only these is_synced=true. Anything not acked stays
     // is_synced=false and is re-offered next pull. Empty when there are no field logs to apply.
@@ -749,6 +760,7 @@ export class SyncEngine {
           totalPulled += result.inserted + result.updated + result.softDeleted;
           totalApplyErrors += result.errors.length;
           if (result.errors.length > 0) {
+            failedOneWayTables.push(tableData.tableName);
             result.errors.slice(0, 3).forEach((e) => syncDiag(`PULL ONE-WAY ERROR: ${tableData.tableName}[${e.rowIndex}]: ${String(e.error).substring(0, 150)}`));
             // Collect first 5 error details for batch record
             const errorSamples = result.errors.slice(0, 5).map(
@@ -760,6 +772,7 @@ export class SyncEngine {
             allErrors.push(...errorSamples);
           }
         } catch (err: any) {
+          failedOneWayTables.push(tableData.tableName);
           syncDiag(`PULL ONE-WAY EXCEPTION: ${tableData.tableName}: ${err.message.substring(0, 150)}`);
           console.error(`[SyncEngine] Failed to apply one-way rows for ${tableData.tableName}:`, err.message);
           allErrors.push(`${tableData.tableName}: ${err.message}`);
@@ -876,7 +889,7 @@ export class SyncEngine {
       }
     }
 
-    return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids };
+    return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids, failedOneWayTables };
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1074,7 +1087,10 @@ export class SyncEngine {
           body.lastCheckpoint ? new Date(body.lastCheckpoint) : null
         );
       case '/sync/complete':
-        return svc.completeSyncSession(body.batchUuid, body.vesselId, body.instanceId);
+        // 4th arg (appliedRowUuids) intentionally NOT passed in local mode — preserves the
+        // pre-existing legacy-all marking there. failedOneWayTables (5th) is passed so the
+        // one-way holdback works in local mode too.
+        return svc.completeSyncSession(body.batchUuid, body.vesselId, body.instanceId, undefined, body.failedOneWayTables);
       default:
         throw new Error(`Unknown sync path: ${path}`);
     }

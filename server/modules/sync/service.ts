@@ -990,7 +990,13 @@ export async function completeSyncSession(
   batchUuid: string,
   vesselId: string,
   instanceId: string,
-  appliedRowUuids?: string[]
+  appliedRowUuids?: string[],
+  /** One-way tables whose apply FAILED on the ship this cycle (one-way orphaning fix).
+   *  Non-empty → the checkpoint is held at checkpointBefore instead of advancing, so the
+   *  failed one-way window is re-offered next sync (idempotent upserts). The one-way
+   *  watermark is a single per-instance timestamp, so the hold covers the whole one-way
+   *  window — bounded, idempotent re-delivery; field logs are is_synced-driven and unaffected. */
+  failedOneWayTables?: string[]
 ) {
   const batch = await repo.getBatch(batchUuid);
   if (!batch) {
@@ -1055,11 +1061,26 @@ export async function completeSyncSession(
     );
   }
 
-  // 2. Advance checkpoint
+  // 2. Advance checkpoint — UNLESS the ship reported failed one-way tables, in which
+  //    case hold it at checkpointBefore so the failed one-way window is re-offered next
+  //    cycle instead of being orphaned behind the watermark (the epic Unknown-table case).
+  const oneWayHoldback = Array.isArray(failedOneWayTables) && failedOneWayTables.length > 0;
+  const checkpointBefore = batch.checkpointBefore
+    ? (batch.checkpointBefore instanceof Date ? batch.checkpointBefore : new Date(batch.checkpointBefore))
+    : null;
+  const effectiveCheckpoint = oneWayHoldback ? checkpointBefore : now;
+  if (oneWayHoldback) {
+    const held = effectiveCheckpoint ? effectiveCheckpoint.toISOString() : 'NULL (full one-way resend)';
+    console.warn(
+      `[Sync Complete] ⚠️ ONE-WAY HOLDBACK: ship reported failed one-way table(s) [${failedOneWayTables!.join(', ')}] — ` +
+      `checkpoint held at ${held}; their window re-offers next sync.`
+    );
+    syncDiag(`COMPLETE-SESSION ONE-WAY HOLDBACK: tables=[${failedOneWayTables!.join(',')}] checkpoint held at ${held}`);
+  }
   await repo.upsertInstanceMetadata({
     instanceId,
     vesselId,
-    lastSyncCheckpoint: now,
+    lastSyncCheckpoint: effectiveCheckpoint,
     lastSyncStatus: 'success',
     lastSyncAt: now,
   });
@@ -1068,11 +1089,11 @@ export async function completeSyncSession(
   await repo.updateBatch(batchUuid, {
     status: 'completed',
     completedAt: now,
-    checkpointAfter: now,
+    ...(effectiveCheckpoint ? { checkpointAfter: effectiveCheckpoint } : {}),
     durationMs,
   });
 
-  console.log(`[Sync Complete] Batch ${batchUuid}: ${durationMs}ms, checkpoint advanced to ${now.toISOString()}`);
+  console.log(`[Sync Complete] Batch ${batchUuid}: ${durationMs}ms, checkpoint ${oneWayHoldback ? 'HELD at' : 'advanced to'} ${effectiveCheckpoint ? effectiveCheckpoint.toISOString() : 'NULL'}`);
 
   // Remaining office→ship backlog for this vessel (is_synced=false, instance != ship) AFTER this
   // session's mark-synced — lets the ship's drain loop know whether the pull direction is drained.
@@ -1080,7 +1101,10 @@ export async function completeSyncSession(
 
   return {
     completed: true,
-    newCheckpoint: now.toISOString(),
+    // The EFFECTIVE checkpoint (held back on one-way failures) — the ship saves this
+    // locally, so ship and shore watermarks stay consistent. Null = full one-way resend.
+    newCheckpoint: effectiveCheckpoint ? effectiveCheckpoint.toISOString() : null,
+    oneWayHoldback,
     durationMs,
     remainingPull,
   };

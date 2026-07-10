@@ -124,11 +124,17 @@ export async function completeSyncHandler(req: Request, res: Response) {
 
     // appliedRowUuids is OPTIONAL — new ships send the rows they applied so the shore marks only
     // those synced. Absent (old ship) → completeSyncSession falls back to today's behaviour.
+    // failedOneWayTables is OPTIONAL — new ships report one-way tables whose apply failed so the
+    // shore holds the checkpoint back (one-way orphaning fix). Absent → advance as today.
+    const failedOneWayTables = Array.isArray(req.body.failedOneWayTables)
+      ? req.body.failedOneWayTables.filter((t: unknown) => typeof t === 'string')
+      : undefined;
     const result = await syncService.completeSyncSession(
       batchUuid,
       vesselId,
       instanceId,
-      Array.isArray(appliedRowUuids) ? appliedRowUuids : undefined
+      Array.isArray(appliedRowUuids) ? appliedRowUuids : undefined,
+      failedOneWayTables
     );
     res.json(result);
   } catch (error: any) {

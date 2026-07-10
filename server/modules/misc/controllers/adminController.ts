@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { storage } from '../../../storage';
-import { getDb } from '../../../db';
+import { getDb, getPool } from '../../../db';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { buildExternalMasterDataUrl, getExternalMasterDataBaseUrl } from '../../../config/externalApi';
@@ -599,47 +599,16 @@ export async function syncMasters(req: Request, res: Response) {
     stats.approvers.errors.push(`Fetch failed: ${e.message}`);
   }
   if (approverFetchSucceeded) {
-    // Soft-delete all previously synced Technical approvers so stale records don't linger.
-    // This runs even when the API returns zero records — an empty result is still a valid
-    // response and should clear out any stale synced data.
+    // Atomic natural-key reconcile (replaces the old soft-delete-then-blind-insert,
+    // which minted a fresh mauuid per run, could stack duplicates when the cleanup
+    // failed or a manual row existed, and churned N tombstones + M inserts to every
+    // vessel through the ONE_WAY mirror each run). All-or-nothing: a failure leaves
+    // the previous approver state fully intact.
     try {
-      await db.update(mocApprovers)
-        .set({ isDeleted: true, updatedAt: now })
-        .where(and(eq(mocApprovers.isSync, true), eq(mocApprovers.isDeleted, false)));
+      await reconcileApprovers(fetchedApprovers, now, stats.approvers);
     } catch (e: any) {
-      console.error(`[syncMasters] Failed to soft-delete stale approvers: ${e.message}`);
-    }
-    // Filter to Technical module only (matches useLocalApprovers read filter)
-    const technicalApprovers = fetchedApprovers.filter(
-      (a: any) => (a.modulename || a.moduleName || '') === 'Technical'
-    );
-    for (const a of technicalApprovers) {
-      try {
-        const userId = getFieldValue(a, ['userId', 'user_id', 'uid']);
-        if (!userId) { stats.approvers.skipped++; continue; }
-        const name = getFieldValue(a, ['name', 'fullname', 'fullName', 'userName']) || null;
-        const userUuid = getFieldValue(a, ['userUuid', 'user_uuid', 'uuid']) || null;
-        const approverLevel = getFieldValue(a, ['approverLevel', 'approver_level', 'level']) || null;
-        const emailId = getFieldValue(a, ['emailId', 'email_id', 'email']) || null;
-        const modulename = getFieldValue(a, ['modulename', 'moduleName']) || 'Technical';
-        const isActiveRaw = a.isActive ?? a.is_active;
-        const isActive = isActiveRaw === 1 || isActiveRaw === true ? 1 : 0;
-        await db.insert(mocApprovers).values({
-          name,
-          userId,
-          userUuid,
-          approverLevel,
-          emailId,
-          isActive,
-          modulename,
-          isSync: true,
-          isDeleted: false,
-          updatedAt: now,
-        });
-        stats.approvers.inserted++;
-      } catch (e: any) {
-        stats.approvers.errors.push(`Approver ${a.userId || a.user_id}: ${e.message}`);
-      }
+      console.error(`[syncMasters] Approver reconcile failed (state unchanged): ${e.message}`);
+      stats.approvers.errors.push(`Reconcile failed (rolled back): ${e.message}`);
     }
   }
 
@@ -650,6 +619,112 @@ export async function syncMasters(req: Request, res: Response) {
     message: 'Master data sync completed successfully',
     statistics: stats
   });
+}
+
+/**
+ * Atomic natural-key reconcile of moc_approvers against a fetched SAILERP payload.
+ * Exported for the test harness; syncMasters step 7 is the production caller.
+ *
+ * Semantics (office is master; ONE_WAY mirror ships the result fleet-wide):
+ *  - Upsert each fetched Technical approver by the natural key
+ *    (user_id, approver_level, modulename) against ACTIVE rows — the partial unique
+ *    index from migration 135. An existing row (synced OR manual) is UPDATED in
+ *    place, PRESERVING its mauuid — so vessels receive an update, not a
+ *    tombstone + brand-new row (the old churn). A matched manual row is adopted
+ *    (is_sync=true): manual and synced copies of the same approver cannot coexist.
+ *  - Tombstone previously-synced ACTIVE Technical rows absent from the fetch
+ *    (updated_at stamped so the eviction mirrors). Manual-only rows the master
+ *    doesn't know about are left untouched.
+ *  - Approvers without a userId OR without an approverLevel are skipped (counted):
+ *    a level-less approver can never satisfy verifyApproverForLevel, and NULLs
+ *    bypass the unique index (NULLs are distinct) — inserting them would reopen
+ *    the duplicate hole.
+ *  - ONE transaction: any failure rolls back everything (no partial state).
+ */
+export async function reconcileApprovers(
+  fetchedApprovers: any[],
+  now: Date,
+  stats: { inserted: number; updated: number; skipped: number; errors: string[] },
+): Promise<void> {
+  // Self-contained field reader (the syncMasters getFieldValue is function-scoped).
+  const getFieldValue = (entry: any, fields: string[]): string | null => {
+    for (const field of fields) {
+      if (entry[field] !== undefined && entry[field] !== null) return String(entry[field]);
+    }
+    return null;
+  };
+
+  const pool = await getPool();
+  const client = await pool.connect();
+
+  // Normalize + filter OUTSIDE the transaction (no partial state on bad payload shapes).
+  const technical = fetchedApprovers.filter(
+    (a: any) => (a.modulename || a.moduleName || '') === 'Technical'
+  );
+  const rows: Array<{ name: string | null; userId: string; userUuid: string | null; approverLevel: string; emailId: string | null; modulename: string; isActive: number }> = [];
+  for (const a of technical) {
+    const userId = getFieldValue(a, ['userId', 'user_id', 'uid']);
+    const approverLevel = getFieldValue(a, ['approverLevel', 'approver_level', 'level']) || null;
+    if (!userId || !approverLevel) { stats.skipped++; continue; }
+    const isActiveRaw = a.isActive ?? a.is_active;
+    rows.push({
+      name: getFieldValue(a, ['name', 'fullname', 'fullName', 'userName']) || null,
+      userId,
+      userUuid: getFieldValue(a, ['userUuid', 'user_uuid', 'uuid']) || null,
+      approverLevel,
+      emailId: getFieldValue(a, ['emailId', 'email_id', 'email']) || null,
+      modulename: getFieldValue(a, ['modulename', 'moduleName']) || 'Technical',
+      isActive: isActiveRaw === 1 || isActiveRaw === true ? 1 : 0,
+    });
+  }
+
+  try {
+    await client.query('BEGIN');
+
+    for (const r of rows) {
+      // Upsert against the ACTIVE natural key (partial index, migration 135).
+      // (xmax = 0) distinguishes a fresh INSERT from a conflict-UPDATE for stats.
+      const res = await client.query(
+        `INSERT INTO moc_approvers
+           (name, user_id, user_uuid, approver_level, email_id, modulename, is_active, is_sync, is_deleted, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,true,false,$8)
+         ON CONFLICT (user_id, approver_level, modulename) WHERE is_deleted = false
+         DO UPDATE SET
+           name = EXCLUDED.name,
+           user_uuid = EXCLUDED.user_uuid,
+           email_id = EXCLUDED.email_id,
+           is_active = EXCLUDED.is_active,
+           is_sync = true,
+           updated_at = EXCLUDED.updated_at
+         RETURNING (xmax = 0) AS inserted`,
+        [r.name, r.userId, r.userUuid, r.approverLevel, r.emailId, r.modulename, r.isActive, now]
+      );
+      if (res.rows[0]?.inserted) stats.inserted++; else stats.updated++;
+    }
+
+    // Tombstone previously-synced ACTIVE Technical rows the master no longer lists.
+    // Runs on an empty fetch too (valid response = clear stale synced data — the
+    // old semantics, kept). Manual rows (is_sync=false) not in the fetch are kept.
+    let evictSql =
+      `UPDATE moc_approvers SET is_deleted = true, updated_at = $1
+        WHERE is_sync = true AND is_deleted = false AND modulename = 'Technical'`;
+    const evictParams: any[] = [now];
+    if (rows.length > 0) {
+      const keyPlaceholders = rows
+        .map((_, i) => `($${i * 2 + 2}, $${i * 2 + 3})`)
+        .join(', ');
+      evictSql += ` AND (user_id, approver_level) NOT IN (${keyPlaceholders})`;
+      rows.forEach((r) => evictParams.push(r.userId, r.approverLevel));
+    }
+    await client.query(evictSql, evictParams);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* non-fatal */ }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ── POST /admin/populate-postponement-history ──
