@@ -6979,7 +6979,7 @@ function buildInsertParts(row, meta, skipIntegerPK = false) {
 }
 async function applyFieldLogInserts(fieldLogs, externalClient) {
   if (fieldLogs.length === 0) {
-    return { insertedRows: 0, updateLogs: [], errors: [], failedRowUuids: [] };
+    return { insertedRows: 0, updateLogs: [], errors: [], failedRowUuids: [], needsFullRows: [] };
   }
   syncDiag(`FIELD-LOG-INSERT START: ${fieldLogs.length} logs`);
   const pool2 = externalClient || await getPool();
@@ -6987,6 +6987,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
   const updateLogs = [];
   const errors = [];
   const failedRowUuids = [];
+  const needsFullRows = [];
   const groups = /* @__PURE__ */ new Map();
   for (const log2 of fieldLogs) {
     const key = `${log2.tableName}::${log2.rowUuid}`;
@@ -7094,15 +7095,17 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       if (tableName === "work_orders" && (rowData["id"] === void 0 || rowData["id"] === null)) {
         rowData["id"] = `WO-SYNC-${rowUuid}`;
       }
-      if (isRecoveryInsert && meta && meta.requiredCols.size > 0) {
+      if (meta && meta.requiredCols.size > 0) {
         const missingRequired = Array.from(meta.requiredCols).filter(
           (c) => !meta.identityAlwaysCols.has(c) && rowData[c] == null
         );
         if (missingRequired.length > 0) {
-          const dlMsg = `${tableName}.${rowUuid}: recovery INSERT from UPDATE-shaped group is missing NOT-NULL column(s) [${missingRequired.join(", ")}] \u2014 DEAD-LETTERED (partial row NOT fabricated; acked so it stops re-erroring and unblocks drain)`;
-          console.error(`[FieldLogInsert] \u26A0\uFE0F DEAD-LETTER: ${dlMsg}`);
-          syncDiag(`FIELD-LOG-INSERT DEAD-LETTER: ${dlMsg}`);
-          errors.push(dlMsg);
+          const healMsg = `${tableName}.${rowUuid}: ${isRecoveryInsert ? "recovery" : "INSERT-shaped"} group for an ABSENT row is missing NOT-NULL column(s) [${missingRequired.join(", ")}] \u2014 partial row NOT fabricated; requesting FULL ROW from sender (self-heal), fragments kept pending`;
+          console.warn(`[FieldLogInsert] \u{1FA79} SELF-HEAL REQUEST: ${healMsg}`);
+          syncDiag(`FIELD-LOG-INSERT SELF-HEAL REQUEST: ${healMsg}`);
+          errors.push(healMsg);
+          needsFullRows.push({ tableName, rowUuid });
+          failedRowUuids.push(rowUuid);
           if (externalClient) {
             try {
               await pool2.query(`RELEASE SAVEPOINT ${savepointName}`);
@@ -7405,10 +7408,110 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       }
     }
   }
-  syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${updateLogs.length}, errors=${errors.length}`);
-  return { insertedRows, updateLogs, errors, failedRowUuids };
+  syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${updateLogs.length}, errors=${errors.length}, selfHealRequests=${needsFullRows.length}`);
+  return { insertedRows, updateLogs, errors, failedRowUuids, needsFullRows };
 }
-var columnMetaCache, SYNC_COLUMN_ALIASES, SKIP_UPDATE_COLUMNS;
+async function applyFullRowsIfAbsent(tableName, rows) {
+  const out = { inserted: 0, skipped: 0, errors: [] };
+  if (!rows || rows.length === 0) return out;
+  const config = getTableSyncConfig(tableName);
+  if (!config) {
+    out.errors.push(`${tableName}: unknown table`);
+    return out;
+  }
+  const identityCol = config.identityColumn || "id";
+  const pool2 = await getPool();
+  const meta = await getColumnMeta(pool2, tableName);
+  for (const row of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+    const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
+    if (!identity) {
+      out.errors.push(`${tableName}: row missing identity ${identityCol}`);
+      continue;
+    }
+    try {
+      const exist = await pool2.query(
+        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+        [identity]
+      );
+      if (exist.rows.length > 0) {
+        out.skipped++;
+        syncDiag(`SELF-HEAL SKIP (already present): ${tableName}.${identity}`);
+        continue;
+      }
+      const parts = buildInsertParts(
+        row,
+        meta,
+        /*skipIntegerPK*/
+        true
+      );
+      if (parts.columns.length === 0) {
+        out.errors.push(`${tableName}.${identity}: no insertable columns`);
+        continue;
+      }
+      const sqlText = `INSERT INTO "${tableName}" (${parts.columns.join(", ")}) VALUES (${parts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
+      try {
+        await pool2.query(sqlText, parts.values);
+      } catch (insErr) {
+        if (insErr.code === "23505" && tableName === "work_orders") {
+          const retryRow = { ...row, id: `WO-SYNC-${identity}` };
+          const retryParts = buildInsertParts(retryRow, meta, true);
+          await pool2.query(
+            `INSERT INTO "${tableName}" (${retryParts.columns.join(", ")}) VALUES (${retryParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`,
+            retryParts.values
+          );
+        } else {
+          throw insErr;
+        }
+      }
+      const landed = await pool2.query(
+        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+        [identity]
+      );
+      if (landed.rows.length > 0) {
+        out.inserted++;
+        console.log(`[SelfHeal] \u{1FA79} full row inserted (was absent): ${tableName}.${identity}`);
+        syncDiag(`SELF-HEAL INSERT OK: ${tableName}.${identity}`);
+      } else {
+        out.skipped++;
+        syncDiag(`SELF-HEAL INSERT NO-OP (conflict, left untouched): ${tableName}.${identity}`);
+      }
+    } catch (err) {
+      out.errors.push(`${tableName}.${identity}: ${err.message}`);
+      syncDiag(`SELF-HEAL INSERT FAIL: ${tableName}.${identity} \u2014 ${String(err.message).substring(0, 150)}`);
+    }
+  }
+  if (rows.length > SELF_HEAL_MAX_ROWS_PER_CYCLE) {
+    syncDiag(`SELF-HEAL: ${rows.length - SELF_HEAL_MAX_ROWS_PER_CYCLE} row(s) over the per-cycle cap deferred (will regenerate)`);
+  }
+  return out;
+}
+async function gatherFullRows(requests) {
+  const out = [];
+  const pool2 = await getPool();
+  let budget = SELF_HEAL_MAX_ROWS_PER_CYCLE;
+  for (const req of requests) {
+    if (budget <= 0) break;
+    const config = getTableSyncConfig(req.tableName);
+    if (!config || !req.rowUuids?.length) continue;
+    const identityCol = config.identityColumn || "id";
+    const uuids = req.rowUuids.slice(0, budget);
+    try {
+      const r = await pool2.query(
+        `SELECT * FROM "${req.tableName}" WHERE "${identityCol}" = ANY($1)`,
+        [uuids]
+      );
+      if (r.rows.length > 0) {
+        out.push({ tableName: req.tableName, rows: r.rows });
+        budget -= r.rows.length;
+        syncDiag(`SELF-HEAL GATHER: ${req.tableName} \u2014 ${r.rows.length}/${uuids.length} full row(s)`);
+      }
+    } catch (err) {
+      syncDiag(`SELF-HEAL GATHER FAIL: ${req.tableName} \u2014 ${String(err.message).substring(0, 120)}`);
+    }
+  }
+  return out;
+}
+var columnMetaCache, SYNC_COLUMN_ALIASES, SKIP_UPDATE_COLUMNS, SELF_HEAL_MAX_ROWS_PER_CYCLE;
 var init_oneWayApplier = __esm({
   "server/modules/sync/oneWayApplier.ts"() {
     "use strict";
@@ -7419,6 +7522,7 @@ var init_oneWayApplier = __esm({
     columnMetaCache = /* @__PURE__ */ new Map();
     SYNC_COLUMN_ALIASES = { location2: "location_2" };
     SKIP_UPDATE_COLUMNS = /* @__PURE__ */ new Set(["id", "created_at", "createdAt"]);
+    SELF_HEAL_MAX_ROWS_PER_CYCLE = 50;
   }
 });
 
@@ -9832,6 +9936,7 @@ var init_conflictReviewRepository = __esm({
 var service_exports = {};
 __export(service_exports, {
   completeSyncSession: () => completeSyncSession,
+  fetchFullRowsForHeal: () => fetchFullRowsForHeal,
   getFleetSyncOverview: () => getFleetSyncOverview,
   getRecentBatches: () => getRecentBatches2,
   getSyncStatus: () => getSyncStatus,
@@ -9875,7 +9980,7 @@ async function initiateSyncSession(instanceId, vesselId, lastCheckpoint) {
   };
 }
 async function receivePushData(batchUuid, vesselId, payload) {
-  syncDiag(`RECEIVE-PUSH START: batch=${batchUuid}, vessel=${vesselId}, fieldLogs=${payload.fieldLogs?.length || 0}, oneWayRows=${payload.oneWayRows?.length || 0}`);
+  syncDiag(`RECEIVE-PUSH START: batch=${batchUuid}, vessel=${vesselId}, fieldLogs=${payload.fieldLogs?.length || 0}, oneWayRows=${payload.oneWayRows?.length || 0}, fullRows=${payload.fullRows?.length || 0}`);
   const batch = await getBatch(batchUuid);
   if (!batch) {
     throw Object.assign(new Error(`Batch ${batchUuid} not found`), { statusCode: 404 });
@@ -9930,11 +10035,26 @@ async function receivePushData(batchUuid, vesselId, payload) {
       totalReceived += result.inserted + result.updated;
     }
   }
+  let selfHealInserted = 0;
+  if (payload.fullRows && payload.fullRows.length > 0) {
+    for (const t of payload.fullRows) {
+      const config = getTableSyncConfig(t.tableName);
+      if (!config || config.category !== "BOTH_EDITABLE") {
+        console.warn(`[Sync Push] Self-heal fullRows rejected for non-BOTH_EDITABLE table: ${t.tableName}`);
+        continue;
+      }
+      const r = await applyFullRowsIfAbsent(t.tableName, t.rows);
+      selfHealInserted += r.inserted;
+      if (r.errors.length > 0) r.errors.slice(0, 3).forEach((e) => syncDiag(`SELF-HEAL APPLY ERROR: ${e.substring(0, 150)}`));
+      syncDiag(`SELF-HEAL APPLY (push): ${t.tableName} \u2014 inserted=${r.inserted}, skipped(existing)=${r.skipped}, errors=${r.errors.length}`);
+    }
+  }
   let fieldLogsStored = 0;
   let fieldLogsApplied = 0;
   let fieldLogApplyErrors = 0;
   let fieldLogRowMissing = 0;
   const droppedRowUuids = /* @__PURE__ */ new Set();
+  const needsFullRows = [];
   if (payload.fieldLogs && payload.fieldLogs.length > 0) {
     const acceptedLogs = [];
     for (const log2 of payload.fieldLogs) {
@@ -9975,6 +10095,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
         fieldLogsApplied += insertResult.insertedRows;
         fieldLogApplyErrors += insertResult.errors.length;
         (insertResult.failedRowUuids || []).forEach((r) => droppedRowUuids.add(r));
+        (insertResult.needsFullRows || []).forEach((n) => needsFullRows.push(n));
         if (insertResult.errors.length > 0) {
           insertResult.errors.forEach((e) => console.error(`[Sync Push] INSERT error: ${e}`));
           console.error(
@@ -10375,8 +10496,18 @@ async function receivePushData(batchUuid, vesselId, payload) {
     fieldLogRowMissing,
     droppedRowUuids: Array.from(droppedRowUuids),
     // Fix 2/3: rows the ship must keep unsynced + retry
+    // Self-heal: fragments targeting rows absent here — the ship supplies the complete
+    // rows in its next push. Optional field; old ships ignore it.
+    needsFullRows,
+    selfHealInserted,
     oneWaySummary
   };
+}
+async function fetchFullRowsForHeal(requests) {
+  const sane = (requests || []).filter((r) => r && typeof r.tableName === "string" && Array.isArray(r.rowUuids)).map((r) => ({ tableName: r.tableName, rowUuids: r.rowUuids.filter((u) => typeof u === "string") }));
+  const tables = await gatherFullRows(sane);
+  syncDiag(`SELF-HEAL FETCH (shore): ${sane.length} request table(s) \u2192 ${tables.reduce((n, t) => n + t.rows.length, 0)} row(s) supplied`);
+  return tables;
 }
 async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoint) {
   const batch = await getBatch(batchUuid);
@@ -16159,6 +16290,10 @@ var init_syncEngine = __esm({
       // can't loop forever. In-memory on the (singleton) engine — persists across sync cycles in
       // the running process; resets on restart (a poison row then gets a fresh K attempts + alerts).
       droppedRetryCount = /* @__PURE__ */ new Map();
+      // Self-heal: full-row requests the SHORE returned from our pushes (needsFullRows). Drained
+      // into the next push's fullRows payload. In-memory by design — if lost (restart), the same
+      // fragments re-fail on shore and the request regenerates. Map<tableName, Set<rowUuid>>.
+      pendingFullRowRequests = /* @__PURE__ */ new Map();
       // Pull-side file dead-letter counter (mirrors droppedRetryCount): consecutive failed pulls per
       // file queueUuid. In-memory on the singleton engine so it persists across cycles within a run.
       filePullRetryCount = /* @__PURE__ */ new Map();
@@ -16590,6 +16725,7 @@ var init_syncEngine = __esm({
           }
           if (current.length > 0) chunks.push(current);
           if (chunks.length === 0) chunks.push([]);
+          const fullRowsPayload = await this.drainFullRowRequests();
           for (let idx = 0; idx < chunks.length; idx++) {
             const result = await this.callSyncApiWithRetry("POST", "/sync/push", {
               batchUuid,
@@ -16597,19 +16733,24 @@ var init_syncEngine = __esm({
               oneWayRows: idx === 0 ? shipOnlyRows : [],
               // One-way rows with first chunk only
               fieldLogs: chunks[idx],
-              masterRecordHints: idx === 0 ? masterRecordHints : []
+              masterRecordHints: idx === 0 ? masterRecordHints : [],
               // Hints with first chunk only
+              ...idx === 0 && fullRowsPayload.length > 0 ? { fullRows: fullRowsPayload } : {}
             });
             totalPushed += result.received || 0;
             (result.droppedRowUuids || []).forEach((r) => droppedRowUuids.add(r));
+            this.queueFullRowRequests(result.needsFullRows);
           }
         } else {
-          await this.callSyncApiWithRetry("POST", "/sync/push", {
+          const fullRowsPayload = await this.drainFullRowRequests();
+          const result = await this.callSyncApiWithRetry("POST", "/sync/push", {
             batchUuid,
             vesselId,
             oneWayRows: [],
-            fieldLogs: []
+            fieldLogs: [],
+            ...fullRowsPayload.length > 0 ? { fullRows: fullRowsPayload } : {}
           });
+          this.queueFullRowRequests(result?.needsFullRows);
         }
         const DEAD_LETTER_AFTER = 3;
         const keepUnsynced = /* @__PURE__ */ new Set();
@@ -16685,6 +16826,7 @@ var init_syncEngine = __esm({
             }
           }
         }
+        let pullSelfHealRequests = [];
         if (pullData.fieldLogs && pullData.fieldLogs.length > 0) {
           const pool2 = await getPool();
           const client = await pool2.connect();
@@ -16693,6 +16835,7 @@ var init_syncEngine = __esm({
             await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
             syncDiag(`SYNC-APPLY TRIGGER BYPASS active for pull`);
             const insertResult = await applyFieldLogInserts(pullData.fieldLogs, client);
+            pullSelfHealRequests = insertResult.needsFullRows || [];
             syncDiag(`PULL FIELD-LOG INSERT: inserted=${insertResult.insertedRows}, updateRemaining=${insertResult.updateLogs.length}, errors=${insertResult.errors.length}`);
             if (insertResult.errors.length > 0) {
               insertResult.errors.slice(0, 5).forEach((e) => syncDiag(`PULL INSERT ERROR: ${e.substring(0, 150)}`));
@@ -16757,6 +16900,28 @@ var init_syncEngine = __esm({
             client.release();
           }
         }
+        if (pullSelfHealRequests.length > 0) {
+          try {
+            const byTable = /* @__PURE__ */ new Map();
+            for (const n of pullSelfHealRequests) {
+              if (!byTable.has(n.tableName)) byTable.set(n.tableName, []);
+              byTable.get(n.tableName).push(n.rowUuid);
+            }
+            const requests = Array.from(byTable.entries()).map(([tableName, rowUuids]) => ({ tableName, rowUuids }));
+            const resp = await this.callSyncApi("POST", "/sync/fetch-rows", {
+              vesselId,
+              instanceId: this.instanceId,
+              requests
+            });
+            for (const t of resp?.tables || []) {
+              const healed = await applyFullRowsIfAbsent(t.tableName, t.rows);
+              totalPulled += healed.inserted;
+              syncDiag(`SELF-HEAL APPLY (pull): ${t.tableName} \u2014 inserted=${healed.inserted}, skipped(existing)=${healed.skipped}, errors=${healed.errors.length}`);
+            }
+          } catch (healErr) {
+            syncDiag(`SELF-HEAL FETCH SKIPPED (old shore or network): ${String(healErr?.message || healErr).substring(0, 150)}`);
+          }
+        }
         if (pullData.conflicts && pullData.conflicts.length > 0) {
           conflictsFound = pullData.conflicts.length;
           for (const conflict of pullData.conflicts) {
@@ -16779,6 +16944,34 @@ var init_syncEngine = __esm({
           }
         }
         return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids, failedOneWayTables };
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // SELF-HEAL — full-row request queue (push direction)
+      // ═══════════════════════════════════════════════════════════════
+      /** Queue the shore's needsFullRows (from a push response) for our next push. Dedups. */
+      queueFullRowRequests(needs) {
+        if (!Array.isArray(needs) || needs.length === 0) return;
+        for (const n of needs) {
+          if (!n || typeof n.tableName !== "string" || typeof n.rowUuid !== "string") continue;
+          if (!this.pendingFullRowRequests.has(n.tableName)) this.pendingFullRowRequests.set(n.tableName, /* @__PURE__ */ new Set());
+          this.pendingFullRowRequests.get(n.tableName).add(n.rowUuid);
+        }
+        const total = Array.from(this.pendingFullRowRequests.values()).reduce((s, v) => s + v.size, 0);
+        syncDiag(`SELF-HEAL QUEUE: shore requested full rows \u2014 queue now ${total} row(s) across ${this.pendingFullRowRequests.size} table(s)`);
+      }
+      /** Drain the queue into a fullRows payload (gathered fresh from our own DB). */
+      async drainFullRowRequests() {
+        if (this.pendingFullRowRequests.size === 0) return [];
+        const requests = Array.from(this.pendingFullRowRequests.entries()).map(([tableName, set]) => ({
+          tableName,
+          rowUuids: Array.from(set)
+        }));
+        this.pendingFullRowRequests.clear();
+        const tables = await gatherFullRows(requests);
+        if (tables.length > 0) {
+          syncDiag(`SELF-HEAL DELIVER: sending ${tables.reduce((s, t) => s + t.rows.length, 0)} full row(s) to shore with this push`);
+        }
+        return tables;
       }
       // ═══════════════════════════════════════════════════════════════
       // FIELD LOG APPLIER — Merge a single field change into local DB
@@ -16913,6 +17106,8 @@ var init_syncEngine = __esm({
             );
           case "/sync/complete":
             return svc.completeSyncSession(body.batchUuid, body.vesselId, body.instanceId, void 0, body.failedOneWayTables);
+          case "/sync/fetch-rows":
+            return { tables: await svc.fetchFullRowsForHeal(body.requests) };
           default:
             throw new Error(`Unknown sync path: ${path14}`);
         }
@@ -17094,6 +17289,43 @@ var init_autoSyncScheduler = __esm({
         console.log("[AutoSync] Scheduler stopped");
       }
       // ────────────────────────────────────────────────
+      // One-time self-heal re-offer sweep (Build 2b)
+      // ────────────────────────────────────────────────
+      // Rows dead-lettered by the push-side 3-strike guard were marked is_synced=true and are
+      // indistinguishable from delivered rows in the DB. This ONE-TIME sweep (marker-guarded via
+      // sync_settings 'selfheal_reoffer_v1') re-offers this ship's recent logs for the affected
+      // tables; genuinely-delivered rows re-apply as idempotent no-op updates on the shore, while
+      // stranded rows re-fail there and trigger the full-row self-heal (needsFullRows → next push
+      // delivers the complete row → fragments apply). Bounded: 2 tables × 30-day window.
+      async maybeRunSelfHealReofferSweep(settings, instanceId) {
+        const MARKER = "selfheal_reoffer_v1";
+        if ((settings[MARKER] || "") === "done") return;
+        try {
+          const pool2 = await getPool();
+          const r = await pool2.query(
+            `UPDATE sync_field_log SET is_synced = false
+          WHERE instance_id = $1 AND is_synced = true
+            AND table_name IN ('work_orders','superintendent_notifications')
+            AND changed_at >= NOW() - interval '30 days'`,
+            [instanceId]
+          );
+          const upd = await pool2.query(
+            `UPDATE sync_settings SET setting_value = 'done', updated_at = NOW() WHERE setting_key = $1`,
+            [MARKER]
+          );
+          if ((upd.rowCount ?? 0) === 0) {
+            await pool2.query(
+              `INSERT INTO sync_settings (setting_key, setting_value) VALUES ($1, 'done')`,
+              [MARKER]
+            );
+          }
+          console.log(`[AutoSync] \u{1FA79} Self-heal re-offer sweep: ${r.rowCount ?? 0} log(s) re-offered (one-time, marker set).`);
+          syncDiag(`SELF-HEAL REOFFER SWEEP: ${r.rowCount ?? 0} log(s) re-offered for instance=${instanceId} (work_orders, superintendent_notifications, 30d window). Marker '${MARKER}' set.`);
+        } catch (err) {
+          console.warn(`[AutoSync] Self-heal re-offer sweep failed (will retry next tick): ${err?.message || err}`);
+        }
+      }
+      // ────────────────────────────────────────────────
       // Tick — one scheduler wake-up
       // ────────────────────────────────────────────────
       async tick() {
@@ -17118,6 +17350,7 @@ var init_autoSyncScheduler = __esm({
             console.warn("[AutoSync] No instance_id configured \u2014 cannot determine vessel. Skipping.");
             return;
           }
+          await this.maybeRunSelfHealReofferSweep(settings, instanceId);
           const metadata = await getInstanceMetadata(instanceId);
           const vesselId = metadata?.vesselId;
           if (!vesselId) {
@@ -17419,14 +17652,16 @@ async function initiateSyncHandler(req, res) {
 }
 async function pushHandler(req, res) {
   try {
-    const { batchUuid, vesselId, oneWayRows, fieldLogs, masterRecordHints } = req.body;
+    const { batchUuid, vesselId, oneWayRows, fieldLogs, masterRecordHints, fullRows } = req.body;
     if (!batchUuid || !vesselId) {
       return res.status(400).json({ error: "batchUuid and vesselId are required" });
     }
     const result = await receivePushData(batchUuid, vesselId, {
       oneWayRows,
       fieldLogs,
-      masterRecordHints
+      masterRecordHints,
+      fullRows
+      // self-heal delivery (optional; absent from old ships)
     });
     res.json(result);
   } catch (error) {
@@ -17559,6 +17794,20 @@ async function triggerSyncHandler(req, res) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("[Sync] trigger error:", error);
     res.status(500).json({ error: "Failed to trigger sync" });
+  }
+}
+async function fetchRowsHandler(req, res) {
+  try {
+    const { vesselId, instanceId, requests } = req.body || {};
+    if (!vesselId || !instanceId || !Array.isArray(requests)) {
+      return res.status(400).json({ error: "vesselId, instanceId, and requests[] are required" });
+    }
+    const tables = await fetchFullRowsForHeal(requests);
+    res.json({ tables });
+  } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("[Sync] fetch-rows error:", error);
+    res.status(500).json({ error: "Failed to fetch rows for self-heal" });
   }
 }
 async function uploadChunkHandler(req, res) {
@@ -18192,6 +18441,7 @@ var init_routes = __esm({
     router.post("/sync/pull", syncTenantGuard, asyncHandler(pullHandler));
     router.post("/sync/resolve-conflict", asyncHandler(resolveConflictHandler));
     router.post("/sync/complete", syncTenantGuard, asyncHandler(completeSyncHandler));
+    router.post("/sync/fetch-rows", syncTenantGuard, asyncHandler(fetchRowsHandler));
     router.get("/sync/status", asyncHandler(statusHandler));
     router.get("/sync/batches", asyncHandler(recentBatchesHandler));
     router.get("/sync/conflicts", asyncHandler(unresolvedConflictsHandler));
@@ -76674,6 +76924,8 @@ var EXEMPT_EXACT = [
   "/sync/push",
   "/sync/pull",
   "/sync/complete",
+  // self-heal fetch (ship→shore server-to-server, X-Sync headers only; syncTenantGuard-guarded)
+  "/sync/fetch-rows",
   "/sync/file/upload-chunk",
   // shore→ship file PULL (mirror of upload-chunk; also guarded by syncTenantGuard).
   // Ships call these server-to-server with X-Sync-* (no SAILERP Bearer) — must bypass
