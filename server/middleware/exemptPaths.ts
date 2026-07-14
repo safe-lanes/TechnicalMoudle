@@ -27,6 +27,8 @@ const EXEMPT_EXACT = [
   "/sync/push",
   "/sync/pull",
   "/sync/complete",
+  // self-heal fetch (ship→shore server-to-server, X-Sync headers only; syncTenantGuard-guarded)
+  "/sync/fetch-rows",
   "/sync/file/upload-chunk",
   // shore→ship file PULL (mirror of upload-chunk; also guarded by syncTenantGuard).
   // Ships call these server-to-server with X-Sync-* (no SAILERP Bearer) — must bypass

@@ -499,9 +499,10 @@ export async function applyFieldLogInserts(
   updateLogs: FieldLogEntry[];
   errors: string[];
   failedRowUuids: string[];
+  needsFullRows: Array<{ tableName: string; rowUuid: string }>;
 }> {
   if (fieldLogs.length === 0) {
-    return { insertedRows: 0, updateLogs: [], errors: [], failedRowUuids: [] };
+    return { insertedRows: 0, updateLogs: [], errors: [], failedRowUuids: [], needsFullRows: [] };
   }
 
   syncDiag(`FIELD-LOG-INSERT START: ${fieldLogs.length} logs`);
@@ -515,6 +516,10 @@ export async function applyFieldLogInserts(
   // instead of silently losing them. Populated ONLY at true drop sites (below), never at
   // the defer-to-update sites (unknown table / row-exists / exist-check) which are not lost.
   const failedRowUuids: string[] = [];
+  // Self-heal: fragments that target an ABSENT row and cannot rebuild it (missing NOT-NULLs).
+  // The receiver returns these so the SENDER can supply the complete row (only-if-absent
+  // insert), after which the pending fragments apply as normal updates.
+  const needsFullRows: Array<{ tableName: string; rowUuid: string }> = [];
 
   // 1. Group by (tableName, rowUuid)
   const groups = new Map<string, FieldLogEntry[]>();
@@ -707,32 +712,40 @@ export async function applyFieldLogInserts(
         rowData['id'] = `WO-SYNC-${rowUuid}`;
       }
 
-      // ── PART A: recovery-INSERT NOT-NULL guard (defensive, fleet-wide) ──
-      // ONLY for the recovery path (isRecoveryInsert): an UPDATE-shaped group whose row is
-      // MISSING on the receiver, so we're fabricating a row from UPDATE newValues — which
-      // carry ONLY the changed fields. If any NOT-NULL, no-default column is absent (or null)
-      // in rowData, the INSERT would 23502 EVERY cycle and — kept is_synced=false — block
-      // drain-to-zero forever (the fresh-provision spare_location_stock.spare_id case).
-      // Instead DEAD-LETTER it: loud log + surface once in errors, but do NOT push to
-      // failedRowUuids — so the row is ACKed (is_synced=true), stops re-erroring next cycle,
-      // and drops out of the drain 0-condition. Genuine INSERT groups (isRecoveryInsert=false)
-      // are never touched: a complete row still INSERTs normally. Fail-open when requiredCols
-      // is empty (meta query unavailable) — identical to today's behaviour.
-      if (isRecoveryInsert && meta && meta.requiredCols.size > 0) {
+      // ── NOT-NULL guard + full-row self-heal trigger (ALL row-absent INSERT builds) ──
+      // Every path that reaches this INSERT build has already proven the row is ABSENT on the
+      // receiver (exist-checks above). If the fabricated rowData is missing (or explicitly null
+      // in) any NOT-NULL, no-default column, the INSERT would 23502 — historically either a
+      // retry-forever loop or a terminal dead-letter that stranded the data. The guard now
+      // covers EVERY shape that can under-fill rowData:
+      //   - pure UPDATE-shaped recovery groups (the original 6c8ff600e case), AND
+      //   - MIXED groups (an UPDATE that sets previously-null fields logs oldValue=null and
+      //     masquerades as INSERT-origin — the Frontier Venture completed-WO case), AND
+      //   - genuine INSERT groups (full-row logs: all NOT-NULLs present → guard passes; only a
+      //     truly defective group is caught).
+      // Behaviour: NEVER fabricate the partial row. Instead:
+      //   1. add {tableName, rowUuid} to needsFullRows — the SELF-HEAL request: the sender holds
+      //      the complete row and will supply it (push response / fetch-rows), after which these
+      //      same fragments apply as normal per-field UPDATEs;
+      //   2. KEEP the row in failedRowUuids (fragments stay unsynced and retry) — so the heal is
+      //      self-correcting even if a request is lost, and the data is never acked away before
+      //      the full row lands. The ship's push-side 3-strike guard remains the final backstop.
+      // Fail-open when requiredCols is empty (meta query unavailable) — identical to before.
+      if (meta && meta.requiredCols.size > 0) {
         const missingRequired = Array.from(meta.requiredCols).filter(
           (c) => !meta!.identityAlwaysCols.has(c) && rowData[c] == null
         );
         if (missingRequired.length > 0) {
-          const dlMsg = `${tableName}.${rowUuid}: recovery INSERT from UPDATE-shaped group is missing NOT-NULL column(s) [${missingRequired.join(', ')}] — DEAD-LETTERED (partial row NOT fabricated; acked so it stops re-erroring and unblocks drain)`;
-          console.error(`[FieldLogInsert] ⚠️ DEAD-LETTER: ${dlMsg}`);
-          syncDiag(`FIELD-LOG-INSERT DEAD-LETTER: ${dlMsg}`);
-          errors.push(dlMsg);
+          const healMsg = `${tableName}.${rowUuid}: ${isRecoveryInsert ? 'recovery' : 'INSERT-shaped'} group for an ABSENT row is missing NOT-NULL column(s) [${missingRequired.join(', ')}] — partial row NOT fabricated; requesting FULL ROW from sender (self-heal), fragments kept pending`;
+          console.warn(`[FieldLogInsert] 🩹 SELF-HEAL REQUEST: ${healMsg}`);
+          syncDiag(`FIELD-LOG-INSERT SELF-HEAL REQUEST: ${healMsg}`);
+          errors.push(healMsg);
+          needsFullRows.push({ tableName, rowUuid });
+          failedRowUuids.push(rowUuid); // keep fragments pending — they apply once the row exists
           // Only a SELECT ran under the savepoint — release it to keep the tx clean.
           if (externalClient) {
             try { await pool.query(`RELEASE SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
           }
-          // INTENTIONALLY NOT pushing rowUuid to failedRowUuids: a dead-letter must ACK so it
-          // leaves the is_synced=false backlog and the drain can reach zero.
           continue;
         }
       }
@@ -1104,6 +1117,132 @@ export async function applyFieldLogInserts(
     }
   }
 
-  syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${updateLogs.length}, errors=${errors.length}`);
-  return { insertedRows, updateLogs, errors, failedRowUuids };
+  syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${updateLogs.length}, errors=${errors.length}, selfHealRequests=${needsFullRows.length}`);
+  return { insertedRows, updateLogs, errors, failedRowUuids, needsFullRows };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SELF-HEAL — full-row only-if-absent insert
+// ═══════════════════════════════════════════════════════════════
+
+/** Per-cycle cap on self-heal requests/deliveries — bounds payload size. Excess
+ *  regenerates naturally on the next cycle (fragments stay pending). */
+export const SELF_HEAL_MAX_ROWS_PER_CYCLE = 50;
+
+/**
+ * Apply complete rows supplied by the OTHER side to heal fragments that targeted absent rows.
+ *
+ * HARD RULE: only-if-absent. This function is structurally incapable of updating, overwriting,
+ * or deleting: it exist-checks by the table's identity column and SKIPS any row already present
+ * (including rows that appeared meanwhile), and its INSERT carries ON CONFLICT DO NOTHING so
+ * even a race cannot turn into an overwrite. Serial/identity integer PKs are stripped (the
+ * receiver assigns its own); work_orders' LOCAL text id falls back to the WO-SYNC-<wouuid>
+ * convention on collision. Rows travel as SELECT * JSON (snake_case) from the sender.
+ */
+export async function applyFullRowsIfAbsent(
+  tableName: string,
+  rows: any[]
+): Promise<{ inserted: number; skipped: number; errors: string[] }> {
+  const out = { inserted: 0, skipped: 0, errors: [] as string[] };
+  if (!rows || rows.length === 0) return out;
+
+  const config = getTableSyncConfig(tableName);
+  if (!config) {
+    out.errors.push(`${tableName}: unknown table`);
+    return out;
+  }
+  const identityCol = config.identityColumn || 'id';
+  const pool = await getPool();
+  const meta = await getColumnMeta(pool, tableName);
+
+  for (const row of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+    const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
+    if (!identity) { out.errors.push(`${tableName}: row missing identity ${identityCol}`); continue; }
+    try {
+      const exist = await pool.query(
+        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [identity]
+      );
+      if (exist.rows.length > 0) {
+        // Row appeared meanwhile (or was never actually missing) — NEVER touch it.
+        out.skipped++;
+        syncDiag(`SELF-HEAL SKIP (already present): ${tableName}.${identity}`);
+        continue;
+      }
+      // Build the INSERT column-name-mapped (order-safe); skip serial/identity integer PKs so
+      // the receiver assigns its own (buildInsertParts also coerces json/array values).
+      const parts = buildInsertParts(row, meta, /*skipIntegerPK*/ true);
+      if (parts.columns.length === 0) { out.errors.push(`${tableName}.${identity}: no insertable columns`); continue; }
+      const sqlText = `INSERT INTO "${tableName}" (${parts.columns.join(', ')}) VALUES (${parts.placeholders.join(', ')}) ON CONFLICT DO NOTHING`;
+      try {
+        await pool.query(sqlText, parts.values);
+      } catch (insErr: any) {
+        // work_orders.id is a LOCAL text PK — on collision retry once with the WO-SYNC
+        // convention (children FK wouuid; id never crosses instances).
+        if (insErr.code === '23505' && tableName === 'work_orders') {
+          const retryRow = { ...row, id: `WO-SYNC-${identity}` };
+          const retryParts = buildInsertParts(retryRow, meta, true);
+          await pool.query(
+            `INSERT INTO "${tableName}" (${retryParts.columns.join(', ')}) VALUES (${retryParts.placeholders.join(', ')}) ON CONFLICT DO NOTHING`,
+            retryParts.values
+          );
+        } else {
+          throw insErr;
+        }
+      }
+      // Confirm it landed (ON CONFLICT DO NOTHING can no-op on a natural-unique collision).
+      const landed = await pool.query(
+        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [identity]
+      );
+      if (landed.rows.length > 0) {
+        out.inserted++;
+        console.log(`[SelfHeal] 🩹 full row inserted (was absent): ${tableName}.${identity}`);
+        syncDiag(`SELF-HEAL INSERT OK: ${tableName}.${identity}`);
+      } else {
+        out.skipped++;
+        syncDiag(`SELF-HEAL INSERT NO-OP (conflict, left untouched): ${tableName}.${identity}`);
+      }
+    } catch (err: any) {
+      out.errors.push(`${tableName}.${identity}: ${err.message}`);
+      syncDiag(`SELF-HEAL INSERT FAIL: ${tableName}.${identity} — ${String(err.message).substring(0, 150)}`);
+    }
+  }
+  if (rows.length > SELF_HEAL_MAX_ROWS_PER_CYCLE) {
+    syncDiag(`SELF-HEAL: ${rows.length - SELF_HEAL_MAX_ROWS_PER_CYCLE} row(s) over the per-cycle cap deferred (will regenerate)`);
+  }
+  return out;
+}
+
+/**
+ * Gather the complete current rows for self-heal requests, from THIS side's DB
+ * (ship: its local DB; shore: the tenant DB via the ALS-aware getPool()).
+ * Read-only. Unknown tables / missing rows are skipped silently — the requester
+ * simply doesn't receive them and the fragments stay pending.
+ */
+export async function gatherFullRows(
+  requests: Array<{ tableName: string; rowUuids: string[] }>
+): Promise<Array<{ tableName: string; rows: any[] }>> {
+  const out: Array<{ tableName: string; rows: any[] }> = [];
+  const pool = await getPool();
+  let budget = SELF_HEAL_MAX_ROWS_PER_CYCLE;
+  for (const req of requests) {
+    if (budget <= 0) break;
+    const config = getTableSyncConfig(req.tableName);
+    if (!config || !req.rowUuids?.length) continue;
+    const identityCol = config.identityColumn || 'id';
+    const uuids = req.rowUuids.slice(0, budget);
+    try {
+      const r = await pool.query(
+        `SELECT * FROM "${req.tableName}" WHERE "${identityCol}" = ANY($1)`,
+        [uuids]
+      );
+      if (r.rows.length > 0) {
+        out.push({ tableName: req.tableName, rows: r.rows });
+        budget -= r.rows.length;
+        syncDiag(`SELF-HEAL GATHER: ${req.tableName} — ${r.rows.length}/${uuids.length} full row(s)`);
+      }
+    } catch (err: any) {
+      syncDiag(`SELF-HEAL GATHER FAIL: ${req.tableName} — ${String(err.message).substring(0, 120)}`);
+    }
+  }
+  return out;
 }

@@ -191,6 +191,50 @@ export class SyncAutoScheduler {
   }
 
   // ────────────────────────────────────────────────
+  // One-time self-heal re-offer sweep (Build 2b)
+  // ────────────────────────────────────────────────
+  // Rows dead-lettered by the push-side 3-strike guard were marked is_synced=true and are
+  // indistinguishable from delivered rows in the DB. This ONE-TIME sweep (marker-guarded via
+  // sync_settings 'selfheal_reoffer_v1') re-offers this ship's recent logs for the affected
+  // tables; genuinely-delivered rows re-apply as idempotent no-op updates on the shore, while
+  // stranded rows re-fail there and trigger the full-row self-heal (needsFullRows → next push
+  // delivers the complete row → fragments apply). Bounded: 2 tables × 30-day window.
+  private async maybeRunSelfHealReofferSweep(
+    settings: Record<string, string>,
+    instanceId: string,
+  ): Promise<void> {
+    const MARKER = 'selfheal_reoffer_v1';
+    if ((settings[MARKER] || '') === 'done') return;
+    try {
+      const pool = await getPool();
+      const r = await pool.query(
+        `UPDATE sync_field_log SET is_synced = false
+          WHERE instance_id = $1 AND is_synced = true
+            AND table_name IN ('work_orders','superintendent_notifications')
+            AND changed_at >= NOW() - interval '30 days'`,
+        [instanceId],
+      );
+      // Persist the marker (sync_settings row may not exist for a brand-new key — UPDATE
+      // then INSERT; seedSettingIfEmpty is UPDATE-only and would no-op here).
+      const upd = await pool.query(
+        `UPDATE sync_settings SET setting_value = 'done', updated_at = NOW() WHERE setting_key = $1`,
+        [MARKER],
+      );
+      if ((upd.rowCount ?? 0) === 0) {
+        await pool.query(
+          `INSERT INTO sync_settings (setting_key, setting_value) VALUES ($1, 'done')`,
+          [MARKER],
+        );
+      }
+      console.log(`[AutoSync] 🩹 Self-heal re-offer sweep: ${r.rowCount ?? 0} log(s) re-offered (one-time, marker set).`);
+      syncDiag(`SELF-HEAL REOFFER SWEEP: ${r.rowCount ?? 0} log(s) re-offered for instance=${instanceId} (work_orders, superintendent_notifications, 30d window). Marker '${MARKER}' set.`);
+    } catch (err: any) {
+      // Marker NOT set on failure → retried next tick.
+      console.warn(`[AutoSync] Self-heal re-offer sweep failed (will retry next tick): ${err?.message || err}`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
   // Tick — one scheduler wake-up
   // ────────────────────────────────────────────────
 
@@ -228,6 +272,9 @@ export class SyncAutoScheduler {
         console.warn('[AutoSync] No instance_id configured — cannot determine vessel. Skipping.');
         return;
       }
+
+      // 3b. One-time self-heal re-offer sweep (marker-guarded; ship-only by the gate above).
+      await this.maybeRunSelfHealReofferSweep(settings, instanceId);
 
       const metadata = await syncRepo.getInstanceMetadata(instanceId);
       const vesselId = metadata?.vesselId;

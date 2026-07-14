@@ -43,7 +43,7 @@ export async function initiateSyncHandler(req: Request, res: Response) {
 
 export async function pushHandler(req: Request, res: Response) {
   try {
-    const { batchUuid, vesselId, oneWayRows, fieldLogs, masterRecordHints } = req.body;
+    const { batchUuid, vesselId, oneWayRows, fieldLogs, masterRecordHints, fullRows } = req.body;
     if (!batchUuid || !vesselId) {
       return res.status(400).json({ error: 'batchUuid and vesselId are required' });
     }
@@ -52,6 +52,7 @@ export async function pushHandler(req: Request, res: Response) {
       oneWayRows,
       fieldLogs,
       masterRecordHints,
+      fullRows, // self-heal delivery (optional; absent from old ships)
     });
     res.json(result);
   } catch (error: any) {
@@ -223,6 +224,24 @@ export async function triggerSyncHandler(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] trigger error:', error);
     res.status(500).json({ error: 'Failed to trigger sync' });
+  }
+}
+
+// ── POST /sync/fetch-rows ──  self-heal (pull direction): the ship requests complete rows
+// for fragments that target rows absent on the ship. Read-only; tenant-scoped by the guard.
+
+export async function fetchRowsHandler(req: Request, res: Response) {
+  try {
+    const { vesselId, instanceId, requests } = req.body || {};
+    if (!vesselId || !instanceId || !Array.isArray(requests)) {
+      return res.status(400).json({ error: 'vesselId, instanceId, and requests[] are required' });
+    }
+    const tables = await syncService.fetchFullRowsForHeal(requests);
+    res.json({ tables });
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] fetch-rows error:', error);
+    res.status(500).json({ error: 'Failed to fetch rows for self-heal' });
   }
 }
 

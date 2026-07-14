@@ -16,6 +16,9 @@ router.post('/sync/push', syncTenantGuard, asyncHandler(syncController.pushHandl
 router.post('/sync/pull', syncTenantGuard, asyncHandler(syncController.pullHandler));
 router.post('/sync/resolve-conflict', asyncHandler(syncController.resolveConflictHandler));
 router.post('/sync/complete', syncTenantGuard, asyncHandler(syncController.completeSyncHandler));
+// Self-heal fetch (pull direction): ship requests complete rows for fragments targeting
+// rows absent on the ship. Server-to-server — same guard, and MUST be in exemptPaths.
+router.post('/sync/fetch-rows', syncTenantGuard, asyncHandler(syncController.fetchRowsHandler));
 router.get('/sync/status', asyncHandler(syncController.statusHandler));
 
 // Sync admin endpoints (for shore-side management)
