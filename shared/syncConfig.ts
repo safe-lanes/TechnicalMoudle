@@ -1482,6 +1482,18 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     businessRules: null,
     notes: 'Auto-computed linking from defect data.',
   },
+  shipskart_role_mappings: {
+    tableName: 'shipskart_role_mappings',
+    category: 'NO_SYNC',
+    direction: 'none',
+    identityColumn: null,
+    vesselScopeColumn: null,
+    vesselScopeJoinPath: null,
+    isGlobal: true,
+    isConfigurable: false,
+    businessRules: null,
+    notes: 'Shipskart SSO role mapping (SAIL role → Shipskart role). Shore-only office feature — ships have no Shipskart config; per-tenant by db-per-tenant construction. Register ONE_WAY_SHORE_TO_SHIP later only if ships ever need Purchasing.',
+  },
 };
 
 // ════════════════════════════════════════════════════════════════════════════════

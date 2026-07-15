@@ -4384,6 +4384,21 @@ export const mocApprovers = pgTable("moc_approvers", {
   isSync: boolean("is_sync").notNull().default(false),
 });
 
+// ── Shipskart role mappings (Purchasing SSO) ──
+// UI-configurable many-to-one map: SAIL role → Shipskart role ('captain'|'purchaser'|'manager',
+// validated in the service against the role-source seam — later Shipskart's Get Role API).
+// Per-tenant by construction (db-per-tenant). Will also serve the future user-registration
+// push; the SHIPSKART_USER_* env account layer is the temporary bridge until per-user accounts.
+export const shipskartRoleMappings = pgTable("shipskart_role_mappings", {
+  id: serial("id").primaryKey(),
+  sailRole: text("sail_role").notNull().unique(), // one SAIL role → exactly one Shipskart role
+  shipskartRole: text("shipskart_role").notNull(), // many rows may share this (many-to-one)
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+  updatedByUuid: text("updated_by_uuid"),
+});
+export type ShipskartRoleMapping = typeof shipskartRoleMappings.$inferSelect;
+
 export const insertMocApproverSchema = createInsertSchema(mocApprovers).omit({
   id: true,
   mauuid: true,

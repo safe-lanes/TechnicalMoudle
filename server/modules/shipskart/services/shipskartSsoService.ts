@@ -18,6 +18,7 @@
 
 import crypto from 'crypto';
 import { AppError } from '../../shared/errors';
+import * as roleMappingRepo from '../repositories/shipskartRoleMappingRepository';
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -60,15 +61,15 @@ function getShipskartConfig(): ShipskartConfig {
   if (!hmacSecret) missing.push('SHIPSKART_HMAC_SECRET');
   if (!tenantId) missing.push('SHIPSKART_TENANT_ID');
 
-  // At least one role→externalUserId mapping must be configured, otherwise the
-  // role map is empty and every user would be blocked.
+  // At least one Shipskart-role ACCOUNT must be configured (new role-named vars or their
+  // legacy SAIL-role-named aliases), otherwise every mapped user would still be blocked.
   const hasAnyRoleMapping = !!(
-    process.env.SHIPSKART_USER_VESSEL_ADMIN ||
-    process.env.SHIPSKART_USER_ADMIN ||
-    process.env.SHIPSKART_USER_REGULAR
+    process.env.SHIPSKART_USER_CAPTAIN || process.env.SHIPSKART_USER_VESSEL_ADMIN ||
+    process.env.SHIPSKART_USER_PURCHASER || process.env.SHIPSKART_USER_ADMIN ||
+    process.env.SHIPSKART_USER_MANAGER || process.env.SHIPSKART_USER_REGULAR
   );
   if (!hasAnyRoleMapping) {
-    missing.push('at least one of SHIPSKART_USER_VESSEL_ADMIN / SHIPSKART_USER_ADMIN / SHIPSKART_USER_REGULAR');
+    missing.push('at least one SHIPSKART_USER_* account (CAPTAIN/PURCHASER/MANAGER or legacy VESSEL_ADMIN/ADMIN/REGULAR)');
   }
 
   if (missing.length > 0) {
@@ -157,22 +158,54 @@ async function signedPost(path: string, body: Record<string, unknown>): Promise<
 }
 
 /**
- * Resolve the Shipskart externalUserId for one of our roles. Per-role mapping
- * (NOT per-user): every user with the same role gets the same Shipskart
- * account. Returns null if the role has no mapping → caller blocks the user.
+ * Shipskart-role → externalUserId ACCOUNT layer. This is the TEMPORARY bridge until
+ * Shipskart's User Registration API gives us per-user accounts: today every user resolved
+ * to the same Shipskart role shares that role's account. Reads the NEW role-named env vars
+ * first (SHIPSKART_USER_CAPTAIN/PURCHASER/MANAGER) and falls back to the LEGACY SAIL-role-
+ * named ones (VESSEL_ADMIN/ADMIN/REGULAR) so existing deployments keep working without an
+ * .env change (the recurring re-seed gotcha).
+ */
+export function accountForShipskartRole(shipskartRole: string): string | null {
+  const accounts: Record<string, string | undefined> = {
+    captain:   process.env.SHIPSKART_USER_CAPTAIN   || process.env.SHIPSKART_USER_VESSEL_ADMIN,
+    purchaser: process.env.SHIPSKART_USER_PURCHASER || process.env.SHIPSKART_USER_ADMIN,
+    manager:   process.env.SHIPSKART_USER_MANAGER   || process.env.SHIPSKART_USER_REGULAR,
+  };
+  return accounts[shipskartRole] ?? null;
+}
+
+/**
+ * Resolve the Shipskart externalUserId for one of our roles.
+ *
+ * Two layers (both many-to-one friendly):
+ *   1. SAIL role → Shipskart role: the UI-CONFIGURABLE shipskart_role_mappings table
+ *      (per-tenant via db-per-tenant; replaces the old hardcoded roleMap — admins edit it
+ *      under Admin → Access Control). Many SAIL roles may map to the same Shipskart role.
+ *      This table will also serve the future user-registration push (role assignment at
+ *      user creation, once Shipskart's Registration API lands).
+ *   2. Shipskart role → account: accountForShipskartRole() env bridge (see above).
+ *
+ * Returns null when the role has no mapping row OR the mapped Shipskart role has no
+ * account configured → caller blocks with ROLE_NOT_MAPPED (block-not-default by design:
+ * never silently grant Purchasing to an unmapped role).
  *
  * For dev testing on this codebase, temporarily change mockAuthMiddleware
- * (server/middleware/auth.ts) to return one of the mapped roles (Vessel Admin /
- * Admin / User) instead of "Sail Admin". Do NOT commit that change.
+ * (server/middleware/auth.ts) to return a mapped role instead of "Sail Admin" —
+ * or simply add a 'Sail Admin' mapping row via the Access Control UI.
  */
-export function resolveExternalUserId(userRole: string): string | null {
-  const roleMap: Record<string, string | undefined> = {
-    'Vessel Admin': process.env.SHIPSKART_USER_VESSEL_ADMIN,
-    'Admin':        process.env.SHIPSKART_USER_ADMIN,
-    'User':         process.env.SHIPSKART_USER_REGULAR,
-  };
-  const externalUserId = roleMap[userRole];
-  return externalUserId ?? null;
+export async function resolveExternalUserId(userRole: string): Promise<string | null> {
+  if (!userRole) return null;
+  const mapping = await roleMappingRepo.getMappingForSailRole(userRole);
+  if (!mapping) return null;
+  const account = accountForShipskartRole(mapping.shipskartRole);
+  if (!account) {
+    console.warn(
+      `[Shipskart] Role '${userRole}' maps to '${mapping.shipskartRole}' but no account env is set ` +
+      `(SHIPSKART_USER_${mapping.shipskartRole.toUpperCase()} or its legacy alias) — blocking SSO.`,
+    );
+    return null;
+  }
+  return account;
 }
 
 /**
@@ -195,7 +228,7 @@ export async function initiateSso(userRole: string): Promise<{
 }> {
   const cfg = getShipskartConfig();
 
-  const externalUserId = resolveExternalUserId(userRole);
+  const externalUserId = await resolveExternalUserId(userRole);
   if (externalUserId === null) {
     throw new ShipskartRoleNotMappedError(userRole);
   }
@@ -223,7 +256,7 @@ export async function initiateSso(userRole: string): Promise<{
  *                  local logout must always complete.
  */
 export async function logoutSso(userRole: string): Promise<{ success: boolean; message?: string }> {
-  const externalUserId = resolveExternalUserId(userRole);
+  const externalUserId = await resolveExternalUserId(userRole);
   if (externalUserId === null) {
     // Unmapped role never had a Shipskart session — nothing to evict.
     return { success: true, message: 'No Shipskart mapping for role — logout skipped' };
