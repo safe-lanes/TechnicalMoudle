@@ -54,8 +54,11 @@ function App() {
                 <Route path="/pms/work-order/unplanned/new">
                   {() => <ProtectedRoute><WorkOrderFormPage mode="unplanned-create" /></ProtectedRoute>}
                 </Route>
+                {/* key={id}: approval-queue advance navigates id→id on the SAME route —
+                    without a key React reuses the mounted form and local state (remarks,
+                    justification, execution fields) would leak across work orders. */}
                 <Route path="/pms/work-order/:id">
-                  {() => <ProtectedRoute><WorkOrderFormPage mode="execution" /></ProtectedRoute>}
+                  {(params) => <ProtectedRoute><WorkOrderFormPage key={params.id} mode="execution" /></ProtectedRoute>}
                 </Route>
                 
                 {/* Jobs Form route - standalone, no TechnicalModule layout */}

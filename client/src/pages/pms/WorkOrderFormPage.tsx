@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown, ChevronsUpDown, ListChecks, ChevronLeft, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
@@ -55,6 +55,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { viewAuthedDocument } from "@/lib/authedDownload";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useApprovalPolicy, effectiveApprovalTier } from "@/hooks/useApprovalPolicy";
+import { getQueuePosition, advanceApprovalQueue, clearApprovalQueue } from "@/lib/approvalQueue";
 import { PeriodPicker } from "@/components/filters/PeriodPicker";
 import type { PeriodValue } from "@/components/filters/PeriodPicker";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
@@ -558,6 +559,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // (a stamped superintendent_locked behaves as notification while the lock
   // toggle is OFF; the server gate applies the same live downgrade).
   const { superintendentLockEnabled } = useApprovalPolicy();
+  // Phase 2 — approval queue: position of this WO in the active review queue
+  // (sessionStorage-backed, survives reloads; null when not reviewing a queue).
+  // Read per render — cheap, and the route is keyed by WO id so each queue
+  // step is a fresh mount anyway.
+  const queuePos = !embedded ? getQueuePosition(workOrderId) : null;
 
   // Superintendent completion-rejection state
   const [completionRejectionRemarks, setCompletionRejectionRemarks] = useState('');
@@ -3713,9 +3719,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           : "Work order has been approved and marked as completed",
       });
       if (!result.rhBackdated) {
-        navigate("/pms/work-orders");
+        // Phase 2 — approval queue: auto-advance to the next pending WO instead
+        // of returning to the list. Queue exhausted → back to the list.
+        const advance = advanceApprovalQueue(workOrderId);
+        if (advance.queueWasActive && advance.nextId) {
+          navigate(`/pms/work-order/${advance.nextId}`);
+        } else {
+          if (advance.queueWasActive) {
+            toast({ title: "Review queue complete", description: "All work orders in the queue have been processed." });
+          }
+          navigate("/pms/work-orders");
+        }
       } else {
         // Stay on page so the amber banner is visible; refresh the WO context.
+        // An active queue stays intact — the officer advances via the queue bar.
         await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
       }
     } catch (error: any) {
@@ -3770,7 +3787,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         title: "Rejected",
         description: "Work order has been rejected",
       });
-      navigate("/pms/work-orders");
+      // Phase 2 — approval queue: a rejected WO leaves Pending Approval, so
+      // advance the queue exactly like an approval does.
+      const rejectAdvance = advanceApprovalQueue(workOrderId);
+      if (rejectAdvance.queueWasActive && rejectAdvance.nextId) {
+        navigate(`/pms/work-order/${rejectAdvance.nextId}`);
+      } else {
+        if (rejectAdvance.queueWasActive) {
+          toast({ title: "Review queue complete", description: "All work orders in the queue have been processed." });
+        }
+        navigate("/pms/work-orders");
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -3900,6 +3927,45 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </div>
         </div>
       )}
+      {/* Phase 2 — approval queue bar: N of M + Previous/Skip/Exit. Only
+          navigation — every approval rule stays in the Approval Section and
+          on the server. Locked WOs sit in the queue visibly locked (Skip). */}
+      {!embedded && queuePos && (
+        <div className="sticky top-0 z-[60] bg-[#16324f] border-b border-[#0f2438] px-4 py-2 flex items-center gap-3" data-testid="approval-queue-bar">
+          <ListChecks className="h-4 w-4 text-white shrink-0" />
+          <span className="text-sm font-semibold text-white" data-testid="text-queue-position">
+            Approval Queue — {queuePos.done + queuePos.index + 1} of {queuePos.startedWith}
+          </span>
+          <span className="text-xs text-blue-200" data-testid="text-queue-remaining">
+            {queuePos.remaining} remaining · {queuePos.done} processed
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              className="flex items-center px-2 py-1 rounded text-xs font-medium bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!queuePos.prevId}
+              onClick={() => queuePos.prevId && navigate(`/pms/work-order/${queuePos.prevId}`)}
+              data-testid="button-queue-prev"
+            >
+              <ChevronLeft className="h-3.5 w-3.5 mr-0.5" /> Previous
+            </button>
+            <button
+              className="flex items-center px-2 py-1 rounded text-xs font-medium bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!queuePos.nextId}
+              onClick={() => queuePos.nextId && navigate(`/pms/work-order/${queuePos.nextId}`)}
+              data-testid="button-queue-skip"
+            >
+              Skip <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+            </button>
+            <button
+              className="flex items-center px-2 py-1 rounded text-xs font-medium bg-white/10 text-white hover:bg-white/20"
+              onClick={() => { clearApprovalQueue(); navigate("/pms/work-orders"); }}
+              data-testid="button-queue-exit"
+            >
+              <X className="h-3.5 w-3.5 mr-0.5" /> Exit Queue
+            </button>
+          </div>
+        </div>
+      )}
       {!embedded && currentWorkOrderStatus === 'Pending Approval' && (() => {
         const topTier: string = effectiveApprovalTier(
           (workOrderContext as any)?.workOrder?.approvalTier,
@@ -3927,7 +3993,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         };
         const cfg = topBannerMap[topTier] || topBannerMap.standard;
         return (
-          <div className={`sticky top-0 z-50 ${cfg.bg} border-b px-4 py-2`} data-testid="banner-top-approval-tier">
+          // Stacks below the queue bar (also sticky) when a review queue is active.
+          <div className={`sticky z-50 ${cfg.bg} border-b px-4 py-2`} style={{ top: queuePos ? 40 : 0 }} data-testid="banner-top-approval-tier">
             <span className={`text-sm font-medium ${cfg.text}`}>{cfg.message}</span>
           </div>
         );

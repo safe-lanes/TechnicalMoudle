@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ChevronDown, Zap } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ChevronDown, Zap, ListChecks } from "lucide-react";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
 import type { ColDef, RowClickedEvent } from 'ag-grid-community';
@@ -44,6 +44,7 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useApprovalPolicy, effectiveApprovalTier } from "@/hooks/useApprovalPolicy";
+import { startApprovalQueue } from "@/lib/approvalQueue";
 import * as XLSX from "xlsx";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
@@ -942,6 +943,34 @@ const WorkOrders: React.FC = () => {
     setPostponeDialogOpen(true);
   };
 
+  // Phase 2 — approval queue: capture the FULL ordered pending set (same
+  // filters + sort the officer is looking at, reproduced client-side over the
+  // full fetch exactly like the export builders do) and walk it on the form
+  // page with approve-auto-advance.
+  const [startingQueue, setStartingQueue] = useState(false);
+  const handleStartReviewQueue = async () => {
+    setStartingQueue(true);
+    try {
+      const allWorkOrders = await fetchAllWorkOrders();
+      const ordered = filterAndSortWorkOrders(allWorkOrders, {
+        ...currentFilterParams,
+        sortField: woSortField ?? undefined,
+        sortDir: woSortDir,
+      });
+      const ids = ordered.map((wo) => wo.id).filter(Boolean);
+      if (ids.length === 0) {
+        toast({ title: "Nothing to review", description: "No work orders pending approval for the current filters." });
+        return;
+      }
+      startApprovalQueue(ids, vesselId ?? null);
+      setLocation(`/pms/work-order/${ids[0]}`);
+    } catch (err: any) {
+      toast({ title: "Could not start review queue", description: err?.message, variant: "destructive" });
+    } finally {
+      setStartingQueue(false);
+    }
+  };
+
   const handleWorkOrderClick = (workOrder: WorkOrder) => {
     // Navigate to work order detail page (full-screen)
     setLocation(`/pms/work-order/${workOrder.id}`);
@@ -1608,20 +1637,33 @@ const WorkOrders: React.FC = () => {
           { icon: Eye, label: "Standard Approval", count: standardCount, bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-800 dark:text-green-300", testId: "stat-standard" },
         ];
         return (
-          <div className="grid grid-cols-4 gap-3" data-testid="pending-approval-stat-bar">
-            {statCards.map((card) => (
-              <div
-                key={card.testId}
-                className={`flex items-center gap-3 rounded-md px-4 py-3 ${card.count === 0 ? "bg-gray-100 dark:bg-gray-800 opacity-60" : card.bg}`}
-                data-testid={card.testId}
-              >
-                <card.icon className={`h-5 w-5 ${card.count === 0 ? "text-gray-400" : card.text}`} />
-                <div>
-                  <div className={`text-xl font-bold ${card.count === 0 ? "text-gray-400" : card.text}`} data-testid={`${card.testId}-count`}>{card.count}</div>
-                  <div className={`text-xs ${card.count === 0 ? "text-gray-400" : card.text}`}>{card.label}</div>
+          <div className="flex items-stretch gap-3" data-testid="pending-approval-stat-bar">
+            <div className="grid grid-cols-4 gap-3 flex-1">
+              {statCards.map((card) => (
+                <div
+                  key={card.testId}
+                  className={`flex items-center gap-3 rounded-md px-4 py-3 ${card.count === 0 ? "bg-gray-100 dark:bg-gray-800 opacity-60" : card.bg}`}
+                  data-testid={card.testId}
+                >
+                  <card.icon className={`h-5 w-5 ${card.count === 0 ? "text-gray-400" : card.text}`} />
+                  <div>
+                    <div className={`text-xl font-bold ${card.count === 0 ? "text-gray-400" : card.text}`} data-testid={`${card.testId}-count`}>{card.count}</div>
+                    <div className={`text-xs ${card.count === 0 ? "text-gray-400" : card.text}`}>{card.label}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            {/* Phase 2 — approval queue: walk every pending WO with approve-auto-advance,
+                no pagination round-trips. Locked WOs appear in the queue locked (Skip only). */}
+            <Button
+              className="h-auto px-4 bg-[#1E5A8E] hover:bg-[#174a78] text-white shrink-0"
+              disabled={startingQueue || totalItems === 0}
+              onClick={handleStartReviewQueue}
+              data-testid="button-start-review-queue"
+            >
+              {startingQueue ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ListChecks className="h-4 w-4 mr-2" />}
+              Review Queue{totalItems > 0 ? ` (${totalItems})` : ''}
+            </Button>
           </div>
         );
       })()}
