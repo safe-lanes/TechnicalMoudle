@@ -65,6 +65,15 @@ router.get('/work-orders/planner/export', asyncHandler(woCtrl.exportPlanner));
 // POST /work-orders/planner/export — export planner as Excel from client-provided items
 router.post('/work-orders/planner/export', asyncHandler(woCtrl.exportPlannerFromItems));
 
+// ── Company Approval Policy (superintendent lock toggle) ──
+// Distinct top-level path — no /work-orders/:id param collision.
+
+// GET /approval-policy — current policy (used by WO form/list for effective tier)
+router.get('/approval-policy', asyncHandler(woCtrl.getApprovalPolicy));
+
+// PUT /approval-policy — shore-only (403 on ship), Sail Admin / Super Admin only
+router.put('/approval-policy', asyncHandler(woCtrl.updateApprovalPolicy));
+
 // ── Core Work Order CRUD ──
 
 // GET  /work-orders — list all (optional ?vesselId= filter)

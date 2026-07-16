@@ -10,9 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Clock, Settings, Ship, Save, X, Calendar, Gauge, CheckCircle2, ArrowLeft, Search, Building2 } from "lucide-react";
+import { Clock, Settings, Ship, Save, X, Calendar, Gauge, CheckCircle2, ArrowLeft, Search, Building2, Lock, Unlock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import type { PmsVesselSettings } from "@shared/schema";
 import { Marker } from "@/components/Marker";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
+import { useApprovalPolicy } from "@/hooks/useApprovalPolicy";
 
 interface Vessel {
   id: string;
@@ -366,6 +370,8 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
               </p>
             )}
           </div>
+
+          <ApprovalPolicyCard />
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredVessels.map((vessel) => {
@@ -1360,6 +1366,70 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ── Approval Policy card (superintendent lock toggle, migration 137) ──
+// Shore-only editing (same isShore gate as the Shipskart mapping card): the
+// setting syncs ONE_WAY shore→ship, so ship edits would be overwritten — the
+// server also refuses ship PUTs with 403. Editors: Sail Admin / Super Admin.
+function ApprovalPolicyCard() {
+  const { hasRole } = useAuth();
+  const { isShore } = useSyncInstanceInfo();
+  const { toast } = useToast();
+  const { superintendentLockEnabled, isLoading, policy } = useApprovalPolicy();
+
+  const canEdit = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
+
+  const saveMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("PUT", "/technical/api/approval-policy", {
+        superintendentLockEnabled: enabled,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/approval-policy"] });
+      toast({
+        title: data.superintendentLockEnabled ? "Superintendent lock ENABLED" : "Superintendent lock DISABLED",
+        description: data.superintendentLockEnabled
+          ? "High-severity overdue work orders are locked until the Superintendent acknowledges."
+          : "High-severity work orders are notify-only: approval allowed, Superintendent still notified, detailed remarks still mandatory.",
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not save approval policy", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  if (!canEdit) return null;
+
+  return (
+    <div className="flex items-center gap-4 mb-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm" data-testid="card-approval-policy">
+      {superintendentLockEnabled
+        ? <Lock className="h-5 w-5 text-red-600 shrink-0" />
+        : <Unlock className="h-5 w-5 text-amber-600 shrink-0" />}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-900">Superintendent Approval Lock</p>
+        <p className="text-xs text-gray-600">
+          When ON (default), work orders with 3+ missed cycles, 21+ days late, or 7+ days backdating are LOCKED
+          until the Superintendent acknowledges. When OFF, they become notify-only: the HOD can approve, the
+          Superintendent is still notified, and detailed remarks (min 20 characters) remain mandatory.
+          Applies company-wide and syncs to all vessels.
+        </p>
+        {policy?.updatedBy && (
+          <p className="text-[11px] text-gray-400 mt-0.5" data-testid="text-approval-policy-updated-by">
+            Last changed by {policy.updatedBy}
+          </p>
+        )}
+      </div>
+      <Switch
+        checked={superintendentLockEnabled}
+        disabled={isLoading || saveMutation.isPending}
+        onCheckedChange={(checked) => saveMutation.mutate(checked)}
+        data-testid="switch-superintendent-lock"
+      />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import * as repo from '../repositories/workOrderRepository';
 import { ValidationError } from '../../shared/errors';
-import { calculateMissedCycles, calculateNextDueDate } from '@shared/dateUtils';
+import { calculateMissedCycles, calculateNextDueDate, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
 import { invalidateComplianceCache } from './complianceAnomalyService';
 import { logFieldChanges } from '../../sync';
 import { finalizeWorkOrderCompletion } from './workOrderCompletionService';
+import { isSuperintendentLockEnabled } from './workOrderService';
 
 // ── Bulk Approve Work Orders ──
 
@@ -19,6 +20,11 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
     success: [],
     failed: []
   };
+
+  // Layer 5 — the bulk path must enforce the SAME approval-tier gates as the
+  // single-approve path (workOrderService). Live policy read, once per batch.
+  const lockEnabled = await isSuperintendentLockEnabled();
+  const remarks = (approverRemarks || '').trim();
 
   for (const workOrderId of workOrderIds) {
     try {
@@ -66,16 +72,55 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       }
 
       const completionDateForCalc = actualCompletionDate || existingWO.completionDateTime || existingWO.dateCompleted;
-      const missedCycles = existingWO.maintenanceBasis === 'Running Hours'
-        ? 0
-        : calculateMissedCycles(
-            existingWO.nextDueDate || existingWO.dueDate,
-            completionDateForCalc,
-            existingWO.frequencyValue,
-            existingWO.frequencyUnit
-          );
+      // Real missed-cycle computation per maintenance basis — the RH branch was
+      // previously hardcoded to 0, which let late RH WOs bypass the justification
+      // gate on the bulk path. Mirrors workOrderCompletionService.
+      let missedCycles: number;
+      if (existingWO.maintenanceBasis === 'Running Hours') {
+        const completionRHValue = existingWO.completionRH;
+        const dueRH = existingWO.nextDueReading ?? null;
+        let jobIntervalRH: number | string | null = null;
+        if (existingWO.jobId) {
+          try {
+            const jobForRH = await repo.findJob(existingWO.jobId);
+            if (jobForRH?.intervalRunningHour) jobIntervalRH = jobForRH.intervalRunningHour;
+          } catch { /* fall through to frequencyValue */ }
+        }
+        if (!jobIntervalRH && existingWO.frequencyValue) jobIntervalRH = existingWO.frequencyValue;
+        missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
+      } else {
+        missedCycles = calculateMissedCycles(
+          existingWO.nextDueDate || existingWO.dueDate,
+          completionDateForCalc,
+          existingWO.frequencyValue,
+          existingWO.frequencyUnit
+        );
+      }
       if (missedCycles > 0) {
         console.log(`⚠️ Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
+      }
+
+      // ── Layer 5 approval-tier gates (same rules as the single-approve path) ──
+      const currentTier = existingWO.approvalTier || 'standard';
+
+      if (currentTier === 'superintendent_locked' && lockEnabled) {
+        results.failed.push({
+          id: workOrderId,
+          error: 'Work order is LOCKED pending Superintendent acknowledgment and cannot be bulk-approved.'
+        });
+        continue;
+      }
+      // locked-with-lock-disabled behaves as the notification tier (min 20 chars).
+      const tierMinRemarks =
+        (currentTier === 'superintendent_locked' || currentTier === 'superintendent_notification') ? 20
+        : currentTier === 'ce_with_justification' ? 10
+        : 0;
+      if (tierMinRemarks > 0 && remarks.length < tierMinRemarks) {
+        results.failed.push({
+          id: workOrderId,
+          error: `Work order approval tier requires detailed approver remarks (minimum ${tierMinRemarks} characters).`
+        });
+        continue;
       }
 
       if (missedCycles >= 1) {
@@ -107,6 +152,9 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         approvalAction: "approved",
         approver: resolvedApprover,
         approverRemarks,
+        // Parity with the single-approve path: tiered approvals persist the
+        // mandatory remarks in ceApprovalRemarks for the audit trail.
+        ceApprovalRemarks: tierMinRemarks > 0 ? remarks : null,
         skippedCyclesJustification: (missedCycles >= 1 && skippedCyclesJustification) ? skippedCyclesJustification : null,
         approvalDate: new Date().toISOString(),
         wasRejected: false

@@ -8,6 +8,8 @@ import {
   vessels,
   pmsVesselSettings,
   companyStandardGraceSettings,
+  companyApprovalSettings,
+  type CompanyApprovalSettings,
   makers,
   masterLists,
   masterListTypes,
@@ -8062,8 +8064,33 @@ export class PostgresStorage {
     }
   }
 
+  async getCompanyApprovalSettings(): Promise<CompanyApprovalSettings | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(companyApprovalSettings).limit(1);
+    return result[0];
+  }
+
+  async upsertCompanyApprovalSettings(settings: { superintendentLockEnabled: boolean; updatedBy?: string | null }): Promise<CompanyApprovalSettings> {
+    const db = await getDb();
+    const existing = await db.select().from(companyApprovalSettings).limit(1);
+
+    if (existing.length > 0) {
+      // updated_at bump is what the ONE_WAY_SHORE_TO_SHIP gather keys on.
+      const result = await db.update(companyApprovalSettings)
+        .set({ superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null, updatedAt: new Date() })
+        .where(eq(companyApprovalSettings.id, existing[0].id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(companyApprovalSettings)
+        .values({ singletonKey: 'ACTIVE', superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null })
+        .returning();
+      return result[0];
+    }
+  }
+
   // ============= FLEET MANAGEMENT =============
-  
+
   async getAllFleets(): Promise<Fleet[]> {
     const db = await getDb();
     return await db.select().from(fleets)

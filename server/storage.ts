@@ -129,6 +129,7 @@ import {
   companyStandardGraceSettings,
   type CompanyStandardGraceSettings,
   type InsertCompanyStandardGraceSettings,
+  type CompanyApprovalSettings,
   makerList,
   type MakerList,
   type InsertMakerList,
@@ -762,6 +763,10 @@ export interface IStorage {
   // Company Standard Grace Settings - Singleton company-wide grace rule
   getCompanyStandardGraceSettings(): Promise<CompanyStandardGraceSettings | undefined>;
   upsertCompanyStandardGraceSettings(settings: InsertCompanyStandardGraceSettings): Promise<CompanyStandardGraceSettings>;
+
+  // Company Approval Settings - Singleton approval policy (superintendent lock toggle)
+  getCompanyApprovalSettings(): Promise<CompanyApprovalSettings | undefined>;
+  upsertCompanyApprovalSettings(settings: { superintendentLockEnabled: boolean; updatedBy?: string | null }): Promise<CompanyApprovalSettings>;
   
   // Maker List - Master data for manufacturers
   getMakerList(): Promise<MakerList[]>;

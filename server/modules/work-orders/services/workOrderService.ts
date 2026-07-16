@@ -126,11 +126,32 @@ function calculateBackdatingDaysForApproval(completionDate: string | null | unde
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
+/**
+ * Company approval policy — superintendent lock toggle (migration 137).
+ * Read LIVE at both tier assignment and the approval gate so flipping the
+ * setting OFF unlocks already-stamped 'superintendent_locked' WOs immediately
+ * (no data migration). Fail-safe: any read error resolves to TRUE (locked
+ * stays locked) — never accidentally weaken the compliance gate.
+ */
+export async function isSuperintendentLockEnabled(): Promise<boolean> {
+  try {
+    const settings = await storage.getCompanyApprovalSettings();
+    return settings?.superintendentLockEnabled ?? true;
+  } catch (err: any) {
+    console.warn(`[ApprovalPolicy] Could not read company approval settings (defaulting to lock ENABLED): ${err.message}`);
+    return true;
+  }
+}
+
 export function calculateApprovalTier(
   dueDate: string | null | undefined,
   completionDate: string | null | undefined,
   missedCycles: number,
-  backdatingDays: number = 0
+  backdatingDays: number = 0,
+  // Superintendent lock toggle: when FALSE the high-severity branch assigns
+  // 'superintendent_notification' instead of 'superintendent_locked' — approval
+  // allowed, Superintendent still notified, HOD remarks (>=20) still mandatory.
+  superintendentLockEnabled: boolean = true
 ) {
   // SHARED parser (dateParse.ts contract): raw new Date() made DD-MM-YYYY due
   // dates Invalid (daysLate NaN) or month/day-swapped (daysLate 0) → WOs that
@@ -150,10 +171,18 @@ export function calculateApprovalTier(
   let approvalBlockReason: string | null = null;
 
   if (missedCycles >= 3 || daysLate >= 21 || backdatingDays >= 7) {
-    approvalTier = 'superintendent_locked';
-    superintendentAcknowledged = false;
-    superintendentNotifiedAt = new Date().toISOString();
-    approvalBlockReason = 'Awaiting Superintendent acknowledgment';
+    if (superintendentLockEnabled) {
+      approvalTier = 'superintendent_locked';
+      superintendentAcknowledged = false;
+      superintendentNotifiedAt = new Date().toISOString();
+      approvalBlockReason = 'Awaiting Superintendent acknowledgment';
+    } else {
+      // Lock disabled by company policy — notify-only downgrade. Notification
+      // still fires (notification tier), remarks (>=20) still mandatory, no block.
+      approvalTier = 'superintendent_notification';
+      superintendentNotifiedAt = new Date().toISOString();
+      superintendentAcknowledged = false;
+    }
   } else if (missedCycles === 2 || (daysLate >= 14 && daysLate < 21) || (backdatingDays >= 3 && backdatingDays < 7)) {
     approvalTier = 'superintendent_notification';
     superintendentNotifiedAt = new Date().toISOString();
@@ -1210,7 +1239,8 @@ export async function updateWorkOrder(id: string, body: any) {
       tierCompDate,
       updateData.submittedDate || existingWO.submittedDate
     );
-    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays);
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled();
+    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
     updateData.superintendentNotifiedAt = tierResult.superintendentNotifiedAt;
@@ -1315,10 +1345,21 @@ export async function updateWorkOrder(id: string, body: any) {
     const ceRemarks = (updateData.ceApprovalRemarks || '').trim();
 
     if (currentTier === 'superintendent_locked') {
-      throw new ValidationError(
-        `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
-        { code: 'SUPERINTENDENT_LOCKED' }
-      );
+      // Live policy read: toggling the company setting OFF unlocks already-stamped
+      // locked WOs immediately — they fall through to the notify-tier remarks rule.
+      const lockEnabled = await isSuperintendentLockEnabled();
+      if (lockEnabled) {
+        throw new ValidationError(
+          `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
+          { code: 'SUPERINTENDENT_LOCKED' }
+        );
+      }
+      if (!ceRemarks || ceRemarks.length < 20) {
+        throw new ValidationError(
+          `This work order has high severity issues and the Superintendent lock is disabled by company policy. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
+          { code: 'CE_REMARKS_REQUIRED', minLength: 20 }
+        );
+      }
     }
 
     if (currentTier === 'superintendent_notification') {

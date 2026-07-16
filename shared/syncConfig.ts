@@ -472,6 +472,18 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     businessRules: null,
     notes: 'Company-wide grace period settings. Single-row global config. Integer PK, no UUID.',
   },
+  company_approval_settings: {
+    tableName: 'company_approval_settings',
+    category: 'ONE_WAY_SHORE_TO_SHIP',
+    direction: 'shore_to_ship',
+    identityColumn: 'singleton_key',
+    vesselScopeColumn: null,
+    vesselScopeJoinPath: null,
+    isGlobal: true,
+    isConfigurable: false,
+    businessRules: null,
+    notes: 'Company approval policy (superintendent lock toggle, migration 137). Single-row global config, shore-configured. Integer PK, no UUID.',
+  },
   pms_vessel_settings: {
     tableName: 'pms_vessel_settings',
     category: 'ONE_WAY_SHORE_TO_SHIP',

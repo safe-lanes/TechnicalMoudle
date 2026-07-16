@@ -3225,6 +3225,14 @@ const Dashboard = () => {
                           rowHeight={52}
                           rowSelection={isHeadOfDept ? "multiple" : undefined}
                           onSelectionChanged={isHeadOfDept ? handlePendingSelectionChanged : undefined}
+                          // Bulk approval is for ON-TIME completions only: tiered/locked or
+                          // missed-cycle WOs need per-WO remarks (Layer 5) — server refuses
+                          // them in bulk; making the rows unselectable is the UX side.
+                          isRowSelectable={isHeadOfDept ? ((node: any) => {
+                            const wo = node.data;
+                            if (!wo) return false;
+                            return (!wo.approvalTier || wo.approvalTier === 'standard') && (wo.missedCycles ?? 0) === 0;
+                          }) : undefined}
                           noRowsMessage={isHeadOfDept ? "No work orders pending your approval" : "No items pending office review"}
                           testId="ag-grid-op-pending-approvals"
                           getRowId={(params) => String(params.data.id)}

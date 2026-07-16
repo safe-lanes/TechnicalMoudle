@@ -2321,6 +2321,24 @@ export type CompanyStandardGraceSettings = typeof companyStandardGraceSettings.$
 export type CompanyGraceMethod = 'FIXED_DAYS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH';
 export type CompanyGraceScope = 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH';
 
+// Company approval-policy settings (migration 137) — singleton, shore-configured,
+// synced ONE_WAY_SHORE_TO_SHIP (same pattern as companyStandardGraceSettings).
+// superintendent_lock_enabled toggles the Layer-5 'superintendent_locked' tier:
+// TRUE (default) = today's behaviour; FALSE = downgrade to notify-only (approval
+// allowed, Superintendent notification + mandatory HOD remarks unchanged).
+export const companyApprovalSettings = pgTable("company_approval_settings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  singletonKey: text("singleton_key").notNull().unique().default("ACTIVE"),
+  superintendentLockEnabled: boolean("superintendent_lock_enabled").notNull().default(true),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: updatedAtColumn(),
+  // Required by the provisioning exporter / one-way sync filters (see mig 137).
+  isDeleted: boolean("is_deleted").default(false),
+});
+
+export type CompanyApprovalSettings = typeof companyApprovalSettings.$inferSelect;
+
 // =====================================================
 // MAKER LIST - Master data for equipment manufacturers
 // Linked with fleet components, vessel components, fleet spares, vessel spares

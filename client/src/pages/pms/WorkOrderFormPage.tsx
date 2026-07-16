@@ -54,6 +54,7 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { viewAuthedDocument } from "@/lib/authedDownload";
 import { useModifyMode } from "@/hooks/useModifyMode";
+import { useApprovalPolicy, effectiveApprovalTier } from "@/hooks/useApprovalPolicy";
 import { PeriodPicker } from "@/components/filters/PeriodPicker";
 import type { PeriodValue } from "@/components/filters/PeriodPicker";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
@@ -553,6 +554,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [rhOverridePrompt, setRhOverridePrompt] = useState<{ message: string; canOverride: boolean } | null>(null);
   const [skippedCyclesJustification, setSkippedCyclesJustification] = useState('');
   const [ceApprovalRemarks, setCeApprovalRemarks] = useState('');
+  // Company approval policy — the approval section renders the EFFECTIVE tier
+  // (a stamped superintendent_locked behaves as notification while the lock
+  // toggle is OFF; the server gate applies the same live downgrade).
+  const { superintendentLockEnabled } = useApprovalPolicy();
 
   // Superintendent completion-rejection state
   const [completionRejectionRemarks, setCompletionRejectionRemarks] = useState('');
@@ -3896,7 +3901,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         </div>
       )}
       {!embedded && currentWorkOrderStatus === 'Pending Approval' && (() => {
-        const topTier: string = (workOrderContext as any)?.workOrder?.approvalTier || 'standard';
+        const topTier: string = effectiveApprovalTier(
+          (workOrderContext as any)?.workOrder?.approvalTier,
+          superintendentLockEnabled
+        );
         const topDaysLate = (workOrderContext as any)?.workOrder?.daysLate || 0;
         const topMissedCycles = (workOrderContext as any)?.workOrder?.missedCycles || 0;
         const topBannerMap: Record<string, { bg: string; text: string; message: string }> = {
@@ -6661,7 +6669,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             const approvalOriginalDueDate = (workOrderContext as any)?.workOrder?.originalDueDate || '';
             const approvalDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime || '';
             const approvalDaysLate = (workOrderContext as any)?.workOrder?.daysLate || 0;
-            const approvalTier: string = (workOrderContext as any)?.workOrder?.approvalTier || 'standard';
+            // EFFECTIVE tier: stamped locked + company lock toggle OFF → renders/gates
+            // as the notification tier (mirrors the server's live enforcement).
+            const approvalTier: string = effectiveApprovalTier(
+              (workOrderContext as any)?.workOrder?.approvalTier,
+              superintendentLockEnabled
+            );
             const justificationValid = skippedCyclesJustification.trim().length >= 30;
 
             const isSuptLocked = approvalTier === 'superintendent_locked';

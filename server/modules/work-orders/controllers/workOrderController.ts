@@ -35,6 +35,47 @@ function resolveActorIdentity(req: Request): string | undefined {
   return undefined;
 }
 
+// ── Company Approval Policy (superintendent lock toggle, migration 137) ──
+
+const APPROVAL_POLICY_EDITOR_ROLES = new Set(['Sail Admin', 'Super Admin']);
+
+export async function getApprovalPolicy(_req: Request, res: Response) {
+  const settings = await storage.getCompanyApprovalSettings();
+  res.json({
+    superintendentLockEnabled: settings?.superintendentLockEnabled ?? true,
+    updatedBy: settings?.updatedBy ?? null,
+    updatedAt: settings?.updatedAt ?? null,
+  });
+}
+
+export async function updateApprovalPolicy(req: Request, res: Response) {
+  // Shore-configured setting synced ONE_WAY_SHORE_TO_SHIP — a ship-side edit
+  // would be silently overwritten by the next pull, so refuse it outright.
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (await isShipInstance()) {
+    return res.status(403).json({ error: 'shore_only', message: 'The approval policy is configured on the shore server and synced to ships.' });
+  }
+
+  const userRole = (req as AuthenticatedRequest).user?.role || '';
+  if (!APPROVAL_POLICY_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: 'forbidden', message: 'Only Sail Admin / Super Admin may edit the approval policy.' });
+  }
+
+  const { superintendentLockEnabled } = req.body ?? {};
+  if (typeof superintendentLockEnabled !== 'boolean') {
+    return res.status(400).json({ error: 'superintendentLockEnabled (boolean) is required' });
+  }
+
+  const username = (req as AuthenticatedRequest).user?.username || null;
+  const saved = await storage.upsertCompanyApprovalSettings({ superintendentLockEnabled, updatedBy: username });
+  console.log(`[ApprovalPolicy] superintendent_lock_enabled set to ${superintendentLockEnabled} by ${username || 'unknown'}`);
+  res.json({
+    superintendentLockEnabled: saved.superintendentLockEnabled,
+    updatedBy: saved.updatedBy,
+    updatedAt: saved.updatedAt,
+  });
+}
+
 // ── Core Work Order CRUD ──
 
 export async function listWorkOrders(req: Request, res: Response) {
