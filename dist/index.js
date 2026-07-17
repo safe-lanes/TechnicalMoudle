@@ -457,6 +457,7 @@ __export(schema_exports, {
   changeRequestApproval: () => changeRequestApproval,
   changeRequestAttachment: () => changeRequestAttachment,
   changeRequestComment: () => changeRequestComment,
+  companyApprovalSettings: () => companyApprovalSettings,
   companyStandardGraceSettings: () => companyStandardGraceSettings,
   componentClassRegulatory: () => componentClassRegulatory,
   componentDocuments: () => componentDocuments,
@@ -637,6 +638,7 @@ __export(schema_exports, {
   shipCertificatesMaster: () => shipCertificatesMaster,
   shipSurveysLabelsConfig: () => shipSurveysLabelsConfig,
   shipSurveysMaster: () => shipSurveysMaster,
+  shipskartRoleMappings: () => shipskartRoleMappings,
   spareComponentLinks: () => spareComponentLinks,
   spareLocationStock: () => spareLocationStock,
   spares: () => spares,
@@ -675,7 +677,7 @@ import { pgTable as pgTable2, text as text2, integer as integer2, boolean as boo
 import { sql as sql2 } from "drizzle-orm";
 import { createInsertSchema as createInsertSchema2 } from "drizzle-zod";
 import { z } from "zod";
-var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, insertMocApproverSchema;
+var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -3000,6 +3002,16 @@ var init_schema = __esm({
       createdAt: true,
       updatedAt: true
     });
+    companyApprovalSettings = pgTable2("company_approval_settings", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      singletonKey: text2("singleton_key").notNull().unique().default("ACTIVE"),
+      superintendentLockEnabled: boolean2("superintendent_lock_enabled").notNull().default(true),
+      updatedBy: text2("updated_by"),
+      createdAt: timestamp3("created_at").defaultNow(),
+      updatedAt: updatedAtColumn(),
+      // Required by the provisioning exporter / one-way sync filters (see mig 137).
+      isDeleted: boolean2("is_deleted").default(false)
+    });
     makerList = pgTable2("maker_list", {
       id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
       makerListUuid: text2("maker_list_uuid").default(sql2`gen_random_uuid()`),
@@ -4838,6 +4850,16 @@ var init_schema = __esm({
       isDeleted: boolean2("is_deleted").notNull().default(false),
       isSync: boolean2("is_sync").notNull().default(false)
     });
+    shipskartRoleMappings = pgTable2("shipskart_role_mappings", {
+      id: serial2("id").primaryKey(),
+      sailRole: text2("sail_role").notNull().unique(),
+      // one SAIL role → exactly one Shipskart role
+      shipskartRole: text2("shipskart_role").notNull(),
+      // many rows may share this (many-to-one)
+      createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date()),
+      updatedByUuid: text2("updated_by_uuid")
+    });
     insertMocApproverSchema = createInsertSchema2(mocApprovers).omit({
       id: true,
       mauuid: true,
@@ -5441,6 +5463,18 @@ var init_syncConfig = __esm({
         isConfigurable: false,
         businessRules: null,
         notes: "Company-wide grace period settings. Single-row global config. Integer PK, no UUID."
+      },
+      company_approval_settings: {
+        tableName: "company_approval_settings",
+        category: "ONE_WAY_SHORE_TO_SHIP",
+        direction: "shore_to_ship",
+        identityColumn: "singleton_key",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Company approval policy (superintendent lock toggle, migration 137). Single-row global config, shore-configured. Integer PK, no UUID."
       },
       pms_vessel_settings: {
         tableName: "pms_vessel_settings",
@@ -6415,6 +6449,18 @@ var init_syncConfig = __esm({
         isConfigurable: false,
         businessRules: null,
         notes: "Auto-computed linking from defect data."
+      },
+      shipskart_role_mappings: {
+        tableName: "shipskart_role_mappings",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Shipskart SSO role mapping (SAIL role \u2192 Shipskart role). Shore-only office feature \u2014 ships have no Shipskart config; per-tenant by db-per-tenant construction. Register ONE_WAY_SHORE_TO_SHIP later only if ships ever need Purchasing."
       }
     };
   }
@@ -24536,6 +24582,22 @@ var init_postgresStorage = __esm({
           return result[0];
         }
       }
+      async getCompanyApprovalSettings() {
+        const db2 = await getDb();
+        const result = await db2.select().from(companyApprovalSettings).limit(1);
+        return result[0];
+      }
+      async upsertCompanyApprovalSettings(settings) {
+        const db2 = await getDb();
+        const existing = await db2.select().from(companyApprovalSettings).limit(1);
+        if (existing.length > 0) {
+          const result = await db2.update(companyApprovalSettings).set({ superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(companyApprovalSettings.id, existing[0].id)).returning();
+          return result[0];
+        } else {
+          const result = await db2.insert(companyApprovalSettings).values({ singletonKey: "ACTIVE", superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null }).returning();
+          return result[0];
+        }
+      }
       // ============= FLEET MANAGEMENT =============
       async getAllFleets() {
         const db2 = await getDb();
@@ -31216,6 +31278,7 @@ __export(workOrderService_exports, {
   getScopedOperationData: () => getScopedOperationData,
   getWorkOrder: () => getWorkOrder,
   getWorkOrdersWithComputedStatus: () => getWorkOrdersWithComputedStatus,
+  isSuperintendentLockEnabled: () => isSuperintendentLockEnabled,
   listWorkOrders: () => listWorkOrders,
   listWorkOrdersPaged: () => listWorkOrdersPaged,
   rejectCompletedWorkOrder: () => rejectCompletedWorkOrder,
@@ -31290,7 +31353,16 @@ function calculateBackdatingDaysForApproval(completionDate, submittedDate) {
   const diffMs = reference.getTime() - comp.getTime();
   return Math.max(0, Math.floor(diffMs / (1e3 * 60 * 60 * 24)));
 }
-function calculateApprovalTier(dueDate, completionDate, missedCycles, backdatingDays = 0) {
+async function isSuperintendentLockEnabled() {
+  try {
+    const settings = await storage.getCompanyApprovalSettings();
+    return settings?.superintendentLockEnabled ?? true;
+  } catch (err) {
+    console.warn(`[ApprovalPolicy] Could not read company approval settings (defaulting to lock ENABLED): ${err.message}`);
+    return true;
+  }
+}
+function calculateApprovalTier(dueDate, completionDate, missedCycles, backdatingDays = 0, superintendentLockEnabled = true) {
   let daysLate = 0;
   const due = parseWorkOrderDate(dueDate);
   const comp = parseWorkOrderDate(completionDate);
@@ -31303,10 +31375,16 @@ function calculateApprovalTier(dueDate, completionDate, missedCycles, backdating
   let superintendentAcknowledged = false;
   let approvalBlockReason = null;
   if (missedCycles >= 3 || daysLate >= 21 || backdatingDays >= 7) {
-    approvalTier = "superintendent_locked";
-    superintendentAcknowledged = false;
-    superintendentNotifiedAt = (/* @__PURE__ */ new Date()).toISOString();
-    approvalBlockReason = "Awaiting Superintendent acknowledgment";
+    if (superintendentLockEnabled) {
+      approvalTier = "superintendent_locked";
+      superintendentAcknowledged = false;
+      superintendentNotifiedAt = (/* @__PURE__ */ new Date()).toISOString();
+      approvalBlockReason = "Awaiting Superintendent acknowledgment";
+    } else {
+      approvalTier = "superintendent_notification";
+      superintendentNotifiedAt = (/* @__PURE__ */ new Date()).toISOString();
+      superintendentAcknowledged = false;
+    }
   } else if (missedCycles === 2 || daysLate >= 14 && daysLate < 21 || backdatingDays >= 3 && backdatingDays < 7) {
     approvalTier = "superintendent_notification";
     superintendentNotifiedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -32086,7 +32164,8 @@ async function updateWorkOrder(id, body) {
       tierCompDate,
       updateData.submittedDate || existingWO2.submittedDate
     );
-    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays);
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled();
+    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
     updateData.superintendentNotifiedAt = tierResult.superintendentNotifiedAt;
@@ -32167,10 +32246,19 @@ async function updateWorkOrder(id, body) {
     const currentTier = existingWO2.approvalTier || "standard";
     const ceRemarks = (updateData.ceApprovalRemarks || "").trim();
     if (currentTier === "superintendent_locked") {
-      throw new ValidationError(
-        `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
-        { code: "SUPERINTENDENT_LOCKED" }
-      );
+      const lockEnabled = await isSuperintendentLockEnabled();
+      if (lockEnabled) {
+        throw new ValidationError(
+          `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
+          { code: "SUPERINTENDENT_LOCKED" }
+        );
+      }
+      if (!ceRemarks || ceRemarks.length < 20) {
+        throw new ValidationError(
+          `This work order has high severity issues and the Superintendent lock is disabled by company policy. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
+          { code: "CE_REMARKS_REQUIRED", minLength: 20 }
+        );
+      }
     }
     if (currentTier === "superintendent_notification") {
       if (!ceRemarks || ceRemarks.length < 20) {
@@ -34986,7 +35074,7 @@ var alertEngine_exports = {};
 __export(alertEngine_exports, {
   generateAlerts: () => generateAlerts
 });
-import { eq as eq29, and as and25, isNull as isNull4, ne as ne2, desc as desc7, inArray as inArray8 } from "drizzle-orm";
+import { eq as eq30, and as and25, isNull as isNull4, ne as ne2, desc as desc7, inArray as inArray8 } from "drizzle-orm";
 async function generateAlerts(report) {
   const [consumed, cleared] = await Promise.all([
     evaluateRules(report),
@@ -35008,7 +35096,7 @@ async function ruleConsumptionSpike(report) {
   const db2 = await getDb();
   const todayTotal = (toNum(report.hfoConsumption) ?? 0) + (toNum(report.lsmgoConsumption) ?? 0) + (toNum(report.mgoConsumption) ?? 0) + (toNum(report.vlsfoConsumption) ?? 0) + (toNum(report.lpgConsumption) ?? 0);
   if (todayTotal <= 0) return;
-  const robRows = await db2.select().from(nrFuelRob).where(eq29(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq30(nrFuelRob.vesselId, report.vesselId));
   const avg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (avg7Day <= 0) return;
   const pctAbove = (todayTotal - avg7Day) / avg7Day;
@@ -35038,7 +35126,7 @@ async function ruleConsumptionSpike(report) {
 }
 async function ruleRobEndurance(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq29(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq30(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (totalAvg7Day <= 0) return;
@@ -35072,8 +35160,8 @@ async function ruleAeHoursSpike(report) {
   const currentAeHours = toNum(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
   const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and25(
-    eq29(nrNoonReports.vesselId, report.vesselId),
-    eq29(nrNoonReports.status, "submitted"),
+    eq30(nrNoonReports.vesselId, report.vesselId),
+    eq30(nrNoonReports.status, "submitted"),
     ne2(nrNoonReports.id, report.id)
   )).orderBy(desc7(nrNoonReports.reportDate)).limit(7);
   const priorHours = prior.map((r) => toNum(r.aeRunningHours)).filter((v) => v !== null && v > 0);
@@ -35096,7 +35184,7 @@ async function ruleAeHoursSpike(report) {
 async function ruleCiiBandDrop(report) {
   const db2 = await getDb();
   const year = new Date(report.reportDate).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and25(eq29(nrCiiTracking.vesselId, report.vesselId), eq29(nrCiiTracking.year, year))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and25(eq30(nrCiiTracking.vesselId, report.vesselId), eq30(nrCiiTracking.year, year))).limit(1);
   const row = ciiRows[0] ?? null;
   if (!row || !row.ciiRating || !row.previousCiiRating) return;
   const prevOrder = CII_ORDER[row.previousCiiRating] ?? 0;
@@ -35140,7 +35228,7 @@ async function ruleNegativeRobRisk(report) {
 }
 async function autoResolveCleared(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq29(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq30(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   const enduranceDays = totalAvg7Day > 0 ? totalRob / totalAvg7Day : null;
@@ -35164,7 +35252,7 @@ async function autoResolveCleared(report) {
     acknowledgedAt: /* @__PURE__ */ new Date(),
     acknowledgedBy: "system"
   }).where(and25(
-    eq29(nrAlerts.vesselId, report.vesselId),
+    eq30(nrAlerts.vesselId, report.vesselId),
     isNull4(nrAlerts.acknowledgedAt),
     inArray8(nrAlerts.alertType, toResolve)
   ));
@@ -35172,16 +35260,16 @@ async function autoResolveCleared(report) {
 async function resolveOpenAlert(vesselId, alertType) {
   const db2 = await getDb();
   await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and25(
-    eq29(nrAlerts.vesselId, vesselId),
-    eq29(nrAlerts.alertType, alertType),
+    eq30(nrAlerts.vesselId, vesselId),
+    eq30(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   ));
 }
 async function upsertAlert(vesselId, reportId, alertType, severity, message, metricValue, thresholdValue) {
   const db2 = await getDb();
   const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and25(
-    eq29(nrAlerts.vesselId, vesselId),
-    eq29(nrAlerts.alertType, alertType),
+    eq30(nrAlerts.vesselId, vesselId),
+    eq30(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   )).limit(1);
   if (existing.length > 0) {
@@ -35191,7 +35279,7 @@ async function upsertAlert(vesselId, reportId, alertType, severity, message, met
       message,
       metricValue: metricValue !== null ? String(metricValue) : null,
       thresholdValue: thresholdValue !== null ? String(thresholdValue) : null
-    }).where(eq29(nrAlerts.id, existing[0].id));
+    }).where(eq30(nrAlerts.id, existing[0].id));
   } else {
     await db2.insert(nrAlerts).values({
       vesselId,
@@ -40646,6 +40734,7 @@ init_dateUtils();
 init_hodResolutionService();
 init_complianceAnomalyService();
 init_sync();
+init_workOrderService2();
 async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCyclesJustification) {
   if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
     throw new ValidationError("workOrderIds array is required");
@@ -40655,6 +40744,8 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
     success: [],
     failed: []
   };
+  const lockEnabled = await isSuperintendentLockEnabled();
+  const remarks = (approverRemarks || "").trim();
   for (const workOrderId of workOrderIds) {
     try {
       const existingWO2 = await findById3(workOrderId);
@@ -40692,14 +40783,46 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         nextDueReading = (parseInt(existingWO2.currentReading) + parseInt(existingWO2.frequencyValue || "0")).toString();
       }
       const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
-      const missedCycles = existingWO2.maintenanceBasis === "Running Hours" ? 0 : calculateMissedCycles(
-        existingWO2.nextDueDate || existingWO2.dueDate,
-        completionDateForCalc,
-        existingWO2.frequencyValue,
-        existingWO2.frequencyUnit
-      );
+      let missedCycles;
+      if (existingWO2.maintenanceBasis === "Running Hours") {
+        const completionRHValue = existingWO2.completionRH;
+        const dueRH = existingWO2.nextDueReading ?? null;
+        let jobIntervalRH = null;
+        if (existingWO2.jobId) {
+          try {
+            const jobForRH = await findJob(existingWO2.jobId);
+            if (jobForRH?.intervalRunningHour) jobIntervalRH = jobForRH.intervalRunningHour;
+          } catch {
+          }
+        }
+        if (!jobIntervalRH && existingWO2.frequencyValue) jobIntervalRH = existingWO2.frequencyValue;
+        missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
+      } else {
+        missedCycles = calculateMissedCycles(
+          existingWO2.nextDueDate || existingWO2.dueDate,
+          completionDateForCalc,
+          existingWO2.frequencyValue,
+          existingWO2.frequencyUnit
+        );
+      }
       if (missedCycles > 0) {
         console.log(`\u26A0\uFE0F Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
+      }
+      const currentTier = existingWO2.approvalTier || "standard";
+      if (currentTier === "superintendent_locked" && lockEnabled) {
+        results.failed.push({
+          id: workOrderId,
+          error: "Work order is LOCKED pending Superintendent acknowledgment and cannot be bulk-approved."
+        });
+        continue;
+      }
+      const tierMinRemarks = currentTier === "superintendent_locked" || currentTier === "superintendent_notification" ? 20 : currentTier === "ce_with_justification" ? 10 : 0;
+      if (tierMinRemarks > 0 && remarks.length < tierMinRemarks) {
+        results.failed.push({
+          id: workOrderId,
+          error: `Work order approval tier requires detailed approver remarks (minimum ${tierMinRemarks} characters).`
+        });
+        continue;
       }
       if (missedCycles >= 1) {
         const justification = (skippedCyclesJustification || "").trim();
@@ -40727,6 +40850,9 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         approvalAction: "approved",
         approver: resolvedApprover,
         approverRemarks,
+        // Parity with the single-approve path: tiered approvals persist the
+        // mandatory remarks in ceApprovalRemarks for the audit trail.
+        ceApprovalRemarks: tierMinRemarks > 0 ? remarks : null,
         skippedCyclesJustification: missedCycles >= 1 && skippedCyclesJustification ? skippedCyclesJustification : null,
         approvalDate: (/* @__PURE__ */ new Date()).toISOString(),
         wasRejected: false
@@ -42035,6 +42161,37 @@ function resolveActorIdentity(req) {
   }
   return void 0;
 }
+var APPROVAL_POLICY_EDITOR_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
+async function getApprovalPolicy(_req, res) {
+  const settings = await storage.getCompanyApprovalSettings();
+  res.json({
+    superintendentLockEnabled: settings?.superintendentLockEnabled ?? true,
+    updatedBy: settings?.updatedBy ?? null,
+    updatedAt: settings?.updatedAt ?? null
+  });
+}
+async function updateApprovalPolicy(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "The approval policy is configured on the shore server and synced to ships." });
+  }
+  const userRole = req.user?.role || "";
+  if (!APPROVAL_POLICY_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may edit the approval policy." });
+  }
+  const { superintendentLockEnabled } = req.body ?? {};
+  if (typeof superintendentLockEnabled !== "boolean") {
+    return res.status(400).json({ error: "superintendentLockEnabled (boolean) is required" });
+  }
+  const username = req.user?.username || null;
+  const saved = await storage.upsertCompanyApprovalSettings({ superintendentLockEnabled, updatedBy: username });
+  console.log(`[ApprovalPolicy] superintendent_lock_enabled set to ${superintendentLockEnabled} by ${username || "unknown"}`);
+  res.json({
+    superintendentLockEnabled: saved.superintendentLockEnabled,
+    updatedBy: saved.updatedBy,
+    updatedAt: saved.updatedAt
+  });
+}
 async function listWorkOrders2(req, res) {
   const vesselId = req.query.vesselId;
   const vesselIdsRaw = req.query.vesselIds;
@@ -42791,6 +42948,8 @@ router5.patch("/work-orders/planner/planned-date", asyncHandler(savePlannedDate2
 router5.patch("/work-orders/planner/bulk-planned-date", asyncHandler(bulkSavePlannedDate2));
 router5.get("/work-orders/planner/export", asyncHandler(exportPlanner));
 router5.post("/work-orders/planner/export", asyncHandler(exportPlannerFromItems));
+router5.get("/approval-policy", asyncHandler(getApprovalPolicy));
+router5.put("/approval-policy", asyncHandler(updateApprovalPolicy));
 router5.get("/work-orders", asyncHandler(listWorkOrders2));
 router5.get("/work-orders/:id", asyncHandler(getWorkOrder2));
 router5.get("/work-orders/:id/context", asyncHandler(getWorkOrderContext2));
@@ -75599,6 +75758,33 @@ import { Router as Router24 } from "express";
 // server/modules/shipskart/services/shipskartSsoService.ts
 init_errors();
 import crypto5 from "crypto";
+
+// server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
+init_db();
+init_schema();
+import { eq as eq27 } from "drizzle-orm";
+async function getAllMappings() {
+  const db2 = await getDb();
+  return db2.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
+}
+async function getMappingForSailRole(sailRole) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(shipskartRoleMappings).where(eq27(shipskartRoleMappings.sailRole, sailRole)).limit(1);
+  return rows[0];
+}
+async function upsertMapping(sailRole, shipskartRole, updatedByUuid) {
+  const db2 = await getDb();
+  await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
+    target: shipskartRoleMappings.sailRole,
+    set: { shipskartRole, updatedByUuid: updatedByUuid ?? null, updatedAt: /* @__PURE__ */ new Date() }
+  });
+}
+async function deleteMapping(sailRole) {
+  const db2 = await getDb();
+  await db2.delete(shipskartRoleMappings).where(eq27(shipskartRoleMappings.sailRole, sailRole));
+}
+
+// server/modules/shipskart/services/shipskartSsoService.ts
 var REQUEST_TIMEOUT_MS = 15e3;
 var ShipskartRoleNotMappedError = class extends Error {
   constructor(userRole) {
@@ -75619,9 +75805,9 @@ function getShipskartConfig() {
   if (!apiKey) missing.push("SHIPSKART_API_KEY");
   if (!hmacSecret) missing.push("SHIPSKART_HMAC_SECRET");
   if (!tenantId) missing.push("SHIPSKART_TENANT_ID");
-  const hasAnyRoleMapping = !!(process.env.SHIPSKART_USER_VESSEL_ADMIN || process.env.SHIPSKART_USER_ADMIN || process.env.SHIPSKART_USER_REGULAR);
+  const hasAnyRoleMapping = !!(process.env.SHIPSKART_USER_CAPTAIN || process.env.SHIPSKART_USER_VESSEL_ADMIN || process.env.SHIPSKART_USER_PURCHASER || process.env.SHIPSKART_USER_ADMIN || process.env.SHIPSKART_USER_MANAGER || process.env.SHIPSKART_USER_REGULAR);
   if (!hasAnyRoleMapping) {
-    missing.push("at least one of SHIPSKART_USER_VESSEL_ADMIN / SHIPSKART_USER_ADMIN / SHIPSKART_USER_REGULAR");
+    missing.push("at least one SHIPSKART_USER_* account (CAPTAIN/PURCHASER/MANAGER or legacy VESSEL_ADMIN/ADMIN/REGULAR)");
   }
   if (missing.length > 0) {
     throw new AppError(
@@ -75686,18 +75872,30 @@ async function signedPost(path14, body) {
   }
   return payload;
 }
-function resolveExternalUserId(userRole) {
-  const roleMap = {
-    "Vessel Admin": process.env.SHIPSKART_USER_VESSEL_ADMIN,
-    "Admin": process.env.SHIPSKART_USER_ADMIN,
-    "User": process.env.SHIPSKART_USER_REGULAR
+function accountForShipskartRole(shipskartRole) {
+  const accounts = {
+    captain: process.env.SHIPSKART_USER_CAPTAIN || process.env.SHIPSKART_USER_VESSEL_ADMIN,
+    purchaser: process.env.SHIPSKART_USER_PURCHASER || process.env.SHIPSKART_USER_ADMIN,
+    manager: process.env.SHIPSKART_USER_MANAGER || process.env.SHIPSKART_USER_REGULAR
   };
-  const externalUserId = roleMap[userRole];
-  return externalUserId ?? null;
+  return accounts[shipskartRole] ?? null;
+}
+async function resolveExternalUserId(userRole) {
+  if (!userRole) return null;
+  const mapping = await getMappingForSailRole(userRole);
+  if (!mapping) return null;
+  const account = accountForShipskartRole(mapping.shipskartRole);
+  if (!account) {
+    console.warn(
+      `[Shipskart] Role '${userRole}' maps to '${mapping.shipskartRole}' but no account env is set (SHIPSKART_USER_${mapping.shipskartRole.toUpperCase()} or its legacy alias) \u2014 blocking SSO.`
+    );
+    return null;
+  }
+  return account;
 }
 async function initiateSso(userRole) {
   const cfg = getShipskartConfig();
-  const externalUserId = resolveExternalUserId(userRole);
+  const externalUserId = await resolveExternalUserId(userRole);
   if (externalUserId === null) {
     throw new ShipskartRoleNotMappedError(userRole);
   }
@@ -75712,7 +75910,7 @@ async function initiateSso(userRole) {
   return result;
 }
 async function logoutSso(userRole) {
-  const externalUserId = resolveExternalUserId(userRole);
+  const externalUserId = await resolveExternalUserId(userRole);
   if (externalUserId === null) {
     return { success: true, message: "No Shipskart mapping for role \u2014 logout skipped" };
   }
@@ -75757,10 +75955,65 @@ async function logoutHandler(req, res) {
   }
 }
 
+// server/modules/shipskart/services/shipskartRoleSource.ts
+async function getAvailableShipskartRoles() {
+  return ["captain", "purchaser", "manager"];
+}
+
+// server/modules/shipskart/controllers/shipskartRoleMappingController.ts
+var EDITOR_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
+async function getRoleMappingsHandler(req, res) {
+  const [availableRoles, rows] = await Promise.all([
+    getAvailableShipskartRoles(),
+    getAllMappings()
+  ]);
+  res.json({
+    availableRoles,
+    mappings: rows.map((r) => ({ sailRole: r.sailRole, shipskartRole: r.shipskartRole }))
+  });
+}
+async function putRoleMappingsHandler(req, res) {
+  const userRole = req.user?.role || "";
+  if (!EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may edit the Shipskart role mapping." });
+  }
+  const mappings = req.body?.mappings;
+  if (!Array.isArray(mappings)) {
+    return res.status(400).json({ error: "mappings[] is required" });
+  }
+  const validRoles = new Set(await getAvailableShipskartRoles());
+  for (const m of mappings) {
+    if (!m || typeof m.sailRole !== "string" || !m.sailRole.trim()) {
+      return res.status(400).json({ error: `every entry needs a sailRole` });
+    }
+    if (m.shipskartRole != null && !validRoles.has(m.shipskartRole)) {
+      return res.status(400).json({
+        error: "invalid_shipskart_role",
+        message: `'${m.shipskartRole}' is not an available Shipskart role (${Array.from(validRoles).join(", ")}).`
+      });
+    }
+  }
+  const updatedBy = req.user?.userUuid || null;
+  for (const m of mappings) {
+    if (m.shipskartRole == null) {
+      await deleteMapping(m.sailRole.trim());
+    } else {
+      await upsertMapping(m.sailRole.trim(), m.shipskartRole, updatedBy);
+    }
+  }
+  const rows = await getAllMappings();
+  res.json({
+    success: true,
+    mappings: rows.map((r) => ({ sailRole: r.sailRole, shipskartRole: r.shipskartRole }))
+  });
+}
+
 // server/modules/shipskart/routes.ts
 var router24 = Router24();
 router24.post("/shipskart/sso/initiate", asyncHandler(initiateHandler));
 router24.post("/shipskart/sso/logout", asyncHandler(logoutHandler));
+router24.get("/shipskart/role-mappings", asyncHandler(getRoleMappingsHandler));
+router24.put("/shipskart/role-mappings", asyncHandler(putRoleMappingsHandler));
 var routes_default24 = router24;
 
 // server/modules/noon-report/routes.ts
@@ -75775,13 +76028,13 @@ init_middleware();
 // server/modules/noon-report/repositories/noonReportRepository.ts
 init_db();
 init_schema();
-import { eq as eq27, and as and24, desc as desc6 } from "drizzle-orm";
+import { eq as eq28, and as and24, desc as desc6 } from "drizzle-orm";
 async function getNoonReports(filters) {
   const db2 = await getDb();
   let query = db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate));
   const conditions = [];
-  if (filters.vesselId) conditions.push(eq27(nrNoonReports.vesselId, filters.vesselId));
-  if (filters.status) conditions.push(eq27(nrNoonReports.status, filters.status));
+  if (filters.vesselId) conditions.push(eq28(nrNoonReports.vesselId, filters.vesselId));
+  if (filters.status) conditions.push(eq28(nrNoonReports.status, filters.status));
   if (conditions.length > 0) {
     return db2.select().from(nrNoonReports).where(and24(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
   }
@@ -75789,7 +76042,7 @@ async function getNoonReports(filters) {
 }
 async function getNoonReportById(id) {
   const db2 = await getDb();
-  const result = await db2.select().from(nrNoonReports).where(eq27(nrNoonReports.id, id)).limit(1);
+  const result = await db2.select().from(nrNoonReports).where(eq28(nrNoonReports.id, id)).limit(1);
   return result[0] || null;
 }
 async function createNoonReport(data) {
@@ -75802,7 +76055,7 @@ async function createNoonReport(data) {
 }
 async function updateNoonReport(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq28(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function submitNoonReport(id, submittedBy) {
@@ -75812,27 +76065,27 @@ async function submitNoonReport(id, submittedBy) {
     submittedAt: /* @__PURE__ */ new Date(),
     submittedBy,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq27(nrNoonReports.id, id)).returning();
+  }).where(eq28(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function deleteNoonReport(id) {
   const db2 = await getDb();
-  await db2.delete(nrNoonReports).where(and24(eq27(nrNoonReports.id, id), eq27(nrNoonReports.status, "draft")));
+  await db2.delete(nrNoonReports).where(and24(eq28(nrNoonReports.id, id), eq28(nrNoonReports.status, "draft")));
 }
 async function saveDraft(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq27(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq28(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function getFuelRobByVessel(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrFuelRob).where(eq27(nrFuelRob.vesselId, vesselId));
+  return db2.select().from(nrFuelRob).where(eq28(nrFuelRob.vesselId, vesselId));
 }
 async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
   const db2 = await getDb();
-  const existing = await db2.select().from(nrFuelRob).where(and24(eq27(nrFuelRob.vesselId, vesselId), eq27(nrFuelRob.fuelType, fuelType))).limit(1);
+  const existing = await db2.select().from(nrFuelRob).where(and24(eq28(nrFuelRob.vesselId, vesselId), eq28(nrFuelRob.fuelType, fuelType))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and24(eq27(nrFuelRob.vesselId, vesselId), eq27(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and24(eq28(nrFuelRob.vesselId, vesselId), eq28(nrFuelRob.fuelType, fuelType)));
   } else {
     await db2.insert(nrFuelRob).values({
       vesselId,
@@ -75844,23 +76097,23 @@ async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
 }
 async function getLastNReports(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and24(eq27(nrNoonReports.vesselId, vesselId), eq27(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and24(eq28(nrNoonReports.vesselId, vesselId), eq28(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
 }
 
 // server/modules/noon-report/services/noonReportService.ts
 init_db();
 init_schema();
-import { eq as eq31, and as and27, desc as desc9, asc as asc6, isNull as isNull5, count } from "drizzle-orm";
+import { eq as eq32, and as and27, desc as desc9, asc as asc6, isNull as isNull5, count } from "drizzle-orm";
 
 // server/modules/noon-report/services/calculationEngine.ts
 init_db();
 init_schema();
-import { eq as eq30, and as and26, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
+import { eq as eq31, and as and26, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
 
 // server/modules/noon-report/utils/existingDataAdapter.ts
 init_db();
 init_schema();
-import { eq as eq28, sql as sql21 } from "drizzle-orm";
+import { eq as eq29, sql as sql21 } from "drizzle-orm";
 async function getVesselById(vesselId) {
   const db2 = await getDb();
   const result = await db2.execute(
@@ -75890,7 +76143,7 @@ async function getVesselDwt(vesselId) {
 init_fuelConversionFactors();
 async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrFuelRob).where(and26(eq30(nrFuelRob.vesselId, vesselId), eq30(nrFuelRob.fuelType, fuelType))).limit(1);
+  const rows = await db2.select().from(nrFuelRob).where(and26(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType))).limit(1);
   if (rows.length === 0) {
     const newRob = Math.max(0, deltaMt);
     await db2.insert(nrFuelRob).values({
@@ -75902,7 +76155,7 @@ async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   } else {
     const current = Number(rows[0].currentRob) || 0;
     const updated = Math.max(0, current + deltaMt);
-    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and26(eq30(nrFuelRob.vesselId, vesselId), eq30(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and26(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType)));
   }
 }
 var PHASE1_STEPS = ["rollingAverages", "ciiTracking", "eeoi"];
@@ -75947,7 +76200,7 @@ async function computeRollingAveragesAndEndurance(report) {
     const cons3 = last3.map((r) => getReportConsumption(r, fuelType)).filter((v) => v !== null);
     const avg7Day = cons7.length > 0 ? cons7.reduce((a, b) => a + b, 0) / cons7.length : null;
     const avg3Day = cons3.length > 0 ? cons3.reduce((a, b) => a + b, 0) / cons3.length : null;
-    const robRows = await db2.select().from(nrFuelRob).where(and26(eq30(nrFuelRob.vesselId, report.vesselId), eq30(nrFuelRob.fuelType, fuelType))).limit(1);
+    const robRows = await db2.select().from(nrFuelRob).where(and26(eq31(nrFuelRob.vesselId, report.vesselId), eq31(nrFuelRob.fuelType, fuelType))).limit(1);
     const robRow = robRows[0] ?? null;
     const currentRob = robRow !== null ? Math.max(0, toNum2(robRow.currentRob) ?? 0) : null;
     let enduranceDays = null;
@@ -75963,7 +76216,7 @@ async function computeRollingAveragesAndEndurance(report) {
         avg7Day: avg7Day !== null ? String(avg7Day) : null,
         enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
         enduranceNm: enduranceNM !== null ? String(enduranceNM) : null
-      }).where(and26(eq30(nrFuelRob.vesselId, report.vesselId), eq30(nrFuelRob.fuelType, fuelType)));
+      }).where(and26(eq31(nrFuelRob.vesselId, report.vesselId), eq31(nrFuelRob.fuelType, fuelType)));
     } else if (avg7Day !== null) {
       await db2.insert(nrFuelRob).values({
         vesselId: report.vesselId,
@@ -75985,8 +76238,8 @@ async function computeCiiTracking(report) {
   const yearEnd = `${year}-12-31`;
   const yearReports = await db2.select().from(nrNoonReports).where(
     and26(
-      eq30(nrNoonReports.vesselId, report.vesselId),
-      eq30(nrNoonReports.status, "submitted"),
+      eq31(nrNoonReports.vesselId, report.vesselId),
+      eq31(nrNoonReports.status, "submitted"),
       gte5(nrNoonReports.reportDate, yearStart),
       lte3(nrNoonReports.reportDate, yearEnd)
     )
@@ -76013,7 +76266,7 @@ async function computeCiiTracking(report) {
     const refLine = computeCiiRefLine(dwt);
     ciiRating = assignCiiRating(aer, refLine);
   }
-  const existing = await db2.select().from(nrCiiTracking).where(and26(eq30(nrCiiTracking.vesselId, report.vesselId), eq30(nrCiiTracking.year, year))).limit(1);
+  const existing = await db2.select().from(nrCiiTracking).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year))).limit(1);
   const previousCiiRating = existing[0]?.ciiRating ?? null;
   if (existing.length > 0) {
     await db2.update(nrCiiTracking).set({
@@ -76024,7 +76277,7 @@ async function computeCiiTracking(report) {
       previousCiiRating,
       // store old rating before overwriting
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(and26(eq30(nrCiiTracking.vesselId, report.vesselId), eq30(nrCiiTracking.year, year)));
+    }).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year)));
   } else {
     await db2.insert(nrCiiTracking).values({
       vesselId: report.vesselId,
@@ -76055,9 +76308,9 @@ async function computeEeoi(report) {
     }
   }
   const eeoi = totalCo2Mt / (cargoMt * distanceSailed);
-  const existing = await db2.select().from(nrVoyageLegs).where(and26(eq30(nrVoyageLegs.vesselId, report.vesselId), eq30(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
+  const existing = await db2.select().from(nrVoyageLegs).where(and26(eq31(nrVoyageLegs.vesselId, report.vesselId), eq31(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq30(nrVoyageLegs.id, existing[0].id));
+    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq31(nrVoyageLegs.id, existing[0].id));
   } else {
     await db2.insert(nrVoyageLegs).values({
       vesselId: report.vesselId,
@@ -76084,7 +76337,7 @@ function getReportConsumption(report, fuelType) {
 }
 async function getLastNSubmitted(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and26(eq30(nrNoonReports.vesselId, vesselId), eq30(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and26(eq31(nrNoonReports.vesselId, vesselId), eq31(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
 }
 function toNum2(val) {
   if (val === null || val === void 0 || val === "") return null;
@@ -76157,7 +76410,7 @@ async function updateFuelRobFromReport(report) {
 }
 async function getFuelDashboard(vesselId) {
   const db2 = await getDb();
-  const robRecords = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, vesselId));
+  const robRecords = await db2.select().from(nrFuelRob).where(eq32(nrFuelRob.vesselId, vesselId));
   const robByFuelType = {};
   const enduranceDaysByFuel = {};
   const avg7DayByFuel = {};
@@ -76188,11 +76441,11 @@ async function getFuelDashboard(vesselId) {
     recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
   }
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and27(eq31(nrCiiTracking.vesselId, vesselId), eq31(nrCiiTracking.year, currentYear))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and27(eq32(nrCiiTracking.vesselId, vesselId), eq32(nrCiiTracking.year, currentYear))).limit(1);
   const ciiTracking = ciiRows[0] ?? null;
   const dwt = await getVesselDwt(vesselId);
   const ciiRefLine = dwt !== null ? computeCiiRefLine(dwt) : null;
-  const last30Raw = await db2.select().from(nrNoonReports).where(and27(eq31(nrNoonReports.vesselId, vesselId), eq31(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
+  const last30Raw = await db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
   const last30 = [...last30Raw].reverse().map((r) => {
     const hfo = toNum3(r.hfoConsumption) ?? 0;
     const lsmgo = toNum3(r.lsmgoConsumption) ?? 0;
@@ -76222,7 +76475,7 @@ async function getFuelDashboard(vesselId) {
     vlsfoConsumption: nrNoonReports.vlsfoConsumption,
     lpgConsumption: nrNoonReports.lpgConsumption,
     reportDate: nrNoonReports.reportDate
-  }).from(nrNoonReports).where(and27(eq31(nrNoonReports.vesselId, vesselId), eq31(nrNoonReports.status, "submitted"))).orderBy(asc6(nrNoonReports.reportDate));
+  }).from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(asc6(nrNoonReports.reportDate));
   const speedConsumptionData = allReports.flatMap((r) => {
     const speed = toNum3(r.speed);
     if (speed === null) return [];
@@ -76256,7 +76509,7 @@ async function getVesselKPIs(vesselId) {
 }
 async function getActiveAlerts(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrAlerts).where(and27(eq31(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
+  return db2.select().from(nrAlerts).where(and27(eq32(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
 }
 async function getAllAlerts(vesselId, page, limit) {
   const db2 = await getDb();
@@ -76264,8 +76517,8 @@ async function getAllAlerts(vesselId, page, limit) {
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * safeLimit;
   const [data, totalRows] = await Promise.all([
-    db2.select().from(nrAlerts).where(eq31(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
-    db2.select({ total: count() }).from(nrAlerts).where(eq31(nrAlerts.vesselId, vesselId))
+    db2.select().from(nrAlerts).where(eq32(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
+    db2.select({ total: count() }).from(nrAlerts).where(eq32(nrAlerts.vesselId, vesselId))
   ]);
   const total = totalRows[0]?.total ?? 0;
   return {
@@ -76278,28 +76531,28 @@ async function getAllAlerts(vesselId, page, limit) {
 }
 async function getActiveAlertCount(vesselId) {
   const db2 = await getDb();
-  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and27(eq31(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and27(eq32(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
   return rows[0]?.total ?? 0;
 }
 async function acknowledgeAlert(alertId, acknowledgedBy) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq31(nrAlerts.id, alertId)).limit(1);
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq32(nrAlerts.id, alertId)).limit(1);
   if (existing.length === 0) return null;
-  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq31(nrAlerts.id, alertId)).returning();
+  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq32(nrAlerts.id, alertId)).returning();
   return updated[0] ?? null;
 }
 async function getFleetSummary(vesselIds) {
   const db2 = await getDb();
   const results = [];
   for (const vesselId of vesselIds) {
-    const latestReports = await db2.select().from(nrNoonReports).where(and27(eq31(nrNoonReports.vesselId, vesselId), eq31(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
+    const latestReports = await db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
     const latest = latestReports[0] ?? null;
-    const allReports = await db2.select().from(nrNoonReports).where(eq31(nrNoonReports.vesselId, vesselId));
+    const allReports = await db2.select().from(nrNoonReports).where(eq32(nrNoonReports.vesselId, vesselId));
     const totalReports = allReports.length;
     const submittedReports = allReports.filter((r) => r.status === "submitted").length;
-    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and27(eq31(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and27(eq32(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
     const activeAlerts = alertRows[0]?.total ?? 0;
-    const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, vesselId));
+    const robRows = await db2.select().from(nrFuelRob).where(eq32(nrFuelRob.vesselId, vesselId));
     const totalHfoRob = toNum3(robRows.find((r) => r.fuelType === "HFO")?.currentRob) ?? 0;
     const totalAllRob = robRows.reduce((acc, r) => acc + (toNum3(r.currentRob) ?? 0), 0);
     const avg7Day = robRows.reduce((acc, r) => acc + (toNum3(r.avg7Day) ?? 0), 0) || null;
@@ -76338,16 +76591,16 @@ function round4(n) {
 // server/modules/noon-report/repositories/bunkerRepository.ts
 init_db();
 init_schema();
-import { eq as eq32, and as and28, desc as desc10, sum } from "drizzle-orm";
+import { eq as eq33, and as and28, desc as desc10, sum } from "drizzle-orm";
 async function getBunkerRecords(filters) {
   const db2 = await getDb();
-  const conditions = [eq32(nrBunkerRecords.vesselId, filters.vesselId)];
-  if (filters.voyageNo) conditions.push(eq32(nrBunkerRecords.voyageNo, filters.voyageNo));
+  const conditions = [eq33(nrBunkerRecords.vesselId, filters.vesselId)];
+  if (filters.voyageNo) conditions.push(eq33(nrBunkerRecords.voyageNo, filters.voyageNo));
   return db2.select().from(nrBunkerRecords).where(and28(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
 }
 async function getBunkerRecordById(id) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrBunkerRecords).where(eq32(nrBunkerRecords.id, id)).limit(1);
+  const rows = await db2.select().from(nrBunkerRecords).where(eq33(nrBunkerRecords.id, id)).limit(1);
   return rows[0] ?? null;
 }
 async function createBunkerRecord(data) {
@@ -76357,17 +76610,17 @@ async function createBunkerRecord(data) {
 }
 async function updateBunkerRecord(id, data) {
   const db2 = await getDb();
-  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq32(nrBunkerRecords.id, id)).returning();
+  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq33(nrBunkerRecords.id, id)).returning();
   return rows[0] ?? null;
 }
 async function deleteBunkerRecord(id) {
   const db2 = await getDb();
-  await db2.delete(nrBunkerRecords).where(eq32(nrBunkerRecords.id, id));
+  await db2.delete(nrBunkerRecords).where(eq33(nrBunkerRecords.id, id));
 }
 async function getBunkerCostSummary(vesselId, voyageNo) {
   const db2 = await getDb();
-  const conditions = [eq32(nrBunkerRecords.vesselId, vesselId)];
-  if (voyageNo) conditions.push(eq32(nrBunkerRecords.voyageNo, voyageNo));
+  const conditions = [eq33(nrBunkerRecords.vesselId, vesselId)];
+  if (voyageNo) conditions.push(eq33(nrBunkerRecords.voyageNo, voyageNo));
   const rows = await db2.select({
     fuelType: nrBunkerRecords.fuelType,
     totalQuantityMt: sum(nrBunkerRecords.quantityMt),
