@@ -457,6 +457,7 @@ __export(schema_exports, {
   changeRequestApproval: () => changeRequestApproval,
   changeRequestAttachment: () => changeRequestAttachment,
   changeRequestComment: () => changeRequestComment,
+  companyApprovalSettings: () => companyApprovalSettings,
   companyStandardGraceSettings: () => companyStandardGraceSettings,
   componentClassRegulatory: () => componentClassRegulatory,
   componentDocuments: () => componentDocuments,
@@ -676,7 +677,7 @@ import { pgTable as pgTable2, text as text2, integer as integer2, boolean as boo
 import { sql as sql2 } from "drizzle-orm";
 import { createInsertSchema as createInsertSchema2 } from "drizzle-zod";
 import { z } from "zod";
-var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
+var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -3000,6 +3001,16 @@ var init_schema = __esm({
       singletonKey: true,
       createdAt: true,
       updatedAt: true
+    });
+    companyApprovalSettings = pgTable2("company_approval_settings", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      singletonKey: text2("singleton_key").notNull().unique().default("ACTIVE"),
+      superintendentLockEnabled: boolean2("superintendent_lock_enabled").notNull().default(true),
+      updatedBy: text2("updated_by"),
+      createdAt: timestamp3("created_at").defaultNow(),
+      updatedAt: updatedAtColumn(),
+      // Required by the provisioning exporter / one-way sync filters (see mig 137).
+      isDeleted: boolean2("is_deleted").default(false)
     });
     makerList = pgTable2("maker_list", {
       id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -5452,6 +5463,18 @@ var init_syncConfig = __esm({
         isConfigurable: false,
         businessRules: null,
         notes: "Company-wide grace period settings. Single-row global config. Integer PK, no UUID."
+      },
+      company_approval_settings: {
+        tableName: "company_approval_settings",
+        category: "ONE_WAY_SHORE_TO_SHIP",
+        direction: "shore_to_ship",
+        identityColumn: "singleton_key",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Company approval policy (superintendent lock toggle, migration 137). Single-row global config, shore-configured. Integer PK, no UUID."
       },
       pms_vessel_settings: {
         tableName: "pms_vessel_settings",
@@ -24559,6 +24582,22 @@ var init_postgresStorage = __esm({
           return result[0];
         }
       }
+      async getCompanyApprovalSettings() {
+        const db2 = await getDb();
+        const result = await db2.select().from(companyApprovalSettings).limit(1);
+        return result[0];
+      }
+      async upsertCompanyApprovalSettings(settings) {
+        const db2 = await getDb();
+        const existing = await db2.select().from(companyApprovalSettings).limit(1);
+        if (existing.length > 0) {
+          const result = await db2.update(companyApprovalSettings).set({ superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(companyApprovalSettings.id, existing[0].id)).returning();
+          return result[0];
+        } else {
+          const result = await db2.insert(companyApprovalSettings).values({ singletonKey: "ACTIVE", superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null }).returning();
+          return result[0];
+        }
+      }
       // ============= FLEET MANAGEMENT =============
       async getAllFleets() {
         const db2 = await getDb();
@@ -31239,6 +31278,7 @@ __export(workOrderService_exports, {
   getScopedOperationData: () => getScopedOperationData,
   getWorkOrder: () => getWorkOrder,
   getWorkOrdersWithComputedStatus: () => getWorkOrdersWithComputedStatus,
+  isSuperintendentLockEnabled: () => isSuperintendentLockEnabled,
   listWorkOrders: () => listWorkOrders,
   listWorkOrdersPaged: () => listWorkOrdersPaged,
   rejectCompletedWorkOrder: () => rejectCompletedWorkOrder,
@@ -31313,7 +31353,16 @@ function calculateBackdatingDaysForApproval(completionDate, submittedDate) {
   const diffMs = reference.getTime() - comp.getTime();
   return Math.max(0, Math.floor(diffMs / (1e3 * 60 * 60 * 24)));
 }
-function calculateApprovalTier(dueDate, completionDate, missedCycles, backdatingDays = 0) {
+async function isSuperintendentLockEnabled() {
+  try {
+    const settings = await storage.getCompanyApprovalSettings();
+    return settings?.superintendentLockEnabled ?? true;
+  } catch (err) {
+    console.warn(`[ApprovalPolicy] Could not read company approval settings (defaulting to lock ENABLED): ${err.message}`);
+    return true;
+  }
+}
+function calculateApprovalTier(dueDate, completionDate, missedCycles, backdatingDays = 0, superintendentLockEnabled = true) {
   let daysLate = 0;
   const due = parseWorkOrderDate(dueDate);
   const comp = parseWorkOrderDate(completionDate);
@@ -31326,10 +31375,16 @@ function calculateApprovalTier(dueDate, completionDate, missedCycles, backdating
   let superintendentAcknowledged = false;
   let approvalBlockReason = null;
   if (missedCycles >= 3 || daysLate >= 21 || backdatingDays >= 7) {
-    approvalTier = "superintendent_locked";
-    superintendentAcknowledged = false;
-    superintendentNotifiedAt = (/* @__PURE__ */ new Date()).toISOString();
-    approvalBlockReason = "Awaiting Superintendent acknowledgment";
+    if (superintendentLockEnabled) {
+      approvalTier = "superintendent_locked";
+      superintendentAcknowledged = false;
+      superintendentNotifiedAt = (/* @__PURE__ */ new Date()).toISOString();
+      approvalBlockReason = "Awaiting Superintendent acknowledgment";
+    } else {
+      approvalTier = "superintendent_notification";
+      superintendentNotifiedAt = (/* @__PURE__ */ new Date()).toISOString();
+      superintendentAcknowledged = false;
+    }
   } else if (missedCycles === 2 || daysLate >= 14 && daysLate < 21 || backdatingDays >= 3 && backdatingDays < 7) {
     approvalTier = "superintendent_notification";
     superintendentNotifiedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -32109,7 +32164,8 @@ async function updateWorkOrder(id, body) {
       tierCompDate,
       updateData.submittedDate || existingWO2.submittedDate
     );
-    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays);
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled();
+    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
     updateData.superintendentNotifiedAt = tierResult.superintendentNotifiedAt;
@@ -32190,10 +32246,19 @@ async function updateWorkOrder(id, body) {
     const currentTier = existingWO2.approvalTier || "standard";
     const ceRemarks = (updateData.ceApprovalRemarks || "").trim();
     if (currentTier === "superintendent_locked") {
-      throw new ValidationError(
-        `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
-        { code: "SUPERINTENDENT_LOCKED" }
-      );
+      const lockEnabled = await isSuperintendentLockEnabled();
+      if (lockEnabled) {
+        throw new ValidationError(
+          `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
+          { code: "SUPERINTENDENT_LOCKED" }
+        );
+      }
+      if (!ceRemarks || ceRemarks.length < 20) {
+        throw new ValidationError(
+          `This work order has high severity issues and the Superintendent lock is disabled by company policy. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
+          { code: "CE_REMARKS_REQUIRED", minLength: 20 }
+        );
+      }
     }
     if (currentTier === "superintendent_notification") {
       if (!ceRemarks || ceRemarks.length < 20) {
@@ -40669,6 +40734,7 @@ init_dateUtils();
 init_hodResolutionService();
 init_complianceAnomalyService();
 init_sync();
+init_workOrderService2();
 async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCyclesJustification) {
   if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
     throw new ValidationError("workOrderIds array is required");
@@ -40678,6 +40744,8 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
     success: [],
     failed: []
   };
+  const lockEnabled = await isSuperintendentLockEnabled();
+  const remarks = (approverRemarks || "").trim();
   for (const workOrderId of workOrderIds) {
     try {
       const existingWO2 = await findById3(workOrderId);
@@ -40715,14 +40783,46 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         nextDueReading = (parseInt(existingWO2.currentReading) + parseInt(existingWO2.frequencyValue || "0")).toString();
       }
       const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
-      const missedCycles = existingWO2.maintenanceBasis === "Running Hours" ? 0 : calculateMissedCycles(
-        existingWO2.nextDueDate || existingWO2.dueDate,
-        completionDateForCalc,
-        existingWO2.frequencyValue,
-        existingWO2.frequencyUnit
-      );
+      let missedCycles;
+      if (existingWO2.maintenanceBasis === "Running Hours") {
+        const completionRHValue = existingWO2.completionRH;
+        const dueRH = existingWO2.nextDueReading ?? null;
+        let jobIntervalRH = null;
+        if (existingWO2.jobId) {
+          try {
+            const jobForRH = await findJob(existingWO2.jobId);
+            if (jobForRH?.intervalRunningHour) jobIntervalRH = jobForRH.intervalRunningHour;
+          } catch {
+          }
+        }
+        if (!jobIntervalRH && existingWO2.frequencyValue) jobIntervalRH = existingWO2.frequencyValue;
+        missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
+      } else {
+        missedCycles = calculateMissedCycles(
+          existingWO2.nextDueDate || existingWO2.dueDate,
+          completionDateForCalc,
+          existingWO2.frequencyValue,
+          existingWO2.frequencyUnit
+        );
+      }
       if (missedCycles > 0) {
         console.log(`\u26A0\uFE0F Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
+      }
+      const currentTier = existingWO2.approvalTier || "standard";
+      if (currentTier === "superintendent_locked" && lockEnabled) {
+        results.failed.push({
+          id: workOrderId,
+          error: "Work order is LOCKED pending Superintendent acknowledgment and cannot be bulk-approved."
+        });
+        continue;
+      }
+      const tierMinRemarks = currentTier === "superintendent_locked" || currentTier === "superintendent_notification" ? 20 : currentTier === "ce_with_justification" ? 10 : 0;
+      if (tierMinRemarks > 0 && remarks.length < tierMinRemarks) {
+        results.failed.push({
+          id: workOrderId,
+          error: `Work order approval tier requires detailed approver remarks (minimum ${tierMinRemarks} characters).`
+        });
+        continue;
       }
       if (missedCycles >= 1) {
         const justification = (skippedCyclesJustification || "").trim();
@@ -40750,6 +40850,9 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         approvalAction: "approved",
         approver: resolvedApprover,
         approverRemarks,
+        // Parity with the single-approve path: tiered approvals persist the
+        // mandatory remarks in ceApprovalRemarks for the audit trail.
+        ceApprovalRemarks: tierMinRemarks > 0 ? remarks : null,
         skippedCyclesJustification: missedCycles >= 1 && skippedCyclesJustification ? skippedCyclesJustification : null,
         approvalDate: (/* @__PURE__ */ new Date()).toISOString(),
         wasRejected: false
@@ -42058,6 +42161,37 @@ function resolveActorIdentity(req) {
   }
   return void 0;
 }
+var APPROVAL_POLICY_EDITOR_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
+async function getApprovalPolicy(_req, res) {
+  const settings = await storage.getCompanyApprovalSettings();
+  res.json({
+    superintendentLockEnabled: settings?.superintendentLockEnabled ?? true,
+    updatedBy: settings?.updatedBy ?? null,
+    updatedAt: settings?.updatedAt ?? null
+  });
+}
+async function updateApprovalPolicy(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "The approval policy is configured on the shore server and synced to ships." });
+  }
+  const userRole = req.user?.role || "";
+  if (!APPROVAL_POLICY_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may edit the approval policy." });
+  }
+  const { superintendentLockEnabled } = req.body ?? {};
+  if (typeof superintendentLockEnabled !== "boolean") {
+    return res.status(400).json({ error: "superintendentLockEnabled (boolean) is required" });
+  }
+  const username = req.user?.username || null;
+  const saved = await storage.upsertCompanyApprovalSettings({ superintendentLockEnabled, updatedBy: username });
+  console.log(`[ApprovalPolicy] superintendent_lock_enabled set to ${superintendentLockEnabled} by ${username || "unknown"}`);
+  res.json({
+    superintendentLockEnabled: saved.superintendentLockEnabled,
+    updatedBy: saved.updatedBy,
+    updatedAt: saved.updatedAt
+  });
+}
 async function listWorkOrders2(req, res) {
   const vesselId = req.query.vesselId;
   const vesselIdsRaw = req.query.vesselIds;
@@ -42814,6 +42948,8 @@ router5.patch("/work-orders/planner/planned-date", asyncHandler(savePlannedDate2
 router5.patch("/work-orders/planner/bulk-planned-date", asyncHandler(bulkSavePlannedDate2));
 router5.get("/work-orders/planner/export", asyncHandler(exportPlanner));
 router5.post("/work-orders/planner/export", asyncHandler(exportPlannerFromItems));
+router5.get("/approval-policy", asyncHandler(getApprovalPolicy));
+router5.put("/approval-policy", asyncHandler(updateApprovalPolicy));
 router5.get("/work-orders", asyncHandler(listWorkOrders2));
 router5.get("/work-orders/:id", asyncHandler(getWorkOrder2));
 router5.get("/work-orders/:id/context", asyncHandler(getWorkOrderContext2));
