@@ -291,7 +291,7 @@ export default function DefectsLogWithTabs() {
   const [, setLocation] = useLocation();
   const { currentUser } = useAuth();
   const { toast } = useToast();
-  const { isClientAdmin } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isTechSuperintendent, isHeadOfDept, isVessel, isExternal } = useUIRole();
   const [filters, setFilters] = useState<DefectsFilters>({});
   const [vesselFilterValue, setVesselFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
   const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
@@ -543,13 +543,11 @@ export default function DefectsLogWithTabs() {
   }, [filteredDefects, currentPage, pageSize]);
   
   const canEdit = () => {
-    const role = currentUser?.role || '';
-    return ["Master", "Chief Engineer", "Superintendent", "Admin", "Ship", "Office", "PMS Admin", "Sail Admin"].includes(role);
+    return isSailAdmin || isClientAdmin || isTechSuperintendent || isHeadOfDept || isVessel;
   };
   
   const canLink = () => {
-    const role = currentUser?.role || '';
-    return ["Chief Engineer", "Superintendent", "Admin", "Office", "PMS Admin", "Sail Admin"].includes(role);
+    return isSailAdmin || isClientAdmin || isTechSuperintendent || isHeadOfDept;
   };
   
   const handleViewClick = (defect: Defect) => {
@@ -597,8 +595,7 @@ export default function DefectsLogWithTabs() {
   };
   
   const canVerify = () => {
-    const role = currentUser?.role || '';
-    return ['Office', 'PMS Admin', 'Sail Admin', 'Client Admin', 'Superintendent'].includes(role);
+    return isSailAdmin || isClientAdmin || isTechSuperintendent;
   };
   
   const verifyMutation = useMutation({

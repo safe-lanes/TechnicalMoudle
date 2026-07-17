@@ -30,6 +30,7 @@ import { getSireReferencesByVersion } from "@/data/sireReferences";
 import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
 import { VesselComponentCombobox, type VesselComponentSelection } from "@/components/VesselComponentCombobox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 const defectFormSchema = insertDefectSchema.extend({
   critical: z.boolean().optional(),
@@ -73,6 +74,7 @@ export default function DefectFormWizard({
   console.log('[DefectFormWizard] Rendering with mode:', mode, 'defect:', defect?.id);
   const { toast } = useToast();
   const { currentUser } = useAuth();
+  const { isSailAdmin, isClientAdmin, isTechSuperintendent } = useUIRole();
   const { data: vessels = [] } = useVessels();
   
   // Fetch equipment categories from database
@@ -605,7 +607,7 @@ export default function DefectFormWizard({
   };
 
   // Roles permitted to verify defects (must match DefectsLogWithTabs canVerify)
-  const canVerify = ['Office', 'PMS Admin', 'Sail Admin', 'Client Admin', 'Superintendent'].includes(currentUser?.role || '');
+  const canVerify = isSailAdmin || isClientAdmin || isTechSuperintendent;
 
   // C2 Verification auto-fill handler for Office, PMS Admin, Sail Admin, Client Admin, and Superintendent users
   const handleVerifiedChange = (checked: boolean | "indeterminate", fieldOnChange: (value: boolean) => void) => {
@@ -619,8 +621,8 @@ export default function DefectFormWizard({
       crewDesignation: currentUser?.crewDesignation 
     });
     
-    // Auto-fill for Office, PMS Admin, Sail Admin, Client Admin, and Superintendent users when checkbox is checked
-    const canAutoFill = ['Office', 'PMS Admin', 'Sail Admin', 'Client Admin', 'Superintendent'].includes(currentUser?.role || '');
+    // Auto-fill for Sail Admin, Client Admin, and Superintendent users when checkbox is checked
+    const canAutoFill = isSailAdmin || isClientAdmin || isTechSuperintendent;
     if (isChecked && canAutoFill) {
       const today = new Date().toISOString().split('T')[0];
       console.log('[C2 Auto-fill] Applying auto-fill values:', { 
