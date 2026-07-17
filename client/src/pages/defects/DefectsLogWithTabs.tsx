@@ -598,7 +598,7 @@ export default function DefectsLogWithTabs() {
   
   const canVerify = () => {
     const role = currentUser?.role || '';
-    return ['Office', 'PMS Admin', 'Sail Admin'].includes(role);
+    return ['Office', 'PMS Admin', 'Sail Admin', 'Client Admin', 'Superintendent'].includes(role);
   };
   
   const verifyMutation = useMutation({
