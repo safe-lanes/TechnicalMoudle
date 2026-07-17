@@ -604,6 +604,9 @@ export default function DefectFormWizard({
     setIsViewMode(!isViewMode);
   };
 
+  // Roles permitted to verify defects (must match DefectsLogWithTabs canVerify)
+  const canVerify = ['Office', 'PMS Admin', 'Sail Admin', 'Client Admin', 'Superintendent'].includes(currentUser?.role || '');
+
   // C2 Verification auto-fill handler for Office, PMS Admin, Sail Admin, Client Admin, and Superintendent users
   const handleVerifiedChange = (checked: boolean | "indeterminate", fieldOnChange: (value: boolean) => void) => {
     const isChecked = checked === true;
@@ -2171,7 +2174,7 @@ export default function DefectFormWizard({
                               id="verified"
                               checked={field.value || false}
                               onCheckedChange={(checked) => handleVerifiedChange(checked, field.onChange)}
-                              disabled={isViewMode}
+                              disabled={isViewMode || !canVerify}
                               data-testid="checkbox-verified"
                             />
                           )}
