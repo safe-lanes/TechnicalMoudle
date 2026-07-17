@@ -41,12 +41,24 @@ export function RoleSwitcher() {
         {VISIBLE_UI_ROLES.map((role) => (
           <DropdownMenuItem
             key={role}
-            className={`flex items-center justify-between ${uiRole === role ? "cursor-default font-medium" : "cursor-default opacity-50"}`}
+            className={`flex items-center justify-between ${
+              uiRole === role
+                ? "cursor-default font-medium"
+                : import.meta.env.DEV
+                  ? "cursor-pointer"
+                  : "cursor-default opacity-50"
+            }`}
             data-testid={`menu-role-${role.toLowerCase().replace("_", "-")}`}
-            onSelect={(e) => e.preventDefault()}
+            onSelect={(e) => {
+              if (!import.meta.env.DEV) { e.preventDefault(); return; }
+              setUIRole(role as import("@shared/uiRoles").UIRole);
+            }}
           >
             <span>{UI_ROLE_LABELS[role]}</span>
             {uiRole === role && <Check className="h-4 w-4 text-green-600" />}
+            {import.meta.env.DEV && uiRole !== role && (
+              <span className="text-[10px] text-orange-400 font-mono ml-1">DEV</span>
+            )}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
