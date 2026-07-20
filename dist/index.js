@@ -20471,11 +20471,64 @@ var init_postgresStorage = __esm({
         if (updateData.ihmPresence === "YES" && !updateData.ihm) updateData.ihm = "Yes";
         else if (updateData.ihmPresence === "NO" && !updateData.ihm) updateData.ihm = "No";
         const numId = Number(id);
-        const result = await db2.update(spares).set(updateData).where(or(eq3(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq3(spares.id, numId)] : [])).returning();
-        if (!result[0]) {
-          throw new Error(`Spare ${id} not found`);
+        const robChanged = data.rob !== void 0 || data.robLocationA !== void 0 || data.robLocationB !== void 0;
+        const locationChanged = data.location !== void 0 || data.location2 !== void 0;
+        const needsStockSync = (robChanged || locationChanged) && !!(existingSpare?.vesselId || data.vesselId);
+        if (robChanged && existingSpare) {
+          const effB = data.robLocationB !== void 0 ? data.robLocationB ?? 0 : existingSpare.robLocationB ?? 0;
+          let effA;
+          if (data.robLocationA !== void 0) {
+            effA = data.robLocationA ?? 0;
+          } else if (data.rob !== void 0) {
+            effA = Math.max(0, (data.rob ?? 0) - effB);
+          } else {
+            effA = existingSpare.robLocationA ?? 0;
+          }
+          updateData.robLocationA = effA;
+          updateData.robLocationB = effB;
+          updateData.rob = effA + effB;
         }
-        const updatedSpare = result[0];
+        let stockTargets = [];
+        let effectiveSpare = null;
+        if (needsStockSync && existingSpare) {
+          effectiveSpare = { ...existingSpare, ...data };
+          stockTargets = await this.resolveLegacyStockTargets(effectiveSpare);
+        }
+        const updatedSpare = await db2.transaction(async (tx) => {
+          const result = await tx.update(spares).set(updateData).where(or(eq3(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq3(spares.id, numId)] : [])).returning();
+          if (!result[0]) {
+            throw new Error(`Spare ${id} not found`);
+          }
+          const updated = result[0];
+          if (needsStockSync && effectiveSpare) {
+            await this.syncLegacyRobToLocationStockTx(
+              tx,
+              { ...effectiveSpare, id: updated.id, suuid: updated.suuid },
+              stockTargets,
+              updated.robLocationA ?? 0,
+              updated.robLocationB ?? 0
+            );
+            if (locationChanged && stockTargets.length > 0) {
+              const activeLocationIds = stockTargets.map((t) => t.locationId);
+              const allStockRows = await tx.select().from(spareLocationStock).where(eq3(spareLocationStock.spareId, updated.id));
+              for (const row of allStockRows) {
+                if (activeLocationIds.includes(row.locationId)) continue;
+                const evidence = await tx.select({ id: inventoryTransactions.id }).from(inventoryTransactions).where(and3(
+                  eq3(inventoryTransactions.spareId, updated.id),
+                  eq3(inventoryTransactions.locationId, row.locationId)
+                )).limit(1);
+                if (evidence.length > 0) continue;
+                await tx.delete(spareLocationStock).where(
+                  and3(
+                    eq3(spareLocationStock.spareId, updated.id),
+                    eq3(spareLocationStock.locationId, row.locationId)
+                  )
+                );
+              }
+            }
+          }
+          return updated;
+        });
         if (existingSpare) {
           try {
             await logFieldChanges("spares", existingSpare.suuid, existingSpare.vesselId || null, existingSpare, updatedSpare, data.updatedBy || "system");
@@ -20500,61 +20553,6 @@ var init_postgresStorage = __esm({
             console.warn(`[updateSpare] Failed to create spare_component_link for spare ${id} \u2192 component ${data.componentId}: ${linkError.message}`);
           }
         }
-        const robChanged = data.robLocationA !== void 0 || data.robLocationB !== void 0;
-        const locationChanged = data.location !== void 0 || data.location2 !== void 0;
-        if ((robChanged || locationChanged) && updatedSpare.vesselId) {
-          const vesselId = updatedSpare.vesselId;
-          const robA = updatedSpare.robLocationA ?? 0;
-          const robB = updatedSpare.robLocationB ?? 0;
-          if (updatedSpare.location) {
-            try {
-              const locationAObj = await this.findLocationStrict(vesselId, updatedSpare.location);
-              await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationAObj.id, qty: robA });
-            } catch (syncError) {
-              console.warn(`[updateSpare] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-            }
-          }
-          if (updatedSpare.location2) {
-            try {
-              const locationBObj = await this.findLocationStrict(vesselId, updatedSpare.location2);
-              await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationBObj.id, qty: robB });
-            } catch (syncError) {
-              console.warn(`[updateSpare] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-            }
-          }
-          const activeLocationIds = [];
-          if (updatedSpare.location) {
-            try {
-              const locA = await this.findLocationStrict(vesselId, updatedSpare.location);
-              activeLocationIds.push(locA.id);
-            } catch (_) {
-            }
-          }
-          if (updatedSpare.location2) {
-            try {
-              const locB = await this.findLocationStrict(vesselId, updatedSpare.location2);
-              activeLocationIds.push(locB.id);
-            } catch (_) {
-            }
-          }
-          try {
-            const allStockRows = await this.getSpareLocationStock(updatedSpare.id);
-            const orphanedRows = allStockRows.filter((r) => !activeLocationIds.includes(r.locationId));
-            for (const orphan of orphanedRows) {
-              await db2.delete(spareLocationStock).where(
-                and3(
-                  eq3(spareLocationStock.spareId, updatedSpare.id),
-                  eq3(spareLocationStock.locationId, orphan.locationId)
-                )
-              );
-            }
-            if (orphanedRows.length > 0) {
-              console.log(`[updateSpare] Cleaned up ${orphanedRows.length} orphaned spare_location_stock entries for spare ${id}`);
-            }
-          } catch (cleanupError) {
-            console.warn(`[updateSpare] Failed to cleanup orphaned spare_location_stock for spare ${id}: ${cleanupError.message}`);
-          }
-        }
         return updatedSpare;
       }
       async deleteSpare(id) {
@@ -20570,6 +20568,53 @@ var init_postgresStorage = __esm({
           }
         }
       }
+      /**
+       * Resolve the location rows that a spare's legacy location/location2 text labels map to.
+       * Read-only; safe to call before opening a transaction.
+       */
+      async resolveLegacyStockTargets(spare) {
+        const vesselId = spare.vesselId || "V001";
+        const targets = [];
+        if (spare.location && spare.location.trim() !== "") {
+          try {
+            const locA = await this.findLocationStrict(vesselId, spare.location);
+            targets.push({ locationId: locA.id, which: "A" });
+          } catch (e) {
+            throw new Error(
+              `Data integrity error: spare ${spare.id} (${spare.partName}) has Location A "${spare.location}" which does not match any location for vessel ${vesselId}. Fix the spare's location before changing stock. (${e.message})`
+            );
+          }
+        }
+        if (spare.location2 && spare.location2.trim() !== "") {
+          try {
+            const locB = await this.findLocationStrict(vesselId, spare.location2);
+            targets.push({ locationId: locB.id, which: "B" });
+          } catch (e) {
+            throw new Error(
+              `Data integrity error: spare ${spare.id} (${spare.partName}) has Location B "${spare.location2}" which does not match any location for vessel ${vesselId}. Fix the spare's location before changing stock. (${e.message})`
+            );
+          }
+        }
+        return targets;
+      }
+      /**
+       * Single transactional core for keeping spare_location_stock in lockstep with the
+       * legacy spares.rob_location_a/b columns. MUST be called INSIDE the same DB
+       * transaction that updates the legacy columns, with pre-resolved targets, so the
+       * two representations can never diverge on a partial failure.
+       */
+      async syncLegacyRobToLocationStockTx(tx, spare, targets, newRobA, newRobB) {
+        const vesselId = spare.vesselId || "V001";
+        for (const t of targets) {
+          await this.upsertSpareLocationStock({
+            vesselId,
+            spareId: spare.id,
+            spareUuid: spare.suuid,
+            locationId: t.locationId,
+            qty: Math.max(0, t.which === "A" ? newRobA : newRobB)
+          }, tx);
+        }
+      }
       async consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz) {
         const db2 = await getDb();
         const spare = await this.getSpare(id);
@@ -20578,6 +20623,7 @@ var init_postgresStorage = __esm({
         }
         const newRob = (spare.rob ?? 0) - quantity;
         const newRobA = (spare.robLocationA ?? 0) - quantity;
+        const stockTargets = await this.resolveLegacyStockTargets(spare);
         const updated = await db2.transaction(async (tx) => {
           const result = await tx.update(spares).set({
             rob: newRob,
@@ -20605,27 +20651,19 @@ var init_postgresStorage = __esm({
             tz: tz ?? null,
             place: place ?? null
           }, tx);
+          await this.syncLegacyRobToLocationStockTx(
+            tx,
+            spare,
+            stockTargets,
+            newRobA < 0 ? 0 : newRobA,
+            spare.robLocationB ?? 0
+          );
           return result[0];
         });
         try {
           await logFieldChanges("spares", spare.suuid, spare.vesselId || null, spare, updated, userId);
         } catch (err) {
           console.error("[FieldLogger] Spare consume:", err);
-        }
-        const vesselId = spare.vesselId || "V001";
-        if (spare.location) {
-          try {
-            const locationA = await this.findLocationStrict(vesselId, spare.location);
-            await this.upsertSpareLocationStock({
-              vesselId,
-              spareId: spare.id,
-              spareUuid: spare.suuid,
-              locationId: locationA.id,
-              qty: newRobA < 0 ? 0 : newRobA
-            });
-          } catch (syncError) {
-            console.warn(`[consumeSpare] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-          }
         }
         return updated;
       }
@@ -20649,6 +20687,7 @@ var init_postgresStorage = __esm({
           newRobB = Math.max(0, currentRobB - deducted);
         }
         const newRob = Math.max(0, currentRob - deducted);
+        const stockTargets = await this.resolveLegacyStockTargets(spare);
         const txResult = await db2.transaction(async (tx) => {
           const result = await tx.update(spares).set({
             rob: newRob,
@@ -20677,29 +20716,13 @@ var init_postgresStorage = __esm({
             tz: null,
             place: null
           }, tx);
+          await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newRobA, newRobB);
           return result[0];
         });
         try {
           await logFieldChanges("spares", spare.suuid, spare.vesselId || null, spare, txResult, userId);
         } catch (err) {
           console.error("[FieldLogger] Spare consumeFromLocation:", err);
-        }
-        const vesselId = spare.vesselId || "V001";
-        if (spare.location) {
-          try {
-            const locationAObj = await this.findLocationStrict(vesselId, spare.location);
-            await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newRobA });
-          } catch (syncError) {
-            console.warn(`[consumeSpareFromLocation] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-          }
-        }
-        if (spare.location2) {
-          try {
-            const locationBObj = await this.findLocationStrict(vesselId, spare.location2);
-            await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newRobB });
-          } catch (syncError) {
-            console.warn(`[consumeSpareFromLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-          }
         }
         return {
           spare: txResult,
@@ -20725,6 +20748,7 @@ var init_postgresStorage = __esm({
           newRobB = currentRobB + quantity;
         }
         const newRob = currentRob + quantity;
+        const stockTargets = await this.resolveLegacyStockTargets(spare);
         const updated = await db2.transaction(async (tx) => {
           const result = await tx.update(spares).set({
             rob: newRob,
@@ -20754,29 +20778,13 @@ var init_postgresStorage = __esm({
             tz: null,
             place: null
           }, tx);
+          await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newRobA, newRobB);
           return result[0];
         });
         try {
           await logFieldChanges("spares", spare.suuid, spare.vesselId || null, spare, updated, userId);
         } catch (err) {
           console.error("[FieldLogger] Spare receiveToLocation:", err);
-        }
-        const vesselId = spare.vesselId || "V001";
-        if (spare.location) {
-          try {
-            const locationAObj = await this.findLocationStrict(vesselId, spare.location);
-            await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newRobA });
-          } catch (syncError) {
-            console.warn(`[receiveSpareToLocation] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-          }
-        }
-        if (spare.location2) {
-          try {
-            const locationBObj = await this.findLocationStrict(vesselId, spare.location2);
-            await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newRobB });
-          } catch (syncError) {
-            console.warn(`[receiveSpareToLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-          }
         }
         return {
           spare: updated,
@@ -20808,6 +20816,7 @@ var init_postgresStorage = __esm({
           return spare;
         }
         const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === "A" ? oldLocA : oldLocB}\u2192${newRob}`;
+        const stockTargets = await this.resolveLegacyStockTargets(spare);
         const updated = await db2.transaction(async (tx) => {
           const result = await tx.update(spares).set({
             rob: newTotal,
@@ -20836,29 +20845,13 @@ var init_postgresStorage = __esm({
             tz: tz ?? null,
             place: place ?? null
           }, tx);
+          await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newLocA, newLocB);
           return result[0];
         });
         try {
           await logFieldChanges("spares", spare.suuid, spare.vesselId || null, spare, updated, userId);
         } catch (err) {
           console.error("[FieldLogger] Spare adjustAtLocation:", err);
-        }
-        const vesselId = spare.vesselId || "V001";
-        if (spare.location) {
-          try {
-            const locationAObj = await this.findLocationStrict(vesselId, spare.location);
-            await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newLocA });
-          } catch (syncError) {
-            console.warn(`[adjustSpareAtLocation] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-          }
-        }
-        if (spare.location2) {
-          try {
-            const locationBObj = await this.findLocationStrict(vesselId, spare.location2);
-            await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newLocB });
-          } catch (syncError) {
-            console.warn(`[adjustSpareAtLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-          }
         }
         return updated;
       }
@@ -20886,6 +20879,7 @@ var init_postgresStorage = __esm({
         const newTotalRob = newLocA + newLocB;
         const oldTotalRob = oldLocA + oldLocB;
         const isTrueTransfer = deltaA !== 0 && deltaB !== 0 && newTotalRob === oldTotalRob;
+        const stockTargets = await this.resolveLegacyStockTargets(spare);
         const txResult = await db2.transaction(async (tx) => {
           const result = await tx.update(spares).set({
             rob: newTotalRob,
@@ -20955,43 +20949,13 @@ var init_postgresStorage = __esm({
               place: place ?? null
             }, tx);
           }
+          await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newLocA, newLocB);
           return result[0];
         });
         try {
           await logFieldChanges("spares", spare.suuid, spare.vesselId || null, spare, txResult, userId);
         } catch (err) {
           console.error("[FieldLogger] Spare transfer:", err);
-        }
-        const vesselId = spare.vesselId || "V001";
-        if (spare.location) {
-          try {
-            const locationA = await this.findLocationStrict(vesselId, spare.location);
-            await this.upsertSpareLocationStock({
-              vesselId,
-              spareId: spare.id,
-              spareUuid: spare.suuid,
-              locationId: locationA.id,
-              qty: newLocA
-            });
-            console.log(`[transferSpareLocation] Synced Location A spare_location_stock for spare ${id}: ${spare.location}=${newLocA}`);
-          } catch (syncError) {
-            console.warn(`[transferSpareLocation] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-          }
-        }
-        if (spare.location2) {
-          try {
-            const locationB = await this.findLocationStrict(vesselId, spare.location2);
-            await this.upsertSpareLocationStock({
-              vesselId,
-              spareId: spare.id,
-              spareUuid: spare.suuid,
-              locationId: locationB.id,
-              qty: newLocB
-            });
-            console.log(`[transferSpareLocation] Synced Location B spare_location_stock for spare ${id}: ${spare.location2}=${newLocB}`);
-          } catch (syncError) {
-            console.warn(`[transferSpareLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-          }
         }
         return { spare: txResult, isTransfer: isTrueTransfer };
       }
@@ -21003,6 +20967,7 @@ var init_postgresStorage = __esm({
         }
         const newRob = (spare.rob ?? 0) + quantity;
         const newRobA = (spare.robLocationA ?? 0) + quantity;
+        const stockTargets = await this.resolveLegacyStockTargets(spare);
         const updated = await db2.transaction(async (tx) => {
           const result = await tx.update(spares).set({
             rob: newRob,
@@ -21031,6 +20996,7 @@ var init_postgresStorage = __esm({
             tz: tz ?? null,
             place: place ?? null
           }, tx);
+          await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newRobA, spare.robLocationB ?? 0);
           return result[0];
         });
         try {
@@ -21050,6 +21016,7 @@ var init_postgresStorage = __esm({
         const currentRobA = spare.robLocationA ?? 0;
         const newRob = Math.max(0, currentRob + qtyChange);
         const newRobA = Math.max(0, currentRobA + qtyChange);
+        const stockTargets = await this.resolveLegacyStockTargets(spare);
         const updated = await db2.transaction(async (tx) => {
           const result = await tx.update(spares).set({
             rob: newRob,
@@ -21077,6 +21044,7 @@ var init_postgresStorage = __esm({
             tz: null,
             place: null
           }, tx);
+          await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newRobA, spare.robLocationB ?? 0);
           return result[0];
         });
         try {
@@ -25187,24 +25155,28 @@ var init_postgresStorage = __esm({
         }
         let currentLocationStock = await this.getSpareLocationStockItem(input.spareId, input.locationId);
         if (!currentLocationStock) {
+          const existingStockRows = await this.getSpareLocationStock(input.spareId);
           const spareForSync = await db2.select().from(spares).where(eq3(spares.id, input.spareId));
           const spareLegacy = spareForSync[0];
           if (spareLegacy) {
+            const existingSum = existingStockRows.reduce((s, r) => s + (r.qty ?? 0), 0);
+            const residual = Math.max(0, (spareLegacy.rob ?? 0) - existingSum);
             const locName = (location.locationName || "").toLowerCase().trim();
             const spareLegacyLocA = (spareLegacy.location || "").toLowerCase().trim();
             const spareLegacyLocB = (spareLegacy.location2 || "").toLowerCase().trim();
-            let seedQty = null;
+            let labelQty = null;
             if (spareLegacyLocA && locName === spareLegacyLocA) {
-              seedQty = spareLegacy.robLocationA ?? 0;
+              labelQty = spareLegacy.robLocationA ?? 0;
             } else if (spareLegacyLocB && locName === spareLegacyLocB) {
-              seedQty = spareLegacy.robLocationB ?? 0;
+              labelQty = spareLegacy.robLocationB ?? 0;
             } else if (spareLegacyLocA && !spareLegacyLocB) {
-              seedQty = spareLegacy.robLocationA ?? 0;
+              labelQty = spareLegacy.robLocationA ?? 0;
             } else if (!spareLegacyLocA && spareLegacyLocB) {
-              seedQty = spareLegacy.robLocationB ?? 0;
+              labelQty = spareLegacy.robLocationB ?? 0;
             } else if (!spareLegacyLocA && !spareLegacyLocB) {
-              seedQty = spareLegacy.rob ?? 0;
+              labelQty = spareLegacy.rob ?? 0;
             }
+            const seedQty = labelQty !== null ? Math.min(labelQty, residual) : null;
             if (seedQty !== null) {
               console.log(`[performInventoryTransaction] AUTO-SYNC: No spare_location_stock record for spare ${input.spareId} at location ${input.locationId}. Seeding from legacy ROB: ${seedQty}`);
               await this.upsertSpareLocationStock({
@@ -25366,8 +25338,7 @@ var init_postgresStorage = __esm({
       async getSpareWithInventory(spareId) {
         const spare = await this.getSpare(spareId);
         if (!spare) return null;
-        const activeLocationNames = [spare.location, spare.location2].filter((n) => !!n && n.trim() !== "");
-        const locationsWithQty = activeLocationNames.length > 0 ? await this.getSpareLocationsWithQty(spare.id, activeLocationNames) : [];
+        const locationsWithQty = await this.getSpareLocationsWithQty(spare.id);
         const robTotal = locationsWithQty.reduce((sum2, l) => sum2 + l.qty, 0);
         const linkedComponents = await this.getLinkedComponentsForSpare(spare.id, spare.vesselId || void 0);
         const stockStatus = robTotal <= (spare.min ?? 0) ? "At Min" : "OK";
@@ -25387,12 +25358,7 @@ var init_postgresStorage = __esm({
           'locationId', sls.location_id,
           'locationName', l.location_name,
           'qty', sls.qty
-        )) FILTER (WHERE sls.id IS NOT NULL
-          AND LOWER(TRIM(l.location_name)) IN (
-            LOWER(TRIM(COALESCE(s.location, ''))),
-            LOWER(TRIM(COALESCE(s.location_2, '')))
-          )
-        ), '[]'::json) AS locations,
+        )) FILTER (WHERE sls.id IS NOT NULL), '[]'::json) AS locations,
         COALESCE(json_agg(DISTINCT jsonb_build_object(
           'componentId', scl.component_id,
           'componentCode', c.component_code,
@@ -25573,10 +25539,6 @@ var init_postgresStorage = __esm({
           FROM spare_location_stock sls
           JOIN locations l ON l.id = sls.location_id
           WHERE sls.spare_id = f.id
-            AND LOWER(TRIM(l.location_name)) IN (
-              LOWER(TRIM(COALESCE(f.location, ''))),
-              LOWER(TRIM(COALESCE(f.location_2, '')))
-            )
         ), '[]'::json) AS locations,
         COALESCE((
           SELECT json_agg(jsonb_build_object(
@@ -25814,9 +25776,12 @@ var init_postgresStorage = __esm({
         let errors = 0;
         for (const spare of sparesInVessel) {
           try {
+            const existingRows = await this.getSpareLocationStock(spare.id);
+            if (existingRows.length > 0) {
+              continue;
+            }
             const robA = spare.robLocationA ?? 0;
             const robB = spare.robLocationB ?? 0;
-            await db2.delete(spareLocationStock).where(eq3(spareLocationStock.spareId, spare.id));
             let locationSynced = false;
             if (spare.location) {
               try {
@@ -43751,14 +43716,19 @@ async function receiveSimple(spareId, body) {
   if (!spare) {
     throw Object.assign(new Error("Spare not found"), { statusCode: 404 });
   }
-  const newRobLocationA = (spare.robLocationA || 0) + qty;
-  const updatedSpare = await updateSpare(spareId, {
-    robLocationA: newRobLocationA
-  });
+  const result = await receiveSpareToLocation(
+    spareId,
+    qty,
+    "A",
+    userId || "User",
+    remarks,
+    supplierPO,
+    dateLocal
+  );
   return {
     success: true,
     message: "Spare received successfully",
-    data: updatedSpare
+    data: result.spare
   };
 }
 async function consumeFromLocation(paramsRaw, bodyRaw) {
