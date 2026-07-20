@@ -2596,7 +2596,7 @@ export class PostgresStorage {
 
     // Determine whether this update touches ROB values or location labels — if so,
     // spare_location_stock must change in the SAME transaction as the spares row.
-    const robChanged = data.robLocationA !== undefined || data.robLocationB !== undefined;
+    const robChanged = data.rob !== undefined || data.robLocationA !== undefined || data.robLocationB !== undefined;
     const locationChanged = data.location !== undefined || data.location2 !== undefined;
     const needsStockSync = (robChanged || locationChanged) && !!(existingSpare?.vesselId || (data as any).vesselId);
 
@@ -2716,20 +2716,30 @@ export class PostgresStorage {
   ): Promise<Array<{ locationId: number; which: 'A' | 'B' }>> {
     const vesselId = spare.vesselId || 'V001';
     const targets: Array<{ locationId: number; which: 'A' | 'B' }> = [];
-    if (spare.location) {
+    // FAIL-CLOSED: if a location label is configured but cannot be resolved to a
+    // locations row, abort the mutation instead of silently updating only the
+    // legacy columns — a partial update here is exactly the drift this system
+    // is designed to prevent. Surface the data problem so it can be fixed.
+    if (spare.location && spare.location.trim() !== '') {
       try {
         const locA = await this.findLocationStrict(vesselId, spare.location);
         targets.push({ locationId: locA.id, which: 'A' });
       } catch (e: any) {
-        console.warn(`[spareStockSync] Could not resolve Location A "${spare.location}" for spare ${spare.id}: ${e.message}`);
+        throw new Error(
+          `Data integrity error: spare ${spare.id} (${spare.partName}) has Location A "${spare.location}" ` +
+          `which does not match any location for vessel ${vesselId}. Fix the spare's location before changing stock. (${e.message})`
+        );
       }
     }
-    if (spare.location2) {
+    if (spare.location2 && spare.location2.trim() !== '') {
       try {
         const locB = await this.findLocationStrict(vesselId, spare.location2);
         targets.push({ locationId: locB.id, which: 'B' });
       } catch (e: any) {
-        console.warn(`[spareStockSync] Could not resolve Location B "${spare.location2}" for spare ${spare.id}: ${e.message}`);
+        throw new Error(
+          `Data integrity error: spare ${spare.id} (${spare.partName}) has Location B "${spare.location2}" ` +
+          `which does not match any location for vessel ${vesselId}. Fix the spare's location before changing stock. (${e.message})`
+        );
       }
     }
     return targets;
