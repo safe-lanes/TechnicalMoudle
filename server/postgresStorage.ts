@@ -8873,33 +8873,35 @@ export class PostgresStorage {
     let currentLocationStock = await this.getSpareLocationStockItem(input.spareId, input.locationId);
     
     if (!currentLocationStock) {
-      // GUARD against double-counting: only auto-seed from legacy ROB when the spare
-      // has NO spare_location_stock rows at all. If stock rows already exist at other
-      // locations, the legacy total is already (partly) represented there — seeding the
-      // legacy value again would count the same stock twice (the "2x ROB" drift bug).
+      // GUARD against double-counting (the "2x ROB" drift bug): auto-seed from legacy
+      // ROB is capped at the RESIDUAL — the portion of the legacy total NOT already
+      // represented by existing spare_location_stock rows at other locations.
+      // residual = max(0, legacy rob - sum(existing rows)). Seeding at most the
+      // residual provably cannot double-count: total seeded never exceeds legacy rob.
       const existingStockRows = await this.getSpareLocationStock(input.spareId);
-      const spareForSync = existingStockRows.length === 0
-        ? await db.select().from(spares).where(eq(spares.id, input.spareId))
-        : [];
+      const spareForSync = await db.select().from(spares).where(eq(spares.id, input.spareId));
       const spareLegacy = spareForSync[0];
       if (spareLegacy) {
+        const existingSum = existingStockRows.reduce((s, r) => s + (r.qty ?? 0), 0);
+        const residual = Math.max(0, (spareLegacy.rob ?? 0) - existingSum);
         const locName = (location.locationName || '').toLowerCase().trim();
         const spareLegacyLocA = (spareLegacy.location || '').toLowerCase().trim();
         const spareLegacyLocB = (spareLegacy.location2 || '').toLowerCase().trim();
         
-        let seedQty: number | null = null;
+        let labelQty: number | null = null;
         if (spareLegacyLocA && locName === spareLegacyLocA) {
-          seedQty = spareLegacy.robLocationA ?? 0;
+          labelQty = spareLegacy.robLocationA ?? 0;
         } else if (spareLegacyLocB && locName === spareLegacyLocB) {
-          seedQty = spareLegacy.robLocationB ?? 0;
+          labelQty = spareLegacy.robLocationB ?? 0;
         } else if (spareLegacyLocA && !spareLegacyLocB) {
-          seedQty = spareLegacy.robLocationA ?? 0;
+          labelQty = spareLegacy.robLocationA ?? 0;
         } else if (!spareLegacyLocA && spareLegacyLocB) {
-          seedQty = spareLegacy.robLocationB ?? 0;
+          labelQty = spareLegacy.robLocationB ?? 0;
         } else if (!spareLegacyLocA && !spareLegacyLocB) {
-          seedQty = spareLegacy.rob ?? 0;
+          labelQty = spareLegacy.rob ?? 0;
         }
         
+        const seedQty = labelQty !== null ? Math.min(labelQty, residual) : null;
         if (seedQty !== null) {
           console.log(`[performInventoryTransaction] AUTO-SYNC: No spare_location_stock record for spare ${input.spareId} at location ${input.locationId}. Seeding from legacy ROB: ${seedQty}`);
           await this.upsertSpareLocationStock({
