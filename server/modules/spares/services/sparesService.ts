@@ -334,15 +334,16 @@ export async function receiveSimple(spareId: string, body: any): Promise<any> {
     throw Object.assign(new Error("Spare not found"), { statusCode: 404 });
   }
 
-  const newRobLocationA = (spare.robLocationA || 0) + qty;
-  const updatedSpare = await repo.updateSpare(spareId, {
-    robLocationA: newRobLocationA
-  });
+  // Route through the transactional receive path so legacy ROB, spare_location_stock
+  // and spares_history are all updated atomically (was a raw robLocationA update).
+  const result = await repo.receiveSpareToLocation(
+    spareId, qty, 'A', userId || 'User', remarks, supplierPO, dateLocal
+  );
 
   return {
     success: true,
     message: "Spare received successfully",
-    data: updatedSpare
+    data: result.spare
   };
 }
 
