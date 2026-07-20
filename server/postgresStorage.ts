@@ -2600,6 +2600,26 @@ export class PostgresStorage {
     const locationChanged = data.location !== undefined || data.location2 !== undefined;
     const needsStockSync = (robChanged || locationChanged) && !!(existingSpare?.vesselId || (data as any).vesselId);
 
+    // Normalize ROB fields so the invariant rob == robLocationA + robLocationB
+    // (== sum of spare_location_stock) always holds after this update:
+    // - a direct `rob` edit without A/B is applied to Location A (same convention
+    //   as adjustSpareQuantity), keeping B unchanged;
+    // - whenever any ROB field changes, the rollup is re-derived from A + B.
+    if (robChanged && existingSpare) {
+      const effB = data.robLocationB !== undefined ? (data.robLocationB ?? 0) : (existingSpare.robLocationB ?? 0);
+      let effA: number;
+      if (data.robLocationA !== undefined) {
+        effA = data.robLocationA ?? 0;
+      } else if (data.rob !== undefined) {
+        effA = Math.max(0, (data.rob ?? 0) - effB);
+      } else {
+        effA = existingSpare.robLocationA ?? 0;
+      }
+      (updateData as any).robLocationA = effA;
+      (updateData as any).robLocationB = effB;
+      (updateData as any).rob = effA + effB;
+    }
+
     // Pre-resolve stock targets from the post-update effective spare (read-only, safe pre-tx)
     let stockTargets: Array<{ locationId: number; which: 'A' | 'B' }> = [];
     let effectiveSpare: Spare | null = null;
