@@ -1,0 +1,82 @@
+I want to redesign how environment files are loaded for vessel deployments. Before making any code changes, analyze the current startup flow and then implement the solution with the minimum required modifications.
+
+Objective
+
+The application should support two deployment models:
+
+Online/shore deployments will continue using the existing .env.
+Offline vessel deployments will contain only .env.offline.
+
+The application should continue reading configuration from process.env exactly as it does today. Do not introduce dotenv into the application or modify any business logic.
+
+Important Finding
+
+Our deployment starts using:
+
+pm2 start ecosystem.config.cjs
+
+PM2 launches dist/index.js directly.
+
+Therefore, investigate how ecosystem.config.cjs currently provides environment variables to the application. The solution should be implemented at the PM2/environment-loading layer rather than inside the application.
+
+Required Investigation
+
+Before implementing anything, analyze the following:
+
+How ecosystem.config.cjs currently sets the env object.
+Whether it already reads an environment file or simply inherits process.env.
+Whether any startup scripts are still involved in PM2 deployments.
+Confirm the complete startup flow:
+pm2
+    ↓
+ecosystem.config.cjs
+    ↓
+dist/index.js
+
+Identify the most appropriate and centralized place to introduce environment-file selection.
+
+Desired Behaviour
+
+Implement the following environment selection logic:
+
+if (.env exists)
+    load .env
+else if (.env.offline exists)
+    load .env.offline
+else
+    continue using the existing process.env
+Requirements
+.env remains the primary environment file.
+.env.offline acts as the fallback when .env is not present.
+.env.offline is a complete standalone environment file, not an overlay.
+Only one environment file should be loaded.
+No variable merging.
+No override logic.
+No duplicate loading.
+The rest of the application should continue using process.env without any changes.
+
+This means:
+
+Online / Shore
+
+.env
+
+Offline Vessel
+
+.env.offline
+Constraints
+Do not modify application code that consumes process.env.
+Do not add environment-selection logic throughout the application.
+Do not change any business logic.
+Keep the implementation centralized.
+Maintain backward compatibility with existing online deployments.
+The solution should work transparently with PM2.
+Expected Deliverables
+Explain the current startup and environment-loading flow.
+Identify the best implementation point.
+Describe the proposed architecture.
+Implement the required changes.
+Explain why this approach is preferable to alternatives such as overlay files or application-level dotenv.
+Ensure the implementation is extensible so additional deployment-specific environment files (if required in the future) can be incorporated with minimal changes.
+
+The final solution should be clean, maintainable, and require the least amount of code changes while allowing online deployments to continue using .env and offline vessel deployments to function using only .env.offline.
