@@ -2628,12 +2628,24 @@ export class PostgresStorage {
           updated.robLocationB ?? 0
         );
 
-        // Remove stock rows orphaned by a location rename (same tx)
-        const activeLocationIds = stockTargets.map(t => t.locationId);
-        const allStockRows = await tx.select().from(spareLocationStock)
-          .where(eq(spareLocationStock.spareId, updated.id));
-        for (const row of allStockRows) {
-          if (!activeLocationIds.includes(row.locationId)) {
+        // Remove stock rows orphaned by an explicit location-label change (same tx).
+        // Guards: never on ROB-only edits; never when no label resolved (would wipe
+        // everything); never for rows with inventory-transaction evidence at that
+        // location (they represent real per-location stock, not stale seeds).
+        if (locationChanged && stockTargets.length > 0) {
+          const activeLocationIds = stockTargets.map(t => t.locationId);
+          const allStockRows = await tx.select().from(spareLocationStock)
+            .where(eq(spareLocationStock.spareId, updated.id));
+          for (const row of allStockRows) {
+            if (activeLocationIds.includes(row.locationId)) continue;
+            const evidence = await tx.select({ id: inventoryTransactions.id })
+              .from(inventoryTransactions)
+              .where(and(
+                eq(inventoryTransactions.spareId, updated.id),
+                eq(inventoryTransactions.locationId, row.locationId)
+              ))
+              .limit(1);
+            if (evidence.length > 0) continue;
             await tx.delete(spareLocationStock).where(
               and(
                 eq(spareLocationStock.spareId, updated.id),
