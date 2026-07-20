@@ -2593,15 +2593,59 @@ export class PostgresStorage {
     else if (updateData.ihmPresence === 'NO' && !updateData.ihm) updateData.ihm = 'No';
 
     const numId = Number(id);
-    const result = await db.update(spares)
-      .set(updateData)
-      .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])))
-      .returning();
-    if (!result[0]) {
-      throw new Error(`Spare ${id} not found`);
+
+    // Determine whether this update touches ROB values or location labels — if so,
+    // spare_location_stock must change in the SAME transaction as the spares row.
+    const robChanged = data.robLocationA !== undefined || data.robLocationB !== undefined;
+    const locationChanged = data.location !== undefined || data.location2 !== undefined;
+    const needsStockSync = (robChanged || locationChanged) && !!(existingSpare?.vesselId || (data as any).vesselId);
+
+    // Pre-resolve stock targets from the post-update effective spare (read-only, safe pre-tx)
+    let stockTargets: Array<{ locationId: number; which: 'A' | 'B' }> = [];
+    let effectiveSpare: Spare | null = null;
+    if (needsStockSync && existingSpare) {
+      effectiveSpare = { ...existingSpare, ...data } as Spare;
+      stockTargets = await this.resolveLegacyStockTargets(effectiveSpare);
     }
 
-    const updatedSpare = result[0];
+    const updatedSpare = await db.transaction(async (tx) => {
+      const result = await tx.update(spares)
+        .set(updateData)
+        .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])))
+        .returning();
+      if (!result[0]) {
+        throw new Error(`Spare ${id} not found`);
+      }
+      const updated = result[0];
+
+      if (needsStockSync && effectiveSpare) {
+        // Upsert stock rows for the (possibly new) configured locations
+        await this.syncLegacyRobToLocationStockTx(
+          tx,
+          { ...effectiveSpare, id: updated.id, suuid: updated.suuid } as Spare,
+          stockTargets,
+          updated.robLocationA ?? 0,
+          updated.robLocationB ?? 0
+        );
+
+        // Remove stock rows orphaned by a location rename (same tx)
+        const activeLocationIds = stockTargets.map(t => t.locationId);
+        const allStockRows = await tx.select().from(spareLocationStock)
+          .where(eq(spareLocationStock.spareId, updated.id));
+        for (const row of allStockRows) {
+          if (!activeLocationIds.includes(row.locationId)) {
+            await tx.delete(spareLocationStock).where(
+              and(
+                eq(spareLocationStock.spareId, updated.id),
+                eq(spareLocationStock.locationId, row.locationId)
+              )
+            );
+          }
+        }
+      }
+
+      return updated;
+    });
 
     // Sync field logging — spare UPDATE
     if (existingSpare) {
@@ -2630,63 +2674,6 @@ export class PostgresStorage {
       }
     }
 
-    // SYNC: Update spare_location_stock if ROB values or location fields changed
-    const robChanged = data.robLocationA !== undefined || data.robLocationB !== undefined;
-    const locationChanged = data.location !== undefined || data.location2 !== undefined;
-    if ((robChanged || locationChanged) && updatedSpare.vesselId) {
-      const vesselId = updatedSpare.vesselId;
-      const robA = updatedSpare.robLocationA ?? 0;
-      const robB = updatedSpare.robLocationB ?? 0;
-
-      if (updatedSpare.location) {
-        try {
-          const locationAObj = await this.findLocationStrict(vesselId, updatedSpare.location);
-          await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationAObj.id, qty: robA });
-        } catch (syncError: any) {
-          console.warn(`[updateSpare] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-        }
-      }
-      if (updatedSpare.location2) {
-        try {
-          const locationBObj = await this.findLocationStrict(vesselId, updatedSpare.location2);
-          await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationBObj.id, qty: robB });
-        } catch (syncError: any) {
-          console.warn(`[updateSpare] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-        }
-      }
-
-      const activeLocationIds: number[] = [];
-      if (updatedSpare.location) {
-        try {
-          const locA = await this.findLocationStrict(vesselId, updatedSpare.location);
-          activeLocationIds.push(locA.id);
-        } catch (_) {}
-      }
-      if (updatedSpare.location2) {
-        try {
-          const locB = await this.findLocationStrict(vesselId, updatedSpare.location2);
-          activeLocationIds.push(locB.id);
-        } catch (_) {}
-      }
-      try {
-        const allStockRows = await this.getSpareLocationStock(updatedSpare.id);
-        const orphanedRows = allStockRows.filter(r => !activeLocationIds.includes(r.locationId));
-        for (const orphan of orphanedRows) {
-          await db.delete(spareLocationStock).where(
-            and(
-              eq(spareLocationStock.spareId, updatedSpare.id),
-              eq(spareLocationStock.locationId, orphan.locationId)
-            )
-          );
-        }
-        if (orphanedRows.length > 0) {
-          console.log(`[updateSpare] Cleaned up ${orphanedRows.length} orphaned spare_location_stock entries for spare ${id}`);
-        }
-      } catch (cleanupError: any) {
-        console.warn(`[updateSpare] Failed to cleanup orphaned spare_location_stock for spare ${id}: ${cleanupError.message}`);
-      }
-    }
-    
     return updatedSpare;
   }
 
