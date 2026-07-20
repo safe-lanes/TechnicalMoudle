@@ -4,6 +4,15 @@ import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { useAuth } from "@/contexts/AuthContext";
 
+const DEV_ROLE_TO_STORAGE: Record<UIRole, { userType: string; role: string }> = {
+  Sail_Admin:         { userType: "Office", role: "Sail Admin" },
+  Client_Admin:       { userType: "Office", role: "Client Admin" },
+  Tech_Superintendent:{ userType: "Office", role: "Admin" },
+  Head_of_Dept:       { userType: "Ship",   role: "Vessel Admin" },
+  Vessel:             { userType: "Ship",   role: "Vessel User" },
+  External:           { userType: "Office", role: "External 10" },
+};
+
 interface UIRoleContextType {
   uiRole: UIRole | null;
   setUIRole: (role: UIRole) => void;
@@ -65,7 +74,15 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     setUIRoleState(mapLoggedRoleToUIRole(currentUser.userType, currentUser.role));
   }, [currentUser]);
 
-  const setUIRole = (_role: UIRole) => {
+  const setUIRole = (role: UIRole) => {
+    if (!import.meta.env.DEV) return;
+    const storage = DEV_ROLE_TO_STORAGE[role];
+    localStorage.setItem("userType", storage.userType);
+    const existing = (() => {
+      try { return JSON.parse(localStorage.getItem("userProfile") || "{}"); } catch { return {}; }
+    })();
+    localStorage.setItem("userProfile", JSON.stringify({ ...existing, role: storage.role }));
+    setUIRoleState(role);
   };
 
   const value: UIRoleContextType = {
