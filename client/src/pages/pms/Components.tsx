@@ -1891,9 +1891,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   const getDocumentsForType = (typeName: string): any[] =>
     viewableDocuments.filter(
       (doc: any) =>
-        doc.fileName?.toLowerCase().includes(typeName.toLowerCase()) ||
-        doc.fileType?.toLowerCase() === typeName.toLowerCase() ||
-        doc.notes?.toLowerCase().includes(typeName.toLowerCase())
+        doc.notes?.toLowerCase() === typeName.toLowerCase()
     );
 
   const handleUploadClick = (docType: string) => {
