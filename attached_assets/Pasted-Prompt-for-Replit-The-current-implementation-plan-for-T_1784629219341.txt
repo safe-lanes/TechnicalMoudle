@@ -1,0 +1,186 @@
+Prompt for Replit
+
+The current implementation plan for Task #324 - Configurable Role-to-View-Mode Mapping needs to be redesigned before implementation.
+
+Do not start coding immediately. First perform a detailed architectural analysis and propose the best implementation considering our existing architecture, sync framework, provisioning, and future extensibility.
+
+New Requirements
+
+The previous proposal suggested adding a view_mode column directly to admn_role_master. Re-evaluate this approach.
+
+Instead, investigate implementing the solution using three entities:
+
+Role Master (admn_role_master)
+Continue to remain the master table for application roles.
+Do not store the view mode directly inside this table unless there is a compelling architectural reason.
+View Modes Master
+Create a dedicated View Modes master table.
+The table should contain all available application view modes.
+Initial data should contain:
+Sail_Admin
+Client_Admin
+Tech_Superintendent
+Head_of_Dept
+Vessel
+External
+The design should allow future view modes to be added without changing database structure.
+Analyse whether view-mode metadata (display name, description, sort order, active flag, etc.) should also be supported for future extensibility.
+Role ↔ View Mode Mapping Table
+Create an intermediary mapping table between roles and view modes instead of storing the mapping directly in admn_role_master.
+This table should become the single source of truth for configurable mappings.
+Follow the same project standards used by other master tables:
+UUID/ruid
+created_at
+updated_at
+created_by_uuid
+updated_by_uuid
+is_deleted
+is_sync
+etc.
+One role should map to one view mode.
+Analyse whether uniqueness should be enforced on (role_id) or another combination.
+Behaviour Changes
+
+The previous fallback behaviour must also be reconsidered.
+
+Sail Admin
+
+The Sail Admin role must never depend on database mapping.
+
+It should always resolve to the Sail_Admin view mode regardless of mapping configuration.
+
+No mapping should be required for this role.
+
+Unmapped Roles
+
+Unlike the previous proposal:
+
+Roles without a configured mapping must NOT fall back to the existing mapLoggedRoleToUIRole() logic.
+Instead, they should behave similarly to the existing Shipskart Role Mapping implementation.
+If a role has no mapping, the user should not be allowed to enter the application (or should receive the configured access denied behaviour).
+
+Investigate the best implementation pattern for this behaviour while ensuring it is secure and maintainable.
+
+Existing Hardcoded Mapping
+
+Analyse whether the existing mapLoggedRoleToUIRole() function should:
+
+be completely removed,
+remain only for Sail Admin,
+remain only for backward compatibility,
+or be replaced with a database-driven resolver.
+
+Recommend the cleanest long-term architecture.
+
+Future Extensibility
+
+The primary goal of introducing a View Modes master is future scalability.
+
+Analyse whether this architecture allows future additions such as:
+
+Fleet Manager
+Superintendent Plus
+Contractor
+Inspector
+Auditor
+
+without requiring structural database changes.
+
+If additional application code would still be required for a new view mode, document exactly which layers would need modification.
+
+Sync Analysis
+
+This is extremely important.
+
+Investigate how the new tables should participate in sync.
+
+Specifically analyse:
+
+whether both new tables should be registered in shared/syncConfig.ts
+whether they should follow the same ONE_WAY_SHORE_TO_SHIP strategy used for Access Control
+whether provisioning automatically includes them or requires additional work
+whether existing RBAC provisioning logic needs modification
+deployment ordering requirements
+migration considerations
+conflict handling
+sync performance impact
+whether lookup tables should sync before mapping tables
+
+The final recommendation should follow existing project sync architecture and minimise additional sync complexity.
+
+Provisioning
+
+Investigate how provisioning should work.
+
+Determine whether:
+
+both new tables should be provisioned,
+provisioning order matters,
+any cleanup logic needs modification,
+existing provisioning utilities can be reused.
+Backend API
+
+Review whether the previous API contract is still appropriate.
+
+Recommend the best endpoints.
+
+For example:
+
+GET available view modes
+GET role mappings
+PUT bulk save mappings
+
+or another structure if more appropriate.
+
+Continue following:
+
+Route
+Controller
+Service
+Repository
+
+architecture.
+
+Frontend
+
+Retain the existing UX direction:
+
+same collapsible card style as Shipskart Role Mapping
+dropdown per role
+bulk save
+dirty tracking
+loading/saving state
+TanStack Query
+
+However, the dropdown should now load values from the View Modes master instead of a hardcoded list.
+
+Validation
+
+Investigate where validation should occur.
+
+Examples:
+
+duplicate mappings
+inactive view modes
+deleted roles
+invalid references
+Sail Admin special handling
+
+Recommend database constraints versus service-layer validation.
+
+Deliverables
+
+Before implementation, provide:
+
+Recommended database design (ER diagram or equivalent)
+Table structures
+Sync strategy
+Provisioning strategy
+Login resolution flow
+Authorization flow for unmapped roles
+Migration plan
+API design
+Advantages and disadvantages of this architecture compared with the previous proposal that reused admn_role_master
+Final recommendation explaining why this approach is the most maintainable and scalable for the project.
+
+Do not begin implementation until the architectural analysis is complete and a final recommendation has been provided. The solution should align with existing Access Control and Shipskart design patterns while remaining future-proof and fully compatible with the current sync framework.

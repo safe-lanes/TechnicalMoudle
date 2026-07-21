@@ -1,0 +1,229 @@
+# Task #324 — Configurable Role-to-View-Mode Mapping (FINAL corrected plan)
+
+Reviewed against the codebase at `origin/replit_dev = 5c725ac41` (2026-07-20).
+Nilesh's submitted plan is fundamentally sound — the 3-entity design, fail-closed
+semantics with Sail-Admin bypass, behaviour-neutral seed, no-FK/no-CHECK rule on
+synced columns, and the Shipskart-card UX mirror are all kept as submitted. The
+corrections below are mostly sync-layer mechanics and stale numbers.
+
+---
+
+## CHANGES FROM SUBMITTED PLAN (read this first)
+
+1. **Identity columns = NATURAL KEYS, not uuids (critical).** The plan registered
+   both tables ONE_WAY_SHORE_TO_SHIP with "uuid identity columns". Both tables are
+   seeded by migration on BOTH sides (necessary — ships must never boot unmapped),
+   so each side mints DIFFERENT uuids for the same logical rows. The one-way
+   applier matches rows by `syncConfig.identityColumn`
+   (`oneWayApplier.ts:160 — lookupColumn = identityCol || 'id'`): with a uuid
+   identity, shore rows never match the ship's seeded rows and EVERY sync cycle
+   inserts duplicates on ships. This is exactly the `approval_workflow_config`
+   seeded-both-sides bug we fixed with natural-key convergence.
+   **Fix:** `identityColumn: 'code'` for the view-modes master and
+   `identityColumn: 'role_ruid'` for the mapping table. No applier change needed —
+   unlike awc (whose identity was already a uuid, forcing the FORCE_COMPOSITE
+   mechanism), here we simply declare the natural key AS the identity. Side
+   effect (fine): on first sync the UPDATE brings shore's uuid onto the ship row,
+   so uuids converge to shore's; the mapping references view modes by `code`, so
+   nothing breaks while they converge.
+
+2. **tsc baseline is 292, not 374.** 374 is the pre-merge fork number. New
+   precondition before starting: `git fetch origin && git reset --hard
+   origin/replit_dev` (converged tip) and confirm `npx tsc --noEmit` = 292 before
+   any change; must still be ≤ 292 at commit.
+
+3. **Migration numbers pinned: 139 (Drizzle table migration) + 140 (seed).**
+   Current highest on origin/replit_dev is `138_repair_spare_location_stock_drift`.
+   Check at build time (from REPLIT-FORK-GUIDELINES):
+   `git fetch origin replit_dev && git ls-tree --name-only origin/replit_dev migrations/ | sort | tail -5`
+   ⚠️ 139 is also earmarked by the Shipskart b2b link-tables design (designed,
+   NOT committed). Whoever commits second renumbers — the runner is
+   filename-keyed so this is hygiene, but check before both commits.
+
+4. **The seed spec was under-specified — the real `mapLoggedRoleToUIRole` takes
+   TWO inputs** (`userType`, `profileRole`) with DEFAULT-OPEN fallthroughs
+   (verified in `shared/uiRoles.ts`). The seed must iterate `admn_role_master`
+   active roles and compute `mapLoggedRoleToUIRole(roletype, assignedRole)` —
+   `roletype` is the userType analogue ('Office'/'Ship'). The exact current
+   behaviour (this IS the seed table):
+
+   | roletype | assignedRole | mode |
+   |---|---|---|
+   | Office | Sail Admin | Sail_Admin |
+   | Office | Admin | Tech_Superintendent |
+   | Office | External 10 | External |
+   | Office | anything else (incl. **Super Admin**, Client Admin, User, External 1-5, Offline Admin) | Client_Admin |
+   | Ship | Vessel Admin, Vessel User 3 | Head_of_Dept |
+   | Ship | anything else (Vessel Management, Vessel User, Vessel User 2/4, …) | Vessel |
+
+   Note and preserve the oddity: **Super Admin seeds to Client_Admin** (that is
+   today's behaviour; behaviour-neutral means keeping it — changing it is a
+   product decision for Ghazi, not this task).
+   **The ONE deliberate behaviour change to document loudly:** today unknown
+   roles fall through OPEN (Office→Client_Admin, Ship→Vessel). After this task,
+   a role created AFTER the seed is BLOCKED until an admin maps it. That is the
+   point of the feature — say so in the delivery summary so support expects it.
+
+5. **"Project-standard columns" corrected against migrations 136/137 as built.**
+   For a ONE_WAY synced table the true REQUIREMENTS are: a stable identity column,
+   **`is_deleted BOOLEAN DEFAULT FALSE`** (the provisioning exporter filters
+   `COALESCE(is_deleted,false)=false` — its absence broke bundle generation in the
+   137 build), and **`updated_at`** (the one-way gather keys on
+   `updated_at > checkpoint`). The conventional extras (per
+   `company_standard_grace_settings`, the closest template):
+   `is_sync BOOLEAN DEFAULT FALSE` (snake_case in SQL; `isSync` only in Drizzle),
+   `created_by_uuid` / `updated_by_uuid` TEXT, `created_at`,
+   `updatedAt` via the `updatedAtColumn()` helper, `sort_order`. uuid columns use
+   the house default `gen_random_uuid()::text`. Keep the uuids on both tables
+   (`vmuuid`, `rvmuuid`) — they're just not the sync identity.
+
+6. **Sync registration — exact entries** (order in `SYNC_CONFIG`: master before
+   mapping, matching gather/apply iteration order; no FKs so ordering is hygiene,
+   keep it anyway):
+
+   ```
+   view_modes_master: { category: 'ONE_WAY_SHORE_TO_SHIP', direction: 'shore_to_ship',
+     identityColumn: 'code', vesselScopeColumn: null, vesselScopeJoinPath: null,
+     isGlobal: true, isConfigurable: false, businessRules: null,
+     notes: 'View-mode master (Task #324). SEEDED BOTH SIDES by migration — natural-key
+             identity (code) prevents seeded-uuid duplication (awc lesson).' }
+   role_view_mode_mapping: { same shape, identityColumn: 'role_ruid',
+     notes: 'Role→view-mode mapping. Seeded both sides; natural key = role_ruid (UNIQUE).' }
+   ```
+
+   ⚠️ Standing rule: `shared/syncConfig.ts` is a sign-off surface — this
+   registration is pre-approved by this plan but must be called out in the
+   delivery report like the 137 build did.
+
+7. **Provisioning cleanup — exact insertion verified.** The existing RBAC block
+   (`provisioningService.ts:410-440`) deletes child-then-parent
+   (`adm_role_menu_access` → … → `admn_role_master`) when the bundle contains
+   those tables. Extend the SAME block (or add a sibling block directly after):
+   trigger when the bundle contains either new table; delete
+   `role_view_mode_mapping` FIRST, then `view_modes_master`. This makes
+   re-provisioning replace both cleanly with shore rows (shore uuids land,
+   convergence immediate).
+
+8. **Ship lockout window: NONE — verified.** `server/index.ts` runs
+   `runBackupAndMigrations()` (line 51) before `registerRoutes` (104) and
+   `listen` (133). Ships seed the tables before serving a single request. Newly
+   provisioned ships get the tables via the bundle (global one-way) after the
+   cleanup in (7). No first-sync dependency, as the plan intended.
+
+9. **ADDED: shore-only editing (the plan omitted it).** The tables are
+   ONE_WAY_SHORE_TO_SHIP — a ship-side edit would be silently overwritten. Mirror
+   the two existing patterns exactly:
+   - Card: fold `useSyncInstanceInfo().isShore` into `canEdit` (card hidden on
+     ships — Shipskart-card pattern). Decide consciously: hidden entirely
+     (recommended, matches Shipskart) rather than visible-read-only.
+   - Server: PUT returns `403 shore_only` on ship instances via
+     `isShipInstance()` (approval-policy endpoint pattern), plus the
+     Sail Admin/Super Admin role guard the plan already had.
+
+10. **Route collision — CONFIRMED REAL, fix specified.** The access-control
+    module already registers `GET/PUT /admin/access-control/:roleRuid`
+    (`server/modules/access-control/routes.ts:38,49`). Any new route shaped
+    `/admin/access-control/view-modes` would be swallowed by `:roleRuid`.
+    **Use distinct paths, not ordering tricks** (per CLAUDE.md): 
+    `GET /admin/view-modes`, `GET/PUT /admin/role-view-mappings`,
+    `GET /admin/role-view-mappings/resolve` (login-path resolver). Zero
+    `:param` overlap with existing routes.
+
+11. **Resolver consumers enumerated + failure semantics.** `mapLoggedRoleToUIRole`
+    has SEVEN call sites: `AuthContext.tsx` (4) and `UIRoleContext.tsx` (3) —
+    the plan said "AuthContext/UIRoleContext" but all seven must move to the
+    resolver (one shared TanStack query, resolved once per app load, cached).
+    Failure semantics: the resolver endpoint is the LOCAL server on both shore
+    and ship (ships run their own server+DB), so network failure ≈ app down;
+    on resolver ERROR show the blocked/retry screen (fail-closed) — never
+    fall back to the old hardcoded map. Keep `mapLoggedRoleToUIRole` exported
+    but used ONLY by the seed migration reference and the DEV persona switcher
+    (`DEV_ROLE_TO_STORAGE` in UIRoleContext keeps working: it writes
+    localStorage and the resolver resolves the new role like any other).
+
+12. **Harness expectations added** (the plan had manual verification only) — see
+    Verification below; modeled on the Phase-1/ROB harnesses.
+
+---
+
+## What & Why (unchanged in substance)
+
+Replace hardcoded role→view-mode logic with a DB-driven, admin-configurable
+system: existing `admn_role_master` (untouched) + NEW `view_modes_master` + NEW
+`role_view_mode_mapping`. Fail-closed (unmapped role = blocked, Shipskart
+pattern) with a hardcoded Sail-Admin bypass so admins can never be locked out.
+
+## Done looks like (with corrections applied)
+
+- `view_modes_master` seeded with the 6 modes exactly as in `shared/uiRoles.ts`
+  (`Sail_Admin`, `Client_Admin`, `Tech_Superintendent`, `Head_of_Dept`,
+  `Vessel`, `External`) — `code` (natural key, UNIQUE), display name (from
+  `UI_ROLE_LABELS` — note `Tech_Superintendent` displays as "Superintendent"),
+  description, sort order, active flag, + required/conventional columns (§5).
+- `role_view_mode_mapping` — UNIQUE `role_ruid` (one role → one mode),
+  references roles by ruid and modes by `code`; no DB FKs, no CHECKs on synced
+  columns; service-layer referential validation (both against ACTIVE rows).
+- Seed migration 140: 6 modes + one mapping per active `admn_role_master` row
+  computed as `mapLoggedRoleToUIRole(roletype, assignedRole)` (§4 table) —
+  name/ruid-based lookups, `WHERE NOT EXISTS` / `ON CONFLICT (natural key) DO
+  NOTHING`, no hardcoded ids, re-run = clean no-op ×2.
+- Access Control card "Role View Mode Mapping": Shipskart-card UX (per-role
+  dropdown from ACTIVE view modes — never hardcoded, dirty tracking, bulk save,
+  TanStack invalidation, data-testids), Sail Admin row pinned/disabled at
+  Sail_Admin, **visible/editable on shore only** (§9).
+- Resolution: Sail Admin role → `Sail_Admin` constant, no DB hit; others via
+  resolver endpoint; unmapped → access-denied screen (block-not-default);
+  resolver error → fail-closed retry screen (§11).
+- Endpoints per §10 paths: GET view-modes (active), GET mappings (+ available
+  modes), PUT bulk save (validate-all-before-write; Sail Admin row immutable —
+  reject, don't silently ignore, so the UI can toast it; ship→403 shore_only;
+  Sail Admin/Super Admin guard), GET resolve.
+- syncConfig registration per §6; provisioning cleanup per §7.
+- Delivery summary documents: sync/provisioning analysis, the §4 behaviour
+  delta (new roles now block until mapped), and the §Out-of-scope limitation.
+
+## Out of scope (unchanged, all confirmed correct)
+
+Shipskart implementation (reference only) · sync-engine code (registration +
+cleanup only, flagged for sign-off) · per-mode BEHAVIOUR in DB (a NEW mode still
+needs code: the `UIRole` union/labels in `shared/uiRoles.ts` + page gates —
+document this) · multiple modes per role · real backend auth enforcement (mock
+auth today; guard caveat same as every admin endpoint).
+
+## Steps
+
+1. **Precondition**: reset to origin tip; tsc = 292; migration-number check (§3).
+2. **Schema + migrations** — both tables in `shared/schema.ts` (§5 columns),
+   `npm run db:generate` + review; hand-written seed migration 140 (§4). Never
+   `db:push`. Re-run both locally ×2.
+3. **Sync + provisioning** — syncConfig entries (§6, natural-key identities,
+   master first) + provisioning cleanup extension (§7).
+4. **Backend** — access-control module, routes→controller→service→repository;
+   §10 paths; PUT guards (ship 403 + role guard + validate-all + Sail-Admin-row
+   rejection); resolve endpoint.
+5. **Frontend resolution** — all 7 call sites (§11) → shared resolver query;
+   Sail Admin constant first; blocked + retry screens; DEV switcher untouched.
+6. **Frontend card** — Access Control card per Done-looks-like, shore-only (§9).
+7. **Verification + docs** — below.
+
+## Verification
+
+- `npx tsc --noEmit` ≤ **292**; migrations idempotent ×2 (live dev DB).
+- **Harness** (untracked, `scripts/test-role-view-mode-mapping.ts`), covering:
+  1. seed ×2 idempotent — 6 modes + one mapping per active role, second run 0 rows;
+  2. **behaviour-neutrality sweep** — for EVERY active role, resolver result ===
+     `mapLoggedRoleToUIRole(roletype, assignedRole)`;
+  3. **natural-key convergence via the REAL `applyOneWayRows`** (Phase-1-harness
+     pattern): apply a shore-shaped row with a DIFFERENT uuid but same
+     `code`/`role_ruid` → row count unchanged (UPDATE not INSERT), uuid adopted;
+  4. Sail Admin bypass (no DB row needed) + PUT rejects remapping Sail Admin;
+  5. unmapped role → resolver returns ROLE_NOT_MAPPED (block);
+  6. PUT guards: ship instance 403 shore_only (flip `sync_settings.instance_id`
+     to SHIP-x and restore, as the Phase-1 harness does), non-admin 403,
+     validate-all rejects an inactive/unknown mode with zero partial writes.
+- Live UI: card renders on shore, hidden on ship-instance dev run; save/reload
+  round-trip; unmapped-role login shows the block screen.
+- Regressions: the 11 existing harnesses stay green (this touches syncConfig —
+  re-run at minimum approval-sync, self-heal, firstprov, snapshot-baseline).
+- Commit as support@sl-sail.com, do NOT push; report real results + honest
+  not-tested list; push approval against the report.

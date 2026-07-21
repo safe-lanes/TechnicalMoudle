@@ -1,0 +1,73 @@
+Prompt for Replit: Configurable Role-to-View Mode Mapping
+Objective
+
+Implement a configurable mapping between our application roles and View Modes.
+
+Currently, the application supports 6 View Modes. Every role should have an additional configuration that allows administrators to select one View Modes from a dropdown and persist this configuration in the backend.
+
+The implementation should be designed to be configurable rather than hardcoded.
+
+Requirements
+1. Role Configuration
+
+For every role in our application:
+
+Add an additional configuration section.
+Display a dropdown  containing all available View Modes.
+The selected View Mode(s) should be saved in the backend.
+Whenever the role configuration is loaded, the previously saved View Mode(s) should also be loaded.
+2. Database Investigation
+
+Before introducing any new schema changes:
+
+Investigate whether the existing role-related tables can accommodate this new mapping.
+Check if any existing configuration or mapping tables can be reused.
+Only recommend creating a new table if the current schema cannot support the requirement cleanly.
+
+Additionally, investigate whether View Modes themselves should remain hardcoded or whether they should be stored in a dedicated master table for better maintainability and future expansion.
+
+Provide a recommendation with the reasoning.
+
+3. Backend
+
+Implement the backend support required to:
+
+Save the selected View Mode(s) against a role.
+Retrieve the configured View Mode(s).
+Validate the data appropriately.
+Follow the existing project architecture and coding standards.
+4. Frontend
+
+Update the Role Management screen to:
+
+Display the new View Mode configuration.
+Load existing values during edit.
+Save changes along with the role.
+Maintain the existing UI/UX patterns used throughout the application.
+5. Sync Investigation
+
+This configuration must eventually be synchronized between Shore and Vessel.
+
+During development, investigate:
+
+Whether the current synchronization framework can handle this configuration.
+Whether the existing sync registration can be reused.
+Whether provisioning already supports similar master/configuration data.
+Whether this mapping should be provisioned, one-way synced, or handled through another existing synchronization mechanism.
+Any additional changes required to make this feature sync-ready.
+
+Document the findings even if sync implementation is deferred.
+
+6. Deliverables
+
+Provide:
+
+Implementation approach.
+Database changes (or justification for reusing existing tables).
+Recommendation on whether View Modes should have their own master table.
+Backend implementation details.
+Frontend implementation details.
+Sync impact analysis and recommendations.
+Any risks, assumptions, or future considerations.
+
+Important: Reuse existing infrastructure wherever possible. Avoid introducing new tables or services unless there is a clear architectural need. The implementation should be extensible so that additional View Modes can be added in the future with minimal code changes.
