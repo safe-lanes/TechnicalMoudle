@@ -362,8 +362,13 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
 
 // ── Approve / Reject ──
 
-export async function approveChangeRequest(id: number, body: { comment: string; reviewerId?: string; role?: string }) {
-  const { comment, reviewerId, role } = body;
+export async function approveChangeRequest(id: number, body: {
+  comment: string;
+  reviewerId?: string;
+  role?: string;
+  overriddenChanges?: Array<{ field: string; approverNewValue: string }>;
+}) {
+  const { comment, reviewerId, role, overriddenChanges } = body;
 
   if (!comment) {
     throw new ValidationError('Comment is required for approval');
@@ -374,10 +379,11 @@ export async function approveChangeRequest(id: number, body: { comment: string; 
     id: existing?.id,
     targetType: existing?.targetType,
     targetId: existing?.targetId,
-    proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0
+    proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0,
+    overriddenFieldCount: overriddenChanges?.length ?? 0
   });
 
-  const updated = await crRepo.approveChangeRequest(id, reviewerId || 'reviewer', comment, role);
+  const updated = await crRepo.approveChangeRequest(id, reviewerId || 'reviewer', comment, role, overriddenChanges);
   console.log(`[CR_SERVICE] Approval complete, status: ${updated.status}`);
   return updated;
 }
