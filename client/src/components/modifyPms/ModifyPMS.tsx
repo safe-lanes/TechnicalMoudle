@@ -20,6 +20,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { ChangeRequestModal } from '@/components/modify/ChangeRequestModal';
+import ApproveRejectModal from '@/pages/change-requests/ApproveRejectModal';
 import { RejectionHistorySection } from '@/components/wo/RejectionHistorySection';
 import { useVessel } from '@/contexts/VesselContext';
 import { useUIRole } from '@/contexts/UIRoleContext';
@@ -176,40 +177,7 @@ export function ModifyPMS() {
         : userIsApproverForActiveStep
   );
 
-  // Approve mutation
-  const approveMutation = useMutation({
-    mutationFn: async ({ id, comment }: { id: number; comment: string }) => {
-      const response = await fetch(`/technical/api/change-requests/${id}/approve`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment, reviewerId: 'current_user' })
-      });
-      if (!response.ok) throw new Error('Failed to approve request');
-      return response.json();
-    },
-    onMutate: async ({ id }) => {
-      // Optimistically update the UI immediately
-      if (viewingRequest) {
-        setViewingRequest({ ...viewingRequest, status: 'approved' });
-      }
-    },
-    onSuccess: (updatedRequest) => {
-      // Invalidate both list queries and individual request query
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-      if (viewingRequest) {
-        queryClient.invalidateQueries({ queryKey: [`/technical/api/change-requests/${viewingRequest.id}`] });
-      }
-      
-      // Force refetch to ensure UI updates immediately - include vesselId for proper cache matching
-      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests'] });
-      
-      setViewingRequest(null);
-      toast({
-        title: "Request approved",
-        description: "The change request has been approved successfully"
-      });
-    }
-  });
+  const [showApproveModal, setShowApproveModal] = useState(false);
 
   // Reject mutation
   const rejectMutation = useMutation({
@@ -640,15 +608,7 @@ export function ModifyPMS() {
               </Button>
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => {
-                  if (viewingRequest) {
-                    approveMutation.mutate({
-                      id: viewingRequest.id,
-                      comment: 'Request approved'
-                    });
-                  }
-                }}
-                disabled={approveMutation.isPending}
+                onClick={() => setShowApproveModal(true)}
               >
                 <Check className="w-4 h-4 mr-2" />
                 Approve
@@ -661,6 +621,20 @@ export function ModifyPMS() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {showApproveModal && viewingRequest && (
+      <ApproveRejectModal
+        open={showApproveModal}
+        onClose={() => setShowApproveModal(false)}
+        requestId={viewingRequest.id}
+        action="approve"
+        onProcessed={() => {
+          setShowApproveModal(false);
+          queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests'] });
+          setViewingRequest(null);
+        }}
+      />
+    )}
     </>
   );
 }
