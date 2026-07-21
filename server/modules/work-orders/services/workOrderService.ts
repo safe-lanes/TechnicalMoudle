@@ -2661,10 +2661,8 @@ export async function submitPostponeRequest(id: string, body: any) {
 
   const today = new Date().toISOString().split('T')[0];
 
-  // 90-DAY POSTPONEMENT CAP VALIDATION (Calendar and Critical WOs only)
-  // Skipped for resubmissions (Postponement Rejected / Awaiting Office Approval).
-  // Skipped for Running Hours / Dual Frequency WOs — these use RH-based scheduling
-  // and full end-to-end RH postponement support (with persistence) is not yet implemented.
+  // 90-DAY POSTPONEMENT CAP VALIDATION
+  // Skipped entirely on resubmissions (Postponement Rejected / Awaiting Office Approval).
   const isResubmit =
     wo.status === 'Postponement Rejected' ||
     wo.status === 'Awaiting Office Approval';
@@ -2673,22 +2671,38 @@ export async function submitPostponeRequest(id: string, body: any) {
     wo.maintenanceBasis === 'Running Hours' ||
     wo.maintenanceBasis === 'Dual Frequency';
 
-  if (!isResubmit && !isRHBasedWO) {
-    const originalDueDateStr = wo.originalDueDate || wo.dueDate;
-    const newDueDateStr = body.nextDueDate || body.postponeDate;
-    if (originalDueDateStr && newDueDateStr) {
-      const orig = parseWorkOrderDate(originalDueDateStr);
-      const next = parseWorkOrderDate(newDueDateStr);
-      if (orig && next) {
-        const diffDays = Math.round((next.getTime() - orig.getTime()) / 86400000);
-        if (diffDays > 90) {
-          const maxDate = new Date(orig);
-          maxDate.setDate(maxDate.getDate() + 90);
-          const maxStr = maxDate.toISOString().split('T')[0];
+  if (!isResubmit) {
+    if (isRHBasedWO) {
+      // Cap: originalDueRH + 2,160 hours (90 days × 24 hrs)
+      const originalDueRH = wo.nextDueReading != null ? Number(wo.nextDueReading) : null;
+      const newDueRH = body.newDueRH != null ? Number(body.newDueRH) : null;
+      if (originalDueRH != null && newDueRH != null && !isNaN(originalDueRH) && !isNaN(newDueRH)) {
+        if (newDueRH - originalDueRH > 2160) {
           throw new ValidationError(
-            `Postponement date cannot exceed 90 days from the original due date. Maximum allowed: ${maxStr}.`,
-            { code: 'POSTPONEMENT_DATE_EXCEEDS_90_DAYS' }
+            `New due running hours cannot exceed ${(originalDueRH + 2160).toLocaleString()} hrs ` +
+            `(90-day equivalent from original due RH of ${originalDueRH.toLocaleString()} hrs).`,
+            { code: 'POSTPONEMENT_RH_EXCEEDS_90_DAY_LIMIT' }
           );
+        }
+      }
+    } else {
+      // Cap: originalDueDate + 90 days (Calendar and Critical WOs)
+      const originalDueDateStr = wo.originalDueDate || wo.dueDate;
+      const newDueDateStr = body.nextDueDate || body.postponeDate;
+      if (originalDueDateStr && newDueDateStr) {
+        const orig = parseWorkOrderDate(originalDueDateStr);
+        const next = parseWorkOrderDate(newDueDateStr);
+        if (orig && next) {
+          const diffDays = Math.round((next.getTime() - orig.getTime()) / 86400000);
+          if (diffDays > 90) {
+            const maxDate = new Date(orig);
+            maxDate.setDate(maxDate.getDate() + 90);
+            const maxStr = maxDate.toISOString().split('T')[0];
+            throw new ValidationError(
+              `Postponement date cannot exceed 90 days from the original due date. Maximum allowed: ${maxStr}.`,
+              { code: 'POSTPONEMENT_DATE_EXCEEDS_90_DAYS' }
+            );
+          }
         }
       }
     }
