@@ -30,8 +30,6 @@ import { downloadAuthedFile } from "@/lib/authedDownload";
 import { useVessels } from "@/hooks/useVessels";
 import { useDepartmentOptions, useMasterListOptions } from "@/hooks/useDepartments";
 import type { ComponentDocument } from "@shared/schema";
-import { AddDraftJobModal } from "./pms/AddDraftJobModal";
-import type { DraftJob } from "./pms/AddDraftJobModal";
 
 interface ComponentNode {
   id: string;
@@ -69,8 +67,7 @@ export default function ComponentRegisterAddEdit({
   const [criticalityFilter, setCriticalityFilter] = useState("all");
   const [makerOpen, setMakerOpen] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
-  const [draftJobs, setDraftJobs] = useState<DraftJob[]>([]);
-  const [showAddJobModal, setShowAddJobModal] = useState(false);
+  const navigateToJobAfterSave = useRef(false);
 
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -958,57 +955,21 @@ export default function ComponentRegisterAddEdit({
         const createRes = await apiRequest('POST', '/technical/api/components', payload);
         const newComponent = await createRes.json();
 
-        if (draftJobs.length > 0) {
-          let successCount = 0;
-          const jobErrors: string[] = [];
-          for (const draft of draftJobs) {
-            try {
-              const jobPayload: Record<string, any> = {
-                jobTitle: draft.jobTitle,
-                maintenanceType: draft.maintenanceType || null,
-                maintenanceBasis: draft.maintenanceBasis,
-                jobPriority: draft.jobPriority || null,
-                assignedTo: draft.assignedTo || null,
-                briefWorkDescription: draft.briefWorkDescription || null,
-                componentId: newComponent.cuuid,
-                componentCode: newComponent.componentCode,
-                componentName: newComponent.name,
-                vesselId: vesselId || 'V001',
-              };
-              if (draft.maintenanceBasis === 'Running Hours') {
-                jobPayload.intervalRunningHour = parseInt(draft.frequencyValue) || 0;
-                jobPayload.frequencyUnit = 'Hours';
-                if (draft.lastDoneRH) jobPayload.lastDoneRH = draft.lastDoneRH;
-              } else {
-                jobPayload.frequencyValue = draft.frequencyValue || null;
-                jobPayload.frequencyUnit = draft.frequencyUnit || null;
-                if (draft.lastDoneDate) jobPayload.lastDoneDate = draft.lastDoneDate;
-              }
-              await apiRequest('POST', '/technical/api/jobs', jobPayload);
-              successCount++;
-            } catch {
-              jobErrors.push(draft.jobTitle);
-            }
-          }
-          setDraftJobs([]);
-          if (jobErrors.length === 0) {
-            toast({
-              title: "Component & Jobs Created",
-              description: `Component created successfully with ${successCount} job${successCount !== 1 ? 's' : ''}.`,
-            });
-          } else {
-            toast({
-              title: "Component Created",
-              description: `Component saved. ${successCount} job${successCount !== 1 ? 's' : ''} created. Failed: ${jobErrors.join(', ')}.`,
-              variant: "destructive",
-            });
-          }
-        } else {
-          toast({
-            title: "Component Created",
-            description: "New component has been created successfully.",
-          });
+        if (navigateToJobAfterSave.current) {
+          navigateToJobAfterSave.current = false;
+          setLocation(
+            `/pms/work-order/new/${encodeURIComponent(newComponent.componentCode)}` +
+            `?mode=template` +
+            `&componentName=${encodeURIComponent(newComponent.name || componentData.componentName)}` +
+            `&componentCuuid=${encodeURIComponent(newComponent.cuuid || '')}`
+          );
+          return;
         }
+
+        toast({
+          title: "Component Created",
+          description: "New component has been created successfully.",
+        });
       }
 
       // Refetch all component-related queries to ensure tree refreshes
@@ -1840,54 +1801,19 @@ export default function ComponentRegisterAddEdit({
                         size="sm"
                         className="h-7 text-xs text-sky-600 border-sky-300 disabled:opacity-40 disabled:cursor-not-allowed"
                         data-testid="button-add-job"
-                        disabled={!isMandatoryComplete}
-                        title={!isMandatoryComplete ? "Fill all mandatory fields (Component Code, Name, Category, Dept, Parent, Is Active) first" : "Add a job to this component"}
-                        onClick={() => setShowAddJobModal(true)}
+                        disabled={!isMandatoryComplete || isSaving}
+                        title={!isMandatoryComplete ? "Fill all mandatory fields (Component Code, Name, Category, Dept, Parent, Is Active) first" : "Save component and open Job Form"}
+                        onClick={() => {
+                          navigateToJobAfterSave.current = true;
+                          handleSave();
+                        }}
                       >
-                        + Add Job
+                        {isSaving ? "Saving..." : "+ Add Job"}
                       </Button>
                     </div>
-                    {draftJobs.length > 0 ? (
-                      <div className="border rounded overflow-hidden">
-                        <table className="w-full text-xs">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="text-left px-3 py-2 font-medium text-gray-600">Job Title</th>
-                              <th className="text-left px-3 py-2 font-medium text-gray-600">Task Type</th>
-                              <th className="text-left px-3 py-2 font-medium text-gray-600">Basis</th>
-                              <th className="text-left px-3 py-2 font-medium text-gray-600">Frequency</th>
-                              <th className="px-3 py-2"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {draftJobs.map((job, idx) => (
-                              <tr key={idx} className="border-t">
-                                <td className="px-3 py-2 text-gray-700">{job.jobTitle}</td>
-                                <td className="px-3 py-2 text-gray-700">{job.maintenanceType || '—'}</td>
-                                <td className="px-3 py-2 text-gray-700">{job.maintenanceBasis}</td>
-                                <td className="px-3 py-2 text-gray-700">
-                                  {job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit}` : '—'}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <button
-                                    onClick={() => setDraftJobs(prev => prev.filter((_, i) => i !== idx))}
-                                    className="text-red-400 hover:text-red-600"
-                                    data-testid={`btn-remove-draft-job-${idx}`}
-                                    title="Remove this draft job"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-gray-400 text-center py-4">
-                        No jobs added yet. Fill mandatory fields and click + Add Job.
-                      </div>
-                    )}
+                    <div className="text-xs text-gray-400 text-center py-4">
+                      Fill mandatory fields and click + Add Job to create a job for this component.
+                    </div>
                   </>
                 ) : (
                   <>
@@ -2212,17 +2138,6 @@ export default function ComponentRegisterAddEdit({
           </div>
         </div>
       </div>
-
-      <AddDraftJobModal
-        open={showAddJobModal}
-        onClose={() => setShowAddJobModal(false)}
-        onSaveDraft={(job) => {
-          setDraftJobs(prev => [...prev, job]);
-          setShowAddJobModal(false);
-        }}
-        componentCode={componentData.componentCode}
-        componentName={componentData.componentName}
-      />
 
       <Dialog open={showJobDeactivateDialog} onOpenChange={setShowJobDeactivateDialog}>
         <DialogContent className="sm:max-w-md">
