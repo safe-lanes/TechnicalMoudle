@@ -275,6 +275,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         jobTitle: workOrder.jobTitle,
         originalDueDate: workOrder.dueDate || "",
         postponeDate: prefillPostponeDate,
+        newDueRH: "",
         reasonForPostponement: prefillReason,
         postponementRemarks: prefillRemarks,
         approver: "Office",
@@ -547,40 +548,22 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
   const handleSubmit = () => {
     const newErrors: typeof errors = {};
 
-    if (isRHBased) {
-      // Running Hours / Dual Frequency WOs: validate the newDueRH field
-      if (!formData.newDueRH) {
-        newErrors.newDueRH = "Please enter the new due running hours.";
-      } else {
-        const enteredRH = parseFloat(formData.newDueRH);
-        if (isNaN(enteredRH) || enteredRH <= 0) {
-          newErrors.newDueRH = "Please enter a valid running hours value.";
-        } else if (workOrder?.dueRH != null && enteredRH <= workOrder.dueRH) {
-          newErrors.newDueRH = `New due RH must be greater than the current due RH of ${workOrder.dueRH.toLocaleString()} hrs.`;
-        } else if (!isResubmitMode && maxAllowedRH != null && enteredRH > maxAllowedRH) {
-          // 90-day RH cap — guard against manual entry beyond max
-          newErrors.newDueRH = `New due RH cannot exceed ${maxAllowedRH.toLocaleString()} hrs — 90-day limit from original due RH of ${workOrder?.dueRH?.toLocaleString()} hrs.`;
-        }
-      }
+    if (!formData.postponeDate) {
+      newErrors.postponeDate = "Please select a postpone date.";
     } else {
-      // Calendar / Critical WOs: validate the date picker
-      if (!formData.postponeDate) {
-        newErrors.postponeDate = "Please select a postpone date.";
-      } else {
-        const orig = parseDateFlexible(formData.originalDueDate);
-        const postpone = new Date(formData.postponeDate + "T00:00:00");
-        if (orig && !isNaN(orig.getTime())) {
-          orig.setHours(0, 0, 0, 0);
-          postpone.setHours(0, 0, 0, 0);
-          if (postpone <= orig) {
-            newErrors.postponeDate = "Postpone date must be after the original due date.";
-          } else if (!isResubmitMode && postponeDateMaxValue) {
-            // 90-day cap — guard against keyboard bypass of the max attribute
-            const max = new Date(postponeDateMaxValue + "T00:00:00");
-            max.setHours(0, 0, 0, 0);
-            if (postpone > max) {
-              newErrors.postponeDate = `Postpone date cannot exceed 90 days from the original due date (max: ${maxDateFormatted}).`;
-            }
+      const orig = parseDateFlexible(formData.originalDueDate);
+      const postpone = new Date(formData.postponeDate + "T00:00:00");
+      if (orig && !isNaN(orig.getTime())) {
+        orig.setHours(0, 0, 0, 0);
+        postpone.setHours(0, 0, 0, 0);
+        if (postpone <= orig) {
+          newErrors.postponeDate = "Postpone date must be after the original due date.";
+        } else if (!isResubmitMode && !isRHBased && postponeDateMaxValue) {
+          // 90-day cap for Calendar / Critical WOs — guard against keyboard bypass of the max attribute
+          const max = new Date(postponeDateMaxValue + "T00:00:00");
+          max.setHours(0, 0, 0, 0);
+          if (postpone > max) {
+            newErrors.postponeDate = `Postpone date cannot exceed 90 days from the original due date (max: ${maxDateFormatted}).`;
           }
         }
       }
@@ -601,7 +584,6 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       onConfirm(workOrder.id || "", {
         postponeDate: formData.postponeDate,
         nextDueDate: computedNextDueDate,
-        newDueRH: isRHBased && formData.newDueRH ? parseFloat(formData.newDueRH) : undefined,
         reason: formData.reasonForPostponement,
         postponementRemarks: formData.postponementRemarks,
         approver: formData.approver,
@@ -790,63 +772,38 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
               </div>
             ) : (
               <>
-            {/* Row 4: Postpone Date (calendar WOs) or New Due RH (RH/Dual Freq WOs) */}
-            {isRHBased ? (
-              <div className="space-y-1">
-                <Label htmlFor="newDueRH" className="text-sm">
-                  New Due Running Hours <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="newDueRH"
-                  type="number"
-                  min={workOrder?.dueRH != null ? workOrder.dueRH + 1 : 0}
-                  max={maxAllowedRH ?? undefined}
-                  value={formData.newDueRH}
-                  onChange={(e) => {
-                    setFormData({ ...formData, newDueRH: e.target.value });
-                    if (e.target.value) setErrors((prev) => ({ ...prev, newDueRH: undefined }));
-                  }}
-                  placeholder={workOrder?.dueRH != null ? `> ${workOrder.dueRH.toLocaleString()} hrs` : "Enter new due RH"}
-                  className={`h-9 max-w-xs${errors.newDueRH ? " border-red-500" : ""}`}
-                  data-testid="input-new-due-rh"
-                />
-                {errors.newDueRH && (
-                  <p className="text-sm text-red-500" data-testid="error-new-due-rh">{errors.newDueRH}</p>
-                )}
-                {!isResubmitMode && maxAllowedRH != null && (
-                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="helper-postpone-max-rh">
-                    Maximum: {maxAllowedRH.toLocaleString()} hrs — 90-day equivalent from original due RH of {workOrder?.dueRH?.toLocaleString()} hrs
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <Label htmlFor="postponeDate" className="text-sm">
-                  Postpone Date <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="postponeDate"
-                  type="date"
-                  value={formData.postponeDate}
-                  min={postponeDateMinValue}
-                  max={postponeDateMaxValue}
-                  onChange={(e) => {
-                    setFormData({ ...formData, postponeDate: e.target.value });
-                    if (e.target.value) setErrors((prev) => ({ ...prev, postponeDate: undefined }));
-                  }}
-                  className={`h-9 max-w-xs${errors.postponeDate ? " border-red-500" : ""}`}
-                  data-testid="input-postpone-date"
-                />
-                {errors.postponeDate && (
-                  <p className="text-sm text-red-500" data-testid="error-postpone-date">{errors.postponeDate}</p>
-                )}
-                {!isResubmitMode && maxDateFormatted && (
-                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="helper-postpone-max-date">
-                    Maximum postponement: 90 days from original due date — by {maxDateFormatted}
-                  </p>
-                )}
-              </div>
-            )}
+            {/* Row 4: Postpone Date — mandatory primary input */}
+            <div className="space-y-1">
+              <Label htmlFor="postponeDate" className="text-sm">
+                Postpone Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="postponeDate"
+                type="date"
+                value={formData.postponeDate}
+                min={postponeDateMinValue}
+                max={postponeDateMaxValue}
+                onChange={(e) => {
+                  setFormData({ ...formData, postponeDate: e.target.value });
+                  if (e.target.value) setErrors((prev) => ({ ...prev, postponeDate: undefined }));
+                }}
+                className={`h-9 max-w-xs${errors.postponeDate ? " border-red-500" : ""}`}
+                data-testid="input-postpone-date"
+              />
+              {errors.postponeDate && (
+                <p className="text-sm text-red-500" data-testid="error-postpone-date">{errors.postponeDate}</p>
+              )}
+              {!isResubmitMode && !isRHBased && maxDateFormatted && (
+                <p className="text-xs text-muted-foreground mt-0.5" data-testid="helper-postpone-max-date">
+                  Maximum postponement: 90 days from original due date — by {maxDateFormatted}
+                </p>
+              )}
+              {!isResubmitMode && isRHBased && maxAllowedRH != null && (
+                <p className="text-xs text-muted-foreground mt-0.5" data-testid="helper-postpone-max-rh">
+                  Note: This job is due at {workOrder?.dueRH?.toLocaleString()} hrs. Maximum RH postponement is {maxAllowedRH.toLocaleString()} hrs (90-day equivalent).
+                </p>
+              )}
+            </div>
 
             {/* Row 5: Reason for Postponement */}
             <div className="space-y-1">
