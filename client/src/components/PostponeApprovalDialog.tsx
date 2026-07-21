@@ -173,6 +173,35 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
               </p>
             </div>
 
+            {/* 90-day advisory warning for approver — informational only */}
+            {(() => {
+              const orig = workOrder.dueDate;
+              const requested = workOrder.postponeRequestedDate;
+              if (!orig || !requested) return null;
+              const origDate = /^\d{4}-\d{2}-\d{2}/.test(orig)
+                ? new Date(orig + "T00:00:00")
+                : new Date(orig);
+              const reqDate = /^\d{4}-\d{2}-\d{2}/.test(requested)
+                ? new Date(requested + "T00:00:00")
+                : new Date(requested);
+              if (isNaN(origDate.getTime()) || isNaN(reqDate.getTime())) return null;
+              origDate.setHours(0, 0, 0, 0);
+              reqDate.setHours(0, 0, 0, 0);
+              const diffDays = Math.round((reqDate.getTime() - origDate.getTime()) / 86400000);
+              if (diffDays <= 90) return null;
+              return (
+                <div
+                  className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                  data-testid="warning-approval-90-days"
+                >
+                  <span className="mt-0.5 shrink-0 text-amber-500">⚠</span>
+                  <span>
+                    Warning: This postponement exceeds the recommended 90-day limit from the Work Order Due Date. Please review carefully before approving.
+                  </span>
+                </div>
+              );
+            })()}
+
             {userCanAct && (
               <div className="space-y-1">
                 <Label htmlFor="approver-remarks" className="text-sm">
