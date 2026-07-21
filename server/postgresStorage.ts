@@ -5497,43 +5497,75 @@ export class PostgresStorage {
           : [];
 
         let effectiveProposedChanges = originalProposedChanges;
-        const overrideMap = new Map((overriddenChanges || []).map(o => [o.field, o.approverNewValue]));
 
-        if (overrideMap.size > 0) {
+        // Accumulate overrides from all partial_approval entries already in revisionHistory
+        // (recorded by non-final approvers who approved in earlier levels), then apply the
+        // current (final) approver's overrides on top — later wins.
+        const allPriorHistory: Array<any> = Array.isArray(existing.revisionHistory)
+          ? (existing.revisionHistory as Array<any>)
+          : [];
+        const partialApprovals = allPriorHistory.filter((e: any) => e.type === 'partial_approval');
+
+        // Map from field -> { approverNewValue, modifiedBy, modifiedAt }
+        // Earlier levels go in first so that higher levels can override them.
+        const accumulatedOverrideMap = new Map<string, { approverNewValue: string; modifiedBy: string; modifiedAt: string }>();
+        for (const partial of partialApprovals) {
+          for (const ov of (partial.overriddenFields || [])) {
+            accumulatedOverrideMap.set(String(ov.field), {
+              approverNewValue: String(ov.approverNewValue ?? ''),
+              modifiedBy: String(ov.modifiedBy ?? partial.approvedBy ?? ''),
+              modifiedAt: String(ov.modifiedAt ?? partial.approvedAt ?? now.toISOString())
+            });
+          }
+        }
+        // Final approver's overrides take precedence over all previous levels
+        for (const ov of (overriddenChanges || [])) {
+          accumulatedOverrideMap.set(ov.field, {
+            approverNewValue: ov.approverNewValue,
+            modifiedBy: reviewerId,
+            modifiedAt: now.toISOString()
+          });
+        }
+
+        if (accumulatedOverrideMap.size > 0) {
           effectiveProposedChanges = originalProposedChanges.map((change: any) => {
             const fieldKey = change.field ?? change.columnName;
-            if (fieldKey && overrideMap.has(fieldKey)) {
-              return { ...change, newValue: overrideMap.get(fieldKey) };
+            if (fieldKey && accumulatedOverrideMap.has(String(fieldKey))) {
+              return { ...change, newValue: accumulatedOverrideMap.get(String(fieldKey))!.approverNewValue };
             }
             return change;
           });
-          console.log(`[CR_APPLY] Approver overrode ${overrideMap.size} field(s) before applying CR ${id}`);
+          console.log(`[CR_APPLY] Applied ${accumulatedOverrideMap.size} accumulated field override(s) before applying CR ${id} (${partialApprovals.length} prior level(s), ${overriddenChanges?.length ?? 0} final-level override(s))`);
         }
 
         // Apply the effective (possibly overridden) changes
         const existingWithOverrides: ChangeRequest = { ...existing, proposedChangesJson: effectiveProposedChanges };
         const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existingWithOverrides);
 
-        // Build overriddenFields for the audit trail — only fields that actually differ
-        const overriddenFields = (overriddenChanges || [])
-          .filter(o => {
-            const original = originalProposedChanges.find(
-              (c: any) => (c.field ?? c.columnName) === o.field
-            );
-            return original && String(original.newValue ?? '') !== o.approverNewValue;
-          })
-          .map(o => {
-            const original = originalProposedChanges.find(
-              (c: any) => (c.field ?? c.columnName) === o.field
-            );
-            return {
-              field: o.field,
-              originalNewValue: original?.newValue ?? null,
-              approverNewValue: o.approverNewValue,
-              modifiedBy: reviewerId,
-              modifiedAt: now.toISOString()
-            };
-          });
+        // Build overriddenFields for the audit trail — all accumulated overrides vs original values.
+        // Records the last approver who touched each field and the timestamp of that edit.
+        const overriddenFields: Array<{
+          field: string;
+          originalNewValue: any;
+          approverNewValue: string;
+          modifiedBy: string;
+          modifiedAt: string;
+        }> = [];
+        for (const [field, overrideData] of accumulatedOverrideMap) {
+          const original = originalProposedChanges.find(
+            (c: any) => (c.field ?? c.columnName) === field
+          );
+          const originalNewValue = original?.newValue ?? null;
+          if (String(originalNewValue ?? '') !== overrideData.approverNewValue) {
+            overriddenFields.push({
+              field,
+              originalNewValue,
+              approverNewValue: overrideData.approverNewValue,
+              modifiedBy: overrideData.modifiedBy,
+              modifiedAt: overrideData.modifiedAt
+            });
+          }
+        }
 
         const revisionHistoryEntry: Record<string, any> = {
           revisionNumber: newRevisionNumber,
@@ -5608,6 +5640,35 @@ export class PostgresStorage {
     if (remainingSteps.length > 0) {
       // More steps remain — mark the active step approved non-atomically is fine here;
       // CR stays in 'submitted' state awaiting the next level.
+
+      // Persist any field-level overrides from this non-final approver into revisionHistory
+      // so they can be accumulated when the final approver triggers finalization.
+      if (overriddenChanges && overriddenChanges.length > 0) {
+        const originalProposed = Array.isArray(existing.proposedChangesJson)
+          ? (existing.proposedChangesJson as Array<any>)
+          : [];
+        const partialEntry: Record<string, any> = {
+          type: 'partial_approval',
+          approvedBy: reviewerId,
+          approvedAt: now.toISOString(),
+          approvalLevel: activeStep.approvalLevel,
+          comments: comment,
+          overriddenFields: overriddenChanges.map(o => {
+            const orig = originalProposed.find((c: any) => (c.field ?? c.columnName) === o.field);
+            return {
+              field: o.field,
+              originalNewValue: orig?.newValue ?? null,
+              approverNewValue: o.approverNewValue,
+              modifiedBy: reviewerId,
+              modifiedAt: now.toISOString()
+            };
+          })
+        };
+        const updatedHistory = [...((existing.revisionHistory as Array<any>) || []), partialEntry];
+        await this.updateChangeRequest(id, { revisionHistory: updatedHistory as any });
+        console.log(`[CR_WORKFLOW] CR ${id} — non-final approver ${reviewerId} overrode ${overriddenChanges.length} field(s) at ${activeStep.approvalLevel}, recorded in revisionHistory`);
+      }
+
       await this.updateChangeRequestApprovalStep(activeStep.id, {
         status: 'Approved',
         actionByUserId: reviewerId,
