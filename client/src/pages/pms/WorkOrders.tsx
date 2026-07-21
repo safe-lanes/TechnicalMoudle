@@ -1124,6 +1124,7 @@ const WorkOrders: React.FC = () => {
       data: {
         postponeDate: postponeData.postponeDate,
         nextDueDate: postponeData.nextDueDate,
+        newDueRH: postponeData.newDueRH,
         reason: postponeData.reason,
         postponementRemarks: postponeData.postponementRemarks,
         approver: postponeData.approver || 'Office',
