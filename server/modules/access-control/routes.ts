@@ -18,7 +18,10 @@ const router = Router();
 router.get('/admin/view-modes', requireAuth, getViewModesHandler);
 router.get('/admin/role-view-mappings/resolve', requireAuth, resolveViewModeHandler);
 router.get('/admin/role-view-mappings', requireAuth, getRoleViewMappingsHandler);
-router.put('/admin/role-view-mappings', requirePMSAdmin, putRoleViewMappingsHandler);
+// PUT uses requireAuth only: requirePMSAdmin would block Super Admin, but the
+// spec's editor set is {Sail Admin, Super Admin} — enforced in the controller
+// (ship-instance 403 first, then editor-role check).
+router.put('/admin/role-view-mappings', requireAuth, putRoleViewMappingsHandler);
 
 router.get('/admin/roles', async (_req: Request, res: Response) => {
   try {
