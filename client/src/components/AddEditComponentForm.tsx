@@ -567,6 +567,15 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   const isEditMode = !!componentId;
   const [makerOpen, setMakerOpen] = useState(false);
 
+  // Reset draft-job state whenever the dialog is closed (cancel, backdrop, ESC, post-save close)
+  // so stale drafts never bleed into the next Add Component session.
+  useEffect(() => {
+    if (!isOpen) {
+      setDraftJobs([]);
+      setShowAddJobModal(false);
+    }
+  }, [isOpen]);
+
   const { data: makersList = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/fleet/makers'],
   });
