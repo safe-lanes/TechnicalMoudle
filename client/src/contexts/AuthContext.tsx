@@ -7,7 +7,10 @@ import {
 } from "react";
 import type { PublicUser, UserRole } from "@shared/schema";
 import type { UIRole } from "@shared/uiRoles";
-import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
+import {
+  useViewModeResolution,
+  type ViewModeResolution,
+} from "@/hooks/useViewModeResolution";
 import { secureGetItem, secureClear } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 import {
@@ -163,6 +166,8 @@ interface AuthContextType {
   canModifyData: () => boolean;
   canApproveChanges: () => boolean;
   userType: UIRole | null;
+  /** Full fail-closed resolution state (Task #324) — loading/error/blocked drives the app gate. */
+  uiRoleResolution: ViewModeResolution;
   login: (user: PublicUser) => void;
   logout: () => void;
 }
@@ -206,11 +211,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [myVessels, setMyVessels] = useState<MyVesselAssignment[]>([]);
   const [domain, setDomain] = useState<string | null>(null);
-  const [userType, setUserType] = useState<UIRole | null>(null);
+
+  // Task #324 — view mode is resolved SERVER-SIDE (DB mapping, fail-closed with
+  // the Office/'Sail Admin' bypass), replacing the old synchronous
+  // mapLoggedRoleToUIRole call. Shared TanStack key with UIRoleContext.
+  const uiRoleResolution = useViewModeResolution(
+    currentUser?.userType ?? null,
+    currentUser?.role ?? null,
+  );
+  const userType = uiRoleResolution.uiRole;
 
   useEffect(() => {
     let resolvedUser: PublicUser | null = null;
-    let resolvedUserType: UIRole | null = null;
     let resolvedMyVessels: MyVesselAssignment[] = [];
 
     const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
@@ -239,11 +251,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     if (encryptedUserType && encryptedProfile?.role) {
-      resolvedUserType = mapLoggedRoleToUIRole(
-        encryptedUserType,
-        encryptedProfile.role,
-      );
-
       const role = (encryptedProfile.role as UserRole) || "Office";
       const resolved = resolveProfileName(encryptedProfile);
       resolvedUser = {
@@ -301,11 +308,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (plainUserType && plainProfile?.role) {
-        resolvedUserType = mapLoggedRoleToUIRole(
-          plainUserType,
-          plainProfile.role,
-        );
-
         const role = (plainProfile.role as UserRole) || "Office";
         const resolved = resolveProfileName(plainProfile);
         resolvedUser = {
@@ -333,16 +335,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (!resolvedUser) {
       resolvedUser = DEFAULT_USER;
-      resolvedUserType = mapLoggedRoleToUIRole(
-        DEFAULT_USER.userType,
-        DEFAULT_USER.role,
-      );
     }
 
     setCurrentUser(resolvedUser);
     setMyVessels(resolvedMyVessels);
     setDomain(resolveDomain());
-    setUserType(resolvedUserType);
     const hydratedRankChanged = setActiveRank(resolvedUser?.rank_name ?? null);
     // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
     setActiveIdentity(toActiveIdentity(resolvedUser));
@@ -407,10 +404,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
-    const derivedUIType = mapLoggedRoleToUIRole(user.userType, user.role);
-
+    // View mode resolves reactively from the server via useViewModeResolution
+    // once currentUser updates (Task #324) — no synchronous mapping here.
     setCurrentUser(sanitizedUser);
-    setUserType(derivedUIType);
 
     // Keep assigned-fleet ("My Vessel") scope in sync with the freshly
     // logged-in account. The vessel assignments live on the stored
@@ -466,7 +462,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     secureClear();
 
     setCurrentUser(null);
-    setUserType(null);
     setMyVessels([]);
     setDomain(null);
     const rankChanged = setActiveRank(null);
@@ -491,6 +486,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     canModifyData,
     canApproveChanges,
     userType,
+    uiRoleResolution,
     login,
     logout,
   };

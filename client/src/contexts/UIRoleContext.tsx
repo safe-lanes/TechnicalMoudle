@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { UIRole } from "@shared/uiRoles";
-import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { useAuth } from "@/contexts/AuthContext";
+import { useViewModeResolution } from "@/hooks/useViewModeResolution";
 
 const DEV_ROLE_TO_STORAGE: Record<UIRole, { userType: string; role: string }> = {
   Sail_Admin:         { userType: "Office", role: "Sail Admin" },
@@ -30,16 +30,28 @@ interface UIRoleProviderProps {
   children: ReactNode;
 }
 
+interface ResolutionInputs {
+  userType: string | null;
+  role: string | null;
+}
+
 export function UIRoleProvider({ children }: UIRoleProviderProps) {
   const { currentUser } = useAuth();
-  const [uiRole, setUIRoleState] = useState<UIRole | null>(null);
+  const [inputs, setInputs] = useState<ResolutionInputs>({ userType: null, role: null });
+  // DEV-only role switcher override — wins over server resolution so switching
+  // to synthetic storage roles (e.g. "Client Admin") never hits ROLE_NOT_FOUND.
+  const [devOverride, setDevOverride] = useState<UIRole | null>(null);
 
   useEffect(() => {
     if (!currentUser) {
-      setUIRoleState(null);
+      setInputs({ userType: null, role: null });
+      setDevOverride(null);
       return;
     }
 
+    // Same precedence as before Task #324: encrypted storage → plain storage →
+    // currentUser. Only the MAPPING moved server-side (fail-closed DB lookup
+    // via the shared useViewModeResolution hook, replacing mapLoggedRoleToUIRole).
     const encryptedUserType = secureGetItem<string>("userType");
     let encryptedProfileRole: string | null = null;
     try {
@@ -50,7 +62,7 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     }
 
     if (encryptedUserType && encryptedProfileRole) {
-      setUIRoleState(mapLoggedRoleToUIRole(encryptedUserType, encryptedProfileRole));
+      setInputs({ userType: encryptedUserType, role: encryptedProfileRole });
       return;
     }
 
@@ -67,12 +79,18 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     }
 
     if (plainUserType && plainProfileRole) {
-      setUIRoleState(mapLoggedRoleToUIRole(plainUserType, plainProfileRole));
+      setInputs({ userType: plainUserType, role: plainProfileRole });
       return;
     }
 
-    setUIRoleState(mapLoggedRoleToUIRole(currentUser.userType, currentUser.role));
+    setInputs({
+      userType: currentUser.userType ?? null,
+      role: currentUser.role ?? null,
+    });
   }, [currentUser]);
+
+  const resolution = useViewModeResolution(inputs.userType, inputs.role);
+  const uiRole = devOverride ?? resolution.uiRole;
 
   const setUIRole = (role: UIRole) => {
     if (!import.meta.env.DEV) return;
@@ -82,7 +100,7 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
       try { return JSON.parse(localStorage.getItem("userProfile") || "{}"); } catch { return {}; }
     })();
     localStorage.setItem("userProfile", JSON.stringify({ ...existing, role: storage.role }));
-    setUIRoleState(role);
+    setDevOverride(role);
   };
 
   const value: UIRoleContextType = {

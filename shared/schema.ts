@@ -3901,6 +3901,70 @@ export const insertAdmnRoleMasterSchema = createInsertSchema(admnRoleMaster).omi
 export type InsertAdmnRoleMaster = z.infer<typeof insertAdmnRoleMasterSchema>;
 export type AdmnRoleMaster = typeof admnRoleMaster.$inferSelect;
 
+// ── Role → View-Mode mapping (Task #324) ──────────────────────────────────────
+// DB-driven replacement for the hardcoded mapLoggedRoleToUIRole logic.
+// Both tables are ONE_WAY_SHORE_TO_SHIP and SEEDED ON BOTH SIDES by migration,
+// so the sync identity is the NATURAL KEY (code / role_ruid), NOT the uuid
+// (approval_workflow_config seeded-both-sides lesson). uuids are kept as stable
+// row ids but are not the sync identity. No FKs / CHECKs on synced columns —
+// referential validation lives in the service layer.
+
+export const viewModesMaster = pgTable("view_modes_master", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vmuuid: text("vmuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  // Natural key + sync identity. Matches the UIRole union in shared/uiRoles.ts.
+  code: text("code").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  // Retire modes via isActive=false — NEVER hard-delete (hard deletes don't sync;
+  // historical mapping rows must stay resolvable).
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+});
+
+export const insertViewModesMasterSchema = createInsertSchema(viewModesMaster).omit({
+  id: true,
+  vmuuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertViewModesMaster = z.infer<typeof insertViewModesMasterSchema>;
+export type ViewModesMaster = typeof viewModesMaster.$inferSelect;
+
+export const roleViewModeMapping = pgTable("role_view_mode_mapping", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  rvmuuid: text("rvmuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  // Natural key + sync identity: one role → exactly one view mode.
+  roleRuid: text("role_ruid").notNull().unique(),
+  // References view_modes_master.code (no DB FK — synced table rule).
+  viewModeCode: text("view_mode_code").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  // Unmap = SOFT delete (is_deleted=true + explicit updated_at bump) — a hard
+  // DELETE never enters the updated_at>checkpoint sync delta, so ships would
+  // keep the mapping forever. Remap revives via ON CONFLICT (role_ruid).
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
+});
+
+export const insertRoleViewModeMappingSchema = createInsertSchema(roleViewModeMapping).omit({
+  id: true,
+  rvmuuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertRoleViewModeMapping = z.infer<typeof insertRoleViewModeMappingSchema>;
+export type RoleViewModeMapping = typeof roleViewModeMapping.$inferSelect;
+
 export const admMenumasterAc = pgTable("adm_menumaster_ac", {
   id: integer("id").primaryKey(),
   muid: text("muid").notNull().unique(),

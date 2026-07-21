@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Loader2, Save, ChevronRight, ChevronDown, ShieldCheck, ShoppingCart } from "lucide-react";
+import { Loader2, Save, ChevronRight, ChevronDown, ShieldCheck, ShoppingCart, MonitorCog, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -196,6 +196,7 @@ export default function AccessControl() {
       </div>
 
       <ShipskartRoleMappingCard roles={rolesQuery.data ?? []} />
+      <RoleViewModeMappingCard />
 
       <div className="flex-1 flex gap-4 min-h-0">
         <div className="w-64 flex-shrink-0 bg-white rounded-lg border border-gray-200 flex flex-col" data-testid="roles-panel">
@@ -368,6 +369,147 @@ const UNMAPPED = "__unmapped__";
 interface RoleMappingData {
   availableRoles: string[];
   mappings: Array<{ sailRole: string; shipskartRole: string }>;
+}
+
+// ── Role → View-Mode Mapping (Task #324) ────────────────────────────────────
+// UI-configurable, DB-driven replacement for the hardcoded role→view-mode logic.
+// Rows/options come from GET /admin/role-view-mappings. Unmap = block-not-default:
+// unmapped roles cannot enter the app until an admin maps them. The Office/Sail
+// Admin row is LOCKED (hardcoded bypass; backend rejects edits). Shore-only —
+// hidden on ships (mappings arrive via sync), same gating as the Shipskart card.
+
+interface RoleViewMappingData {
+  availableModes: Array<{ code: string; displayName: string }>;
+  mappings: Array<{ roleRuid: string; roleName: string; roletype: string; viewModeCode: string | null }>;
+}
+
+function RoleViewModeMappingCard() {
+  const { hasRole } = useAuth();
+  const { toast } = useToast();
+  const { isShore } = useSyncInstanceInfo();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState(false);
+
+  const canEdit = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
+
+  const mappingQuery = useQuery<RoleViewMappingData>({
+    queryKey: ["/technical/api/admin/role-view-mappings"],
+    enabled: canEdit && open,
+  });
+
+  useEffect(() => {
+    if (!mappingQuery.data || dirty) return;
+    const next: Record<string, string> = {};
+    for (const m of mappingQuery.data.mappings) next[m.roleRuid] = m.viewModeCode ?? UNMAPPED;
+    setDraft(next);
+  }, [mappingQuery.data, dirty]);
+
+  const rows = mappingQuery.data?.mappings ?? [];
+  const modes = mappingQuery.data?.availableModes ?? [];
+  const isLockedSailAdmin = (r: { roleName: string; roletype: string }) =>
+    r.roletype === "Office" && r.roleName === "Sail Admin";
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      // Only send CHANGED, editable rows (backend rejects the Sail Admin row).
+      const mappings = rows
+        .filter((r) => !isLockedSailAdmin(r))
+        .filter((r) => (draft[r.roleRuid] ?? UNMAPPED) !== (r.viewModeCode ?? UNMAPPED))
+        .map((r) => ({
+          roleRuid: r.roleRuid,
+          viewModeCode: draft[r.roleRuid] && draft[r.roleRuid] !== UNMAPPED ? draft[r.roleRuid] : null,
+        }));
+      const res = await apiRequest("PUT", "/technical/api/admin/role-view-mappings", { mappings });
+      return res.json();
+    },
+    onSuccess: () => {
+      setDirty(false);
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/admin/role-view-mappings"] });
+      // Resolve results may have changed for any role — drop all cached resolves.
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          typeof q.queryKey?.[0] === "string" &&
+          (q.queryKey[0] as string).startsWith("/technical/api/admin/role-view-mappings/resolve"),
+      });
+      toast({ title: "Role view-mode mapping saved" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not save mapping", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  if (!canEdit) return null;
+
+  return (
+    <div className="flex-shrink-0 mb-4 border border-gray-200 rounded-lg bg-white" data-testid="role-view-mode-mapping-card">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full px-4 py-3 flex items-center gap-2 text-left"
+        data-testid="view-mode-mapping-toggle"
+      >
+        {open ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+        <MonitorCog className="h-4 w-4 text-blue-600" />
+        <span className="font-semibold text-gray-900">Role View-Mode Mapping</span>
+        <span className="text-xs text-gray-500 ml-2">Which app view mode each role gets — unmapped roles are blocked from entry</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4">
+          {mappingQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-gray-500 py-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading mapping…</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 max-h-64 overflow-y-auto pr-2">
+                {rows.map((r) => {
+                  const locked = isLockedSailAdmin(r);
+                  return (
+                    <div key={r.roleRuid} className="flex items-center justify-between gap-3 py-1" data-testid={`view-mode-row-${r.roleRuid}`}>
+                      <div className="min-w-0 flex items-center gap-1.5">
+                        <span className="text-sm text-gray-900">{r.roleName}</span>
+                        <span className="text-xs text-gray-400">{r.roletype}</span>
+                        {locked && <Lock className="h-3 w-3 text-gray-400" aria-label="Locked" />}
+                      </div>
+                      {locked ? (
+                        <span className="text-sm text-gray-500 w-44 text-right pr-1" data-testid={`view-mode-locked-${r.roleRuid}`}>Sail Admin (locked)</span>
+                      ) : (
+                        <Select
+                          value={draft[r.roleRuid] ?? UNMAPPED}
+                          onValueChange={(v) => { setDraft((d) => ({ ...d, [r.roleRuid]: v })); setDirty(true); }}
+                        >
+                          <SelectTrigger className="w-44 h-8" data-testid={`view-mode-select-${r.roleRuid}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={UNMAPPED}>— not mapped (blocked) —</SelectItem>
+                            {modes.map((m) => (
+                              <SelectItem key={m.code} value={m.code}>{m.displayName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-end mt-3">
+                <Button
+                  size="sm"
+                  onClick={() => saveMutation.mutate()}
+                  disabled={!dirty || saveMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  data-testid="btn-save-view-mode-mapping"
+                >
+                  {saveMutation.isPending ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>) : (<><Save className="mr-2 h-4 w-4" />Save Mapping</>)}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ShipskartRoleMappingCard({ roles }: { roles: Array<{ assignedRole: string; roletype: string; isActive: boolean }> }) {
