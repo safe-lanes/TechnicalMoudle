@@ -30,6 +30,8 @@ import { downloadAuthedFile } from "@/lib/authedDownload";
 import { useVessels } from "@/hooks/useVessels";
 import { useDepartmentOptions, useMasterListOptions } from "@/hooks/useDepartments";
 import type { ComponentDocument } from "@shared/schema";
+import { AddDraftJobModal } from "./pms/AddDraftJobModal";
+import type { DraftJob } from "./pms/AddDraftJobModal";
 
 interface ComponentNode {
   id: string;
@@ -67,6 +69,8 @@ export default function ComponentRegisterAddEdit({
   const [criticalityFilter, setCriticalityFilter] = useState("all");
   const [makerOpen, setMakerOpen] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [draftJobs, setDraftJobs] = useState<DraftJob[]>([]);
+  const [showAddJobModal, setShowAddJobModal] = useState(false);
 
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -806,6 +810,11 @@ export default function ComponentRegisterAddEdit({
     ? ALL_MANDATORY_FIELDS.filter(f => !PARENT_OPTIONAL_FIELDS.includes(f.key))
     : ALL_MANDATORY_FIELDS;
 
+  const isMandatoryComplete = MANDATORY_FIELDS.every(field => {
+    const value = componentData[field.key as keyof typeof componentData];
+    return value && String(value).trim() !== '';
+  });
+
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   const validateMandatoryFields = (): boolean => {
@@ -946,11 +955,60 @@ export default function ComponentRegisterAddEdit({
           description: "Component has been updated successfully.",
         });
       } else {
-        await apiRequest('POST', '/technical/api/components', payload);
-        toast({
-          title: "Component Created",
-          description: "New component has been created successfully.",
-        });
+        const createRes = await apiRequest('POST', '/technical/api/components', payload);
+        const newComponent = await createRes.json();
+
+        if (draftJobs.length > 0) {
+          let successCount = 0;
+          const jobErrors: string[] = [];
+          for (const draft of draftJobs) {
+            try {
+              const jobPayload: Record<string, any> = {
+                jobTitle: draft.jobTitle,
+                maintenanceType: draft.maintenanceType || null,
+                maintenanceBasis: draft.maintenanceBasis,
+                jobPriority: draft.jobPriority || null,
+                assignedTo: draft.assignedTo || null,
+                briefWorkDescription: draft.briefWorkDescription || null,
+                componentId: newComponent.cuuid,
+                componentCode: newComponent.componentCode,
+                componentName: newComponent.name,
+                vesselId: vesselId || 'V001',
+              };
+              if (draft.maintenanceBasis === 'Running Hours') {
+                jobPayload.intervalRunningHour = parseInt(draft.frequencyValue) || 0;
+                jobPayload.frequencyUnit = 'Hours';
+                if (draft.lastDoneRH) jobPayload.lastDoneRH = draft.lastDoneRH;
+              } else {
+                jobPayload.frequencyValue = draft.frequencyValue || null;
+                jobPayload.frequencyUnit = draft.frequencyUnit || null;
+                if (draft.lastDoneDate) jobPayload.lastDoneDate = draft.lastDoneDate;
+              }
+              await apiRequest('POST', '/technical/api/jobs', jobPayload);
+              successCount++;
+            } catch {
+              jobErrors.push(draft.jobTitle);
+            }
+          }
+          setDraftJobs([]);
+          if (jobErrors.length === 0) {
+            toast({
+              title: "Component & Jobs Created",
+              description: `Component created successfully with ${successCount} job${successCount !== 1 ? 's' : ''}.`,
+            });
+          } else {
+            toast({
+              title: "Component Created",
+              description: `Component saved. ${successCount} job${successCount !== 1 ? 's' : ''} created. Failed: ${jobErrors.join(', ')}.`,
+              variant: "destructive",
+            });
+          }
+        } else {
+          toast({
+            title: "Component Created",
+            description: "New component has been created successfully.",
+          });
+        }
       }
 
       // Refetch all component-related queries to ensure tree refreshes
@@ -1774,76 +1832,137 @@ export default function ComponentRegisterAddEdit({
                 </CardHeader>
                 {!collapsedSections['C'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                {activeComponentId && componentData.componentCode && (
-                <div className="flex items-center justify-end mb-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs text-sky-600 border-sky-300"
-                    data-testid="button-add-job"
-                    onClick={() => setLocation(`/pms/work-order/new/${componentData.componentCode}?mode=template&componentName=${encodeURIComponent(componentData.componentName)}`)}
-                  >
-                    + Add Jobs
-                  </Button>
-                </div>
+                {(!isEditMode || isAddingNew) ? (
+                  <>
+                    <div className="flex items-center justify-end mb-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs text-sky-600 border-sky-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                        data-testid="button-add-job"
+                        disabled={!isMandatoryComplete}
+                        title={!isMandatoryComplete ? "Fill all mandatory fields (Component Code, Name, Category, Dept, Parent, Is Active) first" : "Add a job to this component"}
+                        onClick={() => setShowAddJobModal(true)}
+                      >
+                        + Add Job
+                      </Button>
+                    </div>
+                    {draftJobs.length > 0 ? (
+                      <div className="border rounded overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="text-left px-3 py-2 font-medium text-gray-600">Job Title</th>
+                              <th className="text-left px-3 py-2 font-medium text-gray-600">Task Type</th>
+                              <th className="text-left px-3 py-2 font-medium text-gray-600">Basis</th>
+                              <th className="text-left px-3 py-2 font-medium text-gray-600">Frequency</th>
+                              <th className="px-3 py-2"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {draftJobs.map((job, idx) => (
+                              <tr key={idx} className="border-t">
+                                <td className="px-3 py-2 text-gray-700">{job.jobTitle}</td>
+                                <td className="px-3 py-2 text-gray-700">{job.maintenanceType || '—'}</td>
+                                <td className="px-3 py-2 text-gray-700">{job.maintenanceBasis}</td>
+                                <td className="px-3 py-2 text-gray-700">
+                                  {job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit}` : '—'}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <button
+                                    onClick={() => setDraftJobs(prev => prev.filter((_, i) => i !== idx))}
+                                    className="text-red-400 hover:text-red-600"
+                                    data-testid={`btn-remove-draft-job-${idx}`}
+                                    title="Remove this draft job"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-400 text-center py-4">
+                        No jobs added yet. Fill mandatory fields and click + Add Job.
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {activeComponentId && componentData.componentCode && (
+                    <div className="flex items-center justify-end mb-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs text-sky-600 border-sky-300"
+                        data-testid="button-add-job"
+                        onClick={() => setLocation(`/pms/work-order/new/${componentData.componentCode}?mode=template&componentName=${encodeURIComponent(componentData.componentName)}`)}
+                      >
+                        + Add Jobs
+                      </Button>
+                    </div>
+                    )}
+                    <div className="border rounded overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">W.O No.</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Job Title</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Assigned to</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Due Date</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
+                            <th className="px-3 py-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {workOrders.length > 0 ? workOrders.map((wo) => {
+                            const isInactive = wo.isActive === false;
+                            const textClass = isInactive ? "text-gray-400" : "text-gray-700";
+                            return (
+                            <tr key={wo.id} className={`border-t ${isInactive ? "opacity-60 bg-gray-50" : ""}`}>
+                              <td className={`px-3 py-2 ${textClass}`}>
+                                {wo.woNo}{isInactive && <span className="ml-1 text-xs text-red-400">(Inactive)</span>}
+                              </td>
+                              <td className={`px-3 py-2 ${textClass}`}>{wo.jobTitle}</td>
+                              <td className={`px-3 py-2 ${textClass}`}>{wo.assignedTo}</td>
+                              <td className={`px-3 py-2 ${textClass}`}>{wo.dueDate}</td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(wo.status)}`}>
+                                  {wo.status}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                {!isInactive && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                    data-testid={`button-delete-wo-${wo.id}`}
+                                    onClick={() => {
+                                      setJobToDeactivate(wo);
+                                      setShowJobDeactivateDialog(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                            );
+                          }) : (
+                            <tr>
+                              <td colSpan={6} className="px-3 py-4 text-center text-gray-400">
+                                No work orders found
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
-                <div className="border rounded overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">W.O No.</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Job Title</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Assigned to</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Due Date</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
-                        <th className="px-3 py-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {workOrders.length > 0 ? workOrders.map((wo) => {
-                        const isInactive = wo.isActive === false;
-                        const textClass = isInactive ? "text-gray-400" : "text-gray-700";
-                        return (
-                        <tr key={wo.id} className={`border-t ${isInactive ? "opacity-60 bg-gray-50" : ""}`}>
-                          <td className={`px-3 py-2 ${textClass}`}>
-                            {wo.woNo}{isInactive && <span className="ml-1 text-xs text-red-400">(Inactive)</span>}
-                          </td>
-                          <td className={`px-3 py-2 ${textClass}`}>{wo.jobTitle}</td>
-                          <td className={`px-3 py-2 ${textClass}`}>{wo.assignedTo}</td>
-                          <td className={`px-3 py-2 ${textClass}`}>{wo.dueDate}</td>
-                          <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(wo.status)}`}>
-                              {wo.status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">
-                            {!isInactive && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                data-testid={`button-delete-wo-${wo.id}`}
-                                onClick={() => {
-                                  setJobToDeactivate(wo);
-                                  setShowJobDeactivateDialog(true);
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                        );
-                      }) : (
-                        <tr>
-                          <td colSpan={6} className="px-3 py-4 text-center text-gray-400">
-                            No work orders found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
                 </CardContent>
                 )}
               </Card>
@@ -2093,6 +2212,17 @@ export default function ComponentRegisterAddEdit({
           </div>
         </div>
       </div>
+
+      <AddDraftJobModal
+        open={showAddJobModal}
+        onClose={() => setShowAddJobModal(false)}
+        onSaveDraft={(job) => {
+          setDraftJobs(prev => [...prev, job]);
+          setShowAddJobModal(false);
+        }}
+        componentCode={componentData.componentCode}
+        componentName={componentData.componentName}
+      />
 
       <Dialog open={showJobDeactivateDialog} onOpenChange={setShowJobDeactivateDialog}>
         <DialogContent className="sm:max-w-md">
