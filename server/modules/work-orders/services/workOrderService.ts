@@ -1162,6 +1162,31 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   }
 
+  // ── RH accuracy validations (migration 139) — PATCH path mirror of the
+  // completion-service checks (the ship Part-B save submits via PATCH). ──
+  if (updateData.woCompletionRh !== undefined && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== '') {
+    const woRhNum = parseFloat(String(updateData.woCompletionRh));
+    const readingRaw = updateData.runningHours ?? updateData.currentReading ?? existingWO.runningHours ?? existingWO.currentReading;
+    const readingNum = readingRaw !== undefined && readingRaw !== null && String(readingRaw).trim() !== '' ? parseFloat(String(readingRaw)) : NaN;
+    if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
+      throw new ValidationError(
+        `WO Completion RH (${woRhNum}) cannot be greater than the Current Reading (${readingNum}). ` +
+        `The completion reading is the hours at the time the work was done; the Current Reading is the latest meter value.`,
+        { code: 'WO_COMPLETION_RH_EXCEEDS_READING' }
+      );
+    }
+  }
+  if (updateData.currentReadingDate) {
+    const rdParsed = new Date(String(updateData.currentReadingDate));
+    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+    if (isNaN(rdParsed.getTime())) {
+      throw new ValidationError('Current Reading Date is not a valid date.', { code: 'INVALID_READING_DATE' });
+    }
+    if (rdParsed.getTime() > todayEnd.getTime()) {
+      throw new ValidationError('Current Reading Date cannot be in the future.', { code: 'READING_DATE_IN_FUTURE' });
+    }
+  }
+
   // REJECTION WORKFLOW
   const isBeingRejected = updateData.status?.toLowerCase() === 'rejected';
   if (isBeingRejected) {
@@ -1437,6 +1462,10 @@ export async function updateWorkOrder(id: string, body: any) {
         return !isNaN(p.getTime()) ? p.toISOString().split('T')[0] : undefined;
       };
       const completionDateNorm = normRhDate(existingWO.completionDateTime || existingWO.dateCompleted || updateData.completionDateTime);
+      // R2 (migration 139): the RH module operates on the date the reading was
+      // TAKEN (stored Current Reading Date); fallback to the completion date =
+      // exact pre-feature behaviour.
+      const readingDateNorm = normRhDate((existingWO as any).currentReadingDate || (updateData as any).currentReadingDate) || completionDateNorm;
 
       if (rhComp && rhCounterType === 'MASTER' && !isNaN(rhValue)) {
         // MASTER pre-flight: detect back-dated lower entry.
@@ -1444,11 +1473,11 @@ export async function updateWorkOrder(id: string, body: any) {
         // greater than the current master RH, skip the RH module write. The WO still completes.
         let rhBackdatedSkippedApproval = false;
         const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || '0');
-        if (rhValue <= masterCurrentRHApproval && completionDateNorm) {
+        if (rhValue <= masterCurrentRHApproval && readingDateNorm) {
           const masterUpdRawApproval: any = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
           const masterUpdDateApproval: Date | null = masterUpdRawApproval instanceof Date ? masterUpdRawApproval : (masterUpdRawApproval ? new Date(masterUpdRawApproval) : null);
           if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
-            const approvalCompletionDate = new Date(completionDateNorm);
+            const approvalCompletionDate = new Date(readingDateNorm!);
             const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
             const woDay = Date.UTC(approvalCompletionDate.getUTCFullYear(), approvalCompletionDate.getUTCMonth(), approvalCompletionDate.getUTCDate());
             if (woDay < masterDay) {
@@ -1457,7 +1486,7 @@ export async function updateWorkOrder(id: string, body: any) {
               rhBackdatedApproval = true;
               latestRHApproval = masterCurrentRHApproval;
               latestRHDateApproval = masterUpdDateApproval.toISOString().split('T')[0];
-              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
+              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
             }
           }
         }
@@ -1474,7 +1503,7 @@ export async function updateWorkOrder(id: string, body: any) {
             userRole: body.userRole || 'Ship',
             adminOverride: body.adminOverride || false,
             comments: `RH update via work order completion ${existingWO.workOrderNo}`,
-            dateUpdated: completionDateNorm
+            dateUpdated: readingDateNorm
           });
           updateData.rhSyncedAt = new Date();
           console.log(`✅ [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO.workOrderNo} (cascaded to INHERITED children)`);
@@ -1518,11 +1547,11 @@ export async function updateWorkOrder(id: string, body: any) {
           // INHERITED pre-flight: detect back-dated lower entry against the master.
           let rhBackdatedSkippedInherited = false;
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || '0');
-          if (rhValue <= inhMasterCurrentRH && completionDateNorm) {
+          if (rhValue <= inhMasterCurrentRH && readingDateNorm) {
             const inhMasterUpdRaw: any = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
             const inhMasterUpdDate: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
-              const inhCompletionDate = new Date(completionDateNorm);
+              const inhCompletionDate = new Date(readingDateNorm!);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
               const woDay = Date.UTC(inhCompletionDate.getUTCFullYear(), inhCompletionDate.getUTCMonth(), inhCompletionDate.getUTCDate());
               if (woDay < masterDay) {
@@ -1531,7 +1560,7 @@ export async function updateWorkOrder(id: string, body: any) {
                 rhBackdatedApproval = true;
                 latestRHApproval = inhMasterCurrentRH;
                 latestRHDateApproval = inhMasterUpdDate.toISOString().split('T')[0];
-                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
+                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
               }
             }
           }
@@ -1548,7 +1577,7 @@ export async function updateWorkOrder(id: string, body: any) {
               userRole: body.userRole || 'Ship',
               adminOverride: body.adminOverride || false,
               comments: `WO ${existingWO.workOrderNo} (INHERITED → cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-              dateUpdated: completionDateNorm
+              dateUpdated: readingDateNorm
             });
             updateData.rhSyncedAt = new Date();
             console.log(`✅ [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO.workOrderNo}`);
@@ -1570,9 +1599,9 @@ export async function updateWorkOrder(id: string, body: any) {
           } // end if (!rhBackdatedSkippedInherited) — INHERITED branch
         } else {
           // No valid master link: timeline-validate and record on this child only.
-          if (completionDateNorm) {
+          if (readingDateNorm) {
             const { validateRHEntry } = await import('../../running-hours/services/rhTimelineValidationService');
-            const backdateCheck = await validateRHEntry(rhComp.cuuid, completionDateNorm, rhValue);
+            const backdateCheck = await validateRHEntry(rhComp.cuuid, readingDateNorm, rhValue);
             if (!backdateCheck.isValid && backdateCheck.validationStatus === 'INVALID_BACKDATED') {
               throw new ValidationError(backdateCheck.errorMessage, {
                 code: 'INVALID_BACKDATED',
@@ -1937,7 +1966,11 @@ export async function updateWorkOrder(id: string, body: any) {
 
           if (job) {
             const rawJobCompletionDate = freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime;
-            const runningHours = freshWorkOrder.runningHours;
+            // R1 (migration 139): next-cycle math derives from the stored WO
+            // Completion RH; fallback to the stored reading = pre-feature
+            // behaviour for historical/in-flight WOs. The raw reading is still
+            // used for display/logging where it denotes the meter value.
+            const runningHours = (freshWorkOrder as any).woCompletionRh ?? freshWorkOrder.runningHours;
 
             const normalizeJobDate = (dateStr: string | undefined | null): string | null => {
               if (!dateStr) return null;

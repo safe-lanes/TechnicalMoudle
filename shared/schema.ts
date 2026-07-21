@@ -1271,6 +1271,15 @@ export const workOrders = pgTable("work_orders", {
 
   // === Layer 7: Running Hours Validation & Isolation ===
   completionRH: decimal("completion_rh", { precision: 10, scale: 2 }),
+  // RH accuracy (migration 139): reading AT completion — drives the NEXT RH cycle
+  // (lastDoneRH/nextDueRH/nextDueReading + RH missed-cycles) via the fallback chain
+  // (woCompletionRh ?? completion reading). Section B3 Current Reading remains only
+  // the equipment-RH-record update source.
+  woCompletionRh: decimal("wo_completion_rh", { precision: 10, scale: 2 }),
+  // RH accuracy (migration 139): date the Current Reading was taken (ISO string);
+  // threads into the RH module's dateUpdated → last_updated/audit reflect the
+  // actual reading date, not the WO completion date.
+  currentReadingDate: text("current_reading_date"),
   completionRHValidated: boolean("completion_rh_validated"),
   completionRHSource: text("completion_rh_source"),
   completionRHValidationDetails: jsonb("completion_rh_validation_details"),

@@ -968,6 +968,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     jobExperienceNotes: "",
     previousReading: "",
     currentReading: "",
+    // RH accuracy (migration 139): B2.1 completion-time RH (prefilled from Current
+    // Reading via display fallback) + B3 date the reading was taken.
+    woCompletionRh: "",
+    currentReadingDate: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
     consumedSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityConsumed: string, location: string, locationId: number | null, comments: string}>,
     ihmUpdate: {
@@ -2986,6 +2990,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const saveExecutionData = {
         ...executionData,
         runningHours: currentRHValue || executionData.runningHours,
+        // RH accuracy (migration 139): materialize the DISPLAYED defaults so what the
+        // user sees is what is stored — reading date defaults to today in the UI.
+        currentReadingDate: executionData.currentReadingDate || new Date().toISOString().split('T')[0],
         riskAssessmentStatus: executionData.riskAssessment,
         safetyChecklistsStatus: executionData.safetyChecklists,
         operationalFormsStatus: executionData.operationalForms,
@@ -5787,6 +5794,35 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     />
                   </div>
 
+                  {/* RH accuracy (migration 139): completion-time RH — the NEXT RH cycle
+                      calculates from THIS value; Section B3's Current Reading only updates
+                      the equipment's RH record. Prefilled from Current Reading (display
+                      fallback — empty field submits nothing and the backend falls back to
+                      the reading, same value). Editable down (warn-only server-side). */}
+                  {(() => {
+                    const b21Basis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
+                    if (b21Basis !== 'Running Hours' && b21Basis !== 'Dual Frequency') return null;
+                    const woRhValue = executionData.woCompletionRh !== '' && executionData.woCompletionRh != null
+                      ? executionData.woCompletionRh
+                      : (executionData.currentReading || '');
+                    return (
+                      <div className="space-y-2">
+                        <Label className="text-sm text-[#8798ad]" data-testid="label-wo-completion-rh">WO Completion RH</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={woRhValue}
+                          onChange={(e) => handleExecutionChange('woCompletionRh', e.target.value)}
+                          disabled={isPartBReadOnly}
+                          className="text-sm"
+                          placeholder="RH at completion (prefilled from Current Reading)"
+                          data-testid="input-wo-completion-rh"
+                        />
+                        <p className="text-[11px] text-gray-400">Hours at the time the work was done — drives the next RH cycle.</p>
+                      </div>
+                    );
+                  })()}
+
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.13"><Marker id="WOF.B2.13" />Performed by <span className="text-red-500">*</span></Label>
                     <Select
@@ -6108,6 +6144,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       Fetch RH
                     </Button>
                   )}
+                </div>
+
+                {/* RH accuracy (migration 139): date the reading was TAKEN — becomes the
+                    RH module's Last Updated date instead of the WO completion date.
+                    Defaults to today, cannot be in the future. */}
+                <div className="space-y-1 mt-2">
+                  <Label className="text-sm text-[#8798ad]" data-testid="label-current-reading-date">Current Reading Date</Label>
+                  <Input
+                    type="date"
+                    value={executionData.currentReadingDate || new Date().toISOString().split('T')[0]}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => handleExecutionChange('currentReadingDate', e.target.value)}
+                    disabled={isPartBReadOnly}
+                    className="text-sm"
+                    data-testid="input-current-reading-date"
+                  />
                 </div>
 
                 {/* RH Valid Range Helper */}

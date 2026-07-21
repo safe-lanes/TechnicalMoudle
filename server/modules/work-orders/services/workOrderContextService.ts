@@ -405,6 +405,9 @@ export async function getWorkOrderContext(workOrderId: string) {
     runningHoursDifference: correctedWorkOrder.runningHoursDifference?.toString() || '',
     readingDate: correctedWorkOrder.readingDate || '',
     runningHours: correctedWorkOrder.runningHours || '',
+    // RH accuracy (migration 139): round-trip the completion-time RH + reading date.
+    woCompletionRh: (correctedWorkOrder as any).woCompletionRh?.toString() || '',
+    currentReadingDate: (correctedWorkOrder as any).currentReadingDate || '',
     rhBackdatedEntry: !!(correctedWorkOrder as any).rhBackdatedEntry,
     // B4 - Spare Parts Consumed
     consumedSpareParts: ensureArray(correctedWorkOrder.consumedSpareParts),

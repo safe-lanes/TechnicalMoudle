@@ -67,8 +67,11 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
             nextDueDate = computed;
           }
         }
-      } else if (existingWO.maintenanceBasis === "Running Hours" && existingWO.currentReading) {
-        nextDueReading = (parseInt(existingWO.currentReading) + parseInt(existingWO.frequencyValue || "0")).toString();
+      } else if (existingWO.maintenanceBasis === "Running Hours" && ((existingWO as any).woCompletionRh || existingWO.currentReading)) {
+        // R1 (migration 139): next due derives from the stored WO Completion RH
+        // (fallback: current reading = pre-feature behaviour).
+        const bulkCycleRH = (existingWO as any).woCompletionRh ?? existingWO.currentReading;
+        nextDueReading = (parseInt(String(bulkCycleRH)) + parseInt(existingWO.frequencyValue || "0")).toString();
       }
 
       const completionDateForCalc = actualCompletionDate || existingWO.completionDateTime || existingWO.dateCompleted;
@@ -77,7 +80,9 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       // gate on the bulk path. Mirrors workOrderCompletionService.
       let missedCycles: number;
       if (existingWO.maintenanceBasis === 'Running Hours') {
-        const completionRHValue = existingWO.completionRH;
+        // R1 (migration 139): missed-cycles measures intervals at the moment the
+        // work was done — WO Completion RH first, stored completion reading fallback.
+        const completionRHValue = (existingWO as any).woCompletionRh ?? existingWO.completionRH;
         const dueRH = existingWO.nextDueReading ?? null;
         let jobIntervalRH: number | string | null = null;
         if (existingWO.jobId) {
@@ -240,8 +245,10 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
       const computed = calculateNextDueDate(actualCompletionDate, existingWO.frequencyValue, existingWO.frequencyUnit, originalDueDate);
       if (computed) nextDueDate = computed;
     }
-  } else if (existingWO.maintenanceBasis === 'Running Hours' && existingWO.currentReading) {
-    nextDueReading = (parseInt(existingWO.currentReading) + parseInt(existingWO.frequencyValue || '0')).toString();
+  } else if (existingWO.maintenanceBasis === 'Running Hours' && ((existingWO as any).woCompletionRh || existingWO.currentReading)) {
+    // R1 (migration 139): same source switch as the bulk path above.
+    const cycleRHSrc = (existingWO as any).woCompletionRh ?? existingWO.currentReading;
+    nextDueReading = (parseInt(String(cycleRHSrc)) + parseInt(existingWO.frequencyValue || '0')).toString();
   }
 
   const { calculateMissedCycles } = await import('@shared/dateUtils');
