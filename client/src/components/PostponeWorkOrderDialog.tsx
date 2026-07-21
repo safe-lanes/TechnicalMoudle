@@ -93,6 +93,10 @@ interface PostponeWorkOrderDialogProps {
     postponementEndDate?: string | null;
     postponementAuthorizedBy?: string | null;
     postponementApprovalRemarks?: string | null;
+    /** Maintenance basis — used to determine cap type (date vs RH) */
+    maintenanceBasis?: string | null;
+    /** Original due running hours — used for RH/Dual Frequency WO cap */
+    dueRH?: number | null;
   } | null;
   onConfirm?: (workOrderId: string, postponeData: any) => void;
 }
@@ -151,6 +155,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     postponeDate?: string;
     reason?: string;
     remarks?: string;
+    newDueRH?: string;
   }>({});
 
   const [postponementDocs, setPostponementDocs] = useState<PostponementDoc[]>([]);
@@ -211,6 +216,43 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     next.setDate(next.getDate() + 1);
     return next.toISOString().split("T")[0];
   }, [formData.originalDueDate]);
+
+  // Detect resubmit mode — cap is removed for resubmissions
+  const isResubmitMode =
+    workOrder?.status === 'Awaiting Office Approval' ||
+    workOrder?.computedStatus === 'Awaiting Office Approval' ||
+    workOrder?.status === 'Postponement Rejected' ||
+    workOrder?.computedStatus === 'Postponement Rejected';
+
+  // RH-based WOs use an hours cap instead of a date cap
+  const isRHBased =
+    workOrder?.maintenanceBasis === 'Running Hours' ||
+    workOrder?.maintenanceBasis === 'Dual Frequency';
+
+  // Max allowed date for Calendar/Critical WOs (originalDueDate + 90 days)
+  const postponeDateMaxValue = useMemo(() => {
+    if (isResubmitMode) return undefined;
+    if (isRHBased) return undefined;
+    const orig = parseDateFlexible(formData.originalDueDate);
+    if (!orig || isNaN(orig.getTime())) return undefined;
+    const max = new Date(orig);
+    max.setDate(max.getDate() + 90);
+    return max.toISOString().split("T")[0];
+  }, [formData.originalDueDate, isResubmitMode, isRHBased]);
+
+  // Human-readable version for display in helper text and error messages
+  const maxDateFormatted = useMemo(() => {
+    if (!postponeDateMaxValue) return null;
+    const d = new Date(postponeDateMaxValue + "T00:00:00");
+    return isNaN(d.getTime()) ? null : formatDDMMMYYYY(d);
+  }, [postponeDateMaxValue]);
+
+  // Max allowed RH for Running Hours / Dual Frequency WOs (dueRH + 2160 hrs = 90 days)
+  const maxAllowedRH = useMemo(() => {
+    if (!isRHBased || isResubmitMode) return null;
+    if (workOrder?.dueRH == null) return null;
+    return workOrder.dueRH + 2160;
+  }, [isRHBased, isResubmitMode, workOrder?.dueRH]);
 
   useEffect(() => {
     if (workOrder) {
@@ -514,7 +556,22 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         postpone.setHours(0, 0, 0, 0);
         if (postpone <= orig) {
           newErrors.postponeDate = "Postpone date must be after the original due date.";
+        } else if (!isResubmitMode && !isRHBased && postponeDateMaxValue) {
+          // 90-day cap for Calendar / Critical WOs — guard against keyboard bypass
+          const max = new Date(postponeDateMaxValue + "T00:00:00");
+          max.setHours(0, 0, 0, 0);
+          if (postpone > max) {
+            newErrors.postponeDate = `Postpone date cannot exceed 90 days from the original due date (max: ${maxDateFormatted}).`;
+          }
         }
+      }
+    }
+
+    // 90-day RH cap for Running Hours / Dual Frequency WOs
+    if (!isResubmitMode && isRHBased && maxAllowedRH != null && formData.newDueRH) {
+      const enteredRH = parseFloat(formData.newDueRH);
+      if (!isNaN(enteredRH) && enteredRH > maxAllowedRH) {
+        newErrors.newDueRH = `New due RH cannot exceed ${maxAllowedRH.toLocaleString()} hrs — 90-day limit from original due RH of ${workOrder?.dueRH?.toLocaleString()} hrs.`;
       }
     }
 
@@ -731,6 +788,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                 type="date"
                 value={formData.postponeDate}
                 min={postponeDateMinValue}
+                max={postponeDateMaxValue}
                 onChange={(e) => {
                   setFormData({ ...formData, postponeDate: e.target.value });
                   if (e.target.value) setErrors((prev) => ({ ...prev, postponeDate: undefined }));
@@ -740,6 +798,16 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
               />
               {errors.postponeDate && (
                 <p className="text-sm text-red-500" data-testid="error-postpone-date">{errors.postponeDate}</p>
+              )}
+              {!isResubmitMode && !isRHBased && maxDateFormatted && (
+                <p className="text-xs text-muted-foreground mt-0.5" data-testid="helper-postpone-max-date">
+                  Maximum postponement: 90 days from original due date — by {maxDateFormatted}
+                </p>
+              )}
+              {!isResubmitMode && isRHBased && maxAllowedRH != null && (
+                <p className="text-xs text-muted-foreground mt-0.5" data-testid="helper-postpone-max-rh">
+                  Maximum postponement: {maxAllowedRH.toLocaleString()} hrs — 90-day equivalent from original due RH of {workOrder?.dueRH?.toLocaleString()} hrs
+                </p>
               )}
             </div>
 
