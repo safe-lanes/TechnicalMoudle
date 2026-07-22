@@ -30,8 +30,8 @@ export async function deleteChangeRequest(id: number): Promise<void> {
 
 // ── Workflow Actions ──
 
-export async function approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {
-  return storage.approveChangeRequest(id, reviewerId, comment, role);
+export async function approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
+  return storage.approveChangeRequest(id, reviewerId, comment, role, overriddenChanges);
 }
 
 export async function getAuditLogsByEntity(entityType: string, entityId: string): Promise<any[]> {

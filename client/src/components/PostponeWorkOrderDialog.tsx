@@ -93,6 +93,10 @@ interface PostponeWorkOrderDialogProps {
     postponementEndDate?: string | null;
     postponementAuthorizedBy?: string | null;
     postponementApprovalRemarks?: string | null;
+    /** Maintenance basis — used to determine cap type (date vs RH) */
+    maintenanceBasis?: string | null;
+    /** Original due running hours — used for RH/Dual Frequency WO cap */
+    dueRH?: number | null;
   } | null;
   onConfirm?: (workOrderId: string, postponeData: any) => void;
 }
@@ -211,6 +215,24 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     next.setDate(next.getDate() + 1);
     return next.toISOString().split("T")[0];
   }, [formData.originalDueDate]);
+
+  // Detect resubmit mode
+  const isResubmitMode =
+    workOrder?.status === 'Awaiting Office Approval' ||
+    workOrder?.computedStatus === 'Awaiting Office Approval' ||
+    workOrder?.status === 'Postponement Rejected' ||
+    workOrder?.computedStatus === 'Postponement Rejected';
+
+  // Soft 90-day advisory warning — applies to ALL WO types
+  const exceeds90Days = useMemo(() => {
+    if (!formData.postponeDate || !formData.originalDueDate) return false;
+    const orig = parseDateFlexible(formData.originalDueDate);
+    const postpone = new Date(formData.postponeDate + "T00:00:00");
+    if (!orig || isNaN(orig.getTime()) || isNaN(postpone.getTime())) return false;
+    orig.setHours(0, 0, 0, 0);
+    postpone.setHours(0, 0, 0, 0);
+    return Math.round((postpone.getTime() - orig.getTime()) / 86400000) > 90;
+  }, [formData.postponeDate, formData.originalDueDate]);
 
   useEffect(() => {
     if (workOrder) {
@@ -742,6 +764,19 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                 <p className="text-sm text-red-500" data-testid="error-postpone-date">{errors.postponeDate}</p>
               )}
             </div>
+
+            {/* 90-day advisory warning — informational only, does not block submission */}
+            {exceeds90Days && (
+              <div
+                className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                data-testid="warning-postpone-90-days"
+              >
+                <span className="mt-0.5 shrink-0 text-amber-500">⚠</span>
+                <span>
+                  Warning: The selected Postponement Date exceeds the recommended 90-day limit from the Work Order Due Date.
+                </span>
+              </div>
+            )}
 
             {/* Row 5: Reason for Postponement */}
             <div className="space-y-1">

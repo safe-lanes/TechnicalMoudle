@@ -433,7 +433,7 @@ export interface IStorage {
   updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<ChangeRequest>;
   deleteChangeRequest(id: number): Promise<void>;
   submitChangeRequest(id: number, userId: string): Promise<ChangeRequest>;
-  approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest>;
+  approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest>;
   rejectChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest>;
   returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
   applyApprovedChanges(changeRequest: ChangeRequest): Promise<{ appliedFieldCount: number }>;

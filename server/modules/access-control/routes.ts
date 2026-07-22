@@ -1,8 +1,27 @@
 import { Router, Request, Response } from 'express';
 import { storage } from '../../storage';
-import { requirePMSAdmin } from '../../middleware/auth';
+import { requireAuth, requirePMSAdmin } from '../../middleware/auth';
+import {
+  getViewModesHandler,
+  getRoleViewMappingsHandler,
+  putRoleViewMappingsHandler,
+  resolveViewModeHandler,
+} from './controllers/viewModeController';
 
 const router = Router();
+
+// ── Role → View-Mode mapping (Task #324) ──
+// Distinct literal paths — no :param collision with /admin/access-control/:roleRuid
+// or /admin/role-by-name/:roleName below. Route-level middleware is defense-in-
+// depth; the finer guards (shore-only, editor roles, Sail Admin row lock,
+// validate-all-before-write) live in the controller/service layers.
+router.get('/admin/view-modes', requireAuth, getViewModesHandler);
+router.get('/admin/role-view-mappings/resolve', requireAuth, resolveViewModeHandler);
+router.get('/admin/role-view-mappings', requireAuth, getRoleViewMappingsHandler);
+// PUT uses requireAuth only: requirePMSAdmin would block Super Admin, but the
+// spec's editor set is {Sail Admin, Super Admin} — enforced in the controller
+// (ship-instance 403 first, then editor-role check).
+router.put('/admin/role-view-mappings', requireAuth, putRoleViewMappingsHandler);
 
 router.get('/admin/roles', async (_req: Request, res: Response) => {
   try {

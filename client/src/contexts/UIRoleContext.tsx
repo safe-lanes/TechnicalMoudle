@@ -1,17 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { UIRole } from "@shared/uiRoles";
-import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { useAuth } from "@/contexts/AuthContext";
-
-const DEV_ROLE_TO_STORAGE: Record<UIRole, { userType: string; role: string }> = {
-  Sail_Admin:         { userType: "Office", role: "Sail Admin" },
-  Client_Admin:       { userType: "Office", role: "Client Admin" },
-  Tech_Superintendent:{ userType: "Office", role: "Admin" },
-  Head_of_Dept:       { userType: "Ship",   role: "Vessel Admin" },
-  Vessel:             { userType: "Ship",   role: "Vessel User" },
-  External:           { userType: "Office", role: "External 10" },
-};
+import { useViewModeResolution } from "@/hooks/useViewModeResolution";
+import { isReplit } from "@/lib/env";
 
 interface UIRoleContextType {
   uiRole: UIRole | null;
@@ -30,16 +22,28 @@ interface UIRoleProviderProps {
   children: ReactNode;
 }
 
+interface ResolutionInputs {
+  userType: string | null;
+  role: string | null;
+}
+
 export function UIRoleProvider({ children }: UIRoleProviderProps) {
   const { currentUser } = useAuth();
-  const [uiRole, setUIRoleState] = useState<UIRole | null>(null);
+  const [inputs, setInputs] = useState<ResolutionInputs>({ userType: null, role: null });
+  // DEV-only role switcher override — wins over server resolution so switching
+  // to synthetic storage roles (e.g. "Client Admin") never hits ROLE_NOT_FOUND.
+  const [devOverride, setDevOverride] = useState<UIRole | null>(null);
 
   useEffect(() => {
     if (!currentUser) {
-      setUIRoleState(null);
+      setInputs({ userType: null, role: null });
+      setDevOverride(null);
       return;
     }
 
+    // Precedence: ENCRYPTED storage → currentUser. Plain-text localStorage is
+    // untrusted (attacker-editable) and is never read. The MAPPING itself is
+    // server-side (fail-closed DB lookup via the shared useViewModeResolution hook).
     const encryptedUserType = secureGetItem<string>("userType");
     let encryptedProfileRole: string | null = null;
     try {
@@ -50,39 +54,26 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     }
 
     if (encryptedUserType && encryptedProfileRole) {
-      setUIRoleState(mapLoggedRoleToUIRole(encryptedUserType, encryptedProfileRole));
+      setInputs({ userType: encryptedUserType, role: encryptedProfileRole });
       return;
     }
 
-    const plainUserType = localStorage.getItem("userType");
-    let plainProfileRole: string | null = null;
-    try {
-      const raw = localStorage.getItem("userProfile");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        plainProfileRole = parsed?.role || null;
-      }
-    } catch {
-      plainProfileRole = null;
-    }
-
-    if (plainUserType && plainProfileRole) {
-      setUIRoleState(mapLoggedRoleToUIRole(plainUserType, plainProfileRole));
-      return;
-    }
-
-    setUIRoleState(mapLoggedRoleToUIRole(currentUser.userType, currentUser.role));
+    setInputs({
+      userType: currentUser.userType ?? null,
+      role: currentUser.role ?? null,
+    });
   }, [currentUser]);
 
+  const resolution = useViewModeResolution(inputs.userType, inputs.role);
+  const uiRole = devOverride ?? resolution.uiRole;
+
   const setUIRole = (role: UIRole) => {
-    if (!import.meta.env.DEV) return;
-    const storage = DEV_ROLE_TO_STORAGE[role];
-    localStorage.setItem("userType", storage.userType);
-    const existing = (() => {
-      try { return JSON.parse(localStorage.getItem("userProfile") || "{}"); } catch { return {}; }
-    })();
-    localStorage.setItem("userProfile", JSON.stringify({ ...existing, role: storage.role }));
-    setUIRoleState(role);
+    // Dev-only switching, restricted to the Replit workspace (VITE_APP_ENV=replit).
+    // Memory-only override — NEVER writes to localStorage, so a stale synthetic
+    // role can never poison a later session (the "Client Admin" reload lockout).
+    // Trade-off: the picked role resets to the default user on page reload.
+    if (!isReplit()) return;
+    setDevOverride(role);
   };
 
   const value: UIRoleContextType = {

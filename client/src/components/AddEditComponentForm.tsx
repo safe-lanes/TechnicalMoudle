@@ -39,6 +39,9 @@ import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel"
 
 const SFI_FORMAT_HINT = "Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.";
 
+import { DraftJob, AddDraftJobModal } from './pms/AddDraftJobModal';
+export type { DraftJob };
+
 interface JobsSectionCProps {
   isEditMode: boolean;
   isLoadingJobs: boolean;
@@ -48,6 +51,12 @@ interface JobsSectionCProps {
   toggleShowAllRows: (sectionId: string) => void;
   PREVIEW_ROW_LIMIT: number;
   vesselId: string;
+  draftJobs: DraftJob[];
+  isMandatoryComplete: boolean;
+  currentComponentCode: string;
+  currentComponentName: string;
+  onOpenAddJobModal: () => void;
+  onRemoveDraftJob: (index: number) => void;
 }
 
 const JobsSectionC: React.FC<JobsSectionCProps> = ({
@@ -59,6 +68,10 @@ const JobsSectionC: React.FC<JobsSectionCProps> = ({
   toggleShowAllRows,
   PREVIEW_ROW_LIMIT,
   vesselId,
+  draftJobs,
+  isMandatoryComplete,
+  onOpenAddJobModal,
+  onRemoveDraftJob,
 }) => {
   const { toast } = useToast();
   const [jobToDeactivate, setJobToDeactivate] = useState<any>(null);
@@ -86,99 +99,155 @@ const JobsSectionC: React.FC<JobsSectionCProps> = ({
   return (
     <>
       <div className="overflow-x-auto">
-        {isEditMode && (
-          <div className="flex justify-end mb-3">
+        <div className="flex justify-end mb-3">
+          {isEditMode ? (
             <Button
               size="sm"
               className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white"
               disabled
+              data-testid="btn-add-job-edit"
             >
               <Plus className="h-4 w-4 mr-1" />
               Add Job
             </Button>
-          </div>
-        )}
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Job Code</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Job Title</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Task Type</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Frequency</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Last Done Date</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due Date</th>
-              <th className="w-10"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoadingJobs ? (
-              <tr>
-                <td colSpan={7} className="py-8 text-center text-gray-500">
-                  Loading jobs...
-                </td>
-              </tr>
-            ) : !isEditMode ? (
-              <tr>
-                <td colSpan={7} className="py-8 text-center text-gray-500">
-                  Jobs will be available after component is created
-                </td>
-              </tr>
-            ) : componentJobs.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="py-8 text-center text-gray-500">
-                  No jobs found for this component
-                </td>
-              </tr>
+          ) : (
+            <Button
+              size="sm"
+              className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!isMandatoryComplete}
+              onClick={onOpenAddJobModal}
+              title={!isMandatoryComplete ? "Fill all mandatory component fields to enable" : "Add a draft job"}
+              data-testid="btn-add-job-draft"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Job
+            </Button>
+          )}
+        </div>
+
+        {!isEditMode ? (
+          <>
+            {draftJobs.length === 0 ? (
+              <div className="py-8 text-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-md">
+                {isMandatoryComplete
+                  ? 'No draft jobs added yet. Click "+ Add Job" to create one.'
+                  : 'Fill all mandatory component fields above, then add jobs here before saving.'}
+              </div>
             ) : (
-              getPreviewData(componentJobs, "C").map((job, index) => {
-                const isInactive = job.isActive === false;
-                return (
-                  <tr
-                    key={index}
-                    className={`border-b border-gray-100 ${isInactive ? "opacity-60" : "hover:bg-gray-50"}`}
-                    data-testid={`job-row-${job.jobNo}`}
-                  >
-                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>
-                      {job.jobNo}{isInactive && <span className="ml-1 text-xs text-red-400">(Inactive)</span>}
-                    </td>
-                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.jobTitle}</td>
-                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.maintenanceType}</td>
-                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.frequencyValue} {job.frequencyUnit}</td>
-                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
-                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatProfessionalDate(job.nextDueDate) || '-'}</td>
-                    <td className="py-3 px-1">
-                      {!isInactive && (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 px-3 font-medium text-gray-600">Job Title</th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-600">Task Type</th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-600">Maintenance Basis</th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-600">Frequency</th>
+                    <th className="w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {draftJobs.map((job, index) => (
+                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50" data-testid={`draft-job-row-${index}`}>
+                      <td className="py-3 px-3 text-gray-900">{job.jobTitle}</td>
+                      <td className="py-3 px-3 text-gray-600">{job.maintenanceType || '—'}</td>
+                      <td className="py-3 px-3 text-gray-600">{job.maintenanceBasis}</td>
+                      <td className="py-3 px-3 text-gray-600">
+                        {job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit}` : '—'}
+                      </td>
+                      <td className="py-3 px-1">
                         <button
                           className="p-1.5 rounded text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setJobToDeactivate(job);
-                            setShowDeactivateDialog(true);
-                          }}
-                          data-testid={`btn-delete-job-${job.jobNo}`}
+                          onClick={() => onRemoveDraftJob(index)}
+                          title="Remove draft job"
+                          data-testid={`btn-remove-draft-job-${index}`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <X className="h-4 w-4" />
                         </button>
-                      )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        ) : (
+          <>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-2 px-3 font-medium text-gray-600">Job Code</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-600">Job Title</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-600">Task Type</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-600">Frequency</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-600">Last Done Date</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due Date</th>
+                  <th className="w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoadingJobs ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-500">
+                      Loading jobs...
                     </td>
                   </tr>
-                );
-              })
+                ) : componentJobs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-500">
+                      No jobs found for this component
+                    </td>
+                  </tr>
+                ) : (
+                  getPreviewData(componentJobs, "C").map((job, index) => {
+                    const isInactive = job.isActive === false;
+                    return (
+                      <tr
+                        key={index}
+                        className={`border-b border-gray-100 ${isInactive ? "opacity-60" : "hover:bg-gray-50"}`}
+                        data-testid={`job-row-${job.jobNo}`}
+                      >
+                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>
+                          {job.jobNo}{isInactive && <span className="ml-1 text-xs text-red-400">(Inactive)</span>}
+                        </td>
+                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.jobTitle}</td>
+                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.maintenanceType}</td>
+                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.frequencyValue} {job.frequencyUnit}</td>
+                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
+                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatProfessionalDate(job.nextDueDate) || '-'}</td>
+                        <td className="py-3 px-1">
+                          {!isInactive && (
+                            <button
+                              className="p-1.5 rounded text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setJobToDeactivate(job);
+                                setShowDeactivateDialog(true);
+                              }}
+                              data-testid={`btn-delete-job-${job.jobNo}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+            {componentJobs.length > PREVIEW_ROW_LIMIT && (
+              <div className="text-center mt-2">
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => toggleShowAllRows("C")}
+                  className="text-[#16569e] text-xs"
+                  data-testid="button-toggle-jobs"
+                >
+                  {showAllRows.has("C") ? `Show Less` : `View More (${componentJobs.length - PREVIEW_ROW_LIMIT} more)`}
+                </Button>
+              </div>
             )}
-          </tbody>
-        </table>
-        {componentJobs.length > PREVIEW_ROW_LIMIT && (
-          <div className="text-center mt-2">
-            <Button
-              variant="link"
-              size="sm"
-              onClick={() => toggleShowAllRows("C")}
-              className="text-[#16569e] text-xs"
-              data-testid="button-toggle-jobs"
-            >
-              {showAllRows.has("C") ? `Show Less` : `View More (${componentJobs.length - PREVIEW_ROW_LIMIT} more)`}
-            </Button>
-          </div>
+          </>
         )}
       </div>
 
@@ -233,12 +302,23 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   const { canViewDocument, canDownloadDocument } = useAuth();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A"]));
   const [isSaving, setIsSaving] = useState(false);
+  const [draftJobs, setDraftJobs] = useState<DraftJob[]>([]);
+  const [showAddJobModal, setShowAddJobModal] = useState(false);
   // Track which sections show all rows (default: only 2 rows preview)
   const [showAllRows, setShowAllRows] = useState<Set<string>>(new Set());
   const PREVIEW_ROW_LIMIT = 2;
 
   const isEditMode = !!componentId;
   const [makerOpen, setMakerOpen] = useState(false);
+
+  // Reset draft-job state whenever the dialog is closed (cancel, backdrop, ESC, post-save close)
+  // so stale drafts never bleed into the next Add Component session.
+  useEffect(() => {
+    if (!isOpen) {
+      setDraftJobs([]);
+      setShowAddJobModal(false);
+    }
+  }, [isOpen]);
 
   const { data: makersList = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/fleet/makers'],
@@ -572,6 +652,19 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     return true;
   });
 
+  const isMandatoryComplete = React.useMemo(() => {
+    for (const field of MANDATORY_FIELDS) {
+      if (field.key === 'parentComponent') continue;
+      const value = componentData[field.key as keyof typeof componentData];
+      if (!value || (typeof value === 'string' && value.trim() === '')) return false;
+    }
+    if (!isTopLevelCode) {
+      const parent = (componentData.parentComponent ?? '').trim();
+      if (!parent) return false;
+    }
+    return true;
+  }, [componentData, MANDATORY_FIELDS, isTopLevelCode]);
+
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [parentErrorMessage, setParentErrorMessage] = useState<string | null>(null);
 
@@ -733,11 +826,59 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
           description: "Component has been updated successfully.",
         });
       } else {
-        await apiRequest('POST', '/technical/api/components', payload);
-        toast({
-          title: "Component Created",
-          description: "New component has been created successfully.",
-        });
+        const createRes = await apiRequest('POST', '/technical/api/components', payload);
+        const newComponent = await createRes.json();
+
+        if (draftJobs.length > 0) {
+          let successCount = 0;
+          const jobErrors: string[] = [];
+          for (const draft of draftJobs) {
+            try {
+              const jobPayload: Record<string, any> = {
+                jobTitle: draft.jobTitle,
+                maintenanceType: draft.maintenanceType || null,
+                maintenanceBasis: draft.maintenanceBasis,
+                jobPriority: draft.jobPriority || null,
+                assignedTo: draft.assignedTo || null,
+                briefWorkDescription: draft.briefWorkDescription || null,
+                componentId: newComponent.cuuid,
+                componentCode: newComponent.componentCode,
+                componentName: newComponent.name,
+                vesselId: vesselId || 'V001',
+              };
+              if (draft.maintenanceBasis === 'Running Hours') {
+                jobPayload.intervalRunningHour = parseInt(draft.frequencyValue) || 0;
+                jobPayload.frequencyUnit = 'Hours';
+                if (draft.lastDoneRH) jobPayload.lastDoneRH = draft.lastDoneRH;
+              } else {
+                jobPayload.frequencyValue = draft.frequencyValue || null;
+                jobPayload.frequencyUnit = draft.frequencyUnit || null;
+                if (draft.lastDoneDate) jobPayload.lastDoneDate = draft.lastDoneDate;
+              }
+              await apiRequest('POST', '/technical/api/jobs', jobPayload);
+              successCount++;
+            } catch (jobErr: any) {
+              jobErrors.push(draft.jobTitle);
+            }
+          }
+          if (jobErrors.length === 0) {
+            toast({
+              title: "Component & Jobs Created",
+              description: `Component created successfully with ${successCount} job${successCount !== 1 ? 's' : ''}.`,
+            });
+          } else {
+            toast({
+              title: "Component Created",
+              description: `Component saved. ${successCount} job${successCount !== 1 ? 's' : ''} created. Failed: ${jobErrors.join(', ')}.`,
+              variant: "destructive",
+            });
+          }
+        } else {
+          toast({
+            title: "Component Created",
+            description: "New component has been created successfully.",
+          });
+        }
       }
 
       // Invalidate all component-related queries to force fresh data fetch
@@ -813,6 +954,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-hidden p-0">
         <DialogHeader className="px-6 py-4 border-b">
@@ -1363,6 +1505,12 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           toggleShowAllRows={toggleShowAllRows}
                           PREVIEW_ROW_LIMIT={PREVIEW_ROW_LIMIT}
                           vesselId={vesselId}
+                          draftJobs={draftJobs}
+                          isMandatoryComplete={isMandatoryComplete}
+                          currentComponentCode={componentData.componentCode}
+                          currentComponentName={componentData.componentName}
+                          onOpenAddJobModal={() => setShowAddJobModal(true)}
+                          onRemoveDraftJob={(index) => setDraftJobs(prev => prev.filter((_, i) => i !== index))}
                         />
                       )}
 
@@ -1823,6 +1971,14 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         </div>
       </DialogContent>
     </Dialog>
+    <AddDraftJobModal
+      open={showAddJobModal}
+      onClose={() => setShowAddJobModal(false)}
+      onSaveDraft={(job) => setDraftJobs(prev => [...prev, job])}
+      componentCode={componentData.componentCode}
+      componentName={componentData.componentName}
+    />
+    </>
   );
 };
 

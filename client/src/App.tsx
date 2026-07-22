@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Switch, Route, useLocation } from "wouter";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UIRoleProvider } from "@/contexts/UIRoleContext";
+import { ViewModeGate } from "@/components/ViewModeGate";
 import { ChangeRequestProvider } from "@/contexts/ChangeRequestContext";
 import { ChangeModeProvider } from "@/contexts/ChangeModeContext";
 import { VesselProvider } from "@/contexts/VesselContext";
@@ -27,9 +28,12 @@ import { ChatButton } from "./components/chat/ChatButton";
 function App() {
   return (
     <MarkerProvider>
-      <AuthProvider>
-        <UIRoleProvider>
-          <QueryClientProvider client={queryClient}>
+      {/* QueryClientProvider must wrap AuthProvider/UIRoleProvider — both resolve
+          the view mode via a shared TanStack query (Task #324). */}
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <UIRoleProvider>
+            <ViewModeGate>
             <PermissionsProvider>
             <VesselProvider>
               <OfflineProvider>
@@ -124,9 +128,10 @@ function App() {
               </OfflineProvider>
             </VesselProvider>
           </PermissionsProvider>
-          </QueryClientProvider>
-        </UIRoleProvider>
-      </AuthProvider>
+            </ViewModeGate>
+          </UIRoleProvider>
+        </AuthProvider>
+      </QueryClientProvider>
     </MarkerProvider>
   );
 }

@@ -58,6 +58,7 @@ import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
 import { WorkOrdersListModal } from "./WorkOrdersListModal";
 import { SparesListModal } from "./SparesListModal";
+import ApproveRejectModal from "@/pages/change-requests/ApproveRejectModal";
 import WorkOrderForm from "@/components/WorkOrderForm";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import type { TableColumn } from "@/lib/pdfReportGenerator";
@@ -473,6 +474,7 @@ const Dashboard = () => {
   const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null; mode?: 'template' | 'execution' }>({ open: false, workOrder: null });
   const [opDetailSpare, setOpDetailSpare] = useState<Spare | null>(null);
   const [opDetailChangeRequest, setOpDetailChangeRequest] = useState<ChangeRequest | null>(null);
+  const [crApproveModalId, setCrApproveModalId] = useState<number | null>(null);
   const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; type: 'wo' | 'cr'; id: string | null; label: string }>({ open: false, type: 'wo', id: null, label: '' });
   const [rejectReason, setRejectReason] = useState('');
@@ -4568,6 +4570,19 @@ const Dashboard = () => {
         </DialogContent>
       </Dialog>
 
+      {crApproveModalId !== null && (
+        <ApproveRejectModal
+          open={crApproveModalId !== null}
+          onClose={() => setCrApproveModalId(null)}
+          requestId={crApproveModalId}
+          action="approve"
+          onProcessed={() => {
+            setCrApproveModalId(null);
+            setOpDetailChangeRequest(null);
+          }}
+        />
+      )}
+
       {opDetailChangeRequest && (
         <Dialog open={!!opDetailChangeRequest} onOpenChange={(isOpen) => !isOpen && setOpDetailChangeRequest(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -4701,24 +4716,7 @@ const Dashboard = () => {
                     <Button
                       variant="default"
                       className="bg-green-600 hover:bg-green-700"
-                      onClick={async () => {
-                        const comment = prompt('Please provide approval comments:');
-                        if (comment) {
-                          try {
-                            const response = await fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/approve`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ comment, reviewerId: 'current_user' })
-                            });
-                            if (!response.ok) throw new Error('Failed to approve');
-                            queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-                            setOpDetailChangeRequest(null);
-                            toast({ title: "Change request approved", description: "The change request has been approved successfully" });
-                          } catch {
-                            toast({ title: "Error", description: "Failed to approve the change request", variant: "destructive" });
-                          }
-                        }
-                      }}
+                      onClick={() => setCrApproveModalId(opDetailChangeRequest.id)}
                       data-testid="button-op-cr-approve"
                     >
                       <CheckCircle className="h-4 w-4 mr-1" />

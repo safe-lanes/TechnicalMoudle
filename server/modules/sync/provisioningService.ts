@@ -461,6 +461,25 @@ export async function importProvisioningBundle(
     }
   }
 
+  // ── Pre-import: clear seeded view-mode tables (Task #324, same RBAC pattern) ──
+  // Migration 140 seeds both tables on BOTH sides with per-instance random uuids.
+  // Deleting local seeds lets the shore bundle land cleanly (shore uuids adopted,
+  // natural-key convergence immediate). Mapping first, then master (no FKs — hygiene).
+  if (bundleTableNames.has('view_modes_master') || bundleTableNames.has('role_view_mode_mapping')) {
+    try {
+      const deletedRvm = await pool.query('DELETE FROM role_view_mode_mapping');
+      const deletedVm = await pool.query('DELETE FROM view_modes_master');
+      console.log(
+        `[Provisioning] View-mode cleanup: deleted ${deletedRvm.rowCount} mapping(s), ${deletedVm.rowCount} mode(s) before import`
+      );
+    } catch (cleanupErr: any) {
+      // Non-fatal: tables may not exist on older DBs
+      console.warn(
+        `[Provisioning] View-mode cleanup partial: ${cleanupErr.message}`
+      );
+    }
+  }
+
   // ── Pre-import: clear seeded approval_workflow_config (same RBAC pattern) ──
   // Migration 126 seeds ~20 rows on BOTH sides with per-instance random awcuuid and a
   // UNIQUE (function_id, variable_name). Upserting shore's rows (different awcuuid) into
