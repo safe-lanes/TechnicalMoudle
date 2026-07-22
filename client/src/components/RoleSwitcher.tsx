@@ -10,6 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { isReplit } from "@/lib/env";
 import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
 import type { UIRole } from "@shared/uiRoles";
 import { User, Check } from "lucide-react";
@@ -17,6 +18,11 @@ import { Button } from "@/components/ui/button";
 
 export function RoleSwitcher() {
   const { uiRole, setUIRole } = useUIRole();
+
+  // Dev-only tool: render nothing outside the Replit workspace.
+  if (!isReplit()) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
@@ -44,19 +50,19 @@ export function RoleSwitcher() {
             className={`flex items-center justify-between ${
               uiRole === role
                 ? "cursor-default font-medium"
-                : import.meta.env.DEV
+                : isReplit()
                   ? "cursor-pointer"
                   : "cursor-default opacity-50"
             }`}
             data-testid={`menu-role-${role.toLowerCase().replace("_", "-")}`}
             onSelect={(e) => {
-              if (!import.meta.env.DEV) { e.preventDefault(); return; }
+              if (!isReplit()) { e.preventDefault(); return; }
               setUIRole(role as import("@shared/uiRoles").UIRole);
             }}
           >
             <span>{UI_ROLE_LABELS[role]}</span>
             {uiRole === role && <Check className="h-4 w-4 text-green-600" />}
-            {import.meta.env.DEV && uiRole !== role && (
+            {isReplit() && uiRole !== role && (
               <span className="text-[10px] text-orange-400 font-mono ml-1">DEV</span>
             )}
           </DropdownMenuItem>

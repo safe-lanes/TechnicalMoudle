@@ -3,6 +3,7 @@ import type { UIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useViewModeResolution } from "@/hooks/useViewModeResolution";
+import { isReplit } from "@/lib/env";
 
 const DEV_ROLE_TO_STORAGE: Record<UIRole, { userType: string; role: string }> = {
   Sail_Admin:         { userType: "Office", role: "Sail Admin" },
@@ -93,7 +94,8 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
   const uiRole = devOverride ?? resolution.uiRole;
 
   const setUIRole = (role: UIRole) => {
-    if (!import.meta.env.DEV) return;
+    // Dev-only switching, restricted to the Replit workspace (VITE_APP_ENV=replit).
+    if (!isReplit()) return;
     const storage = DEV_ROLE_TO_STORAGE[role];
     localStorage.setItem("userType", storage.userType);
     const existing = (() => {
