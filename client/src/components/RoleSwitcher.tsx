@@ -62,9 +62,6 @@ export function RoleSwitcher() {
           >
             <span>{UI_ROLE_LABELS[role]}</span>
             {uiRole === role && <Check className="h-4 w-4 text-green-600" />}
-            {isReplit() && uiRole !== role && (
-              <span className="text-[10px] text-orange-400 font-mono ml-1">DEV</span>
-            )}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
