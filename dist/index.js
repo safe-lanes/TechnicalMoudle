@@ -567,6 +567,7 @@ __export(schema_exports, {
   insertRecurringDefectSchema: () => insertRecurringDefectSchema,
   insertReportFavoriteSchema: () => insertReportFavoriteSchema,
   insertReportSnapshotSchema: () => insertReportSnapshotSchema,
+  insertRoleViewModeMappingSchema: () => insertRoleViewModeMappingSchema,
   insertRunningHoursAuditSchema: () => insertRunningHoursAuditSchema,
   insertSfiDetailsSchema: () => insertSfiDetailsSchema,
   insertShipCertificateMasterSchema: () => insertShipCertificateMasterSchema,
@@ -596,6 +597,7 @@ __export(schema_exports, {
   insertVesselSurveyApplicabilitySchema: () => insertVesselSurveyApplicabilitySchema,
   insertVesselSurveyDataSchema: () => insertVesselSurveyDataSchema,
   insertVesselTypeSchema: () => insertVesselTypeSchema,
+  insertViewModesMasterSchema: () => insertViewModesMasterSchema,
   insertWoPostponementApprovalSchema: () => insertWoPostponementApprovalSchema,
   insertWorkOrderAnomalySchema: () => insertWorkOrderAnomalySchema,
   insertWorkOrderDocumentSchema: () => insertWorkOrderDocumentSchema,
@@ -632,6 +634,7 @@ __export(schema_exports, {
   reportFavorites: () => reportFavorites,
   reportSnapshots: () => reportSnapshots,
   retentionSettings: () => retentionSettings,
+  roleViewModeMapping: () => roleViewModeMapping,
   runningHoursAudit: () => runningHoursAudit,
   sfiDetails: () => sfiDetails,
   shipCertificatesLabelsConfig: () => shipCertificatesLabelsConfig,
@@ -665,6 +668,7 @@ __export(schema_exports, {
   vesselSurveyData: () => vesselSurveyData,
   vesselTypes: () => vesselTypes,
   vessels: () => vessels,
+  viewModesMaster: () => viewModesMaster,
   woPostponementApprovals: () => woPostponementApprovals,
   workOrderAnomalies: () => workOrderAnomalies,
   workOrderDocuments: () => workOrderDocuments,
@@ -677,7 +681,7 @@ import { pgTable as pgTable2, text as text2, integer as integer2, boolean as boo
 import { sql as sql2 } from "drizzle-orm";
 import { createInsertSchema as createInsertSchema2 } from "drizzle-zod";
 import { z } from "zod";
-var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
+var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, viewModesMaster, insertViewModesMasterSchema, roleViewModeMapping, insertRoleViewModeMappingSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -1994,6 +1998,15 @@ var init_schema = __esm({
       reopenedAt: text2("reopened_at"),
       // === Layer 7: Running Hours Validation & Isolation ===
       completionRH: decimal2("completion_rh", { precision: 10, scale: 2 }),
+      // RH accuracy (migration 139): reading AT completion — drives the NEXT RH cycle
+      // (lastDoneRH/nextDueRH/nextDueReading + RH missed-cycles) via the fallback chain
+      // (woCompletionRh ?? completion reading). Section B3 Current Reading remains only
+      // the equipment-RH-record update source.
+      woCompletionRh: decimal2("wo_completion_rh", { precision: 10, scale: 2 }),
+      // RH accuracy (migration 139): date the Current Reading was taken (ISO string);
+      // threads into the RH module's dateUpdated → last_updated/audit reflect the
+      // actual reading date, not the WO completion date.
+      currentReadingDate: text2("current_reading_date"),
       completionRHValidated: boolean2("completion_rh_validated"),
       completionRHSource: text2("completion_rh_source"),
       completionRHValidationDetails: jsonb("completion_rh_validation_details"),
@@ -4413,6 +4426,54 @@ var init_schema = __esm({
       createdAt: true,
       updatedAt: true
     });
+    viewModesMaster = pgTable2("view_modes_master", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      vmuuid: text2("vmuuid").notNull().unique().default(sql2`gen_random_uuid()::text`),
+      // Natural key + sync identity. Matches the UIRole union in shared/uiRoles.ts.
+      code: text2("code").notNull().unique(),
+      displayName: text2("display_name").notNull(),
+      description: text2("description"),
+      // Retire modes via isActive=false — NEVER hard-delete (hard deletes don't sync;
+      // historical mapping rows must stay resolvable).
+      isActive: boolean2("is_active").notNull().default(true),
+      sortOrder: integer2("sort_order").default(0),
+      createdAt: timestamp3("created_at").notNull().defaultNow(),
+      updatedAt: updatedAtColumn(),
+      createdByUuid: text2("created_by_uuid"),
+      updatedByUuid: text2("updated_by_uuid"),
+      isDeleted: boolean2("is_deleted").notNull().default(false),
+      isSync: boolean2("is_sync").notNull().default(false)
+    });
+    insertViewModesMasterSchema = createInsertSchema2(viewModesMaster).omit({
+      id: true,
+      vmuuid: true,
+      createdAt: true,
+      updatedAt: true
+    });
+    roleViewModeMapping = pgTable2("role_view_mode_mapping", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      rvmuuid: text2("rvmuuid").notNull().unique().default(sql2`gen_random_uuid()::text`),
+      // Natural key + sync identity: one role → exactly one view mode.
+      roleRuid: text2("role_ruid").notNull().unique(),
+      // References view_modes_master.code (no DB FK — synced table rule).
+      viewModeCode: text2("view_mode_code").notNull(),
+      createdAt: timestamp3("created_at").notNull().defaultNow(),
+      updatedAt: updatedAtColumn(),
+      createdByUuid: text2("created_by_uuid"),
+      updatedByUuid: text2("updated_by_uuid"),
+      // Unmap = SOFT delete (is_deleted=true + explicit updated_at bump) — a hard
+      // DELETE never enters the updated_at>checkpoint sync delta, so ships would
+      // keep the mapping forever. Remap revives via ON CONFLICT (role_ruid).
+      isDeleted: boolean2("is_deleted").notNull().default(false),
+      isSync: boolean2("is_sync").notNull().default(false),
+      sortOrder: integer2("sort_order").default(0)
+    });
+    insertRoleViewModeMappingSchema = createInsertSchema2(roleViewModeMapping).omit({
+      id: true,
+      rvmuuid: true,
+      createdAt: true,
+      updatedAt: true
+    });
     admMenumasterAc = pgTable2("adm_menumaster_ac", {
       id: integer2("id").primaryKey(),
       muid: text2("muid").notNull().unique(),
@@ -5268,6 +5329,30 @@ var init_syncConfig = __esm({
         isConfigurable: false,
         businessRules: null,
         notes: "Role definitions. ruid is the text identity column."
+      },
+      view_modes_master: {
+        tableName: "view_modes_master",
+        category: "ONE_WAY_SHORE_TO_SHIP",
+        direction: "shore_to_ship",
+        identityColumn: "code",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "View-mode master (Task #324). SEEDED BOTH SIDES by migration \u2014 natural-key identity (code) prevents seeded-uuid duplication (awc lesson). Retire modes via is_active, never delete."
+      },
+      role_view_mode_mapping: {
+        tableName: "role_view_mode_mapping",
+        category: "ONE_WAY_SHORE_TO_SHIP",
+        direction: "shore_to_ship",
+        identityColumn: "role_ruid",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Role\u2192view-mode mapping (Task #324). Seeded both sides; natural key = role_ruid (UNIQUE). Unmap = soft delete (hard deletes never sync); remap revives."
       },
       adm_menumaster_ac: {
         tableName: "adm_menumaster_ac",
@@ -15851,6 +15936,19 @@ async function importProvisioningBundle(bundle) {
       );
     }
   }
+  if (bundleTableNames.has("view_modes_master") || bundleTableNames.has("role_view_mode_mapping")) {
+    try {
+      const deletedRvm = await pool2.query("DELETE FROM role_view_mode_mapping");
+      const deletedVm = await pool2.query("DELETE FROM view_modes_master");
+      console.log(
+        `[Provisioning] View-mode cleanup: deleted ${deletedRvm.rowCount} mapping(s), ${deletedVm.rowCount} mode(s) before import`
+      );
+    } catch (cleanupErr) {
+      console.warn(
+        `[Provisioning] View-mode cleanup partial: ${cleanupErr.message}`
+      );
+    }
+  }
   if (bundleTableNames.has("approval_workflow_config")) {
     try {
       const deletedAwc = await pool2.query("DELETE FROM approval_workflow_config");
@@ -22643,12 +22741,12 @@ var init_postgresStorage = __esm({
         return found.length > 0;
       }
       // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──
-      async finaliseApprovedCR(id, existing, reviewerId, comment) {
-        return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, /* @__PURE__ */ new Date());
+      async finaliseApprovedCR(id, existing, reviewerId, comment, overriddenChanges) {
+        return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, /* @__PURE__ */ new Date(), overriddenChanges);
       }
       // ── Internal: atomically mark the final approval step AND finalise the CR ──
       // stepId: if provided, marks that step as Approved inside the same transaction.
-      async finaliseApprovedCRWithStep(id, existing, stepId, reviewerId, comment, now) {
+      async finaliseApprovedCRWithStep(id, existing, stepId, reviewerId, comment, now, overriddenChanges) {
         const db2 = await getDb();
         const newRevisionNumber = (existing.revisionNumber || 0) + 1;
         try {
@@ -22678,16 +22776,65 @@ var init_postgresStorage = __esm({
                 }
               }
             }
-            const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existing);
+            const originalProposedChanges = Array.isArray(existing.proposedChangesJson) ? [...existing.proposedChangesJson] : [];
+            let effectiveProposedChanges = originalProposedChanges;
+            const allPriorHistory = Array.isArray(existing.revisionHistory) ? existing.revisionHistory : [];
+            const partialApprovals = allPriorHistory.filter((e) => e.type === "partial_approval");
+            const accumulatedOverrideMap = /* @__PURE__ */ new Map();
+            for (const partial of partialApprovals) {
+              for (const ov of partial.overriddenFields || []) {
+                accumulatedOverrideMap.set(String(ov.field), {
+                  approverNewValue: String(ov.approverNewValue ?? ""),
+                  modifiedBy: String(ov.modifiedBy ?? partial.approvedBy ?? ""),
+                  modifiedAt: String(ov.modifiedAt ?? partial.approvedAt ?? now.toISOString())
+                });
+              }
+            }
+            for (const ov of overriddenChanges || []) {
+              accumulatedOverrideMap.set(ov.field, {
+                approverNewValue: ov.approverNewValue,
+                modifiedBy: reviewerId,
+                modifiedAt: now.toISOString()
+              });
+            }
+            if (accumulatedOverrideMap.size > 0) {
+              effectiveProposedChanges = originalProposedChanges.map((change) => {
+                const fieldKey = change.field ?? change.columnName;
+                if (fieldKey && accumulatedOverrideMap.has(String(fieldKey))) {
+                  return { ...change, newValue: accumulatedOverrideMap.get(String(fieldKey)).approverNewValue };
+                }
+                return change;
+              });
+              console.log(`[CR_APPLY] Applied ${accumulatedOverrideMap.size} accumulated field override(s) before applying CR ${id} (${partialApprovals.length} prior level(s), ${overriddenChanges?.length ?? 0} final-level override(s))`);
+            }
+            const existingWithOverrides = { ...existing, proposedChangesJson: effectiveProposedChanges };
+            const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existingWithOverrides);
+            const overriddenFields = [];
+            for (const [field, overrideData] of Array.from(accumulatedOverrideMap.entries())) {
+              const original = originalProposedChanges.find(
+                (c) => (c.field ?? c.columnName) === field
+              );
+              const originalNewValue = original?.newValue ?? null;
+              if (String(originalNewValue ?? "") !== overrideData.approverNewValue) {
+                overriddenFields.push({
+                  field,
+                  originalNewValue,
+                  approverNewValue: overrideData.approverNewValue,
+                  modifiedBy: overrideData.modifiedBy,
+                  modifiedAt: overrideData.modifiedAt
+                });
+              }
+            }
             const revisionHistoryEntry = {
               revisionNumber: newRevisionNumber,
               approvedBy: reviewerId,
               approvedAt: now.toISOString(),
-              appliedChanges: Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson : [],
+              appliedChanges: effectiveProposedChanges,
               appliedStatus: "success",
               appliedAt: now.toISOString(),
               appliedFieldCount: appliedChangesResult.appliedFieldCount,
-              comments: comment
+              comments: comment,
+              ...overriddenFields.length > 0 ? { overriddenFields } : {}
             };
             const updatedHistory = [...existing.revisionHistory || [], revisionHistoryEntry];
             const updateResult = await tx.update(changeRequest).set({
@@ -22713,13 +22860,13 @@ var init_postgresStorage = __esm({
           throw new Error(`Failed to approve change request: ${error.message}`);
         }
       }
-      async approveChangeRequest(id, reviewerId, comment, role) {
+      async approveChangeRequest(id, reviewerId, comment, role, overriddenChanges) {
         const existing = await this.getChangeRequest(id);
         if (!existing) throw new Error("Change request not found");
         const steps = await this.getChangeRequestApprovalSteps(id);
         const now = /* @__PURE__ */ new Date();
         if (steps.length === 0) {
-          return this.finaliseApprovedCR(id, existing, reviewerId, comment);
+          return this.finaliseApprovedCR(id, existing, reviewerId, comment, overriddenChanges);
         }
         const activeStep = steps.find((s) => s.status === "Pending");
         if (!activeStep) {
@@ -22734,6 +22881,29 @@ var init_postgresStorage = __esm({
         }
         const remainingSteps = steps.filter((s) => s.id !== activeStep.id && s.status === "Pending");
         if (remainingSteps.length > 0) {
+          if (overriddenChanges && overriddenChanges.length > 0) {
+            const originalProposed = Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson : [];
+            const partialEntry = {
+              type: "partial_approval",
+              approvedBy: reviewerId,
+              approvedAt: now.toISOString(),
+              approvalLevel: activeStep.approvalLevel,
+              comments: comment,
+              overriddenFields: overriddenChanges.map((o) => {
+                const orig = originalProposed.find((c) => (c.field ?? c.columnName) === o.field);
+                return {
+                  field: o.field,
+                  originalNewValue: orig?.newValue ?? null,
+                  approverNewValue: o.approverNewValue,
+                  modifiedBy: reviewerId,
+                  modifiedAt: now.toISOString()
+                };
+              })
+            };
+            const updatedHistory = [...existing.revisionHistory || [], partialEntry];
+            await this.updateChangeRequest(id, { revisionHistory: updatedHistory });
+            console.log(`[CR_WORKFLOW] CR ${id} \u2014 non-final approver ${reviewerId} overrode ${overriddenChanges.length} field(s) at ${activeStep.approvalLevel}, recorded in revisionHistory`);
+          }
           await this.updateChangeRequestApprovalStep(activeStep.id, {
             status: "Approved",
             actionByUserId: reviewerId,
@@ -22744,7 +22914,7 @@ var init_postgresStorage = __esm({
           return await this.getChangeRequest(id);
         }
         console.log(`[CR_WORKFLOW] CR ${id} \u2014 all approval levels satisfied, finalising`);
-        return this.finaliseApprovedCRWithStep(id, existing, activeStep.id, reviewerId, comment, now);
+        return this.finaliseApprovedCRWithStep(id, existing, activeStep.id, reviewerId, comment, now, overriddenChanges);
       }
       /**
        * Apply approved changes to the target PMS entity (non-transactional version)
@@ -32068,6 +32238,28 @@ async function updateWorkOrder(id, body) {
       console.log("\u{1F4DD} Auto-setting status to Pending Approval (completion data provided without explicit status)");
     }
   }
+  if (updateData.woCompletionRh !== void 0 && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== "") {
+    const woRhNum = parseFloat(String(updateData.woCompletionRh));
+    const readingRaw = updateData.runningHours ?? updateData.currentReading ?? existingWO2.runningHours ?? existingWO2.currentReading;
+    const readingNum = readingRaw !== void 0 && readingRaw !== null && String(readingRaw).trim() !== "" ? parseFloat(String(readingRaw)) : NaN;
+    if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
+      throw new ValidationError(
+        `WO Completion RH (${woRhNum}) cannot be greater than the Current Reading (${readingNum}). The completion reading is the hours at the time the work was done; the Current Reading is the latest meter value.`,
+        { code: "WO_COMPLETION_RH_EXCEEDS_READING" }
+      );
+    }
+  }
+  if (updateData.currentReadingDate) {
+    const rdParsed = new Date(String(updateData.currentReadingDate));
+    const todayEnd = /* @__PURE__ */ new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    if (isNaN(rdParsed.getTime())) {
+      throw new ValidationError("Current Reading Date is not a valid date.", { code: "INVALID_READING_DATE" });
+    }
+    if (rdParsed.getTime() > todayEnd.getTime()) {
+      throw new ValidationError("Current Reading Date cannot be in the future.", { code: "READING_DATE_IN_FUTURE" });
+    }
+  }
   const isBeingRejected = updateData.status?.toLowerCase() === "rejected";
   if (isBeingRejected) {
     updateData.completionDateTime = null;
@@ -32274,14 +32466,15 @@ async function updateWorkOrder(id, body) {
         return !isNaN(p.getTime()) ? p.toISOString().split("T")[0] : void 0;
       };
       const completionDateNorm = normRhDate(existingWO2.completionDateTime || existingWO2.dateCompleted || updateData.completionDateTime);
+      const readingDateNorm = normRhDate(existingWO2.currentReadingDate || updateData.currentReadingDate) || completionDateNorm;
       if (rhComp && rhCounterType === "MASTER" && !isNaN(rhValue)) {
         let rhBackdatedSkippedApproval = false;
         const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || "0");
-        if (rhValue <= masterCurrentRHApproval && completionDateNorm) {
+        if (rhValue <= masterCurrentRHApproval && readingDateNorm) {
           const masterUpdRawApproval = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
           const masterUpdDateApproval = masterUpdRawApproval instanceof Date ? masterUpdRawApproval : masterUpdRawApproval ? new Date(masterUpdRawApproval) : null;
           if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
-            const approvalCompletionDate = new Date(completionDateNorm);
+            const approvalCompletionDate = new Date(readingDateNorm);
             const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
             const woDay = Date.UTC(approvalCompletionDate.getUTCFullYear(), approvalCompletionDate.getUTCMonth(), approvalCompletionDate.getUTCDate());
             if (woDay < masterDay) {
@@ -32290,7 +32483,7 @@ async function updateWorkOrder(id, body) {
               rhBackdatedApproval = true;
               latestRHApproval = masterCurrentRHApproval;
               latestRHDateApproval = masterUpdDateApproval.toISOString().split("T")[0];
-              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
+              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
             }
           }
         }
@@ -32305,7 +32498,7 @@ async function updateWorkOrder(id, body) {
               userRole: body.userRole || "Ship",
               adminOverride: body.adminOverride || false,
               comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
-              dateUpdated: completionDateNorm
+              dateUpdated: readingDateNorm
             });
             updateData.rhSyncedAt = /* @__PURE__ */ new Date();
             console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children)`);
@@ -32337,11 +32530,11 @@ async function updateWorkOrder(id, body) {
         if (masterComp) {
           let rhBackdatedSkippedInherited = false;
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || "0");
-          if (rhValue <= inhMasterCurrentRH && completionDateNorm) {
+          if (rhValue <= inhMasterCurrentRH && readingDateNorm) {
             const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
             const inhMasterUpdDate = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
-              const inhCompletionDate = new Date(completionDateNorm);
+              const inhCompletionDate = new Date(readingDateNorm);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
               const woDay = Date.UTC(inhCompletionDate.getUTCFullYear(), inhCompletionDate.getUTCMonth(), inhCompletionDate.getUTCDate());
               if (woDay < masterDay) {
@@ -32350,7 +32543,7 @@ async function updateWorkOrder(id, body) {
                 rhBackdatedApproval = true;
                 latestRHApproval = inhMasterCurrentRH;
                 latestRHDateApproval = inhMasterUpdDate.toISOString().split("T")[0];
-                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
+                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
               }
             }
           }
@@ -32365,7 +32558,7 @@ async function updateWorkOrder(id, body) {
                 userRole: body.userRole || "Ship",
                 adminOverride: body.adminOverride || false,
                 comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                dateUpdated: completionDateNorm
+                dateUpdated: readingDateNorm
               });
               updateData.rhSyncedAt = /* @__PURE__ */ new Date();
               console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO2.workOrderNo}`);
@@ -32386,9 +32579,9 @@ async function updateWorkOrder(id, body) {
             }
           }
         } else {
-          if (completionDateNorm) {
+          if (readingDateNorm) {
             const { validateRHEntry: validateRHEntry3 } = await Promise.resolve().then(() => (init_rhTimelineValidationService(), rhTimelineValidationService_exports));
-            const backdateCheck = await validateRHEntry3(rhComp.cuuid, completionDateNorm, rhValue);
+            const backdateCheck = await validateRHEntry3(rhComp.cuuid, readingDateNorm, rhValue);
             if (!backdateCheck.isValid && backdateCheck.validationStatus === "INVALID_BACKDATED") {
               throw new ValidationError(backdateCheck.errorMessage, {
                 code: "INVALID_BACKDATED",
@@ -32705,7 +32898,7 @@ async function updateWorkOrder(id, body) {
           }
           if (job) {
             const rawJobCompletionDate = freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime;
-            const runningHours = freshWorkOrder.runningHours;
+            const runningHours = freshWorkOrder.woCompletionRh ?? freshWorkOrder.runningHours;
             const normalizeJobDate = (dateStr) => {
               if (!dateStr) return null;
               if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split("T")[0];
@@ -35039,7 +35232,7 @@ var alertEngine_exports = {};
 __export(alertEngine_exports, {
   generateAlerts: () => generateAlerts
 });
-import { eq as eq30, and as and25, isNull as isNull4, ne as ne2, desc as desc7, inArray as inArray8 } from "drizzle-orm";
+import { eq as eq31, and as and26, isNull as isNull4, ne as ne2, desc as desc7, inArray as inArray8 } from "drizzle-orm";
 async function generateAlerts(report) {
   const [consumed, cleared] = await Promise.all([
     evaluateRules(report),
@@ -35061,7 +35254,7 @@ async function ruleConsumptionSpike(report) {
   const db2 = await getDb();
   const todayTotal = (toNum(report.hfoConsumption) ?? 0) + (toNum(report.lsmgoConsumption) ?? 0) + (toNum(report.mgoConsumption) ?? 0) + (toNum(report.vlsfoConsumption) ?? 0) + (toNum(report.lpgConsumption) ?? 0);
   if (todayTotal <= 0) return;
-  const robRows = await db2.select().from(nrFuelRob).where(eq30(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
   const avg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (avg7Day <= 0) return;
   const pctAbove = (todayTotal - avg7Day) / avg7Day;
@@ -35091,7 +35284,7 @@ async function ruleConsumptionSpike(report) {
 }
 async function ruleRobEndurance(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq30(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (totalAvg7Day <= 0) return;
@@ -35124,9 +35317,9 @@ async function ruleAeHoursSpike(report) {
   const db2 = await getDb();
   const currentAeHours = toNum(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
-  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and25(
-    eq30(nrNoonReports.vesselId, report.vesselId),
-    eq30(nrNoonReports.status, "submitted"),
+  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and26(
+    eq31(nrNoonReports.vesselId, report.vesselId),
+    eq31(nrNoonReports.status, "submitted"),
     ne2(nrNoonReports.id, report.id)
   )).orderBy(desc7(nrNoonReports.reportDate)).limit(7);
   const priorHours = prior.map((r) => toNum(r.aeRunningHours)).filter((v) => v !== null && v > 0);
@@ -35149,7 +35342,7 @@ async function ruleAeHoursSpike(report) {
 async function ruleCiiBandDrop(report) {
   const db2 = await getDb();
   const year = new Date(report.reportDate).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and25(eq30(nrCiiTracking.vesselId, report.vesselId), eq30(nrCiiTracking.year, year))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year))).limit(1);
   const row = ciiRows[0] ?? null;
   if (!row || !row.ciiRating || !row.previousCiiRating) return;
   const prevOrder = CII_ORDER[row.previousCiiRating] ?? 0;
@@ -35193,7 +35386,7 @@ async function ruleNegativeRobRisk(report) {
 }
 async function autoResolveCleared(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq30(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   const enduranceDays = totalAvg7Day > 0 ? totalRob / totalAvg7Day : null;
@@ -35216,25 +35409,25 @@ async function autoResolveCleared(report) {
   await db2.update(nrAlerts).set({
     acknowledgedAt: /* @__PURE__ */ new Date(),
     acknowledgedBy: "system"
-  }).where(and25(
-    eq30(nrAlerts.vesselId, report.vesselId),
+  }).where(and26(
+    eq31(nrAlerts.vesselId, report.vesselId),
     isNull4(nrAlerts.acknowledgedAt),
     inArray8(nrAlerts.alertType, toResolve)
   ));
 }
 async function resolveOpenAlert(vesselId, alertType) {
   const db2 = await getDb();
-  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and25(
-    eq30(nrAlerts.vesselId, vesselId),
-    eq30(nrAlerts.alertType, alertType),
+  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and26(
+    eq31(nrAlerts.vesselId, vesselId),
+    eq31(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   ));
 }
 async function upsertAlert(vesselId, reportId, alertType, severity, message, metricValue, thresholdValue) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and25(
-    eq30(nrAlerts.vesselId, vesselId),
-    eq30(nrAlerts.alertType, alertType),
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and26(
+    eq31(nrAlerts.vesselId, vesselId),
+    eq31(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   )).limit(1);
   if (existing.length > 0) {
@@ -35244,7 +35437,7 @@ async function upsertAlert(vesselId, reportId, alertType, severity, message, met
       message,
       metricValue: metricValue !== null ? String(metricValue) : null,
       thresholdValue: thresholdValue !== null ? String(thresholdValue) : null
-    }).where(eq30(nrAlerts.id, existing[0].id));
+    }).where(eq31(nrAlerts.id, existing[0].id));
   } else {
     await db2.insert(nrAlerts).values({
       vesselId,
@@ -39646,6 +39839,9 @@ async function getWorkOrderContext(workOrderId) {
     runningHoursDifference: correctedWorkOrder.runningHoursDifference?.toString() || "",
     readingDate: correctedWorkOrder.readingDate || "",
     runningHours: correctedWorkOrder.runningHours || "",
+    // RH accuracy (migration 139): round-trip the completion-time RH + reading date.
+    woCompletionRh: correctedWorkOrder.woCompletionRh?.toString() || "",
+    currentReadingDate: correctedWorkOrder.currentReadingDate || "",
     rhBackdatedEntry: !!correctedWorkOrder.rhBackdatedEntry,
     // B4 - Spare Parts Consumed
     consumedSpareParts: ensureArray(correctedWorkOrder.consumedSpareParts),
@@ -39878,8 +40074,14 @@ async function completeWorkOrder(workOrderId, body) {
     adminOverride,
     userId: bodyUserId,
     userUuid: bodyUserUuid,
+    woCompletionRh: bodyWoCompletionRh,
+    currentReadingDate: bodyCurrentReadingDate,
     ...executionData
   } = body;
+  const woCompletionRh = bodyWoCompletionRh !== void 0 && bodyWoCompletionRh !== null && String(bodyWoCompletionRh).trim() !== "" ? String(bodyWoCompletionRh) : null;
+  const currentReadingDate = bodyCurrentReadingDate ? String(bodyCurrentReadingDate) : null;
+  const cycleRH = woCompletionRh ?? runningHours;
+  const completionWarnings = [];
   const workOrder = await findById3(workOrderId);
   if (!workOrder) {
     throw new NotFoundError("Work order not found");
@@ -39931,6 +40133,27 @@ async function completeWorkOrder(workOrderId, body) {
   if (workOrder.maintenanceBasis === "Running Hours" && counterType !== "NOT_RH_DRIVEN" && !runningHours) {
     throw new ValidationError("Running hours is required for RH-based maintenance work orders");
   }
+  if (woCompletionRh && runningHours) {
+    const woRhNum = parseFloat(woCompletionRh);
+    const readingNum = parseFloat(runningHours);
+    if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
+      throw new ValidationError(
+        `WO Completion RH (${woRhNum}) cannot be greater than the Current Reading (${readingNum}). The completion reading is the hours at the time the work was done; the Current Reading is the latest meter value.`,
+        { code: "WO_COMPLETION_RH_EXCEEDS_READING" }
+      );
+    }
+  }
+  if (currentReadingDate) {
+    const readingDateParsed = new Date(currentReadingDate);
+    const todayEnd = /* @__PURE__ */ new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    if (isNaN(readingDateParsed.getTime())) {
+      throw new ValidationError("Current Reading Date is not a valid date.", { code: "INVALID_READING_DATE" });
+    }
+    if (readingDateParsed.getTime() > todayEnd.getTime()) {
+      throw new ValidationError("Current Reading Date cannot be in the future.", { code: "READING_DATE_IN_FUTURE" });
+    }
+  }
   let rhValidationDetails = null;
   let completionRHSource = "MANUAL_ENTRY";
   let rhReadingApplied = false;
@@ -39940,6 +40163,7 @@ async function completeWorkOrder(workOrderId, body) {
   if (runningHours && counterType !== "NOT_RH_DRIVEN" && await isShipInstance()) {
     const newRH = parseInt(runningHours);
     const completionDateForValidation = dateOfCompletion || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    const readingDateForRH = currentReadingDate || completionDateForValidation;
     const componentVesselId = workOrder.vesselId || component.vesselId || "V001";
     const previousRH = parseInt(component.currentCumulativeRH || "0");
     const alreadySynced = !!workOrder.rhSyncedAt;
@@ -39955,14 +40179,14 @@ async function completeWorkOrder(workOrderId, body) {
           const masterUpdRaw = component.rhMasterUpdatedAt ?? (component.lastUpdated ? new Date(component.lastUpdated) : null);
           const masterUpdDate = masterUpdRaw instanceof Date ? masterUpdRaw : masterUpdRaw ? new Date(masterUpdRaw) : null;
           if (masterUpdDate && !isNaN(masterUpdDate.getTime())) {
-            const woCompletionDate = new Date(completionDateForValidation);
+            const woCompletionDate = new Date(readingDateForRH);
             const masterDay = Date.UTC(masterUpdDate.getUTCFullYear(), masterUpdDate.getUTCMonth(), masterUpdDate.getUTCDate());
             const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
             if (woDay < masterDay) {
               rhBackdatedSkipped = true;
               rhBackdatedLatestRH = masterCurrentRH;
               rhBackdatedLatestRHDate = masterUpdDate.toISOString().split("T")[0];
-              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master current ${masterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated \u2014 reading saved to WO for scheduling only.`);
+              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (reading date ${readingDateForRH}) is older and lower than master current ${masterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated \u2014 reading saved to WO for scheduling only.`);
             }
           }
         }
@@ -39977,7 +40201,7 @@ async function completeWorkOrder(workOrderId, body) {
               userRole: userRole || "Ship",
               adminOverride: adminOverride || false,
               comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ""})`,
-              dateUpdated: completionDateForValidation
+              dateUpdated: readingDateForRH
             });
             rhReadingApplied = true;
             console.log(`\u2705 [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
@@ -40014,14 +40238,14 @@ async function completeWorkOrder(workOrderId, body) {
             const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
             const inhMasterUpdDate = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
-              const woCompletionDate = new Date(completionDateForValidation);
+              const woCompletionDate = new Date(readingDateForRH);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
               const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
               if (woDay < masterDay) {
                 rhBackdatedSkipped = true;
                 rhBackdatedLatestRH = inhMasterCurrentRH;
                 rhBackdatedLatestRHDate = inhMasterUpdDate.toISOString().split("T")[0];
-                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated \u2014 reading saved to WO for scheduling only.`);
+                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (reading date ${readingDateForRH}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated \u2014 reading saved to WO for scheduling only.`);
               }
             }
           }
@@ -40036,7 +40260,7 @@ async function completeWorkOrder(workOrderId, body) {
                 userRole: userRole || "Ship",
                 adminOverride: adminOverride || false,
                 comments: `WO ${workOrder.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                dateUpdated: completionDateForValidation
+                dateUpdated: readingDateForRH
               });
               console.log(`\u2705 [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
             } catch (masterErr) {
@@ -40056,7 +40280,7 @@ async function completeWorkOrder(workOrderId, body) {
             }
           }
         } else {
-          const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
+          const validation = await validateRHEntry(component.cuuid, readingDateForRH, newRH);
           if (!validation.isValid) {
             throw new ValidationError(validation.errorMessage, {
               code: validation.validationStatus,
@@ -40090,7 +40314,7 @@ async function completeWorkOrder(workOrderId, body) {
             previousRH: previousRH.toString(),
             newRH: newRH.toString(),
             cumulativeRH: newRH.toString(),
-            dateUpdatedLocal: completionDateForValidation,
+            dateUpdatedLocal: readingDateForRH,
             dateUpdatedTZ: "UTC",
             enteredAtUTC: /* @__PURE__ */ new Date(),
             userId: executionData.performedBy || "System",
@@ -40107,22 +40331,33 @@ async function completeWorkOrder(workOrderId, body) {
     }
   }
   let missedCycles;
-  if (workOrder.maintenanceBasis === "Running Hours" && runningHours) {
-    const completionRHValue = parseInt(runningHours);
+  if (workOrder.maintenanceBasis === "Running Hours" && cycleRH) {
+    const completionRHValue = parseInt(cycleRH);
     const dueRH = workOrder.nextDueReading ? parseFloat(workOrder.nextDueReading) : null;
     let jobIntervalRH = null;
+    let prevLastDoneRH = null;
     if (workOrder.jobId) {
       const jobForRH = await findJob(workOrder.jobId);
       if (jobForRH?.intervalRunningHour) {
         jobIntervalRH = jobForRH.intervalRunningHour;
       }
+      const prevRaw = jobForRH?.lastDoneRH;
+      if (prevRaw !== void 0 && prevRaw !== null && String(prevRaw).trim() !== "") {
+        const parsedPrev = parseFloat(String(prevRaw));
+        if (!isNaN(parsedPrev)) prevLastDoneRH = parsedPrev;
+      }
     }
     if (!jobIntervalRH && workOrder.frequencyValue) {
       jobIntervalRH = parseInt(String(workOrder.frequencyValue));
     }
+    if (woCompletionRh && prevLastDoneRH !== null && !isNaN(completionRHValue) && completionRHValue < prevLastDoneRH) {
+      const warnMsg = `WO Completion RH (${completionRHValue}) is below the previous completion's RH (${prevLastDoneRH}) for this job \u2014 saved as entered; please verify the reading.`;
+      completionWarnings.push(warnMsg);
+      console.warn(`\u26A0\uFE0F [RH Accuracy] ${warnMsg} (WO ${workOrder.workOrderNo})`);
+    }
     missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
     if (missedCycles > 0) {
-      console.log(`\u26A0\uFE0F Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, completionRH: ${completionRHValue}, interval: ${jobIntervalRH})`);
+      console.log(`\u26A0\uFE0F Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, cycleRH: ${completionRHValue}${woCompletionRh ? " [woCompletionRh]" : " [currentReading fallback]"}, interval: ${jobIntervalRH})`);
     }
   } else if (workOrder.maintenanceBasis === "Dual Frequency") {
     let dualCalendarDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
@@ -40175,6 +40410,9 @@ async function completeWorkOrder(workOrderId, body) {
     missedCycles,
     originalDueDate,
     completionRH: runningHours ? runningHours : void 0,
+    // RH accuracy (migration 139): persist the completion-time RH + reading date.
+    woCompletionRh: woCompletionRh ?? void 0,
+    currentReadingDate: currentReadingDate ?? void 0,
     completionRHValidated: runningHours ? true : void 0,
     completionRHSource: runningHours ? completionRHSource : void 0,
     completionRHValidationDetails: rhValidationDetails || void 0,
@@ -40383,8 +40621,8 @@ async function completeWorkOrder(workOrderId, body) {
             console.log(`\u2705 [Dual] Auto-calculated next due date for job ${job.jobNo}: ${nextDue}`);
           }
         }
-        if (runningHours) {
-          const dualCurrentRH = parseInt(runningHours);
+        if (cycleRH) {
+          const dualCurrentRH = parseInt(cycleRH);
           if (!isNaN(dualCurrentRH)) {
             linkUpdates.lastDoneRH = dualCurrentRH.toString();
             jobUpdates.lastDoneRH = dualCurrentRH;
@@ -40407,8 +40645,8 @@ async function completeWorkOrder(workOrderId, body) {
         await updateJob3(job.juuid, jobUpdates);
         console.log(`\u2705 Updated Dual Frequency job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}${runningHours ? ", lastDoneRH: " + runningHours : " (RH unchanged)"}`);
       }
-      if (workOrder.maintenanceBasis === "Running Hours" && runningHours) {
-        const currentRH = parseInt(runningHours);
+      if (workOrder.maintenanceBasis === "Running Hours" && cycleRH) {
+        const currentRH = parseInt(cycleRH);
         if (!isNaN(currentRH)) {
           linkUpdates.lastDoneRH = currentRH.toString();
           jobUpdates.lastDoneRH = currentRH;
@@ -40510,6 +40748,9 @@ async function completeWorkOrder(workOrderId, body) {
     runningHoursUpdated: !!runningHours,
     missedCycles,
     rhBackdated: rhBackdatedSkipped,
+    // RH accuracy (migration 139): warn-only advisories (e.g. completion RH below
+    // the previous completion) — saved as entered, surfaced for the UI to toast.
+    ...completionWarnings.length > 0 && { warnings: completionWarnings },
     ...rhBackdatedSkipped && {
       latestRH: rhBackdatedLatestRH,
       latestRHDate: rhBackdatedLatestRHDate
@@ -40614,8 +40855,9 @@ async function finalizeWorkOrderCompletion(workOrderId) {
         await updateJob3(job.juuid, updates);
         console.log(`\u2705 [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
       }
-      if ((basis === "Running Hours" || basis === "Dual Frequency") && workOrder.runningHours) {
-        const currentRH = parseInt(workOrder.runningHours);
+      const finalizeCycleRH = workOrder.woCompletionRh ?? workOrder.runningHours;
+      if ((basis === "Running Hours" || basis === "Dual Frequency") && finalizeCycleRH) {
+        const currentRH = parseInt(String(finalizeCycleRH));
         if (!isNaN(currentRH)) {
           const rhUpdates = { lastDoneRH: currentRH };
           const rhLinkUpdates = { lastDoneRH: currentRH.toString(), updatedAt: /* @__PURE__ */ new Date() };
@@ -40744,13 +40986,14 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
             nextDueDate = computed;
           }
         }
-      } else if (existingWO2.maintenanceBasis === "Running Hours" && existingWO2.currentReading) {
-        nextDueReading = (parseInt(existingWO2.currentReading) + parseInt(existingWO2.frequencyValue || "0")).toString();
+      } else if (existingWO2.maintenanceBasis === "Running Hours" && (existingWO2.woCompletionRh || existingWO2.currentReading)) {
+        const bulkCycleRH = existingWO2.woCompletionRh ?? existingWO2.currentReading;
+        nextDueReading = (parseInt(String(bulkCycleRH)) + parseInt(existingWO2.frequencyValue || "0")).toString();
       }
       const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
       let missedCycles;
       if (existingWO2.maintenanceBasis === "Running Hours") {
-        const completionRHValue = existingWO2.completionRH;
+        const completionRHValue = existingWO2.woCompletionRh ?? existingWO2.completionRH;
         const dueRH = existingWO2.nextDueReading ?? null;
         let jobIntervalRH = null;
         if (existingWO2.jobId) {
@@ -40890,8 +41133,9 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
       const computed = calculateNextDueDate2(actualCompletionDate, existingWO2.frequencyValue, existingWO2.frequencyUnit, originalDueDate);
       if (computed) nextDueDate = computed;
     }
-  } else if (existingWO2.maintenanceBasis === "Running Hours" && existingWO2.currentReading) {
-    nextDueReading = (parseInt(existingWO2.currentReading) + parseInt(existingWO2.frequencyValue || "0")).toString();
+  } else if (existingWO2.maintenanceBasis === "Running Hours" && (existingWO2.woCompletionRh || existingWO2.currentReading)) {
+    const cycleRHSrc = existingWO2.woCompletionRh ?? existingWO2.currentReading;
+    nextDueReading = (parseInt(String(cycleRHSrc)) + parseInt(existingWO2.frequencyValue || "0")).toString();
   }
   const { calculateMissedCycles: calculateMissedCycles2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
   const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
@@ -60720,8 +60964,8 @@ async function createChangeRequest(request) {
 async function updateChangeRequest(id, data) {
   return storage.updateChangeRequest(id, data);
 }
-async function approveChangeRequest(id, reviewerId, comment, role) {
-  return storage.approveChangeRequest(id, reviewerId, comment, role);
+async function approveChangeRequest(id, reviewerId, comment, role, overriddenChanges) {
+  return storage.approveChangeRequest(id, reviewerId, comment, role, overriddenChanges);
 }
 async function getAuditLogsByEntity2(entityType, entityId) {
   return storage.getAuditLogsByEntity(entityType, entityId);
@@ -61185,7 +61429,7 @@ async function submitChangeRequestWorkflow(id, userId) {
   return updated;
 }
 async function approveChangeRequest2(id, body) {
-  const { comment, reviewerId, role } = body;
+  const { comment, reviewerId, role, overriddenChanges } = body;
   if (!comment) {
     throw new ValidationError("Comment is required for approval");
   }
@@ -61194,9 +61438,10 @@ async function approveChangeRequest2(id, body) {
     id: existing?.id,
     targetType: existing?.targetType,
     targetId: existing?.targetId,
-    proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0
+    proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0,
+    overriddenFieldCount: overriddenChanges?.length ?? 0
   });
-  const updated = await approveChangeRequest(id, reviewerId || "reviewer", comment, role);
+  const updated = await approveChangeRequest(id, reviewerId || "reviewer", comment, role, overriddenChanges);
   console.log(`[CR_SERVICE] Approval complete, status: ${updated.status}`);
   return updated;
 }
@@ -61331,7 +61576,8 @@ async function approveChangeRequest3(req, res) {
   const updated = await approveChangeRequest2(id, {
     comment: req.body.comment,
     reviewerId: serverReviewerId,
-    role: userRole
+    role: userRole,
+    overriddenChanges: req.body.overriddenChanges
   });
   res.json(updated);
 }
@@ -74227,7 +74473,228 @@ var routes_default18 = router18;
 // server/modules/access-control/routes.ts
 init_storage();
 import { Router as Router19 } from "express";
+
+// server/modules/access-control/controllers/viewModeController.ts
+init_syncRole();
+
+// server/modules/access-control/repositories/viewModeRepository.ts
+init_db();
+init_schema();
+import { eq as eq27, and as and24, asc as asc6, sql as sql20 } from "drizzle-orm";
+async function getActiveViewModes() {
+  const db2 = await getDb();
+  return db2.select().from(viewModesMaster).where(and24(eq27(viewModesMaster.isDeleted, false), eq27(viewModesMaster.isActive, true))).orderBy(asc6(viewModesMaster.sortOrder), asc6(viewModesMaster.code));
+}
+async function getRolesWithMappings() {
+  const db2 = await getDb();
+  const rows = await db2.select({
+    roleRuid: sql20`${admnRoleMaster.ruid}::text`,
+    roleName: admnRoleMaster.assignedRole,
+    roletype: admnRoleMaster.roletype,
+    viewModeCode: roleViewModeMapping.viewModeCode
+  }).from(admnRoleMaster).leftJoin(
+    roleViewModeMapping,
+    and24(
+      sql20`${roleViewModeMapping.roleRuid} = ${admnRoleMaster.ruid}::text`,
+      eq27(roleViewModeMapping.isDeleted, false)
+    )
+  ).where(and24(eq27(admnRoleMaster.isActive, true), eq27(admnRoleMaster.isDeleted, false))).orderBy(asc6(admnRoleMaster.roletype), asc6(admnRoleMaster.assignedRole));
+  return rows;
+}
+async function getActiveRoleByTypeAndName(roletype, assignedRole) {
+  const db2 = await getDb();
+  const rows = await db2.select({
+    ruid: sql20`${admnRoleMaster.ruid}::text`,
+    assignedRole: admnRoleMaster.assignedRole,
+    roletype: admnRoleMaster.roletype
+  }).from(admnRoleMaster).where(
+    and24(
+      eq27(admnRoleMaster.roletype, roletype),
+      eq27(admnRoleMaster.assignedRole, assignedRole),
+      eq27(admnRoleMaster.isActive, true),
+      eq27(admnRoleMaster.isDeleted, false)
+    )
+  ).limit(1);
+  return rows[0];
+}
+async function getActiveRoleByRuid(roleRuid) {
+  const db2 = await getDb();
+  const rows = await db2.select({
+    ruid: sql20`${admnRoleMaster.ruid}::text`,
+    assignedRole: admnRoleMaster.assignedRole,
+    roletype: admnRoleMaster.roletype
+  }).from(admnRoleMaster).where(
+    and24(
+      sql20`${admnRoleMaster.ruid}::text = ${roleRuid}`,
+      eq27(admnRoleMaster.isActive, true),
+      eq27(admnRoleMaster.isDeleted, false)
+    )
+  ).limit(1);
+  return rows[0];
+}
+async function getMappingByRoleRuid(roleRuid) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(roleViewModeMapping).where(
+    and24(eq27(roleViewModeMapping.roleRuid, roleRuid), eq27(roleViewModeMapping.isDeleted, false))
+  ).limit(1);
+  return rows[0];
+}
+async function upsertMapping(roleRuid, viewModeCode, updatedByUuid) {
+  const db2 = await getDb();
+  await db2.insert(roleViewModeMapping).values({ roleRuid, viewModeCode, createdByUuid: updatedByUuid, updatedByUuid }).onConflictDoUpdate({
+    target: roleViewModeMapping.roleRuid,
+    set: {
+      viewModeCode,
+      isDeleted: false,
+      updatedByUuid,
+      updatedAt: /* @__PURE__ */ new Date()
+    }
+  });
+}
+async function softDeleteMapping(roleRuid, updatedByUuid) {
+  const db2 = await getDb();
+  await db2.update(roleViewModeMapping).set({ isDeleted: true, updatedByUuid, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(roleViewModeMapping.roleRuid, roleRuid));
+}
+
+// server/modules/access-control/services/viewModeService.ts
+var SAIL_ADMIN_ROLE = "Sail Admin";
+var SAIL_ADMIN_MODE = "Sail_Admin";
+async function listViewModes() {
+  return getActiveViewModes();
+}
+async function getRoleViewMappings() {
+  const [availableModes, mappings] = await Promise.all([
+    getActiveViewModes(),
+    getRolesWithMappings()
+  ]);
+  return { availableModes, mappings };
+}
+var ValidationError2 = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+  }
+};
+async function saveMappings(entries, updatedByUuid) {
+  const activeCodes = new Set((await getActiveViewModes()).map((m) => m.code));
+  const validated = [];
+  for (const entry of entries) {
+    if (!entry || typeof entry.roleRuid !== "string" || !entry.roleRuid.trim()) {
+      throw new ValidationError2("invalid_entry", "Every entry needs a roleRuid.");
+    }
+    if (entry.viewModeCode != null && !activeCodes.has(entry.viewModeCode)) {
+      throw new ValidationError2(
+        "invalid_view_mode",
+        `'${entry.viewModeCode}' is not an active view mode.`
+      );
+    }
+    const role = await getActiveRoleByRuid(entry.roleRuid.trim());
+    if (!role) {
+      throw new ValidationError2("role_not_found", `No active role with ruid '${entry.roleRuid}'.`);
+    }
+    if (role.roletype === "Office" && role.assignedRole === SAIL_ADMIN_ROLE) {
+      throw new ValidationError2(
+        "sail_admin_locked",
+        "The Sail Admin role mapping is locked and cannot be changed."
+      );
+    }
+    validated.push({ entry: { ...entry, roleRuid: entry.roleRuid.trim() }, roleName: role.assignedRole, roletype: role.roletype });
+  }
+  for (const { entry } of validated) {
+    if (entry.viewModeCode == null) {
+      await softDeleteMapping(entry.roleRuid, updatedByUuid);
+    } else {
+      await upsertMapping(entry.roleRuid, entry.viewModeCode, updatedByUuid);
+    }
+  }
+}
+async function resolveViewMode(userType, roleName) {
+  if (userType === "Office" && roleName === SAIL_ADMIN_ROLE) {
+    return { mode: SAIL_ADMIN_MODE, reason: null };
+  }
+  const role = await getActiveRoleByTypeAndName(userType, roleName);
+  if (!role) {
+    return { mode: null, reason: "ROLE_NOT_FOUND" };
+  }
+  const mapping = await getMappingByRoleRuid(role.ruid);
+  if (!mapping) {
+    return { mode: null, reason: "ROLE_NOT_MAPPED" };
+  }
+  const activeCodes = new Set((await getActiveViewModes()).map((m) => m.code));
+  if (!activeCodes.has(mapping.viewModeCode)) {
+    return { mode: null, reason: "ROLE_NOT_MAPPED" };
+  }
+  return { mode: mapping.viewModeCode, reason: null };
+}
+
+// server/modules/access-control/controllers/viewModeController.ts
+var EDITOR_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
+async function getViewModesHandler(_req, res) {
+  try {
+    const modes = await listViewModes();
+    res.json(modes);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch view modes", details: error.message });
+  }
+}
+async function getRoleViewMappingsHandler(_req, res) {
+  try {
+    const result = await getRoleViewMappings();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch role view mappings", details: error.message });
+  }
+}
+async function putRoleViewMappingsHandler(req, res) {
+  try {
+    if (await isShipInstance()) {
+      return res.status(403).json({
+        error: "shore_only",
+        message: "View-mode mappings can only be edited on the shore instance. Ships receive updates via sync."
+      });
+    }
+    const userRole = req.user?.role || "";
+    if (!EDITOR_ROLES.has(userRole)) {
+      return res.status(403).json({
+        error: "forbidden",
+        message: "Only Sail Admin / Super Admin may edit the role view-mode mapping."
+      });
+    }
+    const entries = req.body?.mappings;
+    if (!Array.isArray(entries)) {
+      return res.status(400).json({ error: "mappings[] is required" });
+    }
+    const updatedBy = req.user?.userUuid || null;
+    await saveMappings(entries, updatedBy);
+    const result = await getRoleViewMappings();
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if (error instanceof ValidationError2) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
+    res.status(500).json({ error: "Failed to save role view mappings", details: error.message });
+  }
+}
+async function resolveViewModeHandler(req, res) {
+  try {
+    const userType = typeof req.query.userType === "string" ? req.query.userType.trim() : "";
+    const role = typeof req.query.role === "string" ? req.query.role.trim() : "";
+    if (!userType || !role) {
+      return res.status(400).json({ error: "userType and role query params are required" });
+    }
+    const result = await resolveViewMode(userType, role);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to resolve view mode", details: error.message });
+  }
+}
+
+// server/modules/access-control/routes.ts
 var router19 = Router19();
+router19.get("/admin/view-modes", requireAuth, getViewModesHandler);
+router19.get("/admin/role-view-mappings/resolve", requireAuth, resolveViewModeHandler);
+router19.get("/admin/role-view-mappings", requireAuth, getRoleViewMappingsHandler);
+router19.put("/admin/role-view-mappings", requireAuth, putRoleViewMappingsHandler);
 router19.get("/admin/roles", async (_req, res) => {
   try {
     const roles = await storage.getActiveRoles();
@@ -75732,17 +76199,17 @@ import crypto5 from "crypto";
 // server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
 init_db();
 init_schema();
-import { eq as eq27 } from "drizzle-orm";
+import { eq as eq28 } from "drizzle-orm";
 async function getAllMappings() {
   const db2 = await getDb();
   return db2.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
 }
 async function getMappingForSailRole(sailRole) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartRoleMappings).where(eq27(shipskartRoleMappings.sailRole, sailRole)).limit(1);
+  const rows = await db2.select().from(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole)).limit(1);
   return rows[0];
 }
-async function upsertMapping(sailRole, shipskartRole, updatedByUuid) {
+async function upsertMapping2(sailRole, shipskartRole, updatedByUuid) {
   const db2 = await getDb();
   await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
     target: shipskartRoleMappings.sailRole,
@@ -75751,7 +76218,7 @@ async function upsertMapping(sailRole, shipskartRole, updatedByUuid) {
 }
 async function deleteMapping(sailRole) {
   const db2 = await getDb();
-  await db2.delete(shipskartRoleMappings).where(eq27(shipskartRoleMappings.sailRole, sailRole));
+  await db2.delete(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole));
 }
 
 // server/modules/shipskart/services/shipskartSsoService.ts
@@ -75931,7 +76398,7 @@ async function getAvailableShipskartRoles() {
 }
 
 // server/modules/shipskart/controllers/shipskartRoleMappingController.ts
-var EDITOR_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
+var EDITOR_ROLES2 = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
 async function getRoleMappingsHandler(req, res) {
   const [availableRoles, rows] = await Promise.all([
     getAvailableShipskartRoles(),
@@ -75944,7 +76411,7 @@ async function getRoleMappingsHandler(req, res) {
 }
 async function putRoleMappingsHandler(req, res) {
   const userRole = req.user?.role || "";
-  if (!EDITOR_ROLES.has(userRole)) {
+  if (!EDITOR_ROLES2.has(userRole)) {
     return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may edit the Shipskart role mapping." });
   }
   const mappings = req.body?.mappings;
@@ -75968,7 +76435,7 @@ async function putRoleMappingsHandler(req, res) {
     if (m.shipskartRole == null) {
       await deleteMapping(m.sailRole.trim());
     } else {
-      await upsertMapping(m.sailRole.trim(), m.shipskartRole, updatedBy);
+      await upsertMapping2(m.sailRole.trim(), m.shipskartRole, updatedBy);
     }
   }
   const rows = await getAllMappings();
@@ -75998,21 +76465,21 @@ init_middleware();
 // server/modules/noon-report/repositories/noonReportRepository.ts
 init_db();
 init_schema();
-import { eq as eq28, and as and24, desc as desc6 } from "drizzle-orm";
+import { eq as eq29, and as and25, desc as desc6 } from "drizzle-orm";
 async function getNoonReports(filters) {
   const db2 = await getDb();
   let query = db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate));
   const conditions = [];
-  if (filters.vesselId) conditions.push(eq28(nrNoonReports.vesselId, filters.vesselId));
-  if (filters.status) conditions.push(eq28(nrNoonReports.status, filters.status));
+  if (filters.vesselId) conditions.push(eq29(nrNoonReports.vesselId, filters.vesselId));
+  if (filters.status) conditions.push(eq29(nrNoonReports.status, filters.status));
   if (conditions.length > 0) {
-    return db2.select().from(nrNoonReports).where(and24(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
+    return db2.select().from(nrNoonReports).where(and25(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
   }
   return db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
 }
 async function getNoonReportById(id) {
   const db2 = await getDb();
-  const result = await db2.select().from(nrNoonReports).where(eq28(nrNoonReports.id, id)).limit(1);
+  const result = await db2.select().from(nrNoonReports).where(eq29(nrNoonReports.id, id)).limit(1);
   return result[0] || null;
 }
 async function createNoonReport(data) {
@@ -76025,7 +76492,7 @@ async function createNoonReport(data) {
 }
 async function updateNoonReport(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq28(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function submitNoonReport(id, submittedBy) {
@@ -76035,27 +76502,27 @@ async function submitNoonReport(id, submittedBy) {
     submittedAt: /* @__PURE__ */ new Date(),
     submittedBy,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq28(nrNoonReports.id, id)).returning();
+  }).where(eq29(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function deleteNoonReport(id) {
   const db2 = await getDb();
-  await db2.delete(nrNoonReports).where(and24(eq28(nrNoonReports.id, id), eq28(nrNoonReports.status, "draft")));
+  await db2.delete(nrNoonReports).where(and25(eq29(nrNoonReports.id, id), eq29(nrNoonReports.status, "draft")));
 }
 async function saveDraft(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq28(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq29(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function getFuelRobByVessel(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrFuelRob).where(eq28(nrFuelRob.vesselId, vesselId));
+  return db2.select().from(nrFuelRob).where(eq29(nrFuelRob.vesselId, vesselId));
 }
 async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
   const db2 = await getDb();
-  const existing = await db2.select().from(nrFuelRob).where(and24(eq28(nrFuelRob.vesselId, vesselId), eq28(nrFuelRob.fuelType, fuelType))).limit(1);
+  const existing = await db2.select().from(nrFuelRob).where(and25(eq29(nrFuelRob.vesselId, vesselId), eq29(nrFuelRob.fuelType, fuelType))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and24(eq28(nrFuelRob.vesselId, vesselId), eq28(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and25(eq29(nrFuelRob.vesselId, vesselId), eq29(nrFuelRob.fuelType, fuelType)));
   } else {
     await db2.insert(nrFuelRob).values({
       vesselId,
@@ -76067,27 +76534,27 @@ async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
 }
 async function getLastNReports(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and24(eq28(nrNoonReports.vesselId, vesselId), eq28(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and25(eq29(nrNoonReports.vesselId, vesselId), eq29(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
 }
 
 // server/modules/noon-report/services/noonReportService.ts
 init_db();
 init_schema();
-import { eq as eq32, and as and27, desc as desc9, asc as asc6, isNull as isNull5, count } from "drizzle-orm";
+import { eq as eq33, and as and28, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
 
 // server/modules/noon-report/services/calculationEngine.ts
 init_db();
 init_schema();
-import { eq as eq31, and as and26, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
+import { eq as eq32, and as and27, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
 
 // server/modules/noon-report/utils/existingDataAdapter.ts
 init_db();
 init_schema();
-import { eq as eq29, sql as sql21 } from "drizzle-orm";
+import { eq as eq30, sql as sql22 } from "drizzle-orm";
 async function getVesselById(vesselId) {
   const db2 = await getDb();
   const result = await db2.execute(
-    sql21`SELECT vuuid, name, imo_number, flag, vessel_type, deadweight, gross_tonnage
+    sql22`SELECT vuuid, name, imo_number, flag, vessel_type, deadweight, gross_tonnage
         FROM vessels WHERE vuuid = ${vesselId} LIMIT 1`
   );
   const row = result.rows[0] ?? null;
@@ -76113,7 +76580,7 @@ async function getVesselDwt(vesselId) {
 init_fuelConversionFactors();
 async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrFuelRob).where(and26(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType))).limit(1);
+  const rows = await db2.select().from(nrFuelRob).where(and27(eq32(nrFuelRob.vesselId, vesselId), eq32(nrFuelRob.fuelType, fuelType))).limit(1);
   if (rows.length === 0) {
     const newRob = Math.max(0, deltaMt);
     await db2.insert(nrFuelRob).values({
@@ -76125,7 +76592,7 @@ async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   } else {
     const current = Number(rows[0].currentRob) || 0;
     const updated = Math.max(0, current + deltaMt);
-    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and26(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and27(eq32(nrFuelRob.vesselId, vesselId), eq32(nrFuelRob.fuelType, fuelType)));
   }
 }
 var PHASE1_STEPS = ["rollingAverages", "ciiTracking", "eeoi"];
@@ -76170,7 +76637,7 @@ async function computeRollingAveragesAndEndurance(report) {
     const cons3 = last3.map((r) => getReportConsumption(r, fuelType)).filter((v) => v !== null);
     const avg7Day = cons7.length > 0 ? cons7.reduce((a, b) => a + b, 0) / cons7.length : null;
     const avg3Day = cons3.length > 0 ? cons3.reduce((a, b) => a + b, 0) / cons3.length : null;
-    const robRows = await db2.select().from(nrFuelRob).where(and26(eq31(nrFuelRob.vesselId, report.vesselId), eq31(nrFuelRob.fuelType, fuelType))).limit(1);
+    const robRows = await db2.select().from(nrFuelRob).where(and27(eq32(nrFuelRob.vesselId, report.vesselId), eq32(nrFuelRob.fuelType, fuelType))).limit(1);
     const robRow = robRows[0] ?? null;
     const currentRob = robRow !== null ? Math.max(0, toNum2(robRow.currentRob) ?? 0) : null;
     let enduranceDays = null;
@@ -76186,7 +76653,7 @@ async function computeRollingAveragesAndEndurance(report) {
         avg7Day: avg7Day !== null ? String(avg7Day) : null,
         enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
         enduranceNm: enduranceNM !== null ? String(enduranceNM) : null
-      }).where(and26(eq31(nrFuelRob.vesselId, report.vesselId), eq31(nrFuelRob.fuelType, fuelType)));
+      }).where(and27(eq32(nrFuelRob.vesselId, report.vesselId), eq32(nrFuelRob.fuelType, fuelType)));
     } else if (avg7Day !== null) {
       await db2.insert(nrFuelRob).values({
         vesselId: report.vesselId,
@@ -76207,9 +76674,9 @@ async function computeCiiTracking(report) {
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
   const yearReports = await db2.select().from(nrNoonReports).where(
-    and26(
-      eq31(nrNoonReports.vesselId, report.vesselId),
-      eq31(nrNoonReports.status, "submitted"),
+    and27(
+      eq32(nrNoonReports.vesselId, report.vesselId),
+      eq32(nrNoonReports.status, "submitted"),
       gte5(nrNoonReports.reportDate, yearStart),
       lte3(nrNoonReports.reportDate, yearEnd)
     )
@@ -76236,7 +76703,7 @@ async function computeCiiTracking(report) {
     const refLine = computeCiiRefLine(dwt);
     ciiRating = assignCiiRating(aer, refLine);
   }
-  const existing = await db2.select().from(nrCiiTracking).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year))).limit(1);
+  const existing = await db2.select().from(nrCiiTracking).where(and27(eq32(nrCiiTracking.vesselId, report.vesselId), eq32(nrCiiTracking.year, year))).limit(1);
   const previousCiiRating = existing[0]?.ciiRating ?? null;
   if (existing.length > 0) {
     await db2.update(nrCiiTracking).set({
@@ -76247,7 +76714,7 @@ async function computeCiiTracking(report) {
       previousCiiRating,
       // store old rating before overwriting
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year)));
+    }).where(and27(eq32(nrCiiTracking.vesselId, report.vesselId), eq32(nrCiiTracking.year, year)));
   } else {
     await db2.insert(nrCiiTracking).values({
       vesselId: report.vesselId,
@@ -76278,9 +76745,9 @@ async function computeEeoi(report) {
     }
   }
   const eeoi = totalCo2Mt / (cargoMt * distanceSailed);
-  const existing = await db2.select().from(nrVoyageLegs).where(and26(eq31(nrVoyageLegs.vesselId, report.vesselId), eq31(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
+  const existing = await db2.select().from(nrVoyageLegs).where(and27(eq32(nrVoyageLegs.vesselId, report.vesselId), eq32(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq31(nrVoyageLegs.id, existing[0].id));
+    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq32(nrVoyageLegs.id, existing[0].id));
   } else {
     await db2.insert(nrVoyageLegs).values({
       vesselId: report.vesselId,
@@ -76307,7 +76774,7 @@ function getReportConsumption(report, fuelType) {
 }
 async function getLastNSubmitted(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and26(eq31(nrNoonReports.vesselId, vesselId), eq31(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
 }
 function toNum2(val) {
   if (val === null || val === void 0 || val === "") return null;
@@ -76380,7 +76847,7 @@ async function updateFuelRobFromReport(report) {
 }
 async function getFuelDashboard(vesselId) {
   const db2 = await getDb();
-  const robRecords = await db2.select().from(nrFuelRob).where(eq32(nrFuelRob.vesselId, vesselId));
+  const robRecords = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
   const robByFuelType = {};
   const enduranceDaysByFuel = {};
   const avg7DayByFuel = {};
@@ -76411,11 +76878,11 @@ async function getFuelDashboard(vesselId) {
     recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
   }
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and27(eq32(nrCiiTracking.vesselId, vesselId), eq32(nrCiiTracking.year, currentYear))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and28(eq33(nrCiiTracking.vesselId, vesselId), eq33(nrCiiTracking.year, currentYear))).limit(1);
   const ciiTracking = ciiRows[0] ?? null;
   const dwt = await getVesselDwt(vesselId);
   const ciiRefLine = dwt !== null ? computeCiiRefLine(dwt) : null;
-  const last30Raw = await db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
+  const last30Raw = await db2.select().from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
   const last30 = [...last30Raw].reverse().map((r) => {
     const hfo = toNum3(r.hfoConsumption) ?? 0;
     const lsmgo = toNum3(r.lsmgoConsumption) ?? 0;
@@ -76445,7 +76912,7 @@ async function getFuelDashboard(vesselId) {
     vlsfoConsumption: nrNoonReports.vlsfoConsumption,
     lpgConsumption: nrNoonReports.lpgConsumption,
     reportDate: nrNoonReports.reportDate
-  }).from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(asc6(nrNoonReports.reportDate));
+  }).from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
   const speedConsumptionData = allReports.flatMap((r) => {
     const speed = toNum3(r.speed);
     if (speed === null) return [];
@@ -76479,7 +76946,7 @@ async function getVesselKPIs(vesselId) {
 }
 async function getActiveAlerts(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrAlerts).where(and27(eq32(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
+  return db2.select().from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
 }
 async function getAllAlerts(vesselId, page, limit) {
   const db2 = await getDb();
@@ -76487,8 +76954,8 @@ async function getAllAlerts(vesselId, page, limit) {
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * safeLimit;
   const [data, totalRows] = await Promise.all([
-    db2.select().from(nrAlerts).where(eq32(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
-    db2.select({ total: count() }).from(nrAlerts).where(eq32(nrAlerts.vesselId, vesselId))
+    db2.select().from(nrAlerts).where(eq33(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
+    db2.select({ total: count() }).from(nrAlerts).where(eq33(nrAlerts.vesselId, vesselId))
   ]);
   const total = totalRows[0]?.total ?? 0;
   return {
@@ -76501,28 +76968,28 @@ async function getAllAlerts(vesselId, page, limit) {
 }
 async function getActiveAlertCount(vesselId) {
   const db2 = await getDb();
-  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and27(eq32(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
   return rows[0]?.total ?? 0;
 }
 async function acknowledgeAlert(alertId, acknowledgedBy) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq32(nrAlerts.id, alertId)).limit(1);
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq33(nrAlerts.id, alertId)).limit(1);
   if (existing.length === 0) return null;
-  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq32(nrAlerts.id, alertId)).returning();
+  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq33(nrAlerts.id, alertId)).returning();
   return updated[0] ?? null;
 }
 async function getFleetSummary(vesselIds) {
   const db2 = await getDb();
   const results = [];
   for (const vesselId of vesselIds) {
-    const latestReports = await db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
+    const latestReports = await db2.select().from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
     const latest = latestReports[0] ?? null;
-    const allReports = await db2.select().from(nrNoonReports).where(eq32(nrNoonReports.vesselId, vesselId));
+    const allReports = await db2.select().from(nrNoonReports).where(eq33(nrNoonReports.vesselId, vesselId));
     const totalReports = allReports.length;
     const submittedReports = allReports.filter((r) => r.status === "submitted").length;
-    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and27(eq32(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
     const activeAlerts = alertRows[0]?.total ?? 0;
-    const robRows = await db2.select().from(nrFuelRob).where(eq32(nrFuelRob.vesselId, vesselId));
+    const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
     const totalHfoRob = toNum3(robRows.find((r) => r.fuelType === "HFO")?.currentRob) ?? 0;
     const totalAllRob = robRows.reduce((acc, r) => acc + (toNum3(r.currentRob) ?? 0), 0);
     const avg7Day = robRows.reduce((acc, r) => acc + (toNum3(r.avg7Day) ?? 0), 0) || null;
@@ -76561,16 +77028,16 @@ function round4(n) {
 // server/modules/noon-report/repositories/bunkerRepository.ts
 init_db();
 init_schema();
-import { eq as eq33, and as and28, desc as desc10, sum } from "drizzle-orm";
+import { eq as eq34, and as and29, desc as desc10, sum } from "drizzle-orm";
 async function getBunkerRecords(filters) {
   const db2 = await getDb();
-  const conditions = [eq33(nrBunkerRecords.vesselId, filters.vesselId)];
-  if (filters.voyageNo) conditions.push(eq33(nrBunkerRecords.voyageNo, filters.voyageNo));
-  return db2.select().from(nrBunkerRecords).where(and28(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
+  const conditions = [eq34(nrBunkerRecords.vesselId, filters.vesselId)];
+  if (filters.voyageNo) conditions.push(eq34(nrBunkerRecords.voyageNo, filters.voyageNo));
+  return db2.select().from(nrBunkerRecords).where(and29(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
 }
 async function getBunkerRecordById(id) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrBunkerRecords).where(eq33(nrBunkerRecords.id, id)).limit(1);
+  const rows = await db2.select().from(nrBunkerRecords).where(eq34(nrBunkerRecords.id, id)).limit(1);
   return rows[0] ?? null;
 }
 async function createBunkerRecord(data) {
@@ -76580,22 +77047,22 @@ async function createBunkerRecord(data) {
 }
 async function updateBunkerRecord(id, data) {
   const db2 = await getDb();
-  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq33(nrBunkerRecords.id, id)).returning();
+  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrBunkerRecords.id, id)).returning();
   return rows[0] ?? null;
 }
 async function deleteBunkerRecord(id) {
   const db2 = await getDb();
-  await db2.delete(nrBunkerRecords).where(eq33(nrBunkerRecords.id, id));
+  await db2.delete(nrBunkerRecords).where(eq34(nrBunkerRecords.id, id));
 }
 async function getBunkerCostSummary(vesselId, voyageNo) {
   const db2 = await getDb();
-  const conditions = [eq33(nrBunkerRecords.vesselId, vesselId)];
-  if (voyageNo) conditions.push(eq33(nrBunkerRecords.voyageNo, voyageNo));
+  const conditions = [eq34(nrBunkerRecords.vesselId, vesselId)];
+  if (voyageNo) conditions.push(eq34(nrBunkerRecords.voyageNo, voyageNo));
   const rows = await db2.select({
     fuelType: nrBunkerRecords.fuelType,
     totalQuantityMt: sum(nrBunkerRecords.quantityMt),
     totalCost: sum(nrBunkerRecords.totalCost)
-  }).from(nrBunkerRecords).where(and28(...conditions)).groupBy(nrBunkerRecords.fuelType);
+  }).from(nrBunkerRecords).where(and29(...conditions)).groupBy(nrBunkerRecords.fuelType);
   return rows.map((r) => ({
     fuelType: r.fuelType,
     totalQuantityMt: r.totalQuantityMt ?? "0",
