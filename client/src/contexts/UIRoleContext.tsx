@@ -5,15 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useViewModeResolution } from "@/hooks/useViewModeResolution";
 import { isReplit } from "@/lib/env";
 
-const DEV_ROLE_TO_STORAGE: Record<UIRole, { userType: string; role: string }> = {
-  Sail_Admin:         { userType: "Office", role: "Sail Admin" },
-  Client_Admin:       { userType: "Office", role: "Client Admin" },
-  Tech_Superintendent:{ userType: "Office", role: "Admin" },
-  Head_of_Dept:       { userType: "Ship",   role: "Vessel Admin" },
-  Vessel:             { userType: "Ship",   role: "Vessel User" },
-  External:           { userType: "Office", role: "External 10" },
-};
-
 interface UIRoleContextType {
   uiRole: UIRole | null;
   setUIRole: (role: UIRole) => void;
@@ -50,9 +41,9 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
       return;
     }
 
-    // Same precedence as before Task #324: encrypted storage → plain storage →
-    // currentUser. Only the MAPPING moved server-side (fail-closed DB lookup
-    // via the shared useViewModeResolution hook, replacing mapLoggedRoleToUIRole).
+    // Precedence: ENCRYPTED storage → currentUser. Plain-text localStorage is
+    // untrusted (attacker-editable) and is never read. The MAPPING itself is
+    // server-side (fail-closed DB lookup via the shared useViewModeResolution hook).
     const encryptedUserType = secureGetItem<string>("userType");
     let encryptedProfileRole: string | null = null;
     try {
@@ -67,23 +58,6 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
       return;
     }
 
-    const plainUserType = localStorage.getItem("userType");
-    let plainProfileRole: string | null = null;
-    try {
-      const raw = localStorage.getItem("userProfile");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        plainProfileRole = parsed?.role || null;
-      }
-    } catch {
-      plainProfileRole = null;
-    }
-
-    if (plainUserType && plainProfileRole) {
-      setInputs({ userType: plainUserType, role: plainProfileRole });
-      return;
-    }
-
     setInputs({
       userType: currentUser.userType ?? null,
       role: currentUser.role ?? null,
@@ -95,13 +69,10 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
 
   const setUIRole = (role: UIRole) => {
     // Dev-only switching, restricted to the Replit workspace (VITE_APP_ENV=replit).
+    // Memory-only override — NEVER writes to localStorage, so a stale synthetic
+    // role can never poison a later session (the "Client Admin" reload lockout).
+    // Trade-off: the picked role resets to the default user on page reload.
     if (!isReplit()) return;
-    const storage = DEV_ROLE_TO_STORAGE[role];
-    localStorage.setItem("userType", storage.userType);
-    const existing = (() => {
-      try { return JSON.parse(localStorage.getItem("userProfile") || "{}"); } catch { return {}; }
-    })();
-    localStorage.setItem("userProfile", JSON.stringify({ ...existing, role: storage.role }));
     setDevOverride(role);
   };
 

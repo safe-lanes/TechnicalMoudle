@@ -275,63 +275,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         updatedAt: new Date(),
       };
       resolvedMyVessels = normalizeMyVessels(encryptedProfile);
-    } else {
-      const plainUserType = localStorage.getItem("userType");
-      let plainProfile: Record<string, any> | null = null;
-      try {
-        const raw = localStorage.getItem("userProfile");
-        if (raw) plainProfile = JSON.parse(raw);
-      } catch {
-        plainProfile = null;
-      }
-
-      if (plainProfile && import.meta.env.DEV) {
-        console.log(
-          "[AuthContext] plain userProfile keys:",
-          Object.keys(plainProfile),
-        );
-        console.log("[AuthContext] plain name-related fields:", {
-          fullName: plainProfile.fullName,
-          full_name: plainProfile.full_name,
-          name: plainProfile.name,
-          displayName: plainProfile.displayName,
-          userName: plainProfile.userName,
-          username: plainProfile.username,
-          firstname: plainProfile.firstname,
-          lastname: plainProfile.lastname,
-          firstName: plainProfile.firstName,
-          lastName: plainProfile.lastName,
-          first_name: plainProfile.first_name,
-          last_name: plainProfile.last_name,
-          userId: plainProfile.userId,
-        });
-      }
-
-      if (plainUserType && plainProfile?.role) {
-        const role = (plainProfile.role as UserRole) || "Office";
-        const resolved = resolveProfileName(plainProfile);
-        resolvedUser = {
-          id: plainProfile.id || 0,
-          username: resolved.username || "user",
-          fullName: resolved.fullName || resolved.username || "User",
-          email: plainProfile.email || null,
-          role: role,
-          userType:
-            plainUserType === "Office" || plainUserType === "Ship"
-              ? plainUserType
-              : undefined,
-          vesselId: plainProfile.vesselId || null,
-          department: plainProfile.department || null,
-          isActive: true,
-          crewDesignation: plainProfile.crewDesignation || null,
-          rank_name: plainProfile.rank_name || plainProfile.rankName || null,
-          userUuid: resolved.userUuid || undefined,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        resolvedMyVessels = normalizeMyVessels(plainProfile);
-      }
     }
+    // SECURITY: no plain-text localStorage fallback. Plain `userProfile`/
+    // `userType` values are attacker-editable and must never be trusted as
+    // identity inputs — only the encrypted keys written by the real login
+    // flow count. Absent/undecryptable keys fall through to DEFAULT_USER.
 
     if (!resolvedUser) {
       resolvedUser = DEFAULT_USER;
@@ -410,19 +358,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Keep assigned-fleet ("My Vessel") scope in sync with the freshly
     // logged-in account. The vessel assignments live on the stored
-    // userProfile (encrypted preferred, plain fallback), so re-read it here
-    // rather than relying solely on the initial mount hydration.
+    // userProfile (ENCRYPTED ONLY — plain-text storage is untrusted), so
+    // re-read it here rather than relying solely on the initial mount hydration.
     let loginMyVessels: MyVesselAssignment[] = [];
     const encLoginProfile = secureGetItem<Record<string, any>>("userProfile");
     if (encLoginProfile) {
       loginMyVessels = normalizeMyVessels(encLoginProfile);
-    } else {
-      try {
-        const raw = localStorage.getItem("userProfile");
-        if (raw) loginMyVessels = normalizeMyVessels(JSON.parse(raw));
-      } catch {
-        loginMyVessels = [];
-      }
     }
     setMyVessels(loginMyVessels);
     setDomain(resolveDomain());
