@@ -1345,14 +1345,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
-  const performRHValidation = async (rhValue: string, completionDate?: string) => {
+  // RH accuracy (migration 139 follow-up): every RH plausibility check anchors on the date the
+  // reading was TAKEN (B2 "Current Reading Date"), NOT the WO completion date — the server has
+  // done so since f93fcef31 (readingDateForRH / readingDateNorm), so anchoring the client
+  // pre-flight on the completion date made the displayed range disagree with what the server
+  // would accept. Materialised EXACTLY like the save path and the B3 input default: an untouched
+  // field is "" in state but both displays and saves TODAY, so reading raw state here would
+  // silently fall back and keep the old behaviour for the commonest case.
+  const rhReadingDateAnchor = executionData.currentReadingDate || new Date().toISOString().split('T')[0];
+
+  // readingDateOverride: pass the NEW value when called from inside a setExecutionData updater —
+  // the closure's executionData is still the pre-change render's state.
+  const performRHValidation = async (rhValue: string, readingDateOverride?: string) => {
     const context = workOrderContext as any;
     const componentId = context?.component?.id;
     if (!componentId || !rhValue || isNaN(Number(rhValue))) {
       setRhValidation(prev => ({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null, componentActualRH: prev.componentActualRH }));
       return;
     }
-    const dateToUse = completionDate || executionData.completionDateTime?.split('T')[0] || executionData.dateOfCompletion || new Date().toISOString().split('T')[0];
+    const dateToUse = readingDateOverride || rhReadingDateAnchor;
     setRhValidation(prev => ({ ...prev, status: 'loading', message: 'Validating...' }));
     try {
       const res = await fetch('/technical/api/running-hours/validate', {
@@ -1441,45 +1452,47 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     fetchComponentActualRH();
   }, [(workOrderContext as any)?.component?.id]);
 
-  // Task #252: instant, client-side guard for RH-driven completions dated BEFORE the component's
+  // Task #252: instant, client-side guard for RH-driven readings dated BEFORE the component's
   // last running-hours update. Mirrors the authoritative server rule (validateRHEntry →
   // INVALID_BACKDATED). To avoid false positives on legitimate backdating BETWEEN two existing
   // historical entries, suppress when the server has resolved a real previous anchor on/before the
-  // completion date.
+  // reading date.
+  // RH accuracy follow-up: anchored on the READING date (B3), matching the server's
+  // readingDateForRH — a WO completed long ago but READ today is no longer "backdated before
+  // baseline" (intended relaxation, confirmed by Jeevan). A reading date genuinely earlier than
+  // the last update still blocks exactly as before.
   const rhBackdateError = useMemo<string | null>(() => {
     // Only guard when a REAL RH baseline exists. A fabricated updatedAt/now fallback (brand-new
     // component with no RH reference) must never block — matches the authoritative server rule.
     if (!isRhDrivenCounter || !componentActualRHHasBaseline || !componentActualRHLastUpdated) return null;
-    const completionStr = executionData.completionDateTime
-      ? executionData.completionDateTime.split('T')[0]
-      : (executionData.dateOfCompletion || '');
-    if (!completionStr) return null;
+    const readingStr = rhReadingDateAnchor;
+    if (!readingStr) return null;
     const toUTCDay = (s: string) => {
       const d = new Date(s);
       return isNaN(d.getTime()) ? NaN : Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
     };
-    const completionMs = toUTCDay(completionStr);
+    const readingMs = toUTCDay(readingStr);
     const lastUpdatedMs = toUTCDay(componentActualRHLastUpdated);
-    if (isNaN(completionMs) || isNaN(lastUpdatedMs)) return null;
-    if (completionMs >= lastUpdatedMs) return null; // same-day or later is fine
+    if (isNaN(readingMs) || isNaN(lastUpdatedMs)) return null;
+    if (readingMs >= lastUpdatedMs) return null; // same-day or later is fine
     // Back-dated LOWER: the backend will silently skip the RH module update and flag the WO.
     // Do not block submission — the amber banner will explain the outcome after save.
     const enteredRHNum = executionData.currentReading ? Number(executionData.currentReading) : NaN;
     const componentCurrentRH = rhValidation.componentActualRH;
     if (!isNaN(enteredRHNum) && componentCurrentRH !== null && enteredRHNum <= componentCurrentRH) return null;
     // Backdated before the latest reading. Allow only if a real prior RH entry exists on/before the
-    // completion date (legitimate between-entries backdating, per the server timeline result).
+    // reading date (legitimate between-entries backdating, per the server timeline result).
     const prev = rhValidation.previousEntry;
     if (prev?.date) {
       const prevMs = toUTCDay(prev.date);
-      if (!isNaN(prevMs) && prevMs <= completionMs) return null;
+      if (!isNaN(prevMs) && prevMs <= readingMs) return null;
     }
     const fmt = (s: string) => {
       const d = new Date(s);
       return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
     };
-    return `Completion Date (${fmt(completionStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
-  }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, executionData.completionDateTime, executionData.dateOfCompletion, executionData.currentReading, rhValidation.previousEntry, rhValidation.componentActualRH]);
+    return `Current Reading Date (${fmt(readingStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
+  }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, rhReadingDateAnchor, executionData.currentReading, rhValidation.previousEntry, rhValidation.componentActualRH]);
 
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {
@@ -1501,10 +1514,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         autoCalcTotalTime(newData);
       }
 
-      if ((field === 'completionDateTime' || field === 'dateOfCompletion') && newData.currentReading) {
-        const newDate = field === 'completionDateTime' ? value.split('T')[0] : value;
+      // RH plausibility anchors on the READING date, so it is the Current Reading Date — not the
+      // completion date — that must re-trigger validation. Pass the new value explicitly: the
+      // performRHValidation closure still holds the pre-change executionData.
+      if (field === 'currentReadingDate' && newData.currentReading) {
+        const newReadingDate = value || new Date().toISOString().split('T')[0];
         if (rhValidationTimeoutRef.current) clearTimeout(rhValidationTimeoutRef.current);
-        rhValidationTimeoutRef.current = setTimeout(() => performRHValidation(newData.currentReading, newDate), 500);
+        rhValidationTimeoutRef.current = setTimeout(() => performRHValidation(newData.currentReading, newReadingDate), 500);
       }
 
       if (field === 'noOfPersons') {
@@ -6216,7 +6232,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {(rhBackdateError || (rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus === 'INVALID_BACKDATED')) && (
                   <div className="mt-2 p-3 bg-red-50 border border-red-300 rounded-md" data-testid="text-rh-backdated">
                     <div className="flex items-center gap-1.5 text-sm font-semibold text-red-800 mb-1">
-                      <AlertTriangle className="h-4 w-4 text-red-600" /> Invalid Completion Date
+                      <AlertTriangle className="h-4 w-4 text-red-600" /> Invalid Current Reading Date
                     </div>
                     <p className="text-xs text-red-700">
                       {rhBackdateError || rhValidation.message}
@@ -6230,7 +6246,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
                   };
                   const enteredRH = executionData.currentReading || '';
-                  const enteredDate = (executionData.completionDateTime || executionData.dateOfCompletion || '').split('T')[0];
+                  // The server's back-dated-lower skip is keyed on readingDateForRH, so this
+                  // banner must report the reading date it actually compared.
+                  const enteredDate = rhReadingDateAnchor;
                   const latestRH = rhValidation.componentActualRH;
                   const latestRHDate = componentActualRHLastUpdated || '';
                   return (
@@ -6240,8 +6258,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       </div>
                       <p className="text-xs text-amber-700">
                         {enteredDate && enteredRH
-                          ? `The Completion Date (${fmt(enteredDate)}) and RH reading (${enteredRH} hrs) are older and lower than the component's current RH state`
-                          : "The entered Completion Date and RH reading are older and lower than the component's current RH state"}
+                          ? `The Current Reading Date (${fmt(enteredDate)}) and RH reading (${enteredRH} hrs) are older and lower than the component's current RH state`
+                          : "The entered Current Reading Date and RH reading are older and lower than the component's current RH state"}
                         {latestRH !== null && latestRHDate
                           ? ` (${latestRH} hrs as of ${fmt(latestRHDate)}).`
                           : '.'}
