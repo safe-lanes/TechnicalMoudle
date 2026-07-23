@@ -287,20 +287,21 @@ export default function AccessControl() {
                 <h2 className="text-sm font-semibold text-gray-700">
                   Permissions for: <span className="text-blue-600">{selectedRole?.assignedRole}</span>
                 </h2>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-600 uppercase">
+                  <span>Select All</span>
+                  <Checkbox
+                    checked={globalCheckState}
+                    onCheckedChange={(checked) => toggleGlobalSelectAll(checked === true)}
+                    aria-label="Select all permissions for all menu items"
+                    data-testid="checkbox-global-select-all"
+                  />
+                </label>
               </div>
 
               <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
                 <div className="grid grid-cols-[1fr_80px_80px_80px_80px_80px] gap-1 text-xs font-medium text-gray-500 uppercase">
                   <div>Menu Item</div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span>Select All</span>
-                    <Checkbox
-                      checked={globalCheckState}
-                      onCheckedChange={(checked) => toggleGlobalSelectAll(checked === true)}
-                      aria-label="Select all permissions for all menu items"
-                      data-testid="checkbox-global-select-all"
-                    />
-                  </div>
+                  <div className="text-center">Select All</div>
                   <div className="text-center">View</div>
                   <div className="text-center">Create</div>
                   <div className="text-center">Edit</div>
