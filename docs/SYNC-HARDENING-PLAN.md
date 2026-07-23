@@ -301,9 +301,27 @@ Design: a `logFieldChanges` failure must NEVER break the business write. Instead
 ### 9.5 Phase 2 — transactional logging (the cure; scoped, not built)
 Destination: row-write + field-log in the SAME transaction (both commit or neither). The logger already accepts `txConn`. Refactor = plumb an optional tx through repo→storage write methods and wrap each write+log pair (~20 sites, mechanical); risk = slightly longer transactions; the CR appliers just pass their existing `tx`. Belongs in **Phase 2** with the ordering guard (same apply-correctness family). Un-swallow (9.4) is the stopgap, not the cure.
 
-### 9.6 Structural gate (approved direction)
-- **Now (with Phase 1):** CI/lint gate banning raw writes to synced tables outside the storage layer + non-prod runtime assertion (synced-table write without a same-request field-log = loud failure).
-- **Later (Phase 2+):** DB trigger in **shadow mode only** — trigger writes to a comparison table; diff against app-layer logs on ONE pilot vessel for a week; cut over per-table only when byte-identical (serialization-parity proof). Never fleet-wide without that.
+### 9.6 Structural gate (FINAL — reviewed 2026-07-23)
+1. **Transactional logging is the destination** (§9.5): row-write + field-log in the same transaction — the structural guarantee lives at the application layer. The 3 CR appliers are already converted (pulled forward); the remaining ~17 sites are Phase 2.
+2. **Un-swallow (mig 142) is the stopgap** — lost logs are loud + durable until tx-logging lands.
+3. **CI/lint gate** (with Phase 1): ban raw writes to synced tables outside the storage layer; require field-log adjacency.
+4. **Non-prod runtime assertion** (with Phase 1): a synced-table write without a same-request field-log fails loudly in dev/staging.
+
+**DB trigger: REJECTED outright — do not revisit.** Prior production experience with audit
+triggers in MySQL caused performance problems, and a trigger embedded in the schema is hard to
+back out once live across a fleet. The structural guarantee comes from transactional logging at
+the application layer instead. (Recorded so shadow-mode proposals are not re-raised.)
+
+### 9.7 Status of §9.3 sites (post-review build)
+- CR appliers (WO/spares/stores) — **FIXED** (tx-joined logging; phantom-log-on-rollback closed).
+- `workOrderAutoService` jobId backfill — **FIXED** (logged, 'auto-generation' actor).
+- `repairRhTracking` — **documented at the site** as deliberate local-only (no logging, by decision).
+- `workOrderContextService:375` corrective — **HOLD, documented at the site**: stays local-only
+  (known bounded divergence: a stuck-rejected WO corrected on one side stays local) until the
+  Phase-2 fix relocates it out of the view path and logs it with a real actor.
+
+### 9.8 Migration numbering
+141 = timeout backfill · **142 = sync_field_log_failures (consumed by the un-swallow)** · **Phase-1 tri-state = 143** (do not reuse 142).
 
 ## 8. Phase 1 — Locked Scoping (2026-07-23 review round 3, A–D)
 

@@ -948,6 +948,11 @@ export async function rhDiagnostic(req: Request, res: Response) {
 
 // ── POST /admin/repair-rh-tracking ──
 
+// DELIBERATE LOCAL-ONLY REPAIR (mig-138 class; plan §9.3, reviewed 2026-07-23): the
+// nextDueReading corrections below write work_orders DIRECTLY and are intentionally NOT
+// field-logged. Each instance derives the correct values from its OWN jobs/links and runs
+// the repair itself — syncing 'system'-authored repairs would recreate the false-conflict
+// class (the removed status-recalculator lesson). Do NOT add logFieldChanges here.
 export async function repairRhTracking(req: Request, res: Response) {
   const vesselId = req.body?.vesselId || req.query.vesselId;
   const dryRun = req.body?.dryRun !== false;

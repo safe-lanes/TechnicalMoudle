@@ -5959,8 +5959,12 @@ export class PostgresStorage {
       const success = String(applied) === String(expected);
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
-    // Sync field logging — WO entity changes applied by CR approval (best-effort)
-    try { await logFieldChanges('work_orders', resolvedWouuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply work_order:', e); }
+    // Sync field logging — tx-JOINED (plan §9.5, pulled forward): the log commits or rolls back
+    // WITH the CR apply. Previously the log was written on the GLOBAL pool while this tx was
+    // still open — a CR-finalize ROLLBACK left a phantom field log for changes that never
+    // applied, which would sync a false value to the other side. Throwing on log failure is
+    // intentional here: apply-without-log is not allowed (atomicity contract).
+    await logFieldChanges('work_orders', resolvedWouuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   /**
@@ -6023,7 +6027,8 @@ export class PostgresStorage {
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
     // Sync field logging — spare entity changes applied by CR approval (best-effort)
-    try { await logFieldChanges('spares', resolvedSuuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply spare:', e); }
+    // Tx-joined logging (see applyWorkOrderChangesInTx comment — phantom-log-on-rollback fix).
+    await logFieldChanges('spares', resolvedSuuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   /**
@@ -6086,7 +6091,8 @@ export class PostgresStorage {
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
     // Sync field logging — store entity changes applied by CR approval (best-effort)
-    try { await logFieldChanges('stores_items', resolvedStuuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply store:', e); }
+    // Tx-joined logging (see applyWorkOrderChangesInTx comment — phantom-log-on-rollback fix).
+    await logFieldChanges('stores_items', resolvedStuuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   async rejectChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {

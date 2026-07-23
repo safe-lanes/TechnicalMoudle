@@ -371,7 +371,13 @@ export async function getWorkOrderContext(workOrderId: string) {
     correctedWorkOrder.dateCompleted = null;
     correctedWorkOrder.approvalTier = null;
     wasStuckRejection = true;
-    // Fire-and-forget DB correction
+    // Fire-and-forget DB correction — DELIBERATELY NOT field-logged (plan §9.3, reviewed
+    // 2026-07-23): a read path causing a synced write stamped 'system' is the wrong shape
+    // (the recalculator false-conflict class), and making this propagate mid sync-integrity
+    // work invites surprises. KNOWN BOUNDED DIVERGENCE: a stuck-rejected WO corrected here
+    // stays corrected LOCALLY only, until the Phase-2 fix relocates this corrective out of
+    // the view path (scheduled or on-write) and logs it with a real actor. Do NOT "fix" by
+    // just adding logFieldChanges here.
     repo.update(workOrder.id || (workOrder as any).wouuid, {
       status: 'Due',
       completionDateTime: null,
