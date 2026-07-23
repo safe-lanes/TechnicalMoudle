@@ -153,6 +153,48 @@ export default function AccessControl() {
     return (p.canView || p.canCreate || p.canEdit || p.canDelete) && !isAllChecked(muid);
   };
 
+  // All menu ids in the tree (parents + all nested descendants).
+  const allMenuMuids = useMemo(() => {
+    const ids: string[] = [];
+    const walk = (nodes: MenuTreeNode[]) => {
+      for (const node of nodes) {
+        ids.push(node.muid);
+        walk(node.children);
+      }
+    };
+    walk(menuTree);
+    return ids;
+  }, [menuTree]);
+
+  const toggleGlobalSelectAll = (checked: boolean) => {
+    const newPerms = { ...effectivePermissions };
+    for (const muid of allMenuMuids) {
+      newPerms[muid] = {
+        menuMuid: muid,
+        canView: checked,
+        canCreate: checked,
+        canEdit: checked,
+        canDelete: checked,
+      };
+    }
+    setPermissions(newPerms);
+    setIsDirty(true);
+  };
+
+  const globalCheckState: boolean | "indeterminate" = useMemo(() => {
+    if (allMenuMuids.length === 0) return false;
+    let checkedCount = 0;
+    let anyChecked = false;
+    for (const muid of allMenuMuids) {
+      const p = effectivePermissions[muid];
+      if (!p) continue;
+      if (p.canView || p.canCreate || p.canEdit || p.canDelete) anyChecked = true;
+      if (p.canView && p.canCreate && p.canEdit && p.canDelete) checkedCount++;
+    }
+    if (checkedCount === allMenuMuids.length) return true;
+    return anyChecked ? "indeterminate" : false;
+  }, [allMenuMuids, effectivePermissions]);
+
   const toggleExpand = (muid: string) => {
     setExpandedParents((prev) => {
       const next = new Set(prev);
@@ -250,7 +292,15 @@ export default function AccessControl() {
               <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
                 <div className="grid grid-cols-[1fr_80px_80px_80px_80px_80px] gap-1 text-xs font-medium text-gray-500 uppercase">
                   <div>Menu Item</div>
-                  <div className="text-center">Select All</div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span>Select All</span>
+                    <Checkbox
+                      checked={globalCheckState}
+                      onCheckedChange={(checked) => toggleGlobalSelectAll(checked === true)}
+                      aria-label="Select all permissions for all menu items"
+                      data-testid="checkbox-global-select-all"
+                    />
+                  </div>
                   <div className="text-center">View</div>
                   <div className="text-center">Create</div>
                   <div className="text-center">Edit</div>
