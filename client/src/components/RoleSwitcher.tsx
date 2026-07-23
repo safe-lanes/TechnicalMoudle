@@ -19,10 +19,9 @@ import { Button } from "@/components/ui/button";
 export function RoleSwitcher() {
   const { uiRole, setUIRole } = useUIRole();
 
-  // Dev-only tool: render nothing outside the Replit workspace.
-  if (!isReplit()) {
-    return null;
-  }
+  // Visible in every environment so users can see their current view mode.
+  // Switching is Replit-only: outside the workspace the menu items are dimmed
+  // and inert (guarded here AND in UIRoleContext.setUIRole).
 
   return (
     <DropdownMenu>
