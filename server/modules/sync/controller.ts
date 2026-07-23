@@ -13,6 +13,7 @@ import { syncAutoScheduler } from './autoSyncScheduler';
 import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import { runPruning } from './pruningService';
 import { runHealthCheck, getTableStats } from './healthMonitor';
+import { getFieldLogFailureSessionCount } from './fieldLogger';
 import { getPool } from '../../db';
 import { isShipInstanceId, isShipInstance } from './syncRole';
 import { getSyncLogPath, getSyncLogDir } from './syncDiagLogger';
@@ -156,7 +157,21 @@ export async function statusHandler(req: Request, res: Response) {
     }
 
     const result = await syncService.getSyncStatus(vesselId, instanceId);
-    res.json(result);
+
+    // Phase-0 un-swallow (§9.4): surface LOST field logs until the Sync-Health panel exists.
+    // session = failures since this process started; unresolved = durable backlog needing the
+    // full-row-diff recovery. Best-effort — an old DB without migration 142 reports nulls.
+    let fieldLogFailures: { session: number; unresolved: number | null } = {
+      session: getFieldLogFailureSessionCount(),
+      unresolved: null,
+    };
+    try {
+      const pool = await getPool();
+      const r = await pool.query(`SELECT count(*)::int AS n FROM sync_field_log_failures WHERE resolved = false`);
+      fieldLogFailures.unresolved = r.rows[0]?.n ?? 0;
+    } catch { /* table absent pre-migration — leave null */ }
+
+    res.json({ ...result, fieldLogFailures });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] status error:', error);

@@ -270,6 +270,41 @@ Partial = indexes only the small pending set. **Risk if missed:** the gather run
 
 **6 — Fleet impact list (targets Phase 0).** Per vessel, on **ship** and its **shore** tenant DB: `SELECT vessel_id, count(*) FROM work_orders WHERE is_deleted=false GROUP BY vessel_id;` — ship-count > shore-count = affected ship (magnitude = missing). Repeat for `superintendent_notifications`, `component_maintenance_history`. Dead-letter tally from ship logs: `grep -oE "DEAD-LETTER: row=[a-f0-9-]+" <logs> | sort -u | wc -l`.
 
+## 9. Fourth Root Cause — Unlogged/Un-durable Field Logging (2026-07-23 audit)
+
+Nilesh ruled out ops SQL on work_orders. Exhaustive write audit findings:
+
+### 9.1 The computed-status split (check FIRST for the 52)
+`shared/workOrders/status.ts:276`: stored `Due`/`Active` + `completionDateTime` present ⇒ **displays/tab-counts as Completed with NO status write ever happening** (live-proven on the RHSUG-1 fixture). Stored `'Pending Approval'` always passes through (:250/:264) and can never display Completed. Therefore:
+- shore-tab PA vs ship-tab Completed → stored values MUST differ → a real write with a missing log.
+- shore-tab Due/Overdue vs ship-tab Completed → stored can MATCH → **no log was ever missing; the un-synced data is the completion FIELDS.**
+The discriminator query (run identically both sides on the 52): `SELECT wouuid, work_order_no, status, completion_date_time, date_completed, was_rejected, is_execution FROM work_orders WHERE wouuid IN (…) ORDER BY work_order_no;`
+**The full-row-diff recovery (§3.2-redesigned) covers both classes unchanged.**
+
+### 9.2 A4 — the swallowed-catch / non-transactional logging window (strongest recent-row explanation)
+- **No work_orders site logs inside the row's transaction** — every site commits the row, then calls `logFieldChanges` separately, wrapped in `try { … } catch { console.error }` (**20 sites**). A crash between commit-and-log, or ANY logger error (notably the deliberate instance-id-resolution throw during MT registration/restart churn), silently loses the log while the row commits. Fits the MT go-live timeline for the 52.
+- **Reverse phantom:** the three CR appliers (`applyWorkOrderChangesInTx` :5963, spares :6026, stores :6089) DO log — but **without `txConn`**, so the log commits on the global pool while the row-write sits in the still-open CR transaction. On CR-finalize ROLLBACK, a field log exists for changes that never applied → a false value would sync. (The ROB-merge phantom-log window, live in 3 places.)
+
+### 9.3 Unlogged write sites (audit result)
+| Site | Verdict |
+|---|---|
+| `workOrderContextService.ts:375` — corrective `status='Due'` on VIEW | **UNLOGGED — fix.** Once logged, the correction propagates both sides (correct — both sides should agree); note the view-triggered-write smell and the 'system' actor. |
+| `adminController.ts:1068/1115` (`repairRhTracking`) — nextDueReading | **Deliberate local-only repair (mig-138 class)** — document at the site, do NOT log (each side runs its own repair; logging 'system' repairs recreates the false-conflict class). |
+| `workOrderAutoService.ts:273` — jobId backfill | **UNLOGGED — fix** (trivial). |
+| `archiveWorkOrder` | **Correction: it DOES log** (inside the storage method). Not a finding. |
+| `applyWorkOrderChangesInTx` (A5) | **DOES log** (:5963) — not the feared live bug — but swallowed + non-tx (see 9.2). |
+| Sync appliers / provisioning / migrations / repairs / harnesses | Exempt by design (applying already-logged remote data, or deliberate local repairs). |
+
+### 9.4 Phase-0 hardening (approved): un-swallow — LOUD + DURABLE, never blocking
+Design: a `logFieldChanges` failure must NEVER break the business write. Instead: (a) loud `console.error` + **syncDiag `FIELD-LOG-LOST`** line, (b) in-memory counter surfaced via `/sync/status`, (c) **durable row in new local table `sync_field_log_failures`** (table_name, row_uuid, vessel_id, failed_fields, error, occurred_at) so lost logs are *recoverable by list*, not discovered weeks later by counting. Table is local bookkeeping — NOT synced, NOT provisioned. Tx-callers (`txConn` provided) keep throwing (atomicity is the caller's contract). Until the Sync-Health panel exists, the surfaces are: the failures table, the syncDiag file, and `/sync/status`.
+
+### 9.5 Phase 2 — transactional logging (the cure; scoped, not built)
+Destination: row-write + field-log in the SAME transaction (both commit or neither). The logger already accepts `txConn`. Refactor = plumb an optional tx through repo→storage write methods and wrap each write+log pair (~20 sites, mechanical); risk = slightly longer transactions; the CR appliers just pass their existing `tx`. Belongs in **Phase 2** with the ordering guard (same apply-correctness family). Un-swallow (9.4) is the stopgap, not the cure.
+
+### 9.6 Structural gate (approved direction)
+- **Now (with Phase 1):** CI/lint gate banning raw writes to synced tables outside the storage layer + non-prod runtime assertion (synced-table write without a same-request field-log = loud failure).
+- **Later (Phase 2+):** DB trigger in **shadow mode only** — trigger writes to a comparison table; diff against app-layer logs on ONE pilot vessel for a week; cut over per-table only when byte-identical (serialization-parity proof). Never fleet-wide without that.
+
 ## 8. Phase 1 — Locked Scoping (2026-07-23 review round 3, A–D)
 
 ### A. Re-send storm must be structurally impossible (transitional predicate + cutover gate)

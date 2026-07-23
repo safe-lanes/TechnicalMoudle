@@ -4315,6 +4315,27 @@ export const insertSyncFieldLogSchema = createInsertSchema(syncFieldLog).omit({
 export type InsertSyncFieldLog = z.infer<typeof insertSyncFieldLogSchema>;
 export type SyncFieldLog = typeof syncFieldLog.$inferSelect;
 
+// Durable record of LOST field logs (migration 142, SYNC-HARDENING-PLAN §9.4).
+// Written best-effort by the field logger when a standalone logFieldChanges call fails —
+// the business row committed but its sync log was never written. Recovery tooling reads
+// unresolved rows and regenerates the missing logs (full-row diff), then marks resolved.
+// LOCAL BOOKKEEPING ONLY: never synced (not in syncConfig), never provisioned.
+export const syncFieldLogFailures = pgTable("sync_field_log_failures", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  tableName: text("table_name").notNull(),
+  rowUuid: text("row_uuid").notNull(),
+  vesselId: text("vessel_id"),
+  failedFields: integer("failed_fields").notNull().default(0),
+  error: text("error"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  resolved: boolean("resolved").notNull().default(false),
+}, (table) => ({
+  idxUnresolved: index("idx_sflf_unresolved").on(table.resolved, table.occurredAt),
+  idxRow: index("idx_sflf_row").on(table.tableName, table.rowUuid),
+}));
+
+export type SyncFieldLogFailure = typeof syncFieldLogFailures.$inferSelect;
+
 export const syncConflicts = pgTable("sync_conflicts", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   conflictUuid: text("conflict_uuid").notNull().unique().default(sql`gen_random_uuid()::text`),
