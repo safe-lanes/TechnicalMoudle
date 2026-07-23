@@ -43,6 +43,12 @@ const RETRY_DELAYS = [5000, 15000, 45000]; // Exponential backoff (ms)
 // so a provisioned ship can carry per-vessel values. Defaults preserve the prior
 // hardcoded behavior EXACTLY: no DB row + no env ⇒ 30000 / 1000, byte-identical.
 const DEFAULT_REQUEST_TIMEOUT_MS = 30000; // A2: per /sync/push attempt
+// VSAT-safe FLOOR for the per-push request timeout. No source (DB, env, provisioning bundle, or
+// the hardcoded default) may drive the effective timeout below this — a shorter value aborts
+// pushes the shore has already applied → false failures → dead-letter data loss (the Frontier
+// Venture 2026-07-23 incident, caused by env=1200). Enforced at runtime (loadSettings clamp) and
+// at provisioning (seed clamp). 60s standard, uniform across the fleet.
+export const SYNC_REQUEST_TIMEOUT_FLOOR_MS = 60000;
 const DEFAULT_PUSH_BATCH_SIZE = 1000;     // A1: field-log rows per push
 // B-P0.2: overall budget for the file-transfer phase so a slow/stuck file can never
 // hang the sync cycle. Healthy file syncs finish in seconds and are unaffected; only
@@ -129,7 +135,17 @@ export class SyncEngine {
       const dbBatch = parseInt(settings['sync_push_batch_size'] || '', 10);
       this.pushBatchSize = dbBatch || parseInt(process.env.SYNC_PUSH_BATCH_SIZE || '', 10) || DEFAULT_PUSH_BATCH_SIZE;
       const dbTimeout = parseInt(settings['sync_request_timeout_ms'] || '', 10);
-      this.requestTimeoutMs = dbTimeout || parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || '', 10) || DEFAULT_REQUEST_TIMEOUT_MS;
+      const envTimeout = parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || '', 10);
+      const resolvedTimeout = dbTimeout || envTimeout || DEFAULT_REQUEST_TIMEOUT_MS;
+      // Source of the effective timeout — surfaced in the startup log so a bad value
+      // (e.g. the env=1200 that caused the Frontier Venture outage) is visible immediately.
+      const timeoutSource = dbTimeout ? 'DB' : (envTimeout ? 'env' : 'default');
+      // RUNTIME FLOOR (belt-and-suspenders): clamp so NO source — a hand-set low DB value, a low
+      // env, or the hardcoded default — can ever drive the effective timeout below the VSAT floor.
+      this.requestTimeoutMs = Math.max(resolvedTimeout, SYNC_REQUEST_TIMEOUT_FLOOR_MS);
+      if (resolvedTimeout < SYNC_REQUEST_TIMEOUT_FLOOR_MS) {
+        console.warn(`[SyncEngine] ⚠️ requestTimeoutMs=${resolvedTimeout} (${timeoutSource}) is below the ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms VSAT floor — clamped to ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms.`);
+      }
       // Drain cap — same sync_settings key the auto-scheduler uses; default 20 when unseeded.
       const dbCatchUp = parseInt(settings['catch_up_max_cycles'] || '', 10);
       this.catchUpMaxCycles = dbCatchUp || DEFAULT_DRAIN_MAX_CYCLES;
@@ -138,7 +154,7 @@ export class SyncEngine {
       this.fileDrainMaxBytes = dbFileMax || DEFAULT_FILE_DRAIN_MAX_BYTES;
 
       this.settingsLoaded = true;
-      console.log(`[SyncEngine] Settings loaded from DB — instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || '(empty)'}, localMode=${this.isLocalMode()}`);
+      console.log(`[SyncEngine] Settings loaded from DB — instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || '(empty)'}, localMode=${this.isLocalMode()}, requestTimeoutMs=${this.requestTimeoutMs} (${timeoutSource}), pushBatchSize=${this.pushBatchSize}`);
     } catch (error) {
       // DB might not be ready — fall back to env vars (already set in constructor)
       console.warn('[SyncEngine] Could not load DB settings, using env vars:', error);

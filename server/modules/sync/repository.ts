@@ -631,12 +631,19 @@ export async function updateSetting(key: string, value: string, userId?: string)
 export async function seedSettingIfEmpty(key: string, value: string): Promise<void> {
   if (value === undefined || value === null || value === '') return;
   const db = await getDb();
-  await db.update(syncSettings)
-    .set({ settingValue: value, updatedAt: new Date() })
-    .where(and(
-      eq(syncSettings.settingKey, key),
-      sql`COALESCE(${syncSettings.settingValue}, '') = ''`,
-    ));
+  // UPDATE-then-INSERT (was UPDATE-only). The old UPDATE-only form silently no-oped when the
+  // row did not exist (a key not pre-seeded by migration 132) — the latent defect behind two
+  // incidents (the timeout key on un-re-provisioned ships, and the selfheal_reoffer_v1 marker
+  // which had to hand-roll UPDATE-then-INSERT in autoSyncScheduler). ON CONFLICT keeps it
+  // idempotent and the setWhere ensures we ONLY write when the existing value is empty — an
+  // operator-set value is never overwritten.
+  await db.execute(sql`
+    INSERT INTO sync_settings (ssuuid, setting_key, setting_value, updated_at)
+    VALUES (gen_random_uuid()::text, ${key}, ${value}, NOW())
+    ON CONFLICT (setting_key) DO UPDATE
+      SET setting_value = EXCLUDED.setting_value, updated_at = NOW()
+      WHERE COALESCE(sync_settings.setting_value, '') = ''
+  `);
 }
 
 export async function updateSettings(settings: Record<string, string>, userId?: string): Promise<void> {

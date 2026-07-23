@@ -24,6 +24,7 @@ import {
   getSyncPhaseOrder,
   type TableSyncConfig,
 } from '../../../shared/syncConfig';
+import { SYNC_REQUEST_TIMEOUT_FLOOR_MS } from './syncEngine';
 
 // ── Types ──
 
@@ -786,7 +787,15 @@ export async function importProvisioningBundle(
     if (bundle.manifest.syncApiKey) await syncRepo.seedSettingIfEmpty('sync_api_key', bundle.manifest.syncApiKey);
     const env = bundle.manifest.envSettings;
     const pushBatch = env?.syncPushBatchSize ?? 200;
-    const reqTimeout = env?.syncRequestTimeoutMs ?? 120000;
+    // VSAT FLOOR (not just a default): a shore .env carrying a too-short timeout (e.g. 1200)
+    // would otherwise seed 1200 into every newly provisioned ship — reviving the Frontier
+    // Venture incident. Clamp the seeded value to the floor so a short value can NEVER be
+    // provisioned, and log loudly when a below-floor bundle value is clamped.
+    const rawTimeout = typeof env?.syncRequestTimeoutMs === 'number' ? env.syncRequestTimeoutMs : SYNC_REQUEST_TIMEOUT_FLOOR_MS;
+    const reqTimeout = Math.max(rawTimeout, SYNC_REQUEST_TIMEOUT_FLOOR_MS);
+    if (rawTimeout < SYNC_REQUEST_TIMEOUT_FLOOR_MS) {
+      console.warn(`[Provisioning] ⚠️ Bundle syncRequestTimeoutMs=${rawTimeout}ms is below the ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms VSAT floor — clamped to ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms (a short timeout aborts pushes the shore has already applied → false failures → data loss).`);
+    }
     await syncRepo.seedSettingIfEmpty('sync_push_batch_size', String(pushBatch));
     await syncRepo.seedSettingIfEmpty('sync_request_timeout_ms', String(reqTimeout));
   } catch (seedErr: any) {
