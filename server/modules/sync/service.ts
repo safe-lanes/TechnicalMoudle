@@ -11,7 +11,7 @@
  */
 
 import * as repo from './repository';
-import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows , evaluateInsertOriginGuard } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows , evaluateInsertOriginGuard, evaluateStaleSkipGuard } from './oneWayApplier';
 import {
   getTableSyncConfig,
   getTablesByCategory,
@@ -345,108 +345,62 @@ export async function receivePushData(
               syncDiag(`INSERT-LOG ALLOWED: ${log.tableName}.${log.fieldName} row=${log.rowUuid}`);
               // fall through to apply below
             } else {
-              // Per-field stale-skip: check if the RECEIVER has a newer log for this
-              // exact (table, row, field). Only receiver-local logs count — we compare
-              // against instance_id = receiverInstanceId, NOT against the sender's logs.
-              const fieldCheck = await client.query(
-                `SELECT changed_at, instance_id FROM sync_field_log
-                 WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
-                   AND instance_id = $4 AND changed_at > $5
-                 ORDER BY changed_at DESC LIMIT 1`,
-                [log.tableName, log.rowUuid, log.fieldName, receiverInstanceId, logChangedAt]
+              // §18: the detection + conflict-record now live in the SHARED helper that the
+              // ship's pull path also calls, so both directions behave identically and there is
+              // one implementation to reason about. The notification below stays here — it is a
+              // shore-side choice about office-user attention, not part of the guard.
+              const stale = await evaluateStaleSkipGuard(
+                client,
+                { ...log, changedAt: logChangedAt },
+                receiverInstanceId,
+                { batchUuid },
               );
 
-              if (fieldCheck.rows.length > 0) {
-                // REAL CONFLICT: receiver edited this SAME field more recently.
-                const winner = fieldCheck.rows[0];
-                const winnerChangedAt = new Date(winner.changed_at);
-
-                // Read current value from data table for the conflict log
-                let currentValue: string | null = null;
+              if (stale.skip) {
+                // ── Conflict notification (fire-and-forget, SHORE ONLY) ──
                 try {
-                  const curRow = await client.query(
-                    `SELECT "${fieldNameSnake}" FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-                    [log.rowUuid]
-                  );
-                  if (curRow.rows.length > 0) {
-                    const raw = curRow.rows[0][fieldNameSnake];
-                    currentValue = raw === null || raw === undefined ? null : String(raw);
-                  }
-                } catch { /* best-effort — don't fail the loop for logging */ }
+                  // Look up the rejected user from the incoming sender's field log
+                  const rejectedUserId = (log as any).changedByUserId || null;
+                  // 'auto-generation' (and startup/cron stamp 'system') — neither is a real
+                  // recipient, so both must be excluded or we'd queue a notification nobody owns.
+                  const MACHINE_ACTORS = new Set(['system', 'auto-generation']);
+                  if (rejectedUserId && !MACHINE_ACTORS.has(rejectedUserId)) {
+                    const fieldLabel = getFieldDisplayName(log.fieldName);
+                    const event = await alertsRepo.createAlertEvent({
+                      alertType: 'sync_conflict_detected',
+                      priority: 'medium',
+                      objectType: log.tableName,
+                      objectId: log.rowUuid,
+                      vesselId: log.vesselId || null,
+                      dedupeKey: `sync_conflict:${log.tableName}:${log.rowUuid}:${log.fieldName}:${logChangedAt.toISOString()}`,
+                      state: 'open',
+                      payload: JSON.stringify({
+                        alertMessage: `Sync conflict: your change to "${fieldLabel}" was rejected — the other side has a newer edit`,
+                        tableName: log.tableName,
+                        fieldName: log.fieldName,
+                        targetUserId: rejectedUserId,
+                        link: `/admin/sync-conflicts`,
+                      }),
+                    });
 
-                // Record in sync_conflict_log
-                try {
-                  await client.query(
-                    `INSERT INTO sync_conflict_log
-                       (batch_uuid, table_name, row_uuid, field_name,
-                        incoming_sender_instance, incoming_changed_at,
-                        incoming_old_value, incoming_new_value,
-                        receiver_winner_instance, receiver_winner_changed_at,
-                        receiver_current_value)
-                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-                    [batchUuid, log.tableName, log.rowUuid, log.fieldName,
-                     log.instanceId, logChangedAt,
-                     log.oldValue, log.newValue,
-                     receiverInstanceId, winnerChangedAt,
-                     currentValue]
-                  );
-                  // ── Conflict notification (fire-and-forget) ──
-                  try {
-                    // Look up the rejected user from the incoming sender's field log
-                    const rejectedUserQuery = await client.query(
-                      `SELECT changed_by_user_id FROM sync_field_log
-                       WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
-                         AND instance_id = $4
-                       ORDER BY changed_at DESC LIMIT 1`,
-                      [log.tableName, log.rowUuid, log.fieldName, log.instanceId]
-                    );
-                    const rejectedUserId = rejectedUserQuery.rows[0]?.changed_by_user_id;
-
-                    // Only notify real users, not machine actors. Auto-generated writers stamp
-                    // 'auto-generation' (and startup/cron stamp 'system') — neither is a real
-                    // recipient, so both must be excluded or we'd queue a notification nobody owns.
-                    const MACHINE_ACTORS = new Set(['system', 'auto-generation']);
-                    if (rejectedUserId && !MACHINE_ACTORS.has(rejectedUserId)) {
-                      const fieldLabel = getFieldDisplayName(log.fieldName);
-                      const event = await alertsRepo.createAlertEvent({
-                        alertType: 'sync_conflict_detected',
-                        priority: 'medium',
-                        objectType: log.tableName,
-                        objectId: log.rowUuid,
-                        vesselId: log.vesselId || null,
-                        dedupeKey: `sync_conflict:${log.tableName}:${log.rowUuid}:${log.fieldName}:${logChangedAt.toISOString()}`,
-                        state: 'open',
-                        payload: JSON.stringify({
-                          alertMessage: `Sync conflict: your change to "${fieldLabel}" was rejected — the other side has a newer edit`,
-                          tableName: log.tableName,
-                          fieldName: log.fieldName,
-                          targetUserId: rejectedUserId,
-                          link: `/admin/sync-conflicts`,
-                        }),
+                    if (event) {
+                      await alertsRepo.createAlertDelivery({
+                        eventId: event.id,
+                        eventUuid: event.aeuuid,
+                        channel: 'in_app',
+                        recipient: rejectedUserId,
+                        status: 'sent',
                       });
-
-                      if (event) {
-                        await alertsRepo.createAlertDelivery({
-                          eventId: event.id,
-                          eventUuid: event.aeuuid,
-                          channel: 'in_app',
-                          recipient: rejectedUserId,
-                          status: 'sent',
-                        });
-                        syncDiag(`CONFLICT NOTIFICATION: sent to user=${rejectedUserId} for ${log.tableName}.${log.fieldName}`);
-                      }
-                    }
-                  } catch (notifyErr: any) {
-                    // Dedupe key collision is normal — ignore. Other errors are non-fatal.
-                    if (!notifyErr.message?.includes('unique') && !notifyErr.message?.includes('duplicate')) {
-                      syncDiag(`CONFLICT NOTIFICATION FAILED: ${notifyErr.message} — conflict still logged`);
+                      syncDiag(`CONFLICT NOTIFICATION: sent to user=${rejectedUserId} for ${log.tableName}.${log.fieldName}`);
                     }
                   }
-                } catch (clErr: any) {
-                  console.error(`[Sync Push] Failed to write sync_conflict_log: ${clErr.message}`);
+                } catch (notifyErr: any) {
+                  // Dedupe key collision is normal — ignore. Other errors are non-fatal.
+                  if (!notifyErr.message?.includes('unique') && !notifyErr.message?.includes('duplicate')) {
+                    syncDiag(`CONFLICT NOTIFICATION FAILED: ${notifyErr.message} — conflict still logged`);
+                  }
                 }
 
-                syncDiag(`CONFLICT LOGGED: ${log.tableName}.${log.fieldName} row=${log.rowUuid} — incoming ${logChangedAt.toISOString()} rejected by receiver ${winnerChangedAt.toISOString()}`);
                 try { await client.query(`RELEASE SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
                 continue; // skip apply — receiver's edit wins
               }

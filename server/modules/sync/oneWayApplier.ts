@@ -1332,3 +1332,97 @@ export async function evaluateInsertOriginGuard(
   syncDiag(`INSERT-LOG SKIP (terminal-ack): ${log.tableName}.${log.fieldName} row=${log.rowUuid} — ${reason}`);
   return { skip: true, reason };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PER-FIELD STALE-SKIP GUARD — SHARED BY BOTH DIRECTIONS (plan §17/§18)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Reject an incoming UPDATE-origin log when the RECEIVER has edited the same field more
+ * recently. Last-writer-wins, decided per field, using only receiver-LOCAL logs.
+ *
+ * WHY THIS IS SHARED: this logic lived only in `service.ts` (shore receive-push). The ship's
+ * pull loop (`syncEngine.ts`) applied every update log with a bare UPDATE — no staleness check,
+ * no conflict record. So an OLDER shore edit could silently overwrite a NEWER local ship value
+ * with no trace, while the identical situation on shore was detected and recorded. The ship was
+ * strictly weaker than the shore against the same class of overwrite. Measured before the fix:
+ * `receiverInstanceId` 5x in service.ts, 0x in syncEngine.ts.
+ *
+ * CONFLICT ROWS: written on BOTH sides now — the Conflict Review UI exists on ships too, so the
+ * rows have somewhere to surface and the two directions record the same things.
+ * NOTIFICATIONS: deliberately NOT fired from here. The shore's receive path keeps its own
+ * notification block; the ship sends none for now. Visibility first, crew attention later only
+ * if real volume justifies it (same reasoning as the insert-skip counter).
+ *
+ * Callers treat `skip: true` as "receiver's edit wins — do not apply". A conflict row is already
+ * written by the time this returns.
+ */
+export interface StaleSkipDecision {
+  skip: boolean;
+  winnerChangedAt?: Date;
+  currentValue?: string | null;
+}
+
+export async function evaluateStaleSkipGuard(
+  client: { query: (sql: string, params?: any[]) => Promise<any> },
+  log: {
+    tableName: string; rowUuid: string; fieldName: string;
+    oldValue: string | null | undefined; newValue: string | null | undefined;
+    changedAt: Date; instanceId?: string | null;
+  },
+  receiverInstanceId: string,
+  opts: { batchUuid?: string | null } = {},
+): Promise<StaleSkipDecision> {
+  // Only receiver-LOCAL logs count. Comparing against the sender's own logs would make every
+  // re-delivery look like a conflict.
+  const fieldCheck = await client.query(
+    `SELECT changed_at, instance_id FROM sync_field_log
+      WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
+        AND instance_id = $4 AND changed_at > $5
+      ORDER BY changed_at DESC LIMIT 1`,
+    [log.tableName, log.rowUuid, log.fieldName, receiverInstanceId, log.changedAt]
+  );
+  if (fieldCheck.rows.length === 0) return { skip: false };
+
+  const winnerChangedAt = new Date(fieldCheck.rows[0].changed_at);
+  const config = getTableSyncConfig(log.tableName);
+  const identityCol = config?.identityColumn || 'id';
+  const fieldNameSnake = fieldNameToColumn(log.fieldName);
+
+  // Current value is for the conflict record only — best-effort, never fails the apply loop.
+  let currentValue: string | null = null;
+  try {
+    const curRow = await client.query(
+      `SELECT "${fieldNameSnake}" FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+      [log.rowUuid]
+    );
+    if (curRow.rows.length > 0) {
+      const raw = curRow.rows[0][fieldNameSnake];
+      currentValue = raw === null || raw === undefined ? null : String(raw);
+    }
+  } catch { /* best-effort */ }
+
+  try {
+    await client.query(
+      `INSERT INTO sync_conflict_log
+         (batch_uuid, table_name, row_uuid, field_name,
+          incoming_sender_instance, incoming_changed_at,
+          incoming_old_value, incoming_new_value,
+          receiver_winner_instance, receiver_winner_changed_at,
+          receiver_current_value)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [opts.batchUuid ?? null, log.tableName, log.rowUuid, log.fieldName,
+       log.instanceId ?? null, log.changedAt,
+       log.oldValue ?? null, log.newValue ?? null,
+       receiverInstanceId, winnerChangedAt, currentValue]
+    );
+  } catch (clErr: any) {
+    // A failed conflict RECORD must never turn into an applied overwrite. Skip regardless.
+    console.error(`[Sync] Failed to write sync_conflict_log: ${clErr.message}`);
+  }
+
+  syncDiag(
+    `STALE-SKIP: ${log.tableName}.${log.fieldName} row=${log.rowUuid} — incoming ` +
+    `${log.changedAt.toISOString()} rejected by receiver ${winnerChangedAt.toISOString()}`
+  );
+  return { skip: true, winnerChangedAt, currentValue };
+}

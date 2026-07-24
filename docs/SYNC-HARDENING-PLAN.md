@@ -626,3 +626,41 @@ helper — the same shape as `evaluateInsertOriginGuard` — and call it from th
 Core check ~10 lines. Open decision: whether the ship also writes `sync_conflict_log` rows and
 fires notifications (the Conflict Review UI exists, so probably yes, but ship-side recipients
 need a deliberate choice). NOT built — awaiting direction.
+
+---
+
+## §18 — STALE-SKIP MADE SYMMETRIC (BUILT 2026-07-24, no migration)
+
+Closes the §17 asymmetry. `evaluateStaleSkipGuard` in `oneWayApplier.ts` is now the SINGLE
+implementation, called by BOTH directions:
+- `service.ts` (shore receive-push) — refactored ONTO the helper, **net −46 lines** (−95/+49).
+  Not a second copy: the old inline block is gone.
+- `syncEngine.ts` (ship pull) — gained the check it never had.
+
+**What was possible before and is not now:** an OLDER shore edit overwriting a NEWER local ship
+value, silently, with no conflict record. `applyFieldLog` issued a bare
+`UPDATE "<table>" SET "<col>" = $1`. The identical case on shore was always detected.
+
+**Decisions (Ghazi, 2026-07-24):**
+- **Conflict ROWS: YES on the ship.** The Conflict Review UI already exists in the vessel admin
+  menu, so the rows have somewhere to surface and both sides now record the same things.
+- **Notifications: NO on the ship, for now.** They stay in `service.ts` as a shore-side choice
+  about office-user attention — deliberately NOT moved into the shared helper. Visibility first;
+  crew attention only if real volume justifies it (same reasoning as the insert-skip counter).
+
+**Terminal, like the shore's:** a stale-skipped log is NOT added to `failedRowUuids`. The
+receiver's edit won, so re-offering cannot change the outcome and would loop forever.
+
+**A failed conflict RECORD still skips.** A logging failure must never silently become an
+applied overwrite (harness case 6).
+
+**Only receiver-LOCAL logs count** (`instance_id = receiverInstanceId`). Comparing against the
+sender's own logs would make every re-delivery look like a conflict (harness case 4).
+
+Harness `scripts/test-stale-skip-symmetry.ts` 13/13, incl. the regression that matters: an older
+shore log no longer overwrites a newer local ship value, and the conflict row is written with
+both instants, the winner, the current value and the rejected incoming value.
+
+### HARD GATE carried forward to Phase 2 / tri-state (144)
+**The ordering watermark MUST live in shared code called by BOTH paths.** Scoped per-side it
+would reproduce exactly the asymmetry this section just removed. Confirmed by Ghazi.

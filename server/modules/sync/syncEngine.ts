@@ -23,7 +23,7 @@
  */
 
 import * as syncRepo from './repository';
-import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows, SYNC_COLUMN_ALIASES, coerceArrayValue, evaluateInsertOriginGuard } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows, SYNC_COLUMN_ALIASES, coerceArrayValue, evaluateInsertOriginGuard, evaluateStaleSkipGuard } from './oneWayApplier';
 import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import {
   getTablesByCategory,
@@ -913,6 +913,25 @@ export class SyncEngine {
             if (guard.skip) {
               try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
               continue;
+            }
+            // §18 SYMMETRY: the shore's receive path has rejected a stale incoming edit since
+            // day one; this path did not, so an OLDER shore edit silently overwrote a NEWER
+            // local ship value with no conflict record. Same shared helper as the shore now, so
+            // the two directions record the same things. Conflict ROWS yes (the Conflict Review
+            // UI exists on ships); notifications deliberately not yet.
+            // TERMINAL like the shore's: the receiver's edit won, so re-offering cannot change
+            // the outcome — do NOT add to failedRowUuids.
+            if (log.oldValue !== null && log.oldValue !== undefined) {
+              const stale = await evaluateStaleSkipGuard(
+                client,
+                { ...log, changedAt: log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt)) } as any,
+                this.instanceId,
+                { batchUuid },
+              );
+              if (stale.skip) {
+                try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
+                continue;
+              }
             }
             await this.applyFieldLog(log, client);
             try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
