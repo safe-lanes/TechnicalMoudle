@@ -17,6 +17,7 @@ import { tenantConnectionManager } from "../utils/tenantConnectionManager";
 import { pmsAlertEngine } from "../modules/alerts/services/pmsAlertEngine";
 import { runPruning } from "../modules/sync/pruningService";
 import { runHealthCheck } from "../modules/sync/healthMonitor";
+import { runDriftScan } from "../modules/sync/driftDetector";
 
 // Parse an int env var honoring an explicit 0 (a plain `|| default` treats "0" as
 // unset — wrong for jitter, where 0 = "no jitter").
@@ -33,6 +34,7 @@ const JITTER_MS = Math.max(0, envInt("MAINT_JITTER_MS", 5_000)); // 0..JITTER pe
 const TIMEOUT_ALERTS_MS = envInt("MAINT_ALERTS_TIMEOUT_MS", 4 * 60_000);
 const TIMEOUT_HEALTH_MS = envInt("MAINT_HEALTH_TIMEOUT_MS", 5 * 60_000);
 const TIMEOUT_PRUNING_MS = envInt("MAINT_PRUNING_TIMEOUT_MS", 30 * 60_000);
+const TIMEOUT_DRIFT_MS = envInt("MAINT_DRIFT_TIMEOUT_MS", 15 * 60_000);
 
 interface MaintTask {
   name: string;
@@ -48,6 +50,9 @@ export class MaintenanceOrchestrator {
     { name: "alerts", intervalMs: 5 * 60_000, timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
     { name: "health", intervalMs: 6 * 60 * 60_000, timeoutMs: TIMEOUT_HEALTH_MS, run: () => runHealthCheck() },
     { name: "pruning", intervalMs: 24 * 60 * 60_000, timeoutMs: TIMEOUT_PRUNING_MS, run: () => runPruning() },
+    // Drift = row value vs its OWN newest field log (local only; ship and shore both).
+    // Read-only w.r.t. business data — reports into sync_field_log_failures kind='drift'.
+    { name: "drift", intervalMs: 24 * 60 * 60_000, timeoutMs: TIMEOUT_DRIFT_MS, run: () => runDriftScan() },
   ];
   private timers: NodeJS.Timeout[] = [];
   // Per-(task,tenant) in-progress guard — a slow tenant never stacks or blocks others.

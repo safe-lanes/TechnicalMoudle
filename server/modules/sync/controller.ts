@@ -12,6 +12,7 @@ import { getSyncEngine } from './syncEngine';
 import { syncAutoScheduler } from './autoSyncScheduler';
 import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import { runPruning } from './pruningService';
+import { runDriftScan, getOpenDrift } from './driftDetector';
 import { runHealthCheck, getTableStats } from './healthMonitor';
 import { getFieldLogFailureSessionCount } from './fieldLogger';
 import { getPool } from '../../db';
@@ -774,4 +775,28 @@ export async function diagLogsListHandler(req: Request, res: Response) {
     console.error('[Sync] diag-logs error:', error);
     res.status(500).json({ error: 'Failed to list diagnostic logs' });
   }
+}
+
+
+/** GET /sync/drift — open drift findings (row value != its own newest field log). */
+export async function driftListHandler(req: any, res: any) {
+  const limit = Math.min(parseInt(req.query?.limit ?? '500', 10) || 500, 2000);
+  res.json({ success: true, findings: await getOpenDrift(limit) });
+}
+
+/**
+ * POST /sync/drift/scan — run the scan on demand.
+ * Body: { vesselId?, tables?: string[], sinceDays?, maxRowsPerTable?, dryRun? }
+ * dryRun=true reports without writing findings — safe to run against production to look.
+ */
+export async function driftScanHandler(req: any, res: any) {
+  const b = req.body || {};
+  const result = await runDriftScan({
+    vesselId: b.vesselId,
+    tables: Array.isArray(b.tables) ? b.tables : undefined,
+    sinceDays: b.sinceDays ? parseInt(b.sinceDays, 10) : undefined,
+    maxRowsPerTable: b.maxRowsPerTable ? parseInt(b.maxRowsPerTable, 10) : undefined,
+    dryRun: b.dryRun === true,
+  });
+  res.json({ success: true, ...result });
 }

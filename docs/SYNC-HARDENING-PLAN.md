@@ -360,3 +360,75 @@ SELECT count(*) AS rows, pg_size_pretty(pg_total_relation_size('sync_field_log')
 ## 7. One-Line Summary for Non-Technical Stakeholders
 
 > During a multi-day satellite outage, the sync system gave up on some records and wrongly marked them "done," so they never reached the office. We've stopped the outage (timeout fix), we're recovering the affected records, and we're rebuilding the "done" flag into three states — **done, pending, and failed** — so a record can never again be marked done unless the office actually confirms it received it. Failed records stay visible and retry automatically.
+
+---
+
+## §10 — MECHANISM OF THE "39" (Frontier Venture group A), 2026-07-24
+
+### §10.1 Ruled out, with evidence
+- **H1 absent-row reconstruction (`applyFieldLogInserts`)** — oneWayApplier.ts:663-700 sorts the
+  log group by `changedAt` ASC and takes the LATEST value per field. Reconstruction yields
+  `status='Pending Approval'`, the OPPOSITE of the observed row. It also cannot produce a mixed
+  row; every field comes from one sorted set. RULED OUT.
+- **H2 `applyFullRowsIfAbsent` (self-heal)** — insert-only, inserts the SENDER's row verbatim.
+  Shore held no 8-Jul data before 23-Jul 11:48 and held `Pending Approval` after 11:59. Neither
+  snapshot yields "8-Jul fields present AND status Active". The 23-Jul log also shows self-heal
+  for work_orders running SHIP→SHORE. RULED OUT.
+- **H3 provisioning / bundle import** — same snapshot logic, plus positively contradicted by
+  data: `created_at` spreads across 23-Jun (791), 1-Jul (620), 3-Jul (254), 4–14 Jul. A bundle
+  import stamps ONE window. RULED OUT.
+- **INSERT hypothesis generally** — the `created_at` spread kills it.
+
+### §10.2 The mechanism that fits
+An `UPDATE` executed with `sync.bypass_trigger='true'` that does NOT include `updated_at` in its
+SET list. Migration 110's trigger returns NEW unchanged under bypass, so `updated_at` keeps its
+OLD value rather than being stamped. 33 fields land, `updated_at` stays frozen at 23-Jun, and no
+INSERT is required. Only applier paths set that bypass.
+
+### §10.3 The remaining open question (narrow)
+`service.ts:330` computes `isInsertLog = (log.oldValue == null)`. INSERT-origin logs take an
+**ALWAYS APPLY** branch that skips the per-field stale-skip guard entirely (`INSERT-LOG ALLOWED`),
+while non-INSERT logs are guarded at :337-348. That split partitions the 8-Jul batch EXACTLY as
+observed — 33 null-old_value fields vs the 3 with prior values. Note the asymmetry: the INSERT
+*reconstruction* path has an IMMUTABLE-ACK guard for re-delivered insert logs (oneWayApplier:640)
+but the per-field UPDATE path has NO equivalent. A re-delivered INSERT-origin log therefore
+overwrites a NEWER receiver value with no staleness check at all — and re-delivery is exactly
+what a dead-letter re-offer or checkpoint rewind produces. Phase 2's applied_at watermark does
+NOT fix this, because the INSERT-origin branch bypasses ordering before the watermark is
+consulted. The guard needs its own correction. NOT YET BUILT — decision pending.
+
+### §10.4 Group A rows have NO creation-time field log on the ship
+Q3 showed 35-36 total field logs per row, all from the 8-Jul batch. Group B rows DO have a
+`(null)→Active` creation log; group A rows do not. So group A was created on SHORE and synced
+down (appliers do not log). Shore therefore holds their INSERT-origin creation logs, including
+`status: null→Active` — the exact payload that would revert the ship under §10.3.
+CONFIRMING QUERY when ship access returns (shore side): do shore's field logs for the 39 contain
+INSERT-origin status logs, and were they re-delivered (is_synced reset / new sync_batch_id) after
+8-Jul?
+
+---
+
+## §11 — ITEM A: DRIFT DETECTOR (BUILT 2026-07-24, migration 143)
+
+**Migration numbering: drift = 143. Phase 1 tri-state moves 143 → 144 (confirmed).**
+
+**SCOPE — stated plainly so expectations are right.** The detector compares a row's current value
+against THAT ROW'S OWN newest field log, on ONE instance. It catches the CAUSE class: a write
+that logged one thing and stored another, or a later write that reverted a value without logging.
+**It does NOT compare ship against shore.** A divergence where both sides are internally
+consistent but disagree with each other is INVISIBLE to it. Cross-instance reconciliation needs
+both databases and stays **Phase 3**.
+
+Reports into `sync_field_log_failures` with `kind='drift'` — the SAME operator list as the
+Phase-0 un-swallow lost-log records. One open row per (kind, table, row, field); repeat scans
+bump `last_seen_at` instead of piling up.
+
+**Deliberately reported, not allowlisted** (expected in every first run): the
+`workOrderContextService` stuck-rejection corrective and `adminController.repairRhTracking` both
+write without a field log by design. They ARE local divergence. An allowlist would hide the same
+shape arriving from a path we did not intend.
+
+**First full run against the dev DB found a previously unknown bug**: `spares_history.timestampUTC`
+and `spare_component_links.linkedAt` are TEXT columns storing a JS `Date.toString()`, so the ISO
+digits get relabelled as local time and the stored instant is 5.5h (IST offset) off the logged
+one. Verified real, not a formatting artifact. Separate writer bug — own task.

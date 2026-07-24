@@ -52,6 +52,9 @@ router.post('/sync/file/:queueUuid/fail', syncTenantGuard, asyncHandler(syncCont
 // Pruning & Health endpoints
 router.post('/sync/prune', requireOfflineAdmin, asyncHandler(syncController.pruneHandler));
 router.get('/sync/health', asyncHandler(syncController.healthCheckHandler));
+// Drift findings — row value vs its OWN newest field log (migration 143). Read-only.
+router.get('/sync/drift', requireOfflineAdmin, asyncHandler(syncController.driftListHandler));
+router.post('/sync/drift/scan', requireOfflineAdmin, asyncHandler(syncController.driftScanHandler));
 router.get('/sync/table-stats', asyncHandler(syncController.tableStatsHandler));
 
 // Settings endpoints (admin only)
