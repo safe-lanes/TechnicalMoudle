@@ -23,7 +23,7 @@
  */
 
 import * as syncRepo from './repository';
-import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows, SYNC_COLUMN_ALIASES, coerceArrayValue } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows, SYNC_COLUMN_ALIASES, coerceArrayValue, evaluateInsertOriginGuard } from './oneWayApplier';
 import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import {
   getTablesByCategory,
@@ -904,6 +904,16 @@ export class SyncEngine {
           const updSp = `pull_upd_${updSpIdx++}`;
           try { await client.query(`SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
           try {
+            // §13 guard: the PULL path previously applied EVERY update log unconditionally —
+            // no stale-skip, no insert-origin check. That is the exact path by which the
+            // Frontier Venture "39" had status/approval_tier/days_late reverted by a
+            // re-delivered creation-time log. Skip is TERMINAL (acked, not re-offered): the
+            // row exists and its column is populated, so retrying can never change the outcome.
+            const guard = await evaluateInsertOriginGuard(client, log as any);
+            if (guard.skip) {
+              try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
+              continue;
+            }
             await this.applyFieldLog(log, client);
             try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
             totalPulled++;

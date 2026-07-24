@@ -1246,3 +1246,89 @@ export async function gatherFullRows(
   }
   return out;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RE-DELIVERED INSERT-ORIGIN GUARD (SYNC-HARDENING-PLAN §13)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Frontier Venture, group A ("the 39"): a re-delivered CREATION-time field log
+ * (`old_value IS NULL`) was applied unconditionally on top of an existing row and reverted
+ * status / approval_tier / days_late to their creation values. `service.ts` took an
+ * `INSERT-LOG ALLOWED` branch that skipped the stale-skip guard entirely, and the pull path in
+ * `syncEngine.ts` had no guard at all. Re-delivery is exactly what recovery produces
+ * (is_synced resets, dead-letter re-offer, checkpoint rewind).
+ *
+ * THE RULE
+ *   row ABSENT             → apply (unchanged; the row needs these fields to exist)
+ *   row EXISTS + column NULL   → apply (legitimate "partial previous apply" repair)
+ *   row EXISTS + column NOT NULL → SKIP, terminal-ACK
+ *
+ * WHY IT CANNOT DISCARD NEWER TRUTH: an INSERT-origin log records the row's state AT CREATION —
+ * by definition the OLDEST possible state of that row. It can never legitimately be newer than a
+ * value already present on an existing row.
+ *
+ * WHY VALUE-BASED AND NOT TIMESTAMP-BASED: the obvious fix — route these through the existing
+ * per-field stale-skip — would NOT have saved the 39. That guard only fires when the receiver
+ * holds a NEWER LOCAL log, and the ship's values had been written by appliers, which do not
+ * write logs. There was nothing to compare. Hence: compare the VALUE.
+ *
+ * PREDICATE IS STRICTLY `IS NULL` — empty string is NOT treated as empty. A deliberately blanked
+ * text field is a real user decision; treating '' as empty would let a creation value overwrite
+ * it, which is the same data loss in the other direction. Deliberate, and tested both ways.
+ *
+ * KNOWN BOUNDED CASE (placeholder freeze): 870 columns across 116 synced tables carry a DB
+ * default — including work_orders.status='Active', approval_tier='standard', days_late=0, i.e.
+ * the exact three FV fields. If a recovery/reconstruction INSERT omits such a column, the DB
+ * default populates it and this guard will then permanently skip the TRUE creation value,
+ * freezing the placeholder. Bounded because: (1) it needs the creation log to be the ONLY source
+ * of that value — any later UPDATE-origin log still applies normally; (2) every skip is
+ * diag-logged and counted; (3) the drift detector (§11) reports the row, since its value will
+ * disagree with its own newest log. Accepted over the alternative, which is silent corruption.
+ */
+export interface InsertGuardDecision {
+  skip: boolean;
+  reason?: string;
+}
+
+/** Process-lifetime counters, surfaced on /sync/status so a spike is visible without per-row rows. */
+let insertLogSkipsSession = 0;
+export function getInsertLogSkipCount(): number { return insertLogSkipsSession; }
+export function resetInsertLogSkipCount(): void { insertLogSkipsSession = 0; }
+
+/**
+ * Decide whether an incoming field log must be skipped as a re-delivered INSERT-origin write.
+ *
+ * THROWS on an unreadable receiver state. That is deliberate: callers treat a throw as a
+ * non-terminal failure and re-offer the log next cycle (delayed field), whereas a `skip` is
+ * terminal-ACKed. Failing closed on corruption, retryable on uncertainty.
+ */
+export async function evaluateInsertOriginGuard(
+  client: { query: (sql: string, params?: any[]) => Promise<any> },
+  log: { tableName: string; rowUuid: string; fieldName: string; oldValue: string | null | undefined },
+): Promise<InsertGuardDecision> {
+  // Only creation-time logs are in scope. UPDATE-origin logs keep their existing behaviour
+  // (per-field stale-skip on the push path, direct apply on the pull path).
+  if (log.oldValue !== null && log.oldValue !== undefined) return { skip: false };
+
+  const config = getTableSyncConfig(log.tableName);
+  if (!config) return { skip: false }; // unknown table — leave to the existing error handling
+  const identityCol = config.identityColumn || 'id';
+  const column = fieldNameToColumn(log.fieldName);
+
+  // One query answers both questions: does the row exist, and is the column already populated?
+  // No rows back  → row ABSENT → apply.
+  // Row back, col NULL → apply.  Row back, col NOT NULL → skip.
+  const res = await client.query(
+    `SELECT ("${column}" IS NOT NULL) AS populated FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+    [log.rowUuid]
+  );
+  if (res.rows.length === 0) return { skip: false };
+  if (!res.rows[0].populated) return { skip: false };
+
+  insertLogSkipsSession++;
+  const reason =
+    `re-delivered INSERT-origin log for an EXISTING row whose "${column}" is already populated — ` +
+    `not applied (a creation-time log is the oldest possible state of the row and cannot be newer)`;
+  syncDiag(`INSERT-LOG SKIP (terminal-ack): ${log.tableName}.${log.fieldName} row=${log.rowUuid} — ${reason}`);
+  return { skip: true, reason };
+}

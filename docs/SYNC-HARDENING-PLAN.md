@@ -506,3 +506,48 @@ arithmetic, not a formatting artifact. Found by the drift detector's first full 
 **Do NOT fix inside the guard work.** Note for whoever takes it: HISTORICAL ROWS ARE ALREADY
 WRONG, so the fix needs a data question answered first — do we backfill the stored instants, and
 against which source of truth (the log's ISO, or the displayed local time users have been reading)?
+
+---
+
+## §15 — §13 GUARD: BUILT 2026-07-24 (no migration; 144 still reserved for tri-state)
+
+### Two apply paths needed it, not one
+- `service.ts:330` (shore receive-push) took the `INSERT-LOG ALLOWED` branch — skips the guard.
+- `syncEngine.ts:900` (**ship PULL**) had **no guard at all** — it applied EVERY update log
+  unconditionally, no stale-skip, no insert-origin check. **This is the path that reverted the 39.**
+Both now call the shared `evaluateInsertOriginGuard` in `oneWayApplier.ts`.
+
+### §3.1 predicate — DECIDED: strictly `IS NULL`
+Empty string is **NOT** treated as empty. A deliberately blanked text field is a real user
+decision; treating `''` as empty would let a creation-time value overwrite it — the same data
+loss in the other direction. Tested explicitly (harness case 5) so the decision is deliberate.
+
+### §3.2 placeholder freeze — REACHABLE, accepted as a known bounded case
+**870 columns across 116 synced tables carry a DB default**, including
+`work_orders.status='Active'`, `approval_tier='standard'`, `days_late=0` — the exact three FV
+fields. If a recovery/reconstruction INSERT omits such a column the default populates it, and
+this guard then permanently skips the TRUE creation value, freezing the placeholder.
+BOUNDED BY: (1) it requires the creation log to be the ONLY source of that value — any later
+UPDATE-origin log still applies normally; (2) every skip is diag-logged and counted;
+(3) the drift detector (§11) reports the row, because its value disagrees with its own newest log.
+Accepted over the alternative, which is silent corruption.
+
+### §3.3 skip visibility
+`insertLogSkips.session` on **GET /sync/status**, beside `fieldLogFailures`. A skip writes NO
+`sync_conflict_log` row and fires NO notification (that would flood the conflict surface on any
+re-offer), so this counter is the only signal — and a spike means someone is re-offering old logs.
+
+### Terminal vs retryable — the distinction that matters
+- **skip** → TERMINAL, acked, never re-offered. The condition cannot change, so retrying would
+  loop forever. Safe because the push side marks ALL pushed logs synced on a successful push
+  (`syncEngine.ts:349`) — it does not wait for a per-log ack, so a skip cannot cause a retry loop.
+- **unreadable receiver state** → THROWS, so the existing catch adds the row to `failedRowUuids`
+  and it is re-offered next cycle. Fail-closed on corruption, retryable on uncertainty.
+  A delayed field, never a dropped one.
+
+Harness `scripts/test-insert-origin-guard.ts` 10/10 incl. the FV reproduction (newer value
+survives). Regressions green: drift 28, config-guard 11, unswallow 9, cr-tx 9, settings 18,
+selfheal 31, approval-sync 26. tsc 291.
+
+**§12 FREEZE LIFTS ON DEPLOYMENT OF THIS COMMIT — not on merge.** A ship still running the old
+build is still corruptible by a re-offer.

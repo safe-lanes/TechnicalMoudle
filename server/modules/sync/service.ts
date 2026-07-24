@@ -11,7 +11,7 @@
  */
 
 import * as repo from './repository';
-import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows , evaluateInsertOriginGuard } from './oneWayApplier';
 import {
   getTableSyncConfig,
   getTablesByCategory,
@@ -329,8 +329,19 @@ export async function receivePushData(
             const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
             const isInsertLog = log.oldValue === null || log.oldValue === undefined;
 
-            // INSERT-origin logs ALWAYS apply — row needs these fields to exist
+            // INSERT-origin logs apply UNCONDITIONALLY only while the row is being created.
+            // Once the row EXISTS, a creation-time log is by definition the oldest state of that
+            // row and must not overwrite a populated column — that is how the Frontier Venture
+            // "39" were reverted. See evaluateInsertOriginGuard (SYNC-HARDENING-PLAN §13).
             if (isInsertLog) {
+              const guard = await evaluateInsertOriginGuard(client, log);
+              if (guard.skip) {
+                // TERMINAL: acked, not re-offered. The condition can never change, so retrying
+                // would loop forever. Deliberately NO sync_conflict_log row and NO notification —
+                // this is not a user-visible conflict; the counter on /sync/status is the signal.
+                try { await client.query(`RELEASE SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
+                continue;
+              }
               syncDiag(`INSERT-LOG ALLOWED: ${log.tableName}.${log.fieldName} row=${log.rowUuid}`);
               // fall through to apply below
             } else {

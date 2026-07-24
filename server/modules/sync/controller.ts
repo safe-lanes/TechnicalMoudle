@@ -13,6 +13,7 @@ import { syncAutoScheduler } from './autoSyncScheduler';
 import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import { runPruning } from './pruningService';
 import { runDriftScan, getOpenDrift } from './driftDetector';
+import { getInsertLogSkipCount } from './oneWayApplier';
 import { runHealthCheck, getTableStats } from './healthMonitor';
 import { getFieldLogFailureSessionCount } from './fieldLogger';
 import { getPool } from '../../db';
@@ -172,7 +173,13 @@ export async function statusHandler(req: Request, res: Response) {
       fieldLogFailures.unresolved = r.rows[0]?.n ?? 0;
     } catch { /* table absent pre-migration — leave null */ }
 
-    res.json({ ...result, fieldLogFailures });
+    // §13 guard: count of re-delivered INSERT-origin logs SKIPPED to protect a populated
+    // column. A skip deliberately writes no conflict row and fires no notification, so this
+    // counter is the ONLY signal — a spike means someone is re-offering old logs (recovery,
+    // dead-letter replay, checkpoint rewind) and each skip is a value that did NOT get applied.
+    const insertLogSkips = { session: getInsertLogSkipCount() };
+
+    res.json({ ...result, fieldLogFailures, insertLogSkips });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] status error:', error);
