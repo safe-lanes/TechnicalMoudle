@@ -432,3 +432,77 @@ shape arriving from a path we did not intend.
 and `spare_component_links.linkedAt` are TEXT columns storing a JS `Date.toString()`, so the ISO
 digits get relabelled as local time and the stored instant is 5.5h (IST offset) off the logged
 one. Verified real, not a formatting artifact. Separate writer bug — own task.
+
+---
+
+## §12 — 🔴 HARD GATE: RECOVERY IS FROZEN (2026-07-24)
+
+**NO re-offer, NO `is_synced` reset, NO checkpoint rewind, NO dead-letter replay — on ANY vessel
+— until the INSERT-origin guard fix (§13) ships.**
+
+WHY: `service.ts:330` computes `isInsertLog = (log.oldValue == null)` and INSERT-origin logs take
+an **ALWAYS APPLY** branch that skips the per-field stale-skip guard entirely. A re-delivered
+creation-time log therefore overwrites a NEWER receiver value with no staleness check. Re-delivery
+is exactly what our recovery tooling produces. Running the "52" recovery on current code risks
+corrupting correct data the same way the 39 were corrupted.
+
+Applies to: Frontier Venture and every other vessel. Nilesh is held. Lift only when §13 is
+deployed, not merely merged.
+
+---
+
+## §13 — GUARD FIX SCOPE (NEXT BUILD — ABOVE TRI-STATE)
+
+### The rule
+- Row **absent** on receiver → ALWAYS APPLY (unchanged; the row needs these fields to exist).
+- Row **exists** + INSERT-origin log → apply **only if the receiver's column is NULL/empty**.
+  A populated column is never overwritten; skip is ACK'd like IMMUTABLE-ACK.
+
+### Why this is safe (the key insight)
+An INSERT-origin log records a row's state **at creation** — by definition the OLDEST possible
+state of that row. It can therefore NEVER legitimately be newer than a value already present on
+an existing row. Skipping populated columns cannot discard newer truth. Filling NULL columns
+preserves the legitimate "partial previous apply" repair, and filling a NULL cannot destroy data.
+
+### Risk cases (the thing to get right)
+1. **Legitimate first delivery, partially applied** — row exists, field NULL. SAFE: still applies.
+2. **Receiver value set by an applier (no local log)** — this is exactly group A on the ship.
+   The stale-skip alone would NOT have saved it (no local log to compare); the NULL/empty rule
+   does. This is why the fix is value-based, not log-timestamp-based.
+3. **Unknown row existence** — `updateLogs` has 4 producers (oneWayApplier :562 unknown table,
+   :596 row-exists, :606 exist-check-failed, :644 row-exists). Two guarantee existence, two are
+   error fallbacks. Fail CLOSED on the fallbacks: re-check existence at apply time, and if that
+   also fails prefer the guarded path. Cost of failing closed is a delayed field, not corruption.
+4. **NOT NULL columns** — no risk: the row already exists, so skipping cannot violate NOT NULL.
+5. **Immutable tables** — already ACK'd earlier at :633/:592; unchanged.
+6. **Operator noise** — a skipped re-delivery is NOT a conflict. It must emit a syncDiag line
+   ONLY, and must NOT write sync_conflict_log or fire a conflict notification, or a single
+   re-offer would flood the conflict surface.
+
+### Implementation
+`applyFieldLogInserts` returns a new `existingRowUuids` set (no mutation of shared log entries);
+`service.ts` consults it plus a lazy existence re-check for the unknown cases. **No migration
+required — 144 stays reserved for Phase 1 tri-state.**
+
+### Tests (harness, untracked)
+1. **FV reproduction**: row exists `status='Pending Approval'` + local 8-Jul log; deliver
+   re-delivered INSERT-origin `status: null→'Active'` → **newer value SURVIVES**.
+2. Partial-apply repair: row exists, `status` NULL → INSERT-origin log LANDS.
+3. Absent row → unchanged ALWAYS-APPLY, row created with all fields.
+4. UPDATE-origin logs → existing stale-skip behaviour unchanged (regression).
+5. Immutable table → still ACK, no UPDATE issued (regression).
+6. Unknown-existence fallback → fails closed.
+7. Skipped re-delivery writes NO sync_conflict_log row and NO notification.
+
+---
+
+## §14 — SEPARATE TASK: 5.5h TIMESTAMP BUG (not part of §13)
+
+`spares_history.timestampUTC` and `spare_component_links.linkedAt` are TEXT columns storing a JS
+`Date.toString()` ("Mon Jul 20 2026 15:03:24 GMT+0530") while the field log holds the ISO form.
+The digits match but the stored instant is **5.5h (IST offset) off** the logged one — verified by
+arithmetic, not a formatting artifact. Found by the drift detector's first full run.
+
+**Do NOT fix inside the guard work.** Note for whoever takes it: HISTORICAL ROWS ARE ALREADY
+WRONG, so the fix needs a data question answered first — do we backfill the stored instants, and
+against which source of truth (the log's ISO, or the displayed local time users have been reading)?
