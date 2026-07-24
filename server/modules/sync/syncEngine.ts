@@ -92,6 +92,10 @@ export class SyncEngine {
   private catchUpMaxCycles: number = DEFAULT_DRAIN_MAX_CYCLES;
   private fileDrainMaxBytes: number = DEFAULT_FILE_DRAIN_MAX_BYTES;
   private settingsLoaded: boolean = false;
+  /** Where the effective shore_url came from — surfaced in the startup log. */
+  private shoreUrlSource: 'DB' | 'env' | 'none' = 'none';
+  /** Non-null when the resolved config cannot support a REMOTE sync; runSync() rejects. */
+  private configFatal: string | null = null;
   // Shared re-entrancy guard (backend safety net): one drain/sync per vessel at a time across
   // BOTH the manual "Sync Now" drain and the auto-scheduler tick. Released in try/finally so a
   // thrown/failed cycle always clears it — a stuck guard would block all future syncs.
@@ -125,7 +129,15 @@ export class SyncEngine {
       const settings = await syncRepo.getAllSettings();
 
       this.instanceId = settings['instance_id'] || process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
-      this.shoreBaseUrl = settings['shore_url'] || process.env.SYNC_SHORE_URL || '';
+      // ── shore_url: resolve DB → env, then SELF-HEAL and GUARD ──────────────────────
+      // Frontier Venture carried a BLANK shore_url in sync_settings and worked only because
+      // SYNC_SHORE_URL happened to be set in the ship's .env. Lose that env var and
+      // isLocalMode() flips true, the ship stops talking to shore, and NOTHING reports an
+      // error — it just silently no-ops forever. That is the landmine this closes.
+      const dbShoreUrl = (settings['shore_url'] || '').trim();
+      const envShoreUrl = (process.env.SYNC_SHORE_URL || '').trim();
+      this.shoreBaseUrl = dbShoreUrl || envShoreUrl;
+      this.shoreUrlSource = dbShoreUrl ? 'DB' : (envShoreUrl ? 'env' : 'none');
       // Phase 4b: per-tenant key from sync_settings (seeded at provisioning),
       // env fallback so legacy/unseeded ships behave exactly as today.
       this.syncApiKey = settings['sync_api_key'] || process.env.SYNC_API_KEY || '';
@@ -153,8 +165,39 @@ export class SyncEngine {
       const dbFileMax = parseInt(settings['sync_file_drain_max_bytes'] || '', 10);
       this.fileDrainMaxBytes = dbFileMax || DEFAULT_FILE_DRAIN_MAX_BYTES;
 
+      // SELF-HEAL: DB blank but env resolves → persist the env value so the DB becomes
+      // authoritative as designed, converting a fleet-wide landmine into a one-time auto-fix.
+      // Safe to persist: sync_settings is NOT in shared/syncConfig.ts — it never syncs, so this
+      // value cannot propagate to another instance. seedSettingIfEmpty only writes when the row
+      // is absent/empty, so a deliberate admin DB value is never overwritten by env.
+      // TRADE-OFF, on the record: once persisted the DB WINS, so a wrong env value becomes
+      // sticky and editing .env alone will no longer change behaviour. Hence the loud log.
+      if (!dbShoreUrl && envShoreUrl) {
+        try {
+          await syncRepo.seedSettingIfEmpty('shore_url', envShoreUrl);
+          console.warn(`[SyncEngine] 🩹 CONFIG SELF-HEAL: sync_settings.shore_url was EMPTY — persisted from env: "${envShoreUrl}". The DB value is authoritative from now on; change it there, not in .env.`);
+          syncDiag(`CONFIG SELF-HEAL: shore_url seeded from env "${envShoreUrl}" (was empty in sync_settings)`);
+        } catch (healErr: any) {
+          console.error(`[SyncEngine] config self-heal for shore_url FAILED (non-fatal): ${healErr?.message || healErr}`);
+        }
+      }
+
+      // GUARD: refuse to slide into local mode by ACCIDENT. Explicit SYNC_LOCAL_MODE=true is a
+      // deliberate operator choice and stays allowed; an unresolvable shore_url is not.
+      // Deliberately does NOT exit the process: a vessel losing its whole PMS because sync
+      // config is wrong is worse than sync failing loudly. runSync() rejects instead, so the
+      // failure is visible in SyncDiag and the Sync Health surface every cycle.
+      this.configFatal = null;
+      if (!this.shoreBaseUrl && process.env.SYNC_LOCAL_MODE !== 'true') {
+        this.configFatal =
+          'shore_url is EMPTY in sync_settings AND SYNC_SHORE_URL is unset, and SYNC_LOCAL_MODE is not explicitly "true". ' +
+          'Refusing to run sync in silent local mode. Set sync_settings.shore_url (preferred) or SYNC_SHORE_URL.';
+        console.error(`[SyncEngine] ❌ FATAL CONFIG: ${this.configFatal}`);
+        syncDiag(`FATAL CONFIG: ${this.configFatal}`);
+      }
+
       this.settingsLoaded = true;
-      console.log(`[SyncEngine] Settings loaded from DB — instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || '(empty)'}, localMode=${this.isLocalMode()}, requestTimeoutMs=${this.requestTimeoutMs} (${timeoutSource}), pushBatchSize=${this.pushBatchSize}`);
+      console.log(`[SyncEngine] Settings loaded from DB — instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || '(EMPTY)'} (${this.shoreUrlSource}), localMode=${this.isLocalMode()}, requestTimeoutMs=${this.requestTimeoutMs} (${timeoutSource}), pushBatchSize=${this.pushBatchSize}`);
     } catch (error) {
       // DB might not be ready — fall back to env vars (already set in constructor)
       console.warn('[SyncEngine] Could not load DB settings, using env vars:', error);
@@ -202,6 +245,11 @@ export class SyncEngine {
     let conflictsAutoResolved = 0;
 
     try {
+      // Config guard (item B): never enter local mode by accident — fail loudly, every cycle.
+      if (this.configFatal) {
+        syncDiag(`=== SYNC ABORTED (config) === vessel=${vesselId}: ${this.configFatal}`);
+        throw new Error(`Sync configuration invalid — ${this.configFatal}`);
+      }
       syncDiag(`=== SYNC START === vessel=${vesselId}, instance=${this.instanceId}, mode=${this.isLocalMode() ? 'LOCAL' : 'REMOTE'}`);
       console.log(`[SyncEngine] Starting sync for vessel ${vesselId} from instance ${this.instanceId}`);
 
