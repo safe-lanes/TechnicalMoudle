@@ -643,6 +643,15 @@ export async function updateSettingsHandler(req: Request, res: Response) {
       newIntervalMinutes = n;
     }
 
+    // §16: canonicalise boolean-ish values to lowercase 'true'/'false' BEFORE persisting. The
+    // endpoint previously stored whatever a caller sent, so a UI posting "TRUE" would silently
+    // disable auto-sync forever (the reader used a strict === 'true'). Reader is now tolerant
+    // too, but normalising on write keeps the stored form canonical for SQL and for humans.
+    const canonicalised = syncRepo.canonicaliseBooleanSettings(settings);
+    if (canonicalised.length > 0) {
+      console.log(`[Sync Settings] Canonicalised boolean value(s): ${canonicalised.join(', ')}`);
+    }
+
     const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
     await syncRepo.updateSettings(settings, userId);
 

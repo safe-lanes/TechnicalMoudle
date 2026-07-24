@@ -551,3 +551,78 @@ selfheal 31, approval-sync 26. tsc 291.
 
 **§12 FREEZE LIFTS ON DEPLOYMENT OF THIS COMMIT — not on merge.** A ship still running the old
 build is still corruptible by a re-offer.
+
+---
+
+## §16 — AUTO-SYNC: TOLERANT BOOLEAN SETTINGS (BUILT 2026-07-24, migration 146)
+
+`autoSyncScheduler.ts:253` read `settings['auto_sync_enabled'] === 'true'` — strict and
+case-sensitive. A stored 'TRUE' / 'True' / '1' / ' true' evaluated FALSE, so auto-sync silently
+never ran while manual "Sync Now" kept working, because manual never consults this flag. No
+error, no alarm, one skip line per tick.
+
+### SEED AUDIT — result: every seed path is already CORRECT
+- `migrations/103_sync_settings_seed.sql` seeds `auto_sync_enabled = 'false'` (lowercase).
+- `migrations/119_sync_settings_defaults_update.sql` sets it to `'true'` (lowercase).
+- `provisioningService` does not write this key at all.
+- Dev DB confirms lowercase.
+**So a correctly-provisioned ship is NOT affected, and this is very likely NOT Frontier Venture's
+cause.** I earlier called the case bug a "prime suspect" — the seed audit does not support that,
+and the pgAdmin screenshot showed lowercase `true`. The 'TRUE' seen in the spreadsheet export was
+pandas capitalising a parsed boolean, not the stored value. FV's auto-sync cause is still open;
+the boot-log line below is what will settle it.
+
+### Exposure that DID exist
+`updateSettingsHandler` persisted whatever a caller sent, with no canonicalisation. A settings UI
+or API client posting "TRUE" would have disabled auto-sync permanently and invisibly.
+
+### The fix (three layers)
+1. **Read tolerant** — `parseBooleanSetting()` accepts true/1/yes/y/on/t and negatives, any case,
+   trimmed. An UNRECOGNISED value warns and returns the explicit fallback: "off" must be a
+   decision, never an accident.
+2. **Write canonical** — `canonicaliseBooleanSettings()` normalises boolean keys to lowercase
+   before persisting, and logs what it changed. Keeps raw SQL like
+   `WHERE setting_value = 'true'` honest.
+3. **Migration 146** — normalises any already-stored non-canonical value. Idempotent.
+   NUMBERING: 143 drift, **144 RESERVED for tri-state**, 145 deprecate-dead-keys, 146 this.
+
+### Boot-log line (answers "is auto-sync actually on?" without a DB query)
+`[AutoSync] EFFECTIVE STATE — auto_sync_enabled=ON|OFF (raw "..."), interval=Nmin. ...`
+and when OFF it says `TICKS WILL NO-OP until this is enabled.` **This is the single line to grep
+on Frontier Venture.** Note it goes to PM2 stdout, not sync-diag.
+
+### Audit for the same class elsewhere
+Only ONE boolean setting is read in the sync module (`auto_sync_enabled`). `local_mode` is
+covered defensively but is a dead key (§ mig 145). Everything else read from `sync_settings` is
+an int or a URL. The many `=== 'true'` hits elsewhere in the codebase are HTTP query-string
+parsing, a different and lower-risk class (lowercase by convention, request-scoped).
+
+Harness `scripts/test-boolean-setting-tolerance.ts` 37/37.
+
+---
+
+## §17 — REMAINING PULL-PATH ASYMMETRY (NOT fixed; proposed follow-on)
+
+Measured, not assumed: `receiverInstanceId` appears **5×** in `service.ts` (shore receive-push)
+and **0×** in `syncEngine.ts`; `FROM sync_field_log` appears **0×** in `syncEngine.ts`;
+`sync_conflict_log` appears **5×** in `service.ts` and **0×** in the pull path.
+
+**What is still possible on the SHIP that is not possible on the SHORE:** an OLDER UPDATE-origin
+log arriving from shore overwrites a NEWER local ship value, silently — no stale-skip, no
+conflict row, no notification, no Conflict Review entry. `applyFieldLog` issues a bare
+`UPDATE "<table>" SET "<col>" = $1`. On the shore the same situation is detected and rejected.
+
+**Did it contribute to FV?** No evidence it did. The insert-origin hole (§13/§15) explains the 39
+completely, and shore's value for those rows came FROM the ship, so a shore→ship overwrite would
+have carried 'Pending Approval', not 'Active'. Treat this as a separate latent hole of the same
+family, not a second cause.
+
+**Does Phase 2's ordering guard close it?** Only if the watermark is implemented in a SHARED
+applier path. Scoped per-side it would repeat this asymmetry. Requirement recorded: **the ordering
+guard must live in shared code called by BOTH paths.**
+
+**Proposed follow-on (small):** extract the per-field stale-skip from `service.ts` into a shared
+helper — the same shape as `evaluateInsertOriginGuard` — and call it from the ship's pull loop.
+Core check ~10 lines. Open decision: whether the ship also writes `sync_conflict_log` rows and
+fires notifications (the Conflict Review UI exists, so probably yes, but ship-side recipients
+need a deliberate choice). NOT built — awaiting direction.

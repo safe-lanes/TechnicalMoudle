@@ -895,3 +895,53 @@ export async function resetInstanceDeliveryStateForReprovision(
   );
   return { mode: 'partition', baselineMarkedSynced, postSnapshotUnsynced, batchesDeleted, checkpoint: T.toISOString() };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOLEAN SETTING PARSING (SYNC-HARDENING-PLAN §16)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Keys in sync_settings whose value is a boolean. Used both to PARSE tolerantly on read and
+ * to CANONICALISE on write, so the stored form can never drift from what the reader expects.
+ */
+export const BOOLEAN_SETTING_KEYS = ['auto_sync_enabled', 'local_mode'] as const;
+
+/**
+ * Tolerant boolean read for a sync_settings value.
+ *
+ * WHY: `settings['auto_sync_enabled'] === 'true'` was a strict, case-sensitive comparison. A
+ * value of 'TRUE', 'True', ' true' or '1' therefore read as FALSE and auto-sync silently never
+ * ran — while manual Sync Now kept working, because it never consults this flag. That failure is
+ * completely invisible: no error, no log beyond a single skip line.
+ *
+ * Every seed path in this repo writes lowercase (migrations 103 and 119), so the stored value is
+ * normally fine. The exposure is the settings-save endpoint, which persists whatever a caller
+ * sends without canonicalising, and any hand-edited DB row.
+ *
+ * Accepts: true/1/yes/y/on/t  (and the matching negatives) in any case, with surrounding space.
+ * Anything unrecognised returns `fallback` — an unparseable value must not silently mean "off".
+ */
+export function parseBooleanSetting(raw: string | null | undefined, fallback = false): boolean {
+  if (raw === null || raw === undefined) return fallback;
+  const v = String(raw).trim().toLowerCase();
+  if (v === '') return fallback;
+  if (['true', '1', 'yes', 'y', 'on', 't'].includes(v)) return true;
+  if (['false', '0', 'no', 'n', 'off', 'f'].includes(v)) return false;
+  console.warn(`[SyncSettings] Unrecognised boolean setting value ${JSON.stringify(raw)} — using fallback ${fallback}`);
+  return fallback;
+}
+
+/** Canonicalise boolean-ish setting values to 'true'/'false' before persisting. */
+export function canonicaliseBooleanSettings(settings: Record<string, any>): string[] {
+  const changed: string[] = [];
+  for (const key of BOOLEAN_SETTING_KEYS) {
+    if (!(key in settings)) continue;
+    const original = settings[key];
+    if (typeof original === 'boolean') { settings[key] = original ? 'true' : 'false'; }
+    else {
+      const parsed = parseBooleanSetting(String(original), false);
+      settings[key] = parsed ? 'true' : 'false';
+    }
+    if (String(original) !== settings[key]) changed.push(`${key}: ${JSON.stringify(original)} -> '${settings[key]}'`);
+  }
+  return changed;
+}

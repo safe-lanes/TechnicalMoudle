@@ -114,6 +114,17 @@ export class SyncAutoScheduler {
     }, this.tickIntervalMs);
 
     this.isRunning = true;
+    // EFFECTIVE-STATE line (§16): "is auto-sync actually on?" must be answerable from the boot
+    // log, not a DB query. Mirrors how the sync timeout now reports its resolved source.
+    try {
+      const s = await syncRepo.getAllSettings();
+      const raw = s['auto_sync_enabled'];
+      const on = syncRepo.parseBooleanSetting(raw, false);
+      const mins = Math.round(this.tickIntervalMs / 60000);
+      console.log(`[AutoSync] EFFECTIVE STATE — auto_sync_enabled=${on ? 'ON' : 'OFF'} (raw ${JSON.stringify(raw ?? null)}), interval=${mins}min. ${on ? `Next tick in ${Math.round(BOOT_DELAY_MS / 1000)}s, then every ${mins}min.` : 'TICKS WILL NO-OP until this is enabled.'}`);
+    } catch (e: any) {
+      console.warn(`[AutoSync] Could not read effective auto-sync state at startup: ${e?.message || e}`);
+    }
     console.log(`[AutoSync] Scheduler started — will run every ${Math.round(this.tickIntervalMs / 60000)} minutes`);
   }
 
@@ -250,7 +261,11 @@ export class SyncAutoScheduler {
       // 1. Read settings on every tick (hot-reloadable)
       const settings = await syncRepo.getAllSettings();
 
-      const enabled = settings['auto_sync_enabled'] === 'true';
+      // Tolerant parse (§16): a strict === 'true' meant 'TRUE'/'True'/'1' read as FALSE and
+      // auto-sync silently never ran, while manual Sync Now kept working because it never
+      // consults this flag. Default TRUE on an unparseable value would be worse; default is
+      // the seeded intent, so an unrecognised value logs a warning and falls back to false.
+      const enabled = syncRepo.parseBooleanSetting(settings['auto_sync_enabled'], false);
       if (!enabled) {
         syncDiag('[AutoSync] auto_sync_enabled=false — skipping tick');
         return; // silent skip — don't log connectivity for disabled state
