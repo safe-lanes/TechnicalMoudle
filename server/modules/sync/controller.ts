@@ -14,6 +14,7 @@ import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProce
 import { runPruning } from './pruningService';
 import { runDriftScan, getOpenDrift } from './driftDetector';
 import { getInsertLogSkipCount } from './oneWayApplier';
+import { getBuildInfo } from '../../utils/buildInfo';
 import { runHealthCheck, getTableStats } from './healthMonitor';
 import { getFieldLogFailureSessionCount } from './fieldLogger';
 import { getPool } from '../../db';
@@ -179,7 +180,12 @@ export async function statusHandler(req: Request, res: Response) {
     // dead-letter replay, checkpoint rewind) and each skip is a value that did NOT get applied.
     const insertLogSkips = { session: getInsertLogSkipCount() };
 
-    res.json({ ...result, fieldLogFailures, insertLogSkips });
+    // Build identity, so a vessel can be version-confirmed WITHOUT shell access. That is the
+    // real constraint: ships are intermittently reachable, and the sync guards only log when
+    // they fire, so there was previously no way to prove a fix was live except SSH + git log.
+    const build = getBuildInfo();
+
+    res.json({ ...result, fieldLogFailures, insertLogSkips, build });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] status error:', error);

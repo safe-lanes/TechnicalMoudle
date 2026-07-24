@@ -99,6 +99,9 @@ The runner keys by **full filename** and sorts **lexicographically**, so `0064�
 
 **144 is RESERVED for Phase 1 tri-state — do not use it.**
 
+**The build-identity marker is part of this stack** (no migration — code only). The promotion to
+production must therefore include it, or §5's confirmation checks have nothing to read.
+
 All are idempotent; a second run is a clean no-op.
 
 ---
@@ -211,8 +214,10 @@ SELECT kind, resolved, count(*) FROM sync_field_log_failures GROUP BY 1,2;
 deliberate correctives** (`workOrderContextService` stuck-rejection, `repairRhTracking`) — those
 are reported on purpose, not new bugs.
 
-**F. Skip counters are visible** — `GET /sync/status` returns `fieldLogFailures` and
-`insertLogSkips`. A non-zero `insertLogSkips.session` means old logs are being re-offered
+**F. Status endpoint carries the operator fields** — `GET /sync/status` returns
+`fieldLogFailures`, `insertLogSkips` **and `build`** (`commit` / `branch` / `startedAt` /
+`source`). `build.commit` is how a vessel is version-confirmed without shell access — see §5.
+A `source` of `unknown` means the instance cannot identify itself; treat it as unconfirmed. A non-zero `insertLogSkips.session` means old logs are being re-offered
 somewhere — investigate before assuming it is benign.
 
 **G. Both guards are live** — grep `sync-diag` after the first full cycle:
@@ -288,13 +293,21 @@ read as "the guard isn't there" — nor as "it is".
 
 Required per vessel — **all three**:
 
-1. **BUILD IDENTITY — the definitive one.** In the app directory on the vessel:
-   ```bash
-   git log -1 --oneline
-   ```
-   Must show **`07d697f12`** (per-field stale-skip) **or later**. Because commit order is
+1. **BUILD IDENTITY — the definitive one. No shell access needed.** Read it either way:
+   - **`GET /sync/status`** → `build: { commit, branch, startedAt, source }` — **preferred**,
+     because it works when the vessel is reachable only through the app.
+   - **PM2 log**, emitted unconditionally at every startup:
+     `[Build] BUILD IDENTITY — commit=…, branch=…, source=git, startedAt=…`
+   - **Fallback if neither is available** (e.g. an instance still on an older build that predates
+     this marker): `git log -1 --oneline` in the app directory.
+
+   The commit must be **`07d697f12`** (per-field stale-skip) **or later**. Because commit order is
    `eec60b923` → `3d414f334` → `07d697f12`, a build at `07d697f12`+ necessarily contains **both**
    guards. This is the only check that positively proves the stale-skip fix is present.
+
+   ⚠️ If `source` reads **`unknown`**, the instance could not resolve its own identity (no git
+   tree and no `BUILD_COMMIT` env). Treat that vessel as **unconfirmed** — it is not evidence of
+   anything, and unconfirmed means frozen.
 2. **`[AutoSync] EFFECTIVE STATE`** present in the PM2 log after restart. Emitted unconditionally
    at every ship startup, and introduced in `3d414f334` — so its presence proves the build is at
    least `3d414f334`, hence includes `eec60b923` (the insert-origin guard). It does **not** prove
@@ -303,11 +316,12 @@ Required per vessel — **all three**:
    insert-guard's counter surface is live and the app is actually serving the new build, not a
    cached one.
 
-**KNOWN GAP, stated so nobody trips on it:** `07d697f12` adds no unconditional startup line — its
-only new log output fires on a conflict. That is why check 1 is the commit hash rather than a log
-grep. This is exactly the **build-version startup log / version handshake** already on the open
-follow-ups list; adding one would make future rollouts confirmable from the log alone. Worth doing
-before the tri-state rollout, which will need the same confirmation across the same three ships.
+**GAP NOW CLOSED (in this stack).** Neither guard emits an unconditional startup line — their
+only new log output fires on a conflict — so proving a fix was live previously meant SSH-ing for a
+commit hash, on vessels that are intermittently reachable. The build-identity marker added in this
+stack removes that: identity is now unconditional at startup **and** readable from `/sync/status`
+without shell access. **Still outstanding:** the ship does not yet REPORT its identity to shore, so
+there is no central view of which vessel runs what — that is scoped as tri-state prep, not built.
 
 **Practical consequence:** budget roughly two days between promoting to production and lifting the
 freeze — about a day for all three to pull, plus the verification pass — **and longer if a vessel

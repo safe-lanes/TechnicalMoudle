@@ -664,3 +664,42 @@ both instants, the winner, the current value and the rejected incoming value.
 ### HARD GATE carried forward to Phase 2 / tri-state (144)
 **The ordering watermark MUST live in shared code called by BOTH paths.** Scoped per-side it
 would reproduce exactly the asymmetry this section just removed. Confirmed by Ghazi.
+
+---
+
+## §19 — BUILD IDENTITY (BUILT 2026-07-24, no migration) + the handshake left for tri-state
+
+### Built now — deliberately minimal
+`server/utils/buildInfo.ts`: commit / branch / startedAt / source, resolved ONCE and cached, via
+git → env (`BUILD_COMMIT`/`GIT_COMMIT`/`SOURCE_VERSION`) → `'unknown'`. Never throws, never blocks
+startup (2s timeout, stderr swallowed).
+
+Two surfaces, no behaviour change, no migration:
+1. **Unconditional startup line**, printed BEFORE storage and migrations so a run that aborts
+   still says which build attempted it:
+   `[Build] BUILD IDENTITY — commit=…, branch=…, source=git, startedAt=…`
+2. **`GET /sync/status` → `build`**, beside `fieldLogFailures` and `insertLogSkips`.
+   **This is the one that matters**: it is reachable through the app, so a vessel can be
+   version-confirmed WITHOUT shell access — the actual constraint, since ships are intermittently
+   reachable (Frontier Venture was unreachable for days during the incident).
+
+A `source` of `'unknown'` logs a warning and must be read as **unconfirmed**, never as "probably
+fine".
+
+Harness `scripts/test-build-identity.ts` 13/13 — verified against the real repo HEAD, and verified
+to degrade rather than throw with git unavailable.
+
+### NOT built — scope this when tri-state starts, not before
+**The version handshake: the ship REPORTS its build identity to shore during sync**, so shore
+holds a central view of which vessel runs what.
+
+This is the remaining half of the fleet-visibility gap. What is built above lets you confirm ONE
+vessel if you can reach it; it does not tell you, from shore, which of the three are on which
+build. During the ~1-day auto-pull window that is exactly the unknown that forces the freeze to
+hold across all three.
+
+**Why it belongs to tri-state and not here:** tri-state's staged cutover depends on knowing which
+vessels have the new `sync_state` semantics before flipping behaviour, and getting that wrong
+mixes tri-state and legacy semantics on the same rows. A handshake also touches the sync protocol
+(payload shape + a shore-side store), which is exactly the surface we are trying to keep still
+while the current stack is verified in the field. Scope it as part of tri-state's rollout design.
