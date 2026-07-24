@@ -1,117 +1,80 @@
 # DEPLOY NOTE — accumulated sync/PMS stack (as of 2026-07-24)
 
-**For: Nilesh.** One deploy covering everything merged to `replit_dev` since the last shore
-deploy. Nothing in this stack has been validated in the field yet — that is the point of the
-verification checklist in §4.
+**For: Nilesh.** Everything merged since the last shore deploy, in one note.
 
-**Order of operations: DEPLOY → VERIFY IN FIELD → *then* Phase 1 tri-state (migration 144).**
-Tri-state is the largest change of the programme and is deliberately NOT in this stack. Building
-it on top of eight unverified changes would mean debugging nine at once.
+**⚠️ This stack is on `replit_dev` (development). Production is a separate branch — nothing from
+this week has reached a vessel yet.** It has to be promoted to production before any of it lands.
 
----
+**Order: LOCAL PILOT → SHORE → ships (auto-pull) → VERIFY → *then* Phase 1 tri-state (mig 144).**
+Tri-state is the biggest change of the programme and is deliberately NOT in this stack; building
+it on top of eleven unverified migrations would mean debugging twelve things at once.
 
-## 0. STEP ZERO — TAKE A BACKUP. NON-NEGOTIABLE.
-
-Eleven migrations touch core tables. Do this **before** deploying anything, on **shore and on
-every ship in scope**.
-
-```bash
-pg_dump "$DATABASE_URL" --no-owner --no-acl > ~/predeploy_$(hostname)_$(date +%Y%m%d_%H%M).sql
-ls -lh ~/predeploy_*.sql          # confirm a non-trivial size, not 0 bytes
-tail -5 ~/predeploy_*.sql          # last line should be a normal SQL statement, not a truncation
-```
-Keep it **off the app server's own disk** (copy to your machine or object storage). A backup on a
-box you may have to rebuild is not a backup.
-
-### ⚠️ DO NOT RELY ON THE AUTOMATIC STARTUP BACKUP
-The app takes a `pg_dump` at startup — **but it SKIPS if any backup file under `backup/` is less
-than 24 hours old** (that guard exists because PM2 restarts were producing ~1.25 GB per boot).
-On a deploy day the app has usually restarted at least once already, so the automatic backup will
-be **skipped** and the newest file may predate the day's work. To force a fresh automatic one,
-delete the recent file from `backup/` first. **The manual dump above is the one to trust.**
+The value of this note is §1 (migrations), §2 (what to watch), §3 (behaviour changes support must
+expect), §4 (verification) and §5 (the freeze condition). §0 is reminders only.
 
 ---
 
-## 0b. DEPLOY ORDER AND SCOPE
+## 0. PRE-FLIGHT — three reminders, not instructions
 
-**SHORE FIRST, then ships.** Shore is the authoritative side and the responder; sync is always
-ship-initiated. An old ship against a new shore is a validated-compatible skew (MT deploy-skew
-readiness, 2026-07-11), so shore can lead safely. The reverse — new ship against old shore — is
-NOT covered by that validation.
+1. **Run the local shore+vessel environment first.** Real vessels cannot be staged, so the local
+   pair is the only pilot this stack gets. Work §4's checklist there before promoting to
+   production — a fault caught locally costs nothing; the same fault reaches all three ships.
+2. **Backup shore (all tenants) and all three vessel DBs.** One non-obvious gotcha:
+   **the automatic startup `pg_dump` SKIPS when any file in `backup/` is under 24h old**, so on a
+   deploy day it will usually not run. Take the dump manually, or clear `backup/` first.
+3. **Low-usage window.** Migrations run before the app serves. **138 is the slow one** — it
+   repairs real drifted ROB data, so it scales with how much drift that instance has. Progress is
+   one `✅ Migration <id>` line per file; a big one going quiet is normal, so don't kill it.
 
-**⚠️ SCOPE MUST BE FILLED IN BEFORE THIS GOES OUT — I cannot determine it from the code:**
+---
 
-| Instance | In scope this round? |
+## 0b. SCOPE AND ROLLOUT REALITY
+
+**In scope this round — PMS/Technical is WK-only, 3 ships:**
+
+| Instance | In scope |
 |---|---|
-| Shore | ☐ |
-| Frontier Venture | ☐ |
-| _other WK vessels_ | ☐ |
-| rsms | ☐ |
-| epic | ☐ |
+| Shore (all tenants) | ✅ |
+| Frontier Venture | ✅ |
+| Pioneer Venture | ✅ |
+| Gas Mia | ✅ |
 
-**Open question for Ghazi/Nilesh:** migration 138's watch item names **rsms** and **epic**. State
-plainly whether they are in this round or whether only the WK ships are. Getting 138's correction
-counts watched on an instance nobody deployed to is a wasted check; deploying to one nobody
-briefed is worse.
+**Shore first.** Shore is authoritative and sync is ship-initiated; old-ship/new-shore is a
+validated-compatible skew (MT deploy-skew readiness, 2026-07-11). The reverse is not.
 
-**Remember: the §12 recovery freeze lifts PER VESSEL** (see §5). A vessel not in this round stays
-frozen.
+**⚠️ SHIPS AUTO-PULL PRODUCTION — THERE IS NO PER-SHIP HOLD.** Once this is on the production
+branch, all three vessels take it on their own schedule, at different clock times, landing within
+roughly a day. Consequences to plan around, because they are not optional:
 
----
-
-## 0c. TIMING — pick a low-usage window
-
-**Migrations run at startup, before the app serves any request.** The vessel's PMS is unavailable
-for the whole run.
-
-- Most of the eleven are sub-second (DDL, seeds, small backfills).
-- **138 is the slow one** — it repairs real drifted spares/ROB data, so its duration scales with
-  how much drift that instance actually has. This is the step to plan around.
-- The pre-deploy `pg_dump` itself can take minutes on a large DB (~1.25 GB dumps have been seen).
-
-**What "still working" looks like:** the log advances with one `✅ Migration <id>: N statements
-applied, M skipped` line per file. Progress is per-migration, so a big one can sit quiet for a
-while — that is normal.
-
-**What "hung" looks like:** no new migration line for many minutes **and** no CPU/IO on the
-Postgres process. Check for a blocking lock before assuming a hang:
-```sql
-SELECT pid, state, wait_event_type, wait_event, left(query, 80) FROM pg_stat_activity WHERE state <> 'idle';
-```
-
-**Do not kill the process mid-migration.** See §0d for why that is expensive.
+- **You cannot stage vessel-by-vessel.** There is no "try it on Frontier Venture first". Promoting
+  to production commits all three.
+- **There is a ~1-day mixed-version window** — shore new, some ships new, some still old — and no
+  control over the order. §5 depends on this.
+- **The local pilot is therefore the only gate that exists.** It is doing the job that a staged
+  vessel rollout would otherwise do.
 
 ---
 
-## 0d. IF A MIGRATION FAILS — rollback / recovery
+## 0c. IF A MIGRATION FAILS — repo-specific behaviour worth knowing
 
-**Verified behaviour of the runner:**
+Not general deploy mechanics — this is how *this* runner behaves, verified in the code:
 
-1. Benign errors are **skipped and logged**, not fatal: `42P07` (table exists), `42701` (column
-   exists), `42704` (object missing), `42P01` (undefined table), `42830` (no unique constraint).
-2. **Any other error → the runner THROWS and the entire migration run ABORTS.** Startup fails and
-   the app does not serve. Later migrations in the list do **not** run.
-3. The failing migration is **NOT marked complete** in `schema_migrations`, so a restart
-   re-executes it **from its first statement**.
-4. **Whether the DB is left half-migrated depends on the file:**
+- Benign codes are skipped and logged (`42P07` table exists, `42701` column exists, `42704`
+  object missing, `42P01` undefined table, `42830` no unique constraint).
+- **Any other error throws and ABORTS the whole run** — later migrations do not execute and the
+  app does not start.
+- The failing migration is **not** marked complete, so a restart re-runs it from statement one.
+- **Half-applied state depends on the file:**
 
-| Atomic (single batch — all-or-nothing) | Per-statement (**can half-apply**) |
+| Atomic (all-or-nothing) | Per-statement (**can half-apply**) |
 |---|---|
 | 137, 139, 141, 142 | 0064, 136, 138, 140, 143, 145, 146 |
 
-**RECOVERY — forward is the default, restore is the exception:**
-
-- **Preferred: fix the cause and restart.** Every migration in this stack is written idempotent,
-  and a half-applied per-statement file re-runs cleanly from the top (already-applied statements
-  hit the benign-skip codes above). This is the normal path.
-- **Restore from the §0 backup only if** the failure is not understood, or a half-applied 138 has
-  written repair rows you cannot reason about. Data damage — not a failed DDL — is what justifies
-  a restore.
-- **Do not hand-edit `schema_migrations` to mark a failed migration complete.** That hides a
-  half-applied state and the next deploy inherits it.
-- **Send the failing statement and error before deciding.** The runner prints
-  `❌ Migration <id> failed at statement: <message>` — that line is what determines whether it is
-  forward-fixable.
+**Forward-fix is the default** — every migration here is idempotent, and a half-applied
+per-statement file re-runs cleanly (already-applied statements hit the benign codes above).
+**Restore from backup only** for an unexplained failure, or a half-applied 138 whose repair rows
+you can't reason about. Never hand-edit `schema_migrations` to mark a failure complete — that
+hides the half-applied state and the next deploy inherits it.
 
 ---
 
@@ -223,7 +186,7 @@ SELECT id, applied_at FROM schema_migrations WHERE id ~ '^(0064|13[6-9]|14[0-3]|
 `143_drift_detector_failures_kind`, `145_deprecate_dead_sync_settings`,
 `146_normalise_boolean_sync_settings`. **No 144.**
 
-Fewer than 11 means the run aborted partway — see §0d and check the log for
+Fewer than 11 means the run aborted partway — see §0c and check the log for
 `❌ Migration <id> failed at statement`.
 
 **B. Timeout fix is live** — startup log shows `requestTimeoutMs=60000`. Then:
@@ -269,20 +232,43 @@ on the SHIP. Previously always 0.
 
 ## 5. WHEN THE §12 RECOVERY FREEZE LIFTS
 
-**The freeze on re-offer / `is_synced` reset / checkpoint rewind / dead-letter replay lifts ONLY
-when BOTH of these are DEPLOYED AND RUNNING on BOTH the shore AND the specific vessel:**
+The freeze covers **re-offer, `is_synced` reset, checkpoint rewind, dead-letter replay** — on any
+vessel. It exists because re-delivered INSERT-origin logs used to overwrite live data, and
+re-delivery is exactly what recovery tooling produces.
+
+It lifts only when **both** guard commits are **deployed and running**:
 
 - `eec60b923` — re-delivered INSERT-origin logs cannot overwrite live data
 - `07d697f12` — per-field stale-skip symmetric across both directions
 
-**Explicitly NOT sufficient:**
-- ❌ Merged to `replit_dev` — code in git protects nobody.
-- ❌ Deployed to shore only — the ship's PULL path was the unguarded one. **Shore-only deployment
-  leaves the exact Frontier Venture failure path open.**
-- ❌ Deployed to a different vessel — the freeze lifts **per vessel**.
+**CORRECTION TO THE EARLIER PLAN: the freeze CANNOT lift per vessel.** §12 said it would. That
+was written assuming vessels could be held independently. They cannot — ships auto-pull production
+on their own schedule. So the real condition is:
 
-Confirm with checklist item **G** (`INSERT-LOG SKIP` / `STALE-SKIP` reachable in `sync-diag`) on
-**both** sides before running any recovery on that vessel. Until then the 52/39 stay untouched.
+> **The freeze lifts FLEET-WIDE, and only after ALL THREE vessels have confirmably pulled the
+> build AND shore is on it. Not when the first ship updates — when the last one does.**
+
+Confirm per vessel with checklist item **G** (`INSERT-LOG SKIP` / `STALE-SKIP` reachable in
+`sync-diag`) and item **A** (migrations present). All three must pass before any recovery runs
+anywhere.
+
+**Does this weaken the protection? Yes — say so plainly rather than pretend otherwise:**
+
+1. **No staged rollout.** A defect in either guard reaches all three vessels within about a day,
+   with no opportunity to catch it on one ship and hold the rest. The local pilot is the only
+   thing standing in for that, and a local pair is not a real vessel with real data volume.
+2. **The mixed-version window is unguarded on the laggards.** For roughly a day, shore is new
+   while some ships are still old — and **the old ships still have the unguarded PULL path**,
+   which is the exact Frontier Venture failure route. **No recovery of any kind during that
+   window**, including on a vessel that has already updated, because shore-side re-offers reach
+   the ships that have not.
+3. **"Deployed" is not observable centrally.** There is no fleet dashboard saying which vessel is
+   on which build. It has to be confirmed vessel by vessel from the logs, and until that is done
+   the honest status is "unknown", which for this purpose means "still frozen".
+
+**Practical consequence:** budget roughly two days between promoting to production and lifting the
+freeze — about a day for all three to pull, plus the verification pass. Until then the 52/39 stay
+untouched.
 
 ---
 
