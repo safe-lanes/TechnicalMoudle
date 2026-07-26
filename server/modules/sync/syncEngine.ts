@@ -413,6 +413,38 @@ export class SyncEngine {
           console.warn(`[SyncEngine] Could not count remaining push rows: ${cntErr.message}`);
         }
       }
+      // FINALIZE THE LOCAL BATCH ROW (pilot 2026-07-26).
+      // In REMOTE mode completeSyncSession runs on SHORE and finalizes SHORE's row; the ship's
+      // own row — inserted defensively above so error persistence works — was never updated on
+      // SUCCESS. Only the failure path finalized it. Consequences, all ship-side:
+      //   • Sync Dashboard showed every successful sync as "In Progress", 0 pushed / 0 pulled,
+      //     no duration — indistinguishable from a hung sync on the screen crew actually watch.
+      //   • pruningService only deletes status IN ('completed','failed'), so these rows were
+      //     NEVER prunable — unbounded growth in the very table pruning exists to bound.
+      //   • healthMonitor counts status='in_progress' as ACTIVE batches, so the ship reported
+      //     every historical sync as still running.
+      // Deliberately NOT passing errorMessage (would wipe apply errors stored at Step 6) or
+      // checkpointAfter (completeSyncSession owns it; in local mode it is already correct).
+      // Non-fatal: updateBatch throws 404 if the row is absent (defensive insert failed), and a
+      // bookkeeping failure must never turn a successful sync into a reported failure.
+      if (batchUuid) {
+        try {
+          await syncRepo.updateBatch(batchUuid, {
+            status: 'completed',
+            completedAt: new Date(),
+            durationMs,
+            recordsSent: recordsPushed,
+            recordsReceived: recordsPulled,
+            conflictsFound,
+            conflictsResolved: conflictsAutoResolved,
+            filesQueued: filesProcessedCount + filesFailedCount,
+            filesCompleted: filesProcessedCount,
+          });
+        } catch (finalizeErr: any) {
+          console.warn(`[SyncEngine] Could not finalize local batch row: ${finalizeErr.message}`);
+        }
+      }
+
       syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=success, pushed=${recordsPushed}, pulled=${recordsPulled}, conflicts=${conflictsFound}, files=${filesProcessedCount}+${filesFailedCount}, remainingPush=${remainingPush}, remainingPull=${completeResult.remainingPull ?? 0}`);
       return {
         success: true,

@@ -261,13 +261,20 @@ export default function SyncDashboard() {
   });
 
   // ── Combined Conflict Count (from conflict review endpoint) ──
+  // Vessel-scoped (pilot 2026-07-26). This previously called the endpoint with NO vesselId, so
+  // the header counted conflicts across the WHOLE FLEET while the panel below it listed only the
+  // selected vessel — on shore with 18 vessels the two numbers could never agree. The endpoint
+  // has always supported the filter (conflictReviewController.ts:40); the client just never
+  // passed it. Fleet-wide totals belong on Fleet Overview, not on a vessel-scoped dashboard.
   const conflictCountQuery = useQuery<{ total: number; fromLog: number; fromOld: number }>({
-    queryKey: ["/technical/api/sync/conflicts/review/count"],
+    queryKey: ["/technical/api/sync/conflicts/review/count", selectedVesselId],
     queryFn: async () => {
-      const res = await fetch("/technical/api/sync/conflicts/review/count");
+      if (!selectedVesselId) return { total: 0, fromLog: 0, fromOld: 0 };
+      const res = await fetch(`/technical/api/sync/conflicts/review/count?vesselId=${selectedVesselId}`);
       if (!res.ok) return { total: 0, fromLog: 0, fromOld: 0 };
       return res.json();
     },
+    enabled: !!selectedVesselId,
     refetchInterval: 30_000,
   });
   const totalConflictCount = conflictCountQuery.data?.total ?? 0;
@@ -686,10 +693,31 @@ export default function SyncDashboard() {
           </CardHeader>
           <CardContent>
             {conflicts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle className="h-10 w-10 mx-auto mb-2 text-green-300" />
-                <p>No conflicts - all synced!</p>
-              </div>
+              /* Two distinct empty states. Some conflicts are resolvable inline here; others are
+                 only actionable on Conflict Review. Showing "all synced" whenever THIS list was
+                 empty contradicted the count directly above it. The user is never shown the
+                 reason — just one honest number and a way to act on it. */
+              totalConflictCount > 0 ? (
+                <div className="text-center py-8" data-testid="conflicts-needs-review">
+                  <AlertTriangle className="h-10 w-10 mx-auto mb-2 text-amber-400" />
+                  <p className="font-medium">
+                    {totalConflictCount} {totalConflictCount === 1 ? "conflict needs" : "conflicts need"} review
+                  </p>
+                  <Button
+                    variant="link"
+                    className="mt-1"
+                    onClick={() => setLocation("/admin/sync-conflicts")}
+                    data-testid="link-open-conflict-review"
+                  >
+                    Open Conflict Review →
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="h-10 w-10 mx-auto mb-2 text-green-300" />
+                  <p>No conflicts - all synced!</p>
+                </div>
+              )
             ) : (
               <ScrollArea className="h-[300px]">
                 <Table>
@@ -754,6 +782,19 @@ export default function SyncDashboard() {
                   </TableBody>
                 </Table>
               </ScrollArea>
+            )}
+            {conflicts.length > 0 && totalConflictCount > conflicts.length && (
+              /* The table shows only what can be resolved inline. Without this the row count
+                 would silently disagree with the total above. */
+              <div className="pt-2 text-center">
+                <Button
+                  variant="link"
+                  onClick={() => setLocation("/admin/sync-conflicts")}
+                  data-testid="link-open-conflict-review-all"
+                >
+                  Open Conflict Review to see all {totalConflictCount} conflicts →
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
