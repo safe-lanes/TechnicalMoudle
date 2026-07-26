@@ -8,15 +8,44 @@ function buildProxyUrl(endpoint: string, domain: string): string {
   return `/technical/api/external/master-data/${endpoint}?domain=${encodeURIComponent(domain)}`;
 }
 
+/**
+ * LOCAL-ONLY domain shim — the single deliberate local shim in the codebase.
+ *
+ * Normally the tenant domain comes from the SAILERP JWT and is mirrored into a `domain`
+ * localStorage key. The local shore+ship test environment (docs/LOCAL-TEST-ENVIRONMENT.md) runs
+ * STANDALONE with no SAILERP, so that key is never written and this function used to fall back to
+ * the hardcoded tenant `'rsms'` — silently pointing a WK test session at the wrong company.
+ *
+ * DOUBLE-GATED so it cannot leak: it needs BOTH `VITE_APP_ENV=local` AND an explicit
+ * `VITE_LOCAL_PILOT_DOMAIN`. Miss either and behaviour is byte-identical to before.
+ */
+function localPilotDomain(): string | null {
+  try {
+    const env = (import.meta as any).env;
+    if (env?.VITE_APP_ENV !== 'local') return null;
+    const d = String(env?.VITE_LOCAL_PILOT_DOMAIN ?? '').trim();
+    return d.length > 0 ? d : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getDomain(): string {
   try {
     const domain = localStorage.getItem('domain');
     if (domain && domain.trim().length > 0) {
       return domain.trim();
     }
+    const shim = localPilotDomain();
+    if (shim) {
+      console.warn(`[getDomain] no "domain" in localStorage — using LOCAL test-env domain "${shim}" (VITE_APP_ENV=local).`);
+      return shim;
+    }
     console.warn('[getDomain] "domain" key not found or empty in localStorage. Falling back to "rsms".');
     return 'rsms';
   } catch (e) {
+    const shim = localPilotDomain();
+    if (shim) return shim;
     console.warn('[getDomain] Failed to read "domain" from localStorage:', e, '. Falling back to "rsms".');
     return 'rsms';
   }

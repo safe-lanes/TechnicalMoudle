@@ -29,3 +29,8 @@ ship-deploy/
 # Secrets — never commit real env values (.env.example IS tracked)
 .env
 !.env.example
+
+# local test environment — generated per run, never commit
+local-test-env/bundle.json
+local-test-env/shore.log
+local-test-env/*.local
