@@ -112,7 +112,23 @@ These go to **PM2 stdout**, not `sync-diag`. Capture the first 200 lines after r
 
 ### 2.1 Counts to record (not errors — evidence)
 - **Migration 138** — the ROB correction count. **Nilesh: an error here means STOP and send.**
-  Watch `rsms` / `epic` in particular.
+
+  🔴 **RUN THE PRE-FLIGHT FIRST — on every shore tenant DB and every ship, BEFORE deploying:**
+  ```bash
+  psql "$DATABASE_URL" -f migrations/preflight/138-preflight.sql
+  ```
+  138 treats `spares.location`/`location_2` + `rob_location_a/b` as the AUTHORITY and rebuilds
+  `spare_location_stock` from them (statements 4–7). Statement 1 is the one exception: it reverses
+  direction only where a ROB transaction corroborates the stock table. So where the legacy columns
+  are stale and no evidence exists, 138 will overwrite correct stock with stale values.
+
+  **Decision rule — read the `⚠_of_those_REDUCING_stock` column:**
+  | Value | Action |
+  |---|---|
+  | **0** | Deploy freely. 138 will not reduce recorded stock on that instance. |
+  | **non-zero** | **STOP for that instance.** List those spares, confirm the true ROB with the vessel, then deploy. 138 will write stock DOWN on those rows. |
+
+  Record the per-vessel numbers — they are the before-picture for the correction counts in the log.
 - **Migration 141** — how many rows backfilled to 60000. On a correctly-provisioned ship this
   may legitimately be 0 (the key is seeded non-empty); 0 is not a failure.
 - **Migration 146** — how many boolean values normalised. **Expected: 0.** Every seed path
@@ -126,7 +142,9 @@ These go to **PM2 stdout**, not `sync-diag`. Capture the first 200 lines after r
   [AutoSync] EFFECTIVE STATE — auto_sync_enabled=ON (raw "true"), interval=180min. Next tick in 180s, then every 180min.
   ```
   If it says `OFF`, it will also say `TICKS WILL NO-OP until this is enabled.`
-- **Effective sync timeout + its source**:
+- **Effective sync timeout + its source** — ⚠️ **NOT a startup line.** Pilot-verified: it is emitted
+  by `loadSettings()` on the **first sync cycle**, so on a ship it appears ~3 min after boot (or
+  after the first Sync Now), not in the boot banner:
   ```
   [SyncEngine] Settings loaded from DB — instanceId=…, shoreUrl=… (DB|env), localMode=false, requestTimeoutMs=60000 (DB|env|default), pushBatchSize=…
   ```
@@ -166,6 +184,76 @@ These are intended, not bugs. Brief support before deploy.
    — recording only, by decision. A ship's Conflict Review being non-empty is now normal.
 6. **Sync settings screen**: `request_timeout_seconds` and `local_mode` now read DEPRECATED.
    Tuning them does nothing. The live timeout key is `sync_request_timeout_ms`.
+
+---
+
+## 3a. 🔴 SHORE AND SHIP POSTGRES MUST RUN IN UTC
+
+**Confirmed UTC on all production instances (Ghazi, 2026-07-26) — so there is no issue today.
+This is a standing constraint, not an action item.**
+
+The ONE_WAY shore→ship gather filters `WHERE updated_at > $checkpoint`. `updated_at` is written by
+the DB trigger (`NOW()`, DB clock); the checkpoint is written from JS `new Date()` through Drizzle,
+which lands as UTC wall-clock. **On a UTC host those two agree exactly. On a non-UTC host they do
+not** — measured on the IST pilot host: checkpoint `12:23:19` vs `started_at` `17:53:19` for the
+same instant.
+
+Direction of the failure matters:
+- **UTC** → correct.
+- **UTC+ (east, e.g. IST)** → checkpoint lands behind, ONE_WAY rows are **re-sent** — wasteful,
+  self-correcting, no loss.
+- **UTC− (west, e.g. Americas)** → checkpoint lands ahead, ONE_WAY rows are **silently skipped**:
+  `components`, `jobs`, `admn_role_master`, `adm_role_menu_access`, `company_approval_settings`,
+  `approval_workflow_config` can drop updates with no error.
+
+**If a shore or vessel server is ever relocated to a non-UTC region, this must be resolved BEFORE
+the move.** The field-log path is unaffected (it is `is_synced`-driven, not checkpoint-gated), so
+the blast radius is ONE_WAY tables only. Tracked on the timestamp task; the fix is enforce-UTC
+end-to-end (store and compare in UTC, convert at display), not a per-column patch.
+
+Verify on each instance:
+```bash
+psql "$DATABASE_URL" -c "SHOW timezone;"
+```
+
+---
+
+## 3b. ⚠️ DEPLOY LANDMINES — pilot-verified 2026-07-26
+
+**1. `shore_url` MUST end with `/technical/api`.** Not just the host:port.
+```
+✅ http://<shore-host>:5000/technical/api
+❌ http://<shore-host>:5000
+```
+Get this wrong and sync fails with `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` —
+the ship hit the SPA catch-all and parsed HTML. **The error names neither the setting nor the
+URL.** This cost time in the pilot; it will cost more on a vessel. Check it before the first sync.
+
+**2. `instanceId` is built from `vessels.id`, NOT `vessels.vuuid`.**
+`provisioningService.ts:64,93` does `SELECT name, id AS code FROM vessels WHERE vuuid = $1`, then
+`SHIP-${vesselCode}`. **`MULTITENANCY-DEPLOY-STEPS.md:123` says to set `SYNC_INSTANCE_ID=SHIP-<vuuid>`
+— that doc is WRONG and has been corrected.** If `vessels.id` and `vessels.vuuid` differ, the ship
+registers one identity while the operator sets another, and the ship gets **403** at
+`syncTenantGuard`, or two `tenant_instances` rows for one vessel.
+Pilot-verified: vessel `id='WKFV'`, `vuuid='743ef9d1-…'` → shore registered **`SHIP-WKFV`**.
+**Before provisioning, read the ship's identity from the code's rule:**
+```sql
+SELECT id AS use_this_as_ship_code, vuuid, (id = vuuid) AS safe FROM vessels WHERE vuuid = '<vuuid>';
+```
+`safe = false` means the doc's instruction and the code disagree for that vessel.
+
+**3. `manifest.envSettings` is declared but NEVER populated** — the only occurrences in the whole
+codebase are the type declaration and the reads. Every bundle therefore seeds the hardcoded
+defaults **`sync_push_batch_size=200`** and **`sync_request_timeout_ms=60000`**, regardless of what
+shore is configured with. Pilot-verified: `envSettings: undefined` on a real generated bundle.
+Do not expect per-ship tuning to travel in the bundle — set it on the ship afterwards.
+
+**4. Migration 138 has an asymmetry worth knowing** (not a bug found in the pilot — zero collateral
+on 1,111 untouched spares and 2,220 stock rows). Statement 1 repairs `spares` FROM
+`spare_location_stock` **only when corroborating ROB evidence matches**; statements 4–5 push
+`spares.rob_location_a/b` **INTO** `spare_location_stock` with **no evidence gate**. So where the
+legacy `spares` columns are stale but the stock table is correct, 138 propagates the stale values.
+**This is why the correction counts must be recorded, not just glanced at.**
 
 ---
 
