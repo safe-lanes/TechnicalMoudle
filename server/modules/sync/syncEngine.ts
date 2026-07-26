@@ -100,16 +100,16 @@ export class SyncEngine {
   // BOTH the manual "Sync Now" drain and the auto-scheduler tick. Released in try/finally so a
   // thrown/failed cycle always clears it — a stuck guard would block all future syncs.
   private inFlight = new Set<string>();
-  // Fix 3 poison-row guard: consecutive times the shore has reported a row_uuid as dropped.
-  // After DEAD_LETTER_AFTER, we give up (mark it synced + loud alert) so a genuinely-bad row
-  // can't loop forever. In-memory on the (singleton) engine — persists across sync cycles in
-  // the running process; resets on restart (a poison row then gets a fresh K attempts + alerts).
-  private droppedRetryCount = new Map<string, number>();
+  // REMOVED in migration 147: `droppedRetryCount` was an in-memory Map counting consecutive shore
+  // drops, used to dead-letter a row (mark it is_synced=true) after 3 tries. Two defects: it gave
+  // up on undelivered data — the Frontier Venture 71 — and being in-memory it reset on every PM2
+  // restart, so the count reflected process uptime rather than delivery history. Both are now the
+  // persisted sync_field_log.sync_attempts column plus the backoff ladder, which never gives up.
   // Self-heal: full-row requests the SHORE returned from our pushes (needsFullRows). Drained
   // into the next push's fullRows payload. In-memory by design — if lost (restart), the same
   // fragments re-fail on shore and the request regenerates. Map<tableName, Set<rowUuid>>.
   private pendingFullRowRequests = new Map<string, Set<string>>();
-  // Pull-side file dead-letter counter (mirrors droppedRetryCount): consecutive failed pulls per
+  // Pull-side FILE dead-letter counter (files only — field-log delivery no longer dead-letters at
   // file queueUuid. In-memory on the singleton engine so it persists across cycles within a run.
   private filePullRetryCount = new Map<string, number>();
 
@@ -660,6 +660,9 @@ export class SyncEngine {
     // below. Only logs whose row actually applied get marked synced; dropped rows stay
     // is_synced=false and retry next cycle. `pushedLogUuids` is computed AFTER the loop.
     const droppedRowUuids = new Set<string>();
+    // Migration 147: rows the shore explicitly CONFIRMED applied, and whether it spoke at all.
+    const confirmedRowUuids = new Set<string>();
+    let sawPositiveConfirm = false;
 
     // C. Send in chunks
     //    Field logs may come from raw SQL (snake_case) or Drizzle (camelCase) — handle both
@@ -761,6 +764,14 @@ export class SyncEngine {
         // Fix 3: collect rows the shore could not apply (backward-compat: old shore omits the
         // field → undefined → nothing collected → ship marks all synced = current behaviour).
         (result.droppedRowUuids || []).forEach((r: string) => droppedRowUuids.add(r));
+          // Migration 147 — POSITIVE CONFIRM, selected on FIELD PRESENCE not value.
+          // Writing this as `result.appliedRowUuids || []` would be a data-stall bug: an older
+          // shore omits the key, the empty array would read as "nothing applied", and the ship
+          // would re-push the same backlog forever. Presence of the key IS the capability signal.
+          if (Object.prototype.hasOwnProperty.call(result, 'appliedRowUuids')) {
+            sawPositiveConfirm = true;
+            (result.appliedRowUuids || []).forEach((r: string) => confirmedRowUuids.add(r));
+          }
         // Self-heal: queue the shore's full-row requests for our NEXT push (old shore omits
         // the field → nothing queued → today's behaviour).
         this.queueFullRowRequests(result.needsFullRows);
@@ -779,29 +790,40 @@ export class SyncEngine {
     }
 
     // Fix 3 — mark synced ONLY rows the shore actually applied. Dropped rows stay unsynced
-    // and retry next cycle (after Fix 1 they arrive whole and apply). Poison-row guard: a row
-    // dropped DEAD_LETTER_AFTER cycles in a row is given up (marked synced + loud alert) so it
-    // can never loop forever. Rows that applied this cycle reset their counter.
-    const DEAD_LETTER_AFTER = 3;
-    const keepUnsynced = new Set<string>();
-    for (const r of Array.from(droppedRowUuids)) {
-      const n = (this.droppedRetryCount.get(r) || 0) + 1;
-      if (n >= DEAD_LETTER_AFTER) {
-        this.droppedRetryCount.delete(r);
-        syncDiag(`⚠️ DEAD-LETTER: row=${r} dropped by shore ${n}x in a row — marking synced to stop the loop. NEEDS MANUAL REVIEW (permanent apply failure).`);
-        console.error(`[SyncEngine] ⚠️ DEAD-LETTER row=${r} after ${n} failed apply attempts — marked synced (stop loop), needs manual review.`);
-      } else {
-        this.droppedRetryCount.set(r, n);
-        keepUnsynced.add(r);
-      }
-    }
-    // Reset the counter for any pushed row that was NOT dropped this cycle (it applied).
+    // and retry next cycle (after Fix 1 they arrive whole and apply).
+    //
+    // MIGRATION 147 — THE DEAD-LETTER IS GONE. It used to give up on a row after
+    // DEAD_LETTER_AFTER=3 consecutive drops and mark it is_synced=true "to stop the loop",
+    // silently declaring undelivered data delivered. That is precisely how the Frontier Venture
+    // 71 work orders were lost. Nothing is abandoned any more: unconfirmed rows stay
+    // is_synced=false forever and the persisted backoff ladder throttles how often they retry.
+    //
+    // CONFIRM-BEFORE-SENT: a log is marked synced only when the shore CONFIRMED its row applied.
+    //   * new shore  -> appliedRowUuids present  -> confirm positively (silence != success)
+    //   * old shore  -> key absent               -> fall back to dropped-set subtraction, which is
+    //                                               byte-identical to today's behaviour
+    // Selected on PRESENCE (sawPositiveConfirm), never on the array's emptiness.
+    const confirmedThisCycle = (ru: string): boolean =>
+      sawPositiveConfirm ? confirmedRowUuids.has(ru) : !droppedRowUuids.has(ru);
+
+    const attemptedRowUuids = new Set<string>();
     for (const l of fieldLogs) {
       const ru = l.rowUuid ?? (l as any).row_uuid;
-      if (!droppedRowUuids.has(ru)) this.droppedRetryCount.delete(ru);
+      if (ru && !confirmedThisCycle(ru)) attemptedRowUuids.add(ru);
     }
+    if (attemptedRowUuids.size > 0) {
+      try {
+        await syncRepo.recordDeliveryAttempt(Array.from(attemptedRowUuids), this.instanceId);
+        syncDiag(`RETRY LADDER: ${attemptedRowUuids.size} row(s) not confirmed — attempt recorded, backing off (never abandoned)`);
+      } catch (attErr: any) {
+        // Bookkeeping must never fail a sync. Worst case the row retries next cycle without
+        // backing off — noisier, still correct.
+        console.warn(`[SyncEngine] could not record delivery attempts: ${attErr?.message || attErr}`);
+      }
+    }
+
     const pushedLogUuids = fieldLogs
-      .filter(l => !keepUnsynced.has(l.rowUuid ?? (l as any).row_uuid))
+      .filter(l => confirmedThisCycle(l.rowUuid ?? (l as any).row_uuid))
       .map(l => l.logUuid ?? (l as any).log_uuid);
 
     return { totalPushed, pushedLogUuids };

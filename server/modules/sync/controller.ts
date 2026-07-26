@@ -180,12 +180,22 @@ export async function statusHandler(req: Request, res: Response) {
     // dead-letter replay, checkpoint rewind) and each skip is a value that did NOT get applied.
     const insertLogSkips = { session: getInsertLogSkipCount() };
 
+    // Migration 147 — retry backlog. Now that is_synced=true means CONFIRMED APPLIED, unconfirmed
+    // rows are never marked and never pruned (pruning deletes is_synced=true only). That is the
+    // right trade — better a retained undelivered record than a deleted one — but it must be
+    // VISIBLE or the backlog just grows unseen. `stuck` = rows on the final 7-day tier; they are
+    // still retried forever, "stuck" means a human should look, not that anything gave up.
+    let retryBacklog: { total: number; stuck: number; maxAttempts: number } | null = null;
+    try {
+      retryBacklog = await syncRepo.getRetryBacklog(instanceId);
+    } catch { /* pre-migration-147 DB — leave null */ }
+
     // Build identity, so a vessel can be version-confirmed WITHOUT shell access. That is the
     // real constraint: ships are intermittently reachable, and the sync guards only log when
     // they fire, so there was previously no way to prove a fix was live except SSH + git log.
     const build = getBuildInfo();
 
-    res.json({ ...result, fieldLogFailures, insertLogSkips, build });
+    res.json({ ...result, fieldLogFailures, insertLogSkips, retryBacklog, build });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] status error:', error);

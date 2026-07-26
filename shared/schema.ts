@@ -4296,6 +4296,12 @@ export const syncFieldLog = pgTable("sync_field_log", {
   instanceId: text("instance_id").notNull(),
   syncBatchId: text("sync_batch_id"),
   isSynced: boolean("is_synced").default(false).notNull(),
+  // Retry ladder (migration 147). LOCAL bookkeeping — never on the sync wire.
+  // Replaces the in-memory droppedRetryCount Map so attempts survive a restart, and lets the
+  // backoff ladder throttle retries instead of the old dead-letter force-marking undelivered
+  // rows as synced (the Frontier Venture "71" loss path).
+  syncAttempts: integer("sync_attempts").default(0).notNull(),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   isDeleted: boolean("is_deleted").default(false).notNull(),

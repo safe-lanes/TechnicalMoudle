@@ -83,6 +83,50 @@ export async function getAllInstanceMetadata(): Promise<SyncMetadata[]> {
 // sync_field_log
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * RETRY BACKOFF LADDER (migration 147).
+ *
+ * A record that fails to deliver is NOT abandoned — it is throttled. `sync_attempts` counts failed
+ * delivery attempts; the ladder maps that to how long to wait before trying again. The final tier
+ * repeats FOREVER: there is deliberately no quarantine and no give-up, because giving up is
+ * exactly what the old dead-letter did and it is how the Frontier Venture "71" were lost.
+ *
+ *   0  -> immediately eligible (never attempted)
+ *   1  -> 1 hour     2 -> 6 hours    3 -> 24 hours    4 -> 3 days    5+ -> every 7 days, forever
+ *
+ * Defined ONCE here and rendered into the gather. Deliberately not inlined ad hoc: the gather is
+ * already a ROW_NUMBER() complete-row-batching CTE and a hand-written CASE inside it would rot.
+ */
+export const RETRY_LADDER: ReadonlyArray<{ attempts: number; interval: string }> = [
+  { attempts: 1, interval: '1 hour' },
+  { attempts: 2, interval: '6 hours' },
+  { attempts: 3, interval: '24 hours' },
+  { attempts: 4, interval: '3 days' },
+];
+export const RETRY_LADDER_TAIL = '7 days';
+
+/**
+ * SQL predicate: is this row due for another attempt?
+ * Never-attempted rows (last_attempt_at IS NULL) are ALWAYS due — so on the first cycle after
+ * migration 147 every existing unsynced row is eligible, i.e. exactly today's behaviour.
+ */
+export function retryDuePredicate(alias = ''): string {
+  const p = alias ? `${alias}.` : '';
+  const cases = RETRY_LADDER
+    .map(t => `WHEN ${p}sync_attempts = ${t.attempts} THEN interval '${t.interval}'`)
+    .join(' ');
+  return `(${p}last_attempt_at IS NULL OR ${p}last_attempt_at < now() - (CASE ${cases} ELSE interval '${RETRY_LADDER_TAIL}' END))`;
+}
+
+/** The same ladder in JS, for the operator surface and the harness. ms to wait after N attempts. */
+export function retryDelayMs(attempts: number): number {
+  const H = 3600_000, D = 24 * H;
+  if (attempts <= 0) return 0;
+  const map: Record<string, number> = { '1 hour': H, '6 hours': 6 * H, '24 hours': D, '3 days': 3 * D };
+  const tier = RETRY_LADDER.find(t => t.attempts === attempts);
+  return tier ? map[tier.interval] : 7 * D;
+}
+
 export async function getUnsyncedFieldLogs(
   instanceId: string,
   vesselId: string,
@@ -111,6 +155,7 @@ export async function getUnsyncedFieldLogs(
                 ROW_NUMBER() OVER (ORDER BY changed_at ASC, id ASC) AS rn
          FROM sync_field_log
          WHERE instance_id = $1 AND vessel_id IN (${placeholders}) AND is_synced = false
+           AND ${retryDuePredicate()}
        ) ranked
        WHERE rn <= ${limit}
        GROUP BY table_name, row_uuid
@@ -848,7 +893,7 @@ export async function resetInstanceDeliveryStateForReprovision(
   if (opts?.blunt || !T) {
     // BLUNT: re-deliver everything (today's behaviour). Guaranteed self-heal.
     const fl = await pool.query(
-      `UPDATE sync_field_log SET is_synced = false
+      `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
         WHERE vessel_id IN (${vp}) AND instance_id != ${ip} AND is_synced = true`,
       [...vesselValues, instanceId]
     );
@@ -875,7 +920,7 @@ export async function resetInstanceDeliveryStateForReprovision(
   // (a2) post-snapshot edits (> T) must flow to the fresh ship → mark undelivered (flip any that
   //      a prior sync had marked delivered to the OLD ship). Disjoint from (a1) by the T split.
   const a2 = await pool.query(
-    `UPDATE sync_field_log SET is_synced = false
+    `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at > ${tp} AND is_synced = true`,
     [...vesselValues, instanceId, T]
@@ -944,4 +989,54 @@ export function canonicaliseBooleanSettings(settings: Record<string, any>): stri
     if (String(original) !== settings[key]) changed.push(`${key}: ${JSON.stringify(original)} -> '${settings[key]}'`);
   }
   return changed;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RETRY LADDER BOOKKEEPING (migration 147)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Record a FAILED delivery attempt for rows that were offered but NOT confirmed applied.
+ *
+ * This replaces the in-memory `droppedRetryCount` Map. Because it is a column the count survives
+ * a restart — the Map reset on every PM2 bounce, so history was lost and the (now deleted)
+ * dead-letter threshold could be reached or never reached depending on uptime.
+ *
+ * Keyed by row_uuid, not log_uuid: delivery succeeds or fails per ROW under complete-row
+ * batching, so every log of an unconfirmed row shares the count and backs off together.
+ */
+export async function recordDeliveryAttempt(rowUuids: string[], instanceId: string): Promise<number> {
+  if (!rowUuids.length) return 0;
+  const pool = await getPool();
+  if (!pool) return 0;
+  const res = await pool.query(
+    `UPDATE sync_field_log
+        SET sync_attempts = sync_attempts + 1,
+            last_attempt_at = now(),
+            updated_at = now()
+      WHERE instance_id = $1 AND row_uuid = ANY($2::text[]) AND is_synced = false`,
+    [instanceId, rowUuids]
+  );
+  return res.rowCount ?? 0;
+}
+
+/**
+ * Backlog shape for the operator surface. `stuck` = rows that have fallen through to the final
+ * (7-day) tier. They are still retried forever — "stuck" means a human should look, not that the
+ * system gave up.
+ */
+export async function getRetryBacklog(
+  instanceId: string
+): Promise<{ total: number; stuck: number; maxAttempts: number }> {
+  const pool = await getPool();
+  if (!pool) return { total: 0, stuck: 0, maxAttempts: 0 };
+  const tailFrom = RETRY_LADDER.length + 1;
+  const r = await pool.query(
+    `SELECT count(*)::int AS total,
+            count(*) FILTER (WHERE sync_attempts >= $2)::int AS stuck,
+            COALESCE(max(sync_attempts), 0)::int AS max_attempts
+       FROM sync_field_log
+      WHERE instance_id = $1 AND is_synced = false`,
+    [instanceId, tailFrom]
+  );
+  return { total: r.rows[0].total, stuck: r.rows[0].stuck, maxAttempts: r.rows[0].max_attempts };
 }

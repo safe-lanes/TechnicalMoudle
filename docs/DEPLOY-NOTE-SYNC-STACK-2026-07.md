@@ -68,7 +68,7 @@ Not general deploy mechanics — this is how *this* runner behaves, verified in 
 
 | Atomic (all-or-nothing) | Per-statement (**can half-apply**) |
 |---|---|
-| 137, 139, 141, 142 | 0064, 136, 138, 140, 143, 145, 146 |
+| 137, 139, 141, 142 | 0064, 136, 138, 140, 143, 145, 146, **147** |
 
 **Forward-fix is the default** — every migration here is idempotent, and a half-applied
 per-statement file re-runs cleanly (already-applied statements hit the benign codes above).
@@ -96,6 +96,7 @@ The runner keys by **full filename** and sorts **lexicographically**, so `0064�
 | 9 | `143_drift_detector_failures_kind` | Extends that table with `kind`/`field_name`/`details`/`last_seen_at` + dedupe index, so drift findings share one operator list. |
 | 10 | `145_deprecate_dead_sync_settings` | Marks `request_timeout_seconds` and `local_mode` DEPRECATED in their own description. Rows kept, not deleted. |
 | 11 | `146_normalise_boolean_sync_settings` | Normalises boolean setting values to lowercase. |
+| 12 | `147_sync_field_log_retry_ladder` | Adds `sync_attempts` + `last_attempt_at` to `sync_field_log` (+ partial index). **Deletes the dead-letter that force-marked undelivered rows as synced — the Frontier Venture "71" loss path.** Nothing is abandoned any more; a persisted backoff ladder (1h/6h/24h/3d/7d, then every 7d forever) throttles retries instead. No backfill. |
 
 **144 is RESERVED for Phase 1 tri-state — do not use it.**
 
@@ -131,6 +132,13 @@ These go to **PM2 stdout**, not `sync-diag`. Capture the first 200 lines after r
   Record the per-vessel numbers — they are the before-picture for the correction counts in the log.
 - **Migration 141** — how many rows backfilled to 60000. On a correctly-provisioned ship this
   may legitimately be 0 (the key is seeded non-empty); 0 is not a failure.
+- **Migration 147** — after the FIRST sync, record the attempt distribution:
+  ```sql
+  SELECT sync_attempts, count(*) FROM sync_field_log WHERE is_synced = false GROUP BY 1 ORDER BY 1;
+  ```
+  **Expected: everything at 0** on a healthy vessel. Rows at 1–4 are retrying normally. Rows at
+  **5+ are on the final 7-day tier — they are still being retried forever, but a human should look.**
+  Also visible as `retryBacklog {total, stuck, maxAttempts}` on `GET /sync/status`.
 - **Migration 146** — how many boolean values normalised. **Expected: 0.** Every seed path
   already writes lowercase. A non-zero count means someone hand-edited or a UI posted a
   non-canonical value — record which key.
@@ -254,6 +262,26 @@ on 1,111 untouched spares and 2,220 stock rows). Statement 1 repairs `spares` FR
 `spares.rob_location_a/b` **INTO** `spare_location_stock` with **no evidence gate**. So where the
 legacy `spares` columns are stale but the stock table is correct, 138 propagates the stale values.
 **This is why the correction counts must be recorded, not just glanced at.**
+
+---
+
+## 3d. ⚠️ A SYNC BACKLOG IS NOW VISIBLE INSTEAD OF SILENTLY DISAPPEARING
+
+**This is the biggest behaviour change in the stack and support must expect it.**
+
+Before: a record the shore could not apply three cycles running was marked "synced" and dropped.
+The backlog looked clean because failures were being deleted, not delivered. That is exactly how
+Frontier Venture lost 71 work orders.
+
+Now: **nothing is ever abandoned.** An unconfirmed record stays unsynced and keeps retrying on a
+backoff ladder forever. Consequences that will look like new problems and are not:
+
+- **`remainingPush` may be non-zero and stay non-zero.** That is the system telling the truth about
+  undelivered data. Previously the same situation showed zero because the records had been discarded.
+- **A row at `sync_attempts` 5+ needs a human**, not a restart. It is being retried weekly; something
+  about that specific record is being rejected by shore. Read `retryBacklog.stuck` on `/sync/status`.
+- **Unconfirmed rows never prune.** Pruning only deletes `is_synced = true`, so a genuinely stuck
+  record is retained rather than aged out. Right trade — but watch `retryBacklog.total` growth.
 
 ---
 

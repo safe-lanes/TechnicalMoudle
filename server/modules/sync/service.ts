@@ -754,6 +754,21 @@ export async function receivePushData(
     fieldLogApplyErrors,
     fieldLogRowMissing,
     droppedRowUuids: Array.from(droppedRowUuids), // Fix 2/3: rows the ship must keep unsynced + retry
+    // POSITIVE CONFIRM (migration 147). droppedRowUuids is a NEGATIVE ack: it reports what failed,
+    // so "shore said nothing" reads as "everything applied". Safe while the shore always answers,
+    // but it is the wrong default — silence must never mean success. This field states what the
+    // shore ACTUALLY applied, so the ship can mark synced only on confirmation.
+    //
+    // The ship selects on FIELD PRESENCE, not value: an older shore omits the key entirely and the
+    // ship falls back to the droppedRowUuids path (byte-identical to today). An empty ARRAY here is
+    // meaningful and different — it means "nothing applied".
+    appliedRowUuids: Array.from(
+      new Set(
+        (payload.fieldLogs || [])
+          .map((l: any) => l.rowUuid ?? (l as any).row_uuid)
+          .filter((r: any) => r && !droppedRowUuids.has(r))
+      )
+    ),
     // Self-heal: fragments targeting rows absent here — the ship supplies the complete
     // rows in its next push. Optional field; old ships ignore it.
     needsFullRows,
