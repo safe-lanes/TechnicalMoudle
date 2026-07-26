@@ -756,8 +756,15 @@ export async function getConnectivityLogs(
 }
 
 /**
- * Count unsynced field logs for a vessel — used by catch-up logic to decide
- * whether another consecutive sync cycle is needed.
+ * Count unsynced field logs for a vessel — the TRUE BACKLOG TOTAL.
+ *
+ * This is the number the crew and support see (`remainingPush` on /sync/status and the Sync
+ * Dashboard). It deliberately counts every undelivered row, including ones currently waiting out
+ * a retry-ladder backoff, because a backlog that hides itself is exactly the failure this stack
+ * exists to end. Do NOT filter it by retry-eligibility.
+ *
+ * For "should I run another cycle right now?" use getDueFieldLogCount below — see the comment
+ * there for why the two must not be the same number.
  */
 export async function getUnsyncedFieldLogCount(
   instanceId: string,
@@ -773,6 +780,42 @@ export async function getUnsyncedFieldLogCount(
      WHERE instance_id = $1
        AND vessel_id IN (${placeholders})
        AND is_synced = false`,
+    [instanceId, ...vesselValues]
+  );
+  return result.rows[0]?.c ?? 0;
+}
+
+/**
+ * Count field logs that are undelivered AND retry-eligible RIGHT NOW — the catch-up loop's
+ * stop condition. Same predicate the gather uses, so this answers "would another cycle actually
+ * send anything?".
+ *
+ * WHY THIS IS SEPARATE FROM getUnsyncedFieldLogCount (migration 147 regression, pilot-caught):
+ * the catch-up loop used the total, which before the retry ladder could only mean "there is work
+ * to do" — a row was either sent or dead-lettered away. Now a row can legitimately be waiting out
+ * a backoff, so the total never reaches zero, the loop keeps going, and every gather correctly
+ * returns nothing. Observed on the pilot: 20 catch-up cycles, "found 0 unsynced field logs" each
+ * time, for one held row. Harmless to data, but on a vessel that is 20 wasted VSAT round-trips per
+ * tick for as long as the row is held.
+ *
+ * The two counts answer different questions and must stay different: this one gates WORK, the
+ * total reports TRUTH. Making the dashboard use this number would re-hide the backlog.
+ */
+export async function getDueFieldLogCount(
+  instanceId: string,
+  vesselId: string,
+  vesselCode?: string | null,
+): Promise<number> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(', ');
+  const result = await pool.query(
+    `SELECT count(*)::int AS c FROM sync_field_log
+     WHERE instance_id = $1
+       AND vessel_id IN (${placeholders})
+       AND is_synced = false
+       AND ${retryDuePredicate()}`,
     [instanceId, ...vesselValues]
   );
   return result.rows[0]?.c ?? 0;

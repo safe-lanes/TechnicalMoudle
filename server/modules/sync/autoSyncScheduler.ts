@@ -348,7 +348,13 @@ export class SyncAutoScheduler {
       const vesselCode = await getVesselCode(vesselId);
       // Drain condition covers BOTH directions: ship's unsynced (push) + shore's pending for this
       // vessel (pull). Without the pull term, office→ship large changes lagged across ticks.
-      let remaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode)
+      //
+      // Push term is the DUE count, not the total (migration 147). A row waiting out a retry
+      // backoff is undelivered but not sendable, so counting it here spins the loop to its full
+      // cap while every gather returns nothing — 20 pointless VSAT round-trips per tick. The
+      // total is still what we REPORT (see finalRemaining below and /sync/status); it is just not
+      // what we act on.
+      let remaining = await syncRepo.getDueFieldLogCount(instanceId, vesselId, vesselCode)
         + await syncRepo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
 
       while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
@@ -363,15 +369,21 @@ export class SyncAutoScheduler {
           break;
         }
 
-        // Re-check remaining (push + pull)
-        remaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode)
+        // Re-check remaining (push + pull) — DUE count, same reasoning as above.
+        remaining = await syncRepo.getDueFieldLogCount(instanceId, vesselId, vesselCode)
           + await syncRepo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
       }
 
       if (cycleNumber > 0) {
+        // Report the TRUE TOTAL, not the due count — this line is how support learns a vessel is
+        // carrying undelivered records. "0 due" with rows still held would read as all-clear.
         const finalRemaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode)
           + await syncRepo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
-        console.log(`[AutoSync] Catch-up complete — ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced`);
+        const heldBack = finalRemaining - remaining;
+        console.log(
+          `[AutoSync] Catch-up complete — ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced` +
+          (heldBack > 0 ? ` (${heldBack} waiting on retry backoff — not an error)` : '')
+        );
       }
 
     } finally {

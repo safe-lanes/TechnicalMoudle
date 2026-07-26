@@ -282,6 +282,13 @@ backoff ladder forever. Consequences that will look like new problems and are no
   about that specific record is being rejected by shore. Read `retryBacklog.stuck` on `/sync/status`.
 - **Unconfirmed rows never prune.** Pruning only deletes `is_synced = true`, so a genuinely stuck
   record is retained rather than aged out. Right trade — but watch `retryBacklog.total` growth.
+- **The auto-sync log may end with `(N waiting on retry backoff — not an error)`.** That is the
+  gap between the true backlog and what is sendable right now. It is information, not a fault.
+
+**Two counts, deliberately different — do not "reconcile" them.** The catch-up loop asks *"is
+anything sendable right now?"*; the dashboard reports *"how much is undelivered?"*. A row inside
+its backoff window answers no to the first and yes to the second. Pointing the dashboard at the
+loop's count would re-hide the backlog and undo this entire stack.
 
 ---
 
