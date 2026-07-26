@@ -257,6 +257,25 @@ legacy `spares` columns are stale but the stock table is correct, 138 propagates
 
 ---
 
+## 3c. TWO UI GOTCHAS SUPPORT WILL HIT — pilot-observed
+
+**1. Two different save buttons on the work-order form.** The **top "Save"** saves a DRAFT; the
+**bottom "Submit Work Order"** is the real submit. Press the top one and the toast reads
+*"Draft Updated"* and the status stays `Draft` — which looks like the submit silently failed.
+Expect "why is my work order still a draft" tickets. The form also decides for itself: with any
+required Part B field missing it saves a draft rather than submitting.
+
+**2. `GET /work-orders/counts` returns `{"error":"Work order not found"}`.** The `:id` route
+shadows it (the `:param` collision CLAUDE.md warns about). Harmless today — nothing calls it — but
+do not add a `counts` endpoint at that path without registering it before `/work-orders/:id`.
+
+**Also worth knowing — these validations are CORRECT, not bugs.** The pilot hit all three:
+- *"Risk Assessment is marked Yes but no supporting document has been uploaded"* — answer NA, or attach the document.
+- *"The Head of Department (Chief Engineer) cannot both perform and approve the work"* — segregation of duties; pick a different performer.
+- Blank required Part B fields → saves as draft instead of submitting.
+
+---
+
 ## 4. VERIFICATION CHECKLIST — after deploy, in this order
 
 Each step proves one fix is live. Stop and report if a step fails.

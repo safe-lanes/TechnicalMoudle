@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
 import { getDb } from './db';
 import {
   users,
@@ -228,6 +228,32 @@ import { getAuditActor, getRequestContext } from './middleware/requestContext';
  * This file implements IStorage methods using PostgreSQL via Drizzle ORM.
  * Additional modules will be added incrementally.
  */
+/**
+ * Property names on `work_orders` whose column is integer- or numeric-backed.
+ *
+ * Schema-derived on purpose. The previous hand-written list silently failed to cover
+ * migration 139's `wo_completion_rh`, so every calendar-based work-order completion 500'd.
+ * Keying off `columnType` (PgInteger / PgNumeric / …) rather than `dataType` is deliberate:
+ * Drizzle represents PgNumeric as a JS *string* to preserve precision, so a `dataType`
+ * filter would miss exactly the decimal columns that break.
+ *
+ * Computed lazily once — getTableColumns is cheap but this runs on every WO update.
+ */
+let _woNumericFields: string[] | null = null;
+export function getWorkOrderNumericFields(): string[] {
+  if (_woNumericFields) return _woNumericFields;
+  try {
+    const cols = getTableColumns(workOrders as any) as Record<string, any>;
+    _woNumericFields = Object.entries(cols)
+      .filter(([, c]) => /numeric|decimal|integer|bigint|real|double|serial/i.test(String(c?.columnType ?? '')))
+      .map(([prop]) => prop);
+  } catch {
+    // Never let introspection failure break a save — fall back to the known offenders.
+    _woNumericFields = ['maintenanceIntervalValue', 'intervalRunningHour', 'woCompletionRh', 'missedCycles', 'daysLate'];
+  }
+  return _woNumericFields;
+}
+
 export class PostgresStorage {
 
   private async insertWithSequenceRepair<T>(
@@ -2362,13 +2388,23 @@ export class PostgresStorage {
   async updateWorkOrder(id: string, data: Partial<InsertWorkOrder>): Promise<WorkOrder> {
     const db = await getDb();
     
-    // Sanitize data: convert empty strings to null for integer fields
-    // PostgreSQL cannot cast empty strings to integers
-    const integerFields = ['maintenanceIntervalValue', 'intervalRunningHour'];
+    // Sanitize data: empty string -> NULL for every numeric-ish column.
+    // Postgres cannot cast '' to integer/numeric; the form submits '' for any blank field.
+    //
+    // This was a HAND-MAINTAINED LIST of two names ('maintenanceIntervalValue',
+    // 'intervalRunningHour'), which is why migration 139's new `wo_completion_rh` fell straight
+    // through it: the WO form sends woCompletionRh:'' on EVERY completion where the RH box is
+    // blank (i.e. every calendar-based job), and the PATCH 500'd with
+    //   invalid input syntax for type numeric: ""
+    // `missedCycles` and `daysLate` had the same latent defect and are covered by the same pass.
+    //
+    // Derived from the Drizzle schema so a column added tomorrow cannot repeat this. NOTE the
+    // filter keys off columnType, NOT dataType: Drizzle types PgNumeric as a *string* in JS to
+    // preserve precision, so a `dataType === 'number'` test would have missed woCompletionRh —
+    // the very field that broke. Computed once, then cached.
     const sanitizedData = { ...data };
-    
-    for (const field of integerFields) {
-      if (field in sanitizedData && sanitizedData[field as keyof typeof sanitizedData] === '') {
+    for (const field of getWorkOrderNumericFields()) {
+      if (field in sanitizedData && (sanitizedData as any)[field] === '') {
         (sanitizedData as any)[field] = null;
       }
     }
