@@ -322,16 +322,16 @@ Migrations are tracked in `schema_migrations.id`, and the id is the **full filen
 runner, which does `id = sqlFile.replace('.sql', '')`.
 
 ```sql
-SELECT id, applied_at FROM schema_migrations WHERE id ~ '^(0064|13[6-9]|14[0-3]|14[5-6])_' ORDER BY id;
+SELECT id, applied_at FROM schema_migrations WHERE id ~ '^(0064|13[6-9]|14[0-3]|14[5-7])_' ORDER BY id;
 ```
-**Expect exactly 11 rows** — `0064_view_mode_migration`, `136_shipskart_role_mappings`,
+**Expect exactly 12 rows** — `0064_view_mode_migration`, `136_shipskart_role_mappings`,
 `137_company_approval_settings`, `138_repair_spare_location_stock_drift`,
 `139_wo_completion_rh_reading_date`, `140_seed_role_view_mode_mapping`,
 `141_sync_settings_timeout_backfill`, `142_sync_field_log_failures`,
 `143_drift_detector_failures_kind`, `145_deprecate_dead_sync_settings`,
-`146_normalise_boolean_sync_settings`. **No 144.**
+`146_normalise_boolean_sync_settings`, `147_sync_field_log_retry_ladder`. **No 144.**
 
-Fewer than 11 means the run aborted partway — see §0c and check the log for
+Fewer than 12 means the run aborted partway — see §0c and check the log for
 `❌ Migration <id> failed at statement`.
 
 **B. Timeout fix is live** — startup log shows `requestTimeoutMs=60000`. Then:
@@ -373,7 +373,45 @@ SELECT count(*) FROM sync_conflict_log;
 ```
 on the SHIP. Previously always 0.
 
-**I. Data integrity** — `npx tsx scripts/verify-data-integrity.ts` must show **ALL DATA INTACT**.
+**I. Retry ladder is live (migration 147) — SHIP ONLY**
+
+The schema must carry both columns and the partial index. Run on the SHIP:
+```sql
+SELECT column_name FROM information_schema.columns
+ WHERE table_name = 'sync_field_log' AND column_name IN ('sync_attempts','last_attempt_at');
+SELECT indexname FROM pg_indexes
+ WHERE tablename = 'sync_field_log' AND indexname = 'idx_sfl_retry';
+```
+**Expect 2 column rows + 1 index row.** Missing the index is not cosmetic — without it the
+gather heap-filters the whole backlog on every cycle.
+
+Existing rows need NO backfill and must read `sync_attempts = 0`, `last_attempt_at = NULL`:
+```sql
+SELECT sync_attempts, count(*) FROM sync_field_log WHERE is_synced = false GROUP BY 1 ORDER BY 1;
+```
+**On the first check after deploy, expect everything at 0** — a NULL `last_attempt_at` means
+"never attempted", so every pre-existing undelivered row is eligible on the very first cycle.
+*(Verified on the local pair: a ship upgraded in place with an 8-row backlog delivered 8 of 8.)*
+
+**J. Retry backlog surfaces to the operator** — after the first sync, `GET /sync/status` returns
+`retryBacklog` with `{total, stuck, maxAttempts}` alongside `fieldLogFailures` and `insertLogSkips`.
+
+- `total` — undelivered rows. **May legitimately be non-zero.**
+- `stuck` — rows on the final 7-day tier. **Non-zero here means a human should look at those
+  specific records**; they are still being retried, not abandoned.
+- `maxAttempts` — highest attempt count on the vessel.
+
+If the field is **absent**, the ship is running an older build — re-check item **F** (`build.commit`).
+
+> ⚠️ **TELL SUPPORT BEFORE DEPLOY DAY: a persistent backlog is now VISIBLE, and that is the fix
+> working — not a regression.** Undelivered records used to be force-marked "synced" and dropped
+> after 3 failed cycles, which is how Frontier Venture lost 71 work orders; the queue looked clean
+> because failures were being deleted rather than delivered. Nothing is abandoned any more, so
+> `remainingPush` can stay non-zero and the Sync Dashboard can show a standing count. **Do not
+> raise that as a defect, do not "clear" it, and do not reset `is_synced` to make it go away.**
+> Escalate only when `retryBacklog.stuck` is non-zero or `total` climbs steadily over days.
+
+**K. Data integrity** — `npx tsx scripts/verify-data-integrity.ts` must show **ALL DATA INTACT**.
 
 ---
 
