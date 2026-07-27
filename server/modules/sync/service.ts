@@ -801,7 +801,11 @@ export async function preparePullData(
   batchUuid: string,
   vesselId: string,
   shipInstanceId: string,
-  lastCheckpoint: Date | null
+  lastCheckpoint: Date | null,
+  /** Migration 148 — per-table one-way watermarks from the ship. ABSENT (old ship) means
+   *  fall back to the single `lastCheckpoint` for every table, i.e. today's behaviour
+   *  exactly. Presence of the key is the capability signal; no version handshake. */
+  tableCheckpoints?: Record<string, Date>
 ) {
   // Validate batch
   const batch = await repo.getBatch(batchUuid);
@@ -827,8 +831,10 @@ export async function preparePullData(
     console.error(`[Sync Pull] CRITICAL: SYNC_INSTANCE_ID='${shoreInstanceId}' matches ship '${shipInstanceId}'. Shore's field logs will NOT be sent to ship. Fix SYNC_INSTANCE_ID in shore's environment!`);
   }
 
-  // 1. Gather ONE_WAY_SHORE_TO_SHIP full-row snapshots
-  const oneWayRows = await gatherOneWayShoreRows(vesselId, lastCheckpoint);
+  // 1. Gather ONE_WAY_SHORE_TO_SHIP full-row snapshots (148: per-table watermarks,
+  //    falling back to the shared floor for any table without one)
+  const oneWayGather = await gatherOneWayShoreRows(vesselId, lastCheckpoint, tableCheckpoints);
+  const oneWayRows = oneWayGather.batches;
 
   // 2. Gather shore's BOTH_EDITABLE field logs (excluding ship's own changes)
   //    Pass vesselCode so logs stored with vessel_code (instead of UUID) are also found
@@ -936,6 +942,9 @@ export async function preparePullData(
 
   return {
     oneWayRows,
+    // 148: max updated_at delivered per one-way table this cycle. The ship echoes back
+    // only the tables it applied cleanly, and /sync/complete advances exactly those.
+    oneWayTableMax: oneWayGather.tableMax,
     fieldLogs: nonConflictingLogs,
     conflicts,
   };
@@ -1023,7 +1032,11 @@ export async function completeSyncSession(
    *  failed one-way window is re-offered next sync (idempotent upserts). The one-way
    *  watermark is a single per-instance timestamp, so the hold covers the whole one-way
    *  window — bounded, idempotent re-delivery; field logs are is_synced-driven and unaffected. */
-  failedOneWayTables?: string[]
+  failedOneWayTables?: string[],
+  /** Migration 148 — { tableName: iso } the ship applied cleanly this cycle, echoed from
+   *  the pull response's oneWayTableMax. ABSENT (old ship) → fall back entirely to the
+   *  single-watermark path below, byte-identical to pre-148 behaviour. */
+  appliedTableCheckpoints?: Record<string, string>
 ) {
   const batch = await repo.getBatch(batchUuid);
   if (!batch) {
@@ -1091,6 +1104,29 @@ export async function completeSyncSession(
   // 2. Advance checkpoint — UNLESS the ship reported failed one-way tables, in which
   //    case hold it at checkpointBefore so the failed one-way window is re-offered next
   //    cycle instead of being orphaned behind the watermark (the epic Unknown-table case).
+  // ── 148: PER-TABLE ADVANCE ────────────────────────────────────────────────────
+  // Presence of appliedTableCheckpoints is the capability signal (same rule as 147's
+  // appliedRowUuids). Absent ⇒ old ship ⇒ skip this entirely and use the single
+  // watermark below, unchanged.
+  const failedSet = new Set(failedOneWayTables || []);
+  let perTableWritten = 0;
+  if (appliedTableCheckpoints && Object.keys(appliedTableCheckpoints).length > 0) {
+    // Advance ONLY tables that did not fail. A failed table keeps its old watermark, so
+    // its window re-offers next cycle — while every healthy table moves on. This is what
+    // breaks the "one broken table freezes all ~52" loop.
+    const advance: Record<string, string> = {};
+    for (const [t, iso] of Object.entries(appliedTableCheckpoints)) {
+      if (!failedSet.has(t) && iso) advance[t] = iso;
+    }
+    perTableWritten = await repo.setTableCheckpoints(instanceId, advance);
+    if (failedSet.size > 0) {
+      syncDiag(
+        `COMPLETE-SESSION PER-TABLE: advanced ${perTableWritten} table(s); ` +
+        `held [${Array.from(failedSet).join(',')}] — other tables unaffected`
+      );
+    }
+  }
+
   const oneWayHoldback = Array.isArray(failedOneWayTables) && failedOneWayTables.length > 0;
   const checkpointBefore = batch.checkpointBefore
     ? (batch.checkpointBefore instanceof Date ? batch.checkpointBefore : new Date(batch.checkpointBefore))
@@ -1132,6 +1168,12 @@ export async function completeSyncSession(
     // locally, so ship and shore watermarks stay consistent. Null = full one-way resend.
     newCheckpoint: effectiveCheckpoint ? effectiveCheckpoint.toISOString() : null,
     oneWayHoldback,
+    // 148: the authoritative per-table watermarks after this cycle. The ship persists
+    // these; its `lastCheckpoint` for the NEXT pull is the MINIMUM of them (see
+    // repo.getConservativeFloor). Absent from an old shore's response ⇒ the ship keeps
+    // using the single newCheckpoint for everything.
+    newTableCheckpoints: await repo.getTableCheckpoints(instanceId),
+    perTableAdvanced: perTableWritten,
     durationMs,
     remainingPull,
   };
@@ -1202,10 +1244,20 @@ export async function getUnresolvedConflicts(vesselId: string) {
 /** Gather full-row snapshots from ONE_WAY_SHORE_TO_SHIP tables updated since checkpoint */
 async function gatherOneWayShoreRows(
   vesselId: string,
-  sinceCheckpoint: Date | null
-): Promise<Array<{ tableName: string; rows: any[] }>> {
+  sinceCheckpoint: Date | null,
+  /** Migration 148: per-table watermarks. A table absent here falls back to
+   *  `sinceCheckpoint` — that COALESCE is what keeps day one identical to before. */
+  tableCheckpoints?: Record<string, Date>
+): Promise<{
+  batches: Array<{ tableName: string; rows: any[] }>;
+  /** Max updated_at ACTUALLY DELIVERED per table, ISO. The checkpoint advances to THIS,
+   *  never to wall-clock now — which is what closes the silent LIMIT 5000 truncation:
+   *  rows 5001+ used to be dropped while the watermark jumped past them for good. */
+  tableMax: Record<string, string>;
+}> {
   const oneWayTables = getTablesByCategory('ONE_WAY_SHORE_TO_SHIP');
   const results: Array<{ tableName: string; rows: any[] }> = [];
+  const tableMax: Record<string, string> = {};
   const pool = await getPool();
 
   // Pre-resolve vessel_code for tables scoped by vessel_code instead of vessel_id (UUID)
@@ -1216,15 +1268,20 @@ async function gatherOneWayShoreRows(
       let query: string;
       const params: any[] = [];
 
+      // Per-table watermark (148) with fallback to the shared floor. Missing row =
+      // "never diverged from the single checkpoint", so behaviour is unchanged.
+      const sinceForTable =
+        (tableCheckpoints && tableCheckpoints[config.tableName]) || sinceCheckpoint;
+
       const vesselCol = config.vesselScopeColumn;
 
       if (config.isGlobal) {
         // Global tables — no vessel filter
-        if (sinceCheckpoint) {
-          query = `SELECT * FROM "${config.tableName}" WHERE updated_at > $1 ORDER BY updated_at ASC LIMIT 5000`;
-          params.push(sinceCheckpoint);
+        if (sinceForTable) {
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" WHERE updated_at > $1 ORDER BY updated_at ASC LIMIT 5000`;
+          params.push(sinceForTable);
         } else {
-          query = `SELECT * FROM "${config.tableName}" ORDER BY updated_at ASC LIMIT 5000`;
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" ORDER BY updated_at ASC LIMIT 5000`;
         }
       } else if (vesselCol) {
         // Vessel-scoped tables — use vessel_code or vessel_id depending on column type
@@ -1233,11 +1290,11 @@ async function gatherOneWayShoreRows(
           console.warn(`[Sync Pull] Skipping ${config.tableName}: no ${vesselCol} value for vessel ${vesselId}`);
           continue;
         }
-        if (sinceCheckpoint) {
-          query = `SELECT * FROM "${config.tableName}" WHERE "${vesselCol}" = $1 AND updated_at > $2 ORDER BY updated_at ASC LIMIT 5000`;
-          params.push(scopeValue, sinceCheckpoint);
+        if (sinceForTable) {
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" WHERE "${vesselCol}" = $1 AND updated_at > $2 ORDER BY updated_at ASC LIMIT 5000`;
+          params.push(scopeValue, sinceForTable);
         } else {
-          query = `SELECT * FROM "${config.tableName}" WHERE "${vesselCol}" = $1 ORDER BY updated_at ASC LIMIT 5000`;
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" WHERE "${vesselCol}" = $1 ORDER BY updated_at ASC LIMIT 5000`;
           params.push(scopeValue);
         }
       } else {
@@ -1247,15 +1304,37 @@ async function gatherOneWayShoreRows(
 
       const result = await pool.query(query, params);
       if (result.rows.length > 0) {
+        // Rows are ORDER BY updated_at ASC, so the LAST row carries the max we are
+        // actually delivering. Advancing to this (not to now) means a LIMIT-5000
+        // truncation simply resumes next cycle instead of being skipped forever.
+        //
+        // 🔴 FULL PRECISION IS MANDATORY. Postgres timestamptz keeps MICROseconds; the pg
+        // driver parses it into a JS Date, which keeps only MILLIseconds. Round-tripping
+        // through Date truncates 32.327456Z to 32.327Z — a watermark EARLIER than the row
+        // it just delivered — so `updated_at > wm` returns that row again on every cycle,
+        // forever. Harness caught exactly this: 12009 rows delivered from a 12000-row
+        // table, one boundary row looping. `updated_at::text` keeps the raw value.
+        const last = result.rows[result.rows.length - 1];
+        if (last?.__wm) tableMax[config.tableName] = String(last.__wm);
+        // Strip the helper column so it never reaches the ship's applier as an
+        // unknown column (SELECT * rows are inserted verbatim there).
+        for (const r of result.rows) delete r.__wm;
         results.push({ tableName: config.tableName, rows: result.rows });
+      } else if (sinceForTable) {
+        // Nothing pending for this table: it is fully caught up as of the moment we
+        // asked, so it may safely advance. Recorded only when the table already had a
+        // watermark — a null-checkpoint table must stay null until it delivers.
+        tableMax[config.tableName] = new Date().toISOString();
       }
     } catch (err: any) {
-      // Best-effort: skip tables that don't exist yet or have schema issues
+      // Best-effort: skip tables that don't exist yet or have schema issues.
+      // NOTE: a table that throws records NO tableMax, so its watermark is not advanced
+      // — a schema error can never step the checkpoint over rows it failed to read.
       console.warn(`[Sync Pull] Skipping one-way table ${config.tableName}: ${err.message}`);
     }
   }
 
-  return results;
+  return { batches: results, tableMax };
 }
 
 /** Convert camelCase to snake_case */

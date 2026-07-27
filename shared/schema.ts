@@ -4274,6 +4274,28 @@ export const syncMetadata = pgTable("sync_metadata", {
   isSync: boolean("is_sync").default(false).notNull(),
 });
 
+/**
+ * Per-table one-way watermark (migration 148). Replaces the single
+ * sync_metadata.last_sync_checkpoint as the gather predicate for
+ * ONE_WAY_SHORE_TO_SHIP tables, so one broken table cannot pin the other ~51.
+ *
+ * A MISSING ROW MEANS "use sync_metadata.last_sync_checkpoint" — that COALESCE is
+ * what makes day one byte-identical without seeding a hardcoded table list here.
+ *
+ * NO_SYNC. Each instance owns its own watermarks; this must never travel.
+ */
+export const syncTableCheckpoints = pgTable("sync_table_checkpoints", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  instanceId: text("instance_id").notNull(),
+  tableName: text("table_name").notNull(),
+  lastCheckpoint: timestamp("last_checkpoint", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.instanceId, table.tableName),
+]);
+
+export type SyncTableCheckpoint = typeof syncTableCheckpoints.$inferSelect;
+
 export const insertSyncMetadataSchema = createInsertSchema(syncMetadata).omit({
   id: true, smuuid: true, createdAt: true, updatedAt: true,
 });

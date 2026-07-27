@@ -627,6 +627,88 @@ export async function getRecentBatches(vesselId: string, limit: number = 10): Pr
 // sync_settings
 // ═══════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════
+// PER-TABLE ONE-WAY WATERMARKS (migration 148)
+// ═══════════════════════════════════════════════════════════════
+//
+// The single sync_metadata.last_sync_checkpoint let one unappliable table pin every
+// other one-way table for a vessel. These are per (instance_id, table_name).
+//
+// 🔴 A MISSING ROW IS NOT ZERO — it means "fall back to the single checkpoint". That
+// COALESCE is what makes day one byte-identical without seeding a hardcoded table list
+// into migration 148 (a list that would drift the moment syncConfig gains a table).
+
+/** All per-table watermarks for an instance, as { tableName: Date }. Missing = fall back. */
+export async function getTableCheckpoints(instanceId: string): Promise<Record<string, Date>> {
+  const pool = await getPool();
+  const r = await pool.query(
+    `SELECT table_name, last_checkpoint FROM sync_table_checkpoints
+      WHERE instance_id = $1 AND last_checkpoint IS NOT NULL`,
+    [instanceId]
+  );
+  const out: Record<string, Date> = {};
+  for (const row of r.rows) out[row.table_name] = new Date(row.last_checkpoint);
+  return out;
+}
+
+/**
+ * Upsert watermarks. Only ever moves a watermark FORWARD — an out-of-order or replayed
+ * response can never rewind one and cause a silent skip of rows already passed over.
+ */
+export async function setTableCheckpoints(
+  instanceId: string,
+  checkpoints: Record<string, string | Date>
+): Promise<number> {
+  const entries = Object.entries(checkpoints || {});
+  if (entries.length === 0) return 0;
+  const pool = await getPool();
+  let written = 0;
+  for (const [tableName, ts] of entries) {
+    if (!ts) continue;
+    const r = await pool.query(
+      `INSERT INTO sync_table_checkpoints (instance_id, table_name, last_checkpoint, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (instance_id, table_name) DO UPDATE
+         SET last_checkpoint = GREATEST(
+               sync_table_checkpoints.last_checkpoint,
+               EXCLUDED.last_checkpoint
+             ),
+             updated_at = NOW()
+       WHERE sync_table_checkpoints.last_checkpoint IS NULL
+          OR EXCLUDED.last_checkpoint > sync_table_checkpoints.last_checkpoint`,
+      [instanceId, tableName, ts instanceof Date ? ts.toISOString() : ts]
+    );
+    written += r.rowCount ?? 0;
+  }
+  return written;
+}
+
+/**
+ * The CONSERVATIVE FLOOR sent to shore as `lastCheckpoint`.
+ *
+ * 🔴 THIS MUST BE THE MINIMUM, NEVER THE MAXIMUM. An OLD shore ignores the per-table map
+ * and gathers `WHERE updated_at > lastCheckpoint`, so:
+ *    min -> re-offers rows some tables already applied. Harmless: one-way applies are
+ *           idempotent upserts.
+ *    max -> SILENTLY SKIPS every row between a lagging table's watermark and the max.
+ *           That is unrecoverable data loss, and it is exactly the stranded-parent bug.
+ * Returns null if ANY known one-way table has no watermark — null means "send everything",
+ * which is the safe direction.
+ */
+export async function getConservativeFloor(
+  instanceId: string,
+  knownTables: string[]
+): Promise<Date | null> {
+  const perTable = await getTableCheckpoints(instanceId);
+  let min: Date | null = null;
+  for (const t of knownTables) {
+    const cp = perTable[t];
+    if (!cp) return null;               // a table with no watermark ⇒ full offer
+    if (min === null || cp < min) min = cp;
+  }
+  return min;
+}
+
 export async function getAllSettings(): Promise<Record<string, string>> {
   const db = await getDb();
   const rows = await db.select().from(syncSettings)

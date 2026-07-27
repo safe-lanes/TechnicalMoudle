@@ -1245,6 +1245,18 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     businessRules: null,
     notes: 'FUTURE TABLE. Sync engine internal tracking — sync cursors and state.',
   },
+  sync_table_checkpoints: {
+    tableName: 'sync_table_checkpoints',
+    category: 'NO_SYNC',
+    direction: 'none',
+    identityColumn: null,
+    vesselScopeColumn: null,
+    vesselScopeJoinPath: null,
+    isGlobal: false,
+    isConfigurable: false,
+    businessRules: null,
+    notes: 'Per-table one-way watermarks (migration 148). Runtime infrastructure — each instance owns its own; must NEVER sync, exactly like sync_metadata.',
+  },
   sync_field_log: {
     tableName: 'sync_field_log',
     category: 'NO_SYNC',

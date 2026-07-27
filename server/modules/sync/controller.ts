@@ -75,11 +75,27 @@ export async function pullHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'batchUuid, vesselId, and instanceId are required' });
     }
 
+    // 148: tableCheckpoints is OPTIONAL — new ships send per-table one-way watermarks.
+    // ABSENT (old ship) → every table falls back to the single lastCheckpoint, which is
+    // byte-identical to pre-148 behaviour. Presence of the key IS the capability signal.
+    const rawTableCps = req.body.tableCheckpoints;
+    let tableCheckpoints: Record<string, Date> | undefined;
+    if (rawTableCps && typeof rawTableCps === 'object' && !Array.isArray(rawTableCps)) {
+      tableCheckpoints = {};
+      for (const [t, iso] of Object.entries(rawTableCps)) {
+        if (typeof iso === 'string') {
+          const d = new Date(iso);
+          if (!isNaN(d.getTime())) tableCheckpoints[t] = d;
+        }
+      }
+    }
+
     const result = await syncService.preparePullData(
       batchUuid,
       vesselId,
       instanceId,
-      lastCheckpoint ? new Date(lastCheckpoint) : null
+      lastCheckpoint ? new Date(lastCheckpoint) : null,
+      tableCheckpoints
     );
     res.json(result);
   } catch (error: any) {
@@ -134,12 +150,24 @@ export async function completeSyncHandler(req: Request, res: Response) {
     const failedOneWayTables = Array.isArray(req.body.failedOneWayTables)
       ? req.body.failedOneWayTables.filter((t: unknown) => typeof t === 'string')
       : undefined;
+    // 148: appliedTableCheckpoints is OPTIONAL — new ships echo back the per-table max
+    // they applied cleanly. Absent (old ship) → single-watermark path, unchanged.
+    const rawApplied = req.body.appliedTableCheckpoints;
+    let appliedTableCheckpoints: Record<string, string> | undefined;
+    if (rawApplied && typeof rawApplied === 'object' && !Array.isArray(rawApplied)) {
+      appliedTableCheckpoints = {};
+      for (const [t, iso] of Object.entries(rawApplied)) {
+        if (typeof iso === 'string') appliedTableCheckpoints[t] = iso;
+      }
+    }
+
     const result = await syncService.completeSyncSession(
       batchUuid,
       vesselId,
       instanceId,
       Array.isArray(appliedRowUuids) ? appliedRowUuids : undefined,
-      failedOneWayTables
+      failedOneWayTables,
+      appliedTableCheckpoints
     );
     res.json(result);
   } catch (error: any) {

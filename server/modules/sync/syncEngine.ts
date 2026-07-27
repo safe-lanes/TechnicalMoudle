@@ -309,6 +309,17 @@ export class SyncEngine {
         // holds the checkpoint at checkpointBefore when non-empty, so the failed window
         // is re-offered next sync (one-way applies are idempotent upserts).
         failedOneWayTables: pullResult.failedOneWayTables,
+        // 148: echo the delivered maxima MINUS anything that failed, so the shore advances
+        // only healthy tables. Omitted entirely when the shore never sent them (old shore).
+        ...(Object.keys(pullResult.oneWayTableMax || {}).length > 0
+          ? {
+              appliedTableCheckpoints: Object.fromEntries(
+                Object.entries(pullResult.oneWayTableMax).filter(
+                  ([t]) => !pullResult.failedOneWayTables.includes(t)
+                )
+              ),
+            }
+          : {}),
       });
       console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
 
@@ -330,6 +341,15 @@ export class SyncEngine {
             lastSyncStatus: 'success',
             lastSyncAt: new Date(),
           });
+          // 148: persist the per-table watermarks the shore returned. Presence-gated —
+          // an OLD shore omits the key, we write nothing, and the single checkpoint above
+          // remains the only watermark (byte-identical to pre-148).
+          if (Object.prototype.hasOwnProperty.call(completeResult, 'newTableCheckpoints')) {
+            const n = await syncRepo.setTableCheckpoints(
+              this.instanceId, completeResult.newTableCheckpoints || {}
+            );
+            syncDiag(`PER-TABLE CHECKPOINTS SAVED LOCALLY: ${n} advanced`);
+          }
           syncDiag(`CHECKPOINT SAVED LOCALLY: ${completeResult.newCheckpoint}`);
         } catch (cpErr: any) {
           // Non-fatal: checkpoint stuck means re-sending data but no data loss
@@ -845,6 +865,8 @@ export class SyncEngine {
     errors: string[];
     appliedRowUuids: string[];
     failedOneWayTables: string[];
+    /** 148: max updated_at delivered per one-way table, from the pull response. */
+    oneWayTableMax: Record<string, string>;
   }> {
     let totalPulled = 0;
     let totalApplyErrors = 0;
@@ -855,18 +877,58 @@ export class SyncEngine {
     // the shore holds the checkpoint back instead of advancing past undelivered rows
     // (the one-way orphaning fix — field logs are is_synced-driven and unaffected).
     const failedOneWayTables: string[] = [];
+    // 148: echoed straight back on /sync/complete for the tables that applied cleanly.
+    // Absent from an OLD shore's response ⇒ stays empty ⇒ we send nothing ⇒ single-watermark.
+    let oneWayTableMax: Record<string, string> = {};
     // Option 2 (pull-side per-row ack): row_uuids the ship confirms it APPLIED, sent back in
     // /sync/complete so the shore marks only these is_synced=true. Anything not acked stays
     // is_synced=false and is re-offered next pull. Empty when there are no field logs to apply.
     const appliedRowUuids: string[] = [];
+
+    // ── 148: per-table one-way watermarks ────────────────────────────────────────
+    // 🔴 THE min() RULE. `lastCheckpoint` is what an OLD shore uses — it ignores the map
+    // and gathers `updated_at > lastCheckpoint` for EVERY table. So this value must be the
+    // MINIMUM of our per-table watermarks, never the max:
+    //     min -> an old shore re-offers rows some tables already have. Harmless; one-way
+    //            applies are idempotent upserts.
+    //     max -> an old shore SILENTLY SKIPS everything between a lagging table's
+    //            watermark and the max. Unrecoverable, and exactly the stranded-parent
+    //            bug that cost WK their role rows.
+    // getConservativeFloor returns null when any table has no watermark, and null means
+    // "send everything" — the safe direction.
+    const oneWayTableNames = getTablesByCategory('ONE_WAY_SHORE_TO_SHIP').map(t => t.tableName);
+    const tableCheckpoints = await syncRepo.getTableCheckpoints(this.instanceId);
+    const havePerTable = Object.keys(tableCheckpoints).length > 0;
+    const floor = havePerTable
+      ? await syncRepo.getConservativeFloor(this.instanceId, oneWayTableNames)
+      : lastCheckpoint;
+    if (havePerTable) {
+      syncDiag(
+        `PULL CHECKPOINTS: per-table=${Object.keys(tableCheckpoints).length}, ` +
+        `floor(min)=${floor ? floor.toISOString() : 'NULL (full offer)'}`
+      );
+    }
 
     // A. Request remote changes
     const pullData = await this.callSyncApiWithRetry('POST', '/sync/pull', {
       batchUuid,
       vesselId,
       instanceId: this.instanceId,
-      lastCheckpoint: lastCheckpoint ? lastCheckpoint.toISOString() : null,
+      lastCheckpoint: floor ? floor.toISOString() : null,
+      ...(havePerTable
+        ? {
+            tableCheckpoints: Object.fromEntries(
+              Object.entries(tableCheckpoints).map(([t, d]) => [t, d.toISOString()])
+            ),
+          }
+        : {}),
     });
+
+    // 148: capture per-table delivered maxima. Presence-gated exactly like appliedRowUuids
+    // — an older shore omits the key and we fall back to the single watermark.
+    if (Object.prototype.hasOwnProperty.call(pullData, 'oneWayTableMax')) {
+      oneWayTableMax = pullData.oneWayTableMax || {};
+    }
 
     // Diagnostic breakdown of pull data
     const pullOneWay: Record<string, number> = {};
@@ -1085,7 +1147,7 @@ export class SyncEngine {
       }
     }
 
-    return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids, failedOneWayTables };
+    return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids, failedOneWayTables, oneWayTableMax };
   }
 
   // ═══════════════════════════════════════════════════════════════
