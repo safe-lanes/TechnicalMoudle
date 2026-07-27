@@ -209,6 +209,11 @@ you saw. Also note anything that felt wrong even if it technically passed.
   **Do not raise this separately, and please do not try to count how many are affected** — note
   the component code you happened to hit and move on. It is NOT a sync failure, and the work
   order itself syncs correctly.
+  ⚠️ **A freshly-provisioned vessel will show ZERO stale components** — do NOT read that as
+  "the bug is fixed". The staleness only appears AFTER a master component's running-hours reading
+  is entered and synced; a clean provision copies master and cached figures together, so there is
+  nothing stale to see yet. To observe the bug at all, complete an inherited-component RH reading,
+  sync it, then look at the master's inherited children on shore.
 - **Some equipment demands a running-hours entry even though it is marked "Not RH Driven".**
   This is a KNOWN BUG already queued for fixing — the counter type is stored as `NOT RH DRIVEN`
   (with spaces) on about 30 components on dev, while the system checks for `NOT_RH_DRIVEN` (with
