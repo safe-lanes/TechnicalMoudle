@@ -17,6 +17,14 @@ interface ApplyResult {
   inserted: number;
   updated: number;
   softDeleted: number;
+  /**
+   * Inserts that Postgres accepted but wrote ZERO rows — ON CONFLICT DO NOTHING
+   * absorbing a unique/PK collision. Previously counted as `inserted`, which made
+   * shore rows disappear silently. Every one of these also raises an entry in
+   * `errors`, so the table lands in failedOneWayTables and the checkpoint is held
+   * back rather than advancing past data that never arrived.
+   */
+  silentNoOps: number;
   errors: Array<{ rowIndex: number; error: string }>;
 }
 
@@ -143,14 +151,14 @@ export async function applyOneWayRows(
   tableName: string,
   rows: any[]
 ): Promise<ApplyResult> {
-  if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, errors: [] };
+  if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
 
   syncDiag(`ONE-WAY-APPLY START: ${tableName} — ${rows.length} rows`);
 
   const config = getTableSyncConfig(tableName);
   if (!config) {
     return {
-      inserted: 0, updated: 0, softDeleted: 0,
+      inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0,
       errors: [{ rowIndex: -1, error: `Unknown table: ${tableName}` }],
     };
   }
@@ -198,7 +206,7 @@ export async function applyOneWayRows(
   const compositeKeys = COMPOSITE_KEY_TABLES[tableName] || null;
   const useCompositeKey = compositeKeys !== null && (!identityCol || FORCE_COMPOSITE.has(tableName));
 
-  const result: ApplyResult = { inserted: 0, updated: 0, softDeleted: 0, errors: [] };
+  const result: ApplyResult = { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -286,8 +294,44 @@ export async function applyOneWayRows(
         const insertParts = buildInsertParts(row, meta, useCompositeKey);
         if (insertParts.columns.length > 0) {
           const insertSQL = `INSERT INTO "${tableName}" (${insertParts.columns.join(', ')}) VALUES (${insertParts.placeholders.join(', ')}) ON CONFLICT DO NOTHING`;
-          await pool.query(insertSQL, insertParts.values);
-          result.inserted++;
+          const ins = await pool.query(insertSQL, insertParts.values);
+          if ((ins.rowCount ?? 0) > 0) {
+            result.inserted++;
+          } else {
+            // ── SILENT-DISCARD GUARD ──────────────────────────────────────────
+            // ON CONFLICT DO NOTHING carries NO conflict target, so it absorbs a
+            // collision on ANY unique constraint — including the integer PK for the
+            // tables whose PK is transmitted verbatim (buildInsertParts only skips
+            // identity/serial columns, so admn_role_master.id and adm_menumaster_ac.id
+            // travel). Counting that as `inserted` is exactly how shore's roles
+            // vanished on WK's vessels while the ship kept its own divergent copy,
+            // and every adm_role_menu_access child then failed its FK forever.
+            // The exists-check above already missed on the identity column, so
+            // reaching here means SOMETHING ELSE owns this row: report, never swallow.
+            // (applyFullRowsIfAbsent has confirmed its inserts land since the
+            // self-heal work — this path was the one that never did.)
+            result.silentNoOps++;
+            let detail = 'row did not land (ON CONFLICT DO NOTHING absorbed a unique/PK collision)';
+            try {
+              const pkVal = row['id'] ?? row['ID'];
+              if (pkVal !== undefined && pkVal !== null && lookupColumn) {
+                const clash = await pool.query(
+                  `SELECT "${lookupColumn}" AS existing FROM "${tableName}" WHERE "id" = $1 LIMIT 1`,
+                  [pkVal]
+                );
+                if (clash.rows.length > 0) {
+                  detail =
+                    `PK id=${pkVal} already held by a DIFFERENT ${lookupColumn} ` +
+                    `(ship="${clash.rows[0].existing}", shore="${row[lookupColumn] ?? row[toCamelCase(lookupColumn)]}") ` +
+                    `— independently seeded table, shore row discarded`;
+                }
+              }
+            } catch {
+              /* diagnosis is best-effort; the no-op itself is the finding */
+            }
+            result.errors.push({ rowIndex: i, error: detail });
+            syncDiag(`ONE-WAY-APPLY SILENT NO-OP: ${tableName} row[${i}]: ${detail}`);
+          }
         }
       }
     } catch (err: any) {
@@ -296,7 +340,10 @@ export async function applyOneWayRows(
     }
   }
 
-  syncDiag(`ONE-WAY-APPLY DONE: ${tableName} — inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, errors=${result.errors.length}`);
+  syncDiag(
+    `ONE-WAY-APPLY DONE: ${tableName} — inserted=${result.inserted}, updated=${result.updated}, ` +
+    `deleted=${result.softDeleted}, silentNoOps=${result.silentNoOps}, errors=${result.errors.length}`
+  );
 
   // Advance sequences for GENERATED ALWAYS identity columns so future
   // INSERTs (via UI or next sync) don't collide with imported integer PKs.

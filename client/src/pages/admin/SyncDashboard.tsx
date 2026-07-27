@@ -100,15 +100,26 @@ interface FileQueueItem {
   createdAt: string | null;
 }
 
+/**
+ * MUST match SyncResult in server/modules/sync/syncEngine.ts.
+ * It previously did not: this interface declared `status`, `recordsSent`,
+ * `recordsReceived` and `filesProcessed`, none of which the server has ever
+ * emitted — so `?? 0` fired every time and the panel reported 0 pushed / 0 pulled
+ * / 0 files on EVERY sync, successful or not. `res.json()` is `any`, so the cast
+ * silenced it. Only conflictsFound and durationMs were ever real.
+ */
 interface SyncTriggerResult {
-  batchUuid: string;
-  status: string;
-  recordsSent: number;
-  recordsReceived: number;
+  success: boolean;
+  batchUuid: string | null;
+  recordsPushed: number;
+  recordsPulled: number;
   conflictsFound: number;
-  filesProcessed: number;
+  conflictsAutoResolved: number;
+  filesQueued: number;
   durationMs: number;
-  error?: string;
+  error: string | null;
+  remainingPush: number | null;
+  remainingPull: number | null;
 }
 
 // ── Helpers ──
@@ -291,22 +302,48 @@ export default function SyncDashboard() {
       setSyncLog([`[${new Date().toLocaleTimeString()}] Sync initiated...`]);
     },
     onSuccess: (data) => {
+      // HTTP 200 only means the request came back — the controller returns 200 even
+      // when success is false. Read the payload, not the status code: a sync that
+      // failed to apply rows must never render as "Sync complete".
+      const failed = data.success === false;
+      const hasErrors = Boolean(data.error);
+      const headline = failed
+        ? "SYNC FAILED"
+        : hasErrors
+          ? "Sync finished WITH ERRORS — some records did not apply"
+          : "Sync complete";
+
       setSyncProgress(100);
-      setSyncStage("Sync complete!");
+      setSyncStage(failed ? "Sync failed" : hasErrors ? "Finished with errors" : "Sync complete!");
       const logLines = [
-        `[${new Date().toLocaleTimeString()}] Sync ${data.status || "complete"}`,
-        `  Records pushed: ${data.recordsSent ?? 0}`,
-        `  Records pulled: ${data.recordsReceived ?? 0}`,
+        `[${new Date().toLocaleTimeString()}] ${headline}`,
+        `  Records pushed: ${data.recordsPushed ?? 0}`,
+        `  Records pulled: ${data.recordsPulled ?? 0}`,
         `  Conflicts: ${data.conflictsFound ?? 0}`,
-        `  Files processed: ${data.filesProcessed ?? 0}`,
+        `  Files queued: ${data.filesQueued ?? 0}`,
         `  Duration: ${formatDuration(data.durationMs)}`,
       ];
-      if (data.error) logLines.push(`  Error: ${data.error}`);
+      // A non-zero remainder is NOT a fault — undelivered records now stay queued and
+      // retry instead of being silently dropped (migration 147). Surface it so support
+      // reads it as "still to send", not as data loss.
+      if (data.remainingPush) logLines.push(`  Still to send: ${data.remainingPush}`);
+      if (data.remainingPull) logLines.push(`  Still to receive: ${data.remainingPull}`);
+      // Split the joined error string so each failure is its own line — previously the
+      // whole block was one run-on line and only the first was legible.
+      if (data.error) {
+        String(data.error)
+          .split("\n")
+          .filter((l) => l.trim())
+          .forEach((l) => logLines.push(`  Error: ${l.trim()}`));
+      }
       setSyncLog((prev) => [...prev, ...logLines]);
 
       toast({
-        title: "Sync Complete",
-        description: `Pushed ${data.recordsSent ?? 0}, pulled ${data.recordsReceived ?? 0} records`,
+        title: failed ? "Sync Failed" : hasErrors ? "Sync Finished With Errors" : "Sync Complete",
+        description: failed || hasErrors
+          ? "Some records did not apply — see the sync log below."
+          : `Pushed ${data.recordsPushed ?? 0}, pulled ${data.recordsPulled ?? 0} records`,
+        variant: failed || hasErrors ? "destructive" : undefined,
       });
 
       // Invalidate queries
@@ -528,11 +565,17 @@ export default function SyncDashboard() {
                     <div
                       key={i}
                       className={
-                        line.includes("FAILED")
+                        // Order matters: FAILED and Error must win before the
+                        // "complete" test, or an error line renders green/grey.
+                        line.includes("FAILED") || line.includes("Error:")
                           ? "text-red-600"
-                          : line.includes("complete")
-                            ? "text-green-600"
-                            : "text-gray-700"
+                          : line.includes("WITH ERRORS")
+                            ? "text-amber-600 font-semibold"
+                            : line.includes("Still to")
+                              ? "text-amber-600"
+                              : line.includes("complete")
+                                ? "text-green-600"
+                                : "text-gray-700"
                       }
                     >
                       {line}
@@ -550,13 +593,13 @@ export default function SyncDashboard() {
                   {
                     icon: ArrowUpCircle,
                     label: "Pushed",
-                    value: syncMutation.data.recordsSent ?? 0,
+                    value: syncMutation.data.recordsPushed ?? 0,
                     color: "text-blue-600",
                   },
                   {
                     icon: ArrowDownCircle,
                     label: "Pulled",
-                    value: syncMutation.data.recordsReceived ?? 0,
+                    value: syncMutation.data.recordsPulled ?? 0,
                     color: "text-green-600",
                   },
                   {
@@ -568,7 +611,7 @@ export default function SyncDashboard() {
                   {
                     icon: FileText,
                     label: "Files",
-                    value: syncMutation.data.filesProcessed ?? 0,
+                    value: syncMutation.data.filesQueued ?? 0,
                     color: "text-purple-600",
                   },
                   {
