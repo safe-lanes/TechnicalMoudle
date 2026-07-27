@@ -693,7 +693,14 @@ export async function setTableCheckpoints(
  *    max -> SILENTLY SKIPS every row between a lagging table's watermark and the max.
  *           That is unrecoverable data loss, and it is exactly the stranded-parent bug.
  * Returns null if ANY known one-way table has no watermark — null means "send everything",
- * which is the safe direction.
+ * the safe direction.
+ *
+ * That null is now a MEANINGFUL SIGNAL rather than a permanent state: the gather stamps a
+ * watermark for every table it CONSIDERED, including ones with nothing to deliver (no
+ * vessel scope, or queried and empty). Only a table that THREW during gather stays
+ * unstamped — a real unknown, where being conservative is correct. Before this, 12 of 52
+ * tables were never stamped, the floor was null forever, and a new ship against an old
+ * shore full-snapshotted all 52 tables every sync — the 60s-504 path.
  */
 export async function getConservativeFloor(
   instanceId: string,

@@ -1287,7 +1287,14 @@ async function gatherOneWayShoreRows(
         // Vessel-scoped tables — use vessel_code or vessel_id depending on column type
         const scopeValue = vesselCol === 'vessel_code' ? vesselCode : vesselId;
         if (!scopeValue) {
+          // Not scopeable to this vessel ⇒ it has NOTHING to deliver here, so stamp a
+          // watermark rather than leaving a hole. A hole would make getConservativeFloor
+          // return null forever, and the ship would then full-snapshot all ~52 tables on
+          // every sync against an old shore — the exact 60s-504 path 148 exists to remove.
+          // Only a table that THROWS stays unstamped: that is a real unknown and the
+          // conservative null is the right answer there.
           console.warn(`[Sync Pull] Skipping ${config.tableName}: no ${vesselCol} value for vessel ${vesselId}`);
+          tableMax[config.tableName] = new Date().toISOString();
           continue;
         }
         if (sinceForTable) {
@@ -1298,7 +1305,9 @@ async function gatherOneWayShoreRows(
           params.push(scopeValue);
         }
       } else {
-        // Table has no vessel column and isn't global — skip
+        // No vessel column and not global ⇒ this table can never be gathered for ANY
+        // vessel. Nothing to deliver, so stamp it (same reasoning as the branch above).
+        tableMax[config.tableName] = new Date().toISOString();
         continue;
       }
 
@@ -1320,10 +1329,10 @@ async function gatherOneWayShoreRows(
         // unknown column (SELECT * rows are inserted verbatim there).
         for (const r of result.rows) delete r.__wm;
         results.push({ tableName: config.tableName, rows: result.rows });
-      } else if (sinceForTable) {
-        // Nothing pending for this table: it is fully caught up as of the moment we
-        // asked, so it may safely advance. Recorded only when the table already had a
-        // watermark — a null-checkpoint table must stay null until it delivers.
+      } else {
+        // Queried and found nothing: fully caught up as of the moment we asked, so it may
+        // safely advance — including on a first sync with no prior watermark. We ASKED
+        // and the answer was "no rows"; that is knowledge, not an absence of it.
         tableMax[config.tableName] = new Date().toISOString();
       }
     } catch (err: any) {
