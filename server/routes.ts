@@ -144,8 +144,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // scheduler persists the derived band. This removes the shore's every-minute
   // full-table scan AND the 'system' status writes that were the documented
   // source of false sync conflicts.
-  const { isShipInstance } = await import("./modules/sync/syncRole");
+  const { isShipInstance, isShipInstanceId } = await import("./modules/sync/syncRole");
   const isShip = await isShipInstance();
+
+  // Loud mismatch warning: DB sync_settings.instance_id wins over env, so a ship
+  // whose DB carries a stale non-SHIP value boots as "shore" and silently skips
+  // the ship schedulers (reproduced 2026-07-28). Name the disagreement at boot;
+  // the role watchdog below converges the schedulers once the DB is corrected.
+  const envInstanceId = process.env.SYNC_INSTANCE_ID || '';
+  if (!isShip && isShipInstanceId(envInstanceId)) {
+    console.warn(
+      `[Schedulers] ⚠️ Resolved role is SHORE but env SYNC_INSTANCE_ID ('${envInstanceId}') is a ship id — ` +
+        `DB sync_settings.instance_id wins and is NOT a ship value. If this box is a ship, fix the DB value; ` +
+        `the scheduler role watchdog will then start the ship schedulers without a restart.`,
+    );
+  }
 
   // Daily cadence (configurable). Calendar legs move at day granularity and RH
   // legs change only on running-hours entry, so a daily sweep is sufficient.
@@ -183,6 +196,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } else {
     console.log('[AutoSync] Shore instance detected — auto-sync scheduler not started (sync is ship-initiated)');
   }
+
+  // Role watchdog — the boot-time isShip decision above can be WRONG (stale DB
+  // instance_id at boot) and used to stay wrong until the next restart, leaving
+  // auto-sync + WO generation silently dead on a ship. The watchdog re-resolves
+  // the role periodically and starts/stops the two ship schedulers to match.
+  const { schedulerRoleWatchdog } = await import("./services/schedulerRoleWatchdog");
+  schedulerRoleWatchdog.start({
+    jobDueScanIntervalMs: JOB_DUE_SCAN_INTERVAL_MS,
+    initialRole: isShip ? 'ship' : 'shore',
+  });
 
   // Dev-only seed endpoint for recurring defects testing
   if (process.env.NODE_ENV === 'development') {
@@ -600,6 +623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CPU/heap. (The status recalculator scheduler has been removed entirely.)
   const stopAllSchedulers = () => {
     console.log('Cleaning up scheduled tasks...');
+    schedulerRoleWatchdog.stop(); // first, so it can't restart what we stop below
     jobDueScanner.stop();
     maintenanceOrchestrator.stop(); // stops alerts + sync-health + sync-pruning timers
     syncAutoScheduler.stop();

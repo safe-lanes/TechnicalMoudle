@@ -19,7 +19,7 @@ import { runHealthCheck, getTableStats } from './healthMonitor';
 import { getFieldLogFailureSessionCount } from './fieldLogger';
 import { getPool } from '../../db';
 import { isShipInstanceId, isShipInstance } from './syncRole';
-import { getSyncLogPath, getSyncLogDir } from './syncDiagLogger';
+import { getSyncLogPath, getSyncLogDir, syncDiag } from './syncDiagLogger';
 
 // ── POST /sync/initiate ──
 
@@ -706,7 +706,18 @@ export async function updateSettingsHandler(req: Request, res: Response) {
     // Apply the new interval LIVE. The scheduler only runs on a ship instance;
     // on shore restartWithNewInterval is a graceful no-op (records the preference).
     if (newIntervalMinutes !== null && (await isShipInstance())) {
-      syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+      if (!syncAutoScheduler.isStarted()) {
+        // Self-heal: this instance resolves as a SHIP right now but the scheduler
+        // was never started — the boot-time role decision was taken against a
+        // stale instance_id (reproduced 2026-07-28). "Recording a preference"
+        // here left auto-sync dead until a restart; start it instead. start()
+        // reads sync_interval_minutes from the DB, which we just saved.
+        console.warn('[AutoSync] 🩹 SELF-HEAL: settings saved on a ship instance while the scheduler was not running (stale boot-time role decision) — starting it now.');
+        syncDiag('[AutoSync] SELF-HEAL: settings-save found the scheduler not running on a ship instance — started late (boot-time role decision was stale).');
+        await syncAutoScheduler.start();
+      } else {
+        syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+      }
     }
 
     res.json({

@@ -96,6 +96,12 @@ export class JobDueScannerService {
     console.log('[JobDueScanner] Stopped');
   }
 
+  /** True when the scan timer is live. Used by the scheduler role watchdog to
+   *  detect a ship whose scanner never started (stale boot-time role decision). */
+  isStarted(): boolean {
+    return this.isRunning;
+  }
+
   /**
    * Run a full scan of jobs and generate work orders as needed.
    * @param scopeVesselId optional — when provided, only this vessel's jobs/WOs

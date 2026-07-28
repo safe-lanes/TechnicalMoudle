@@ -201,6 +201,13 @@ export class SyncAutoScheduler {
     console.log('[AutoSync] Scheduler stopped');
   }
 
+  /** True when the tick timer is live. Used by the role watchdog and the
+   *  settings-save self-heal to detect a ship whose scheduler never started
+   *  (stale boot-time role decision). */
+  isStarted(): boolean {
+    return this.isRunning;
+  }
+
   // ────────────────────────────────────────────────
   // One-time self-heal re-offer sweep (Build 2b)
   // ────────────────────────────────────────────────
