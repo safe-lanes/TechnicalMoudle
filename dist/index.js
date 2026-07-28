@@ -657,6 +657,7 @@ __export(schema_exports, {
   syncFileQueue: () => syncFileQueue,
   syncMetadata: () => syncMetadata,
   syncSettings: () => syncSettings,
+  syncTableCheckpoints: () => syncTableCheckpoints,
   updateMasterRHSchema: () => updateMasterRHSchema,
   updateRHConfigSchema: () => updateRHConfigSchema,
   userRoleEnum: () => userRoleEnum,
@@ -682,7 +683,7 @@ import { pgTable as pgTable2, text as text2, integer as integer2, boolean as boo
 import { sql as sql2 } from "drizzle-orm";
 import { createInsertSchema as createInsertSchema2 } from "drizzle-zod";
 import { z } from "zod";
-var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, viewModesMaster, insertViewModesMasterSchema, roleViewModeMapping, insertRoleViewModeMappingSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncFieldLogFailures, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
+var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, viewModesMaster, insertViewModesMasterSchema, roleViewModeMapping, insertRoleViewModeMappingSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, syncTableCheckpoints, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncFieldLogFailures, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -4723,6 +4724,15 @@ var init_schema = __esm({
       isDeleted: boolean2("is_deleted").default(false).notNull(),
       isSync: boolean2("is_sync").default(false).notNull()
     });
+    syncTableCheckpoints = pgTable2("sync_table_checkpoints", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      instanceId: text2("instance_id").notNull(),
+      tableName: text2("table_name").notNull(),
+      lastCheckpoint: timestamp3("last_checkpoint", { withTimezone: true }),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).defaultNow().notNull()
+    }, (table) => [
+      unique().on(table.instanceId, table.tableName)
+    ]);
     insertSyncMetadataSchema = createInsertSchema2(syncMetadata).omit({
       id: true,
       smuuid: true,
@@ -6288,6 +6298,18 @@ var init_syncConfig = __esm({
         businessRules: null,
         notes: "FUTURE TABLE. Sync engine internal tracking \u2014 sync cursors and state."
       },
+      sync_table_checkpoints: {
+        tableName: "sync_table_checkpoints",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: false,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Per-table one-way watermarks (migration 148). Runtime infrastructure \u2014 each instance owns its own; must NEVER sync, exactly like sync_metadata."
+      },
       sync_field_log: {
         tableName: "sync_field_log",
         category: "NO_SYNC",
@@ -6897,7 +6919,7 @@ async function getColumnMeta(pool2, tableName) {
   return meta;
 }
 async function applyOneWayRows(tableName, rows) {
-  if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, errors: [] };
+  if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
   syncDiag(`ONE-WAY-APPLY START: ${tableName} \u2014 ${rows.length} rows`);
   const config = getTableSyncConfig(tableName);
   if (!config) {
@@ -6905,6 +6927,7 @@ async function applyOneWayRows(tableName, rows) {
       inserted: 0,
       updated: 0,
       softDeleted: 0,
+      silentNoOps: 0,
       errors: [{ rowIndex: -1, error: `Unknown table: ${tableName}` }]
     };
   }
@@ -6941,7 +6964,7 @@ async function applyOneWayRows(tableName, rows) {
   const FORCE_COMPOSITE = /* @__PURE__ */ new Set(["approval_workflow_config"]);
   const compositeKeys = COMPOSITE_KEY_TABLES[tableName] || null;
   const useCompositeKey = compositeKeys !== null && (!identityCol || FORCE_COMPOSITE.has(tableName));
-  const result = { inserted: 0, updated: 0, softDeleted: 0, errors: [] };
+  const result = { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     try {
@@ -7015,8 +7038,28 @@ async function applyOneWayRows(tableName, rows) {
         const insertParts = buildInsertParts(row, meta, useCompositeKey);
         if (insertParts.columns.length > 0) {
           const insertSQL = `INSERT INTO "${tableName}" (${insertParts.columns.join(", ")}) VALUES (${insertParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
-          await pool2.query(insertSQL, insertParts.values);
-          result.inserted++;
+          const ins = await pool2.query(insertSQL, insertParts.values);
+          if ((ins.rowCount ?? 0) > 0) {
+            result.inserted++;
+          } else {
+            result.silentNoOps++;
+            let detail = "row did not land (ON CONFLICT DO NOTHING absorbed a unique/PK collision)";
+            try {
+              const pkVal = row["id"] ?? row["ID"];
+              if (pkVal !== void 0 && pkVal !== null && lookupColumn) {
+                const clash = await pool2.query(
+                  `SELECT "${lookupColumn}" AS existing FROM "${tableName}" WHERE "id" = $1 LIMIT 1`,
+                  [pkVal]
+                );
+                if (clash.rows.length > 0) {
+                  detail = `PK id=${pkVal} already held by a DIFFERENT ${lookupColumn} (ship="${clash.rows[0].existing}", shore="${row[lookupColumn] ?? row[toCamelCase(lookupColumn)]}") \u2014 independently seeded table, shore row discarded`;
+                }
+              }
+            } catch {
+            }
+            result.errors.push({ rowIndex: i, error: detail });
+            syncDiag(`ONE-WAY-APPLY SILENT NO-OP: ${tableName} row[${i}]: ${detail}`);
+          }
         }
       }
     } catch (err) {
@@ -7024,7 +7067,9 @@ async function applyOneWayRows(tableName, rows) {
       result.errors.push({ rowIndex: i, error: err.message });
     }
   }
-  syncDiag(`ONE-WAY-APPLY DONE: ${tableName} \u2014 inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, errors=${result.errors.length}`);
+  syncDiag(
+    `ONE-WAY-APPLY DONE: ${tableName} \u2014 inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, silentNoOps=${result.silentNoOps}, errors=${result.errors.length}`
+  );
   if (meta.identityAlwaysCols.size > 0) {
     for (const col of Array.from(meta.identityAlwaysCols)) {
       try {
@@ -7770,6 +7815,7 @@ __export(repository_exports, {
   getConflict: () => getConflict,
   getConflictsByBatch: () => getConflictsByBatch,
   getConnectivityLogs: () => getConnectivityLogs,
+  getConservativeFloor: () => getConservativeFloor,
   getDueFieldLogCount: () => getDueFieldLogCount,
   getFieldLogCount: () => getFieldLogCount,
   getFieldLogsSinceCheckpoint: () => getFieldLogsSinceCheckpoint,
@@ -7783,6 +7829,7 @@ __export(repository_exports, {
   getRetryBacklog: () => getRetryBacklog,
   getSetting: () => getSetting,
   getShorePullRemainingCount: () => getShorePullRemainingCount,
+  getTableCheckpoints: () => getTableCheckpoints,
   getUnresolvedConflicts: () => getUnresolvedConflicts,
   getUnsyncedFieldLogCount: () => getUnsyncedFieldLogCount,
   getUnsyncedFieldLogs: () => getUnsyncedFieldLogs,
@@ -7802,6 +7849,7 @@ __export(repository_exports, {
   retryDuePredicate: () => retryDuePredicate,
   retryFileQueueEntry: () => retryFileQueueEntry,
   seedSettingIfEmpty: () => seedSettingIfEmpty,
+  setTableCheckpoints: () => setTableCheckpoints,
   skipFileQueueEntry: () => skipFileQueueEntry,
   updateBatch: () => updateBatch,
   updateFileStatus: () => updateFileStatus,
@@ -8119,6 +8167,51 @@ async function getRecentBatches(vesselId, limit = 10) {
   const db2 = await getDb();
   const conditions = vesselId && vesselId !== "all" ? [eq(syncBatches.vesselId, vesselId)] : [];
   return db2.select().from(syncBatches).where(conditions.length > 0 ? and(...conditions) : void 0).orderBy(desc(syncBatches.startedAt)).limit(limit);
+}
+async function getTableCheckpoints(instanceId) {
+  const pool2 = await getPool();
+  const r = await pool2.query(
+    `SELECT table_name, last_checkpoint FROM sync_table_checkpoints
+      WHERE instance_id = $1 AND last_checkpoint IS NOT NULL`,
+    [instanceId]
+  );
+  const out = {};
+  for (const row of r.rows) out[row.table_name] = new Date(row.last_checkpoint);
+  return out;
+}
+async function setTableCheckpoints(instanceId, checkpoints) {
+  const entries = Object.entries(checkpoints || {});
+  if (entries.length === 0) return 0;
+  const pool2 = await getPool();
+  let written = 0;
+  for (const [tableName, ts] of entries) {
+    if (!ts) continue;
+    const r = await pool2.query(
+      `INSERT INTO sync_table_checkpoints (instance_id, table_name, last_checkpoint, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (instance_id, table_name) DO UPDATE
+         SET last_checkpoint = GREATEST(
+               sync_table_checkpoints.last_checkpoint,
+               EXCLUDED.last_checkpoint
+             ),
+             updated_at = NOW()
+       WHERE sync_table_checkpoints.last_checkpoint IS NULL
+          OR EXCLUDED.last_checkpoint > sync_table_checkpoints.last_checkpoint`,
+      [instanceId, tableName, ts instanceof Date ? ts.toISOString() : ts]
+    );
+    written += r.rowCount ?? 0;
+  }
+  return written;
+}
+async function getConservativeFloor(instanceId, knownTables) {
+  const perTable = await getTableCheckpoints(instanceId);
+  let min = null;
+  for (const t of knownTables) {
+    const cp = perTable[t];
+    if (!cp) return null;
+    if (min === null || cp < min) min = cp;
+  }
+  return min;
 }
 async function getAllSettings() {
   const db2 = await getDb();
@@ -10852,7 +10945,7 @@ async function fetchFullRowsForHeal(requests) {
   syncDiag(`SELF-HEAL FETCH (shore): ${sane.length} request table(s) \u2192 ${tables.reduce((n, t) => n + t.rows.length, 0)} row(s) supplied`);
   return tables;
 }
-async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoint) {
+async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoint, tableCheckpoints) {
   const batch = await getBatch(batchUuid);
   if (!batch) {
     throw Object.assign(new Error(`Batch ${batchUuid} not found`), { statusCode: 404 });
@@ -10870,7 +10963,8 @@ async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoi
     syncDiag(`PREPARE-PULL CRITICAL WARNING: shore SYNC_INSTANCE_ID '${shoreInstanceId}' matches ship instanceId '${shipInstanceId}' \u2014 shore field logs will be SELF-EXCLUDED!`);
     console.error(`[Sync Pull] CRITICAL: SYNC_INSTANCE_ID='${shoreInstanceId}' matches ship '${shipInstanceId}'. Shore's field logs will NOT be sent to ship. Fix SYNC_INSTANCE_ID in shore's environment!`);
   }
-  const oneWayRows = await gatherOneWayShoreRows(vesselId, lastCheckpoint);
+  const oneWayGather = await gatherOneWayShoreRows(vesselId, lastCheckpoint, tableCheckpoints);
+  const oneWayRows = oneWayGather.batches;
   const shoreFieldLogsRaw = await getFieldLogsSinceCheckpoint(
     vesselId,
     lastCheckpoint,
@@ -10950,6 +11044,9 @@ async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoi
   );
   return {
     oneWayRows,
+    // 148: max updated_at delivered per one-way table this cycle. The ship echoes back
+    // only the tables it applied cleanly, and /sync/complete advances exactly those.
+    oneWayTableMax: oneWayGather.tableMax,
     fieldLogs: nonConflictingLogs,
     conflicts
   };
@@ -10999,7 +11096,7 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
   console.log(`[Sync Resolve] Conflict ${conflictUuid}: ${resolution} \u2192 "${winningValue}"`);
   return { resolved: true, resolution, resolvedValue: winningValue };
 }
-async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUuids, failedOneWayTables) {
+async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUuids, failedOneWayTables, appliedTableCheckpoints) {
   const batch = await getBatch(batchUuid);
   if (!batch) {
     throw Object.assign(new Error(`Batch ${batchUuid} not found`), { statusCode: 404 });
@@ -11044,6 +11141,20 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
       batchUuid
     );
   }
+  const failedSet = new Set(failedOneWayTables || []);
+  let perTableWritten = 0;
+  if (appliedTableCheckpoints && Object.keys(appliedTableCheckpoints).length > 0) {
+    const advance = {};
+    for (const [t, iso] of Object.entries(appliedTableCheckpoints)) {
+      if (!failedSet.has(t) && iso) advance[t] = iso;
+    }
+    perTableWritten = await setTableCheckpoints(instanceId, advance);
+    if (failedSet.size > 0) {
+      syncDiag(
+        `COMPLETE-SESSION PER-TABLE: advanced ${perTableWritten} table(s); held [${Array.from(failedSet).join(",")}] \u2014 other tables unaffected`
+      );
+    }
+  }
   const oneWayHoldback = Array.isArray(failedOneWayTables) && failedOneWayTables.length > 0;
   const checkpointBefore = batch.checkpointBefore ? batch.checkpointBefore instanceof Date ? batch.checkpointBefore : new Date(batch.checkpointBefore) : null;
   const effectiveCheckpoint = oneWayHoldback ? checkpointBefore : now;
@@ -11075,6 +11186,12 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     // locally, so ship and shore watermarks stay consistent. Null = full one-way resend.
     newCheckpoint: effectiveCheckpoint ? effectiveCheckpoint.toISOString() : null,
     oneWayHoldback,
+    // 148: the authoritative per-table watermarks after this cycle. The ship persists
+    // these; its `lastCheckpoint` for the NEXT pull is the MINIMUM of them (see
+    // repo.getConservativeFloor). Absent from an old shore's response ⇒ the ship keeps
+    // using the single newCheckpoint for everything.
+    newTableCheckpoints: await getTableCheckpoints(instanceId),
+    perTableAdvanced: perTableWritten,
     durationMs,
     remainingPull
   };
@@ -11123,48 +11240,57 @@ async function getRecentBatches2(vesselId, limit = 20) {
 async function getUnresolvedConflicts2(vesselId) {
   return getUnresolvedConflicts(vesselId);
 }
-async function gatherOneWayShoreRows(vesselId, sinceCheckpoint) {
+async function gatherOneWayShoreRows(vesselId, sinceCheckpoint, tableCheckpoints) {
   const oneWayTables = getTablesByCategory("ONE_WAY_SHORE_TO_SHIP");
   const results = [];
+  const tableMax = {};
   const pool2 = await getPool();
   const vesselCode = await getVesselCodeForUuid(vesselId);
   for (const config of oneWayTables) {
     try {
       let query;
       const params = [];
+      const sinceForTable = tableCheckpoints && tableCheckpoints[config.tableName] || sinceCheckpoint;
       const vesselCol = config.vesselScopeColumn;
       if (config.isGlobal) {
-        if (sinceCheckpoint) {
-          query = `SELECT * FROM "${config.tableName}" WHERE updated_at > $1 ORDER BY updated_at ASC LIMIT 5000`;
-          params.push(sinceCheckpoint);
+        if (sinceForTable) {
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" WHERE updated_at > $1 ORDER BY updated_at ASC LIMIT 5000`;
+          params.push(sinceForTable);
         } else {
-          query = `SELECT * FROM "${config.tableName}" ORDER BY updated_at ASC LIMIT 5000`;
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" ORDER BY updated_at ASC LIMIT 5000`;
         }
       } else if (vesselCol) {
         const scopeValue = vesselCol === "vessel_code" ? vesselCode : vesselId;
         if (!scopeValue) {
           console.warn(`[Sync Pull] Skipping ${config.tableName}: no ${vesselCol} value for vessel ${vesselId}`);
+          tableMax[config.tableName] = (/* @__PURE__ */ new Date()).toISOString();
           continue;
         }
-        if (sinceCheckpoint) {
-          query = `SELECT * FROM "${config.tableName}" WHERE "${vesselCol}" = $1 AND updated_at > $2 ORDER BY updated_at ASC LIMIT 5000`;
-          params.push(scopeValue, sinceCheckpoint);
+        if (sinceForTable) {
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" WHERE "${vesselCol}" = $1 AND updated_at > $2 ORDER BY updated_at ASC LIMIT 5000`;
+          params.push(scopeValue, sinceForTable);
         } else {
-          query = `SELECT * FROM "${config.tableName}" WHERE "${vesselCol}" = $1 ORDER BY updated_at ASC LIMIT 5000`;
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" WHERE "${vesselCol}" = $1 ORDER BY updated_at ASC LIMIT 5000`;
           params.push(scopeValue);
         }
       } else {
+        tableMax[config.tableName] = (/* @__PURE__ */ new Date()).toISOString();
         continue;
       }
       const result = await pool2.query(query, params);
       if (result.rows.length > 0) {
+        const last = result.rows[result.rows.length - 1];
+        if (last?.__wm) tableMax[config.tableName] = String(last.__wm);
+        for (const r of result.rows) delete r.__wm;
         results.push({ tableName: config.tableName, rows: result.rows });
+      } else {
+        tableMax[config.tableName] = (/* @__PURE__ */ new Date()).toISOString();
       }
     } catch (err) {
       console.warn(`[Sync Pull] Skipping one-way table ${config.tableName}: ${err.message}`);
     }
   }
-  return results;
+  return { batches: results, tableMax };
 }
 function toSnakeCase3(str) {
   return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
@@ -16076,7 +16202,16 @@ var init_syncEngine = __esm({
             // One-way orphaning fix: tables whose one-way apply failed this cycle. The shore
             // holds the checkpoint at checkpointBefore when non-empty, so the failed window
             // is re-offered next sync (one-way applies are idempotent upserts).
-            failedOneWayTables: pullResult.failedOneWayTables
+            failedOneWayTables: pullResult.failedOneWayTables,
+            // 148: echo the delivered maxima MINUS anything that failed, so the shore advances
+            // only healthy tables. Omitted entirely when the shore never sent them (old shore).
+            ...Object.keys(pullResult.oneWayTableMax || {}).length > 0 ? {
+              appliedTableCheckpoints: Object.fromEntries(
+                Object.entries(pullResult.oneWayTableMax).filter(
+                  ([t]) => !pullResult.failedOneWayTables.includes(t)
+                )
+              )
+            } : {}
           });
           console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
           syncDiag(`SYNC COMPLETE: checkpoint=${completeResult.newCheckpoint}`);
@@ -16091,6 +16226,13 @@ var init_syncEngine = __esm({
                 lastSyncStatus: "success",
                 lastSyncAt: /* @__PURE__ */ new Date()
               });
+              if (Object.prototype.hasOwnProperty.call(completeResult, "newTableCheckpoints")) {
+                const n = await setTableCheckpoints(
+                  this.instanceId,
+                  completeResult.newTableCheckpoints || {}
+                );
+                syncDiag(`PER-TABLE CHECKPOINTS SAVED LOCALLY: ${n} advanced`);
+              }
               syncDiag(`CHECKPOINT SAVED LOCALLY: ${completeResult.newCheckpoint}`);
             } catch (cpErr) {
               syncDiag(`CHECKPOINT LOCAL SAVE FAILED: ${cpErr.message}`);
@@ -16474,13 +16616,31 @@ var init_syncEngine = __esm({
         let conflictsAutoResolved = 0;
         const allErrors = [];
         const failedOneWayTables = [];
+        let oneWayTableMax = {};
         const appliedRowUuids = [];
+        const oneWayTableNames = getTablesByCategory("ONE_WAY_SHORE_TO_SHIP").map((t) => t.tableName);
+        const tableCheckpoints = await getTableCheckpoints(this.instanceId);
+        const havePerTable = Object.keys(tableCheckpoints).length > 0;
+        const floor = havePerTable ? await getConservativeFloor(this.instanceId, oneWayTableNames) : lastCheckpoint;
+        if (havePerTable) {
+          syncDiag(
+            `PULL CHECKPOINTS: per-table=${Object.keys(tableCheckpoints).length}, floor(min)=${floor ? floor.toISOString() : "NULL (full offer)"}`
+          );
+        }
         const pullData = await this.callSyncApiWithRetry("POST", "/sync/pull", {
           batchUuid,
           vesselId,
           instanceId: this.instanceId,
-          lastCheckpoint: lastCheckpoint ? lastCheckpoint.toISOString() : null
+          lastCheckpoint: floor ? floor.toISOString() : null,
+          ...havePerTable ? {
+            tableCheckpoints: Object.fromEntries(
+              Object.entries(tableCheckpoints).map(([t, d]) => [t, d.toISOString()])
+            )
+          } : {}
         });
+        if (Object.prototype.hasOwnProperty.call(pullData, "oneWayTableMax")) {
+          oneWayTableMax = pullData.oneWayTableMax || {};
+        }
         const pullOneWay = {};
         (pullData.oneWayRows || []).forEach((r) => {
           pullOneWay[r.tableName] = r.rows?.length || 0;
@@ -16658,7 +16818,7 @@ var init_syncEngine = __esm({
             console.log(`[SyncEngine] ${conflictsFound} conflicts, ${conflictsAutoResolved} auto-resolved`);
           }
         }
-        return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids, failedOneWayTables };
+        return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids, failedOneWayTables, oneWayTableMax };
       }
       // ═══════════════════════════════════════════════════════════════
       // SELF-HEAL — full-row request queue (push direction)
@@ -18386,11 +18546,23 @@ async function pullHandler(req, res) {
     if (!batchUuid || !vesselId || !instanceId) {
       return res.status(400).json({ error: "batchUuid, vesselId, and instanceId are required" });
     }
+    const rawTableCps = req.body.tableCheckpoints;
+    let tableCheckpoints;
+    if (rawTableCps && typeof rawTableCps === "object" && !Array.isArray(rawTableCps)) {
+      tableCheckpoints = {};
+      for (const [t, iso] of Object.entries(rawTableCps)) {
+        if (typeof iso === "string") {
+          const d = new Date(iso);
+          if (!isNaN(d.getTime())) tableCheckpoints[t] = d;
+        }
+      }
+    }
     const result = await preparePullData(
       batchUuid,
       vesselId,
       instanceId,
-      lastCheckpoint ? new Date(lastCheckpoint) : null
+      lastCheckpoint ? new Date(lastCheckpoint) : null,
+      tableCheckpoints
     );
     res.json(result);
   } catch (error) {
@@ -18431,12 +18603,21 @@ async function completeSyncHandler(req, res) {
       return res.status(400).json({ error: "batchUuid, vesselId, and instanceId are required" });
     }
     const failedOneWayTables = Array.isArray(req.body.failedOneWayTables) ? req.body.failedOneWayTables.filter((t) => typeof t === "string") : void 0;
+    const rawApplied = req.body.appliedTableCheckpoints;
+    let appliedTableCheckpoints;
+    if (rawApplied && typeof rawApplied === "object" && !Array.isArray(rawApplied)) {
+      appliedTableCheckpoints = {};
+      for (const [t, iso] of Object.entries(rawApplied)) {
+        if (typeof iso === "string") appliedTableCheckpoints[t] = iso;
+      }
+    }
     const result = await completeSyncSession(
       batchUuid,
       vesselId,
       instanceId,
       Array.isArray(appliedRowUuids) ? appliedRowUuids : void 0,
-      failedOneWayTables
+      failedOneWayTables,
+      appliedTableCheckpoints
     );
     res.json(result);
   } catch (error) {
