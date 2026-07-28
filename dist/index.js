@@ -17894,6 +17894,12 @@ var init_autoSyncScheduler = __esm({
         this.isRunning = false;
         console.log("[AutoSync] Scheduler stopped");
       }
+      /** True when the tick timer is live. Used by the role watchdog and the
+       *  settings-save self-heal to detect a ship whose scheduler never started
+       *  (stale boot-time role decision). */
+      isStarted() {
+        return this.isRunning;
+      }
       // ────────────────────────────────────────────────
       // One-time self-heal re-offer sweep (Build 2b)
       // ────────────────────────────────────────────────
@@ -19000,7 +19006,13 @@ async function updateSettingsHandler(req, res) {
     const engine = getSyncEngine();
     engine.reloadSettings();
     if (newIntervalMinutes !== null && await isShipInstance()) {
-      syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+      if (!syncAutoScheduler.isStarted()) {
+        console.warn("[AutoSync] \u{1FA79} SELF-HEAL: settings saved on a ship instance while the scheduler was not running (stale boot-time role decision) \u2014 starting it now.");
+        syncDiag("[AutoSync] SELF-HEAL: settings-save found the scheduler not running on a ship instance \u2014 started late (boot-time role decision was stale).");
+        await syncAutoScheduler.start();
+      } else {
+        syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+      }
     }
     res.json({
       success: true,
@@ -29268,6 +29280,11 @@ var init_jobDueScanner = __esm({
         this.isRunning = false;
         console.log("[JobDueScanner] Stopped");
       }
+      /** True when the scan timer is live. Used by the scheduler role watchdog to
+       *  detect a ship whose scanner never started (stale boot-time role decision). */
+      isStarted() {
+        return this.isRunning;
+      }
       /**
        * Run a full scan of jobs and generate work orders as needed.
        * @param scopeVesselId optional — when provided, only this vessel's jobs/WOs
@@ -36377,6 +36394,98 @@ var init_maintenanceOrchestrator = __esm({
       }
     };
     maintenanceOrchestrator = new MaintenanceOrchestrator();
+  }
+});
+
+// server/services/schedulerRoleWatchdog.ts
+var schedulerRoleWatchdog_exports = {};
+__export(schedulerRoleWatchdog_exports, {
+  SchedulerRoleWatchdog: () => SchedulerRoleWatchdog,
+  schedulerRoleWatchdog: () => schedulerRoleWatchdog
+});
+var DEFAULT_WATCHDOG_INTERVAL_MS, SchedulerRoleWatchdog, schedulerRoleWatchdog;
+var init_schedulerRoleWatchdog = __esm({
+  "server/services/schedulerRoleWatchdog.ts"() {
+    "use strict";
+    init_jobDueScanner();
+    init_autoSyncScheduler();
+    init_syncRole();
+    init_syncDiagLogger();
+    DEFAULT_WATCHDOG_INTERVAL_MS = 5 * 60 * 1e3;
+    SchedulerRoleWatchdog = class {
+      timer = null;
+      checkInProgress = false;
+      lastRole = null;
+      jobDueScanIntervalMs = 24 * 60 * 60 * 1e3;
+      start(opts) {
+        if (this.timer) return;
+        this.jobDueScanIntervalMs = opts.jobDueScanIntervalMs;
+        this.lastRole = opts.initialRole;
+        const intervalMs = parseInt(process.env.SCHEDULER_ROLE_WATCHDOG_MS || "", 10) || DEFAULT_WATCHDOG_INTERVAL_MS;
+        this.timer = setInterval(() => {
+          void this.check();
+        }, intervalMs);
+        console.log(
+          `[RoleWatchdog] Started (every ${Math.round(intervalMs / 1e3)}s) \u2014 boot role: ${opts.initialRole}. Re-resolves ship/shore from sync_settings.instance_id and starts/stops the ship schedulers to match.`
+        );
+      }
+      stop() {
+        if (this.timer) {
+          clearInterval(this.timer);
+          this.timer = null;
+        }
+      }
+      async check() {
+        if (this.checkInProgress) return;
+        this.checkInProgress = true;
+        try {
+          const ship = await isShipInstance();
+          const role = ship ? "ship" : "shore";
+          if (this.lastRole !== null && role !== this.lastRole) {
+            console.warn(
+              `[RoleWatchdog] \u26A0\uFE0F Instance role changed ${this.lastRole} \u2192 ${role} since the last check (sync_settings.instance_id was re-tagged while the app was running).`
+            );
+          }
+          this.lastRole = role;
+          if (ship) {
+            if (!syncAutoScheduler.isStarted()) {
+              console.warn(
+                "[RoleWatchdog] \u{1FA79} SELF-HEAL: this instance resolves as a SHIP but the auto-sync scheduler is not running (stale boot-time role decision) \u2014 starting it now."
+              );
+              syncDiag(
+                "[RoleWatchdog] SELF-HEAL: instance resolves as SHIP but auto-sync scheduler was not running \u2014 started late (boot-time role decision was stale)."
+              );
+              await syncAutoScheduler.start();
+            }
+            if (!jobDueScanner.isStarted()) {
+              console.warn(
+                "[RoleWatchdog] \u{1FA79} SELF-HEAL: this instance resolves as a SHIP but the job-due scanner is not running (stale boot-time role decision) \u2014 starting it now."
+              );
+              syncDiag(
+                "[RoleWatchdog] SELF-HEAL: instance resolves as SHIP but jobDueScanner was not running \u2014 started late (boot-time role decision was stale)."
+              );
+              jobDueScanner.start(this.jobDueScanIntervalMs);
+            }
+          } else {
+            if (syncAutoScheduler.isStarted() || jobDueScanner.isStarted()) {
+              console.warn(
+                "[RoleWatchdog] Instance now resolves as SHORE \u2014 stopping ship-only schedulers (auto-sync / job-due scanner). Sync stays ship-initiated."
+              );
+              syncDiag(
+                "[RoleWatchdog] Instance re-resolved as SHORE \u2014 ship-only schedulers stopped."
+              );
+              syncAutoScheduler.stop();
+              jobDueScanner.stop();
+            }
+          }
+        } catch (err) {
+          console.warn(`[RoleWatchdog] Check failed (will retry next interval): ${err?.message || err}`);
+        } finally {
+          this.checkInProgress = false;
+        }
+      }
+    };
+    schedulerRoleWatchdog = new SchedulerRoleWatchdog();
   }
 });
 
@@ -78966,8 +79075,14 @@ async function registerRoutes(app2) {
       res.status(404).json({ error: "File not found" });
     }
   });
-  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  const { isShipInstance: isShipInstance2, isShipInstanceId: isShipInstanceId2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
   const isShip = await isShipInstance2();
+  const envInstanceId = process.env.SYNC_INSTANCE_ID || "";
+  if (!isShip && isShipInstanceId2(envInstanceId)) {
+    console.warn(
+      `[Schedulers] \u26A0\uFE0F Resolved role is SHORE but env SYNC_INSTANCE_ID ('${envInstanceId}') is a ship id \u2014 DB sync_settings.instance_id wins and is NOT a ship value. If this box is a ship, fix the DB value; the scheduler role watchdog will then start the ship schedulers without a restart.`
+    );
+  }
   const JOB_DUE_SCAN_INTERVAL_MS = parseInt(process.env.JOB_DUE_SCAN_INTERVAL_MS || "", 10) || 24 * 60 * 60 * 1e3;
   const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
   if (isShip) {
@@ -78980,12 +79095,17 @@ async function registerRoutes(app2) {
   maintenanceOrchestrator2.start();
   console.log("[Maint] Orchestrator started \u2014 alerts (5m), sync-health (6h), sync-pruning (24h)");
   const { syncAutoScheduler: syncAutoScheduler2 } = await Promise.resolve().then(() => (init_autoSyncScheduler(), autoSyncScheduler_exports));
-  if (!isShip) {
+  if (isShip) {
     await syncAutoScheduler2.start(6 * 60 * 60 * 1e3);
     console.log("[AutoSync] Ship instance \u2014 scheduler started (autonomous sync with catch-up and connectivity logging)");
   } else {
     console.log("[AutoSync] Shore instance detected \u2014 auto-sync scheduler not started (sync is ship-initiated)");
   }
+  const { schedulerRoleWatchdog: schedulerRoleWatchdog2 } = await Promise.resolve().then(() => (init_schedulerRoleWatchdog(), schedulerRoleWatchdog_exports));
+  schedulerRoleWatchdog2.start({
+    jobDueScanIntervalMs: JOB_DUE_SCAN_INTERVAL_MS,
+    initialRole: isShip ? "ship" : "shore"
+  });
   if (process.env.NODE_ENV === "development") {
     app2.post("/dev/seed/recurring-defects", async (req, res) => {
       try {
@@ -79298,6 +79418,7 @@ async function registerRoutes(app2) {
   })();
   const stopAllSchedulers = () => {
     console.log("Cleaning up scheduled tasks...");
+    schedulerRoleWatchdog2.stop();
     jobDueScanner2.stop();
     maintenanceOrchestrator2.stop();
     syncAutoScheduler2.stop();
