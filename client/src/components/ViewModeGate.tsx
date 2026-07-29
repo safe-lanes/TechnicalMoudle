@@ -9,10 +9,31 @@
  *   error   → retry screen (server/network failure — never guess a mode)
  *   blocked → "role not mapped" screen (admin must map the role first)
  */
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Loader2, ShieldAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { isReplit } from "@/lib/env";
+import { secureClear } from "@/utils/secureStorage";
+
+// One-shot guard (module scope) so a re-render can never double-redirect.
+let redirectedToLogin = false;
+
+/**
+ * Session expired/invalid (401/403 on resolve). Outside Replit this means the
+ * user must log in again: clear the stale local session so a reload cannot
+ * re-hydrate it, then hard-navigate to the parent app's /login page (same
+ * pattern as onTokenFailure in lib/authToken.ts). On Replit (mock auth, no
+ * real login flow) we never redirect — the retry screen renders instead.
+ */
+function shouldRedirectToLogin(): boolean {
+  return (
+    !isReplit() &&
+    typeof window !== "undefined" &&
+    !redirectedToLogin &&
+    window.location.pathname !== "/login"
+  );
+}
 
 function GateScreen({
   icon,
@@ -49,8 +70,41 @@ function GateScreen({
 export function ViewModeGate({ children }: { children: ReactNode }) {
   const { currentUser, uiRoleResolution } = useAuth();
 
+  const authExpired =
+    !!currentUser && uiRoleResolution.status === "unauthenticated";
+
+  // Redirect to login on session expiry — non-Replit environments only.
+  useEffect(() => {
+    if (authExpired && shouldRedirectToLogin()) {
+      redirectedToLogin = true;
+      secureClear();
+      window.location.assign("/login");
+    }
+  }, [authExpired]);
+
   // No user yet (pre-hydration / logged out) — don't block the login surface.
   if (!currentUser) return <>{children}</>;
+
+  if (uiRoleResolution.status === "unauthenticated") {
+    if (isReplit()) {
+      // Replit dev (mock auth): keep the existing fail-closed retry screen.
+      return (
+        <GateScreen
+          icon={<ShieldAlert className="h-10 w-10 text-amber-500" />}
+          title="Unable to verify your access"
+          message="We couldn't determine your view mode because the server didn't respond. Please retry — access stays blocked until verification succeeds."
+          onRetry={uiRoleResolution.retry}
+        />
+      );
+    }
+    // Production/vessel/local: redirecting to login (effect above) — show a
+    // brief spinner, never the app. Still fail-closed.
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" data-testid="loader-view-mode" />
+      </div>
+    );
+  }
 
   switch (uiRoleResolution.status) {
     case "loading":
