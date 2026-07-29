@@ -567,6 +567,7 @@ __export(schema_exports, {
   insertRecurringDefectSchema: () => insertRecurringDefectSchema,
   insertReportFavoriteSchema: () => insertReportFavoriteSchema,
   insertReportSnapshotSchema: () => insertReportSnapshotSchema,
+  insertRoleViewModeMappingSchema: () => insertRoleViewModeMappingSchema,
   insertRunningHoursAuditSchema: () => insertRunningHoursAuditSchema,
   insertSfiDetailsSchema: () => insertSfiDetailsSchema,
   insertShipCertificateMasterSchema: () => insertShipCertificateMasterSchema,
@@ -596,6 +597,7 @@ __export(schema_exports, {
   insertVesselSurveyApplicabilitySchema: () => insertVesselSurveyApplicabilitySchema,
   insertVesselSurveyDataSchema: () => insertVesselSurveyDataSchema,
   insertVesselTypeSchema: () => insertVesselTypeSchema,
+  insertViewModesMasterSchema: () => insertViewModesMasterSchema,
   insertWoPostponementApprovalSchema: () => insertWoPostponementApprovalSchema,
   insertWorkOrderAnomalySchema: () => insertWorkOrderAnomalySchema,
   insertWorkOrderDocumentSchema: () => insertWorkOrderDocumentSchema,
@@ -632,6 +634,7 @@ __export(schema_exports, {
   reportFavorites: () => reportFavorites,
   reportSnapshots: () => reportSnapshots,
   retentionSettings: () => retentionSettings,
+  roleViewModeMapping: () => roleViewModeMapping,
   runningHoursAudit: () => runningHoursAudit,
   sfiDetails: () => sfiDetails,
   shipCertificatesLabelsConfig: () => shipCertificatesLabelsConfig,
@@ -650,9 +653,11 @@ __export(schema_exports, {
   syncBatches: () => syncBatches,
   syncConflicts: () => syncConflicts,
   syncFieldLog: () => syncFieldLog,
+  syncFieldLogFailures: () => syncFieldLogFailures,
   syncFileQueue: () => syncFileQueue,
   syncMetadata: () => syncMetadata,
   syncSettings: () => syncSettings,
+  syncTableCheckpoints: () => syncTableCheckpoints,
   updateMasterRHSchema: () => updateMasterRHSchema,
   updateRHConfigSchema: () => updateRHConfigSchema,
   userRoleEnum: () => userRoleEnum,
@@ -665,6 +670,7 @@ __export(schema_exports, {
   vesselSurveyData: () => vesselSurveyData,
   vesselTypes: () => vesselTypes,
   vessels: () => vessels,
+  viewModesMaster: () => viewModesMaster,
   woPostponementApprovals: () => woPostponementApprovals,
   workOrderAnomalies: () => workOrderAnomalies,
   workOrderDocuments: () => workOrderDocuments,
@@ -677,7 +683,7 @@ import { pgTable as pgTable2, text as text2, integer as integer2, boolean as boo
 import { sql as sql2 } from "drizzle-orm";
 import { createInsertSchema as createInsertSchema2 } from "drizzle-zod";
 import { z } from "zod";
-var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
+var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, viewModesMaster, insertViewModesMasterSchema, roleViewModeMapping, insertRoleViewModeMappingSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, syncTableCheckpoints, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncFieldLogFailures, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -1994,6 +2000,15 @@ var init_schema = __esm({
       reopenedAt: text2("reopened_at"),
       // === Layer 7: Running Hours Validation & Isolation ===
       completionRH: decimal2("completion_rh", { precision: 10, scale: 2 }),
+      // RH accuracy (migration 139): reading AT completion — drives the NEXT RH cycle
+      // (lastDoneRH/nextDueRH/nextDueReading + RH missed-cycles) via the fallback chain
+      // (woCompletionRh ?? completion reading). Section B3 Current Reading remains only
+      // the equipment-RH-record update source.
+      woCompletionRh: decimal2("wo_completion_rh", { precision: 10, scale: 2 }),
+      // RH accuracy (migration 139): date the Current Reading was taken (ISO string);
+      // threads into the RH module's dateUpdated → last_updated/audit reflect the
+      // actual reading date, not the WO completion date.
+      currentReadingDate: text2("current_reading_date"),
       completionRHValidated: boolean2("completion_rh_validated"),
       completionRHSource: text2("completion_rh_source"),
       completionRHValidationDetails: jsonb("completion_rh_validation_details"),
@@ -4413,6 +4428,54 @@ var init_schema = __esm({
       createdAt: true,
       updatedAt: true
     });
+    viewModesMaster = pgTable2("view_modes_master", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      vmuuid: text2("vmuuid").notNull().unique().default(sql2`gen_random_uuid()::text`),
+      // Natural key + sync identity. Matches the UIRole union in shared/uiRoles.ts.
+      code: text2("code").notNull().unique(),
+      displayName: text2("display_name").notNull(),
+      description: text2("description"),
+      // Retire modes via isActive=false — NEVER hard-delete (hard deletes don't sync;
+      // historical mapping rows must stay resolvable).
+      isActive: boolean2("is_active").notNull().default(true),
+      sortOrder: integer2("sort_order").default(0),
+      createdAt: timestamp3("created_at").notNull().defaultNow(),
+      updatedAt: updatedAtColumn(),
+      createdByUuid: text2("created_by_uuid"),
+      updatedByUuid: text2("updated_by_uuid"),
+      isDeleted: boolean2("is_deleted").notNull().default(false),
+      isSync: boolean2("is_sync").notNull().default(false)
+    });
+    insertViewModesMasterSchema = createInsertSchema2(viewModesMaster).omit({
+      id: true,
+      vmuuid: true,
+      createdAt: true,
+      updatedAt: true
+    });
+    roleViewModeMapping = pgTable2("role_view_mode_mapping", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      rvmuuid: text2("rvmuuid").notNull().unique().default(sql2`gen_random_uuid()::text`),
+      // Natural key + sync identity: one role → exactly one view mode.
+      roleRuid: text2("role_ruid").notNull().unique(),
+      // References view_modes_master.code (no DB FK — synced table rule).
+      viewModeCode: text2("view_mode_code").notNull(),
+      createdAt: timestamp3("created_at").notNull().defaultNow(),
+      updatedAt: updatedAtColumn(),
+      createdByUuid: text2("created_by_uuid"),
+      updatedByUuid: text2("updated_by_uuid"),
+      // Unmap = SOFT delete (is_deleted=true + explicit updated_at bump) — a hard
+      // DELETE never enters the updated_at>checkpoint sync delta, so ships would
+      // keep the mapping forever. Remap revives via ON CONFLICT (role_ruid).
+      isDeleted: boolean2("is_deleted").notNull().default(false),
+      isSync: boolean2("is_sync").notNull().default(false),
+      sortOrder: integer2("sort_order").default(0)
+    });
+    insertRoleViewModeMappingSchema = createInsertSchema2(roleViewModeMapping).omit({
+      id: true,
+      rvmuuid: true,
+      createdAt: true,
+      updatedAt: true
+    });
     admMenumasterAc = pgTable2("adm_menumaster_ac", {
       id: integer2("id").primaryKey(),
       muid: text2("muid").notNull().unique(),
@@ -4661,6 +4724,15 @@ var init_schema = __esm({
       isDeleted: boolean2("is_deleted").default(false).notNull(),
       isSync: boolean2("is_sync").default(false).notNull()
     });
+    syncTableCheckpoints = pgTable2("sync_table_checkpoints", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      instanceId: text2("instance_id").notNull(),
+      tableName: text2("table_name").notNull(),
+      lastCheckpoint: timestamp3("last_checkpoint", { withTimezone: true }),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).defaultNow().notNull()
+    }, (table) => [
+      unique().on(table.instanceId, table.tableName)
+    ]);
     insertSyncMetadataSchema = createInsertSchema2(syncMetadata).omit({
       id: true,
       smuuid: true,
@@ -4683,6 +4755,12 @@ var init_schema = __esm({
       instanceId: text2("instance_id").notNull(),
       syncBatchId: text2("sync_batch_id"),
       isSynced: boolean2("is_synced").default(false).notNull(),
+      // Retry ladder (migration 147). LOCAL bookkeeping — never on the sync wire.
+      // Replaces the in-memory droppedRetryCount Map so attempts survive a restart, and lets the
+      // backoff ladder throttle retries instead of the old dead-letter force-marking undelivered
+      // rows as synced (the Frontier Venture "71" loss path).
+      syncAttempts: integer2("sync_attempts").default(0).notNull(),
+      lastAttemptAt: timestamp3("last_attempt_at", { withTimezone: true }),
       createdAt: timestamp3("created_at").defaultNow().notNull(),
       updatedAt: timestamp3("updated_at").defaultNow().notNull(),
       isDeleted: boolean2("is_deleted").default(false).notNull(),
@@ -4700,6 +4778,19 @@ var init_schema = __esm({
       createdAt: true,
       updatedAt: true
     });
+    syncFieldLogFailures = pgTable2("sync_field_log_failures", {
+      id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
+      tableName: text2("table_name").notNull(),
+      rowUuid: text2("row_uuid").notNull(),
+      vesselId: text2("vessel_id"),
+      failedFields: integer2("failed_fields").notNull().default(0),
+      error: text2("error"),
+      occurredAt: timestamp3("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+      resolved: boolean2("resolved").notNull().default(false)
+    }, (table) => ({
+      idxUnresolved: index2("idx_sflf_unresolved").on(table.resolved, table.occurredAt),
+      idxRow: index2("idx_sflf_row").on(table.tableName, table.rowUuid)
+    }));
     syncConflicts = pgTable2("sync_conflicts", {
       id: integer2("id").primaryKey().generatedByDefaultAsIdentity(),
       conflictUuid: text2("conflict_uuid").notNull().unique().default(sql2`gen_random_uuid()::text`),
@@ -5268,6 +5359,30 @@ var init_syncConfig = __esm({
         isConfigurable: false,
         businessRules: null,
         notes: "Role definitions. ruid is the text identity column."
+      },
+      view_modes_master: {
+        tableName: "view_modes_master",
+        category: "ONE_WAY_SHORE_TO_SHIP",
+        direction: "shore_to_ship",
+        identityColumn: "code",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "View-mode master (Task #324). SEEDED BOTH SIDES by migration \u2014 natural-key identity (code) prevents seeded-uuid duplication (awc lesson). Retire modes via is_active, never delete."
+      },
+      role_view_mode_mapping: {
+        tableName: "role_view_mode_mapping",
+        category: "ONE_WAY_SHORE_TO_SHIP",
+        direction: "shore_to_ship",
+        identityColumn: "role_ruid",
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Role\u2192view-mode mapping (Task #324). Seeded both sides; natural key = role_ruid (UNIQUE). Unmap = soft delete (hard deletes never sync); remap revives."
       },
       adm_menumaster_ac: {
         tableName: "adm_menumaster_ac",
@@ -6183,6 +6298,18 @@ var init_syncConfig = __esm({
         businessRules: null,
         notes: "FUTURE TABLE. Sync engine internal tracking \u2014 sync cursors and state."
       },
+      sync_table_checkpoints: {
+        tableName: "sync_table_checkpoints",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: false,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Per-table one-way watermarks (migration 148). Runtime infrastructure \u2014 each instance owns its own; must NEVER sync, exactly like sync_metadata."
+      },
       sync_field_log: {
         tableName: "sync_field_log",
         category: "NO_SYNC",
@@ -6792,7 +6919,7 @@ async function getColumnMeta(pool2, tableName) {
   return meta;
 }
 async function applyOneWayRows(tableName, rows) {
-  if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, errors: [] };
+  if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
   syncDiag(`ONE-WAY-APPLY START: ${tableName} \u2014 ${rows.length} rows`);
   const config = getTableSyncConfig(tableName);
   if (!config) {
@@ -6800,6 +6927,7 @@ async function applyOneWayRows(tableName, rows) {
       inserted: 0,
       updated: 0,
       softDeleted: 0,
+      silentNoOps: 0,
       errors: [{ rowIndex: -1, error: `Unknown table: ${tableName}` }]
     };
   }
@@ -6836,7 +6964,7 @@ async function applyOneWayRows(tableName, rows) {
   const FORCE_COMPOSITE = /* @__PURE__ */ new Set(["approval_workflow_config"]);
   const compositeKeys = COMPOSITE_KEY_TABLES[tableName] || null;
   const useCompositeKey = compositeKeys !== null && (!identityCol || FORCE_COMPOSITE.has(tableName));
-  const result = { inserted: 0, updated: 0, softDeleted: 0, errors: [] };
+  const result = { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     try {
@@ -6910,8 +7038,28 @@ async function applyOneWayRows(tableName, rows) {
         const insertParts = buildInsertParts(row, meta, useCompositeKey);
         if (insertParts.columns.length > 0) {
           const insertSQL = `INSERT INTO "${tableName}" (${insertParts.columns.join(", ")}) VALUES (${insertParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
-          await pool2.query(insertSQL, insertParts.values);
-          result.inserted++;
+          const ins = await pool2.query(insertSQL, insertParts.values);
+          if ((ins.rowCount ?? 0) > 0) {
+            result.inserted++;
+          } else {
+            result.silentNoOps++;
+            let detail = "row did not land (ON CONFLICT DO NOTHING absorbed a unique/PK collision)";
+            try {
+              const pkVal = row["id"] ?? row["ID"];
+              if (pkVal !== void 0 && pkVal !== null && lookupColumn) {
+                const clash = await pool2.query(
+                  `SELECT "${lookupColumn}" AS existing FROM "${tableName}" WHERE "id" = $1 LIMIT 1`,
+                  [pkVal]
+                );
+                if (clash.rows.length > 0) {
+                  detail = `PK id=${pkVal} already held by a DIFFERENT ${lookupColumn} (ship="${clash.rows[0].existing}", shore="${row[lookupColumn] ?? row[toCamelCase(lookupColumn)]}") \u2014 independently seeded table, shore row discarded`;
+                }
+              }
+            } catch {
+            }
+            result.errors.push({ rowIndex: i, error: detail });
+            syncDiag(`ONE-WAY-APPLY SILENT NO-OP: ${tableName} row[${i}]: ${detail}`);
+          }
         }
       }
     } catch (err) {
@@ -6919,7 +7067,9 @@ async function applyOneWayRows(tableName, rows) {
       result.errors.push({ rowIndex: i, error: err.message });
     }
   }
-  syncDiag(`ONE-WAY-APPLY DONE: ${tableName} \u2014 inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, errors=${result.errors.length}`);
+  syncDiag(
+    `ONE-WAY-APPLY DONE: ${tableName} \u2014 inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, silentNoOps=${result.silentNoOps}, errors=${result.errors.length}`
+  );
   if (meta.identityAlwaysCols.size > 0) {
     for (const col of Array.from(meta.identityAlwaysCols)) {
       try {
@@ -7557,7 +7707,83 @@ async function gatherFullRows(requests) {
   }
   return out;
 }
-var columnMetaCache, SYNC_COLUMN_ALIASES, SKIP_UPDATE_COLUMNS, SELF_HEAL_MAX_ROWS_PER_CYCLE;
+function getInsertLogSkipCount() {
+  return insertLogSkipsSession;
+}
+async function evaluateInsertOriginGuard(client, log2) {
+  if (log2.oldValue !== null && log2.oldValue !== void 0) return { skip: false };
+  const config = getTableSyncConfig(log2.tableName);
+  if (!config) return { skip: false };
+  const identityCol = config.identityColumn || "id";
+  const column = fieldNameToColumn(log2.fieldName);
+  const res = await client.query(
+    `SELECT ("${column}" IS NOT NULL) AS populated FROM "${log2.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+    [log2.rowUuid]
+  );
+  if (res.rows.length === 0) return { skip: false };
+  if (!res.rows[0].populated) return { skip: false };
+  insertLogSkipsSession++;
+  const reason = `re-delivered INSERT-origin log for an EXISTING row whose "${column}" is already populated \u2014 not applied (a creation-time log is the oldest possible state of the row and cannot be newer)`;
+  syncDiag(`INSERT-LOG SKIP (terminal-ack): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 ${reason}`);
+  return { skip: true, reason };
+}
+async function evaluateStaleSkipGuard(client, log2, receiverInstanceId, opts = {}) {
+  const fieldCheck = await client.query(
+    `SELECT changed_at, instance_id FROM sync_field_log
+      WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
+        AND instance_id = $4 AND changed_at > $5
+      ORDER BY changed_at DESC LIMIT 1`,
+    [log2.tableName, log2.rowUuid, log2.fieldName, receiverInstanceId, log2.changedAt]
+  );
+  if (fieldCheck.rows.length === 0) return { skip: false };
+  const winnerChangedAt = new Date(fieldCheck.rows[0].changed_at);
+  const config = getTableSyncConfig(log2.tableName);
+  const identityCol = config?.identityColumn || "id";
+  const fieldNameSnake = fieldNameToColumn(log2.fieldName);
+  let currentValue = null;
+  try {
+    const curRow = await client.query(
+      `SELECT "${fieldNameSnake}" FROM "${log2.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+      [log2.rowUuid]
+    );
+    if (curRow.rows.length > 0) {
+      const raw = curRow.rows[0][fieldNameSnake];
+      currentValue = raw === null || raw === void 0 ? null : String(raw);
+    }
+  } catch {
+  }
+  try {
+    await client.query(
+      `INSERT INTO sync_conflict_log
+         (batch_uuid, table_name, row_uuid, field_name,
+          incoming_sender_instance, incoming_changed_at,
+          incoming_old_value, incoming_new_value,
+          receiver_winner_instance, receiver_winner_changed_at,
+          receiver_current_value)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        opts.batchUuid ?? null,
+        log2.tableName,
+        log2.rowUuid,
+        log2.fieldName,
+        log2.instanceId ?? null,
+        log2.changedAt,
+        log2.oldValue ?? null,
+        log2.newValue ?? null,
+        receiverInstanceId,
+        winnerChangedAt,
+        currentValue
+      ]
+    );
+  } catch (clErr) {
+    console.error(`[Sync] Failed to write sync_conflict_log: ${clErr.message}`);
+  }
+  syncDiag(
+    `STALE-SKIP: ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 incoming ${log2.changedAt.toISOString()} rejected by receiver ${winnerChangedAt.toISOString()}`
+  );
+  return { skip: true, winnerChangedAt, currentValue };
+}
+var columnMetaCache, SYNC_COLUMN_ALIASES, SKIP_UPDATE_COLUMNS, SELF_HEAL_MAX_ROWS_PER_CYCLE, insertLogSkipsSession;
 var init_oneWayApplier = __esm({
   "server/modules/sync/oneWayApplier.ts"() {
     "use strict";
@@ -7569,12 +7795,17 @@ var init_oneWayApplier = __esm({
     SYNC_COLUMN_ALIASES = { location2: "location_2" };
     SKIP_UPDATE_COLUMNS = /* @__PURE__ */ new Set(["id", "created_at", "createdAt"]);
     SELF_HEAL_MAX_ROWS_PER_CYCLE = 50;
+    insertLogSkipsSession = 0;
   }
 });
 
 // server/modules/sync/repository.ts
 var repository_exports = {};
 __export(repository_exports, {
+  BOOLEAN_SETTING_KEYS: () => BOOLEAN_SETTING_KEYS,
+  RETRY_LADDER: () => RETRY_LADDER,
+  RETRY_LADDER_TAIL: () => RETRY_LADDER_TAIL,
+  canonicaliseBooleanSettings: () => canonicaliseBooleanSettings,
   createBatch: () => createBatch,
   createConflict: () => createConflict,
   getAllInstanceMetadata: () => getAllInstanceMetadata,
@@ -7584,6 +7815,8 @@ __export(repository_exports, {
   getConflict: () => getConflict,
   getConflictsByBatch: () => getConflictsByBatch,
   getConnectivityLogs: () => getConnectivityLogs,
+  getConservativeFloor: () => getConservativeFloor,
+  getDueFieldLogCount: () => getDueFieldLogCount,
   getFieldLogCount: () => getFieldLogCount,
   getFieldLogsSinceCheckpoint: () => getFieldLogsSinceCheckpoint,
   getFileQueueEntry: () => getFileQueueEntry,
@@ -7593,8 +7826,10 @@ __export(repository_exports, {
   getPendingFileCountBySize: () => getPendingFileCountBySize,
   getPendingFiles: () => getPendingFiles,
   getRecentBatches: () => getRecentBatches,
+  getRetryBacklog: () => getRetryBacklog,
   getSetting: () => getSetting,
   getShorePullRemainingCount: () => getShorePullRemainingCount,
+  getTableCheckpoints: () => getTableCheckpoints,
   getUnresolvedConflicts: () => getUnresolvedConflicts,
   getUnsyncedFieldLogCount: () => getUnsyncedFieldLogCount,
   getUnsyncedFieldLogs: () => getUnsyncedFieldLogs,
@@ -7604,12 +7839,17 @@ __export(repository_exports, {
   insertFieldLogs: () => insertFieldLogs,
   markFieldLogsSynced: () => markFieldLogsSynced,
   markFileCompleted: () => markFileCompleted,
+  parseBooleanSetting: () => parseBooleanSetting,
   queueFile: () => queueFile,
   queueFileWithUuid: () => queueFileWithUuid,
+  recordDeliveryAttempt: () => recordDeliveryAttempt,
   resetInstanceDeliveryStateForReprovision: () => resetInstanceDeliveryStateForReprovision,
   resolveConflict: () => resolveConflict,
+  retryDelayMs: () => retryDelayMs,
+  retryDuePredicate: () => retryDuePredicate,
   retryFileQueueEntry: () => retryFileQueueEntry,
   seedSettingIfEmpty: () => seedSettingIfEmpty,
+  setTableCheckpoints: () => setTableCheckpoints,
   skipFileQueueEntry: () => skipFileQueueEntry,
   updateBatch: () => updateBatch,
   updateFileStatus: () => updateFileStatus,
@@ -7653,6 +7893,18 @@ async function getAllInstanceMetadata() {
   const db2 = await getDb();
   return db2.select().from(syncMetadata).where(eq(syncMetadata.isDeleted, false)).orderBy(desc(syncMetadata.updatedAt));
 }
+function retryDuePredicate(alias = "") {
+  const p = alias ? `${alias}.` : "";
+  const cases = RETRY_LADDER.map((t) => `WHEN ${p}sync_attempts = ${t.attempts} THEN interval '${t.interval}'`).join(" ");
+  return `(${p}last_attempt_at IS NULL OR ${p}last_attempt_at < now() - (CASE ${cases} ELSE interval '${RETRY_LADDER_TAIL}' END))`;
+}
+function retryDelayMs(attempts) {
+  const H = 36e5, D = 24 * H;
+  if (attempts <= 0) return 0;
+  const map = { "1 hour": H, "6 hours": 6 * H, "24 hours": D, "3 days": 3 * D };
+  const tier = RETRY_LADDER.find((t) => t.attempts === attempts);
+  return tier ? map[tier.interval] : 7 * D;
+}
 async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e3) {
   const pool2 = await getPool();
   const vesselValues = [vesselId];
@@ -7666,6 +7918,7 @@ async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e
                 ROW_NUMBER() OVER (ORDER BY changed_at ASC, id ASC) AS rn
          FROM sync_field_log
          WHERE instance_id = $1 AND vessel_id IN (${placeholders}) AND is_synced = false
+           AND ${retryDuePredicate()}
        ) ranked
        WHERE rn <= ${limit}
        GROUP BY table_name, row_uuid
@@ -7915,6 +8168,51 @@ async function getRecentBatches(vesselId, limit = 10) {
   const conditions = vesselId && vesselId !== "all" ? [eq(syncBatches.vesselId, vesselId)] : [];
   return db2.select().from(syncBatches).where(conditions.length > 0 ? and(...conditions) : void 0).orderBy(desc(syncBatches.startedAt)).limit(limit);
 }
+async function getTableCheckpoints(instanceId) {
+  const pool2 = await getPool();
+  const r = await pool2.query(
+    `SELECT table_name, last_checkpoint FROM sync_table_checkpoints
+      WHERE instance_id = $1 AND last_checkpoint IS NOT NULL`,
+    [instanceId]
+  );
+  const out = {};
+  for (const row of r.rows) out[row.table_name] = new Date(row.last_checkpoint);
+  return out;
+}
+async function setTableCheckpoints(instanceId, checkpoints) {
+  const entries = Object.entries(checkpoints || {});
+  if (entries.length === 0) return 0;
+  const pool2 = await getPool();
+  let written = 0;
+  for (const [tableName, ts] of entries) {
+    if (!ts) continue;
+    const r = await pool2.query(
+      `INSERT INTO sync_table_checkpoints (instance_id, table_name, last_checkpoint, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (instance_id, table_name) DO UPDATE
+         SET last_checkpoint = GREATEST(
+               sync_table_checkpoints.last_checkpoint,
+               EXCLUDED.last_checkpoint
+             ),
+             updated_at = NOW()
+       WHERE sync_table_checkpoints.last_checkpoint IS NULL
+          OR EXCLUDED.last_checkpoint > sync_table_checkpoints.last_checkpoint`,
+      [instanceId, tableName, ts instanceof Date ? ts.toISOString() : ts]
+    );
+    written += r.rowCount ?? 0;
+  }
+  return written;
+}
+async function getConservativeFloor(instanceId, knownTables) {
+  const perTable = await getTableCheckpoints(instanceId);
+  let min = null;
+  for (const t of knownTables) {
+    const cp = perTable[t];
+    if (!cp) return null;
+    if (min === null || cp < min) min = cp;
+  }
+  return min;
+}
 async function getAllSettings() {
   const db2 = await getDb();
   const rows = await db2.select().from(syncSettings).where(eq(syncSettings.isDeleted, false));
@@ -7947,10 +8245,13 @@ async function updateSetting(key, value, userId) {
 async function seedSettingIfEmpty(key, value) {
   if (value === void 0 || value === null || value === "") return;
   const db2 = await getDb();
-  await db2.update(syncSettings).set({ settingValue: value, updatedAt: /* @__PURE__ */ new Date() }).where(and(
-    eq(syncSettings.settingKey, key),
-    sql4`COALESCE(${syncSettings.settingValue}, '') = ''`
-  ));
+  await db2.execute(sql4`
+    INSERT INTO sync_settings (ssuuid, setting_key, setting_value, updated_at)
+    VALUES (gen_random_uuid()::text, ${key}, ${value}, NOW())
+    ON CONFLICT (setting_key) DO UPDATE
+      SET setting_value = EXCLUDED.setting_value, updated_at = NOW()
+      WHERE COALESCE(sync_settings.setting_value, '') = ''
+  `);
 }
 async function updateSettings(settings, userId) {
   for (const [key, value] of Object.entries(settings)) {
@@ -8005,6 +8306,21 @@ async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
   );
   return result.rows[0]?.c ?? 0;
 }
+async function getDueFieldLogCount(instanceId, vesselId, vesselCode) {
+  const pool2 = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(", ");
+  const result = await pool2.query(
+    `SELECT count(*)::int AS c FROM sync_field_log
+     WHERE instance_id = $1
+       AND vessel_id IN (${placeholders})
+       AND is_synced = false
+       AND ${retryDuePredicate()}`,
+    [instanceId, ...vesselValues]
+  );
+  return result.rows[0]?.c ?? 0;
+}
 async function getShorePullRemainingCount(vesselId, excludeInstanceId, vesselCode) {
   const pool2 = await getPool();
   const vesselValues = [vesselId];
@@ -8052,7 +8368,7 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
   const T = opts?.snapshotAt ?? null;
   if (opts?.blunt || !T) {
     const fl = await pool2.query(
-      `UPDATE sync_field_log SET is_synced = false
+      `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
         WHERE vessel_id IN (${vp}) AND instance_id != ${ip} AND is_synced = true`,
       [...vesselValues, instanceId]
     );
@@ -8073,7 +8389,7 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
     [...vesselValues, instanceId, T]
   );
   const a2 = await pool2.query(
-    `UPDATE sync_field_log SET is_synced = false
+    `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at > ${tp} AND is_synced = true`,
     [...vesselValues, instanceId, T]
@@ -8089,6 +8405,59 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
   );
   return { mode: "partition", baselineMarkedSynced, postSnapshotUnsynced, batchesDeleted, checkpoint: T.toISOString() };
 }
+function parseBooleanSetting(raw, fallback = false) {
+  if (raw === null || raw === void 0) return fallback;
+  const v = String(raw).trim().toLowerCase();
+  if (v === "") return fallback;
+  if (["true", "1", "yes", "y", "on", "t"].includes(v)) return true;
+  if (["false", "0", "no", "n", "off", "f"].includes(v)) return false;
+  console.warn(`[SyncSettings] Unrecognised boolean setting value ${JSON.stringify(raw)} \u2014 using fallback ${fallback}`);
+  return fallback;
+}
+function canonicaliseBooleanSettings(settings) {
+  const changed = [];
+  for (const key of BOOLEAN_SETTING_KEYS) {
+    if (!(key in settings)) continue;
+    const original = settings[key];
+    if (typeof original === "boolean") {
+      settings[key] = original ? "true" : "false";
+    } else {
+      const parsed = parseBooleanSetting(String(original), false);
+      settings[key] = parsed ? "true" : "false";
+    }
+    if (String(original) !== settings[key]) changed.push(`${key}: ${JSON.stringify(original)} -> '${settings[key]}'`);
+  }
+  return changed;
+}
+async function recordDeliveryAttempt(rowUuids, instanceId) {
+  if (!rowUuids.length) return 0;
+  const pool2 = await getPool();
+  if (!pool2) return 0;
+  const res = await pool2.query(
+    `UPDATE sync_field_log
+        SET sync_attempts = sync_attempts + 1,
+            last_attempt_at = now(),
+            updated_at = now()
+      WHERE instance_id = $1 AND row_uuid = ANY($2::text[]) AND is_synced = false`,
+    [instanceId, rowUuids]
+  );
+  return res.rowCount ?? 0;
+}
+async function getRetryBacklog(instanceId) {
+  const pool2 = await getPool();
+  if (!pool2) return { total: 0, stuck: 0, maxAttempts: 0 };
+  const tailFrom = RETRY_LADDER.length + 1;
+  const r = await pool2.query(
+    `SELECT count(*)::int AS total,
+            count(*) FILTER (WHERE sync_attempts >= $2)::int AS stuck,
+            COALESCE(max(sync_attempts), 0)::int AS max_attempts
+       FROM sync_field_log
+      WHERE instance_id = $1 AND is_synced = false`,
+    [instanceId, tailFrom]
+  );
+  return { total: r.rows[0].total, stuck: r.rows[0].stuck, maxAttempts: r.rows[0].max_attempts };
+}
+var RETRY_LADDER, RETRY_LADDER_TAIL, BOOLEAN_SETTING_KEYS;
 var init_repository = __esm({
   "server/modules/sync/repository.ts"() {
     "use strict";
@@ -8096,12 +8465,21 @@ var init_repository = __esm({
     init_db();
     init_syncDiagLogger();
     init_schema();
+    RETRY_LADDER = [
+      { attempts: 1, interval: "1 hour" },
+      { attempts: 2, interval: "6 hours" },
+      { attempts: 3, interval: "24 hours" },
+      { attempts: 4, interval: "3 days" }
+    ];
+    RETRY_LADDER_TAIL = "7 days";
+    BOOLEAN_SETTING_KEYS = ["auto_sync_enabled", "local_mode"];
   }
 });
 
 // server/modules/sync/fieldLogger.ts
 var fieldLogger_exports = {};
 __export(fieldLogger_exports, {
+  getFieldLogFailureSessionCount: () => getFieldLogFailureSessionCount,
   initFieldLoggerInstanceId: () => initFieldLoggerInstanceId,
   logFieldChanges: () => logFieldChanges,
   logFieldChangesBatch: () => logFieldChangesBatch,
@@ -8162,7 +8540,37 @@ async function initFieldLoggerInstanceId() {
 async function getInstanceId() {
   return cachedInstanceId ?? initFieldLoggerInstanceId();
 }
+function getFieldLogFailureSessionCount() {
+  return fieldLogFailureSessionCount;
+}
+async function recordFieldLogFailure(tableName, rowUuid, vesselId, failedFields, error) {
+  fieldLogFailureSessionCount++;
+  const msg = `FIELD-LOG-LOST: ${tableName} row=${rowUuid} vessel=${vesselId ?? "null"} failedFields=${failedFields} \u2014 ${error}`;
+  syncDiag(`\u26A0\uFE0F ${msg} (business row COMMITTED; sync log NOT written \u2014 recover via sync_field_log_failures)`);
+  console.error(`[FieldLogger] \u26A0\uFE0F ${msg}`);
+  try {
+    const db2 = await getDb();
+    await db2.insert(syncFieldLogFailures).values({
+      tableName,
+      rowUuid,
+      vesselId: vesselId ?? null,
+      failedFields,
+      error: String(error).slice(0, 2e3)
+    });
+  } catch (persistErr) {
+    console.error(`[FieldLogger] \u26A0\uFE0F Could not persist field-log failure record (syncDiag line above is the trace): ${persistErr?.message}`);
+  }
+}
 async function logFieldChanges(tableName, rowUuid, vesselId, oldRow, newRow, userId, txConn) {
+  try {
+    return await logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow, userId, txConn);
+  } catch (error) {
+    if (txConn) throw error;
+    await recordFieldLogFailure(tableName, rowUuid, vesselId, 0, error?.message || String(error));
+    return 0;
+  }
+}
+async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow, userId, txConn) {
   if (!requiresFieldLogging(tableName)) {
     return 0;
   }
@@ -8174,6 +8582,8 @@ async function logFieldChanges(tableName, rowUuid, vesselId, oldRow, newRow, use
   const instanceId = await getInstanceId();
   const changedAt = /* @__PURE__ */ new Date();
   let logCount = 0;
+  let failedFields = 0;
+  let lastFieldError = "";
   const skipFields = await getEffectiveSkipFields(tableName);
   const ctx = getRequestContext();
   let resolvedUserId;
@@ -8209,6 +8619,8 @@ async function logFieldChanges(tableName, rowUuid, vesselId, oldRow, newRow, use
         });
         logCount++;
       } catch (error) {
+        failedFields++;
+        lastFieldError = error.message;
         console.error(`[FieldLogger] Error logging INSERT field ${tableName}.${fieldName}:`, error.message);
       }
     }
@@ -8237,6 +8649,8 @@ async function logFieldChanges(tableName, rowUuid, vesselId, oldRow, newRow, use
         });
         logCount++;
       } catch (error) {
+        failedFields++;
+        lastFieldError = error.message;
         console.error(`[FieldLogger] Error logging UPDATE field ${tableName}.${key}:`, error.message);
       }
     }
@@ -8246,6 +8660,9 @@ async function logFieldChanges(tableName, rowUuid, vesselId, oldRow, newRow, use
   if (logCount > 0) {
     syncDiag(`FIELD-LOGGER: ${tableName} row=${rowUuid} \u2014 ${logCount} fields changed, isInsert=${oldRow === null}, vesselId=${vesselId}, instanceId=${instanceId}`);
     console.log(`[FieldLogger] Logged ${logCount} field change(s) for ${tableName}.${rowUuid}`);
+  }
+  if (failedFields > 0 && !txConn) {
+    await recordFieldLogFailure(tableName, rowUuid, vesselId, failedFields, lastFieldError);
   }
   return logCount;
 }
@@ -8323,7 +8740,7 @@ async function logSoftDelete(tableName, rowUuid, vesselId, userId, txConn) {
     txConn
   );
 }
-var SKIP_FIELDS, serialIdCache, cachedInstanceId;
+var SKIP_FIELDS, serialIdCache, cachedInstanceId, fieldLogFailureSessionCount;
 var init_fieldLogger = __esm({
   "server/modules/sync/fieldLogger.ts"() {
     "use strict";
@@ -8343,6 +8760,7 @@ var init_fieldLogger = __esm({
     ]);
     serialIdCache = /* @__PURE__ */ new Map();
     cachedInstanceId = null;
+    fieldLogFailureSessionCount = 0;
   }
 });
 
@@ -10177,101 +10595,60 @@ async function receivePushData(batchUuid, vesselId, payload) {
             const logChangedAt = log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt));
             const isInsertLog = log2.oldValue === null || log2.oldValue === void 0;
             if (isInsertLog) {
-              syncDiag(`INSERT-LOG ALLOWED: ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid}`);
-            } else {
-              const fieldCheck = await client.query(
-                `SELECT changed_at, instance_id FROM sync_field_log
-                 WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
-                   AND instance_id = $4 AND changed_at > $5
-                 ORDER BY changed_at DESC LIMIT 1`,
-                [log2.tableName, log2.rowUuid, log2.fieldName, receiverInstanceId, logChangedAt]
-              );
-              if (fieldCheck.rows.length > 0) {
-                const winner = fieldCheck.rows[0];
-                const winnerChangedAt = new Date(winner.changed_at);
-                let currentValue = null;
+              const guard = await evaluateInsertOriginGuard(client, log2);
+              if (guard.skip) {
                 try {
-                  const curRow = await client.query(
-                    `SELECT "${fieldNameSnake}" FROM "${log2.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-                    [log2.rowUuid]
-                  );
-                  if (curRow.rows.length > 0) {
-                    const raw = curRow.rows[0][fieldNameSnake];
-                    currentValue = raw === null || raw === void 0 ? null : String(raw);
-                  }
+                  await client.query(`RELEASE SAVEPOINT ${pushSp}`);
                 } catch {
                 }
+                continue;
+              }
+              syncDiag(`INSERT-LOG ALLOWED: ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid}`);
+            } else {
+              const stale = await evaluateStaleSkipGuard(
+                client,
+                { ...log2, changedAt: logChangedAt },
+                receiverInstanceId,
+                { batchUuid }
+              );
+              if (stale.skip) {
                 try {
-                  await client.query(
-                    `INSERT INTO sync_conflict_log
-                       (batch_uuid, table_name, row_uuid, field_name,
-                        incoming_sender_instance, incoming_changed_at,
-                        incoming_old_value, incoming_new_value,
-                        receiver_winner_instance, receiver_winner_changed_at,
-                        receiver_current_value)
-                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-                    [
-                      batchUuid,
-                      log2.tableName,
-                      log2.rowUuid,
-                      log2.fieldName,
-                      log2.instanceId,
-                      logChangedAt,
-                      log2.oldValue,
-                      log2.newValue,
-                      receiverInstanceId,
-                      winnerChangedAt,
-                      currentValue
-                    ]
-                  );
-                  try {
-                    const rejectedUserQuery = await client.query(
-                      `SELECT changed_by_user_id FROM sync_field_log
-                       WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
-                         AND instance_id = $4
-                       ORDER BY changed_at DESC LIMIT 1`,
-                      [log2.tableName, log2.rowUuid, log2.fieldName, log2.instanceId]
-                    );
-                    const rejectedUserId = rejectedUserQuery.rows[0]?.changed_by_user_id;
-                    const MACHINE_ACTORS = /* @__PURE__ */ new Set(["system", "auto-generation"]);
-                    if (rejectedUserId && !MACHINE_ACTORS.has(rejectedUserId)) {
-                      const fieldLabel = getFieldDisplayName(log2.fieldName);
-                      const event = await createAlertEvent({
-                        alertType: "sync_conflict_detected",
-                        priority: "medium",
-                        objectType: log2.tableName,
-                        objectId: log2.rowUuid,
-                        vesselId: log2.vesselId || null,
-                        dedupeKey: `sync_conflict:${log2.tableName}:${log2.rowUuid}:${log2.fieldName}:${logChangedAt.toISOString()}`,
-                        state: "open",
-                        payload: JSON.stringify({
-                          alertMessage: `Sync conflict: your change to "${fieldLabel}" was rejected \u2014 the other side has a newer edit`,
-                          tableName: log2.tableName,
-                          fieldName: log2.fieldName,
-                          targetUserId: rejectedUserId,
-                          link: `/admin/sync-conflicts`
-                        })
+                  const rejectedUserId = log2.changedByUserId || null;
+                  const MACHINE_ACTORS = /* @__PURE__ */ new Set(["system", "auto-generation"]);
+                  if (rejectedUserId && !MACHINE_ACTORS.has(rejectedUserId)) {
+                    const fieldLabel = getFieldDisplayName(log2.fieldName);
+                    const event = await createAlertEvent({
+                      alertType: "sync_conflict_detected",
+                      priority: "medium",
+                      objectType: log2.tableName,
+                      objectId: log2.rowUuid,
+                      vesselId: log2.vesselId || null,
+                      dedupeKey: `sync_conflict:${log2.tableName}:${log2.rowUuid}:${log2.fieldName}:${logChangedAt.toISOString()}`,
+                      state: "open",
+                      payload: JSON.stringify({
+                        alertMessage: `Sync conflict: your change to "${fieldLabel}" was rejected \u2014 the other side has a newer edit`,
+                        tableName: log2.tableName,
+                        fieldName: log2.fieldName,
+                        targetUserId: rejectedUserId,
+                        link: `/admin/sync-conflicts`
+                      })
+                    });
+                    if (event) {
+                      await createAlertDelivery({
+                        eventId: event.id,
+                        eventUuid: event.aeuuid,
+                        channel: "in_app",
+                        recipient: rejectedUserId,
+                        status: "sent"
                       });
-                      if (event) {
-                        await createAlertDelivery({
-                          eventId: event.id,
-                          eventUuid: event.aeuuid,
-                          channel: "in_app",
-                          recipient: rejectedUserId,
-                          status: "sent"
-                        });
-                        syncDiag(`CONFLICT NOTIFICATION: sent to user=${rejectedUserId} for ${log2.tableName}.${log2.fieldName}`);
-                      }
-                    }
-                  } catch (notifyErr) {
-                    if (!notifyErr.message?.includes("unique") && !notifyErr.message?.includes("duplicate")) {
-                      syncDiag(`CONFLICT NOTIFICATION FAILED: ${notifyErr.message} \u2014 conflict still logged`);
+                      syncDiag(`CONFLICT NOTIFICATION: sent to user=${rejectedUserId} for ${log2.tableName}.${log2.fieldName}`);
                     }
                   }
-                } catch (clErr) {
-                  console.error(`[Sync Push] Failed to write sync_conflict_log: ${clErr.message}`);
+                } catch (notifyErr) {
+                  if (!notifyErr.message?.includes("unique") && !notifyErr.message?.includes("duplicate")) {
+                    syncDiag(`CONFLICT NOTIFICATION FAILED: ${notifyErr.message} \u2014 conflict still logged`);
+                  }
                 }
-                syncDiag(`CONFLICT LOGGED: ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 incoming ${logChangedAt.toISOString()} rejected by receiver ${winnerChangedAt.toISOString()}`);
                 try {
                   await client.query(`RELEASE SAVEPOINT ${pushSp}`);
                 } catch {
@@ -10542,6 +10919,19 @@ async function receivePushData(batchUuid, vesselId, payload) {
     fieldLogRowMissing,
     droppedRowUuids: Array.from(droppedRowUuids),
     // Fix 2/3: rows the ship must keep unsynced + retry
+    // POSITIVE CONFIRM (migration 147). droppedRowUuids is a NEGATIVE ack: it reports what failed,
+    // so "shore said nothing" reads as "everything applied". Safe while the shore always answers,
+    // but it is the wrong default — silence must never mean success. This field states what the
+    // shore ACTUALLY applied, so the ship can mark synced only on confirmation.
+    //
+    // The ship selects on FIELD PRESENCE, not value: an older shore omits the key entirely and the
+    // ship falls back to the droppedRowUuids path (byte-identical to today). An empty ARRAY here is
+    // meaningful and different — it means "nothing applied".
+    appliedRowUuids: Array.from(
+      new Set(
+        (payload.fieldLogs || []).map((l) => l.rowUuid ?? l.row_uuid).filter((r) => r && !droppedRowUuids.has(r))
+      )
+    ),
     // Self-heal: fragments targeting rows absent here — the ship supplies the complete
     // rows in its next push. Optional field; old ships ignore it.
     needsFullRows,
@@ -10555,7 +10945,7 @@ async function fetchFullRowsForHeal(requests) {
   syncDiag(`SELF-HEAL FETCH (shore): ${sane.length} request table(s) \u2192 ${tables.reduce((n, t) => n + t.rows.length, 0)} row(s) supplied`);
   return tables;
 }
-async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoint) {
+async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoint, tableCheckpoints) {
   const batch = await getBatch(batchUuid);
   if (!batch) {
     throw Object.assign(new Error(`Batch ${batchUuid} not found`), { statusCode: 404 });
@@ -10573,7 +10963,8 @@ async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoi
     syncDiag(`PREPARE-PULL CRITICAL WARNING: shore SYNC_INSTANCE_ID '${shoreInstanceId}' matches ship instanceId '${shipInstanceId}' \u2014 shore field logs will be SELF-EXCLUDED!`);
     console.error(`[Sync Pull] CRITICAL: SYNC_INSTANCE_ID='${shoreInstanceId}' matches ship '${shipInstanceId}'. Shore's field logs will NOT be sent to ship. Fix SYNC_INSTANCE_ID in shore's environment!`);
   }
-  const oneWayRows = await gatherOneWayShoreRows(vesselId, lastCheckpoint);
+  const oneWayGather = await gatherOneWayShoreRows(vesselId, lastCheckpoint, tableCheckpoints);
+  const oneWayRows = oneWayGather.batches;
   const shoreFieldLogsRaw = await getFieldLogsSinceCheckpoint(
     vesselId,
     lastCheckpoint,
@@ -10653,6 +11044,9 @@ async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoi
   );
   return {
     oneWayRows,
+    // 148: max updated_at delivered per one-way table this cycle. The ship echoes back
+    // only the tables it applied cleanly, and /sync/complete advances exactly those.
+    oneWayTableMax: oneWayGather.tableMax,
     fieldLogs: nonConflictingLogs,
     conflicts
   };
@@ -10702,7 +11096,7 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
   console.log(`[Sync Resolve] Conflict ${conflictUuid}: ${resolution} \u2192 "${winningValue}"`);
   return { resolved: true, resolution, resolvedValue: winningValue };
 }
-async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUuids, failedOneWayTables) {
+async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUuids, failedOneWayTables, appliedTableCheckpoints) {
   const batch = await getBatch(batchUuid);
   if (!batch) {
     throw Object.assign(new Error(`Batch ${batchUuid} not found`), { statusCode: 404 });
@@ -10747,6 +11141,20 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
       batchUuid
     );
   }
+  const failedSet = new Set(failedOneWayTables || []);
+  let perTableWritten = 0;
+  if (appliedTableCheckpoints && Object.keys(appliedTableCheckpoints).length > 0) {
+    const advance = {};
+    for (const [t, iso] of Object.entries(appliedTableCheckpoints)) {
+      if (!failedSet.has(t) && iso) advance[t] = iso;
+    }
+    perTableWritten = await setTableCheckpoints(instanceId, advance);
+    if (failedSet.size > 0) {
+      syncDiag(
+        `COMPLETE-SESSION PER-TABLE: advanced ${perTableWritten} table(s); held [${Array.from(failedSet).join(",")}] \u2014 other tables unaffected`
+      );
+    }
+  }
   const oneWayHoldback = Array.isArray(failedOneWayTables) && failedOneWayTables.length > 0;
   const checkpointBefore = batch.checkpointBefore ? batch.checkpointBefore instanceof Date ? batch.checkpointBefore : new Date(batch.checkpointBefore) : null;
   const effectiveCheckpoint = oneWayHoldback ? checkpointBefore : now;
@@ -10778,6 +11186,12 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     // locally, so ship and shore watermarks stay consistent. Null = full one-way resend.
     newCheckpoint: effectiveCheckpoint ? effectiveCheckpoint.toISOString() : null,
     oneWayHoldback,
+    // 148: the authoritative per-table watermarks after this cycle. The ship persists
+    // these; its `lastCheckpoint` for the NEXT pull is the MINIMUM of them (see
+    // repo.getConservativeFloor). Absent from an old shore's response ⇒ the ship keeps
+    // using the single newCheckpoint for everything.
+    newTableCheckpoints: await getTableCheckpoints(instanceId),
+    perTableAdvanced: perTableWritten,
     durationMs,
     remainingPull
   };
@@ -10826,48 +11240,57 @@ async function getRecentBatches2(vesselId, limit = 20) {
 async function getUnresolvedConflicts2(vesselId) {
   return getUnresolvedConflicts(vesselId);
 }
-async function gatherOneWayShoreRows(vesselId, sinceCheckpoint) {
+async function gatherOneWayShoreRows(vesselId, sinceCheckpoint, tableCheckpoints) {
   const oneWayTables = getTablesByCategory("ONE_WAY_SHORE_TO_SHIP");
   const results = [];
+  const tableMax = {};
   const pool2 = await getPool();
   const vesselCode = await getVesselCodeForUuid(vesselId);
   for (const config of oneWayTables) {
     try {
       let query;
       const params = [];
+      const sinceForTable = tableCheckpoints && tableCheckpoints[config.tableName] || sinceCheckpoint;
       const vesselCol = config.vesselScopeColumn;
       if (config.isGlobal) {
-        if (sinceCheckpoint) {
-          query = `SELECT * FROM "${config.tableName}" WHERE updated_at > $1 ORDER BY updated_at ASC LIMIT 5000`;
-          params.push(sinceCheckpoint);
+        if (sinceForTable) {
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" WHERE updated_at > $1 ORDER BY updated_at ASC LIMIT 5000`;
+          params.push(sinceForTable);
         } else {
-          query = `SELECT * FROM "${config.tableName}" ORDER BY updated_at ASC LIMIT 5000`;
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" ORDER BY updated_at ASC LIMIT 5000`;
         }
       } else if (vesselCol) {
         const scopeValue = vesselCol === "vessel_code" ? vesselCode : vesselId;
         if (!scopeValue) {
           console.warn(`[Sync Pull] Skipping ${config.tableName}: no ${vesselCol} value for vessel ${vesselId}`);
+          tableMax[config.tableName] = (/* @__PURE__ */ new Date()).toISOString();
           continue;
         }
-        if (sinceCheckpoint) {
-          query = `SELECT * FROM "${config.tableName}" WHERE "${vesselCol}" = $1 AND updated_at > $2 ORDER BY updated_at ASC LIMIT 5000`;
-          params.push(scopeValue, sinceCheckpoint);
+        if (sinceForTable) {
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" WHERE "${vesselCol}" = $1 AND updated_at > $2 ORDER BY updated_at ASC LIMIT 5000`;
+          params.push(scopeValue, sinceForTable);
         } else {
-          query = `SELECT * FROM "${config.tableName}" WHERE "${vesselCol}" = $1 ORDER BY updated_at ASC LIMIT 5000`;
+          query = `SELECT *, updated_at::text AS __wm FROM "${config.tableName}" WHERE "${vesselCol}" = $1 ORDER BY updated_at ASC LIMIT 5000`;
           params.push(scopeValue);
         }
       } else {
+        tableMax[config.tableName] = (/* @__PURE__ */ new Date()).toISOString();
         continue;
       }
       const result = await pool2.query(query, params);
       if (result.rows.length > 0) {
+        const last = result.rows[result.rows.length - 1];
+        if (last?.__wm) tableMax[config.tableName] = String(last.__wm);
+        for (const r of result.rows) delete r.__wm;
         results.push({ tableName: config.tableName, rows: result.rows });
+      } else {
+        tableMax[config.tableName] = (/* @__PURE__ */ new Date()).toISOString();
       }
     } catch (err) {
       console.warn(`[Sync Pull] Skipping one-way table ${config.tableName}: ${err.message}`);
     }
   }
-  return results;
+  return { batches: results, tableMax };
 }
 function toSnakeCase3(str) {
   return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
@@ -15370,9 +15793,9 @@ var init_tenantConnectionManager = __esm({
         if (!this._isMultiTenantEnabled || !this.masterDb) {
           throw new Error("Multi-tenant is not configured");
         }
-        const cached = this.tenantCache.get(domain);
-        if (cached && cached.expiresAt > Date.now()) {
-          return { tuid: cached.tuid, databaseName: cached.databaseName };
+        const cached2 = this.tenantCache.get(domain);
+        if (cached2 && cached2.expiresAt > Date.now()) {
+          return { tuid: cached2.tuid, databaseName: cached2.databaseName };
         }
         const rows = await this.masterDb.select({ tuid: tenants.tuid, databaseName: tenants.databaseName, isActive: tenants.isActive }).from(tenants).where(eq2(tenants.domain, domain)).limit(1);
         if (rows.length === 0) throw new TenantNotFoundError(domain);
@@ -15579,6 +16002,1020 @@ var init_tenantConnectionManager = __esm({
       }
     };
     tenantConnectionManager = new TenantConnectionManager();
+  }
+});
+
+// server/modules/sync/syncEngine.ts
+function getSyncEngine() {
+  if (!engineInstance) {
+    engineInstance = new SyncEngine();
+  }
+  return engineInstance;
+}
+function camelToSnake(str) {
+  return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+}
+var CHUNK_SIZE, MAX_RETRIES, RETRY_DELAYS, DEFAULT_REQUEST_TIMEOUT_MS, SYNC_REQUEST_TIMEOUT_FLOOR_MS, DEFAULT_PUSH_BATCH_SIZE, FILE_PHASE_MAX_MS, DEFAULT_DRAIN_MAX_CYCLES, SYNC_DRAIN_MAX_MS, SyncEngine, engineInstance;
+var init_syncEngine = __esm({
+  "server/modules/sync/syncEngine.ts"() {
+    "use strict";
+    init_repository();
+    init_oneWayApplier();
+    init_fileSyncProcessor();
+    init_syncConfig();
+    init_db();
+    init_syncDiagLogger();
+    init_syncRole();
+    CHUNK_SIZE = 200;
+    MAX_RETRIES = 3;
+    RETRY_DELAYS = [5e3, 15e3, 45e3];
+    DEFAULT_REQUEST_TIMEOUT_MS = 3e4;
+    SYNC_REQUEST_TIMEOUT_FLOOR_MS = 6e4;
+    DEFAULT_PUSH_BATCH_SIZE = 1e3;
+    FILE_PHASE_MAX_MS = parseInt(process.env.SYNC_FILE_PHASE_MAX_MS || "", 10) || 12e4;
+    DEFAULT_DRAIN_MAX_CYCLES = 20;
+    SYNC_DRAIN_MAX_MS = parseInt(process.env.SYNC_DRAIN_MAX_MS || "", 10) || 6e4;
+    SyncEngine = class {
+      instanceId;
+      shoreBaseUrl;
+      syncApiKey;
+      // Phase 4a: per-instance tunables, resolved DB-then-env in loadSettings().
+      // Seeded from env (or hardcoded default) in the constructor so they are valid
+      // even before loadSettings runs — default-preserving.
+      requestTimeoutMs;
+      pushBatchSize;
+      catchUpMaxCycles = DEFAULT_DRAIN_MAX_CYCLES;
+      fileDrainMaxBytes = DEFAULT_FILE_DRAIN_MAX_BYTES;
+      settingsLoaded = false;
+      /** Where the effective shore_url came from — surfaced in the startup log. */
+      shoreUrlSource = "none";
+      /** Non-null when the resolved config cannot support a REMOTE sync; runSync() rejects. */
+      configFatal = null;
+      // Shared re-entrancy guard (backend safety net): one drain/sync per vessel at a time across
+      // BOTH the manual "Sync Now" drain and the auto-scheduler tick. Released in try/finally so a
+      // thrown/failed cycle always clears it — a stuck guard would block all future syncs.
+      inFlight = /* @__PURE__ */ new Set();
+      // REMOVED in migration 147: `droppedRetryCount` was an in-memory Map counting consecutive shore
+      // drops, used to dead-letter a row (mark it is_synced=true) after 3 tries. Two defects: it gave
+      // up on undelivered data — the Frontier Venture 71 — and being in-memory it reset on every PM2
+      // restart, so the count reflected process uptime rather than delivery history. Both are now the
+      // persisted sync_field_log.sync_attempts column plus the backoff ladder, which never gives up.
+      // Self-heal: full-row requests the SHORE returned from our pushes (needsFullRows). Drained
+      // into the next push's fullRows payload. In-memory by design — if lost (restart), the same
+      // fragments re-fail on shore and the request regenerates. Map<tableName, Set<rowUuid>>.
+      pendingFullRowRequests = /* @__PURE__ */ new Map();
+      // Pull-side FILE dead-letter counter (files only — field-log delivery no longer dead-letters at
+      // file queueUuid. In-memory on the singleton engine so it persists across cycles within a run.
+      filePullRetryCount = /* @__PURE__ */ new Map();
+      constructor() {
+        this.instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+        this.shoreBaseUrl = process.env.SYNC_SHORE_URL || "";
+        this.syncApiKey = process.env.SYNC_API_KEY || "";
+        this.requestTimeoutMs = parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || "", 10) || DEFAULT_REQUEST_TIMEOUT_MS;
+        this.pushBatchSize = parseInt(process.env.SYNC_PUSH_BATCH_SIZE || "", 10) || DEFAULT_PUSH_BATCH_SIZE;
+      }
+      /** Load settings from DB (with env var fallback). Called once per sync cycle. */
+      async loadSettings() {
+        if (this.settingsLoaded) return;
+        try {
+          const settings = await getAllSettings();
+          this.instanceId = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+          const dbShoreUrl = (settings["shore_url"] || "").trim();
+          const envShoreUrl = (process.env.SYNC_SHORE_URL || "").trim();
+          this.shoreBaseUrl = dbShoreUrl || envShoreUrl;
+          this.shoreUrlSource = dbShoreUrl ? "DB" : envShoreUrl ? "env" : "none";
+          this.syncApiKey = settings["sync_api_key"] || process.env.SYNC_API_KEY || "";
+          const dbBatch = parseInt(settings["sync_push_batch_size"] || "", 10);
+          this.pushBatchSize = dbBatch || parseInt(process.env.SYNC_PUSH_BATCH_SIZE || "", 10) || DEFAULT_PUSH_BATCH_SIZE;
+          const dbTimeout = parseInt(settings["sync_request_timeout_ms"] || "", 10);
+          const envTimeout = parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || "", 10);
+          const resolvedTimeout = dbTimeout || envTimeout || DEFAULT_REQUEST_TIMEOUT_MS;
+          const timeoutSource = dbTimeout ? "DB" : envTimeout ? "env" : "default";
+          this.requestTimeoutMs = Math.max(resolvedTimeout, SYNC_REQUEST_TIMEOUT_FLOOR_MS);
+          if (resolvedTimeout < SYNC_REQUEST_TIMEOUT_FLOOR_MS) {
+            console.warn(`[SyncEngine] \u26A0\uFE0F requestTimeoutMs=${resolvedTimeout} (${timeoutSource}) is below the ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms VSAT floor \u2014 clamped to ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms.`);
+          }
+          const dbCatchUp = parseInt(settings["catch_up_max_cycles"] || "", 10);
+          this.catchUpMaxCycles = dbCatchUp || DEFAULT_DRAIN_MAX_CYCLES;
+          const dbFileMax = parseInt(settings["sync_file_drain_max_bytes"] || "", 10);
+          this.fileDrainMaxBytes = dbFileMax || DEFAULT_FILE_DRAIN_MAX_BYTES;
+          if (!dbShoreUrl && envShoreUrl) {
+            try {
+              await seedSettingIfEmpty("shore_url", envShoreUrl);
+              console.warn(`[SyncEngine] \u{1FA79} CONFIG SELF-HEAL: sync_settings.shore_url was EMPTY \u2014 persisted from env: "${envShoreUrl}". The DB value is authoritative from now on; change it there, not in .env.`);
+              syncDiag(`CONFIG SELF-HEAL: shore_url seeded from env "${envShoreUrl}" (was empty in sync_settings)`);
+            } catch (healErr) {
+              console.error(`[SyncEngine] config self-heal for shore_url FAILED (non-fatal): ${healErr?.message || healErr}`);
+            }
+          }
+          this.configFatal = null;
+          if (!this.shoreBaseUrl && process.env.SYNC_LOCAL_MODE !== "true") {
+            this.configFatal = 'shore_url is EMPTY in sync_settings AND SYNC_SHORE_URL is unset, and SYNC_LOCAL_MODE is not explicitly "true". Refusing to run sync in silent local mode. Set sync_settings.shore_url (preferred) or SYNC_SHORE_URL.';
+            console.error(`[SyncEngine] \u274C FATAL CONFIG: ${this.configFatal}`);
+            syncDiag(`FATAL CONFIG: ${this.configFatal}`);
+          }
+          this.settingsLoaded = true;
+          console.log(`[SyncEngine] Settings loaded from DB \u2014 instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || "(EMPTY)"} (${this.shoreUrlSource}), localMode=${this.isLocalMode()}, requestTimeoutMs=${this.requestTimeoutMs} (${timeoutSource}), pushBatchSize=${this.pushBatchSize}`);
+        } catch (error) {
+          console.warn("[SyncEngine] Could not load DB settings, using env vars:", error);
+        }
+      }
+      /** Force reload on next sync cycle (called when settings are updated via API) */
+      reloadSettings() {
+        this.settingsLoaded = false;
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // HELPER — Resolve vessel UUID → vessel_code (cached)
+      // ═══════════════════════════════════════════════════════════════
+      vesselCodeCache = /* @__PURE__ */ new Map();
+      async getVesselCode(vesselId) {
+        if (this.vesselCodeCache.has(vesselId)) return this.vesselCodeCache.get(vesselId);
+        try {
+          const pool2 = await getPool();
+          const result = await pool2.query(
+            `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
+            [vesselId]
+          );
+          const code = result.rows[0]?.vessel_code || null;
+          this.vesselCodeCache.set(vesselId, code);
+          return code;
+        } catch {
+          return null;
+        }
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // PUBLIC — Run a complete sync cycle
+      // ═══════════════════════════════════════════════════════════════
+      async runSync(vesselId) {
+        await this.loadSettings();
+        const startTime = Date.now();
+        let batchUuid = null;
+        let recordsPushed = 0;
+        let recordsPulled = 0;
+        let conflictsFound = 0;
+        let conflictsAutoResolved = 0;
+        try {
+          if (this.configFatal) {
+            syncDiag(`=== SYNC ABORTED (config) === vessel=${vesselId}: ${this.configFatal}`);
+            throw new Error(`Sync configuration invalid \u2014 ${this.configFatal}`);
+          }
+          syncDiag(`=== SYNC START === vessel=${vesselId}, instance=${this.instanceId}, mode=${this.isLocalMode() ? "LOCAL" : "REMOTE"}`);
+          console.log(`[SyncEngine] Starting sync for vessel ${vesselId} from instance ${this.instanceId}`);
+          const metadata = await getInstanceMetadata(this.instanceId);
+          const lastCheckpoint = metadata?.lastSyncCheckpoint || null;
+          const initResult = await this.callSyncApi("POST", "/sync/initiate", {
+            instanceId: this.instanceId,
+            vesselId,
+            lastCheckpoint: lastCheckpoint ? lastCheckpoint.toISOString() : null
+          });
+          batchUuid = initResult.batchUuid;
+          console.log(`[SyncEngine] Batch initiated: ${batchUuid}`);
+          try {
+            const localPool = await getPool();
+            await localPool.query(
+              `INSERT INTO sync_batches (batch_uuid, initiated_by_instance, vessel_id, checkpoint_before, status)
+           VALUES ($1, $2, $3, $4, 'in_progress')
+           ON CONFLICT (batch_uuid) DO NOTHING`,
+              [batchUuid, this.instanceId, vesselId, lastCheckpoint]
+            );
+          } catch (localBatchErr) {
+            console.warn(`[SyncEngine] Could not create local batch row: ${localBatchErr.message}`);
+          }
+          const pushResult = await this.executePush(batchUuid, vesselId, lastCheckpoint);
+          recordsPushed = pushResult.totalPushed;
+          const pushedLogUuids = pushResult.pushedLogUuids;
+          console.log(`[SyncEngine] Pushed ${recordsPushed} records (${pushedLogUuids.length} field logs)`);
+          const pullResult = await this.executePull(batchUuid, vesselId, lastCheckpoint);
+          recordsPulled = pullResult.totalPulled;
+          conflictsFound = pullResult.conflictsFound;
+          conflictsAutoResolved = pullResult.conflictsAutoResolved;
+          const pullErrors = pullResult.errors;
+          console.log(`[SyncEngine] Pulled ${recordsPulled} records, ${conflictsFound} conflicts`);
+          if (pullResult.totalApplyErrors > 0) {
+            console.warn(`[SyncEngine] ${pullResult.totalApplyErrors} apply errors during pull`);
+          }
+          const completeResult = await this.callSyncApi("POST", "/sync/complete", {
+            batchUuid,
+            vesselId,
+            instanceId: this.instanceId,
+            appliedRowUuids: pullResult.appliedRowUuids,
+            // One-way orphaning fix: tables whose one-way apply failed this cycle. The shore
+            // holds the checkpoint at checkpointBefore when non-empty, so the failed window
+            // is re-offered next sync (one-way applies are idempotent upserts).
+            failedOneWayTables: pullResult.failedOneWayTables,
+            // 148: echo the delivered maxima MINUS anything that failed, so the shore advances
+            // only healthy tables. Omitted entirely when the shore never sent them (old shore).
+            ...Object.keys(pullResult.oneWayTableMax || {}).length > 0 ? {
+              appliedTableCheckpoints: Object.fromEntries(
+                Object.entries(pullResult.oneWayTableMax).filter(
+                  ([t]) => !pullResult.failedOneWayTables.includes(t)
+                )
+              )
+            } : {}
+          });
+          console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
+          syncDiag(`SYNC COMPLETE: checkpoint=${completeResult.newCheckpoint}`);
+          if (!this.isLocalMode()) {
+            try {
+              await upsertInstanceMetadata({
+                instanceId: this.instanceId,
+                vesselId,
+                // newCheckpoint can be null when the shore held the watermark back (failed
+                // one-way tables, or a held-back first sync) — save null, never new Date(null).
+                lastSyncCheckpoint: completeResult.newCheckpoint ? new Date(completeResult.newCheckpoint) : null,
+                lastSyncStatus: "success",
+                lastSyncAt: /* @__PURE__ */ new Date()
+              });
+              if (Object.prototype.hasOwnProperty.call(completeResult, "newTableCheckpoints")) {
+                const n = await setTableCheckpoints(
+                  this.instanceId,
+                  completeResult.newTableCheckpoints || {}
+                );
+                syncDiag(`PER-TABLE CHECKPOINTS SAVED LOCALLY: ${n} advanced`);
+              }
+              syncDiag(`CHECKPOINT SAVED LOCALLY: ${completeResult.newCheckpoint}`);
+            } catch (cpErr) {
+              syncDiag(`CHECKPOINT LOCAL SAVE FAILED: ${cpErr.message}`);
+              console.warn(`[SyncEngine] Failed to save local checkpoint: ${cpErr.message}`);
+            }
+          }
+          const isShip = isShipInstanceId(this.instanceId);
+          if (pushedLogUuids.length > 0 && isShip) {
+            try {
+              await markFieldLogsSynced(pushedLogUuids, batchUuid);
+              syncDiag(`PUSH DONE: marked ${pushedLogUuids.length} field logs as synced locally`);
+              console.log(`[SyncEngine] Marked ${pushedLogUuids.length} local field logs as synced`);
+            } catch (markErr) {
+              console.warn(`[SyncEngine] Failed to mark local logs as synced: ${markErr.message}`);
+            }
+          }
+          let filesProcessedCount = 0;
+          let filesFailedCount = 0;
+          let remainingFilePull = 0;
+          try {
+            const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl, this.instanceId, this.syncApiKey);
+            const fileResult = await fileProcessor.processQueue(vesselId, batchUuid, FILE_PHASE_MAX_MS);
+            filesProcessedCount = fileResult.filesProcessed;
+            filesFailedCount = fileResult.filesFailed;
+            console.log(
+              `[SyncEngine] Files (push): ${fileResult.filesProcessed} processed, ${fileResult.filesFailed} failed, ${fileResult.bytesTransferred} bytes`
+            );
+            const pullResult2 = await fileProcessor.pullQueue(vesselId, FILE_PHASE_MAX_MS, this.fileDrainMaxBytes, this.filePullRetryCount);
+            filesProcessedCount += pullResult2.filesProcessed;
+            filesFailedCount += pullResult2.filesFailed;
+            remainingFilePull = pullResult2.remainingSmall;
+            console.log(
+              `[SyncEngine] Files (pull): ${pullResult2.filesProcessed} processed, ${pullResult2.filesFailed} failed, ${pullResult2.bytesTransferred} bytes, remainingSmall=${pullResult2.remainingSmall}`
+            );
+          } catch (fileError) {
+            console.warn(`[SyncEngine] File sync failed (non-fatal): ${fileError.message}`);
+          }
+          const errorMessage = pullErrors.length > 0 ? pullErrors.join("\n") : null;
+          if (errorMessage && batchUuid) {
+            try {
+              await updateBatch(batchUuid, { errorMessage });
+            } catch (updateErr) {
+              console.warn(`[SyncEngine] Failed to store errors in batch: ${updateErr.message}`);
+            }
+          }
+          const durationMs = Date.now() - startTime;
+          let remainingPush = 0;
+          if (isShip) {
+            try {
+              const vc = await this.getVesselCode(vesselId);
+              remainingPush = await getUnsyncedFieldLogCount(this.instanceId, vesselId, vc);
+            } catch (cntErr) {
+              console.warn(`[SyncEngine] Could not count remaining push rows: ${cntErr.message}`);
+            }
+          }
+          if (batchUuid) {
+            try {
+              await updateBatch(batchUuid, {
+                status: "completed",
+                completedAt: /* @__PURE__ */ new Date(),
+                durationMs,
+                recordsSent: recordsPushed,
+                recordsReceived: recordsPulled,
+                conflictsFound,
+                conflictsResolved: conflictsAutoResolved,
+                filesQueued: filesProcessedCount + filesFailedCount,
+                filesCompleted: filesProcessedCount
+              });
+            } catch (finalizeErr) {
+              console.warn(`[SyncEngine] Could not finalize local batch row: ${finalizeErr.message}`);
+            }
+          }
+          syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=success, pushed=${recordsPushed}, pulled=${recordsPulled}, conflicts=${conflictsFound}, files=${filesProcessedCount}+${filesFailedCount}, remainingPush=${remainingPush}, remainingPull=${completeResult.remainingPull ?? 0}`);
+          return {
+            success: true,
+            batchUuid,
+            recordsPushed,
+            recordsPulled,
+            conflictsFound,
+            conflictsAutoResolved,
+            filesQueued: filesProcessedCount + filesFailedCount,
+            durationMs,
+            error: errorMessage,
+            newCheckpoint: completeResult.newCheckpoint,
+            remainingPush,
+            remainingPull: completeResult.remainingPull ?? 0,
+            remainingFilePull
+          };
+        } catch (error) {
+          const durationMs = Date.now() - startTime;
+          const errorDetail = error.message + (error.cause?.code ? ` [${error.cause.code}]` : "");
+          syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=FAILED, error=${errorDetail}`);
+          console.error(`[SyncEngine] Sync failed for vessel ${vesselId}:`, errorDetail);
+          if (batchUuid) {
+            try {
+              await updateBatch(batchUuid, {
+                status: "failed",
+                errorMessage: errorDetail,
+                completedAt: /* @__PURE__ */ new Date(),
+                durationMs
+              });
+            } catch (updateError) {
+              console.error("[SyncEngine] Failed to update batch status:", updateError);
+            }
+          }
+          return {
+            success: false,
+            batchUuid,
+            recordsPushed,
+            recordsPulled,
+            conflictsFound,
+            conflictsAutoResolved,
+            filesQueued: 0,
+            durationMs,
+            error: errorDetail,
+            newCheckpoint: null,
+            remainingPush: null,
+            // unknown on failure → drain loop stops
+            remainingPull: null,
+            remainingFilePull: null
+          };
+        }
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // RE-ENTRANCY GUARD (shared: manual drain + auto-scheduler)
+      // ═══════════════════════════════════════════════════════════════
+      /** Try to claim a vessel for syncing. Returns false if a sync/drain is already running for it. */
+      tryAcquireVessel(vesselId) {
+        if (this.inFlight.has(vesselId)) return false;
+        this.inFlight.add(vesselId);
+        return true;
+      }
+      /** Release a vessel claim. MUST be called in a finally so a thrown cycle can't leave it stuck. */
+      releaseVessel(vesselId) {
+        this.inFlight.delete(vesselId);
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // DRAIN — repeat whole cycles until push+pull backlogs hit 0 (or a safety stop)
+      // ═══════════════════════════════════════════════════════════════
+      /**
+       * One "Sync Now" = fully reconcile the vessel in a single user action: loop runSync (whole,
+       * unchanged cycles — per-batch limits and all fix internals intact) until BOTH the ship's
+       * unsynced backlog and the shore's pending-for-this-vessel backlog are zero, or a safety stop.
+       * Safety: DRAINED (remaining==0) | NO-PROGRESS (remaining didn't decrease — respects the
+       * dead-letter guard, so a poison row stops the loop rather than spinning) | CAP
+       * (catch_up_max_cycles) | TIME BUDGET (SYNC_DRAIN_MAX_MS) | FAILURE. Returns an aggregate
+       * SyncResult (summed pushed/pulled) plus cyclesRun.
+       */
+      async runSyncToCompletion(vesselId) {
+        await this.loadSettings();
+        if (!this.tryAcquireVessel(vesselId)) {
+          syncDiag(`DRAIN SKIP: sync already in progress for vessel=${vesselId}`);
+          return {
+            success: false,
+            batchUuid: null,
+            recordsPushed: 0,
+            recordsPulled: 0,
+            conflictsFound: 0,
+            conflictsAutoResolved: 0,
+            filesQueued: 0,
+            durationMs: 0,
+            error: "A sync is already in progress for this vessel \u2014 please wait for it to finish.",
+            newCheckpoint: null,
+            remainingPush: null,
+            remainingPull: null,
+            remainingFilePull: null,
+            cyclesRun: 0
+          };
+        }
+        const maxCycles = this.catchUpMaxCycles || DEFAULT_DRAIN_MAX_CYCLES;
+        const startMs = Date.now();
+        let cyclesRun = 0;
+        let prevRemaining = Number.POSITIVE_INFINITY;
+        let aggPushed = 0, aggPulled = 0, aggConflicts = 0, aggAuto = 0, aggFiles = 0;
+        let last;
+        try {
+          for (; ; ) {
+            last = await this.runSync(vesselId);
+            cyclesRun++;
+            aggPushed += last.recordsPushed;
+            aggPulled += last.recordsPulled;
+            aggConflicts += last.conflictsFound;
+            aggAuto += last.conflictsAutoResolved;
+            aggFiles += last.filesQueued;
+            if (!last.success) break;
+            const remaining = (last.remainingPush ?? 0) + (last.remainingPull ?? 0) + (last.remainingFilePull ?? 0);
+            if (remaining === 0) {
+              syncDiag(`DRAIN COMPLETE: vessel=${vesselId} fully reconciled in ${cyclesRun} cycle(s)`);
+              break;
+            }
+            if (remaining >= prevRemaining) {
+              syncDiag(`DRAIN NO-PROGRESS: vessel=${vesselId} remaining=${remaining} did not decrease \u2014 stopping (cycle ${cyclesRun})`);
+              console.warn(`[SyncEngine] Drain stopped (no progress): ${remaining} rows remain for vessel ${vesselId}. Poison/dead-letter rows persist for a later sync.`);
+              break;
+            }
+            prevRemaining = remaining;
+            if (cyclesRun >= maxCycles) {
+              console.warn(`[SyncEngine] Drain hit max cycles (${maxCycles}) for vessel ${vesselId}; ${remaining} rows remain \u2014 will finish on next Sync Now / auto-tick.`);
+              break;
+            }
+            if (Date.now() - startMs >= SYNC_DRAIN_MAX_MS) {
+              console.warn(`[SyncEngine] Drain hit time budget (${SYNC_DRAIN_MAX_MS}ms) for vessel ${vesselId}; ${remaining} rows remain \u2014 will finish on next Sync Now / auto-tick.`);
+              break;
+            }
+          }
+        } finally {
+          this.releaseVessel(vesselId);
+        }
+        return {
+          ...last,
+          recordsPushed: aggPushed,
+          recordsPulled: aggPulled,
+          conflictsFound: aggConflicts,
+          conflictsAutoResolved: aggAuto,
+          filesQueued: aggFiles,
+          cyclesRun
+        };
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // PUSH — Gather and send local changes
+      // ═══════════════════════════════════════════════════════════════
+      async executePush(batchUuid, vesselId, lastCheckpoint) {
+        let totalPushed = 0;
+        const shipOnlyRows = [];
+        if (isShipInstanceId(this.instanceId)) {
+          const shipOnlyTables = getTablesByCategory("SHIP_ONLY");
+          for (const tableConfig of shipOnlyTables) {
+            try {
+              const rows = await this.getChangedRows(tableConfig.tableName, vesselId, lastCheckpoint, tableConfig.vesselScopeColumn);
+              if (rows.length > 0) {
+                shipOnlyRows.push({ tableName: tableConfig.tableName, rows });
+              }
+            } catch (err) {
+              console.warn(`[SyncEngine] Skipping SHIP_ONLY table ${tableConfig.tableName}: ${err.message}`);
+            }
+          }
+        }
+        const isShip = isShipInstanceId(this.instanceId);
+        const vesselCode = await this.getVesselCode(vesselId);
+        syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
+        const fieldLogs = isShip ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, this.pushBatchSize) : [];
+        syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip ? " (shore skips field log push)" : ""}`);
+        const pushTables = {};
+        fieldLogs.forEach((l) => {
+          pushTables[l.tableName ?? l.table_name] = (pushTables[l.tableName ?? l.table_name] || 0) + 1;
+        });
+        if (Object.keys(pushTables).length > 0) syncDiag(`PUSH table breakdown:`, pushTables);
+        fieldLogs.slice(0, 5).forEach((l, i) => {
+          const tbl = l.tableName ?? l.table_name;
+          const fld = l.fieldName ?? l.field_name;
+          const row = l.rowUuid ?? l.row_uuid;
+          const nv = l.newValue ?? l.new_value;
+          syncDiag(`PUSH sample[${i}]: table=${tbl}, field=${fld}, row=${row}, oldNull=${(l.oldValue ?? l.old_value) === null}, newValue=${nv ? String(nv).substring(0, 80) : "NULL"}`);
+        });
+        const droppedRowUuids = /* @__PURE__ */ new Set();
+        const confirmedRowUuids = /* @__PURE__ */ new Set();
+        let sawPositiveConfirm = false;
+        const fieldLogPayloads = fieldLogs.map((log2) => ({
+          tableName: log2.tableName ?? log2.table_name,
+          rowUuid: log2.rowUuid ?? log2.row_uuid,
+          fieldName: log2.fieldName ?? log2.field_name,
+          oldValue: log2.oldValue ?? log2.old_value,
+          newValue: log2.newValue ?? log2.new_value,
+          vesselId: log2.vesselId ?? log2.vessel_id,
+          changedAt: (log2.changedAt ?? log2.changed_at) instanceof Date ? (log2.changedAt ?? log2.changed_at).toISOString() : String(log2.changedAt ?? log2.changed_at),
+          changedByUserId: log2.changedByUserId ?? log2.changed_by_user_id,
+          instanceId: log2.instanceId ?? log2.instance_id
+        }));
+        const masterRecordHints = [];
+        if (isShip && fieldLogPayloads.length > 0) {
+          const surveyMasterIds = /* @__PURE__ */ new Set();
+          const certMasterIds = /* @__PURE__ */ new Set();
+          for (const log2 of fieldLogPayloads) {
+            if (log2.tableName === "vessel_survey_data" && log2.fieldName === "masterId" && log2.newValue) {
+              surveyMasterIds.add(log2.newValue);
+            }
+            if (log2.tableName === "vessel_certificate_data" && log2.fieldName === "masterId" && log2.newValue) {
+              certMasterIds.add(log2.newValue);
+            }
+          }
+          const pool2 = await getPool();
+          if (surveyMasterIds.size > 0) {
+            try {
+              const r = await pool2.query(
+                `SELECT master_id, survey_name, category, "group", requirement_ref,
+                    applicable_to_company, survey_label, company_id, company_group, company_sequence, sequence
+             FROM ship_surveys_master WHERE master_id = ANY($1) AND is_deleted = false`,
+                [Array.from(surveyMasterIds)]
+              );
+              if (r.rows.length > 0) masterRecordHints.push({ tableName: "ship_surveys_master", rows: r.rows });
+            } catch (err) {
+              console.warn("[SyncEngine] FIX 58 survey master hints:", err.message);
+            }
+          }
+          if (certMasterIds.size > 0) {
+            try {
+              const r = await pool2.query(
+                `SELECT master_id, certificate_name, category, "group", requirement_ref,
+                    applicable_to_company, certificate_label, company_id, company_group, company_sequence, sequence
+             FROM ship_certificates_master WHERE master_id = ANY($1) AND is_deleted = false`,
+                [Array.from(certMasterIds)]
+              );
+              if (r.rows.length > 0) masterRecordHints.push({ tableName: "ship_certificates_master", rows: r.rows });
+            } catch (err) {
+              console.warn("[SyncEngine] FIX 58 cert master hints:", err.message);
+            }
+          }
+          if (masterRecordHints.length > 0) {
+            syncDiag(`FIX 58: sending ${masterRecordHints.reduce((s, h) => s + h.rows.length, 0)} master record hint(s) to shore`);
+          }
+        }
+        if (fieldLogPayloads.length > 0 || shipOnlyRows.length > 0) {
+          const chunks = [];
+          let current = [];
+          let lastRow = null;
+          for (const p of fieldLogPayloads) {
+            if (p.rowUuid !== lastRow && current.length >= CHUNK_SIZE) {
+              chunks.push(current);
+              current = [];
+            }
+            current.push(p);
+            lastRow = p.rowUuid;
+          }
+          if (current.length > 0) chunks.push(current);
+          if (chunks.length === 0) chunks.push([]);
+          const fullRowsPayload = await this.drainFullRowRequests();
+          for (let idx = 0; idx < chunks.length; idx++) {
+            const result = await this.callSyncApiWithRetry("POST", "/sync/push", {
+              batchUuid,
+              vesselId,
+              oneWayRows: idx === 0 ? shipOnlyRows : [],
+              // One-way rows with first chunk only
+              fieldLogs: chunks[idx],
+              masterRecordHints: idx === 0 ? masterRecordHints : [],
+              // Hints with first chunk only
+              ...idx === 0 && fullRowsPayload.length > 0 ? { fullRows: fullRowsPayload } : {}
+            });
+            totalPushed += result.received || 0;
+            (result.droppedRowUuids || []).forEach((r) => droppedRowUuids.add(r));
+            if (Object.prototype.hasOwnProperty.call(result, "appliedRowUuids")) {
+              sawPositiveConfirm = true;
+              (result.appliedRowUuids || []).forEach((r) => confirmedRowUuids.add(r));
+            }
+            this.queueFullRowRequests(result.needsFullRows);
+          }
+        } else {
+          const fullRowsPayload = await this.drainFullRowRequests();
+          const result = await this.callSyncApiWithRetry("POST", "/sync/push", {
+            batchUuid,
+            vesselId,
+            oneWayRows: [],
+            fieldLogs: [],
+            ...fullRowsPayload.length > 0 ? { fullRows: fullRowsPayload } : {}
+          });
+          this.queueFullRowRequests(result?.needsFullRows);
+        }
+        const confirmedThisCycle = (ru) => sawPositiveConfirm ? confirmedRowUuids.has(ru) : !droppedRowUuids.has(ru);
+        const attemptedRowUuids = /* @__PURE__ */ new Set();
+        for (const l of fieldLogs) {
+          const ru = l.rowUuid ?? l.row_uuid;
+          if (ru && !confirmedThisCycle(ru)) attemptedRowUuids.add(ru);
+        }
+        if (attemptedRowUuids.size > 0) {
+          try {
+            await recordDeliveryAttempt(Array.from(attemptedRowUuids), this.instanceId);
+            syncDiag(`RETRY LADDER: ${attemptedRowUuids.size} row(s) not confirmed \u2014 attempt recorded, backing off (never abandoned)`);
+          } catch (attErr) {
+            console.warn(`[SyncEngine] could not record delivery attempts: ${attErr?.message || attErr}`);
+          }
+        }
+        const pushedLogUuids = fieldLogs.filter((l) => confirmedThisCycle(l.rowUuid ?? l.row_uuid)).map((l) => l.logUuid ?? l.log_uuid);
+        return { totalPushed, pushedLogUuids };
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // PULL — Get and apply remote changes
+      // ═══════════════════════════════════════════════════════════════
+      async executePull(batchUuid, vesselId, lastCheckpoint) {
+        let totalPulled = 0;
+        let totalApplyErrors = 0;
+        let conflictsFound = 0;
+        let conflictsAutoResolved = 0;
+        const allErrors = [];
+        const failedOneWayTables = [];
+        let oneWayTableMax = {};
+        const appliedRowUuids = [];
+        const oneWayTableNames = getTablesByCategory("ONE_WAY_SHORE_TO_SHIP").map((t) => t.tableName);
+        const tableCheckpoints = await getTableCheckpoints(this.instanceId);
+        const havePerTable = Object.keys(tableCheckpoints).length > 0;
+        const floor = havePerTable ? await getConservativeFloor(this.instanceId, oneWayTableNames) : lastCheckpoint;
+        if (havePerTable) {
+          syncDiag(
+            `PULL CHECKPOINTS: per-table=${Object.keys(tableCheckpoints).length}, floor(min)=${floor ? floor.toISOString() : "NULL (full offer)"}`
+          );
+        }
+        const pullData = await this.callSyncApiWithRetry("POST", "/sync/pull", {
+          batchUuid,
+          vesselId,
+          instanceId: this.instanceId,
+          lastCheckpoint: floor ? floor.toISOString() : null,
+          ...havePerTable ? {
+            tableCheckpoints: Object.fromEntries(
+              Object.entries(tableCheckpoints).map(([t, d]) => [t, d.toISOString()])
+            )
+          } : {}
+        });
+        if (Object.prototype.hasOwnProperty.call(pullData, "oneWayTableMax")) {
+          oneWayTableMax = pullData.oneWayTableMax || {};
+        }
+        const pullOneWay = {};
+        (pullData.oneWayRows || []).forEach((r) => {
+          pullOneWay[r.tableName] = r.rows?.length || 0;
+        });
+        const pullFields = {};
+        (pullData.fieldLogs || []).forEach((l) => {
+          pullFields[l.tableName] = (pullFields[l.tableName] || 0) + 1;
+        });
+        syncDiag(`PULL RECEIVED: ${pullData.oneWayRows?.length || 0} one-way table batches, ${pullData.fieldLogs?.length || 0} field logs`);
+        if (Object.keys(pullOneWay).length > 0) syncDiag(`PULL one-way tables:`, pullOneWay);
+        if (Object.keys(pullFields).length > 0) syncDiag(`PULL field log tables:`, pullFields);
+        if (pullData.oneWayRows && pullData.oneWayRows.length > 0) {
+          for (const tableData of pullData.oneWayRows) {
+            try {
+              const result = await applyOneWayRows(tableData.tableName, tableData.rows);
+              syncDiag(`PULL ONE-WAY: ${tableData.tableName} \u2014 inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, errors=${result.errors.length}`);
+              totalPulled += result.inserted + result.updated + result.softDeleted;
+              totalApplyErrors += result.errors.length;
+              if (result.errors.length > 0) {
+                failedOneWayTables.push(tableData.tableName);
+                result.errors.slice(0, 3).forEach((e) => syncDiag(`PULL ONE-WAY ERROR: ${tableData.tableName}[${e.rowIndex}]: ${String(e.error).substring(0, 150)}`));
+                const errorSamples = result.errors.slice(0, 5).map(
+                  (e) => `${tableData.tableName}[${e.rowIndex}]: ${e.error}`
+                );
+                if (result.errors.length > 5) {
+                  errorSamples.push(`... and ${result.errors.length - 5} more`);
+                }
+                allErrors.push(...errorSamples);
+              }
+            } catch (err) {
+              failedOneWayTables.push(tableData.tableName);
+              syncDiag(`PULL ONE-WAY EXCEPTION: ${tableData.tableName}: ${err.message.substring(0, 150)}`);
+              console.error(`[SyncEngine] Failed to apply one-way rows for ${tableData.tableName}:`, err.message);
+              allErrors.push(`${tableData.tableName}: ${err.message}`);
+            }
+          }
+        }
+        let pullSelfHealRequests = [];
+        if (pullData.fieldLogs && pullData.fieldLogs.length > 0) {
+          const pool2 = await getPool();
+          const client = await pool2.connect();
+          try {
+            await client.query("BEGIN");
+            await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+            syncDiag(`SYNC-APPLY TRIGGER BYPASS active for pull`);
+            const insertResult = await applyFieldLogInserts(pullData.fieldLogs, client);
+            pullSelfHealRequests = insertResult.needsFullRows || [];
+            syncDiag(`PULL FIELD-LOG INSERT: inserted=${insertResult.insertedRows}, updateRemaining=${insertResult.updateLogs.length}, errors=${insertResult.errors.length}`);
+            if (insertResult.errors.length > 0) {
+              insertResult.errors.slice(0, 5).forEach((e) => syncDiag(`PULL INSERT ERROR: ${e.substring(0, 150)}`));
+            }
+            totalPulled += insertResult.insertedRows;
+            if (insertResult.errors.length > 0) {
+              totalApplyErrors += insertResult.errors.length;
+              allErrors.push(...insertResult.errors);
+            }
+            const failedRowUuids = new Set(insertResult.failedRowUuids || []);
+            let updateApplied = 0;
+            let updateErrors = 0;
+            let updSpIdx = 0;
+            for (const log2 of insertResult.updateLogs) {
+              const updSp = `pull_upd_${updSpIdx++}`;
+              try {
+                await client.query(`SAVEPOINT ${updSp}`);
+              } catch {
+              }
+              try {
+                const guard = await evaluateInsertOriginGuard(client, log2);
+                if (guard.skip) {
+                  try {
+                    await client.query(`RELEASE SAVEPOINT ${updSp}`);
+                  } catch {
+                  }
+                  continue;
+                }
+                if (log2.oldValue !== null && log2.oldValue !== void 0) {
+                  const stale = await evaluateStaleSkipGuard(
+                    client,
+                    { ...log2, changedAt: log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt)) },
+                    this.instanceId,
+                    { batchUuid }
+                  );
+                  if (stale.skip) {
+                    try {
+                      await client.query(`RELEASE SAVEPOINT ${updSp}`);
+                    } catch {
+                    }
+                    continue;
+                  }
+                }
+                await this.applyFieldLog(log2, client);
+                try {
+                  await client.query(`RELEASE SAVEPOINT ${updSp}`);
+                } catch {
+                }
+                totalPulled++;
+                updateApplied++;
+              } catch (err) {
+                try {
+                  await client.query(`ROLLBACK TO SAVEPOINT ${updSp}`);
+                } catch {
+                }
+                totalApplyErrors++;
+                updateErrors++;
+                allErrors.push(`${log2.tableName}.${log2.fieldName}: ${err.message}`);
+                const cfg = getTableSyncConfig(log2.tableName);
+                const immutableReject = !!cfg?.immutable || /immutable/i.test(err.message || "");
+                if (immutableReject) {
+                  syncDiag(`PULL FIELD-LOG IMMUTABLE-ACK (terminal): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 ${(err.message || "").substring(0, 120)}`);
+                  console.warn(`[SyncEngine] Immutable-table UPDATE rejected \u2014 acked as terminal (not retried): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid}`);
+                } else {
+                  if (log2.rowUuid) failedRowUuids.add(log2.rowUuid);
+                  console.error(`[SyncEngine] Failed to apply field log ${log2.tableName}.${log2.fieldName}:`, err.message);
+                }
+              }
+            }
+            syncDiag(`PULL FIELD-LOG UPDATE: total=${insertResult.updateLogs.length}, applied=${updateApplied}, errors=${updateErrors}`);
+            const seenRowUuids = /* @__PURE__ */ new Set();
+            for (const l of pullData.fieldLogs) {
+              const ru = l.rowUuid;
+              if (!ru || seenRowUuids.has(ru)) continue;
+              seenRowUuids.add(ru);
+              if (!failedRowUuids.has(ru)) appliedRowUuids.push(ru);
+            }
+            syncDiag(`PULL FIELD-LOG ACK: ${appliedRowUuids.length} rows applied, ${failedRowUuids.size} rows failed (re-offered next pull)`);
+            await client.query("COMMIT");
+          } catch (txErr) {
+            await client.query("ROLLBACK");
+            console.error(`[SyncEngine] Transaction error during pull field log apply: ${txErr.message}`);
+            throw txErr;
+          } finally {
+            client.release();
+          }
+        }
+        if (pullSelfHealRequests.length > 0) {
+          try {
+            const byTable = /* @__PURE__ */ new Map();
+            for (const n of pullSelfHealRequests) {
+              if (!byTable.has(n.tableName)) byTable.set(n.tableName, []);
+              byTable.get(n.tableName).push(n.rowUuid);
+            }
+            const requests = Array.from(byTable.entries()).map(([tableName, rowUuids]) => ({ tableName, rowUuids }));
+            const resp = await this.callSyncApi("POST", "/sync/fetch-rows", {
+              vesselId,
+              instanceId: this.instanceId,
+              requests
+            });
+            for (const t of resp?.tables || []) {
+              const healed = await applyFullRowsIfAbsent(t.tableName, t.rows);
+              totalPulled += healed.inserted;
+              syncDiag(`SELF-HEAL APPLY (pull): ${t.tableName} \u2014 inserted=${healed.inserted}, skipped(existing)=${healed.skipped}, errors=${healed.errors.length}`);
+            }
+          } catch (healErr) {
+            syncDiag(`SELF-HEAL FETCH SKIPPED (old shore or network): ${String(healErr?.message || healErr).substring(0, 150)}`);
+          }
+        }
+        if (pullData.conflicts && pullData.conflicts.length > 0) {
+          conflictsFound = pullData.conflicts.length;
+          for (const conflict of pullData.conflicts) {
+            if (conflict.shipValue === conflict.shoreValue) {
+              try {
+                await resolveConflict(
+                  conflict.conflictUuid,
+                  "auto_same_value",
+                  conflict.shoreValue,
+                  "sync_engine"
+                );
+                conflictsAutoResolved++;
+              } catch (err) {
+                console.error(`[SyncEngine] Failed to auto-resolve conflict ${conflict.conflictUuid}:`, err.message);
+              }
+            }
+          }
+          if (conflictsFound > 0) {
+            console.log(`[SyncEngine] ${conflictsFound} conflicts, ${conflictsAutoResolved} auto-resolved`);
+          }
+        }
+        return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids, failedOneWayTables, oneWayTableMax };
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // SELF-HEAL — full-row request queue (push direction)
+      // ═══════════════════════════════════════════════════════════════
+      /** Queue the shore's needsFullRows (from a push response) for our next push. Dedups. */
+      queueFullRowRequests(needs) {
+        if (!Array.isArray(needs) || needs.length === 0) return;
+        for (const n of needs) {
+          if (!n || typeof n.tableName !== "string" || typeof n.rowUuid !== "string") continue;
+          if (!this.pendingFullRowRequests.has(n.tableName)) this.pendingFullRowRequests.set(n.tableName, /* @__PURE__ */ new Set());
+          this.pendingFullRowRequests.get(n.tableName).add(n.rowUuid);
+        }
+        const total = Array.from(this.pendingFullRowRequests.values()).reduce((s, v) => s + v.size, 0);
+        syncDiag(`SELF-HEAL QUEUE: shore requested full rows \u2014 queue now ${total} row(s) across ${this.pendingFullRowRequests.size} table(s)`);
+      }
+      /** Drain the queue into a fullRows payload (gathered fresh from our own DB). */
+      async drainFullRowRequests() {
+        if (this.pendingFullRowRequests.size === 0) return [];
+        const requests = Array.from(this.pendingFullRowRequests.entries()).map(([tableName, set]) => ({
+          tableName,
+          rowUuids: Array.from(set)
+        }));
+        this.pendingFullRowRequests.clear();
+        const tables = await gatherFullRows(requests);
+        if (tables.length > 0) {
+          syncDiag(`SELF-HEAL DELIVER: sending ${tables.reduce((s, t) => s + t.rows.length, 0)} full row(s) to shore with this push`);
+        }
+        return tables;
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // FIELD LOG APPLIER — Merge a single field change into local DB
+      // ═══════════════════════════════════════════════════════════════
+      async applyFieldLog(log2, client) {
+        const config = getTableSyncConfig(log2.tableName);
+        if (!config) {
+          console.warn(`[SyncEngine] Unknown table in field log: ${log2.tableName}`);
+          return;
+        }
+        if (config.businessRules && log2.tableName === "defects" && log2.fieldName === "status") {
+          if (log2.newValue === "verified" && !isShipInstanceId(this.instanceId)) {
+            console.warn(`[SyncEngine] Business rule: ship cannot verify defects. Skipping.`);
+            return;
+          }
+        }
+        const identityCol = config.identityColumn || "id";
+        const fieldNameSnake = SYNC_COLUMN_ALIASES[log2.fieldName] ?? camelToSnake(log2.fieldName);
+        const conn = client || await getPool();
+        const meta = await getColumnMeta(conn, log2.tableName);
+        if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+          syncDiag(`APPLY-FIELD-LOG SKIP unknown column ${log2.tableName}.${fieldNameSnake}`);
+          return;
+        }
+        let valueToApply = log2.newValue;
+        if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
+          try {
+            JSON.parse(valueToApply);
+          } catch {
+            valueToApply = "[]";
+          }
+        } else if (valueToApply !== null && meta.arrayCols.has(fieldNameSnake)) {
+          valueToApply = coerceArrayValue(valueToApply);
+        }
+        const logTs = log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt));
+        await conn.query(
+          `UPDATE "${log2.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
+          [valueToApply, log2.rowUuid, logTs]
+        );
+        if (log2.tableName === "running_hours_audit" && (fieldNameSnake === "new_rh" || fieldNameSnake === "cumulative_rh") && valueToApply !== null) {
+          try {
+            const auditRow = await conn.query(
+              `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+              [log2.rowUuid]
+            );
+            if (auditRow.rows.length > 0) {
+              const compId = auditRow.rows[0].component_id;
+              const oldRow = await conn.query(
+                `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
+                [compId]
+              );
+              const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || "(not found)";
+              await conn.query(
+                `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, updated_at = NOW() WHERE cuuid = $2`,
+                [String(valueToApply), compId]
+              );
+              syncDiag(`RH-APPLY PULL: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply} from audit row ${log2.rowUuid}`);
+            }
+          } catch (rhErr) {
+            syncDiag(`RH-APPLY PULL ERROR: audit=${log2.rowUuid}: ${rhErr.message}`);
+          }
+        }
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // DELTA EXTRACTION — Get rows changed since checkpoint
+      // ═══════════════════════════════════════════════════════════════
+      async getChangedRows(tableName, vesselId, since, vesselScopeColumn) {
+        const pool2 = await getPool();
+        const conditions = [];
+        const params = [];
+        let paramIdx = 1;
+        if (since) {
+          conditions.push(`"updated_at" > $${paramIdx}`);
+          params.push(since);
+          paramIdx++;
+        }
+        if (vesselScopeColumn && vesselId) {
+          conditions.push(`"${vesselScopeColumn}" = $${paramIdx}`);
+          params.push(vesselId);
+          paramIdx++;
+        }
+        let query = `SELECT * FROM "${tableName}"`;
+        if (conditions.length > 0) {
+          query += " WHERE " + conditions.join(" AND ");
+        }
+        query += ' ORDER BY "updated_at" ASC LIMIT 5000';
+        const result = await pool2.query(query, params);
+        return result.rows;
+      }
+      // ═══════════════════════════════════════════════════════════════
+      // SYNC API CALLER — HTTP or local direct call
+      // ═══════════════════════════════════════════════════════════════
+      async callSyncApi(method, path14, body) {
+        if (this.isLocalMode()) {
+          return this.callLocalSync(path14, body);
+        }
+        const url = `${this.shoreBaseUrl}${path14}`;
+        const response = await fetch(url, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Sync-Api-Key": this.syncApiKey,
+            "X-Sync-Instance-Id": this.instanceId
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(this.requestTimeoutMs)
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Sync API ${response.status}: ${errorText}`);
+        }
+        return response.json();
+      }
+      /** Local mode — call service functions directly (no HTTP) */
+      async callLocalSync(path14, body) {
+        const svc = await Promise.resolve().then(() => (init_service(), service_exports));
+        switch (path14) {
+          case "/sync/initiate":
+            return svc.initiateSyncSession(
+              body.instanceId,
+              body.vesselId,
+              body.lastCheckpoint ? new Date(body.lastCheckpoint) : null
+            );
+          case "/sync/push":
+            return svc.receivePushData(body.batchUuid, body.vesselId, body);
+          case "/sync/pull":
+            return svc.preparePullData(
+              body.batchUuid,
+              body.vesselId,
+              body.instanceId,
+              body.lastCheckpoint ? new Date(body.lastCheckpoint) : null
+            );
+          case "/sync/complete":
+            return svc.completeSyncSession(body.batchUuid, body.vesselId, body.instanceId, void 0, body.failedOneWayTables);
+          case "/sync/fetch-rows":
+            return { tables: await svc.fetchFullRowsForHeal(body.requests) };
+          default:
+            throw new Error(`Unknown sync path: ${path14}`);
+        }
+      }
+      /** Retry wrapper with exponential backoff */
+      async callSyncApiWithRetry(method, path14, body) {
+        let lastError = null;
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            return await this.callSyncApi(method, path14, body);
+          } catch (error) {
+            lastError = error;
+            if (attempt < MAX_RETRIES) {
+              const delay = RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+              console.warn(
+                `[SyncEngine] Attempt ${attempt + 1} failed for ${path14}: ${error.message}. Retrying in ${delay}ms...`
+              );
+              await new Promise((resolve6) => setTimeout(resolve6, delay));
+            }
+          }
+        }
+        throw lastError || new Error(`Failed after ${MAX_RETRIES + 1} attempts`);
+      }
+      /** Check if running in local mode (no HTTP, direct function calls) */
+      isLocalMode() {
+        return process.env.SYNC_LOCAL_MODE === "true" || !this.shoreBaseUrl || this.shoreBaseUrl === "";
+      }
+      /** Get current instance ID (for use by controllers) */
+      getInstanceId() {
+        return this.instanceId;
+      }
+    };
+    engineInstance = null;
   }
 });
 
@@ -15851,6 +17288,19 @@ async function importProvisioningBundle(bundle) {
       );
     }
   }
+  if (bundleTableNames.has("view_modes_master") || bundleTableNames.has("role_view_mode_mapping")) {
+    try {
+      const deletedRvm = await pool2.query("DELETE FROM role_view_mode_mapping");
+      const deletedVm = await pool2.query("DELETE FROM view_modes_master");
+      console.log(
+        `[Provisioning] View-mode cleanup: deleted ${deletedRvm.rowCount} mapping(s), ${deletedVm.rowCount} mode(s) before import`
+      );
+    } catch (cleanupErr) {
+      console.warn(
+        `[Provisioning] View-mode cleanup partial: ${cleanupErr.message}`
+      );
+    }
+  }
   if (bundleTableNames.has("approval_workflow_config")) {
     try {
       const deletedAwc = await pool2.query("DELETE FROM approval_workflow_config");
@@ -16086,7 +17536,11 @@ async function importProvisioningBundle(bundle) {
     if (bundle.manifest.syncApiKey) await seedSettingIfEmpty("sync_api_key", bundle.manifest.syncApiKey);
     const env = bundle.manifest.envSettings;
     const pushBatch = env?.syncPushBatchSize ?? 200;
-    const reqTimeout = env?.syncRequestTimeoutMs ?? 12e4;
+    const rawTimeout = typeof env?.syncRequestTimeoutMs === "number" ? env.syncRequestTimeoutMs : SYNC_REQUEST_TIMEOUT_FLOOR_MS;
+    const reqTimeout = Math.max(rawTimeout, SYNC_REQUEST_TIMEOUT_FLOOR_MS);
+    if (rawTimeout < SYNC_REQUEST_TIMEOUT_FLOOR_MS) {
+      console.warn(`[Provisioning] \u26A0\uFE0F Bundle syncRequestTimeoutMs=${rawTimeout}ms is below the ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms VSAT floor \u2014 clamped to ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms (a short timeout aborts pushes the shore has already applied \u2192 false failures \u2192 data loss).`);
+    }
     await seedSettingIfEmpty("sync_push_batch_size", String(pushBatch));
     await seedSettingIfEmpty("sync_request_timeout_ms", String(reqTimeout));
   } catch (seedErr) {
@@ -16279,914 +17733,11 @@ var init_provisioningService = __esm({
     init_repository();
     init_oneWayApplier();
     init_syncConfig();
+    init_syncEngine();
     SELF_REF_TABLES = {
       adm_menumaster_ac: { idCol: "muid", parentCol: "parent_menu" },
       vessel_org_chart_nodes: { idCol: "node_uuid", parentCol: "parent_node_uuid" }
     };
-  }
-});
-
-// server/modules/sync/syncEngine.ts
-function getSyncEngine() {
-  if (!engineInstance) {
-    engineInstance = new SyncEngine();
-  }
-  return engineInstance;
-}
-function camelToSnake(str) {
-  return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
-}
-var CHUNK_SIZE, MAX_RETRIES, RETRY_DELAYS, DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_PUSH_BATCH_SIZE, FILE_PHASE_MAX_MS, DEFAULT_DRAIN_MAX_CYCLES, SYNC_DRAIN_MAX_MS, SyncEngine, engineInstance;
-var init_syncEngine = __esm({
-  "server/modules/sync/syncEngine.ts"() {
-    "use strict";
-    init_repository();
-    init_oneWayApplier();
-    init_fileSyncProcessor();
-    init_syncConfig();
-    init_db();
-    init_syncDiagLogger();
-    init_syncRole();
-    CHUNK_SIZE = 200;
-    MAX_RETRIES = 3;
-    RETRY_DELAYS = [5e3, 15e3, 45e3];
-    DEFAULT_REQUEST_TIMEOUT_MS = 3e4;
-    DEFAULT_PUSH_BATCH_SIZE = 1e3;
-    FILE_PHASE_MAX_MS = parseInt(process.env.SYNC_FILE_PHASE_MAX_MS || "", 10) || 12e4;
-    DEFAULT_DRAIN_MAX_CYCLES = 20;
-    SYNC_DRAIN_MAX_MS = parseInt(process.env.SYNC_DRAIN_MAX_MS || "", 10) || 6e4;
-    SyncEngine = class {
-      instanceId;
-      shoreBaseUrl;
-      syncApiKey;
-      // Phase 4a: per-instance tunables, resolved DB-then-env in loadSettings().
-      // Seeded from env (or hardcoded default) in the constructor so they are valid
-      // even before loadSettings runs — default-preserving.
-      requestTimeoutMs;
-      pushBatchSize;
-      catchUpMaxCycles = DEFAULT_DRAIN_MAX_CYCLES;
-      fileDrainMaxBytes = DEFAULT_FILE_DRAIN_MAX_BYTES;
-      settingsLoaded = false;
-      // Shared re-entrancy guard (backend safety net): one drain/sync per vessel at a time across
-      // BOTH the manual "Sync Now" drain and the auto-scheduler tick. Released in try/finally so a
-      // thrown/failed cycle always clears it — a stuck guard would block all future syncs.
-      inFlight = /* @__PURE__ */ new Set();
-      // Fix 3 poison-row guard: consecutive times the shore has reported a row_uuid as dropped.
-      // After DEAD_LETTER_AFTER, we give up (mark it synced + loud alert) so a genuinely-bad row
-      // can't loop forever. In-memory on the (singleton) engine — persists across sync cycles in
-      // the running process; resets on restart (a poison row then gets a fresh K attempts + alerts).
-      droppedRetryCount = /* @__PURE__ */ new Map();
-      // Self-heal: full-row requests the SHORE returned from our pushes (needsFullRows). Drained
-      // into the next push's fullRows payload. In-memory by design — if lost (restart), the same
-      // fragments re-fail on shore and the request regenerates. Map<tableName, Set<rowUuid>>.
-      pendingFullRowRequests = /* @__PURE__ */ new Map();
-      // Pull-side file dead-letter counter (mirrors droppedRetryCount): consecutive failed pulls per
-      // file queueUuid. In-memory on the singleton engine so it persists across cycles within a run.
-      filePullRetryCount = /* @__PURE__ */ new Map();
-      constructor() {
-        this.instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-        this.shoreBaseUrl = process.env.SYNC_SHORE_URL || "";
-        this.syncApiKey = process.env.SYNC_API_KEY || "";
-        this.requestTimeoutMs = parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || "", 10) || DEFAULT_REQUEST_TIMEOUT_MS;
-        this.pushBatchSize = parseInt(process.env.SYNC_PUSH_BATCH_SIZE || "", 10) || DEFAULT_PUSH_BATCH_SIZE;
-      }
-      /** Load settings from DB (with env var fallback). Called once per sync cycle. */
-      async loadSettings() {
-        if (this.settingsLoaded) return;
-        try {
-          const settings = await getAllSettings();
-          this.instanceId = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-          this.shoreBaseUrl = settings["shore_url"] || process.env.SYNC_SHORE_URL || "";
-          this.syncApiKey = settings["sync_api_key"] || process.env.SYNC_API_KEY || "";
-          const dbBatch = parseInt(settings["sync_push_batch_size"] || "", 10);
-          this.pushBatchSize = dbBatch || parseInt(process.env.SYNC_PUSH_BATCH_SIZE || "", 10) || DEFAULT_PUSH_BATCH_SIZE;
-          const dbTimeout = parseInt(settings["sync_request_timeout_ms"] || "", 10);
-          this.requestTimeoutMs = dbTimeout || parseInt(process.env.SYNC_REQUEST_TIMEOUT_MS || "", 10) || DEFAULT_REQUEST_TIMEOUT_MS;
-          const dbCatchUp = parseInt(settings["catch_up_max_cycles"] || "", 10);
-          this.catchUpMaxCycles = dbCatchUp || DEFAULT_DRAIN_MAX_CYCLES;
-          const dbFileMax = parseInt(settings["sync_file_drain_max_bytes"] || "", 10);
-          this.fileDrainMaxBytes = dbFileMax || DEFAULT_FILE_DRAIN_MAX_BYTES;
-          this.settingsLoaded = true;
-          console.log(`[SyncEngine] Settings loaded from DB \u2014 instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || "(empty)"}, localMode=${this.isLocalMode()}`);
-        } catch (error) {
-          console.warn("[SyncEngine] Could not load DB settings, using env vars:", error);
-        }
-      }
-      /** Force reload on next sync cycle (called when settings are updated via API) */
-      reloadSettings() {
-        this.settingsLoaded = false;
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // HELPER — Resolve vessel UUID → vessel_code (cached)
-      // ═══════════════════════════════════════════════════════════════
-      vesselCodeCache = /* @__PURE__ */ new Map();
-      async getVesselCode(vesselId) {
-        if (this.vesselCodeCache.has(vesselId)) return this.vesselCodeCache.get(vesselId);
-        try {
-          const pool2 = await getPool();
-          const result = await pool2.query(
-            `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
-            [vesselId]
-          );
-          const code = result.rows[0]?.vessel_code || null;
-          this.vesselCodeCache.set(vesselId, code);
-          return code;
-        } catch {
-          return null;
-        }
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // PUBLIC — Run a complete sync cycle
-      // ═══════════════════════════════════════════════════════════════
-      async runSync(vesselId) {
-        await this.loadSettings();
-        const startTime = Date.now();
-        let batchUuid = null;
-        let recordsPushed = 0;
-        let recordsPulled = 0;
-        let conflictsFound = 0;
-        let conflictsAutoResolved = 0;
-        try {
-          syncDiag(`=== SYNC START === vessel=${vesselId}, instance=${this.instanceId}, mode=${this.isLocalMode() ? "LOCAL" : "REMOTE"}`);
-          console.log(`[SyncEngine] Starting sync for vessel ${vesselId} from instance ${this.instanceId}`);
-          const metadata = await getInstanceMetadata(this.instanceId);
-          const lastCheckpoint = metadata?.lastSyncCheckpoint || null;
-          const initResult = await this.callSyncApi("POST", "/sync/initiate", {
-            instanceId: this.instanceId,
-            vesselId,
-            lastCheckpoint: lastCheckpoint ? lastCheckpoint.toISOString() : null
-          });
-          batchUuid = initResult.batchUuid;
-          console.log(`[SyncEngine] Batch initiated: ${batchUuid}`);
-          try {
-            const localPool = await getPool();
-            await localPool.query(
-              `INSERT INTO sync_batches (batch_uuid, initiated_by_instance, vessel_id, checkpoint_before, status)
-           VALUES ($1, $2, $3, $4, 'in_progress')
-           ON CONFLICT (batch_uuid) DO NOTHING`,
-              [batchUuid, this.instanceId, vesselId, lastCheckpoint]
-            );
-          } catch (localBatchErr) {
-            console.warn(`[SyncEngine] Could not create local batch row: ${localBatchErr.message}`);
-          }
-          const pushResult = await this.executePush(batchUuid, vesselId, lastCheckpoint);
-          recordsPushed = pushResult.totalPushed;
-          const pushedLogUuids = pushResult.pushedLogUuids;
-          console.log(`[SyncEngine] Pushed ${recordsPushed} records (${pushedLogUuids.length} field logs)`);
-          const pullResult = await this.executePull(batchUuid, vesselId, lastCheckpoint);
-          recordsPulled = pullResult.totalPulled;
-          conflictsFound = pullResult.conflictsFound;
-          conflictsAutoResolved = pullResult.conflictsAutoResolved;
-          const pullErrors = pullResult.errors;
-          console.log(`[SyncEngine] Pulled ${recordsPulled} records, ${conflictsFound} conflicts`);
-          if (pullResult.totalApplyErrors > 0) {
-            console.warn(`[SyncEngine] ${pullResult.totalApplyErrors} apply errors during pull`);
-          }
-          const completeResult = await this.callSyncApi("POST", "/sync/complete", {
-            batchUuid,
-            vesselId,
-            instanceId: this.instanceId,
-            appliedRowUuids: pullResult.appliedRowUuids,
-            // One-way orphaning fix: tables whose one-way apply failed this cycle. The shore
-            // holds the checkpoint at checkpointBefore when non-empty, so the failed window
-            // is re-offered next sync (one-way applies are idempotent upserts).
-            failedOneWayTables: pullResult.failedOneWayTables
-          });
-          console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
-          syncDiag(`SYNC COMPLETE: checkpoint=${completeResult.newCheckpoint}`);
-          if (!this.isLocalMode()) {
-            try {
-              await upsertInstanceMetadata({
-                instanceId: this.instanceId,
-                vesselId,
-                // newCheckpoint can be null when the shore held the watermark back (failed
-                // one-way tables, or a held-back first sync) — save null, never new Date(null).
-                lastSyncCheckpoint: completeResult.newCheckpoint ? new Date(completeResult.newCheckpoint) : null,
-                lastSyncStatus: "success",
-                lastSyncAt: /* @__PURE__ */ new Date()
-              });
-              syncDiag(`CHECKPOINT SAVED LOCALLY: ${completeResult.newCheckpoint}`);
-            } catch (cpErr) {
-              syncDiag(`CHECKPOINT LOCAL SAVE FAILED: ${cpErr.message}`);
-              console.warn(`[SyncEngine] Failed to save local checkpoint: ${cpErr.message}`);
-            }
-          }
-          const isShip = isShipInstanceId(this.instanceId);
-          if (pushedLogUuids.length > 0 && isShip) {
-            try {
-              await markFieldLogsSynced(pushedLogUuids, batchUuid);
-              syncDiag(`PUSH DONE: marked ${pushedLogUuids.length} field logs as synced locally`);
-              console.log(`[SyncEngine] Marked ${pushedLogUuids.length} local field logs as synced`);
-            } catch (markErr) {
-              console.warn(`[SyncEngine] Failed to mark local logs as synced: ${markErr.message}`);
-            }
-          }
-          let filesProcessedCount = 0;
-          let filesFailedCount = 0;
-          let remainingFilePull = 0;
-          try {
-            const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl, this.instanceId, this.syncApiKey);
-            const fileResult = await fileProcessor.processQueue(vesselId, batchUuid, FILE_PHASE_MAX_MS);
-            filesProcessedCount = fileResult.filesProcessed;
-            filesFailedCount = fileResult.filesFailed;
-            console.log(
-              `[SyncEngine] Files (push): ${fileResult.filesProcessed} processed, ${fileResult.filesFailed} failed, ${fileResult.bytesTransferred} bytes`
-            );
-            const pullResult2 = await fileProcessor.pullQueue(vesselId, FILE_PHASE_MAX_MS, this.fileDrainMaxBytes, this.filePullRetryCount);
-            filesProcessedCount += pullResult2.filesProcessed;
-            filesFailedCount += pullResult2.filesFailed;
-            remainingFilePull = pullResult2.remainingSmall;
-            console.log(
-              `[SyncEngine] Files (pull): ${pullResult2.filesProcessed} processed, ${pullResult2.filesFailed} failed, ${pullResult2.bytesTransferred} bytes, remainingSmall=${pullResult2.remainingSmall}`
-            );
-          } catch (fileError) {
-            console.warn(`[SyncEngine] File sync failed (non-fatal): ${fileError.message}`);
-          }
-          const errorMessage = pullErrors.length > 0 ? pullErrors.join("\n") : null;
-          if (errorMessage && batchUuid) {
-            try {
-              await updateBatch(batchUuid, { errorMessage });
-            } catch (updateErr) {
-              console.warn(`[SyncEngine] Failed to store errors in batch: ${updateErr.message}`);
-            }
-          }
-          const durationMs = Date.now() - startTime;
-          let remainingPush = 0;
-          if (isShip) {
-            try {
-              const vc = await this.getVesselCode(vesselId);
-              remainingPush = await getUnsyncedFieldLogCount(this.instanceId, vesselId, vc);
-            } catch (cntErr) {
-              console.warn(`[SyncEngine] Could not count remaining push rows: ${cntErr.message}`);
-            }
-          }
-          syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=success, pushed=${recordsPushed}, pulled=${recordsPulled}, conflicts=${conflictsFound}, files=${filesProcessedCount}+${filesFailedCount}, remainingPush=${remainingPush}, remainingPull=${completeResult.remainingPull ?? 0}`);
-          return {
-            success: true,
-            batchUuid,
-            recordsPushed,
-            recordsPulled,
-            conflictsFound,
-            conflictsAutoResolved,
-            filesQueued: filesProcessedCount + filesFailedCount,
-            durationMs,
-            error: errorMessage,
-            newCheckpoint: completeResult.newCheckpoint,
-            remainingPush,
-            remainingPull: completeResult.remainingPull ?? 0,
-            remainingFilePull
-          };
-        } catch (error) {
-          const durationMs = Date.now() - startTime;
-          const errorDetail = error.message + (error.cause?.code ? ` [${error.cause.code}]` : "");
-          syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=FAILED, error=${errorDetail}`);
-          console.error(`[SyncEngine] Sync failed for vessel ${vesselId}:`, errorDetail);
-          if (batchUuid) {
-            try {
-              await updateBatch(batchUuid, {
-                status: "failed",
-                errorMessage: errorDetail,
-                completedAt: /* @__PURE__ */ new Date(),
-                durationMs
-              });
-            } catch (updateError) {
-              console.error("[SyncEngine] Failed to update batch status:", updateError);
-            }
-          }
-          return {
-            success: false,
-            batchUuid,
-            recordsPushed,
-            recordsPulled,
-            conflictsFound,
-            conflictsAutoResolved,
-            filesQueued: 0,
-            durationMs,
-            error: errorDetail,
-            newCheckpoint: null,
-            remainingPush: null,
-            // unknown on failure → drain loop stops
-            remainingPull: null,
-            remainingFilePull: null
-          };
-        }
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // RE-ENTRANCY GUARD (shared: manual drain + auto-scheduler)
-      // ═══════════════════════════════════════════════════════════════
-      /** Try to claim a vessel for syncing. Returns false if a sync/drain is already running for it. */
-      tryAcquireVessel(vesselId) {
-        if (this.inFlight.has(vesselId)) return false;
-        this.inFlight.add(vesselId);
-        return true;
-      }
-      /** Release a vessel claim. MUST be called in a finally so a thrown cycle can't leave it stuck. */
-      releaseVessel(vesselId) {
-        this.inFlight.delete(vesselId);
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // DRAIN — repeat whole cycles until push+pull backlogs hit 0 (or a safety stop)
-      // ═══════════════════════════════════════════════════════════════
-      /**
-       * One "Sync Now" = fully reconcile the vessel in a single user action: loop runSync (whole,
-       * unchanged cycles — per-batch limits and all fix internals intact) until BOTH the ship's
-       * unsynced backlog and the shore's pending-for-this-vessel backlog are zero, or a safety stop.
-       * Safety: DRAINED (remaining==0) | NO-PROGRESS (remaining didn't decrease — respects the
-       * dead-letter guard, so a poison row stops the loop rather than spinning) | CAP
-       * (catch_up_max_cycles) | TIME BUDGET (SYNC_DRAIN_MAX_MS) | FAILURE. Returns an aggregate
-       * SyncResult (summed pushed/pulled) plus cyclesRun.
-       */
-      async runSyncToCompletion(vesselId) {
-        await this.loadSettings();
-        if (!this.tryAcquireVessel(vesselId)) {
-          syncDiag(`DRAIN SKIP: sync already in progress for vessel=${vesselId}`);
-          return {
-            success: false,
-            batchUuid: null,
-            recordsPushed: 0,
-            recordsPulled: 0,
-            conflictsFound: 0,
-            conflictsAutoResolved: 0,
-            filesQueued: 0,
-            durationMs: 0,
-            error: "A sync is already in progress for this vessel \u2014 please wait for it to finish.",
-            newCheckpoint: null,
-            remainingPush: null,
-            remainingPull: null,
-            remainingFilePull: null,
-            cyclesRun: 0
-          };
-        }
-        const maxCycles = this.catchUpMaxCycles || DEFAULT_DRAIN_MAX_CYCLES;
-        const startMs = Date.now();
-        let cyclesRun = 0;
-        let prevRemaining = Number.POSITIVE_INFINITY;
-        let aggPushed = 0, aggPulled = 0, aggConflicts = 0, aggAuto = 0, aggFiles = 0;
-        let last;
-        try {
-          for (; ; ) {
-            last = await this.runSync(vesselId);
-            cyclesRun++;
-            aggPushed += last.recordsPushed;
-            aggPulled += last.recordsPulled;
-            aggConflicts += last.conflictsFound;
-            aggAuto += last.conflictsAutoResolved;
-            aggFiles += last.filesQueued;
-            if (!last.success) break;
-            const remaining = (last.remainingPush ?? 0) + (last.remainingPull ?? 0) + (last.remainingFilePull ?? 0);
-            if (remaining === 0) {
-              syncDiag(`DRAIN COMPLETE: vessel=${vesselId} fully reconciled in ${cyclesRun} cycle(s)`);
-              break;
-            }
-            if (remaining >= prevRemaining) {
-              syncDiag(`DRAIN NO-PROGRESS: vessel=${vesselId} remaining=${remaining} did not decrease \u2014 stopping (cycle ${cyclesRun})`);
-              console.warn(`[SyncEngine] Drain stopped (no progress): ${remaining} rows remain for vessel ${vesselId}. Poison/dead-letter rows persist for a later sync.`);
-              break;
-            }
-            prevRemaining = remaining;
-            if (cyclesRun >= maxCycles) {
-              console.warn(`[SyncEngine] Drain hit max cycles (${maxCycles}) for vessel ${vesselId}; ${remaining} rows remain \u2014 will finish on next Sync Now / auto-tick.`);
-              break;
-            }
-            if (Date.now() - startMs >= SYNC_DRAIN_MAX_MS) {
-              console.warn(`[SyncEngine] Drain hit time budget (${SYNC_DRAIN_MAX_MS}ms) for vessel ${vesselId}; ${remaining} rows remain \u2014 will finish on next Sync Now / auto-tick.`);
-              break;
-            }
-          }
-        } finally {
-          this.releaseVessel(vesselId);
-        }
-        return {
-          ...last,
-          recordsPushed: aggPushed,
-          recordsPulled: aggPulled,
-          conflictsFound: aggConflicts,
-          conflictsAutoResolved: aggAuto,
-          filesQueued: aggFiles,
-          cyclesRun
-        };
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // PUSH — Gather and send local changes
-      // ═══════════════════════════════════════════════════════════════
-      async executePush(batchUuid, vesselId, lastCheckpoint) {
-        let totalPushed = 0;
-        const shipOnlyRows = [];
-        if (isShipInstanceId(this.instanceId)) {
-          const shipOnlyTables = getTablesByCategory("SHIP_ONLY");
-          for (const tableConfig of shipOnlyTables) {
-            try {
-              const rows = await this.getChangedRows(tableConfig.tableName, vesselId, lastCheckpoint, tableConfig.vesselScopeColumn);
-              if (rows.length > 0) {
-                shipOnlyRows.push({ tableName: tableConfig.tableName, rows });
-              }
-            } catch (err) {
-              console.warn(`[SyncEngine] Skipping SHIP_ONLY table ${tableConfig.tableName}: ${err.message}`);
-            }
-          }
-        }
-        const isShip = isShipInstanceId(this.instanceId);
-        const vesselCode = await this.getVesselCode(vesselId);
-        syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
-        const fieldLogs = isShip ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, this.pushBatchSize) : [];
-        syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip ? " (shore skips field log push)" : ""}`);
-        const pushTables = {};
-        fieldLogs.forEach((l) => {
-          pushTables[l.tableName ?? l.table_name] = (pushTables[l.tableName ?? l.table_name] || 0) + 1;
-        });
-        if (Object.keys(pushTables).length > 0) syncDiag(`PUSH table breakdown:`, pushTables);
-        fieldLogs.slice(0, 5).forEach((l, i) => {
-          const tbl = l.tableName ?? l.table_name;
-          const fld = l.fieldName ?? l.field_name;
-          const row = l.rowUuid ?? l.row_uuid;
-          const nv = l.newValue ?? l.new_value;
-          syncDiag(`PUSH sample[${i}]: table=${tbl}, field=${fld}, row=${row}, oldNull=${(l.oldValue ?? l.old_value) === null}, newValue=${nv ? String(nv).substring(0, 80) : "NULL"}`);
-        });
-        const droppedRowUuids = /* @__PURE__ */ new Set();
-        const fieldLogPayloads = fieldLogs.map((log2) => ({
-          tableName: log2.tableName ?? log2.table_name,
-          rowUuid: log2.rowUuid ?? log2.row_uuid,
-          fieldName: log2.fieldName ?? log2.field_name,
-          oldValue: log2.oldValue ?? log2.old_value,
-          newValue: log2.newValue ?? log2.new_value,
-          vesselId: log2.vesselId ?? log2.vessel_id,
-          changedAt: (log2.changedAt ?? log2.changed_at) instanceof Date ? (log2.changedAt ?? log2.changed_at).toISOString() : String(log2.changedAt ?? log2.changed_at),
-          changedByUserId: log2.changedByUserId ?? log2.changed_by_user_id,
-          instanceId: log2.instanceId ?? log2.instance_id
-        }));
-        const masterRecordHints = [];
-        if (isShip && fieldLogPayloads.length > 0) {
-          const surveyMasterIds = /* @__PURE__ */ new Set();
-          const certMasterIds = /* @__PURE__ */ new Set();
-          for (const log2 of fieldLogPayloads) {
-            if (log2.tableName === "vessel_survey_data" && log2.fieldName === "masterId" && log2.newValue) {
-              surveyMasterIds.add(log2.newValue);
-            }
-            if (log2.tableName === "vessel_certificate_data" && log2.fieldName === "masterId" && log2.newValue) {
-              certMasterIds.add(log2.newValue);
-            }
-          }
-          const pool2 = await getPool();
-          if (surveyMasterIds.size > 0) {
-            try {
-              const r = await pool2.query(
-                `SELECT master_id, survey_name, category, "group", requirement_ref,
-                    applicable_to_company, survey_label, company_id, company_group, company_sequence, sequence
-             FROM ship_surveys_master WHERE master_id = ANY($1) AND is_deleted = false`,
-                [Array.from(surveyMasterIds)]
-              );
-              if (r.rows.length > 0) masterRecordHints.push({ tableName: "ship_surveys_master", rows: r.rows });
-            } catch (err) {
-              console.warn("[SyncEngine] FIX 58 survey master hints:", err.message);
-            }
-          }
-          if (certMasterIds.size > 0) {
-            try {
-              const r = await pool2.query(
-                `SELECT master_id, certificate_name, category, "group", requirement_ref,
-                    applicable_to_company, certificate_label, company_id, company_group, company_sequence, sequence
-             FROM ship_certificates_master WHERE master_id = ANY($1) AND is_deleted = false`,
-                [Array.from(certMasterIds)]
-              );
-              if (r.rows.length > 0) masterRecordHints.push({ tableName: "ship_certificates_master", rows: r.rows });
-            } catch (err) {
-              console.warn("[SyncEngine] FIX 58 cert master hints:", err.message);
-            }
-          }
-          if (masterRecordHints.length > 0) {
-            syncDiag(`FIX 58: sending ${masterRecordHints.reduce((s, h) => s + h.rows.length, 0)} master record hint(s) to shore`);
-          }
-        }
-        if (fieldLogPayloads.length > 0 || shipOnlyRows.length > 0) {
-          const chunks = [];
-          let current = [];
-          let lastRow = null;
-          for (const p of fieldLogPayloads) {
-            if (p.rowUuid !== lastRow && current.length >= CHUNK_SIZE) {
-              chunks.push(current);
-              current = [];
-            }
-            current.push(p);
-            lastRow = p.rowUuid;
-          }
-          if (current.length > 0) chunks.push(current);
-          if (chunks.length === 0) chunks.push([]);
-          const fullRowsPayload = await this.drainFullRowRequests();
-          for (let idx = 0; idx < chunks.length; idx++) {
-            const result = await this.callSyncApiWithRetry("POST", "/sync/push", {
-              batchUuid,
-              vesselId,
-              oneWayRows: idx === 0 ? shipOnlyRows : [],
-              // One-way rows with first chunk only
-              fieldLogs: chunks[idx],
-              masterRecordHints: idx === 0 ? masterRecordHints : [],
-              // Hints with first chunk only
-              ...idx === 0 && fullRowsPayload.length > 0 ? { fullRows: fullRowsPayload } : {}
-            });
-            totalPushed += result.received || 0;
-            (result.droppedRowUuids || []).forEach((r) => droppedRowUuids.add(r));
-            this.queueFullRowRequests(result.needsFullRows);
-          }
-        } else {
-          const fullRowsPayload = await this.drainFullRowRequests();
-          const result = await this.callSyncApiWithRetry("POST", "/sync/push", {
-            batchUuid,
-            vesselId,
-            oneWayRows: [],
-            fieldLogs: [],
-            ...fullRowsPayload.length > 0 ? { fullRows: fullRowsPayload } : {}
-          });
-          this.queueFullRowRequests(result?.needsFullRows);
-        }
-        const DEAD_LETTER_AFTER = 3;
-        const keepUnsynced = /* @__PURE__ */ new Set();
-        for (const r of Array.from(droppedRowUuids)) {
-          const n = (this.droppedRetryCount.get(r) || 0) + 1;
-          if (n >= DEAD_LETTER_AFTER) {
-            this.droppedRetryCount.delete(r);
-            syncDiag(`\u26A0\uFE0F DEAD-LETTER: row=${r} dropped by shore ${n}x in a row \u2014 marking synced to stop the loop. NEEDS MANUAL REVIEW (permanent apply failure).`);
-            console.error(`[SyncEngine] \u26A0\uFE0F DEAD-LETTER row=${r} after ${n} failed apply attempts \u2014 marked synced (stop loop), needs manual review.`);
-          } else {
-            this.droppedRetryCount.set(r, n);
-            keepUnsynced.add(r);
-          }
-        }
-        for (const l of fieldLogs) {
-          const ru = l.rowUuid ?? l.row_uuid;
-          if (!droppedRowUuids.has(ru)) this.droppedRetryCount.delete(ru);
-        }
-        const pushedLogUuids = fieldLogs.filter((l) => !keepUnsynced.has(l.rowUuid ?? l.row_uuid)).map((l) => l.logUuid ?? l.log_uuid);
-        return { totalPushed, pushedLogUuids };
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // PULL — Get and apply remote changes
-      // ═══════════════════════════════════════════════════════════════
-      async executePull(batchUuid, vesselId, lastCheckpoint) {
-        let totalPulled = 0;
-        let totalApplyErrors = 0;
-        let conflictsFound = 0;
-        let conflictsAutoResolved = 0;
-        const allErrors = [];
-        const failedOneWayTables = [];
-        const appliedRowUuids = [];
-        const pullData = await this.callSyncApiWithRetry("POST", "/sync/pull", {
-          batchUuid,
-          vesselId,
-          instanceId: this.instanceId,
-          lastCheckpoint: lastCheckpoint ? lastCheckpoint.toISOString() : null
-        });
-        const pullOneWay = {};
-        (pullData.oneWayRows || []).forEach((r) => {
-          pullOneWay[r.tableName] = r.rows?.length || 0;
-        });
-        const pullFields = {};
-        (pullData.fieldLogs || []).forEach((l) => {
-          pullFields[l.tableName] = (pullFields[l.tableName] || 0) + 1;
-        });
-        syncDiag(`PULL RECEIVED: ${pullData.oneWayRows?.length || 0} one-way table batches, ${pullData.fieldLogs?.length || 0} field logs`);
-        if (Object.keys(pullOneWay).length > 0) syncDiag(`PULL one-way tables:`, pullOneWay);
-        if (Object.keys(pullFields).length > 0) syncDiag(`PULL field log tables:`, pullFields);
-        if (pullData.oneWayRows && pullData.oneWayRows.length > 0) {
-          for (const tableData of pullData.oneWayRows) {
-            try {
-              const result = await applyOneWayRows(tableData.tableName, tableData.rows);
-              syncDiag(`PULL ONE-WAY: ${tableData.tableName} \u2014 inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, errors=${result.errors.length}`);
-              totalPulled += result.inserted + result.updated + result.softDeleted;
-              totalApplyErrors += result.errors.length;
-              if (result.errors.length > 0) {
-                failedOneWayTables.push(tableData.tableName);
-                result.errors.slice(0, 3).forEach((e) => syncDiag(`PULL ONE-WAY ERROR: ${tableData.tableName}[${e.rowIndex}]: ${String(e.error).substring(0, 150)}`));
-                const errorSamples = result.errors.slice(0, 5).map(
-                  (e) => `${tableData.tableName}[${e.rowIndex}]: ${e.error}`
-                );
-                if (result.errors.length > 5) {
-                  errorSamples.push(`... and ${result.errors.length - 5} more`);
-                }
-                allErrors.push(...errorSamples);
-              }
-            } catch (err) {
-              failedOneWayTables.push(tableData.tableName);
-              syncDiag(`PULL ONE-WAY EXCEPTION: ${tableData.tableName}: ${err.message.substring(0, 150)}`);
-              console.error(`[SyncEngine] Failed to apply one-way rows for ${tableData.tableName}:`, err.message);
-              allErrors.push(`${tableData.tableName}: ${err.message}`);
-            }
-          }
-        }
-        let pullSelfHealRequests = [];
-        if (pullData.fieldLogs && pullData.fieldLogs.length > 0) {
-          const pool2 = await getPool();
-          const client = await pool2.connect();
-          try {
-            await client.query("BEGIN");
-            await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
-            syncDiag(`SYNC-APPLY TRIGGER BYPASS active for pull`);
-            const insertResult = await applyFieldLogInserts(pullData.fieldLogs, client);
-            pullSelfHealRequests = insertResult.needsFullRows || [];
-            syncDiag(`PULL FIELD-LOG INSERT: inserted=${insertResult.insertedRows}, updateRemaining=${insertResult.updateLogs.length}, errors=${insertResult.errors.length}`);
-            if (insertResult.errors.length > 0) {
-              insertResult.errors.slice(0, 5).forEach((e) => syncDiag(`PULL INSERT ERROR: ${e.substring(0, 150)}`));
-            }
-            totalPulled += insertResult.insertedRows;
-            if (insertResult.errors.length > 0) {
-              totalApplyErrors += insertResult.errors.length;
-              allErrors.push(...insertResult.errors);
-            }
-            const failedRowUuids = new Set(insertResult.failedRowUuids || []);
-            let updateApplied = 0;
-            let updateErrors = 0;
-            let updSpIdx = 0;
-            for (const log2 of insertResult.updateLogs) {
-              const updSp = `pull_upd_${updSpIdx++}`;
-              try {
-                await client.query(`SAVEPOINT ${updSp}`);
-              } catch {
-              }
-              try {
-                await this.applyFieldLog(log2, client);
-                try {
-                  await client.query(`RELEASE SAVEPOINT ${updSp}`);
-                } catch {
-                }
-                totalPulled++;
-                updateApplied++;
-              } catch (err) {
-                try {
-                  await client.query(`ROLLBACK TO SAVEPOINT ${updSp}`);
-                } catch {
-                }
-                totalApplyErrors++;
-                updateErrors++;
-                allErrors.push(`${log2.tableName}.${log2.fieldName}: ${err.message}`);
-                const cfg = getTableSyncConfig(log2.tableName);
-                const immutableReject = !!cfg?.immutable || /immutable/i.test(err.message || "");
-                if (immutableReject) {
-                  syncDiag(`PULL FIELD-LOG IMMUTABLE-ACK (terminal): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 ${(err.message || "").substring(0, 120)}`);
-                  console.warn(`[SyncEngine] Immutable-table UPDATE rejected \u2014 acked as terminal (not retried): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid}`);
-                } else {
-                  if (log2.rowUuid) failedRowUuids.add(log2.rowUuid);
-                  console.error(`[SyncEngine] Failed to apply field log ${log2.tableName}.${log2.fieldName}:`, err.message);
-                }
-              }
-            }
-            syncDiag(`PULL FIELD-LOG UPDATE: total=${insertResult.updateLogs.length}, applied=${updateApplied}, errors=${updateErrors}`);
-            const seenRowUuids = /* @__PURE__ */ new Set();
-            for (const l of pullData.fieldLogs) {
-              const ru = l.rowUuid;
-              if (!ru || seenRowUuids.has(ru)) continue;
-              seenRowUuids.add(ru);
-              if (!failedRowUuids.has(ru)) appliedRowUuids.push(ru);
-            }
-            syncDiag(`PULL FIELD-LOG ACK: ${appliedRowUuids.length} rows applied, ${failedRowUuids.size} rows failed (re-offered next pull)`);
-            await client.query("COMMIT");
-          } catch (txErr) {
-            await client.query("ROLLBACK");
-            console.error(`[SyncEngine] Transaction error during pull field log apply: ${txErr.message}`);
-            throw txErr;
-          } finally {
-            client.release();
-          }
-        }
-        if (pullSelfHealRequests.length > 0) {
-          try {
-            const byTable = /* @__PURE__ */ new Map();
-            for (const n of pullSelfHealRequests) {
-              if (!byTable.has(n.tableName)) byTable.set(n.tableName, []);
-              byTable.get(n.tableName).push(n.rowUuid);
-            }
-            const requests = Array.from(byTable.entries()).map(([tableName, rowUuids]) => ({ tableName, rowUuids }));
-            const resp = await this.callSyncApi("POST", "/sync/fetch-rows", {
-              vesselId,
-              instanceId: this.instanceId,
-              requests
-            });
-            for (const t of resp?.tables || []) {
-              const healed = await applyFullRowsIfAbsent(t.tableName, t.rows);
-              totalPulled += healed.inserted;
-              syncDiag(`SELF-HEAL APPLY (pull): ${t.tableName} \u2014 inserted=${healed.inserted}, skipped(existing)=${healed.skipped}, errors=${healed.errors.length}`);
-            }
-          } catch (healErr) {
-            syncDiag(`SELF-HEAL FETCH SKIPPED (old shore or network): ${String(healErr?.message || healErr).substring(0, 150)}`);
-          }
-        }
-        if (pullData.conflicts && pullData.conflicts.length > 0) {
-          conflictsFound = pullData.conflicts.length;
-          for (const conflict of pullData.conflicts) {
-            if (conflict.shipValue === conflict.shoreValue) {
-              try {
-                await resolveConflict(
-                  conflict.conflictUuid,
-                  "auto_same_value",
-                  conflict.shoreValue,
-                  "sync_engine"
-                );
-                conflictsAutoResolved++;
-              } catch (err) {
-                console.error(`[SyncEngine] Failed to auto-resolve conflict ${conflict.conflictUuid}:`, err.message);
-              }
-            }
-          }
-          if (conflictsFound > 0) {
-            console.log(`[SyncEngine] ${conflictsFound} conflicts, ${conflictsAutoResolved} auto-resolved`);
-          }
-        }
-        return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors, appliedRowUuids, failedOneWayTables };
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // SELF-HEAL — full-row request queue (push direction)
-      // ═══════════════════════════════════════════════════════════════
-      /** Queue the shore's needsFullRows (from a push response) for our next push. Dedups. */
-      queueFullRowRequests(needs) {
-        if (!Array.isArray(needs) || needs.length === 0) return;
-        for (const n of needs) {
-          if (!n || typeof n.tableName !== "string" || typeof n.rowUuid !== "string") continue;
-          if (!this.pendingFullRowRequests.has(n.tableName)) this.pendingFullRowRequests.set(n.tableName, /* @__PURE__ */ new Set());
-          this.pendingFullRowRequests.get(n.tableName).add(n.rowUuid);
-        }
-        const total = Array.from(this.pendingFullRowRequests.values()).reduce((s, v) => s + v.size, 0);
-        syncDiag(`SELF-HEAL QUEUE: shore requested full rows \u2014 queue now ${total} row(s) across ${this.pendingFullRowRequests.size} table(s)`);
-      }
-      /** Drain the queue into a fullRows payload (gathered fresh from our own DB). */
-      async drainFullRowRequests() {
-        if (this.pendingFullRowRequests.size === 0) return [];
-        const requests = Array.from(this.pendingFullRowRequests.entries()).map(([tableName, set]) => ({
-          tableName,
-          rowUuids: Array.from(set)
-        }));
-        this.pendingFullRowRequests.clear();
-        const tables = await gatherFullRows(requests);
-        if (tables.length > 0) {
-          syncDiag(`SELF-HEAL DELIVER: sending ${tables.reduce((s, t) => s + t.rows.length, 0)} full row(s) to shore with this push`);
-        }
-        return tables;
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // FIELD LOG APPLIER — Merge a single field change into local DB
-      // ═══════════════════════════════════════════════════════════════
-      async applyFieldLog(log2, client) {
-        const config = getTableSyncConfig(log2.tableName);
-        if (!config) {
-          console.warn(`[SyncEngine] Unknown table in field log: ${log2.tableName}`);
-          return;
-        }
-        if (config.businessRules && log2.tableName === "defects" && log2.fieldName === "status") {
-          if (log2.newValue === "verified" && !isShipInstanceId(this.instanceId)) {
-            console.warn(`[SyncEngine] Business rule: ship cannot verify defects. Skipping.`);
-            return;
-          }
-        }
-        const identityCol = config.identityColumn || "id";
-        const fieldNameSnake = SYNC_COLUMN_ALIASES[log2.fieldName] ?? camelToSnake(log2.fieldName);
-        const conn = client || await getPool();
-        const meta = await getColumnMeta(conn, log2.tableName);
-        if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
-          syncDiag(`APPLY-FIELD-LOG SKIP unknown column ${log2.tableName}.${fieldNameSnake}`);
-          return;
-        }
-        let valueToApply = log2.newValue;
-        if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
-          try {
-            JSON.parse(valueToApply);
-          } catch {
-            valueToApply = "[]";
-          }
-        } else if (valueToApply !== null && meta.arrayCols.has(fieldNameSnake)) {
-          valueToApply = coerceArrayValue(valueToApply);
-        }
-        const logTs = log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt));
-        await conn.query(
-          `UPDATE "${log2.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
-          [valueToApply, log2.rowUuid, logTs]
-        );
-        if (log2.tableName === "running_hours_audit" && (fieldNameSnake === "new_rh" || fieldNameSnake === "cumulative_rh") && valueToApply !== null) {
-          try {
-            const auditRow = await conn.query(
-              `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
-              [log2.rowUuid]
-            );
-            if (auditRow.rows.length > 0) {
-              const compId = auditRow.rows[0].component_id;
-              const oldRow = await conn.query(
-                `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-                [compId]
-              );
-              const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || "(not found)";
-              await conn.query(
-                `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, updated_at = NOW() WHERE cuuid = $2`,
-                [String(valueToApply), compId]
-              );
-              syncDiag(`RH-APPLY PULL: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply} from audit row ${log2.rowUuid}`);
-            }
-          } catch (rhErr) {
-            syncDiag(`RH-APPLY PULL ERROR: audit=${log2.rowUuid}: ${rhErr.message}`);
-          }
-        }
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // DELTA EXTRACTION — Get rows changed since checkpoint
-      // ═══════════════════════════════════════════════════════════════
-      async getChangedRows(tableName, vesselId, since, vesselScopeColumn) {
-        const pool2 = await getPool();
-        const conditions = [];
-        const params = [];
-        let paramIdx = 1;
-        if (since) {
-          conditions.push(`"updated_at" > $${paramIdx}`);
-          params.push(since);
-          paramIdx++;
-        }
-        if (vesselScopeColumn && vesselId) {
-          conditions.push(`"${vesselScopeColumn}" = $${paramIdx}`);
-          params.push(vesselId);
-          paramIdx++;
-        }
-        let query = `SELECT * FROM "${tableName}"`;
-        if (conditions.length > 0) {
-          query += " WHERE " + conditions.join(" AND ");
-        }
-        query += ' ORDER BY "updated_at" ASC LIMIT 5000';
-        const result = await pool2.query(query, params);
-        return result.rows;
-      }
-      // ═══════════════════════════════════════════════════════════════
-      // SYNC API CALLER — HTTP or local direct call
-      // ═══════════════════════════════════════════════════════════════
-      async callSyncApi(method, path14, body) {
-        if (this.isLocalMode()) {
-          return this.callLocalSync(path14, body);
-        }
-        const url = `${this.shoreBaseUrl}${path14}`;
-        const response = await fetch(url, {
-          method,
-          headers: {
-            "Content-Type": "application/json",
-            "X-Sync-Api-Key": this.syncApiKey,
-            "X-Sync-Instance-Id": this.instanceId
-          },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(this.requestTimeoutMs)
-        });
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Sync API ${response.status}: ${errorText}`);
-        }
-        return response.json();
-      }
-      /** Local mode — call service functions directly (no HTTP) */
-      async callLocalSync(path14, body) {
-        const svc = await Promise.resolve().then(() => (init_service(), service_exports));
-        switch (path14) {
-          case "/sync/initiate":
-            return svc.initiateSyncSession(
-              body.instanceId,
-              body.vesselId,
-              body.lastCheckpoint ? new Date(body.lastCheckpoint) : null
-            );
-          case "/sync/push":
-            return svc.receivePushData(body.batchUuid, body.vesselId, body);
-          case "/sync/pull":
-            return svc.preparePullData(
-              body.batchUuid,
-              body.vesselId,
-              body.instanceId,
-              body.lastCheckpoint ? new Date(body.lastCheckpoint) : null
-            );
-          case "/sync/complete":
-            return svc.completeSyncSession(body.batchUuid, body.vesselId, body.instanceId, void 0, body.failedOneWayTables);
-          case "/sync/fetch-rows":
-            return { tables: await svc.fetchFullRowsForHeal(body.requests) };
-          default:
-            throw new Error(`Unknown sync path: ${path14}`);
-        }
-      }
-      /** Retry wrapper with exponential backoff */
-      async callSyncApiWithRetry(method, path14, body) {
-        let lastError = null;
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-          try {
-            return await this.callSyncApi(method, path14, body);
-          } catch (error) {
-            lastError = error;
-            if (attempt < MAX_RETRIES) {
-              const delay = RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
-              console.warn(
-                `[SyncEngine] Attempt ${attempt + 1} failed for ${path14}: ${error.message}. Retrying in ${delay}ms...`
-              );
-              await new Promise((resolve6) => setTimeout(resolve6, delay));
-            }
-          }
-        }
-        throw lastError || new Error(`Failed after ${MAX_RETRIES + 1} attempts`);
-      }
-      /** Check if running in local mode (no HTTP, direct function calls) */
-      isLocalMode() {
-        return process.env.SYNC_LOCAL_MODE === "true" || !this.shoreBaseUrl || this.shoreBaseUrl === "";
-      }
-      /** Get current instance ID (for use by controllers) */
-      getInstanceId() {
-        return this.instanceId;
-      }
-    };
-    engineInstance = null;
   }
 });
 
@@ -17269,6 +17820,15 @@ var init_autoSyncScheduler = __esm({
           });
         }, this.tickIntervalMs);
         this.isRunning = true;
+        try {
+          const s = await getAllSettings();
+          const raw = s["auto_sync_enabled"];
+          const on = parseBooleanSetting(raw, false);
+          const mins = Math.round(this.tickIntervalMs / 6e4);
+          console.log(`[AutoSync] EFFECTIVE STATE \u2014 auto_sync_enabled=${on ? "ON" : "OFF"} (raw ${JSON.stringify(raw ?? null)}), interval=${mins}min. ${on ? `Next tick in ${Math.round(BOOT_DELAY_MS / 1e3)}s, then every ${mins}min.` : "TICKS WILL NO-OP until this is enabled."}`);
+        } catch (e) {
+          console.warn(`[AutoSync] Could not read effective auto-sync state at startup: ${e?.message || e}`);
+        }
         console.log(`[AutoSync] Scheduler started \u2014 will run every ${Math.round(this.tickIntervalMs / 6e4)} minutes`);
       }
       /**
@@ -17334,6 +17894,12 @@ var init_autoSyncScheduler = __esm({
         this.isRunning = false;
         console.log("[AutoSync] Scheduler stopped");
       }
+      /** True when the tick timer is live. Used by the role watchdog and the
+       *  settings-save self-heal to detect a ship whose scheduler never started
+       *  (stale boot-time role decision). */
+      isStarted() {
+        return this.isRunning;
+      }
       // ────────────────────────────────────────────────
       // One-time self-heal re-offer sweep (Build 2b)
       // ────────────────────────────────────────────────
@@ -17381,7 +17947,7 @@ var init_autoSyncScheduler = __esm({
             return;
           }
           const settings = await getAllSettings();
-          const enabled = settings["auto_sync_enabled"] === "true";
+          const enabled = parseBooleanSetting(settings["auto_sync_enabled"], false);
           if (!enabled) {
             syncDiag("[AutoSync] auto_sync_enabled=false \u2014 skipping tick");
             return;
@@ -17433,7 +17999,7 @@ var init_autoSyncScheduler = __esm({
           }
           if (maxCatchUpCycles <= 0) return;
           const vesselCode = await getVesselCode(vesselId);
-          let remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+          let remaining = await getDueFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
           while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
             cycleNumber++;
             console.log(`[AutoSync] Catch-up cycle ${cycleNumber}/${maxCatchUpCycles} \u2014 ${remaining} unsynced records remain`);
@@ -17443,11 +18009,14 @@ var init_autoSyncScheduler = __esm({
               console.log(`[AutoSync] Catch-up cycle ${cycleNumber} failed \u2014 stopping catch-up`);
               break;
             }
-            remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+            remaining = await getDueFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
           }
           if (cycleNumber > 0) {
             const finalRemaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
-            console.log(`[AutoSync] Catch-up complete \u2014 ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced`);
+            const heldBack = finalRemaining - remaining;
+            console.log(
+              `[AutoSync] Catch-up complete \u2014 ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced` + (heldBack > 0 ? ` (${heldBack} waiting on retry backoff \u2014 not an error)` : "")
+            );
           }
         } finally {
           this.syncInProgress.set(vesselId, false);
@@ -17675,6 +18244,267 @@ var init_pruningService = __esm({
   }
 });
 
+// server/modules/sync/driftDetector.ts
+function looksLikeDate(s) {
+  return /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s) || /^[A-Z][a-z]{2} [A-Z][a-z]{2} \d{2} \d{4} \d{2}:\d{2}/.test(s);
+}
+function valuesEqual(dbValue, logValue) {
+  const dbEmpty = dbValue === null || dbValue === void 0 || dbValue === "";
+  const logEmpty = logValue === null || logValue === void 0 || logValue === "";
+  if (dbEmpty && logEmpty) return true;
+  if (dbEmpty !== logEmpty) return false;
+  const log2 = String(logValue);
+  if (typeof dbValue === "boolean") {
+    const l = log2.toLowerCase();
+    return dbValue === (l === "true" || l === "t" || l === "1");
+  }
+  if (dbValue instanceof Date) {
+    const parsed = new Date(log2);
+    if (!isNaN(parsed.getTime())) return dbValue.getTime() === parsed.getTime();
+    return false;
+  }
+  if (typeof dbValue === "number") {
+    const n = Number(log2);
+    return !isNaN(n) && n === dbValue;
+  }
+  if (typeof dbValue === "string" && looksLikeDate(dbValue) && looksLikeDate(log2)) {
+    const a = new Date(dbValue).getTime(), b = new Date(log2).getTime();
+    if (!isNaN(a) && !isNaN(b)) return a === b;
+  }
+  if (typeof dbValue === "string" && dbValue !== "" && log2 !== "") {
+    const a = Number(dbValue), b = Number(log2);
+    if (!isNaN(a) && !isNaN(b) && String(dbValue).trim() !== "" && log2.trim() !== "") {
+      if (a === b) return true;
+    }
+  }
+  if (Array.isArray(dbValue) || dbValue !== null && typeof dbValue === "object") {
+    try {
+      return JSON.stringify(dbValue) === JSON.stringify(JSON.parse(log2));
+    } catch {
+      return JSON.stringify(dbValue) === log2;
+    }
+  }
+  return String(dbValue) === log2;
+}
+function scannableTables() {
+  const out = [];
+  for (const cfg of Object.values(SYNC_CONFIG)) {
+    if (cfg.category !== "BOTH_EDITABLE") continue;
+    if (!cfg.identityColumn) continue;
+    out.push({
+      tableName: cfg.tableName,
+      identityColumn: cfg.identityColumn,
+      vesselScopeColumn: cfg.vesselScopeColumn ?? null
+    });
+  }
+  return out;
+}
+async function runDriftScan(opts = {}) {
+  const started = Date.now();
+  const sinceDays = opts.sinceDays ?? DEFAULT_SINCE_DAYS;
+  const maxRows = opts.maxRowsPerTable ?? DEFAULT_MAX_ROWS_PER_TABLE;
+  const findings = [];
+  const skippedTables = [];
+  let rowsCompared = 0, fieldsCompared = 0, tablesScanned = 0;
+  const pool2 = await getPool();
+  if (!pool2) {
+    return {
+      tablesScanned: 0,
+      rowsCompared: 0,
+      fieldsCompared: 0,
+      findings: [],
+      skippedTables: ["(no database)"],
+      durationMs: Date.now() - started,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    };
+  }
+  const targets = scannableTables().filter((t) => !opts.tables || opts.tables.includes(t.tableName));
+  for (const t of targets) {
+    try {
+      const latest = await pool2.query(
+        `SELECT DISTINCT ON (row_uuid, field_name)
+                row_uuid, field_name, new_value, changed_at, vessel_id
+           FROM sync_field_log
+          WHERE table_name = $1
+            AND changed_at >= NOW() - ($2::int * INTERVAL '1 day')
+            AND changed_at <= NOW() - ($3::int * INTERVAL '1 minute')
+            AND COALESCE(is_deleted, false) = false
+            ${opts.vesselId ? "AND vessel_id = $4" : ""}
+          ORDER BY row_uuid, field_name, changed_at DESC`,
+        opts.vesselId ? [t.tableName, sinceDays, SETTLE_MINUTES, opts.vesselId] : [t.tableName, sinceDays, SETTLE_MINUTES]
+      );
+      if (latest.rows.length === 0) {
+        tablesScanned++;
+        continue;
+      }
+      const byRow = /* @__PURE__ */ new Map();
+      for (const r of latest.rows) {
+        if (!byRow.has(r.row_uuid)) {
+          if (byRow.size >= maxRows) continue;
+          byRow.set(r.row_uuid, []);
+        }
+        byRow.get(r.row_uuid).push(r);
+      }
+      const uuids = Array.from(byRow.keys());
+      if (uuids.length === 0) {
+        tablesScanned++;
+        continue;
+      }
+      const rows = await pool2.query(
+        `SELECT * FROM "${t.tableName}" WHERE "${t.identityColumn}" = ANY($1::text[])`,
+        [uuids]
+      );
+      const rowByUuid = /* @__PURE__ */ new Map();
+      for (const r of rows.rows) rowByUuid.set(String(r[t.identityColumn]), r);
+      for (const [uuid, logs] of Array.from(byRow.entries())) {
+        const row = rowByUuid.get(uuid);
+        if (!row) continue;
+        rowsCompared++;
+        for (const log2 of logs) {
+          const col = fieldNameToColumn(log2.field_name);
+          if (!(col in row)) continue;
+          fieldsCompared++;
+          if (!valuesEqual(row[col], log2.new_value)) {
+            findings.push({
+              tableName: t.tableName,
+              rowUuid: uuid,
+              fieldName: log2.field_name,
+              expected: log2.new_value,
+              actual: row[col] === null || row[col] === void 0 ? null : String(row[col]),
+              loggedAt: new Date(log2.changed_at).toISOString(),
+              vesselId: log2.vessel_id ?? null
+            });
+          }
+        }
+      }
+      tablesScanned++;
+    } catch (err) {
+      skippedTables.push(`${t.tableName}: ${err?.message || err}`);
+    }
+  }
+  if (!opts.dryRun && findings.length > 0) {
+    await recordFindings(findings);
+  }
+  const result = {
+    tablesScanned,
+    rowsCompared,
+    fieldsCompared,
+    findings,
+    skippedTables,
+    durationMs: Date.now() - started,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const msg = `DRIFT SCAN: ${findings.length} finding(s) across ${tablesScanned} table(s) \u2014 ${rowsCompared} rows / ${fieldsCompared} fields compared in ${result.durationMs}ms` + (skippedTables.length ? ` \u2014 skipped: ${skippedTables.join("; ")}` : "");
+  if (findings.length > 0) console.warn(`[DriftDetector] \u26A0\uFE0F ${msg}`);
+  else console.log(`[DriftDetector] ${msg}`);
+  syncDiag(msg);
+  return result;
+}
+async function recordFindings(findings) {
+  const pool2 = await getPool();
+  if (!pool2) return;
+  for (const f of findings) {
+    try {
+      await pool2.query(
+        `INSERT INTO sync_field_log_failures
+           (kind, table_name, row_uuid, field_name, vessel_id, failed_fields, error, details, occurred_at, last_seen_at, resolved)
+         VALUES ('drift', $1, $2, $3, $4, 1, $5, $6::jsonb, NOW(), NOW(), false)
+         ON CONFLICT (kind, table_name, row_uuid, COALESCE(field_name, '')) WHERE resolved = false
+         DO UPDATE SET last_seen_at = NOW(), details = EXCLUDED.details, error = EXCLUDED.error`,
+        [
+          f.tableName,
+          f.rowUuid,
+          f.fieldName,
+          f.vesselId,
+          `row value disagrees with its own newest field log (expected "${f.expected}", found "${f.actual}")`,
+          JSON.stringify({ expected: f.expected, actual: f.actual, loggedAt: f.loggedAt })
+        ]
+      );
+    } catch (err) {
+      console.error(`[DriftDetector] could not record finding ${f.tableName}.${f.rowUuid}.${f.fieldName}: ${err?.message || err}`);
+    }
+  }
+}
+async function getOpenDrift(limit = 500) {
+  const pool2 = await getPool();
+  if (!pool2) return [];
+  const res = await pool2.query(
+    `SELECT id, table_name, row_uuid, field_name, vessel_id, error, details, occurred_at, last_seen_at
+       FROM sync_field_log_failures
+      WHERE kind = 'drift' AND resolved = false
+      ORDER BY occurred_at DESC
+      LIMIT $1`,
+    [limit]
+  );
+  return res.rows;
+}
+var SETTLE_MINUTES, DEFAULT_SINCE_DAYS, DEFAULT_MAX_ROWS_PER_TABLE;
+var init_driftDetector = __esm({
+  "server/modules/sync/driftDetector.ts"() {
+    "use strict";
+    init_db();
+    init_syncConfig();
+    init_oneWayApplier();
+    init_syncDiagLogger();
+    SETTLE_MINUTES = 5;
+    DEFAULT_SINCE_DAYS = 30;
+    DEFAULT_MAX_ROWS_PER_TABLE = 5e3;
+  }
+});
+
+// server/utils/buildInfo.ts
+import { execSync } from "child_process";
+function tryGit(args) {
+  try {
+    const out = execSync(`git ${args}`, {
+      encoding: "utf-8",
+      timeout: 2e3,
+      stdio: ["ignore", "pipe", "ignore"]
+      // swallow git's stderr; absence of .git is not an error here
+    });
+    const v = out.trim();
+    return v.length > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+function getBuildInfo() {
+  if (cached) return cached;
+  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const gitCommit = tryGit("rev-parse --short HEAD");
+  const gitBranch = tryGit("rev-parse --abbrev-ref HEAD");
+  if (gitCommit) {
+    cached = { commit: gitCommit, branch: gitBranch || "unknown", startedAt, source: "git" };
+    return cached;
+  }
+  const envCommit = process.env.BUILD_COMMIT || process.env.GIT_COMMIT || process.env.SOURCE_VERSION;
+  const envBranch = process.env.BUILD_BRANCH || process.env.GIT_BRANCH;
+  if (envCommit) {
+    cached = { commit: envCommit.slice(0, 9), branch: envBranch || "unknown", startedAt, source: "env" };
+    return cached;
+  }
+  cached = { commit: "unknown", branch: "unknown", startedAt, source: "unknown" };
+  return cached;
+}
+function logBuildIdentity() {
+  const b = getBuildInfo();
+  console.log(
+    `[Build] BUILD IDENTITY \u2014 commit=${b.commit}, branch=${b.branch}, source=${b.source}, startedAt=${b.startedAt}`
+  );
+  if (b.source === "unknown") {
+    console.warn(
+      "[Build] \u26A0\uFE0F Build identity UNRESOLVED \u2014 no git working tree and no BUILD_COMMIT/GIT_COMMIT env. This instance cannot be version-confirmed remotely; set BUILD_COMMIT at build time."
+    );
+  }
+}
+var cached;
+var init_buildInfo = __esm({
+  "server/utils/buildInfo.ts"() {
+    "use strict";
+    cached = null;
+  }
+});
+
 // server/modules/sync/controller.ts
 import * as fs5 from "fs";
 import * as path5 from "path";
@@ -17722,11 +18552,23 @@ async function pullHandler(req, res) {
     if (!batchUuid || !vesselId || !instanceId) {
       return res.status(400).json({ error: "batchUuid, vesselId, and instanceId are required" });
     }
+    const rawTableCps = req.body.tableCheckpoints;
+    let tableCheckpoints;
+    if (rawTableCps && typeof rawTableCps === "object" && !Array.isArray(rawTableCps)) {
+      tableCheckpoints = {};
+      for (const [t, iso] of Object.entries(rawTableCps)) {
+        if (typeof iso === "string") {
+          const d = new Date(iso);
+          if (!isNaN(d.getTime())) tableCheckpoints[t] = d;
+        }
+      }
+    }
     const result = await preparePullData(
       batchUuid,
       vesselId,
       instanceId,
-      lastCheckpoint ? new Date(lastCheckpoint) : null
+      lastCheckpoint ? new Date(lastCheckpoint) : null,
+      tableCheckpoints
     );
     res.json(result);
   } catch (error) {
@@ -17767,12 +18609,21 @@ async function completeSyncHandler(req, res) {
       return res.status(400).json({ error: "batchUuid, vesselId, and instanceId are required" });
     }
     const failedOneWayTables = Array.isArray(req.body.failedOneWayTables) ? req.body.failedOneWayTables.filter((t) => typeof t === "string") : void 0;
+    const rawApplied = req.body.appliedTableCheckpoints;
+    let appliedTableCheckpoints;
+    if (rawApplied && typeof rawApplied === "object" && !Array.isArray(rawApplied)) {
+      appliedTableCheckpoints = {};
+      for (const [t, iso] of Object.entries(rawApplied)) {
+        if (typeof iso === "string") appliedTableCheckpoints[t] = iso;
+      }
+    }
     const result = await completeSyncSession(
       batchUuid,
       vesselId,
       instanceId,
       Array.isArray(appliedRowUuids) ? appliedRowUuids : void 0,
-      failedOneWayTables
+      failedOneWayTables,
+      appliedTableCheckpoints
     );
     res.json(result);
   } catch (error) {
@@ -17789,7 +18640,24 @@ async function statusHandler(req, res) {
       return res.status(400).json({ error: "vesselId and instanceId query params are required" });
     }
     const result = await getSyncStatus(vesselId, instanceId);
-    res.json(result);
+    let fieldLogFailures = {
+      session: getFieldLogFailureSessionCount(),
+      unresolved: null
+    };
+    try {
+      const pool2 = await getPool();
+      const r = await pool2.query(`SELECT count(*)::int AS n FROM sync_field_log_failures WHERE resolved = false`);
+      fieldLogFailures.unresolved = r.rows[0]?.n ?? 0;
+    } catch {
+    }
+    const insertLogSkips = { session: getInsertLogSkipCount() };
+    let retryBacklog = null;
+    try {
+      retryBacklog = await getRetryBacklog(instanceId);
+    } catch {
+    }
+    const build = getBuildInfo();
+    res.json({ ...result, fieldLogFailures, insertLogSkips, retryBacklog, build });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("[Sync] status error:", error);
@@ -18129,12 +18997,22 @@ async function updateSettingsHandler(req, res) {
       }
       newIntervalMinutes = n;
     }
+    const canonicalised = canonicaliseBooleanSettings(settings);
+    if (canonicalised.length > 0) {
+      console.log(`[Sync Settings] Canonicalised boolean value(s): ${canonicalised.join(", ")}`);
+    }
     const userId = req.user?.userUuid || req.user?.username || "system";
     await updateSettings(settings, userId);
     const engine = getSyncEngine();
     engine.reloadSettings();
     if (newIntervalMinutes !== null && await isShipInstance()) {
-      syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+      if (!syncAutoScheduler.isStarted()) {
+        console.warn("[AutoSync] \u{1FA79} SELF-HEAL: settings saved on a ship instance while the scheduler was not running (stale boot-time role decision) \u2014 starting it now.");
+        syncDiag("[AutoSync] SELF-HEAL: settings-save found the scheduler not running on a ship instance \u2014 started late (boot-time role decision was stale).");
+        await syncAutoScheduler.start();
+      } else {
+        syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+      }
     }
     res.json({
       success: true,
@@ -18238,6 +19116,21 @@ async function diagLogsListHandler(req, res) {
     res.status(500).json({ error: "Failed to list diagnostic logs" });
   }
 }
+async function driftListHandler(req, res) {
+  const limit = Math.min(parseInt(req.query?.limit ?? "500", 10) || 500, 2e3);
+  res.json({ success: true, findings: await getOpenDrift(limit) });
+}
+async function driftScanHandler(req, res) {
+  const b = req.body || {};
+  const result = await runDriftScan({
+    vesselId: b.vesselId,
+    tables: Array.isArray(b.tables) ? b.tables : void 0,
+    sinceDays: b.sinceDays ? parseInt(b.sinceDays, 10) : void 0,
+    maxRowsPerTable: b.maxRowsPerTable ? parseInt(b.maxRowsPerTable, 10) : void 0,
+    dryRun: b.dryRun === true
+  });
+  res.json({ success: true, ...result });
+}
 var FILE_CATEGORY_LABELS;
 var init_controller = __esm({
   "server/modules/sync/controller.ts"() {
@@ -18249,7 +19142,12 @@ var init_controller = __esm({
     init_autoSyncScheduler();
     init_fileSyncProcessor();
     init_pruningService();
+    init_driftDetector();
+    init_oneWayApplier();
+    init_buildInfo();
     init_healthMonitor();
+    init_fieldLogger();
+    init_db();
     init_syncRole();
     init_syncDiagLogger();
     FILE_CATEGORY_LABELS = {
@@ -18508,6 +19406,8 @@ var init_routes = __esm({
     router.post("/sync/file/:queueUuid/fail", syncTenantGuard, asyncHandler(failFileHandler));
     router.post("/sync/prune", requireOfflineAdmin, asyncHandler(pruneHandler));
     router.get("/sync/health", asyncHandler(healthCheckHandler));
+    router.get("/sync/drift", requireOfflineAdmin, asyncHandler(driftListHandler));
+    router.post("/sync/drift/scan", requireOfflineAdmin, asyncHandler(driftScanHandler));
     router.get("/sync/table-stats", asyncHandler(tableStatsHandler));
     router.get("/sync/settings", requireOfflineAdmin, asyncHandler(getSettingsHandler));
     router.put("/sync/settings", requireOfflineAdmin, asyncHandler(updateSettingsHandler));
@@ -18693,8 +19593,18 @@ var init_workOrderStatus = __esm({
 
 // server/postgresStorage.ts
 import { randomUUID } from "crypto";
-import { eq as eq3, and as and3, desc as desc2, sql as sql7, inArray as inArray2, or, ilike, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2 } from "drizzle-orm";
-var PostgresStorage, postgresStorage;
+import { eq as eq3, and as and3, desc as desc2, sql as sql7, inArray as inArray2, or, ilike, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
+function getWorkOrderNumericFields() {
+  if (_woNumericFields) return _woNumericFields;
+  try {
+    const cols = getTableColumns(workOrders);
+    _woNumericFields = Object.entries(cols).filter(([, c]) => /numeric|decimal|integer|bigint|real|double|serial/i.test(String(c?.columnType ?? ""))).map(([prop]) => prop);
+  } catch {
+    _woNumericFields = ["maintenanceIntervalValue", "intervalRunningHour", "woCompletionRh", "missedCycles", "daysLate"];
+  }
+  return _woNumericFields;
+}
+var _woNumericFields, PostgresStorage, postgresStorage;
 var init_postgresStorage = __esm({
   "server/postgresStorage.ts"() {
     "use strict";
@@ -18702,6 +19612,7 @@ var init_postgresStorage = __esm({
     init_schema();
     init_sync();
     init_requestContext();
+    _woNumericFields = null;
     PostgresStorage = class {
       async insertWithSequenceRepair(tableName, insertFn) {
         try {
@@ -20285,9 +21196,8 @@ var init_postgresStorage = __esm({
       }
       async updateWorkOrder(id, data) {
         const db2 = await getDb();
-        const integerFields = ["maintenanceIntervalValue", "intervalRunningHour"];
         const sanitizedData = { ...data };
-        for (const field of integerFields) {
+        for (const field of getWorkOrderNumericFields()) {
           if (field in sanitizedData && sanitizedData[field] === "") {
             sanitizedData[field] = null;
           }
@@ -22643,12 +23553,12 @@ var init_postgresStorage = __esm({
         return found.length > 0;
       }
       // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──
-      async finaliseApprovedCR(id, existing, reviewerId, comment) {
-        return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, /* @__PURE__ */ new Date());
+      async finaliseApprovedCR(id, existing, reviewerId, comment, overriddenChanges) {
+        return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, /* @__PURE__ */ new Date(), overriddenChanges);
       }
       // ── Internal: atomically mark the final approval step AND finalise the CR ──
       // stepId: if provided, marks that step as Approved inside the same transaction.
-      async finaliseApprovedCRWithStep(id, existing, stepId, reviewerId, comment, now) {
+      async finaliseApprovedCRWithStep(id, existing, stepId, reviewerId, comment, now, overriddenChanges) {
         const db2 = await getDb();
         const newRevisionNumber = (existing.revisionNumber || 0) + 1;
         try {
@@ -22678,16 +23588,65 @@ var init_postgresStorage = __esm({
                 }
               }
             }
-            const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existing);
+            const originalProposedChanges = Array.isArray(existing.proposedChangesJson) ? [...existing.proposedChangesJson] : [];
+            let effectiveProposedChanges = originalProposedChanges;
+            const allPriorHistory = Array.isArray(existing.revisionHistory) ? existing.revisionHistory : [];
+            const partialApprovals = allPriorHistory.filter((e) => e.type === "partial_approval");
+            const accumulatedOverrideMap = /* @__PURE__ */ new Map();
+            for (const partial of partialApprovals) {
+              for (const ov of partial.overriddenFields || []) {
+                accumulatedOverrideMap.set(String(ov.field), {
+                  approverNewValue: String(ov.approverNewValue ?? ""),
+                  modifiedBy: String(ov.modifiedBy ?? partial.approvedBy ?? ""),
+                  modifiedAt: String(ov.modifiedAt ?? partial.approvedAt ?? now.toISOString())
+                });
+              }
+            }
+            for (const ov of overriddenChanges || []) {
+              accumulatedOverrideMap.set(ov.field, {
+                approverNewValue: ov.approverNewValue,
+                modifiedBy: reviewerId,
+                modifiedAt: now.toISOString()
+              });
+            }
+            if (accumulatedOverrideMap.size > 0) {
+              effectiveProposedChanges = originalProposedChanges.map((change) => {
+                const fieldKey = change.field ?? change.columnName;
+                if (fieldKey && accumulatedOverrideMap.has(String(fieldKey))) {
+                  return { ...change, newValue: accumulatedOverrideMap.get(String(fieldKey)).approverNewValue };
+                }
+                return change;
+              });
+              console.log(`[CR_APPLY] Applied ${accumulatedOverrideMap.size} accumulated field override(s) before applying CR ${id} (${partialApprovals.length} prior level(s), ${overriddenChanges?.length ?? 0} final-level override(s))`);
+            }
+            const existingWithOverrides = { ...existing, proposedChangesJson: effectiveProposedChanges };
+            const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existingWithOverrides);
+            const overriddenFields = [];
+            for (const [field, overrideData] of Array.from(accumulatedOverrideMap.entries())) {
+              const original = originalProposedChanges.find(
+                (c) => (c.field ?? c.columnName) === field
+              );
+              const originalNewValue = original?.newValue ?? null;
+              if (String(originalNewValue ?? "") !== overrideData.approverNewValue) {
+                overriddenFields.push({
+                  field,
+                  originalNewValue,
+                  approverNewValue: overrideData.approverNewValue,
+                  modifiedBy: overrideData.modifiedBy,
+                  modifiedAt: overrideData.modifiedAt
+                });
+              }
+            }
             const revisionHistoryEntry = {
               revisionNumber: newRevisionNumber,
               approvedBy: reviewerId,
               approvedAt: now.toISOString(),
-              appliedChanges: Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson : [],
+              appliedChanges: effectiveProposedChanges,
               appliedStatus: "success",
               appliedAt: now.toISOString(),
               appliedFieldCount: appliedChangesResult.appliedFieldCount,
-              comments: comment
+              comments: comment,
+              ...overriddenFields.length > 0 ? { overriddenFields } : {}
             };
             const updatedHistory = [...existing.revisionHistory || [], revisionHistoryEntry];
             const updateResult = await tx.update(changeRequest).set({
@@ -22713,13 +23672,13 @@ var init_postgresStorage = __esm({
           throw new Error(`Failed to approve change request: ${error.message}`);
         }
       }
-      async approveChangeRequest(id, reviewerId, comment, role) {
+      async approveChangeRequest(id, reviewerId, comment, role, overriddenChanges) {
         const existing = await this.getChangeRequest(id);
         if (!existing) throw new Error("Change request not found");
         const steps = await this.getChangeRequestApprovalSteps(id);
         const now = /* @__PURE__ */ new Date();
         if (steps.length === 0) {
-          return this.finaliseApprovedCR(id, existing, reviewerId, comment);
+          return this.finaliseApprovedCR(id, existing, reviewerId, comment, overriddenChanges);
         }
         const activeStep = steps.find((s) => s.status === "Pending");
         if (!activeStep) {
@@ -22734,6 +23693,29 @@ var init_postgresStorage = __esm({
         }
         const remainingSteps = steps.filter((s) => s.id !== activeStep.id && s.status === "Pending");
         if (remainingSteps.length > 0) {
+          if (overriddenChanges && overriddenChanges.length > 0) {
+            const originalProposed = Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson : [];
+            const partialEntry = {
+              type: "partial_approval",
+              approvedBy: reviewerId,
+              approvedAt: now.toISOString(),
+              approvalLevel: activeStep.approvalLevel,
+              comments: comment,
+              overriddenFields: overriddenChanges.map((o) => {
+                const orig = originalProposed.find((c) => (c.field ?? c.columnName) === o.field);
+                return {
+                  field: o.field,
+                  originalNewValue: orig?.newValue ?? null,
+                  approverNewValue: o.approverNewValue,
+                  modifiedBy: reviewerId,
+                  modifiedAt: now.toISOString()
+                };
+              })
+            };
+            const updatedHistory = [...existing.revisionHistory || [], partialEntry];
+            await this.updateChangeRequest(id, { revisionHistory: updatedHistory });
+            console.log(`[CR_WORKFLOW] CR ${id} \u2014 non-final approver ${reviewerId} overrode ${overriddenChanges.length} field(s) at ${activeStep.approvalLevel}, recorded in revisionHistory`);
+          }
           await this.updateChangeRequestApprovalStep(activeStep.id, {
             status: "Approved",
             actionByUserId: reviewerId,
@@ -22744,7 +23726,7 @@ var init_postgresStorage = __esm({
           return await this.getChangeRequest(id);
         }
         console.log(`[CR_WORKFLOW] CR ${id} \u2014 all approval levels satisfied, finalising`);
-        return this.finaliseApprovedCRWithStep(id, existing, activeStep.id, reviewerId, comment, now);
+        return this.finaliseApprovedCRWithStep(id, existing, activeStep.id, reviewerId, comment, now, overriddenChanges);
       }
       /**
        * Apply approved changes to the target PMS entity (non-transactional version)
@@ -22942,11 +23924,7 @@ var init_postgresStorage = __esm({
           const success = String(applied) === String(expected);
           console.log(`  - ${field}: "${applied}" (${success ? "OK" : "MISMATCH - expected: " + expected})`);
         }
-        try {
-          await logFieldChanges("work_orders", resolvedWouuid, beforeState.vesselId || null, beforeState, afterState, "system");
-        } catch (e) {
-          console.error("[FieldLogger] CR apply work_order:", e);
-        }
+        await logFieldChanges("work_orders", resolvedWouuid, beforeState.vesselId || null, beforeState, afterState, "system", tx);
       }
       /**
        * Apply changes to a Spare record within a transaction
@@ -22991,11 +23969,7 @@ var init_postgresStorage = __esm({
           const success = String(applied) === String(expected);
           console.log(`  - ${field}: "${applied}" (${success ? "OK" : "MISMATCH - expected: " + expected})`);
         }
-        try {
-          await logFieldChanges("spares", resolvedSuuid, beforeState.vesselId || null, beforeState, afterState, "system");
-        } catch (e) {
-          console.error("[FieldLogger] CR apply spare:", e);
-        }
+        await logFieldChanges("spares", resolvedSuuid, beforeState.vesselId || null, beforeState, afterState, "system", tx);
       }
       /**
        * Apply changes to a Store Item record within a transaction
@@ -23040,11 +24014,7 @@ var init_postgresStorage = __esm({
           const success = String(applied) === String(expected);
           console.log(`  - ${field}: "${applied}" (${success ? "OK" : "MISMATCH - expected: " + expected})`);
         }
-        try {
-          await logFieldChanges("stores_items", resolvedStuuid, beforeState.vesselId || null, beforeState, afterState, "system");
-        } catch (e) {
-          console.error("[FieldLogger] CR apply store:", e);
-        }
+        await logFieldChanges("stores_items", resolvedStuuid, beforeState.vesselId || null, beforeState, afterState, "system", tx);
       }
       async rejectChangeRequest(id, reviewerId, comment, role) {
         const existing = await this.getChangeRequest(id);
@@ -28310,6 +29280,11 @@ var init_jobDueScanner = __esm({
         this.isRunning = false;
         console.log("[JobDueScanner] Stopped");
       }
+      /** True when the scan timer is live. Used by the scheduler role watchdog to
+       *  detect a ship whose scanner never started (stale boot-time role decision). */
+      isStarted() {
+        return this.isRunning;
+      }
       /**
        * Run a full scan of jobs and generate work orders as needed.
        * @param scopeVesselId optional — when provided, only this vessel's jobs/WOs
@@ -29365,9 +30340,9 @@ function median(values) {
 }
 async function getComplianceAnomalies(vesselId) {
   const cacheKey = vesselId || "__all__";
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS2) {
-    return cached.result;
+  const cached2 = cache.get(cacheKey);
+  if (cached2 && Date.now() - cached2.timestamp < CACHE_TTL_MS2) {
+    return cached2.result;
   }
   const now = /* @__PURE__ */ new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1e3);
@@ -32068,6 +33043,28 @@ async function updateWorkOrder(id, body) {
       console.log("\u{1F4DD} Auto-setting status to Pending Approval (completion data provided without explicit status)");
     }
   }
+  if (updateData.woCompletionRh !== void 0 && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== "") {
+    const woRhNum = parseFloat(String(updateData.woCompletionRh));
+    const readingRaw = updateData.runningHours ?? updateData.currentReading ?? existingWO2.runningHours ?? existingWO2.currentReading;
+    const readingNum = readingRaw !== void 0 && readingRaw !== null && String(readingRaw).trim() !== "" ? parseFloat(String(readingRaw)) : NaN;
+    if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
+      throw new ValidationError(
+        `WO Completion RH (${woRhNum}) cannot be greater than the Current Reading (${readingNum}). The completion reading is the hours at the time the work was done; the Current Reading is the latest meter value.`,
+        { code: "WO_COMPLETION_RH_EXCEEDS_READING" }
+      );
+    }
+  }
+  if (updateData.currentReadingDate) {
+    const rdParsed = new Date(String(updateData.currentReadingDate));
+    const todayEnd = /* @__PURE__ */ new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    if (isNaN(rdParsed.getTime())) {
+      throw new ValidationError("Current Reading Date is not a valid date.", { code: "INVALID_READING_DATE" });
+    }
+    if (rdParsed.getTime() > todayEnd.getTime()) {
+      throw new ValidationError("Current Reading Date cannot be in the future.", { code: "READING_DATE_IN_FUTURE" });
+    }
+  }
   const isBeingRejected = updateData.status?.toLowerCase() === "rejected";
   if (isBeingRejected) {
     updateData.completionDateTime = null;
@@ -32274,14 +33271,15 @@ async function updateWorkOrder(id, body) {
         return !isNaN(p.getTime()) ? p.toISOString().split("T")[0] : void 0;
       };
       const completionDateNorm = normRhDate(existingWO2.completionDateTime || existingWO2.dateCompleted || updateData.completionDateTime);
+      const readingDateNorm = normRhDate(existingWO2.currentReadingDate || updateData.currentReadingDate) || completionDateNorm;
       if (rhComp && rhCounterType === "MASTER" && !isNaN(rhValue)) {
         let rhBackdatedSkippedApproval = false;
         const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || "0");
-        if (rhValue <= masterCurrentRHApproval && completionDateNorm) {
+        if (rhValue <= masterCurrentRHApproval && readingDateNorm) {
           const masterUpdRawApproval = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
           const masterUpdDateApproval = masterUpdRawApproval instanceof Date ? masterUpdRawApproval : masterUpdRawApproval ? new Date(masterUpdRawApproval) : null;
           if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
-            const approvalCompletionDate = new Date(completionDateNorm);
+            const approvalCompletionDate = new Date(readingDateNorm);
             const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
             const woDay = Date.UTC(approvalCompletionDate.getUTCFullYear(), approvalCompletionDate.getUTCMonth(), approvalCompletionDate.getUTCDate());
             if (woDay < masterDay) {
@@ -32290,7 +33288,7 @@ async function updateWorkOrder(id, body) {
               rhBackdatedApproval = true;
               latestRHApproval = masterCurrentRHApproval;
               latestRHDateApproval = masterUpdDateApproval.toISOString().split("T")[0];
-              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
+              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
             }
           }
         }
@@ -32305,7 +33303,7 @@ async function updateWorkOrder(id, body) {
               userRole: body.userRole || "Ship",
               adminOverride: body.adminOverride || false,
               comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
-              dateUpdated: completionDateNorm
+              dateUpdated: readingDateNorm
             });
             updateData.rhSyncedAt = /* @__PURE__ */ new Date();
             console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children)`);
@@ -32337,11 +33335,11 @@ async function updateWorkOrder(id, body) {
         if (masterComp) {
           let rhBackdatedSkippedInherited = false;
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || "0");
-          if (rhValue <= inhMasterCurrentRH && completionDateNorm) {
+          if (rhValue <= inhMasterCurrentRH && readingDateNorm) {
             const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
             const inhMasterUpdDate = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
-              const inhCompletionDate = new Date(completionDateNorm);
+              const inhCompletionDate = new Date(readingDateNorm);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
               const woDay = Date.UTC(inhCompletionDate.getUTCFullYear(), inhCompletionDate.getUTCMonth(), inhCompletionDate.getUTCDate());
               if (woDay < masterDay) {
@@ -32350,7 +33348,7 @@ async function updateWorkOrder(id, body) {
                 rhBackdatedApproval = true;
                 latestRHApproval = inhMasterCurrentRH;
                 latestRHDateApproval = inhMasterUpdDate.toISOString().split("T")[0];
-                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
+                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
               }
             }
           }
@@ -32365,7 +33363,7 @@ async function updateWorkOrder(id, body) {
                 userRole: body.userRole || "Ship",
                 adminOverride: body.adminOverride || false,
                 comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                dateUpdated: completionDateNorm
+                dateUpdated: readingDateNorm
               });
               updateData.rhSyncedAt = /* @__PURE__ */ new Date();
               console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO2.workOrderNo}`);
@@ -32386,9 +33384,9 @@ async function updateWorkOrder(id, body) {
             }
           }
         } else {
-          if (completionDateNorm) {
+          if (readingDateNorm) {
             const { validateRHEntry: validateRHEntry3 } = await Promise.resolve().then(() => (init_rhTimelineValidationService(), rhTimelineValidationService_exports));
-            const backdateCheck = await validateRHEntry3(rhComp.cuuid, completionDateNorm, rhValue);
+            const backdateCheck = await validateRHEntry3(rhComp.cuuid, readingDateNorm, rhValue);
             if (!backdateCheck.isValid && backdateCheck.validationStatus === "INVALID_BACKDATED") {
               throw new ValidationError(backdateCheck.errorMessage, {
                 code: "INVALID_BACKDATED",
@@ -32705,7 +33703,7 @@ async function updateWorkOrder(id, body) {
           }
           if (job) {
             const rawJobCompletionDate = freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime;
-            const runningHours = freshWorkOrder.runningHours;
+            const runningHours = freshWorkOrder.woCompletionRh ?? freshWorkOrder.runningHours;
             const normalizeJobDate = (dateStr) => {
               if (!dateStr) return null;
               if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split("T")[0];
@@ -35039,7 +36037,7 @@ var alertEngine_exports = {};
 __export(alertEngine_exports, {
   generateAlerts: () => generateAlerts
 });
-import { eq as eq30, and as and25, isNull as isNull4, ne as ne2, desc as desc7, inArray as inArray8 } from "drizzle-orm";
+import { eq as eq31, and as and26, isNull as isNull4, ne as ne2, desc as desc7, inArray as inArray8 } from "drizzle-orm";
 async function generateAlerts(report) {
   const [consumed, cleared] = await Promise.all([
     evaluateRules(report),
@@ -35061,7 +36059,7 @@ async function ruleConsumptionSpike(report) {
   const db2 = await getDb();
   const todayTotal = (toNum(report.hfoConsumption) ?? 0) + (toNum(report.lsmgoConsumption) ?? 0) + (toNum(report.mgoConsumption) ?? 0) + (toNum(report.vlsfoConsumption) ?? 0) + (toNum(report.lpgConsumption) ?? 0);
   if (todayTotal <= 0) return;
-  const robRows = await db2.select().from(nrFuelRob).where(eq30(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
   const avg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (avg7Day <= 0) return;
   const pctAbove = (todayTotal - avg7Day) / avg7Day;
@@ -35091,7 +36089,7 @@ async function ruleConsumptionSpike(report) {
 }
 async function ruleRobEndurance(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq30(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (totalAvg7Day <= 0) return;
@@ -35124,9 +36122,9 @@ async function ruleAeHoursSpike(report) {
   const db2 = await getDb();
   const currentAeHours = toNum(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
-  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and25(
-    eq30(nrNoonReports.vesselId, report.vesselId),
-    eq30(nrNoonReports.status, "submitted"),
+  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and26(
+    eq31(nrNoonReports.vesselId, report.vesselId),
+    eq31(nrNoonReports.status, "submitted"),
     ne2(nrNoonReports.id, report.id)
   )).orderBy(desc7(nrNoonReports.reportDate)).limit(7);
   const priorHours = prior.map((r) => toNum(r.aeRunningHours)).filter((v) => v !== null && v > 0);
@@ -35149,7 +36147,7 @@ async function ruleAeHoursSpike(report) {
 async function ruleCiiBandDrop(report) {
   const db2 = await getDb();
   const year = new Date(report.reportDate).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and25(eq30(nrCiiTracking.vesselId, report.vesselId), eq30(nrCiiTracking.year, year))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year))).limit(1);
   const row = ciiRows[0] ?? null;
   if (!row || !row.ciiRating || !row.previousCiiRating) return;
   const prevOrder = CII_ORDER[row.previousCiiRating] ?? 0;
@@ -35193,7 +36191,7 @@ async function ruleNegativeRobRisk(report) {
 }
 async function autoResolveCleared(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq30(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   const enduranceDays = totalAvg7Day > 0 ? totalRob / totalAvg7Day : null;
@@ -35216,25 +36214,25 @@ async function autoResolveCleared(report) {
   await db2.update(nrAlerts).set({
     acknowledgedAt: /* @__PURE__ */ new Date(),
     acknowledgedBy: "system"
-  }).where(and25(
-    eq30(nrAlerts.vesselId, report.vesselId),
+  }).where(and26(
+    eq31(nrAlerts.vesselId, report.vesselId),
     isNull4(nrAlerts.acknowledgedAt),
     inArray8(nrAlerts.alertType, toResolve)
   ));
 }
 async function resolveOpenAlert(vesselId, alertType) {
   const db2 = await getDb();
-  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and25(
-    eq30(nrAlerts.vesselId, vesselId),
-    eq30(nrAlerts.alertType, alertType),
+  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and26(
+    eq31(nrAlerts.vesselId, vesselId),
+    eq31(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   ));
 }
 async function upsertAlert(vesselId, reportId, alertType, severity, message, metricValue, thresholdValue) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and25(
-    eq30(nrAlerts.vesselId, vesselId),
-    eq30(nrAlerts.alertType, alertType),
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and26(
+    eq31(nrAlerts.vesselId, vesselId),
+    eq31(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   )).limit(1);
   if (existing.length > 0) {
@@ -35244,7 +36242,7 @@ async function upsertAlert(vesselId, reportId, alertType, severity, message, met
       message,
       metricValue: metricValue !== null ? String(metricValue) : null,
       thresholdValue: thresholdValue !== null ? String(thresholdValue) : null
-    }).where(eq30(nrAlerts.id, existing[0].id));
+    }).where(eq31(nrAlerts.id, existing[0].id));
   } else {
     await db2.insert(nrAlerts).values({
       vesselId,
@@ -35285,7 +36283,7 @@ function envInt(name, def) {
   const n = parseInt(v, 10);
   return Number.isFinite(n) ? n : def;
 }
-var BOOT_DELAY_MS2, CONCURRENCY, JITTER_MS, TIMEOUT_ALERTS_MS, TIMEOUT_HEALTH_MS, TIMEOUT_PRUNING_MS, sleep, MaintenanceOrchestrator, maintenanceOrchestrator;
+var BOOT_DELAY_MS2, CONCURRENCY, JITTER_MS, TIMEOUT_ALERTS_MS, TIMEOUT_HEALTH_MS, TIMEOUT_PRUNING_MS, TIMEOUT_DRIFT_MS, sleep, MaintenanceOrchestrator, maintenanceOrchestrator;
 var init_maintenanceOrchestrator = __esm({
   "server/services/maintenanceOrchestrator.ts"() {
     "use strict";
@@ -35293,18 +36291,23 @@ var init_maintenanceOrchestrator = __esm({
     init_pmsAlertEngine();
     init_pruningService();
     init_healthMonitor();
+    init_driftDetector();
     BOOT_DELAY_MS2 = 3e4;
     CONCURRENCY = Math.max(1, envInt("MAINT_TENANT_CONCURRENCY", 4));
     JITTER_MS = Math.max(0, envInt("MAINT_JITTER_MS", 5e3));
     TIMEOUT_ALERTS_MS = envInt("MAINT_ALERTS_TIMEOUT_MS", 4 * 6e4);
     TIMEOUT_HEALTH_MS = envInt("MAINT_HEALTH_TIMEOUT_MS", 5 * 6e4);
     TIMEOUT_PRUNING_MS = envInt("MAINT_PRUNING_TIMEOUT_MS", 30 * 6e4);
+    TIMEOUT_DRIFT_MS = envInt("MAINT_DRIFT_TIMEOUT_MS", 15 * 6e4);
     sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     MaintenanceOrchestrator = class {
       tasks = [
         { name: "alerts", intervalMs: 5 * 6e4, timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
         { name: "health", intervalMs: 6 * 60 * 6e4, timeoutMs: TIMEOUT_HEALTH_MS, run: () => runHealthCheck() },
-        { name: "pruning", intervalMs: 24 * 60 * 6e4, timeoutMs: TIMEOUT_PRUNING_MS, run: () => runPruning() }
+        { name: "pruning", intervalMs: 24 * 60 * 6e4, timeoutMs: TIMEOUT_PRUNING_MS, run: () => runPruning() },
+        // Drift = row value vs its OWN newest field log (local only; ship and shore both).
+        // Read-only w.r.t. business data — reports into sync_field_log_failures kind='drift'.
+        { name: "drift", intervalMs: 24 * 60 * 6e4, timeoutMs: TIMEOUT_DRIFT_MS, run: () => runDriftScan() }
       ];
       timers = [];
       // Per-(task,tenant) in-progress guard — a slow tenant never stacks or blocks others.
@@ -35391,6 +36394,98 @@ var init_maintenanceOrchestrator = __esm({
       }
     };
     maintenanceOrchestrator = new MaintenanceOrchestrator();
+  }
+});
+
+// server/services/schedulerRoleWatchdog.ts
+var schedulerRoleWatchdog_exports = {};
+__export(schedulerRoleWatchdog_exports, {
+  SchedulerRoleWatchdog: () => SchedulerRoleWatchdog,
+  schedulerRoleWatchdog: () => schedulerRoleWatchdog
+});
+var DEFAULT_WATCHDOG_INTERVAL_MS, SchedulerRoleWatchdog, schedulerRoleWatchdog;
+var init_schedulerRoleWatchdog = __esm({
+  "server/services/schedulerRoleWatchdog.ts"() {
+    "use strict";
+    init_jobDueScanner();
+    init_autoSyncScheduler();
+    init_syncRole();
+    init_syncDiagLogger();
+    DEFAULT_WATCHDOG_INTERVAL_MS = 5 * 60 * 1e3;
+    SchedulerRoleWatchdog = class {
+      timer = null;
+      checkInProgress = false;
+      lastRole = null;
+      jobDueScanIntervalMs = 24 * 60 * 60 * 1e3;
+      start(opts) {
+        if (this.timer) return;
+        this.jobDueScanIntervalMs = opts.jobDueScanIntervalMs;
+        this.lastRole = opts.initialRole;
+        const intervalMs = parseInt(process.env.SCHEDULER_ROLE_WATCHDOG_MS || "", 10) || DEFAULT_WATCHDOG_INTERVAL_MS;
+        this.timer = setInterval(() => {
+          void this.check();
+        }, intervalMs);
+        console.log(
+          `[RoleWatchdog] Started (every ${Math.round(intervalMs / 1e3)}s) \u2014 boot role: ${opts.initialRole}. Re-resolves ship/shore from sync_settings.instance_id and starts/stops the ship schedulers to match.`
+        );
+      }
+      stop() {
+        if (this.timer) {
+          clearInterval(this.timer);
+          this.timer = null;
+        }
+      }
+      async check() {
+        if (this.checkInProgress) return;
+        this.checkInProgress = true;
+        try {
+          const ship = await isShipInstance();
+          const role = ship ? "ship" : "shore";
+          if (this.lastRole !== null && role !== this.lastRole) {
+            console.warn(
+              `[RoleWatchdog] \u26A0\uFE0F Instance role changed ${this.lastRole} \u2192 ${role} since the last check (sync_settings.instance_id was re-tagged while the app was running).`
+            );
+          }
+          this.lastRole = role;
+          if (ship) {
+            if (!syncAutoScheduler.isStarted()) {
+              console.warn(
+                "[RoleWatchdog] \u{1FA79} SELF-HEAL: this instance resolves as a SHIP but the auto-sync scheduler is not running (stale boot-time role decision) \u2014 starting it now."
+              );
+              syncDiag(
+                "[RoleWatchdog] SELF-HEAL: instance resolves as SHIP but auto-sync scheduler was not running \u2014 started late (boot-time role decision was stale)."
+              );
+              await syncAutoScheduler.start();
+            }
+            if (!jobDueScanner.isStarted()) {
+              console.warn(
+                "[RoleWatchdog] \u{1FA79} SELF-HEAL: this instance resolves as a SHIP but the job-due scanner is not running (stale boot-time role decision) \u2014 starting it now."
+              );
+              syncDiag(
+                "[RoleWatchdog] SELF-HEAL: instance resolves as SHIP but jobDueScanner was not running \u2014 started late (boot-time role decision was stale)."
+              );
+              jobDueScanner.start(this.jobDueScanIntervalMs);
+            }
+          } else {
+            if (syncAutoScheduler.isStarted() || jobDueScanner.isStarted()) {
+              console.warn(
+                "[RoleWatchdog] Instance now resolves as SHORE \u2014 stopping ship-only schedulers (auto-sync / job-due scanner). Sync stays ship-initiated."
+              );
+              syncDiag(
+                "[RoleWatchdog] Instance re-resolved as SHORE \u2014 ship-only schedulers stopped."
+              );
+              syncAutoScheduler.stop();
+              jobDueScanner.stop();
+            }
+          }
+        } catch (err) {
+          console.warn(`[RoleWatchdog] Check failed (will retry next interval): ${err?.message || err}`);
+        } finally {
+          this.checkInProgress = false;
+        }
+      }
+    };
+    schedulerRoleWatchdog = new SchedulerRoleWatchdog();
   }
 });
 
@@ -39646,6 +40741,9 @@ async function getWorkOrderContext(workOrderId) {
     runningHoursDifference: correctedWorkOrder.runningHoursDifference?.toString() || "",
     readingDate: correctedWorkOrder.readingDate || "",
     runningHours: correctedWorkOrder.runningHours || "",
+    // RH accuracy (migration 139): round-trip the completion-time RH + reading date.
+    woCompletionRh: correctedWorkOrder.woCompletionRh?.toString() || "",
+    currentReadingDate: correctedWorkOrder.currentReadingDate || "",
     rhBackdatedEntry: !!correctedWorkOrder.rhBackdatedEntry,
     // B4 - Spare Parts Consumed
     consumedSpareParts: ensureArray(correctedWorkOrder.consumedSpareParts),
@@ -39878,8 +40976,14 @@ async function completeWorkOrder(workOrderId, body) {
     adminOverride,
     userId: bodyUserId,
     userUuid: bodyUserUuid,
+    woCompletionRh: bodyWoCompletionRh,
+    currentReadingDate: bodyCurrentReadingDate,
     ...executionData
   } = body;
+  const woCompletionRh = bodyWoCompletionRh !== void 0 && bodyWoCompletionRh !== null && String(bodyWoCompletionRh).trim() !== "" ? String(bodyWoCompletionRh) : null;
+  const currentReadingDate = bodyCurrentReadingDate ? String(bodyCurrentReadingDate) : null;
+  const cycleRH = woCompletionRh ?? runningHours;
+  const completionWarnings = [];
   const workOrder = await findById3(workOrderId);
   if (!workOrder) {
     throw new NotFoundError("Work order not found");
@@ -39931,6 +41035,27 @@ async function completeWorkOrder(workOrderId, body) {
   if (workOrder.maintenanceBasis === "Running Hours" && counterType !== "NOT_RH_DRIVEN" && !runningHours) {
     throw new ValidationError("Running hours is required for RH-based maintenance work orders");
   }
+  if (woCompletionRh && runningHours) {
+    const woRhNum = parseFloat(woCompletionRh);
+    const readingNum = parseFloat(runningHours);
+    if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
+      throw new ValidationError(
+        `WO Completion RH (${woRhNum}) cannot be greater than the Current Reading (${readingNum}). The completion reading is the hours at the time the work was done; the Current Reading is the latest meter value.`,
+        { code: "WO_COMPLETION_RH_EXCEEDS_READING" }
+      );
+    }
+  }
+  if (currentReadingDate) {
+    const readingDateParsed = new Date(currentReadingDate);
+    const todayEnd = /* @__PURE__ */ new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    if (isNaN(readingDateParsed.getTime())) {
+      throw new ValidationError("Current Reading Date is not a valid date.", { code: "INVALID_READING_DATE" });
+    }
+    if (readingDateParsed.getTime() > todayEnd.getTime()) {
+      throw new ValidationError("Current Reading Date cannot be in the future.", { code: "READING_DATE_IN_FUTURE" });
+    }
+  }
   let rhValidationDetails = null;
   let completionRHSource = "MANUAL_ENTRY";
   let rhReadingApplied = false;
@@ -39940,6 +41065,7 @@ async function completeWorkOrder(workOrderId, body) {
   if (runningHours && counterType !== "NOT_RH_DRIVEN" && await isShipInstance()) {
     const newRH = parseInt(runningHours);
     const completionDateForValidation = dateOfCompletion || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    const readingDateForRH = currentReadingDate || completionDateForValidation;
     const componentVesselId = workOrder.vesselId || component.vesselId || "V001";
     const previousRH = parseInt(component.currentCumulativeRH || "0");
     const alreadySynced = !!workOrder.rhSyncedAt;
@@ -39955,14 +41081,14 @@ async function completeWorkOrder(workOrderId, body) {
           const masterUpdRaw = component.rhMasterUpdatedAt ?? (component.lastUpdated ? new Date(component.lastUpdated) : null);
           const masterUpdDate = masterUpdRaw instanceof Date ? masterUpdRaw : masterUpdRaw ? new Date(masterUpdRaw) : null;
           if (masterUpdDate && !isNaN(masterUpdDate.getTime())) {
-            const woCompletionDate = new Date(completionDateForValidation);
+            const woCompletionDate = new Date(readingDateForRH);
             const masterDay = Date.UTC(masterUpdDate.getUTCFullYear(), masterUpdDate.getUTCMonth(), masterUpdDate.getUTCDate());
             const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
             if (woDay < masterDay) {
               rhBackdatedSkipped = true;
               rhBackdatedLatestRH = masterCurrentRH;
               rhBackdatedLatestRHDate = masterUpdDate.toISOString().split("T")[0];
-              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master current ${masterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated \u2014 reading saved to WO for scheduling only.`);
+              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (reading date ${readingDateForRH}) is older and lower than master current ${masterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated \u2014 reading saved to WO for scheduling only.`);
             }
           }
         }
@@ -39977,7 +41103,7 @@ async function completeWorkOrder(workOrderId, body) {
               userRole: userRole || "Ship",
               adminOverride: adminOverride || false,
               comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ""})`,
-              dateUpdated: completionDateForValidation
+              dateUpdated: readingDateForRH
             });
             rhReadingApplied = true;
             console.log(`\u2705 [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
@@ -40014,14 +41140,14 @@ async function completeWorkOrder(workOrderId, body) {
             const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
             const inhMasterUpdDate = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
-              const woCompletionDate = new Date(completionDateForValidation);
+              const woCompletionDate = new Date(readingDateForRH);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
               const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
               if (woDay < masterDay) {
                 rhBackdatedSkipped = true;
                 rhBackdatedLatestRH = inhMasterCurrentRH;
                 rhBackdatedLatestRHDate = inhMasterUpdDate.toISOString().split("T")[0];
-                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated \u2014 reading saved to WO for scheduling only.`);
+                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (reading date ${readingDateForRH}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated \u2014 reading saved to WO for scheduling only.`);
               }
             }
           }
@@ -40036,7 +41162,7 @@ async function completeWorkOrder(workOrderId, body) {
                 userRole: userRole || "Ship",
                 adminOverride: adminOverride || false,
                 comments: `WO ${workOrder.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                dateUpdated: completionDateForValidation
+                dateUpdated: readingDateForRH
               });
               console.log(`\u2705 [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
             } catch (masterErr) {
@@ -40056,7 +41182,7 @@ async function completeWorkOrder(workOrderId, body) {
             }
           }
         } else {
-          const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
+          const validation = await validateRHEntry(component.cuuid, readingDateForRH, newRH);
           if (!validation.isValid) {
             throw new ValidationError(validation.errorMessage, {
               code: validation.validationStatus,
@@ -40090,7 +41216,7 @@ async function completeWorkOrder(workOrderId, body) {
             previousRH: previousRH.toString(),
             newRH: newRH.toString(),
             cumulativeRH: newRH.toString(),
-            dateUpdatedLocal: completionDateForValidation,
+            dateUpdatedLocal: readingDateForRH,
             dateUpdatedTZ: "UTC",
             enteredAtUTC: /* @__PURE__ */ new Date(),
             userId: executionData.performedBy || "System",
@@ -40107,22 +41233,33 @@ async function completeWorkOrder(workOrderId, body) {
     }
   }
   let missedCycles;
-  if (workOrder.maintenanceBasis === "Running Hours" && runningHours) {
-    const completionRHValue = parseInt(runningHours);
+  if (workOrder.maintenanceBasis === "Running Hours" && cycleRH) {
+    const completionRHValue = parseInt(cycleRH);
     const dueRH = workOrder.nextDueReading ? parseFloat(workOrder.nextDueReading) : null;
     let jobIntervalRH = null;
+    let prevLastDoneRH = null;
     if (workOrder.jobId) {
       const jobForRH = await findJob(workOrder.jobId);
       if (jobForRH?.intervalRunningHour) {
         jobIntervalRH = jobForRH.intervalRunningHour;
       }
+      const prevRaw = jobForRH?.lastDoneRH;
+      if (prevRaw !== void 0 && prevRaw !== null && String(prevRaw).trim() !== "") {
+        const parsedPrev = parseFloat(String(prevRaw));
+        if (!isNaN(parsedPrev)) prevLastDoneRH = parsedPrev;
+      }
     }
     if (!jobIntervalRH && workOrder.frequencyValue) {
       jobIntervalRH = parseInt(String(workOrder.frequencyValue));
     }
+    if (woCompletionRh && prevLastDoneRH !== null && !isNaN(completionRHValue) && completionRHValue < prevLastDoneRH) {
+      const warnMsg = `WO Completion RH (${completionRHValue}) is below the previous completion's RH (${prevLastDoneRH}) for this job \u2014 saved as entered; please verify the reading.`;
+      completionWarnings.push(warnMsg);
+      console.warn(`\u26A0\uFE0F [RH Accuracy] ${warnMsg} (WO ${workOrder.workOrderNo})`);
+    }
     missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
     if (missedCycles > 0) {
-      console.log(`\u26A0\uFE0F Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, completionRH: ${completionRHValue}, interval: ${jobIntervalRH})`);
+      console.log(`\u26A0\uFE0F Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, cycleRH: ${completionRHValue}${woCompletionRh ? " [woCompletionRh]" : " [currentReading fallback]"}, interval: ${jobIntervalRH})`);
     }
   } else if (workOrder.maintenanceBasis === "Dual Frequency") {
     let dualCalendarDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
@@ -40175,6 +41312,9 @@ async function completeWorkOrder(workOrderId, body) {
     missedCycles,
     originalDueDate,
     completionRH: runningHours ? runningHours : void 0,
+    // RH accuracy (migration 139): persist the completion-time RH + reading date.
+    woCompletionRh: woCompletionRh ?? void 0,
+    currentReadingDate: currentReadingDate ?? void 0,
     completionRHValidated: runningHours ? true : void 0,
     completionRHSource: runningHours ? completionRHSource : void 0,
     completionRHValidationDetails: rhValidationDetails || void 0,
@@ -40383,8 +41523,8 @@ async function completeWorkOrder(workOrderId, body) {
             console.log(`\u2705 [Dual] Auto-calculated next due date for job ${job.jobNo}: ${nextDue}`);
           }
         }
-        if (runningHours) {
-          const dualCurrentRH = parseInt(runningHours);
+        if (cycleRH) {
+          const dualCurrentRH = parseInt(cycleRH);
           if (!isNaN(dualCurrentRH)) {
             linkUpdates.lastDoneRH = dualCurrentRH.toString();
             jobUpdates.lastDoneRH = dualCurrentRH;
@@ -40407,8 +41547,8 @@ async function completeWorkOrder(workOrderId, body) {
         await updateJob3(job.juuid, jobUpdates);
         console.log(`\u2705 Updated Dual Frequency job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}${runningHours ? ", lastDoneRH: " + runningHours : " (RH unchanged)"}`);
       }
-      if (workOrder.maintenanceBasis === "Running Hours" && runningHours) {
-        const currentRH = parseInt(runningHours);
+      if (workOrder.maintenanceBasis === "Running Hours" && cycleRH) {
+        const currentRH = parseInt(cycleRH);
         if (!isNaN(currentRH)) {
           linkUpdates.lastDoneRH = currentRH.toString();
           jobUpdates.lastDoneRH = currentRH;
@@ -40510,6 +41650,9 @@ async function completeWorkOrder(workOrderId, body) {
     runningHoursUpdated: !!runningHours,
     missedCycles,
     rhBackdated: rhBackdatedSkipped,
+    // RH accuracy (migration 139): warn-only advisories (e.g. completion RH below
+    // the previous completion) — saved as entered, surfaced for the UI to toast.
+    ...completionWarnings.length > 0 && { warnings: completionWarnings },
     ...rhBackdatedSkipped && {
       latestRH: rhBackdatedLatestRH,
       latestRHDate: rhBackdatedLatestRHDate
@@ -40614,8 +41757,9 @@ async function finalizeWorkOrderCompletion(workOrderId) {
         await updateJob3(job.juuid, updates);
         console.log(`\u2705 [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
       }
-      if ((basis === "Running Hours" || basis === "Dual Frequency") && workOrder.runningHours) {
-        const currentRH = parseInt(workOrder.runningHours);
+      const finalizeCycleRH = workOrder.woCompletionRh ?? workOrder.runningHours;
+      if ((basis === "Running Hours" || basis === "Dual Frequency") && finalizeCycleRH) {
+        const currentRH = parseInt(String(finalizeCycleRH));
         if (!isNaN(currentRH)) {
           const rhUpdates = { lastDoneRH: currentRH };
           const rhLinkUpdates = { lastDoneRH: currentRH.toString(), updatedAt: /* @__PURE__ */ new Date() };
@@ -40744,13 +41888,14 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
             nextDueDate = computed;
           }
         }
-      } else if (existingWO2.maintenanceBasis === "Running Hours" && existingWO2.currentReading) {
-        nextDueReading = (parseInt(existingWO2.currentReading) + parseInt(existingWO2.frequencyValue || "0")).toString();
+      } else if (existingWO2.maintenanceBasis === "Running Hours" && (existingWO2.woCompletionRh || existingWO2.currentReading)) {
+        const bulkCycleRH = existingWO2.woCompletionRh ?? existingWO2.currentReading;
+        nextDueReading = (parseInt(String(bulkCycleRH)) + parseInt(existingWO2.frequencyValue || "0")).toString();
       }
       const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
       let missedCycles;
       if (existingWO2.maintenanceBasis === "Running Hours") {
-        const completionRHValue = existingWO2.completionRH;
+        const completionRHValue = existingWO2.woCompletionRh ?? existingWO2.completionRH;
         const dueRH = existingWO2.nextDueReading ?? null;
         let jobIntervalRH = null;
         if (existingWO2.jobId) {
@@ -40890,8 +42035,9 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
       const computed = calculateNextDueDate2(actualCompletionDate, existingWO2.frequencyValue, existingWO2.frequencyUnit, originalDueDate);
       if (computed) nextDueDate = computed;
     }
-  } else if (existingWO2.maintenanceBasis === "Running Hours" && existingWO2.currentReading) {
-    nextDueReading = (parseInt(existingWO2.currentReading) + parseInt(existingWO2.frequencyValue || "0")).toString();
+  } else if (existingWO2.maintenanceBasis === "Running Hours" && (existingWO2.woCompletionRh || existingWO2.currentReading)) {
+    const cycleRHSrc = existingWO2.woCompletionRh ?? existingWO2.currentReading;
+    nextDueReading = (parseInt(String(cycleRHSrc)) + parseInt(existingWO2.frequencyValue || "0")).toString();
   }
   const { calculateMissedCycles: calculateMissedCycles2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
   const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
@@ -41317,7 +42463,13 @@ async function backfillJobIds(vesselId) {
       (j) => j.componentId === wo.component && j.jobTitle === wo.jobTitle && (!vesselId || j.vesselId === wo.vesselId)
     );
     if (matchingJob) {
-      await update5(wo.wouuid, { jobId: matchingJob.id });
+      const updatedWO = await update5(wo.wouuid, { jobId: matchingJob.id });
+      try {
+        const { logFieldChanges: logFieldChanges2 } = await Promise.resolve().then(() => (init_sync(), sync_exports));
+        await logFieldChanges2("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO || { ...wo, jobId: matchingJob.id }, "auto-generation");
+      } catch (err) {
+        console.error("[FieldLogger] WO jobId backfill:", err);
+      }
       updated++;
       updateResults.push({
         workOrderId: wo.id,
@@ -60720,8 +61872,8 @@ async function createChangeRequest(request) {
 async function updateChangeRequest(id, data) {
   return storage.updateChangeRequest(id, data);
 }
-async function approveChangeRequest(id, reviewerId, comment, role) {
-  return storage.approveChangeRequest(id, reviewerId, comment, role);
+async function approveChangeRequest(id, reviewerId, comment, role, overriddenChanges) {
+  return storage.approveChangeRequest(id, reviewerId, comment, role, overriddenChanges);
 }
 async function getAuditLogsByEntity2(entityType, entityId) {
   return storage.getAuditLogsByEntity(entityType, entityId);
@@ -61185,7 +62337,7 @@ async function submitChangeRequestWorkflow(id, userId) {
   return updated;
 }
 async function approveChangeRequest2(id, body) {
-  const { comment, reviewerId, role } = body;
+  const { comment, reviewerId, role, overriddenChanges } = body;
   if (!comment) {
     throw new ValidationError("Comment is required for approval");
   }
@@ -61194,9 +62346,10 @@ async function approveChangeRequest2(id, body) {
     id: existing?.id,
     targetType: existing?.targetType,
     targetId: existing?.targetId,
-    proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0
+    proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0,
+    overriddenFieldCount: overriddenChanges?.length ?? 0
   });
-  const updated = await approveChangeRequest(id, reviewerId || "reviewer", comment, role);
+  const updated = await approveChangeRequest(id, reviewerId || "reviewer", comment, role, overriddenChanges);
   console.log(`[CR_SERVICE] Approval complete, status: ${updated.status}`);
   return updated;
 }
@@ -61331,7 +62484,8 @@ async function approveChangeRequest3(req, res) {
   const updated = await approveChangeRequest2(id, {
     comment: req.body.comment,
     reviewerId: serverReviewerId,
-    role: userRole
+    role: userRole,
+    overriddenChanges: req.body.overriddenChanges
   });
   res.json(updated);
 }
@@ -74227,7 +75381,228 @@ var routes_default18 = router18;
 // server/modules/access-control/routes.ts
 init_storage();
 import { Router as Router19 } from "express";
+
+// server/modules/access-control/controllers/viewModeController.ts
+init_syncRole();
+
+// server/modules/access-control/repositories/viewModeRepository.ts
+init_db();
+init_schema();
+import { eq as eq27, and as and24, asc as asc6, sql as sql20 } from "drizzle-orm";
+async function getActiveViewModes() {
+  const db2 = await getDb();
+  return db2.select().from(viewModesMaster).where(and24(eq27(viewModesMaster.isDeleted, false), eq27(viewModesMaster.isActive, true))).orderBy(asc6(viewModesMaster.sortOrder), asc6(viewModesMaster.code));
+}
+async function getRolesWithMappings() {
+  const db2 = await getDb();
+  const rows = await db2.select({
+    roleRuid: sql20`${admnRoleMaster.ruid}::text`,
+    roleName: admnRoleMaster.assignedRole,
+    roletype: admnRoleMaster.roletype,
+    viewModeCode: roleViewModeMapping.viewModeCode
+  }).from(admnRoleMaster).leftJoin(
+    roleViewModeMapping,
+    and24(
+      sql20`${roleViewModeMapping.roleRuid} = ${admnRoleMaster.ruid}::text`,
+      eq27(roleViewModeMapping.isDeleted, false)
+    )
+  ).where(and24(eq27(admnRoleMaster.isActive, true), eq27(admnRoleMaster.isDeleted, false))).orderBy(asc6(admnRoleMaster.roletype), asc6(admnRoleMaster.assignedRole));
+  return rows;
+}
+async function getActiveRoleByTypeAndName(roletype, assignedRole) {
+  const db2 = await getDb();
+  const rows = await db2.select({
+    ruid: sql20`${admnRoleMaster.ruid}::text`,
+    assignedRole: admnRoleMaster.assignedRole,
+    roletype: admnRoleMaster.roletype
+  }).from(admnRoleMaster).where(
+    and24(
+      eq27(admnRoleMaster.roletype, roletype),
+      eq27(admnRoleMaster.assignedRole, assignedRole),
+      eq27(admnRoleMaster.isActive, true),
+      eq27(admnRoleMaster.isDeleted, false)
+    )
+  ).limit(1);
+  return rows[0];
+}
+async function getActiveRoleByRuid(roleRuid) {
+  const db2 = await getDb();
+  const rows = await db2.select({
+    ruid: sql20`${admnRoleMaster.ruid}::text`,
+    assignedRole: admnRoleMaster.assignedRole,
+    roletype: admnRoleMaster.roletype
+  }).from(admnRoleMaster).where(
+    and24(
+      sql20`${admnRoleMaster.ruid}::text = ${roleRuid}`,
+      eq27(admnRoleMaster.isActive, true),
+      eq27(admnRoleMaster.isDeleted, false)
+    )
+  ).limit(1);
+  return rows[0];
+}
+async function getMappingByRoleRuid(roleRuid) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(roleViewModeMapping).where(
+    and24(eq27(roleViewModeMapping.roleRuid, roleRuid), eq27(roleViewModeMapping.isDeleted, false))
+  ).limit(1);
+  return rows[0];
+}
+async function upsertMapping(roleRuid, viewModeCode, updatedByUuid) {
+  const db2 = await getDb();
+  await db2.insert(roleViewModeMapping).values({ roleRuid, viewModeCode, createdByUuid: updatedByUuid, updatedByUuid }).onConflictDoUpdate({
+    target: roleViewModeMapping.roleRuid,
+    set: {
+      viewModeCode,
+      isDeleted: false,
+      updatedByUuid,
+      updatedAt: /* @__PURE__ */ new Date()
+    }
+  });
+}
+async function softDeleteMapping(roleRuid, updatedByUuid) {
+  const db2 = await getDb();
+  await db2.update(roleViewModeMapping).set({ isDeleted: true, updatedByUuid, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(roleViewModeMapping.roleRuid, roleRuid));
+}
+
+// server/modules/access-control/services/viewModeService.ts
+var SAIL_ADMIN_ROLE = "Sail Admin";
+var SAIL_ADMIN_MODE = "Sail_Admin";
+async function listViewModes() {
+  return getActiveViewModes();
+}
+async function getRoleViewMappings() {
+  const [availableModes, mappings] = await Promise.all([
+    getActiveViewModes(),
+    getRolesWithMappings()
+  ]);
+  return { availableModes, mappings };
+}
+var ValidationError2 = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+  }
+};
+async function saveMappings(entries, updatedByUuid) {
+  const activeCodes = new Set((await getActiveViewModes()).map((m) => m.code));
+  const validated = [];
+  for (const entry of entries) {
+    if (!entry || typeof entry.roleRuid !== "string" || !entry.roleRuid.trim()) {
+      throw new ValidationError2("invalid_entry", "Every entry needs a roleRuid.");
+    }
+    if (entry.viewModeCode != null && !activeCodes.has(entry.viewModeCode)) {
+      throw new ValidationError2(
+        "invalid_view_mode",
+        `'${entry.viewModeCode}' is not an active view mode.`
+      );
+    }
+    const role = await getActiveRoleByRuid(entry.roleRuid.trim());
+    if (!role) {
+      throw new ValidationError2("role_not_found", `No active role with ruid '${entry.roleRuid}'.`);
+    }
+    if (role.roletype === "Office" && role.assignedRole === SAIL_ADMIN_ROLE) {
+      throw new ValidationError2(
+        "sail_admin_locked",
+        "The Sail Admin role mapping is locked and cannot be changed."
+      );
+    }
+    validated.push({ entry: { ...entry, roleRuid: entry.roleRuid.trim() }, roleName: role.assignedRole, roletype: role.roletype });
+  }
+  for (const { entry } of validated) {
+    if (entry.viewModeCode == null) {
+      await softDeleteMapping(entry.roleRuid, updatedByUuid);
+    } else {
+      await upsertMapping(entry.roleRuid, entry.viewModeCode, updatedByUuid);
+    }
+  }
+}
+async function resolveViewMode(userType, roleName) {
+  if (userType === "Office" && roleName === SAIL_ADMIN_ROLE) {
+    return { mode: SAIL_ADMIN_MODE, reason: null };
+  }
+  const role = await getActiveRoleByTypeAndName(userType, roleName);
+  if (!role) {
+    return { mode: null, reason: "ROLE_NOT_FOUND" };
+  }
+  const mapping = await getMappingByRoleRuid(role.ruid);
+  if (!mapping) {
+    return { mode: null, reason: "ROLE_NOT_MAPPED" };
+  }
+  const activeCodes = new Set((await getActiveViewModes()).map((m) => m.code));
+  if (!activeCodes.has(mapping.viewModeCode)) {
+    return { mode: null, reason: "ROLE_NOT_MAPPED" };
+  }
+  return { mode: mapping.viewModeCode, reason: null };
+}
+
+// server/modules/access-control/controllers/viewModeController.ts
+var EDITOR_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
+async function getViewModesHandler(_req, res) {
+  try {
+    const modes = await listViewModes();
+    res.json(modes);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch view modes", details: error.message });
+  }
+}
+async function getRoleViewMappingsHandler(_req, res) {
+  try {
+    const result = await getRoleViewMappings();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch role view mappings", details: error.message });
+  }
+}
+async function putRoleViewMappingsHandler(req, res) {
+  try {
+    if (await isShipInstance()) {
+      return res.status(403).json({
+        error: "shore_only",
+        message: "View-mode mappings can only be edited on the shore instance. Ships receive updates via sync."
+      });
+    }
+    const userRole = req.user?.role || "";
+    if (!EDITOR_ROLES.has(userRole)) {
+      return res.status(403).json({
+        error: "forbidden",
+        message: "Only Sail Admin / Super Admin may edit the role view-mode mapping."
+      });
+    }
+    const entries = req.body?.mappings;
+    if (!Array.isArray(entries)) {
+      return res.status(400).json({ error: "mappings[] is required" });
+    }
+    const updatedBy = req.user?.userUuid || null;
+    await saveMappings(entries, updatedBy);
+    const result = await getRoleViewMappings();
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if (error instanceof ValidationError2) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
+    res.status(500).json({ error: "Failed to save role view mappings", details: error.message });
+  }
+}
+async function resolveViewModeHandler(req, res) {
+  try {
+    const userType = typeof req.query.userType === "string" ? req.query.userType.trim() : "";
+    const role = typeof req.query.role === "string" ? req.query.role.trim() : "";
+    if (!userType || !role) {
+      return res.status(400).json({ error: "userType and role query params are required" });
+    }
+    const result = await resolveViewMode(userType, role);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to resolve view mode", details: error.message });
+  }
+}
+
+// server/modules/access-control/routes.ts
 var router19 = Router19();
+router19.get("/admin/view-modes", requireAuth, getViewModesHandler);
+router19.get("/admin/role-view-mappings/resolve", requireAuth, resolveViewModeHandler);
+router19.get("/admin/role-view-mappings", requireAuth, getRoleViewMappingsHandler);
+router19.put("/admin/role-view-mappings", requireAuth, putRoleViewMappingsHandler);
 router19.get("/admin/roles", async (_req, res) => {
   try {
     const roles = await storage.getActiveRoles();
@@ -75732,17 +77107,17 @@ import crypto5 from "crypto";
 // server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
 init_db();
 init_schema();
-import { eq as eq27 } from "drizzle-orm";
+import { eq as eq28 } from "drizzle-orm";
 async function getAllMappings() {
   const db2 = await getDb();
   return db2.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
 }
 async function getMappingForSailRole(sailRole) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartRoleMappings).where(eq27(shipskartRoleMappings.sailRole, sailRole)).limit(1);
+  const rows = await db2.select().from(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole)).limit(1);
   return rows[0];
 }
-async function upsertMapping(sailRole, shipskartRole, updatedByUuid) {
+async function upsertMapping2(sailRole, shipskartRole, updatedByUuid) {
   const db2 = await getDb();
   await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
     target: shipskartRoleMappings.sailRole,
@@ -75751,7 +77126,7 @@ async function upsertMapping(sailRole, shipskartRole, updatedByUuid) {
 }
 async function deleteMapping(sailRole) {
   const db2 = await getDb();
-  await db2.delete(shipskartRoleMappings).where(eq27(shipskartRoleMappings.sailRole, sailRole));
+  await db2.delete(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole));
 }
 
 // server/modules/shipskart/services/shipskartSsoService.ts
@@ -75931,7 +77306,7 @@ async function getAvailableShipskartRoles() {
 }
 
 // server/modules/shipskart/controllers/shipskartRoleMappingController.ts
-var EDITOR_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
+var EDITOR_ROLES2 = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
 async function getRoleMappingsHandler(req, res) {
   const [availableRoles, rows] = await Promise.all([
     getAvailableShipskartRoles(),
@@ -75944,7 +77319,7 @@ async function getRoleMappingsHandler(req, res) {
 }
 async function putRoleMappingsHandler(req, res) {
   const userRole = req.user?.role || "";
-  if (!EDITOR_ROLES.has(userRole)) {
+  if (!EDITOR_ROLES2.has(userRole)) {
     return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may edit the Shipskart role mapping." });
   }
   const mappings = req.body?.mappings;
@@ -75968,7 +77343,7 @@ async function putRoleMappingsHandler(req, res) {
     if (m.shipskartRole == null) {
       await deleteMapping(m.sailRole.trim());
     } else {
-      await upsertMapping(m.sailRole.trim(), m.shipskartRole, updatedBy);
+      await upsertMapping2(m.sailRole.trim(), m.shipskartRole, updatedBy);
     }
   }
   const rows = await getAllMappings();
@@ -75998,21 +77373,21 @@ init_middleware();
 // server/modules/noon-report/repositories/noonReportRepository.ts
 init_db();
 init_schema();
-import { eq as eq28, and as and24, desc as desc6 } from "drizzle-orm";
+import { eq as eq29, and as and25, desc as desc6 } from "drizzle-orm";
 async function getNoonReports(filters) {
   const db2 = await getDb();
   let query = db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate));
   const conditions = [];
-  if (filters.vesselId) conditions.push(eq28(nrNoonReports.vesselId, filters.vesselId));
-  if (filters.status) conditions.push(eq28(nrNoonReports.status, filters.status));
+  if (filters.vesselId) conditions.push(eq29(nrNoonReports.vesselId, filters.vesselId));
+  if (filters.status) conditions.push(eq29(nrNoonReports.status, filters.status));
   if (conditions.length > 0) {
-    return db2.select().from(nrNoonReports).where(and24(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
+    return db2.select().from(nrNoonReports).where(and25(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
   }
   return db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
 }
 async function getNoonReportById(id) {
   const db2 = await getDb();
-  const result = await db2.select().from(nrNoonReports).where(eq28(nrNoonReports.id, id)).limit(1);
+  const result = await db2.select().from(nrNoonReports).where(eq29(nrNoonReports.id, id)).limit(1);
   return result[0] || null;
 }
 async function createNoonReport(data) {
@@ -76025,7 +77400,7 @@ async function createNoonReport(data) {
 }
 async function updateNoonReport(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq28(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function submitNoonReport(id, submittedBy) {
@@ -76035,27 +77410,27 @@ async function submitNoonReport(id, submittedBy) {
     submittedAt: /* @__PURE__ */ new Date(),
     submittedBy,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq28(nrNoonReports.id, id)).returning();
+  }).where(eq29(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function deleteNoonReport(id) {
   const db2 = await getDb();
-  await db2.delete(nrNoonReports).where(and24(eq28(nrNoonReports.id, id), eq28(nrNoonReports.status, "draft")));
+  await db2.delete(nrNoonReports).where(and25(eq29(nrNoonReports.id, id), eq29(nrNoonReports.status, "draft")));
 }
 async function saveDraft(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq28(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq29(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function getFuelRobByVessel(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrFuelRob).where(eq28(nrFuelRob.vesselId, vesselId));
+  return db2.select().from(nrFuelRob).where(eq29(nrFuelRob.vesselId, vesselId));
 }
 async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
   const db2 = await getDb();
-  const existing = await db2.select().from(nrFuelRob).where(and24(eq28(nrFuelRob.vesselId, vesselId), eq28(nrFuelRob.fuelType, fuelType))).limit(1);
+  const existing = await db2.select().from(nrFuelRob).where(and25(eq29(nrFuelRob.vesselId, vesselId), eq29(nrFuelRob.fuelType, fuelType))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and24(eq28(nrFuelRob.vesselId, vesselId), eq28(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and25(eq29(nrFuelRob.vesselId, vesselId), eq29(nrFuelRob.fuelType, fuelType)));
   } else {
     await db2.insert(nrFuelRob).values({
       vesselId,
@@ -76067,27 +77442,27 @@ async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
 }
 async function getLastNReports(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and24(eq28(nrNoonReports.vesselId, vesselId), eq28(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and25(eq29(nrNoonReports.vesselId, vesselId), eq29(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
 }
 
 // server/modules/noon-report/services/noonReportService.ts
 init_db();
 init_schema();
-import { eq as eq32, and as and27, desc as desc9, asc as asc6, isNull as isNull5, count } from "drizzle-orm";
+import { eq as eq33, and as and28, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
 
 // server/modules/noon-report/services/calculationEngine.ts
 init_db();
 init_schema();
-import { eq as eq31, and as and26, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
+import { eq as eq32, and as and27, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
 
 // server/modules/noon-report/utils/existingDataAdapter.ts
 init_db();
 init_schema();
-import { eq as eq29, sql as sql21 } from "drizzle-orm";
+import { eq as eq30, sql as sql22 } from "drizzle-orm";
 async function getVesselById(vesselId) {
   const db2 = await getDb();
   const result = await db2.execute(
-    sql21`SELECT vuuid, name, imo_number, flag, vessel_type, deadweight, gross_tonnage
+    sql22`SELECT vuuid, name, imo_number, flag, vessel_type, deadweight, gross_tonnage
         FROM vessels WHERE vuuid = ${vesselId} LIMIT 1`
   );
   const row = result.rows[0] ?? null;
@@ -76113,7 +77488,7 @@ async function getVesselDwt(vesselId) {
 init_fuelConversionFactors();
 async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrFuelRob).where(and26(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType))).limit(1);
+  const rows = await db2.select().from(nrFuelRob).where(and27(eq32(nrFuelRob.vesselId, vesselId), eq32(nrFuelRob.fuelType, fuelType))).limit(1);
   if (rows.length === 0) {
     const newRob = Math.max(0, deltaMt);
     await db2.insert(nrFuelRob).values({
@@ -76125,7 +77500,7 @@ async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   } else {
     const current = Number(rows[0].currentRob) || 0;
     const updated = Math.max(0, current + deltaMt);
-    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and26(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and27(eq32(nrFuelRob.vesselId, vesselId), eq32(nrFuelRob.fuelType, fuelType)));
   }
 }
 var PHASE1_STEPS = ["rollingAverages", "ciiTracking", "eeoi"];
@@ -76170,7 +77545,7 @@ async function computeRollingAveragesAndEndurance(report) {
     const cons3 = last3.map((r) => getReportConsumption(r, fuelType)).filter((v) => v !== null);
     const avg7Day = cons7.length > 0 ? cons7.reduce((a, b) => a + b, 0) / cons7.length : null;
     const avg3Day = cons3.length > 0 ? cons3.reduce((a, b) => a + b, 0) / cons3.length : null;
-    const robRows = await db2.select().from(nrFuelRob).where(and26(eq31(nrFuelRob.vesselId, report.vesselId), eq31(nrFuelRob.fuelType, fuelType))).limit(1);
+    const robRows = await db2.select().from(nrFuelRob).where(and27(eq32(nrFuelRob.vesselId, report.vesselId), eq32(nrFuelRob.fuelType, fuelType))).limit(1);
     const robRow = robRows[0] ?? null;
     const currentRob = robRow !== null ? Math.max(0, toNum2(robRow.currentRob) ?? 0) : null;
     let enduranceDays = null;
@@ -76186,7 +77561,7 @@ async function computeRollingAveragesAndEndurance(report) {
         avg7Day: avg7Day !== null ? String(avg7Day) : null,
         enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
         enduranceNm: enduranceNM !== null ? String(enduranceNM) : null
-      }).where(and26(eq31(nrFuelRob.vesselId, report.vesselId), eq31(nrFuelRob.fuelType, fuelType)));
+      }).where(and27(eq32(nrFuelRob.vesselId, report.vesselId), eq32(nrFuelRob.fuelType, fuelType)));
     } else if (avg7Day !== null) {
       await db2.insert(nrFuelRob).values({
         vesselId: report.vesselId,
@@ -76207,9 +77582,9 @@ async function computeCiiTracking(report) {
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
   const yearReports = await db2.select().from(nrNoonReports).where(
-    and26(
-      eq31(nrNoonReports.vesselId, report.vesselId),
-      eq31(nrNoonReports.status, "submitted"),
+    and27(
+      eq32(nrNoonReports.vesselId, report.vesselId),
+      eq32(nrNoonReports.status, "submitted"),
       gte5(nrNoonReports.reportDate, yearStart),
       lte3(nrNoonReports.reportDate, yearEnd)
     )
@@ -76236,7 +77611,7 @@ async function computeCiiTracking(report) {
     const refLine = computeCiiRefLine(dwt);
     ciiRating = assignCiiRating(aer, refLine);
   }
-  const existing = await db2.select().from(nrCiiTracking).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year))).limit(1);
+  const existing = await db2.select().from(nrCiiTracking).where(and27(eq32(nrCiiTracking.vesselId, report.vesselId), eq32(nrCiiTracking.year, year))).limit(1);
   const previousCiiRating = existing[0]?.ciiRating ?? null;
   if (existing.length > 0) {
     await db2.update(nrCiiTracking).set({
@@ -76247,7 +77622,7 @@ async function computeCiiTracking(report) {
       previousCiiRating,
       // store old rating before overwriting
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year)));
+    }).where(and27(eq32(nrCiiTracking.vesselId, report.vesselId), eq32(nrCiiTracking.year, year)));
   } else {
     await db2.insert(nrCiiTracking).values({
       vesselId: report.vesselId,
@@ -76278,9 +77653,9 @@ async function computeEeoi(report) {
     }
   }
   const eeoi = totalCo2Mt / (cargoMt * distanceSailed);
-  const existing = await db2.select().from(nrVoyageLegs).where(and26(eq31(nrVoyageLegs.vesselId, report.vesselId), eq31(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
+  const existing = await db2.select().from(nrVoyageLegs).where(and27(eq32(nrVoyageLegs.vesselId, report.vesselId), eq32(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq31(nrVoyageLegs.id, existing[0].id));
+    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq32(nrVoyageLegs.id, existing[0].id));
   } else {
     await db2.insert(nrVoyageLegs).values({
       vesselId: report.vesselId,
@@ -76307,7 +77682,7 @@ function getReportConsumption(report, fuelType) {
 }
 async function getLastNSubmitted(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and26(eq31(nrNoonReports.vesselId, vesselId), eq31(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
 }
 function toNum2(val) {
   if (val === null || val === void 0 || val === "") return null;
@@ -76380,7 +77755,7 @@ async function updateFuelRobFromReport(report) {
 }
 async function getFuelDashboard(vesselId) {
   const db2 = await getDb();
-  const robRecords = await db2.select().from(nrFuelRob).where(eq32(nrFuelRob.vesselId, vesselId));
+  const robRecords = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
   const robByFuelType = {};
   const enduranceDaysByFuel = {};
   const avg7DayByFuel = {};
@@ -76411,11 +77786,11 @@ async function getFuelDashboard(vesselId) {
     recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
   }
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and27(eq32(nrCiiTracking.vesselId, vesselId), eq32(nrCiiTracking.year, currentYear))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and28(eq33(nrCiiTracking.vesselId, vesselId), eq33(nrCiiTracking.year, currentYear))).limit(1);
   const ciiTracking = ciiRows[0] ?? null;
   const dwt = await getVesselDwt(vesselId);
   const ciiRefLine = dwt !== null ? computeCiiRefLine(dwt) : null;
-  const last30Raw = await db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
+  const last30Raw = await db2.select().from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
   const last30 = [...last30Raw].reverse().map((r) => {
     const hfo = toNum3(r.hfoConsumption) ?? 0;
     const lsmgo = toNum3(r.lsmgoConsumption) ?? 0;
@@ -76445,7 +77820,7 @@ async function getFuelDashboard(vesselId) {
     vlsfoConsumption: nrNoonReports.vlsfoConsumption,
     lpgConsumption: nrNoonReports.lpgConsumption,
     reportDate: nrNoonReports.reportDate
-  }).from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(asc6(nrNoonReports.reportDate));
+  }).from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
   const speedConsumptionData = allReports.flatMap((r) => {
     const speed = toNum3(r.speed);
     if (speed === null) return [];
@@ -76479,7 +77854,7 @@ async function getVesselKPIs(vesselId) {
 }
 async function getActiveAlerts(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrAlerts).where(and27(eq32(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
+  return db2.select().from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
 }
 async function getAllAlerts(vesselId, page, limit) {
   const db2 = await getDb();
@@ -76487,8 +77862,8 @@ async function getAllAlerts(vesselId, page, limit) {
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * safeLimit;
   const [data, totalRows] = await Promise.all([
-    db2.select().from(nrAlerts).where(eq32(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
-    db2.select({ total: count() }).from(nrAlerts).where(eq32(nrAlerts.vesselId, vesselId))
+    db2.select().from(nrAlerts).where(eq33(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
+    db2.select({ total: count() }).from(nrAlerts).where(eq33(nrAlerts.vesselId, vesselId))
   ]);
   const total = totalRows[0]?.total ?? 0;
   return {
@@ -76501,28 +77876,28 @@ async function getAllAlerts(vesselId, page, limit) {
 }
 async function getActiveAlertCount(vesselId) {
   const db2 = await getDb();
-  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and27(eq32(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
   return rows[0]?.total ?? 0;
 }
 async function acknowledgeAlert(alertId, acknowledgedBy) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq32(nrAlerts.id, alertId)).limit(1);
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq33(nrAlerts.id, alertId)).limit(1);
   if (existing.length === 0) return null;
-  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq32(nrAlerts.id, alertId)).returning();
+  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq33(nrAlerts.id, alertId)).returning();
   return updated[0] ?? null;
 }
 async function getFleetSummary(vesselIds) {
   const db2 = await getDb();
   const results = [];
   for (const vesselId of vesselIds) {
-    const latestReports = await db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
+    const latestReports = await db2.select().from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
     const latest = latestReports[0] ?? null;
-    const allReports = await db2.select().from(nrNoonReports).where(eq32(nrNoonReports.vesselId, vesselId));
+    const allReports = await db2.select().from(nrNoonReports).where(eq33(nrNoonReports.vesselId, vesselId));
     const totalReports = allReports.length;
     const submittedReports = allReports.filter((r) => r.status === "submitted").length;
-    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and27(eq32(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
     const activeAlerts = alertRows[0]?.total ?? 0;
-    const robRows = await db2.select().from(nrFuelRob).where(eq32(nrFuelRob.vesselId, vesselId));
+    const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
     const totalHfoRob = toNum3(robRows.find((r) => r.fuelType === "HFO")?.currentRob) ?? 0;
     const totalAllRob = robRows.reduce((acc, r) => acc + (toNum3(r.currentRob) ?? 0), 0);
     const avg7Day = robRows.reduce((acc, r) => acc + (toNum3(r.avg7Day) ?? 0), 0) || null;
@@ -76561,16 +77936,16 @@ function round4(n) {
 // server/modules/noon-report/repositories/bunkerRepository.ts
 init_db();
 init_schema();
-import { eq as eq33, and as and28, desc as desc10, sum } from "drizzle-orm";
+import { eq as eq34, and as and29, desc as desc10, sum } from "drizzle-orm";
 async function getBunkerRecords(filters) {
   const db2 = await getDb();
-  const conditions = [eq33(nrBunkerRecords.vesselId, filters.vesselId)];
-  if (filters.voyageNo) conditions.push(eq33(nrBunkerRecords.voyageNo, filters.voyageNo));
-  return db2.select().from(nrBunkerRecords).where(and28(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
+  const conditions = [eq34(nrBunkerRecords.vesselId, filters.vesselId)];
+  if (filters.voyageNo) conditions.push(eq34(nrBunkerRecords.voyageNo, filters.voyageNo));
+  return db2.select().from(nrBunkerRecords).where(and29(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
 }
 async function getBunkerRecordById(id) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrBunkerRecords).where(eq33(nrBunkerRecords.id, id)).limit(1);
+  const rows = await db2.select().from(nrBunkerRecords).where(eq34(nrBunkerRecords.id, id)).limit(1);
   return rows[0] ?? null;
 }
 async function createBunkerRecord(data) {
@@ -76580,22 +77955,22 @@ async function createBunkerRecord(data) {
 }
 async function updateBunkerRecord(id, data) {
   const db2 = await getDb();
-  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq33(nrBunkerRecords.id, id)).returning();
+  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrBunkerRecords.id, id)).returning();
   return rows[0] ?? null;
 }
 async function deleteBunkerRecord(id) {
   const db2 = await getDb();
-  await db2.delete(nrBunkerRecords).where(eq33(nrBunkerRecords.id, id));
+  await db2.delete(nrBunkerRecords).where(eq34(nrBunkerRecords.id, id));
 }
 async function getBunkerCostSummary(vesselId, voyageNo) {
   const db2 = await getDb();
-  const conditions = [eq33(nrBunkerRecords.vesselId, vesselId)];
-  if (voyageNo) conditions.push(eq33(nrBunkerRecords.voyageNo, voyageNo));
+  const conditions = [eq34(nrBunkerRecords.vesselId, vesselId)];
+  if (voyageNo) conditions.push(eq34(nrBunkerRecords.voyageNo, voyageNo));
   const rows = await db2.select({
     fuelType: nrBunkerRecords.fuelType,
     totalQuantityMt: sum(nrBunkerRecords.quantityMt),
     totalCost: sum(nrBunkerRecords.totalCost)
-  }).from(nrBunkerRecords).where(and28(...conditions)).groupBy(nrBunkerRecords.fuelType);
+  }).from(nrBunkerRecords).where(and29(...conditions)).groupBy(nrBunkerRecords.fuelType);
   return rows.map((r) => ({
     fuelType: r.fuelType,
     totalQuantityMt: r.totalQuantityMt ?? "0",
@@ -77700,8 +79075,14 @@ async function registerRoutes(app2) {
       res.status(404).json({ error: "File not found" });
     }
   });
-  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  const { isShipInstance: isShipInstance2, isShipInstanceId: isShipInstanceId2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
   const isShip = await isShipInstance2();
+  const envInstanceId = process.env.SYNC_INSTANCE_ID || "";
+  if (!isShip && isShipInstanceId2(envInstanceId)) {
+    console.warn(
+      `[Schedulers] \u26A0\uFE0F Resolved role is SHORE but env SYNC_INSTANCE_ID ('${envInstanceId}') is a ship id \u2014 DB sync_settings.instance_id wins and is NOT a ship value. If this box is a ship, fix the DB value; the scheduler role watchdog will then start the ship schedulers without a restart.`
+    );
+  }
   const JOB_DUE_SCAN_INTERVAL_MS = parseInt(process.env.JOB_DUE_SCAN_INTERVAL_MS || "", 10) || 24 * 60 * 60 * 1e3;
   const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
   if (isShip) {
@@ -77714,12 +79095,17 @@ async function registerRoutes(app2) {
   maintenanceOrchestrator2.start();
   console.log("[Maint] Orchestrator started \u2014 alerts (5m), sync-health (6h), sync-pruning (24h)");
   const { syncAutoScheduler: syncAutoScheduler2 } = await Promise.resolve().then(() => (init_autoSyncScheduler(), autoSyncScheduler_exports));
-  if (!isShip) {
+  if (isShip) {
     await syncAutoScheduler2.start(6 * 60 * 60 * 1e3);
     console.log("[AutoSync] Ship instance \u2014 scheduler started (autonomous sync with catch-up and connectivity logging)");
   } else {
     console.log("[AutoSync] Shore instance detected \u2014 auto-sync scheduler not started (sync is ship-initiated)");
   }
+  const { schedulerRoleWatchdog: schedulerRoleWatchdog2 } = await Promise.resolve().then(() => (init_schedulerRoleWatchdog(), schedulerRoleWatchdog_exports));
+  schedulerRoleWatchdog2.start({
+    jobDueScanIntervalMs: JOB_DUE_SCAN_INTERVAL_MS,
+    initialRole: isShip ? "ship" : "shore"
+  });
   if (process.env.NODE_ENV === "development") {
     app2.post("/dev/seed/recurring-defects", async (req, res) => {
       try {
@@ -78032,6 +79418,7 @@ async function registerRoutes(app2) {
   })();
   const stopAllSchedulers = () => {
     console.log("Cleaning up scheduled tasks...");
+    schedulerRoleWatchdog2.stop();
     jobDueScanner2.stop();
     maintenanceOrchestrator2.stop();
     syncAutoScheduler2.stop();
@@ -78155,6 +79542,7 @@ function serveStatic(app2) {
 init_storage();
 init_initDb();
 init_migrations();
+init_buildInfo();
 init_tenantConnectionManager();
 var app = express2();
 app.use(express2.json({ limit: "50mb" }));
@@ -78184,6 +79572,7 @@ app.use((req, res, next) => {
   next();
 });
 (async () => {
+  logBuildIdentity();
   await initStorage();
   await runBackupAndMigrations();
   await initializeDatabase();
