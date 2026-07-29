@@ -1,12 +1,15 @@
-# SUPPORT RUNBOOK — Work Order recovery (ship ↔ shore dashboard mismatch)
+# SUPPORT RUNBOOK — Work Order recovery (script method — USE THIS ONE)
 
 **Use this when:** a work order shows on the ship but not in the office, or the two sides show
 different authored statuses (Completed / Pending Approval / Postponed / Rejected), typically
 because old records were dead-lettered by the pre-July-2026 sync code or written before field
 logging covered that path.
 
-**Verified:** the procedure and script below were proven live on the shore+ship test pair on
-2026-07-29 (both repair classes, end-to-end, one sync cycle each).
+**If the script cannot be used** (no ship↔shore connectivity, or `npx tsx` broken on the
+ship), fall back to `docs/SUPPORT-WO-RECOVERY-MANUAL-RUNBOOK.md`.
+
+**Verified:** proven live on the shore+ship test pair on 2026-07-29 — scan flagged 2 planted
+faults out of 300+ WOs with zero false positives; both repaired and converged in one sync.
 
 ---
 
@@ -21,7 +24,7 @@ logging covered that path.
 3. **A standing "Still to send" number on the Sync Dashboard is NOT a defect** — records in
    retry backoff are visible on purpose (the old code silently deleted them; that is how
    Frontier Venture lost 71 work orders). Do not "clear" it, do not reset `is_synced` in bulk.
-4. Only touch the specific record list you identified. Nothing wholesale.
+4. Only touch what the scan flags. Nothing wholesale.
 
 ---
 
@@ -34,11 +37,12 @@ logging covered that path.
   folder. **If the deployed build doesn't carry it yet, copy the single file manually** into
   the app folder's `scripts\` directory — it is self-contained (uses only the `pg` package,
   already in the app's `node_modules`). No build step, no app restart needed.
-- You need the ship's `DATABASE_URL` (same value the app uses — see the ship's `.env`).
+- The ship must be able to reach the shore (same connectivity a normal sync uses) — the scan
+  asks the shore for its work-order list.
 
 ---
 
-## HOW TO RUN THE SCRIPT — exact steps
+## THE PROCEDURE — four commands, in order
 
 All commands run **on the ship machine**, in a terminal, **from the app folder** (the folder
 PM2 runs the app from — the one containing `package.json` and `scripts\`).
@@ -50,140 +54,68 @@ cd <ship app folder>
 If `DATABASE_URL` is not already set in that terminal, set it to the same value as the
 ship's `.env` first (PowerShell: `$env:DATABASE_URL = "<value from .env>"`).
 
-Then, in this order:
+**1. FIND — the ship discovers the faulty WOs itself. Changes NOTHING.**
 
 ```bash
-# 1. FIND — ship discovers faulty WOs by diffing itself against the shore. Changes NOTHING.
 npx tsx scripts/repair-wo-deadletter-reoffer.ts --scan
 ```
 
+Every flagged record is printed with its class:
+
+| Class | What it means | What `--apply` will do |
+|---|---|---|
+| **A** | Sync logs already pending | Nothing — the next sync delivers them |
+| **B** | Logs falsely marked "synced" (dead-letter) | Re-offer them (reset to unsynced) |
+| **C** | NO logs exist (never-logged write) | Generate full-row logs from the ship's record |
+| **MISSING** | Row not on the ship | Nothing — escalate |
+
+The scan also *reports* (but never repairs): shore-only WOs, and Due/Overdue-band-only
+differences (computed from jobs/RH inputs — WO repair cannot and must not touch those).
+The flagged list is saved to `repair-scan-list.txt` — attach it to the ticket.
+
+**2. FIX — same scan, and repairs everything it flagged.**
+
 ```bash
-# 2. FIX — same scan, and repairs everything it flagged (re-offers B, generates logs for C).
 npx tsx scripts/repair-wo-deadletter-reoffer.ts --scan --apply
 ```
 
-3. Press **Sync Now** on the ship's Sync Dashboard (repeat until the diag shows
-   `DRAIN COMPLETE`).
-4. Run step 1 again — it should print `Nothing flagged — ship and shore agree.`
+**3. DELIVER — press Sync Now** on the ship's Sync Dashboard. Repeat until the sync diag
+shows `DRAIN COMPLETE`. A large first run (up to 20 back-to-back cycles) is normal drain
+behaviour, not a fault.
 
-Safety built in: the script **refuses to run against a shore database**, and without
-`--apply` it only prints a report. The flagged list is saved to `repair-scan-list.txt`
-in the app folder — attach it to the ticket.
-
----
-
-## STEP 1 — identify the mismatched work orders
-
-### Automatic (preferred) — let the script find them
-
-On the ship, in the app folder:
+**4. CONFIRM — run the scan again:**
 
 ```bash
 npx tsx scripts/repair-wo-deadletter-reoffer.ts --scan
 ```
 
-The ship asks the shore (via its configured `shore_url`) for this vessel's work orders and
-diffs them itself. It flags every WO that is **missing on shore** or has a **different
-authored status**, prints the classification for each (nothing is changed), and writes the
-list to `repair-scan-list.txt` for the record. It also *reports* — but never repairs —
-shore-only WOs and Due/Overdue-band-only differences (those bands are computed from
-jobs/RH inputs; re-offering the WO cannot and must not touch them).
+Expected output: `Nothing flagged — ship and shore agree.` The Work Order dashboards now
+match by themselves (computed bands recalculate on page load; no further action).
 
-Requires the ship to have connectivity to the shore (same as a normal sync).
-
-### Manual (fallback) — offline, or to double-check the scan
-
-Run on **BOTH** ship and shore DBs, save both outputs, and compare:
-
-```sql
-SELECT wouuid, work_order_no, status, updated_at::date
-FROM work_orders
-WHERE coalesce(is_deleted,false) = false
-  AND vessel_id = '<VESSEL_ID>'
-ORDER BY work_order_no;
-```
-
-(Column is `work_order_no` — there is no `wo_number` column.)
-
-The repair list = every `wouuid` that is **missing on shore** or has a **different authored
-status**. Put them one per line in a file `list.txt` on the ship.
-
----
-
-## STEP 2 — classify (dry run, changes nothing)
-
-On the ship, in the app folder:
-
-```bash
-npx tsx scripts/repair-wo-deadletter-reoffer.ts --file list.txt
-```
-
-Every record is printed with its class. The script refuses to run against a shore DB.
-
-| Class | What it means | What the script will do on `--apply` |
-|---|---|---|
-| **A** | Sync logs already pending | Nothing — the next sync delivers them |
-| **B** | Logs exist but were falsely marked "synced" (dead-letter) | Re-offer them (reset to unsynced, attempts 0) |
-| **C** | NO logs exist at all (written before logging covered it) | Generate full-row logs from the ship's current record |
-| **MISSING** | Record is not on the ship at all | Nothing — escalate (see below) |
-
-Completed WOs automatically include their maintenance-history rows (a completion is a family
-of records, not one row).
-
----
-
-## STEP 3 — per-class actions
-
-### Class A — nothing to repair
-Run **Sync Now** on the ship. If the record still hasn't arrived after a successful sync,
-check `GET /sync/status → retryBacklog`: `total > 0` = waiting out retry backoff (normal,
-keep waiting); `stuck > 0` = escalate with the record ids.
-
-### Class B and C — run the script for real
-
-```bash
-npx tsx scripts/repair-wo-deadletter-reoffer.ts --scan --apply     # automatic path
-npx tsx scripts/repair-wo-deadletter-reoffer.ts --file list.txt --apply   # manual list
-```
-
-The output states exactly how many logs were re-offered (B) / generated (C) per record.
-
-### MISSING — do not improvise
-The record exists on neither side or only on shore. That is a different problem (possibly a
-shore-only record that should flow shore→ship, or genuinely deleted data). Collect the
-`wouuid` list and escalate — do not create rows by hand.
-
----
-
-## STEP 4 — sync and verify
-
-1. On the ship, press **Sync Now**. Repeat until the sync diag shows
-   `DRAIN COMPLETE ... remainingPush=0, remainingPull=0`.
-   A large first run (up to 20 back-to-back cycles) is normal drain behaviour, not a fault.
-2. Re-run the STEP 1 query on both sides — the diff for your repair list should now be empty.
-3. Open the Work Order dashboard on both sides — statuses now match by themselves
-   (computed bands recalculate on page load; no further action).
+Safety built in: the script **refuses to run against a shore database**, and without
+`--apply` it only prints a report.
 
 ---
 
 ## ESCALATION — send these to the development team
 
-- Any **MISSING**-class records (the wouuid list).
+- Any **MISSING**-class records, and any unexpected **shore-only** WOs from the scan output.
 - `retryBacklog.stuck > 0` on `GET /sync/status` after the drain.
-- A record that reverts or differs again AFTER a clean drain (include both sides' STEP-1 rows
+- A record that reverts or differs again AFTER a clean drain (attach `repair-scan-list.txt`
   and the ship's sync-diag file for the day).
 - Any script error output.
 
 ---
 
-## Reference — running-hours audit rows
+## Reference — records the scan does not cover
 
-`running_hours_audit` has no direct work-order column, so it is not auto-included. If a
-specific RH audit row must travel, add it to `list.txt` explicitly as:
+`running_hours_audit` rows have no direct work-order column, so the scan does not flag them.
+If a specific RH audit row must travel, list it in a file (one per line) as
+`running_hours_audit:<rhauuid>` and run:
 
+```bash
+npx tsx scripts/repair-wo-deadletter-reoffer.ts --file list.txt --apply
 ```
-running_hours_audit:<rhauuid>
-```
 
-The same `table:uuid` form works for `component_maintenance_history` rows if one must be
-re-offered without its parent work order.
+The same `table:uuid` form works for `component_maintenance_history` rows without their
+parent work order.
