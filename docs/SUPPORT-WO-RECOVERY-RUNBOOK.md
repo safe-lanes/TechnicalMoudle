@@ -30,8 +30,45 @@ logging covered that path.
 - Both sides run the July-2026 sync stack or later: open `GET /technical/api/sync/status` on
   each side and confirm the `build` field is present. No `build` field = old build = STOP,
   deploy first.
-- The repair script `scripts/repair-wo-deadletter-reoffer.ts` exists in the ship's app folder.
+- The repair script `scripts/repair-wo-deadletter-reoffer.ts` exists in the ship's app
+  folder. **If the deployed build doesn't carry it yet, copy the single file manually** into
+  the app folder's `scripts\` directory — it is self-contained (uses only the `pg` package,
+  already in the app's `node_modules`). No build step, no app restart needed.
 - You need the ship's `DATABASE_URL` (same value the app uses — see the ship's `.env`).
+
+---
+
+## HOW TO RUN THE SCRIPT — exact steps
+
+All commands run **on the ship machine**, in a terminal, **from the app folder** (the folder
+PM2 runs the app from — the one containing `package.json` and `scripts\`).
+
+```bash
+cd <ship app folder>
+```
+
+If `DATABASE_URL` is not already set in that terminal, set it to the same value as the
+ship's `.env` first (PowerShell: `$env:DATABASE_URL = "<value from .env>"`).
+
+Then, in this order:
+
+```bash
+# 1. FIND — ship discovers faulty WOs by diffing itself against the shore. Changes NOTHING.
+npx tsx scripts/repair-wo-deadletter-reoffer.ts --scan
+```
+
+```bash
+# 2. FIX — same scan, and repairs everything it flagged (re-offers B, generates logs for C).
+npx tsx scripts/repair-wo-deadletter-reoffer.ts --scan --apply
+```
+
+3. Press **Sync Now** on the ship's Sync Dashboard (repeat until the diag shows
+   `DRAIN COMPLETE`).
+4. Run step 1 again — it should print `Nothing flagged — ship and shore agree.`
+
+Safety built in: the script **refuses to run against a shore database**, and without
+`--apply` it only prints a report. The flagged list is saved to `repair-scan-list.txt`
+in the app folder — attach it to the ticket.
 
 ---
 
