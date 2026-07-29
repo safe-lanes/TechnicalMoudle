@@ -37,6 +37,25 @@ logging covered that path.
 
 ## STEP 1 — identify the mismatched work orders
 
+### Automatic (preferred) — let the script find them
+
+On the ship, in the app folder:
+
+```bash
+npx tsx scripts/repair-wo-deadletter-reoffer.ts --scan
+```
+
+The ship asks the shore (via its configured `shore_url`) for this vessel's work orders and
+diffs them itself. It flags every WO that is **missing on shore** or has a **different
+authored status**, prints the classification for each (nothing is changed), and writes the
+list to `repair-scan-list.txt` for the record. It also *reports* — but never repairs —
+shore-only WOs and Due/Overdue-band-only differences (those bands are computed from
+jobs/RH inputs; re-offering the WO cannot and must not touch them).
+
+Requires the ship to have connectivity to the shore (same as a normal sync).
+
+### Manual (fallback) — offline, or to double-check the scan
+
 Run on **BOTH** ship and shore DBs, save both outputs, and compare:
 
 ```sql
@@ -86,7 +105,8 @@ keep waiting); `stuck > 0` = escalate with the record ids.
 ### Class B and C — run the script for real
 
 ```bash
-npx tsx scripts/repair-wo-deadletter-reoffer.ts --file list.txt --apply
+npx tsx scripts/repair-wo-deadletter-reoffer.ts --scan --apply     # automatic path
+npx tsx scripts/repair-wo-deadletter-reoffer.ts --file list.txt --apply   # manual list
 ```
 
 The output states exactly how many logs were re-offered (B) / generated (C) per record.

@@ -45,7 +45,64 @@ function parseArgs() {
     const [t, u] = line.includes(':') ? line.split(':') : ['work_orders', line];
     ids.push({ table: t.trim(), uuid: u.trim() });
   }
-  return { ids, apply: a.includes('--apply'), db: get('--db') || process.env.DATABASE_URL };
+  return { ids, scan: a.includes('--scan'), apply: a.includes('--apply'), db: get('--db') || process.env.DATABASE_URL };
+}
+
+// Derived display bands are COMPUTED on read and never persisted — a band-vs-band difference
+// means the INPUTS (jobs/RH/dates) differ, which re-offering the WO row cannot fix. The scan
+// therefore only flags missing rows and AUTHORED-status differences.
+const DERIVED_BANDS = new Set(['Active', 'Due', 'Due (Grace P)', 'Overdue']);
+
+/**
+ * --scan: auto-discover the repair list by asking the SHORE (via the ship's configured
+ * shore_url) for this vessel's work orders and diffing against the local ship rows.
+ * Flags: SHIP row missing on shore · authored-status mismatch. Reports (never repairs):
+ * shore-only rows and derived-band-only differences.
+ */
+async function scanForFaultyWos(pool: Pool): Promise<Array<{ table: string; uuid: string }>> {
+  const s = await pool.query(
+    `SELECT setting_key, setting_value FROM sync_settings WHERE setting_key IN ('shore_url','instance_id')`);
+  const shoreUrl = (s.rows.find((r: any) => r.setting_key === 'shore_url')?.setting_value || '').replace(/\/+$/, '');
+  if (!shoreUrl) { console.log('SCAN ABORT: no shore_url in sync_settings.'); process.exit(1); }
+  const instanceId = (s.rows.find((r: any) => r.setting_key === 'instance_id')?.setting_value?.trim())
+    || process.env.SYNC_INSTANCE_ID || '';
+  const meta = await pool.query(`SELECT vessel_id FROM sync_metadata WHERE instance_id = $1`, [instanceId]);
+  const vesselId = meta.rows[0]?.vessel_id;
+  if (!vesselId) { console.log(`SCAN ABORT: no vessel in sync_metadata for instance '${instanceId}'.`); process.exit(1); }
+
+  console.log(`Scanning: shore=${shoreUrl} vessel=${vesselId}`);
+  const res = await fetch(`${shoreUrl}/work-orders?vesselId=${encodeURIComponent(vesselId)}`,
+    { signal: AbortSignal.timeout(60000) });
+  if (!res.ok) { console.log(`SCAN ABORT: shore returned HTTP ${res.status}.`); process.exit(1); }
+  const shoreList: any[] = await res.json();
+  const shore = new Map<string, string>(shoreList.map(w => [w.wouuid, String(w.status ?? '')]));
+
+  const local = await pool.query(
+    `SELECT wouuid, work_order_no, status FROM work_orders
+      WHERE coalesce(is_deleted,false)=false AND vessel_id=$1`, [vesselId]);
+
+  const found: Array<{ table: string; uuid: string }> = [];
+  let bandOnly = 0;
+  for (const row of local.rows) {
+    const shoreStatus = shore.get(row.wouuid);
+    if (shoreStatus === undefined) {
+      console.log(`  FLAG missing-on-shore     ${row.work_order_no} (${row.wouuid}) ship status='${row.status}'`);
+      found.push({ table: 'work_orders', uuid: row.wouuid });
+    } else if (String(row.status ?? '') !== shoreStatus) {
+      if (DERIVED_BANDS.has(String(row.status ?? '')) && DERIVED_BANDS.has(shoreStatus)) {
+        bandOnly++; // display-input difference (jobs/RH side) — not repairable by WO re-offer
+      } else {
+        console.log(`  FLAG status-mismatch      ${row.work_order_no} (${row.wouuid}) ship='${row.status}' shore='${shoreStatus}'`);
+        found.push({ table: 'work_orders', uuid: row.wouuid });
+      }
+    }
+    shore.delete(row.wouuid);
+  }
+  if (bandOnly) console.log(`  note: ${bandOnly} derived-band-only difference(s) (Due/Overdue class) — inputs differ, NOT flagged for WO repair`);
+  if (shore.size) console.log(`  note: ${shore.size} shore-only WO(s) not on this ship — office-created pending shore→ship delivery, or a different problem. NOT repaired from here; escalate if unexpected.`);
+  console.log(`SCAN RESULT: ${found.length} record(s) flagged for repair\n`);
+  if (found.length) fs.writeFileSync('repair-scan-list.txt', found.map(f => `${f.table}:${f.uuid}`).join('\n') + '\n');
+  return found;
 }
 
 const IDENTITY: Record<string, string> = {
@@ -69,9 +126,10 @@ function serialize(v: any): string | null {
 }
 
 async function main() {
-  const { ids, apply, db } = parseArgs();
-  if (!ids.length || !db) {
-    console.log('Usage: npx tsx scripts/repair-wo-deadletter-reoffer.ts --wo <wouuid,...> [--file list.txt] [--apply]');
+  const { ids, scan, apply, db } = parseArgs();
+  if ((!ids.length && !scan) || !db) {
+    console.log('Usage: npx tsx scripts/repair-wo-deadletter-reoffer.ts --scan | --wo <wouuid,...> | --file list.txt   [--apply]');
+    console.log('  --scan  auto-discover faulty WOs by diffing this ship against the shore (writes repair-scan-list.txt)');
     console.log('DATABASE_URL must point at the SHIP DB.');
     process.exit(2);
   }
@@ -85,6 +143,9 @@ async function main() {
     process.exit(1);
   }
   console.log(`Ship instance: ${instanceId}   mode: ${apply ? '⚠️ APPLY' : 'dry-run'}\n`);
+
+  if (scan) ids.push(...await scanForFaultyWos(pool));
+  if (scan && !ids.length) { console.log('Nothing flagged — ship and shore agree. Done.'); await pool.end(); return; }
 
   // Family expansion: completions span work_orders + component_maintenance_history.
   const work = [...ids];
