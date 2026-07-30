@@ -1,0 +1,43 @@
+Important Sync Questions
+Will request_type be included in field-level sync?
+Is the new request_type column automatically tracked by the field logger?
+Will changes to this field generate sync logs on both ship and shore?
+How will mixed-version environments behave?
+What happens if the shore is upgraded but a vessel is still running the old build without the request_type column?
+Will sync fail because the receiving database does not recognize the new column?
+Is this migration mandatory before sync resumes?
+Should sync be blocked until both ship and shore have completed the migration?
+Is there a minimum schema version check?
+Will the backfill generate sync events?
+The migration updates every existing record to request_type='Postponement'.
+Will these UPDATE statements create field logs and unnecessarily synchronize thousands of historical records?
+If yes, should the backfill bypass the field logger?
+How will provisioning work?
+When provisioning a new vessel, will the seeded workflow (pms-wo-re-postponement) automatically exist?
+Does provisioning also include the new schema changes?
+What happens if one side lacks the new workflow configuration?
+If a ship submits a Re-Postponement request before the shore has the new workflow seeded (or vice versa), will the request fail gracefully or produce an error?
+Is workflow configuration synchronized?
+Is pms-wo-re-postponement treated as master/configuration data that syncs automatically?
+Or must it exist independently on both ship and shore through database initialization?
+Will the new column be included in conflict resolution?
+If request_type is modified on both sides before synchronization, how will conflicts be resolved?
+Are APIs backward compatible?
+Will existing APIs ignore a missing request_type for older clients?
+Or is the field expected to be mandatory after deployment?
+Deployment order
+What is the required deployment sequence?
+Shore first?
+Ship first?
+Both simultaneously?
+Is there any downtime or sync freeze required during deployment?
+Impact on existing pending postponements
+How will existing in-progress approval requests behave after the migration?
+Will they continue normally with request_type='Postponement' after the backfill?
+Sync verification
+After deployment, what test cases will verify that:
+New postponement requests sync correctly.
+Re-postponement requests sync correctly.
+Approval actions sync correctly.
+Workflow lookups succeed on both ship and shore.
+No additional historical records are unnecessarily synchronized.
