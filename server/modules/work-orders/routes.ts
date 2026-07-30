@@ -199,6 +199,29 @@ router.post('/work-orders/:id/postpone-reject',
 // GET /work-orders/:id/postpone-approval-steps — get approval steps for the active postponement
 router.get('/work-orders/:id/postpone-approval-steps', asyncHandler(woCtrl.getPostponementApprovalSteps));
 
+// ── Re-Postponement Approval Workflow ──
+
+// POST /work-orders/:id/re-postpone-request — ship submits re-postponement (WO must be 'Postponement Approved')
+router.post('/work-orders/:id/re-postpone-request', asyncHandler(woCtrl.submitRePostponeRequest));
+
+// PUT /work-orders/:id/re-postpone-request — ship edits & resubmits a pending re-postponement request
+router.put('/work-orders/:id/re-postpone-request', asyncHandler(woCtrl.editRePostponeRequest));
+
+// POST /work-orders/:id/re-postpone-approve — office approves a re-postponement request
+router.post('/work-orders/:id/re-postpone-approve',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.approveRePostponement)
+);
+
+// POST /work-orders/:id/re-postpone-reject — office rejects a re-postponement request
+router.post('/work-orders/:id/re-postpone-reject',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.rejectRePostponement)
+);
+
+// GET /work-orders/:id/re-postpone-approval-steps — get approval steps for the active re-postponement
+router.get('/work-orders/:id/re-postpone-approval-steps', asyncHandler(woCtrl.getRePostponementApprovalSteps));
+
 // ── Work Order Executions ──
 
 // GET  /work-order-executions/:componentId — get executions for component
