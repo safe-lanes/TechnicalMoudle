@@ -12,6 +12,7 @@
  */
 import { runReconciliation } from './shipskartReconcilerService';
 import { isShipInstance } from '../../sync/syncRole';
+import { logIdentityIntegrationExpectation } from './identityGuard';
 
 const DEFAULT_INTERVAL_MS = 60 * 60 * 1000; // hourly — masters change slowly
 const DEFAULT_BOOT_DELAY_MS = 5 * 60 * 1000; // let migrations/sync settle first
@@ -35,6 +36,10 @@ export class ShipskartReconcilerScheduler {
     this.bootTimer = setTimeout(() => { void this.tick(limit); }, bootDelayMs);
     this.timer = setInterval(() => { void this.tick(limit); }, intervalMs);
     this.started = true;
+    // Boot-time note: per-user Purchasing depends on the x-user-id header arriving on
+    // requests. This states the dependency and names the greppable tag, so a shore that is
+    // not identity-integrated is found in the log, not from a mis-attributed requisition.
+    logIdentityIntegrationExpectation();
     console.log(
       `[ShipskartReconciler] Shore instance — scheduler started (every ${Math.round(intervalMs / 60000)}min, ` +
       `first run in ${Math.round(bootDelayMs / 60000)}min). Each tick still requires reconciler_enabled=true for the tenant.`,

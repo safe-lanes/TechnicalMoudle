@@ -8,6 +8,7 @@ import * as tokenService from '../services/shipskartTokenService';
 import * as reconciler from '../services/shipskartReconcilerService';
 import * as b2bRepo from '../repositories/shipskartB2bRepository';
 import * as vesselAssignments from '../services/vesselAssignmentService';
+import { forwardedUserUuid } from '../services/identityGuard';
 
 /** POST /shipskart/b2b/bootstrap { otp? } — the ~90-day manual step (OTP arrives by email). */
 export async function bootstrapHandler(req: Request, res: Response) {
@@ -58,9 +59,12 @@ export async function reconcileHandler(req: Request, res: Response) {
  * from the body, so a caller cannot write another user's assignments.
  */
 export async function vesselAssignmentsHandler(req: AuthenticatedRequest, res: Response) {
-  const userUuid = req.user?.userUuid;
+  // FORWARDED HEADER ONLY — never req.user.userUuid: mock auth substitutes a shared default
+  // uuid when the header is absent, and writing assignments under it would merge every
+  // un-identified user's vessels into one row set (identityGuard.ts).
+  const userUuid = forwardedUserUuid(req, 'vessel-assignments');
   if (!userUuid) {
-    return res.status(401).json({ success: false, message: 'No forwarded user identity (x-user-id) — cannot record vessel assignments.' });
+    return res.status(401).json({ success: false, errorCode: 'NO_FORWARDED_IDENTITY', message: 'No forwarded user identity (x-user-id) — cannot record vessel assignments.' });
   }
   // allowEmpty is opt-in and deliberate: an empty set otherwise no-ops, so a browser that
   // could not decrypt the userProfile can never revoke a user's vessels.
