@@ -1,0 +1,107 @@
+WO Re-Postponement — Complete Functional Explanation
+________________________________________
+What It Is
+Re-Postponement is a second-level extension request for a Work Order that was already postponed and whose postponement date has now expired. It allows the vessel crew to request another due date extension through the office approval process, without closing or cancelling the original WO.
+________________________________________
+When It Becomes Available
+The Re-Postponement option appears only when both conditions are true simultaneously:
+Condition	Detail
+WO Status	Must be Postponement Approved
+Due Date	The approved postponement date must have already passed (today > due date)
+If either condition is not met, the standard Postponement screen opens instead (or no action is available).
+My Remarks: Small Change here, - No need to wait for to cross the postponement date if the 1st postponement is approved then the user should be able to submit the repostponement________________________________________
+Step-by-Step Flow
+________________________________________
+Step 1 — Vessel User Triggers the Request
+The vessel user opens a Work Order that has an expired postponement. They click the Postpone button at the bottom of the Work Order form.
+ 
+The system checks the WO status and due date. Because status = Postponement Approved and the date has passed, it opens the Work Order Re-Postponement screen instead of the standard Postponement screen.
+________________________________________
+Step 2 — Re-Postponement Screen
+The screen looks identical to the standard Postponement screen with one difference — the header reads:
+Work Order Re-Postponement
+The screen displays:
+Field	Description
+Work Order No	Read-only
+Work Order Title	Read-only
+Component Name & Code	Read-only
+Current Due Date	The expired postponement date (read-only)
+Current Approved Postponement Date	The date from the first approval (read-only, extra field vs base Postponement)
+Proposed Re-Postponement Date	User selects the new requested due date
+Reason for Re-Postponement	Mandatory dropdown/text
+Remarks	Optional
+Attachment	Optional supporting document
+All validations from the base Postponement apply here identically (e.g. proposed date must be after current date, reason is mandatory, etc.).
+________________________________________
+Step 3 — Vessel Submits the Request
+When the user submits:
+1.	The WO status changes to Awaiting Office Approval
+2.	A new record is created in the work_order_postponements table with:
+•	request_type = 'Re-Postponement'
+•	postponement_number = next in the sequence (e.g. if base was #1, this becomes #2)
+•	originalDueDate = the current due date (saved for revert on rejection)
+•	newDueDate = the user's requested new date
+•	Approval workflow snapshot based on pms-wo-re-postponement config
+3.	Approval step rows are created (wo_postponement_approvals) for Level 1 and/or Level 2 depending on the configured workflow
+4.	The record syncs to the Office via the existing bidirectional field-log sync
+The WO is now locked — the scanner will not generate a new WO for this job while it sits in Awaiting Office Approval.
+________________________________________
+Step 4 — Office Receives the Request
+In the Office:
+•	The Re-Postponement request appears in the Operations Dashboard → Pending Approval card
+•	Office users with the role Office / PMS Admin / Sail Admin can open and action it
+•	The approval screen shows all WO details, the requested new date, reason, remarks, and any attachments
+________________________________________
+Step 5a — Office Approves
+When the office approves (through all configured approval levels):
+What changes	New value
+WO Status	Returns to Postponement Approved
+WO Due Date	Updated to the newly approved Re-Postponement date
+Approval history	New approved audit row recorded with request_type = 'Re-Postponement'
+These changes sync back to the vessel automatically via the existing field-log bidirectional sync. The vessel crew sees the updated due date on their WO.
+________________________________________
+Step 5b — Office Rejects
+When the office rejects:
+What changes	New value
+WO Status	Reverts to Postponement Approved
+WO Due Date	Reverts to the pre-submission date (the expired postponement date that was saved at Step 3)
+Rejection remarks	Recorded against the Re-Postponement request
+Audit history	New rejected row recorded
+The WO returns to the Postponement tab with the original postponement date as the due date. The vessel crew sees the rejection and the reason provided by the office.
+________________________________________
+Step 6 — Can It Happen Again?
+Yes — unlimited times. There is no cap on the number of Re-Postponements.
+After a Re-Postponement is approved:
+•	WO status = Postponement Approved ✅
+•	New due date is set to the approved date
+When that new date passes:
+•	Both conditions are met again
+•	The vessel user can raise another Re-Postponement
+Each cycle adds a new record to the postponement history with a sequential postponement_number (1 = original postponement, 2 = first re-postponement, 3 = second re-postponement, and so on).
+________________________________________
+Example Timeline
+Date	Event	WO Due Date	WO Status
+01-Jun-2026	WO originally created	15-Jun-2026	Overdue
+02-Jun-2026	User submits Postponement Request	—	Awaiting Office Approval
+03-Jun-2026	Office approves → Due date = 15-Jul-2026	15-Jul-2026	Postponement Approved
+16-Jul-2026	Postponement date has passed — Re-Postponement becomes available	—	Postponement Approved
+16-Jul-2026	User submits Re-Postponement → requests 10-Aug-2026	—	Awaiting Office Approval
+17-Jul-2026	Office approves → Due date = 10-Aug-2026	10-Aug-2026	Postponement Approved
+11-Aug-2026	Second Re-Postponement date has passed — third cycle available	—	Postponement Approved
+________________________________________
+Audit Trail
+Every postponement action (base + all re-postponements) is stored in the work_order_postponements table. Each row has:
+•	postponement_number — sequential (1, 2, 3…)
+•	request_type — 'Postponement' or 'Re-Postponement'
+•	status — Awaiting Approval / Approved / Rejected
+•	Full date, reason, remarks, approver, and approval snapshot
+This means the Postponement History tab on a WO shows the complete chain — original postponement first, then all re-postponements in order — clearly labelled by type.
+________________________________________
+What Does NOT Change
+Item	Status
+Base Postponement flow	Completely unchanged
+Approval workflow configuration UI	Admins just configure a new WO – Re-Postponement workflow type alongside the existing WO – Postponement
+Sync infrastructure	No changes — existing bidirectional sync covers the feature automatically
+All existing WO statuses	No new statuses introduced — Postponement Approved is reused
+All existing validations	Re-Postponement inherits them all
+
