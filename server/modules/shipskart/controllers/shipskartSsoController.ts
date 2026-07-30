@@ -7,7 +7,7 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../../../middleware/auth';
 import * as shipskartSsoService from '../services/shipskartSsoService';
-import { ShipskartRoleNotMappedError } from '../services/shipskartSsoService';
+import { ShipskartRoleNotMappedError, ShipskartUserNotProvisionedError } from '../services/shipskartSsoService';
 
 /**
  * POST /api/shipskart/sso/initiate
@@ -43,6 +43,17 @@ export async function initiateHandler(req: AuthenticatedRequest, res: Response) 
         success: false,
         errorCode: 'ROLE_NOT_MAPPED',
         message: 'Purchasing is not available for your role.',
+      });
+    }
+    // Role IS mapped but this user's own Shipskart account is not provisioned. Blocked on
+    // purpose — no shared-account fallback (see ShipskartUserNotProvisionedError). The
+    // reason is already WARN-logged with the uuid and stored on the link row for the
+    // reconciler; the user gets a plain message, never a raw error or a blank frame.
+    if (err instanceof ShipskartUserNotProvisionedError) {
+      return res.status(409).json({
+        success: false,
+        errorCode: 'USER_NOT_PROVISIONED',
+        message: 'Purchasing is not available yet. Please contact your administrator.',
       });
     }
     // Other Shipskart errors → re-throw so asyncHandler maps them to the

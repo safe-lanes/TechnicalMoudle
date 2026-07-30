@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Loader2, AlertTriangle, Lock } from "lucide-react";
+import { Loader2, AlertTriangle, Lock, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 /**
@@ -19,6 +19,10 @@ export default function PurchasingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [roleBlocked, setRoleBlocked] = useState(false);
+  // Role IS mapped, but this user's own Shipskart account is not provisioned yet. Distinct
+  // from roleBlocked: the admin has granted access, the account just is not ready. We show
+  // a plain message instead of falling back to a shared account (that fallback is retired).
+  const [notProvisioned, setNotProvisioned] = useState(false);
 
   // The logged-in role (already decrypted by AuthContext) drives which Shipskart
   // account Purchasing opens. The backend has no real auth, so we pass it here —
@@ -30,6 +34,7 @@ export default function PurchasingPage() {
     setLoading(true);
     setError(null);
     setRoleBlocked(false);
+    setNotProvisioned(false);
     try {
       // Direct fetch (not apiRequest) so we can inspect the 403 ROLE_NOT_MAPPED
       // body and branch on it instead of treating it as a generic error.
@@ -43,6 +48,13 @@ export default function PurchasingPage() {
 
       if (res.status === 403 && data?.errorCode === "ROLE_NOT_MAPPED") {
         setRoleBlocked(true);
+        return;
+      }
+      // 409 USER_NOT_PROVISIONED — the user's own Shipskart account could not be created
+      // or resolved. Deliberately blocked (no shared-account fallback); the backend has
+      // already logged the reason and recorded it for the reconciler to retry.
+      if (res.status === 409 && data?.errorCode === "USER_NOT_PROVISIONED") {
+        setNotProvisioned(true);
         return;
       }
       if (!res.ok) {
@@ -99,6 +111,33 @@ export default function PurchasingPage() {
             Purchasing is not available for your role. Please contact your
             administrator if you need access.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (notProvisioned) {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center"
+        data-testid="purchasing-not-provisioned"
+      >
+        <div className="text-center max-w-md">
+          <Clock className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">
+            Purchasing is not available yet
+          </h2>
+          <p className="text-gray-500 mb-4">
+            Your Purchasing account is still being set up. Please contact your
+            administrator if this does not resolve shortly.
+          </p>
+          <button
+            onClick={initiate}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            data-testid="purchasing-not-provisioned-retry"
+          >
+            Try again
+          </button>
         </div>
       </div>
     );

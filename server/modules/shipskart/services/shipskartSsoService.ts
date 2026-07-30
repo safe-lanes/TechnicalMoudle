@@ -45,6 +45,23 @@ export class ShipskartRoleNotMappedError extends Error {
   }
 }
 
+/**
+ * Thrown when the user's role IS mapped but their OWN Shipskart account cannot be created
+ * or resolved. The controller returns 409 USER_NOT_PROVISIONED so Purchasing shows a clear
+ * "not available yet, contact your administrator" screen.
+ *
+ * DELIBERATELY NOT a shared-account fallback (Ghazi, 2026-07-30): the shared per-role
+ * account is being retired, and on the WK trial a VISIBLE failure beats users quietly
+ * sharing one Shipskart identity — a shared session would attribute one user's
+ * requisitions to another and make the audit trail meaningless.
+ */
+export class ShipskartUserNotProvisionedError extends Error {
+  constructor(public readonly userUuid: string, public readonly reason: string) {
+    super(`Shipskart account not provisioned for user ${userUuid}: ${reason}`);
+    this.name = 'ShipskartUserNotProvisionedError';
+  }
+}
+
 let _cachedConfig: ShipskartConfig | null = null;
 
 function getShipskartConfig(): ShipskartConfig {
@@ -230,32 +247,78 @@ export async function resolveExternalUserId(userRole: string, userUuid?: string 
   // so a partially-migrated fleet keeps working. It retires when every user is pushed
   // (decision deferred until after the WK trial).
   if (userUuid) {
+    const { getUserLink } = await import('../repositories/shipskartB2bRepository');
+    let link: Awaited<ReturnType<typeof getUserLink>>;
+    let lookupError: string | null = null;
     try {
-      const { getUserLink } = await import('../repositories/shipskartB2bRepository');
-      let link = await getUserLink(userUuid);
-      // JIT: not pushed yet → try once, here and now, so new joiners / role changes /
-      // users the reconciler has not reached resolve on their FIRST click (no cutover day).
-      // Opt-out via SHIPSKART_B2B_JIT=false. Never throws: any failure falls through to
-      // the legacy shared-account bridge below, so Purchasing still opens.
-      if (link?.pushStatus !== 'pushed' && (process.env.SHIPSKART_B2B_JIT || '').toLowerCase() !== 'false') {
+      link = await getUserLink(userUuid);
+    } catch (err: any) {
+      lookupError = `link lookup failed: ${err?.message || err}`;
+      link = undefined;
+    }
+
+    // JIT: not pushed yet → try once, here and now, so new joiners / role changes / users
+    // the reconciler has not reached resolve on their FIRST click (no cutover day).
+    // Opt-out via SHIPSKART_B2B_JIT=false.
+    let jitReason: string | null = null;
+    if (!lookupError && link?.pushStatus !== 'pushed' && (process.env.SHIPSKART_B2B_JIT || '').toLowerCase() !== 'false') {
+      try {
+        const { ensureUserPushed } = await import('./shipskartReconcilerService');
+        const jit = await ensureUserPushed(userUuid, userRole || null);
+        jitReason = jit.reason;
+        if (jit.pushed) {
+          link = await getUserLink(userUuid);
+        }
+      } catch (err: any) {
+        jitReason = `jit threw: ${err?.message || err}`;
+      }
+    }
+
+    if (link?.pushStatus === 'pushed') return userUuid;
+
+    // ── NO SHARED-ACCOUNT FALLBACK for an identified user ──
+    // The shared per-role account is being retired. A user whose role IS mapped but whose
+    // OWN account cannot be created/resolved is BLOCKED with a clear message rather than
+    // silently dropped into a shared identity (Ghazi, 2026-07-30). The link row already
+    // carries the machine-readable status + the raw upstream error, so the reconciler
+    // retries it durably and the admin console shows WHY.
+    const mappingForUser = userRole ? await roleMappingRepo.getMappingForSailRole(userRole) : undefined;
+    if (mappingForUser) {
+      const reason = lookupError
+        ?? jitReason
+        ?? (link ? `link status '${link.pushStatus}'${link.lastError ? `: ${link.lastError}` : ''}` : 'no link row yet');
+      console.warn(
+        `[Shipskart] BLOCKING Purchasing for user ${userUuid} (role '${userRole}' is mapped to ` +
+        `'${mappingForUser.shipskartRole}') — own Shipskart account not provisioned: ${reason}. ` +
+        `No shared-account fallback by design; the reconciler will retry.`,
+      );
+      // Make sure the reason is DURABLE. pushUser/ensureUserPushed already record their own
+      // specific statuses (unmapped_role / missing_email / blocked_duplicate / error /
+      // no_master_row) — do not overwrite those. Only fill the gaps: no row at all, or a
+      // failure that happened before any push was attempted (lookup error / JIT threw).
+      if (!link || lookupError || (jitReason ?? '').startsWith('jit threw')) {
         try {
-          const { ensureUserPushed } = await import('./shipskartReconcilerService');
-          const jit = await ensureUserPushed(userUuid, userRole || null);
-          console.log(`[Shipskart JIT] user ${userUuid}: ${jit.reason}${jit.mappings ? ` mappings=${JSON.stringify(jit.mappings)}` : ''}`);
-          if (jit.pushed) link = await getUserLink(userUuid);
-        } catch (err: any) {
-          console.warn(`[Shipskart JIT] push attempt failed for ${userUuid} (falling back): ${err?.message || err}`);
+          const { upsertUserLink } = await import('../repositories/shipskartB2bRepository');
+          await upsertUserLink(userUuid, { pushStatus: 'jit_failed', lastError: reason.slice(0, 400) });
+        } catch (writeErr: any) {
+          console.warn(`[Shipskart] could not record the block reason for ${userUuid}: ${writeErr?.message || writeErr}`);
         }
       }
-      if (link?.pushStatus === 'pushed') return userUuid;
-    } catch (err: any) {
-      // A link-table read failure must not block Purchasing — fall through to the bridge.
-      console.warn(`[Shipskart] per-user link lookup failed for ${userUuid} — falling back to the shared-account bridge: ${err?.message || err}`);
+      throw new ShipskartUserNotProvisionedError(userUuid, reason);
     }
+    // No role mapping at all → the existing ROLE_NOT_MAPPED path below (null return).
   }
+
+  // LEGACY shared-account bridge — reached ONLY when NO user uuid was forwarded, i.e. a
+  // deployment that is not identity-integrated (no x-user-id). Kept in place, unused on
+  // integrated deployments; deletion is a post-trial decision.
   if (!userRole) return null;
   const mapping = await roleMappingRepo.getMappingForSailRole(userRole);
   if (!mapping) return null;
+  console.warn(
+    `[Shipskart] No forwarded user identity (x-user-id) — using the LEGACY shared '${mapping.shipskartRole}' ` +
+    `account for role '${userRole}'. Per-user SSO requires the identity header.`,
+  );
   const account = accountForShipskartRole(mapping.shipskartRole);
   if (!account) {
     console.warn(
@@ -334,7 +397,14 @@ export async function initiateSso(userRole: string, userUuid?: string | null): P
  *                  local logout must always complete.
  */
 export async function logoutSso(userRole: string, userUuid?: string | null): Promise<{ success: boolean; message?: string }> {
-  const externalUserId = await resolveExternalUserId(userRole, userUuid);
+  // A non-provisioned user never had a session — resolving must not throw out of logout,
+  // which is best-effort by contract and must never block the local logout.
+  let externalUserId: string | null;
+  try {
+    externalUserId = await resolveExternalUserId(userRole, userUuid);
+  } catch (err: any) {
+    return { success: true, message: `No Shipskart session to evict (${err?.name || 'resolve failed'})` };
+  }
   if (externalUserId === null) {
     // Unmapped role never had a Shipskart session — nothing to evict.
     return { success: true, message: 'No Shipskart mapping for role — logout skipped' };
