@@ -61,6 +61,8 @@ function resolveVesselTypeCode(vesselType: string | null): string {
   return '99';
 }
 
+const tally = (acc: Record<string, number>, s: string) => { acc[s] = (acc[s] || 0) + 1; return acc; };
+
 const isDuplicate400 = (res: { status: number; json: any }) =>
   res.status === 400 && /already in use|already exists|duplicate/i.test(JSON.stringify(res.json ?? ''));
 
@@ -202,6 +204,85 @@ export async function mapUserToVessel(userUuid: string, vesselVuuid: string, ctx
   return { status, error };
 }
 
+// ── JIT (just-in-time) push at first Purchasing click ──
+//
+// WHY: without it, a new joiner / role change / user the reconciler has not reached yet
+// cannot open Purchasing until the next sweep. With it the system self-heals on first
+// click and there is no cutover day.
+//
+// MEASURED COST (UAT, 2026-07-30): warm path (already pushed) = 1 API call ≈ 470 ms;
+// cold JIT = 3 API calls ≈ 950 ms (+1 per extra vessel). Token and role lookups are
+// cached and cost no API call.
+//
+// RULES:
+//  • VESSELS ARE NEVER CREATED HERE. Fleet data is the reconciler's job; a wrong IMO or
+//    type created under click-time pressure would put junk in Shipskart. A user whose
+//    vessel is not pushed yet still gets IN — their vessel mapping simply follows later.
+//  • MAPPING FAILURE NEVER BLOCKS THE USER. create-user is what SSO needs; mappings are
+//    best-effort and recorded on the assignment rows for the reconciler to retry.
+//  • ATTEMPT CAP so a permanently failing user cannot hammer Shipskart on every click.
+//    In-memory by design (per process, resets on restart): the durable retry path is the
+//    reconciler, and a restart-proof counter would need a migration for no real gain.
+
+const JIT_MAX_ATTEMPTS = 3;
+const jitAttempts = new Map<string, number>();
+
+export interface JitResult { pushed: boolean; reason: string; mappings?: Record<string, number> }
+
+export async function ensureUserPushed(userUuid: string, sailRole: string | null): Promise<JitResult> {
+  const existing = await b2bRepo.getUserLink(userUuid);
+  if (existing?.pushStatus === 'pushed' && existing.shipskartUserId) {
+    return { pushed: true, reason: 'already_pushed' };
+  }
+  // A duplicate block cannot be resolved from here — Shipskart has no lookup endpoint, so
+  // retrying would fail forever. Leave it for the console/human.
+  if (existing?.pushStatus === 'blocked_duplicate') {
+    return { pushed: false, reason: 'blocked_duplicate' };
+  }
+  const attempts = jitAttempts.get(userUuid) ?? 0;
+  if (attempts >= JIT_MAX_ATTEMPTS) {
+    return { pushed: false, reason: `jit_attempt_cap_reached (${attempts}) — the reconciler keeps retrying durably` };
+  }
+  jitAttempts.set(userUuid, attempts + 1);
+
+  const db = await getDb();
+  const rows = await db.select({
+    id: masterUsers.id, fullName: masterUsers.fullName, email: masterUsers.email,
+    role: masterUsers.role, designation: masterUsers.designation,
+  }).from(masterUsers).where(eq(masterUsers.id, userUuid)).limit(1);
+
+  // A user who has never been through sync-masters has no master_users row. Fall back to
+  // the identity we do have (uuid + the role the request carries) rather than refusing:
+  // email is the only hard requirement on Shipskart's side.
+  const mu = rows[0];
+  if (!mu) {
+    await b2bRepo.upsertUserLink(userUuid, {
+      pushStatus: 'no_master_row',
+      lastError: 'no master_users row — run Admin → sync-masters so this user can be pushed',
+    });
+    return { pushed: false, reason: 'no_master_row' };
+  }
+
+  const push = await pushUser({ ...mu, role: mu.role ?? sailRole ?? null });
+  if (push.status !== 'pushed' && push.status !== 'already_pushed') {
+    return { pushed: false, reason: push.status };
+  }
+  jitAttempts.delete(userUuid);
+
+  // Best-effort mappings for this user's ACTIVE assignments (capture-at-login fills them).
+  const mappings: Record<string, number> = {};
+  try {
+    const vesselIds = await b2bRepo.getActiveVesselIdsForUser(userUuid);
+    for (const vesselId of vesselIds) {
+      const m = await mapUserToVessel(userUuid, vesselId, { userFullName: mu.fullName });
+      tally(mappings, m.status);
+    }
+  } catch (err: any) {
+    console.warn(`[Shipskart JIT] mapping sweep failed for ${userUuid} (user is still in; reconciler will retry): ${err?.message || err}`);
+  }
+  return { pushed: true, reason: 'pushed_jit', mappings };
+}
+
 // ── the sweep ──
 
 export interface ReconcileSummary {
@@ -211,8 +292,6 @@ export interface ReconcileSummary {
   users: Record<string, number>;
   mappings: Record<string, number>;
 }
-
-const tally = (acc: Record<string, number>, s: string) => { acc[s] = (acc[s] || 0) + 1; return acc; };
 
 /**
  * One bounded reconciliation pass. Never throws mid-sweep — every per-record failure is

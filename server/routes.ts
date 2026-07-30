@@ -197,6 +197,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('[AutoSync] Shore instance detected — auto-sync scheduler not started (sync is ship-initiated)');
   }
 
+  // Shipskart b2b reconciler — SHORE-ONLY (ships never talk to Shipskart). Each tick is
+  // additionally gated by the per-tenant reconciler_enabled flag, default FALSE, so a
+  // fresh deploy never starts pushing to a partner API on its own.
+  const { shipskartReconcilerScheduler } = await import("./modules/shipskart/services/shipskartReconcilerScheduler");
+  await shipskartReconcilerScheduler.start();
+
   // Role watchdog — the boot-time isShip decision above can be WRONG (stale DB
   // instance_id at boot) and used to stay wrong until the next restart, leaving
   // auto-sync + WO generation silently dead on a ship. The watchdog re-resolves
@@ -627,6 +633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     jobDueScanner.stop();
     maintenanceOrchestrator.stop(); // stops alerts + sync-health + sync-pruning timers
     syncAutoScheduler.stop();
+    shipskartReconcilerScheduler.stop();
   };
   process.on('SIGTERM', stopAllSchedulers);
   process.on('SIGINT', stopAllSchedulers);

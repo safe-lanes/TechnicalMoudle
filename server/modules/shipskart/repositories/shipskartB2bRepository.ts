@@ -6,7 +6,7 @@
  * All four are SHORE-ONLY / NO_SYNC (see shared/syncConfig.ts). getDb() is ALS-aware,
  * so multi-tenant routing works with zero extra plumbing (same as the role mappings).
  */
-import { and, eq, notInArray } from 'drizzle-orm';
+import { and, eq, ne, notInArray } from 'drizzle-orm';
 import { getDb } from '../../../db';
 import {
   shipskartTenantConfig, type ShipskartTenantConfig,
@@ -211,6 +211,56 @@ export async function getActiveVesselIdsForUser(userUuid: string): Promise<strin
   const rows = await db.select({ v: masterUserVessels.vesselId }).from(masterUserVessels)
     .where(and(eq(masterUserVessels.userUuid, userUuid), eq(masterUserVessels.isActive, true)));
   return rows.map((r) => r.v);
+}
+
+/**
+ * Console detail: rows that are NOT successfully pushed/mapped, with their errors —
+ * the "what needs a human" list. Bounded so a broken tenant cannot return everything.
+ */
+export async function failingRows(limit = 100): Promise<{
+  users: Array<{ userUuid: string; pushStatus: string; lastError: string | null }>;
+  vessels: Array<{ vesselVuuid: string; imoNumber: string | null; pushStatus: string; lastError: string | null }>;
+  assignments: Array<{ userUuid: string; vesselId: string; mapStatus: string; lastError: string | null }>;
+}> {
+  const db = await getDb();
+  const users = await db.select({
+    userUuid: shipskartUserLinks.userUuid, pushStatus: shipskartUserLinks.pushStatus, lastError: shipskartUserLinks.lastError,
+  }).from(shipskartUserLinks).where(ne(shipskartUserLinks.pushStatus, 'pushed')).limit(limit);
+  const vessels = await db.select({
+    vesselVuuid: shipskartVesselLinks.vesselVuuid, imoNumber: shipskartVesselLinks.imoNumber,
+    pushStatus: shipskartVesselLinks.pushStatus, lastError: shipskartVesselLinks.lastError,
+  }).from(shipskartVesselLinks).where(ne(shipskartVesselLinks.pushStatus, 'pushed')).limit(limit);
+  const assignments = await db.select({
+    userUuid: masterUserVessels.userUuid, vesselId: masterUserVessels.vesselId,
+    mapStatus: masterUserVessels.mapStatus, lastError: masterUserVessels.lastError,
+  }).from(masterUserVessels)
+    .where(and(eq(masterUserVessels.isActive, true), ne(masterUserVessels.mapStatus, 'mapped'))).limit(limit);
+  return { users, vessels, assignments };
+}
+
+/**
+ * Console retry: clear a stuck row back to 'pending' so the next reconciler pass re-tries
+ * it. Deliberately does NOT touch a row that already carries a Shipskart id — re-pushing
+ * that would create a duplicate on their side (they have no update endpoint).
+ */
+export async function resetForRetry(kind: 'user' | 'vessel', id: string): Promise<{ reset: boolean; reason?: string }> {
+  const db = await getDb();
+  if (kind === 'user') {
+    const existing = await getUserLink(id);
+    if (!existing) return { reset: false, reason: 'no link row' };
+    if (existing.shipskartUserId) return { reset: false, reason: 'already has a Shipskart id — re-pushing would duplicate' };
+    await db.update(shipskartUserLinks)
+      .set({ pushStatus: 'pending', lastError: null, updatedAt: new Date() })
+      .where(eq(shipskartUserLinks.userUuid, id));
+    return { reset: true };
+  }
+  const existing = await getVesselLink(id);
+  if (!existing) return { reset: false, reason: 'no link row' };
+  if (existing.shipskartVesselId) return { reset: false, reason: 'already has a Shipskart id — re-pushing would duplicate' };
+  await db.update(shipskartVesselLinks)
+    .set({ pushStatus: 'pending', lastError: null, updatedAt: new Date() })
+    .where(eq(shipskartVesselLinks.vesselVuuid, id));
+  return { reset: true };
 }
 
 /** Status endpoint helper: counts per push status. */

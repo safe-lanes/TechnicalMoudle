@@ -16,10 +16,32 @@ export async function bootstrapHandler(req: Request, res: Response) {
   res.json({ success: true, ...result });
 }
 
-/** GET /shipskart/b2b/status — token expiries + link counts. Never returns tokens. */
+/**
+ * GET /shipskart/b2b/status — token expiries + link counts + the "needs a human" list.
+ * Never returns tokens. This is the admin console's data source.
+ */
 export async function statusHandler(_req: Request, res: Response) {
-  const [token, links] = await Promise.all([tokenService.tokenStatus(), b2bRepo.linkStatusCounts()]);
-  res.json({ token, links });
+  const [token, links, failing] = await Promise.all([
+    tokenService.tokenStatus(),
+    b2bRepo.linkStatusCounts(),
+    b2bRepo.failingRows(100),
+  ]);
+  res.json({ token, links, failing });
+}
+
+/**
+ * POST /shipskart/b2b/retry { kind: 'user'|'vessel', id } — clear one stuck row back to
+ * pending for the next reconciler pass. Refuses rows that already carry a Shipskart id
+ * (re-pushing would duplicate — Shipskart has no update endpoint).
+ */
+export async function retryHandler(req: Request, res: Response) {
+  const kind = req.body?.kind;
+  const id = typeof req.body?.id === 'string' ? req.body.id.trim() : '';
+  if ((kind !== 'user' && kind !== 'vessel') || !id) {
+    return res.status(400).json({ success: false, message: "body must be { kind: 'user'|'vessel', id: string }" });
+  }
+  const result = await b2bRepo.resetForRetry(kind, id);
+  res.status(result.reset ? 200 : 409).json({ success: result.reset, ...result });
 }
 
 /** POST /shipskart/b2b/reconcile { limit? } — one bounded manual pass. */

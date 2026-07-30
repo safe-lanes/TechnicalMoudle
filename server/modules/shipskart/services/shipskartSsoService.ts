@@ -232,7 +232,21 @@ export async function resolveExternalUserId(userRole: string, userUuid?: string 
   if (userUuid) {
     try {
       const { getUserLink } = await import('../repositories/shipskartB2bRepository');
-      const link = await getUserLink(userUuid);
+      let link = await getUserLink(userUuid);
+      // JIT: not pushed yet → try once, here and now, so new joiners / role changes /
+      // users the reconciler has not reached resolve on their FIRST click (no cutover day).
+      // Opt-out via SHIPSKART_B2B_JIT=false. Never throws: any failure falls through to
+      // the legacy shared-account bridge below, so Purchasing still opens.
+      if (link?.pushStatus !== 'pushed' && (process.env.SHIPSKART_B2B_JIT || '').toLowerCase() !== 'false') {
+        try {
+          const { ensureUserPushed } = await import('./shipskartReconcilerService');
+          const jit = await ensureUserPushed(userUuid, userRole || null);
+          console.log(`[Shipskart JIT] user ${userUuid}: ${jit.reason}${jit.mappings ? ` mappings=${JSON.stringify(jit.mappings)}` : ''}`);
+          if (jit.pushed) link = await getUserLink(userUuid);
+        } catch (err: any) {
+          console.warn(`[Shipskart JIT] push attempt failed for ${userUuid} (falling back): ${err?.message || err}`);
+        }
+      }
       if (link?.pushStatus === 'pushed') return userUuid;
     } catch (err: any) {
       // A link-table read failure must not block Purchasing — fall through to the bridge.
