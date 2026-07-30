@@ -4539,6 +4539,70 @@ export const shipskartRoleMappings = pgTable("shipskart_role_mappings", {
 });
 export type ShipskartRoleMapping = typeof shipskartRoleMappings.$inferSelect;
 
+// ── Shipskart b2b integration (migration 149) — ALL FOUR SHORE-ONLY, NO_SYNC ──
+
+// Per-tenant b2b state. Rotating token pair lives HERE (survives restarts); the bootstrap
+// seed credentials stay in env. Row created by the bootstrap endpoint, never seeded.
+export const shipskartTenantConfig = pgTable("shipskart_tenant_config", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  tenantId: text("tenant_id").notNull().unique(),
+  enabled: boolean("enabled").notNull().default(false),
+  reconcilerEnabled: boolean("reconciler_enabled").notNull().default(false),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  accessExpiresAt: timestamp("access_expires_at", { withTimezone: true }),
+  refreshExpiresAt: timestamp("refresh_expires_at", { withTimezone: true }),
+  lastBootstrapAt: timestamp("last_bootstrap_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+});
+export type ShipskartTenantConfig = typeof shipskartTenantConfig.$inferSelect;
+
+// SAILERP user (master_users.id uuid) → Shipskart user. externalUserId = OUR uuid, which is
+// also what Shipskart SSO keys on (proven on UAT 2026-07-30). shipskart_user_id is persisted
+// because Shipskart has NO lookup endpoints — a lost create response = unmappable entity.
+export const shipskartUserLinks = pgTable("shipskart_user_links", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userUuid: text("user_uuid").notNull().unique(),
+  shipskartUserId: text("shipskart_user_id"),
+  pushStatus: text("push_status").notNull().default("pending"),
+  lastError: text("last_error"),
+  pushedAt: timestamp("pushed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+});
+export type ShipskartUserLink = typeof shipskartUserLinks.$inferSelect;
+
+export const shipskartVesselLinks = pgTable("shipskart_vessel_links", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  vesselVuuid: text("vessel_vuuid").notNull().unique(),
+  imoNumber: text("imo_number"),
+  shipskartVesselId: text("shipskart_vessel_id"),
+  pushStatus: text("push_status").notNull().default("pending"),
+  lastError: text("last_error"),
+  pushedAt: timestamp("pushed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+});
+export type ShipskartVesselLink = typeof shipskartVesselLinks.$inferSelect;
+
+// user↔vessel assignments captured from SAILERP myVessels at login; feeds map-user-to-vessel.
+export const masterUserVessels = pgTable("master_user_vessels", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userUuid: text("user_uuid").notNull(),
+  vesselId: text("vessel_id").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  shipskartMappingId: text("shipskart_mapping_id"),
+  mapStatus: text("map_status").notNull().default("pending"),
+  lastError: text("last_error"),
+  mappedAt: timestamp("mapped_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+}, (table) => ({
+  userVesselUnique: unique("master_user_vessels_user_vessel_unique").on(table.userUuid, table.vesselId),
+  userIdx: index("idx_master_user_vessels_user").on(table.userUuid),
+}));
+export type MasterUserVessel = typeof masterUserVessels.$inferSelect;
+
 export const insertMocApproverSchema = createInsertSchema(mocApprovers).omit({
   id: true,
   mauuid: true,
