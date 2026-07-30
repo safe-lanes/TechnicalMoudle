@@ -25,8 +25,12 @@ export async function initiateHandler(req: AuthenticatedRequest, res: Response) 
   // req.user.role so existing behavior is preserved.
   const bodyRole = typeof req.body?.role === 'string' ? req.body.role.trim() : '';
   const userRole = bodyRole || req.user?.role || '';
+  // Per-user SSO (b2b): the uuid comes from the forwarded identity (x-user-id → req.user
+  // .userUuid, Audit Phase 0). When this user has been pushed to Shipskart the service
+  // uses it as the externalUserId; otherwise it falls back to the shared role account.
+  const userUuid = req.user?.userUuid ?? null;
   try {
-    const result = await shipskartSsoService.initiateSso(userRole);
+    const result = await shipskartSsoService.initiateSso(userRole, userUuid);
     res.json({
       success: true,
       iframeUrl: result.iframeUrl,
@@ -60,7 +64,7 @@ export async function logoutHandler(req: AuthenticatedRequest, res: Response) {
   const bodyRole = typeof req.body?.role === 'string' ? req.body.role.trim() : '';
   const userRole = bodyRole || req.user?.role || '';
   try {
-    const result = await shipskartSsoService.logoutSso(userRole);
+    const result = await shipskartSsoService.logoutSso(userRole, req.user?.userUuid ?? null);
     res.json({ success: true, message: result?.message });
   } catch (err: any) {
     console.error('[Shipskart] logout failed (non-blocking):', err?.message || err);
