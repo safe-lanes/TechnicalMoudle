@@ -1,0 +1,98 @@
+Work Order Re-Postponement Feature
+Overview
+
+The Work Order Re-Postponement feature allows vessel users to submit a new postponement request for a Work Order that has already received an approved postponement.
+
+Note:
+
+Work Order Postponement and Work Order Re-Postponement are two separate functions.
+Both functions use the same functionality, validations, and approval workflow, but they are maintained independently with different screen headers and request types.
+Business Scenario
+
+Once a Work Order Postponement request has been approved, the user can submit a Re-Postponement Request if an additional extension is required.
+
+The request will follow the existing approval workflow. Once approved by the Office, the Work Order Due Date will be updated to the newly approved Re-Postponement Date.
+
+Functional Requirements
+1. Re-Postponement Eligibility
+
+The Re-Postpone option shall be available only when:
+
+The Work Order has an approved Postponement Request.
+The Work Order is in Open/Pending status and has not been completed.
+
+Note: It is not necessary for the approved postponement date to expire. Once the initial Postponement request has been approved, the user may submit a Re-Postponement request at any time before the Work Order is completed.
+
+2. Re-Postpone Action
+
+When the user clicks the Postpone button on a Work Order that already has an approved postponement:
+
+The system shall open the Work Order Re-Postponement screen.
+The screen shall contain the same fields, validations, and functionality as the existing Work Order Postponement screen.
+The only differences shall be the screen header and the request type.
+
+Screen Header:
+
+Work Order Re-Postponement
+
+3. Re-Postponement Screen
+
+The Re-Postponement screen shall contain the same information as the existing Postponement screen, including:
+
+Work Order Details
+Current Due Date
+Current Approved Postponement Date
+Proposed Re-Postponement Date
+Reason for Re-Postponement
+Remarks
+Attachment (if applicable)
+
+All validations applicable to the Work Order Postponement feature shall also apply to the Re-Postponement feature.
+
+4. Approval Workflow Configuration
+
+A new approval workflow type shall be introduced:
+
+Work Order – WO Re-Postponement
+
+This workflow shall be added below the existing "Work Order – WO Postponement" configuration in the Approval Workflow module.
+
+The WO Re-Postponement workflow shall use the same approval variables, approval levels, roles, permissions, notifications, and workflow logic as the existing WO Postponement workflow.
+
+This allows administrators to configure Re-Postponement approvals independently while maintaining the same approval behavior as Work Order Postponement.
+
+5. Re-Postponement Approval Process
+
+When the user submits a Re-Postponement request:
+
+A WO Re-Postponement Approval Request shall be created.
+The request shall be synchronized to the Office.
+Office users shall receive the request in the Approval Queue.
+The request shall follow the configured WO Re-Postponement approval workflow.
+Office users may Approve or Reject the request.
+6. Approval Result
+If Approved
+The Work Order Due Date shall be updated to the approved Re-Postponement Date.
+The approval details shall be recorded in the approval history.
+The updated Due Date shall be synchronized to the vessel.
+If Rejected
+The existing Work Order Due Date shall remain unchanged.
+The rejection remarks shall be recorded.
+The rejection status shall be synchronized to the vessel.
+Example Workflow
+Step	Action	Due Date
+1	Original Work Order Created	15-06-2026
+2	User submits Postponement Request	15-07-2026
+3	Office approves Postponement	15-07-2026
+4	User requires another extension	—
+5	User submits Re-Postponement Request	10-08-2026
+6	Office approves Re-Postponement	10-08-2026
+Business Rules
+A Re-Postponement request can only be raised after the initial Postponement request has been approved.
+The approved postponement date does not need to expire before submitting a Re-Postponement request.
+Re-Postponement shall use the same validations and functionality as the existing Work Order Postponement feature.
+A separate approval workflow configuration, Work Order – WO Re-Postponement, shall be available in the Approval Workflow module.
+The WO Re-Postponement workflow shall use the same variables and approval configuration as WO Postponement.
+Re-Postponement requests shall be maintained as a separate request type for tracking, reporting, notifications, and audit history.
+The Work Order Due Date shall be updated only after the Office approves the Re-Postponement request.
+The Work Order must remain in Open/Pending status to allow submission of a Re-Postponement request.
