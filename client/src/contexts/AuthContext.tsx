@@ -207,6 +207,45 @@ function toActiveIdentity(
   };
 }
 
+/**
+ * CAPTURE-AT-LOGIN — hand the decrypted SAILERP `myVessels` set to the server ONCE per
+ * page load. The server can never read the encrypted userProfile itself, so this is the
+ * only way user↔vessel assignments reach `master_user_vessels`, which is what the
+ * Shipskart reconciler uses to map users to vessels for Purchasing.
+ *
+ * Fire-and-forget by design: it must NEVER block login or surface an error to the user.
+ * The sessionStorage guard keeps it to one call per load (both the mount-hydration and
+ * the explicit login path call it). The user uuid is taken server-side from the
+ * x-user-id header — deliberately not sent in the body.
+ */
+const VESSEL_CAPTURE_GUARD = "pms.vesselAssignmentsPosted";
+
+function captureVesselAssignments(assignments: MyVesselAssignment[], userUuid: string | null | undefined): void {
+  if (!userUuid) return; // no forwarded identity → the server would reject it anyway
+  // NEVER post an empty set: an absent/unreadable encrypted userProfile normalises to []
+  // and must not be mistaken for "this user has no vessels". The server no-ops on empty
+  // too (belt and braces); a real full revoke is an explicit admin action.
+  if (assignments.length === 0) return;
+  const guardKey = `${VESSEL_CAPTURE_GUARD}:${userUuid}`;
+  try {
+    if (sessionStorage.getItem(guardKey)) return;
+    sessionStorage.setItem(guardKey, String(assignments.length));
+  } catch {
+    // private-mode / storage-disabled: fall through and just post once per call site
+  }
+  void (async () => {
+    try {
+      await apiRequest("POST", "/technical/api/shipskart/vessel-assignments", {
+        myVessels: assignments,
+      });
+    } catch (err) {
+      // Never block the user — a failed capture just means the reconciler has no
+      // assignments for them yet; the next login retries.
+      console.error("[VesselAssignments] capture failed (non-blocking):", err);
+    }
+  })();
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [myVessels, setMyVessels] = useState<MyVesselAssignment[]>([]);
@@ -291,6 +330,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const hydratedRankChanged = setActiveRank(resolvedUser?.rank_name ?? null);
     // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
     setActiveIdentity(toActiveIdentity(resolvedUser));
+    // Capture-at-login (hydration path: an already-logged-in session reloading the app).
+    // AFTER setActiveIdentity so the x-user-id header is on the request.
+    captureVesselAssignments(resolvedMyVessels, resolvedUser?.userUuid);
     if (hydratedRankChanged) {
       invalidateRankScopedQueries();
     }
@@ -371,6 +413,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const rankChanged = setActiveRank(sanitizedUser.rank_name ?? null);
     // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
     setActiveIdentity(toActiveIdentity(sanitizedUser));
+    // Capture-at-login (fresh login path). AFTER setActiveIdentity so x-user-id is sent.
+    captureVesselAssignments(loginMyVessels, sanitizedUser.userUuid);
     if (rankChanged) {
       invalidateRankScopedQueries();
     }

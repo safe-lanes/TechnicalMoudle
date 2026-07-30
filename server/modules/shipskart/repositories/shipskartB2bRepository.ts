@@ -6,7 +6,7 @@
  * All four are SHORE-ONLY / NO_SYNC (see shared/syncConfig.ts). getDb() is ALS-aware,
  * so multi-tenant routing works with zero extra plumbing (same as the role mappings).
  */
-import { and, eq } from 'drizzle-orm';
+import { and, eq, notInArray } from 'drizzle-orm';
 import { getDb } from '../../../db';
 import {
   shipskartTenantConfig, type ShipskartTenantConfig,
@@ -161,6 +161,56 @@ export async function upsertAssignment(userUuid: string, vesselId: string, patch
         updatedAt: now,
       },
     });
+}
+
+/**
+ * CAPTURE-AT-LOGIN replace-set. The assignments live in SAILERP's encrypted userProfile
+ * (`myVessels`), which only the browser can read — so the frontend hands the array over
+ * once per login and this is the whole server-side write path.
+ *
+ * REPLACE-SET, NOT ADD-ONLY: vessels no longer in the profile are DEACTIVATED
+ * (is_active=false) rather than deleted, so a user moved off a vessel loses access here
+ * too, while `shipskart_mapping_id` survives for a clean re-activation if they move back.
+ * Deactivated rows are marked for re-push so the Shipskart mapping is updated as well.
+ *
+ * @returns counts { activated, deactivated }
+ */
+export async function replaceAssignmentsForUser(
+  userUuid: string,
+  vesselVuuids: string[],
+): Promise<{ activated: number; deactivated: number }> {
+  const db = await getDb();
+  const now = new Date();
+  let activated = 0;
+
+  for (const vesselId of vesselVuuids) {
+    const existing = await getAssignment(userUuid, vesselId);
+    // Re-activating a previously deactivated row must re-open the mapping question, so a
+    // row that was mapped-then-deactivated goes back to 'pending' for the reconciler.
+    const mapStatus = existing?.shipskartMappingId && existing.isActive ? undefined : 'pending';
+    await upsertAssignment(userUuid, vesselId, { isActive: true, ...(mapStatus ? { mapStatus } : {}) });
+    activated++;
+  }
+
+  const keep = vesselVuuids.length > 0 ? vesselVuuids : ['__none__'];
+  const deactivatedRows = await db.update(masterUserVessels)
+    .set({ isActive: false, mapStatus: 'revoked', updatedAt: now })
+    .where(and(
+      eq(masterUserVessels.userUuid, userUuid),
+      eq(masterUserVessels.isActive, true),
+      notInArray(masterUserVessels.vesselId, keep),
+    ))
+    .returning({ id: masterUserVessels.id });
+
+  return { activated, deactivated: deactivatedRows.length };
+}
+
+/** Active vessel vuuids for a user — used by the reconciler / JIT push. */
+export async function getActiveVesselIdsForUser(userUuid: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select({ v: masterUserVessels.vesselId }).from(masterUserVessels)
+    .where(and(eq(masterUserVessels.userUuid, userUuid), eq(masterUserVessels.isActive, true)));
+  return rows.map((r) => r.v);
 }
 
 /** Status endpoint helper: counts per push status. */

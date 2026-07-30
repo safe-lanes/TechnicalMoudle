@@ -21,4 +21,10 @@ router.post('/shipskart/b2b/bootstrap', asyncHandler(shipskartB2bController.boot
 router.get('/shipskart/b2b/status', asyncHandler(shipskartB2bController.statusHandler));
 router.post('/shipskart/b2b/reconcile', asyncHandler(shipskartB2bController.reconcileHandler));
 
+// CAPTURE-AT-LOGIN: the browser posts the decrypted SAILERP myVessels array once per
+// login (the server can never read the encrypted profile itself). Identity is taken from
+// the x-user-id header, not the body. Registered as a plain browser route — every logged-in
+// user calls it, not just admins.
+router.post('/shipskart/vessel-assignments', asyncHandler(shipskartB2bController.vesselAssignmentsHandler));
+
 export default router;
