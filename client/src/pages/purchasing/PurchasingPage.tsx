@@ -23,6 +23,9 @@ export default function PurchasingPage() {
   // from roleBlocked: the admin has granted access, the account just is not ready. We show
   // a plain message instead of falling back to a shared account (that fallback is retired).
   const [notProvisioned, setNotProvisioned] = useState(false);
+  // Server-supplied reason text for the not-provisioned screen (identity not configured vs
+  // account not created yet) — falls back to a generic line if absent.
+  const [notProvisionedMessage, setNotProvisionedMessage] = useState<string | null>(null);
 
   // The logged-in role (already decrypted by AuthContext) drives which Shipskart
   // account Purchasing opens. The backend has no real auth, so we pass it here —
@@ -35,6 +38,7 @@ export default function PurchasingPage() {
     setError(null);
     setRoleBlocked(false);
     setNotProvisioned(false);
+    setNotProvisionedMessage(null);
     try {
       // Direct fetch (not apiRequest) so we can inspect the 403 ROLE_NOT_MAPPED
       // body and branch on it instead of treating it as a generic error.
@@ -55,6 +59,7 @@ export default function PurchasingPage() {
       // already logged the reason and recorded it for the reconciler to retry.
       if (res.status === 409 && data?.errorCode === "USER_NOT_PROVISIONED") {
         setNotProvisioned(true);
+        setNotProvisionedMessage(typeof data?.message === "string" ? data.message : null);
         return;
       }
       if (!res.ok) {
@@ -128,8 +133,8 @@ export default function PurchasingPage() {
             Purchasing is not available yet
           </h2>
           <p className="text-gray-500 mb-4">
-            Your Purchasing account is still being set up. Please contact your
-            administrator if this does not resolve shortly.
+            {notProvisionedMessage ??
+              "Your Purchasing account is still being set up. Please contact your administrator if this does not resolve shortly."}
           </p>
           <button
             onClick={initiate}

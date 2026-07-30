@@ -19,8 +19,25 @@
 import crypto from 'crypto';
 import { AppError } from '../../shared/errors';
 import * as roleMappingRepo from '../repositories/shipskartRoleMappingRepository';
+import { IDENTITY_MISSING_TAG } from './identityGuard';
 
 const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * 🔴 DEAD SWITCH — the legacy SHARED per-role Shipskart account is RETIRED (Ghazi,
+ * 2026-07-30). It is false and nothing sets it: every code path below that depends on it
+ * is unreachable by construction.
+ *
+ * WHY RETIRED, not just discouraged: a shared session attributes one user's requisitions
+ * to another and makes the audit trail meaningless. On the WK trial a visibly broken
+ * Purchasing tab is fixed within the hour, whereas users quietly sharing one account may
+ * never be noticed. Loud failure is the correct behaviour.
+ *
+ * THE CODE IS DELIBERATELY KEPT (accountForShipskartRole + the legacy initiate/logout
+ * branches) so it can be restored by flipping this one constant if the trial forces it.
+ * Do not delete those functions.
+ */
+const LEGACY_SHARED_ACCOUNT_ENABLED = false;
 
 // ── Config (cached getter, fail-fast, no fallback values) ──
 // Mirrors the pattern in server/config/externalApi.ts. Reads process.env
@@ -307,11 +324,23 @@ export async function resolveExternalUserId(userRole: string, userUuid?: string 
       throw new ShipskartUserNotProvisionedError(userUuid, reason);
     }
     // No role mapping at all → the existing ROLE_NOT_MAPPED path below (null return).
+  } else if (!LEGACY_SHARED_ACCOUNT_ENABLED) {
+    // ── NO FORWARDED IDENTITY → REFUSE (shared account retired) ──
+    // identityGuard already returned null for: header absent, header blank, or header
+    // carrying the mock default. Without a real identity there is no per-user account to
+    // open, and we will NOT open a shared one. Refuse loudly so a non-integrated
+    // deployment is fixed within the hour instead of quietly sharing one Shipskart login.
+    console.warn(
+      `${IDENTITY_MISSING_TAG} sso: refusing to open Purchasing without a forwarded user identity ` +
+      `(role='${userRole}'). The legacy shared-account fallback is RETIRED — wire the x-user-id header ` +
+      `(SAILERP profile) on this deployment.`,
+    );
+    throw new ShipskartUserNotProvisionedError('(no identity)', 'identity_not_configured');
   }
 
-  // LEGACY shared-account bridge — reached ONLY when NO user uuid was forwarded, i.e. a
-  // deployment that is not identity-integrated (no x-user-id). Kept in place, unused on
-  // integrated deployments; deletion is a post-trial decision.
+  // ══ UNREACHABLE while LEGACY_SHARED_ACCOUNT_ENABLED === false ══════════════════════
+  // The legacy SHARED per-role account path. Retained verbatim so the behaviour can be
+  // restored by flipping that one constant if the WK trial forces it. Do not delete.
   if (!userRole) return null;
   const mapping = await roleMappingRepo.getMappingForSailRole(userRole);
   if (!mapping) return null;
@@ -372,8 +401,10 @@ export async function initiateSso(userRole: string, userUuid?: string | null): P
     return res.json;
   }
 
-  // LEGACY path (user not pushed yet): shared per-role account, tenantId in the body as
-  // that older endpoint expects. Retires when every user is pushed.
+  // ══ UNREACHABLE while LEGACY_SHARED_ACCOUNT_ENABLED === false ══════════════════════
+  // LEGACY path: shared per-role account, tenantId in the body as that older endpoint
+  // expects. resolveExternalUserId can no longer return a shared account, so this is dead
+  // code retained for a one-constant restore. Do not delete.
   const cfg = getShipskartConfig();
   const body = {
     externalUserId,

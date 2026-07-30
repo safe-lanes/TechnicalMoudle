@@ -51,10 +51,15 @@ export async function initiateHandler(req: AuthenticatedRequest, res: Response) 
     // reason is already WARN-logged with the uuid and stored on the link row for the
     // reconciler; the user gets a plain message, never a raw error or a blank frame.
     if (err instanceof ShipskartUserNotProvisionedError) {
+      // Two shapes of the same refusal, distinguished for the person reading the screen:
+      // identity not wired on this deployment vs this user's account not created yet.
+      const identityMissing = err.reason === 'identity_not_configured';
       return res.status(409).json({
         success: false,
         errorCode: 'USER_NOT_PROVISIONED',
-        message: 'Purchasing is not available yet. Please contact your administrator.',
+        message: identityMissing
+          ? 'Purchasing is unavailable: user identity is not configured for this deployment. Please contact your administrator.'
+          : 'Purchasing is not available yet. Please contact your administrator.',
       });
     }
     // Other Shipskart errors → re-throw so asyncHandler maps them to the
