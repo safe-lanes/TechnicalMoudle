@@ -32,6 +32,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { useVessels } from "@/hooks/useVessels";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 // Interface for label configuration (used by Company Group, Master Category, Master Group)
 interface LabelConfig {
@@ -221,6 +222,10 @@ const COMPANY_GROUP_OPTIONS = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
 export default function ShipsCertificatesAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canEditCerts = canEdit("admin-ships-certificates");
+  const canCreateCerts = canCreate("admin-ships-certificates");
+  const canDeleteCerts = canDelete("admin-ships-certificates");
   
   const [activeTab, setActiveTab] = useState<TabType>("master");
   const [viewModes, setViewModes] = useState<Record<TabType, ViewMode>>({
@@ -1612,7 +1617,7 @@ export default function ShipsCertificatesAdmin() {
                             <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600" onClick={() => undoDeleteRow(cert.masterId)} data-testid={`button-undo-delete-${cert.id}`} title="Undo deletion">
                               <Undo2 className="h-4 w-4" />
                             </Button>
-                          ) : (cert.isSystemDefined || SYSTEM_MASTER_IDS.has(cert.masterId)) ? (
+                          ) : (cert.isSystemDefined || SYSTEM_MASTER_IDS.has(cert.masterId) || !canDeleteCerts) ? (
                             <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground opacity-30 cursor-not-allowed" disabled data-testid={`button-delete-disabled-${cert.id}`}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -2623,14 +2628,16 @@ export default function ShipsCertificatesAdmin() {
         
         <div className="flex items-center gap-2">
             {currentViewMode === "view" ? (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={toggleViewMode}
-                data-testid="button-edit-mode"
-              >
-                Edit
-              </Button>
+              canEditCerts && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={toggleViewMode}
+                  data-testid="button-edit-mode"
+                >
+                  Edit
+                </Button>
+              )
             ) : (
               <>
                 <Button 
@@ -2722,7 +2729,7 @@ export default function ShipsCertificatesAdmin() {
               </>
             )}
             
-            {currentViewMode === "edit" && activeTab === "master" && (
+            {currentViewMode === "edit" && activeTab === "master" && canCreateCerts && (
               <Button 
                 size="sm"
                 className="bg-green-600 hover:bg-green-700 gap-1"
@@ -2734,7 +2741,7 @@ export default function ShipsCertificatesAdmin() {
               </Button>
             )}
             
-            {currentViewMode === "edit" && activeTab === "company" && (
+            {currentViewMode === "edit" && activeTab === "company" && canCreateCerts && (
               <Button 
                 size="sm"
                 className="bg-green-600 hover:bg-green-700 gap-1"
@@ -2746,7 +2753,7 @@ export default function ShipsCertificatesAdmin() {
               </Button>
             )}
             
-            {currentViewMode === "edit" && activeTab === "vessel" && selectedVessels.length > 0 && (
+            {currentViewMode === "edit" && activeTab === "vessel" && selectedVessels.length > 0 && canCreateCerts && (
               <Button 
                 size="sm"
                 className="bg-green-600 hover:bg-green-700 gap-1"
@@ -2809,9 +2816,11 @@ export default function ShipsCertificatesAdmin() {
             <Button variant="outline" onClick={cancelConfigureLabels} data-testid="button-cancel-labels">
               Cancel
             </Button>
-            <Button onClick={saveCompanyGroupLabels} className="bg-blue-600 hover:bg-blue-700" data-testid="button-save-labels">
-              Save Labels
-            </Button>
+            {canEditCerts && (
+              <Button onClick={saveCompanyGroupLabels} className="bg-blue-600 hover:bg-blue-700" data-testid="button-save-labels">
+                Save Labels
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2915,9 +2924,11 @@ export default function ShipsCertificatesAdmin() {
             <Button variant="outline" onClick={cancelMasterLabels} data-testid="button-cancel-master-labels">
               Cancel
             </Button>
-            <Button onClick={saveMasterLabels} className="bg-blue-600 hover:bg-blue-700" data-testid="button-save-master-labels">
-              Save Labels
-            </Button>
+            {canEditCerts && (
+              <Button onClick={saveMasterLabels} className="bg-blue-600 hover:bg-blue-700" data-testid="button-save-master-labels">
+                Save Labels
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

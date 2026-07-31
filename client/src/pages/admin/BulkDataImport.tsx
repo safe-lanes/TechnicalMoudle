@@ -19,6 +19,7 @@ import WoHistoryUpload from "./bulk/WoHistoryUpload";
 import BulkImportHistory from "./bulk/BulkImportHistory";
 import { useVessels } from "@/hooks/useVessels";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'locations' | 'wo-history';
 type FleetTemplateType = 'maker-list' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
@@ -247,6 +248,8 @@ const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
 
 export default function BulkDataImport() {
   const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
+  const { canCreate, canEdit } = usePermissions();
+  const canImport = canCreate("admin-masters") || canEdit("admin-masters");
   const { data: vessels = [], isLoading: isLoadingVessels } = useVessels();
   // Fleet mode is available for Sail Admin and External
   const [isFleetModeState, setIsFleetModeState] = useState(false);
@@ -402,6 +405,15 @@ export default function BulkDataImport() {
         <div className="p-6">
           {viewMode === 'history' ? (
             <BulkImportHistory vesselId={selectedVessel} />
+          ) : !canImport ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <FileSpreadsheet className="h-16 w-16 text-gray-300 mb-4" />
+                <p className="text-gray-500 text-center" data-testid="text-import-no-permission">
+                  You do not have permission to import data. You can still view import history.
+                </p>
+              </CardContent>
+            </Card>
           ) : isFleetMode ? (
             (isExternal || selectedFleetTemplate === 'maker-list') ? (
               <MakerListUpload />

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
+import { requirePermission } from '../../middleware/permissions';
 import * as certCtrl from './controllers/certificateController';
 import * as surveyCtrl from './controllers/surveyController';
 import * as certAdminCtrl from './controllers/certAdminController';
@@ -10,6 +11,12 @@ import { initializeSurveys } from './services/surveyService';
 setTimeout(() => initializeSurveys().catch(() => {}), 0);
 
 const router = Router();
+
+// ── Permission policy (requirePermission, per-endpoint) ──
+// Operational certificate/survey writes → cert-certificates / cert-surveys-page.
+// Certificate admin writes → admin-ships-certificates. Survey admin writes →
+// admin-ships-surveys. Bulk upsert+delete saves use any-of [create,edit,delete].
+// GETs stay open. Sail/PMS Admin bypass; unconfigured roles fail-open (see middleware).
 
 // ══════════════════════════════════════════════════════════
 // Operational Certificates Routes
@@ -22,7 +29,7 @@ router.get('/certificates', asyncHandler(certCtrl.getCertificates));
 router.get('/certificates/:id', asyncHandler(certCtrl.getCertificate));
 
 // PATCH /certificates/:id — update certificate data (dates, attachments)
-router.patch('/certificates/:id', asyncHandler(certCtrl.updateCertificate));
+router.patch('/certificates/:id', requirePermission('cert-certificates', 'edit'), asyncHandler(certCtrl.updateCertificate));
 
 // ══════════════════════════════════════════════════════════
 // Operational Surveys Routes
@@ -32,13 +39,13 @@ router.patch('/certificates/:id', asyncHandler(certCtrl.updateCertificate));
 router.get('/surveys', asyncHandler(surveyCtrl.getSurveys));
 
 // POST /surveys — create new survey
-router.post('/surveys', asyncHandler(surveyCtrl.createSurvey));
+router.post('/surveys', requirePermission('cert-surveys-page', 'create'), asyncHandler(surveyCtrl.createSurvey));
 
 // GET  /surveys/:id — get single survey
 router.get('/surveys/:id', asyncHandler(surveyCtrl.getSurvey));
 
 // PATCH /surveys/:id — update survey data (dates, attachments)
-router.patch('/surveys/:id', asyncHandler(surveyCtrl.updateSurvey));
+router.patch('/surveys/:id', requirePermission('cert-surveys-page', 'edit'), asyncHandler(surveyCtrl.updateSurvey));
 
 // ══════════════════════════════════════════════════════════
 // Certificate Admin - Master Routes
@@ -48,10 +55,10 @@ router.patch('/surveys/:id', asyncHandler(surveyCtrl.updateSurvey));
 router.get('/admin/ship-certificates-master', asyncHandler(certAdminCtrl.getMasterCertificates));
 
 // POST /admin/ship-certificates-master — bulk upsert master certificates
-router.post('/admin/ship-certificates-master', asyncHandler(certAdminCtrl.saveMasterCertificates));
+router.post('/admin/ship-certificates-master', requirePermission('admin-ships-certificates', ['create', 'edit', 'delete']), asyncHandler(certAdminCtrl.saveMasterCertificates));
 
 // DELETE /admin/ship-certificates-master/:masterId — delete master certificate
-router.delete('/admin/ship-certificates-master/:masterId', asyncHandler(certAdminCtrl.deleteMasterCertificate));
+router.delete('/admin/ship-certificates-master/:masterId', requirePermission('admin-ships-certificates', 'delete'), asyncHandler(certAdminCtrl.deleteMasterCertificate));
 
 // ══════════════════════════════════════════════════════════
 // Certificate Admin - Labels Routes
@@ -61,7 +68,7 @@ router.delete('/admin/ship-certificates-master/:masterId', asyncHandler(certAdmi
 router.get('/admin/ship-certificates-labels', asyncHandler(certAdminCtrl.getCertificateLabels));
 
 // POST /admin/ship-certificates-labels — save labels configuration
-router.post('/admin/ship-certificates-labels', asyncHandler(certAdminCtrl.saveCertificateLabels));
+router.post('/admin/ship-certificates-labels', requirePermission('admin-ships-certificates', 'edit'), asyncHandler(certAdminCtrl.saveCertificateLabels));
 
 // ══════════════════════════════════════════════════════════
 // Certificate Admin - Applicability Routes
@@ -72,13 +79,13 @@ router.post('/admin/ship-certificates-labels', asyncHandler(certAdminCtrl.saveCe
 router.get('/admin/vessel-certificate-applicability', asyncHandler(certAdminCtrl.getApplicability));
 
 // POST /admin/vessel-certificate-applicability/initialize — initialize vessel applicability
-router.post('/admin/vessel-certificate-applicability/initialize', asyncHandler(certAdminCtrl.initializeApplicability));
+router.post('/admin/vessel-certificate-applicability/initialize', requirePermission('admin-ships-certificates', 'edit'), asyncHandler(certAdminCtrl.initializeApplicability));
 
 // PATCH /admin/vessel-certificate-applicability — update single applicability record
-router.patch('/admin/vessel-certificate-applicability', asyncHandler(certAdminCtrl.updateApplicability));
+router.patch('/admin/vessel-certificate-applicability', requirePermission('admin-ships-certificates', 'edit'), asyncHandler(certAdminCtrl.updateApplicability));
 
 // POST /admin/vessel-certificate-applicability/bulk-update — bulk update applicability
-router.post('/admin/vessel-certificate-applicability/bulk-update', asyncHandler(certAdminCtrl.bulkUpdateApplicability));
+router.post('/admin/vessel-certificate-applicability/bulk-update', requirePermission('admin-ships-certificates', 'edit'), asyncHandler(certAdminCtrl.bulkUpdateApplicability));
 
 // ══════════════════════════════════════════════════════════
 // Survey Admin - Master Routes
@@ -88,10 +95,10 @@ router.post('/admin/vessel-certificate-applicability/bulk-update', asyncHandler(
 router.get('/admin/ship-surveys-master', asyncHandler(surveyAdminCtrl.getMasterSurveys));
 
 // POST /admin/ship-surveys-master — bulk upsert master surveys
-router.post('/admin/ship-surveys-master', asyncHandler(surveyAdminCtrl.saveMasterSurveys));
+router.post('/admin/ship-surveys-master', requirePermission('admin-ships-surveys', ['create', 'edit', 'delete']), asyncHandler(surveyAdminCtrl.saveMasterSurveys));
 
 // DELETE /admin/ship-surveys-master/:masterId — delete master survey
-router.delete('/admin/ship-surveys-master/:masterId', asyncHandler(surveyAdminCtrl.deleteMasterSurvey));
+router.delete('/admin/ship-surveys-master/:masterId', requirePermission('admin-ships-surveys', 'delete'), asyncHandler(surveyAdminCtrl.deleteMasterSurvey));
 
 // ══════════════════════════════════════════════════════════
 // Survey Admin - Labels Routes
@@ -101,7 +108,7 @@ router.delete('/admin/ship-surveys-master/:masterId', asyncHandler(surveyAdminCt
 router.get('/admin/ship-surveys-labels', asyncHandler(surveyAdminCtrl.getSurveyLabels));
 
 // POST /admin/ship-surveys-labels — save survey labels configuration
-router.post('/admin/ship-surveys-labels', asyncHandler(surveyAdminCtrl.saveSurveyLabels));
+router.post('/admin/ship-surveys-labels', requirePermission('admin-ships-surveys', 'edit'), asyncHandler(surveyAdminCtrl.saveSurveyLabels));
 
 // ══════════════════════════════════════════════════════════
 // Survey Admin - Applicability Routes
@@ -111,9 +118,9 @@ router.post('/admin/ship-surveys-labels', asyncHandler(surveyAdminCtrl.saveSurve
 router.get('/admin/vessel-survey-applicability', asyncHandler(surveyAdminCtrl.getApplicability));
 
 // POST /admin/vessel-survey-applicability/initialize — initialize vessel applicability
-router.post('/admin/vessel-survey-applicability/initialize', asyncHandler(surveyAdminCtrl.initializeApplicability));
+router.post('/admin/vessel-survey-applicability/initialize', requirePermission('admin-ships-surveys', 'edit'), asyncHandler(surveyAdminCtrl.initializeApplicability));
 
 // POST /admin/vessel-survey-applicability/bulk-update — bulk update applicability
-router.post('/admin/vessel-survey-applicability/bulk-update', asyncHandler(surveyAdminCtrl.bulkUpdateApplicability));
+router.post('/admin/vessel-survey-applicability/bulk-update', requirePermission('admin-ships-surveys', 'edit'), asyncHandler(surveyAdminCtrl.bulkUpdateApplicability));
 
 export default router;

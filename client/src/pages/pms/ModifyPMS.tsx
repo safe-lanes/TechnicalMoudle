@@ -58,6 +58,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useLocalApprovers } from "@/hooks/useExternalMasterData";
 
 interface RevisionHistoryEntry {
@@ -132,6 +133,9 @@ export default function ModifyPMS() {
   const { vesselId, setVesselId } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { currentUser, isOfficeUser } = useAuth();
+  const { canCreate, canEdit } = usePermissions();
+  const canCreateModifyPms = canCreate("pms-modify-pms");
+  const canEditModifyPms = canEdit("pms-modify-pms");
   const { data: vessels = [] } = useVessels();
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -495,7 +499,7 @@ export default function ModifyPMS() {
             </button>
           ))}
         </div>
-        {!isVessel && (
+        {!isVessel && canCreateModifyPms && (
           <Button 
             className="bg-[#5dc86f] hover:bg-[#4db85f] text-white px-6"
             onClick={() => setIsNewRequestModalOpen(true)}
@@ -876,12 +880,14 @@ export default function ModifyPMS() {
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleSave}
-              disabled={!formData.title || createMutation.isPending || updateMutation.isPending}
-            >
-              {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save as Draft'}
-            </Button>
+            {(editingRequest ? canEditModifyPms : canCreateModifyPms) && (
+              <Button
+                onClick={handleSave}
+                disabled={!formData.title || createMutation.isPending || updateMutation.isPending}
+              >
+                {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save as Draft'}
+              </Button>
+            )}
             {editingRequest && formData.title && formData.reason && formData.targetType && formData.targetId && 
              formData.proposedChangesJson && formData.proposedChangesJson.length > 0 && (
               <Button

@@ -11,6 +11,7 @@ import { useState, useContext, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { VesselContext } from "@/contexts/VesselContext";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -193,6 +194,8 @@ function statusBadge(status: string) {
 
 export default function SyncDashboard() {
   const { toast } = useToast();
+  const { canEdit } = usePermissions();
+  const canEditSync = canEdit("admin-sync-dashboard");
   const { isShip } = useSyncInstanceInfo();
   const vesselCtx = useContext(VesselContext);
   const vessels = vesselCtx?.vessels ?? [];
@@ -530,24 +533,26 @@ export default function SyncDashboard() {
             <CardDescription>Trigger a manual sync cycle for the selected vessel</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button
-              onClick={() => syncMutation.mutate(selectedVesselId)}
-              disabled={syncMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
-              data-testid="btn-sync-now"
-            >
-              {syncMutation.isPending ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Sync Now
-                </>
-              )}
-            </Button>
+            {canEditSync && (
+              <Button
+                onClick={() => syncMutation.mutate(selectedVesselId)}
+                disabled={syncMutation.isPending}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="btn-sync-now"
+              >
+                {syncMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Sync Now
+                  </>
+                )}
+              </Button>
+            )}
 
             {/* Progress */}
             {(syncMutation.isPending || syncProgress > 0) && (
@@ -790,6 +795,8 @@ export default function SyncDashboard() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
+                            {canEditSync && (
+                              <>
                             <Button
                               variant="outline"
                               size="sm"
@@ -818,6 +825,8 @@ export default function SyncDashboard() {
                             >
                               Shore Wins
                             </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -898,6 +907,8 @@ export default function SyncDashboard() {
                       <TableCell className="text-right text-sm text-muted-foreground">{formatAge(f.createdAt)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {canEditSync && (
+                            <>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -916,6 +927,8 @@ export default function SyncDashboard() {
                           >
                             <XCircle className="h-3.5 w-3.5 mr-1" /> Skip
                           </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -2,9 +2,16 @@ import { Router, Request, Response } from 'express';
 import { NOON_MODULE_ENABLED } from './config';
 import { asyncHandler } from '../shared/middleware';
 import { requireOfficeOrAdmin } from '../../middleware/auth';
+import { requirePermission } from '../../middleware/permissions';
 import * as ctrl from './controllers/noonReportController';
 
 const router = Router();
+
+// ── Permission policy (requirePermission, resource 'noon-report') ──
+// Noon report & bunker writes gated by method: POST=create, PATCH/submit=edit,
+// DELETE=delete. /nr-reports/:id/email stays open; nr-alerts acknowledge keeps its
+// existing requireOfficeOrAdmin unchanged. GETs stay open. Sail/PMS Admin bypass;
+// unconfigured roles fail-open (see middleware).
 
 // Feature flag — return 404 for all routes when module is disabled
 if (!NOON_MODULE_ENABLED) {
@@ -17,22 +24,22 @@ if (!NOON_MODULE_ENABLED) {
   router.get('/nr-reports', asyncHandler(ctrl.getNoonReports));
 
   // POST /nr-reports — create new draft report
-  router.post('/nr-reports', asyncHandler(ctrl.createNoonReport));
+  router.post('/nr-reports', requirePermission('noon-report', 'create'), asyncHandler(ctrl.createNoonReport));
 
   // GET  /nr-reports/:id — get single report
   router.get('/nr-reports/:id', asyncHandler(ctrl.getNoonReport));
 
   // PATCH /nr-reports/:id — update draft report
-  router.patch('/nr-reports/:id', asyncHandler(ctrl.updateNoonReport));
+  router.patch('/nr-reports/:id', requirePermission('noon-report', 'edit'), asyncHandler(ctrl.updateNoonReport));
 
   // PATCH /nr-reports/:id/draft — auto-save draft
-  router.patch('/nr-reports/:id/draft', asyncHandler(ctrl.saveDraft));
+  router.patch('/nr-reports/:id/draft', requirePermission('noon-report', 'edit'), asyncHandler(ctrl.saveDraft));
 
   // POST /nr-reports/:id/submit — submit report (lock)
-  router.post('/nr-reports/:id/submit', asyncHandler(ctrl.submitNoonReport));
+  router.post('/nr-reports/:id/submit', requirePermission('noon-report', 'edit'), asyncHandler(ctrl.submitNoonReport));
 
   // DELETE /nr-reports/:id — delete draft report
-  router.delete('/nr-reports/:id', asyncHandler(ctrl.deleteNoonReport));
+  router.delete('/nr-reports/:id', requirePermission('noon-report', 'delete'), asyncHandler(ctrl.deleteNoonReport));
 
   // ── Fuel ROB ──────────────────────────────────────────────────────────────
 
@@ -67,7 +74,7 @@ if (!NOON_MODULE_ENABLED) {
   router.get('/nr-bunker', asyncHandler(ctrl.getBunkerRecords));
 
   // POST /nr-bunker — create new BDN record + increment ROB
-  router.post('/nr-bunker', asyncHandler(ctrl.createBunkerRecord));
+  router.post('/nr-bunker', requirePermission('noon-report', 'create'), asyncHandler(ctrl.createBunkerRecord));
 
   // GET  /nr-bunker-cost — cost summary per fuel type
   router.get('/nr-bunker-cost', asyncHandler(ctrl.getBunkerCostSummary));
@@ -76,10 +83,10 @@ if (!NOON_MODULE_ENABLED) {
   router.get('/nr-bunker/:id', asyncHandler(ctrl.getBunkerRecord));
 
   // PATCH /nr-bunker/:id — update record + adjust ROB delta
-  router.patch('/nr-bunker/:id', asyncHandler(ctrl.updateBunkerRecord));
+  router.patch('/nr-bunker/:id', requirePermission('noon-report', 'edit'), asyncHandler(ctrl.updateBunkerRecord));
 
   // DELETE /nr-bunker/:id — delete record + decrement ROB
-  router.delete('/nr-bunker/:id', asyncHandler(ctrl.deleteBunkerRecord));
+  router.delete('/nr-bunker/:id', requirePermission('noon-report', 'delete'), asyncHandler(ctrl.deleteBunkerRecord));
 
   // ── Fleet Overview ────────────────────────────────────────────────────────
 
