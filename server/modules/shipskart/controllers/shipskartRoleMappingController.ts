@@ -27,10 +27,26 @@ export async function getRoleMappingsHandler(req: AuthenticatedRequest, res: Res
     getAvailableShipskartRoles(),
     repo.getAllMappings(),
   ]);
-  res.json({
-    availableRoles,
-    mappings: rows.map(r => ({ sailRole: r.sailRole, shipskartRole: r.shipskartRole })),
-  });
+  // A saved mapping can point at a role the tenant does NOT have — e.g. rows written
+  // before the dropdown became live-only, which named the retired shared-account roles
+  // ('captain'/'purchaser'/'manager'). Such a mapping silently BLOCKS its users
+  // ('unmapped_role' at create-user), so flag it here instead of letting an admin find out
+  // when someone cannot open Purchasing. `stale: true` = this row needs remapping.
+  const live = new Set(availableRoles);
+  const mappings = rows.map(r => ({
+    sailRole: r.sailRole,
+    shipskartRole: r.shipskartRole,
+    stale: !live.has(r.shipskartRole),
+  }));
+  const staleCount = mappings.filter(m => m.stale).length;
+  if (staleCount > 0) {
+    console.warn(
+      `[Shipskart] ${staleCount} role mapping(s) point at a Shipskart role this tenant does not have ` +
+      `(${mappings.filter(m => m.stale).map(m => `${m.sailRole}→${m.shipskartRole}`).join(', ')}) — ` +
+      `users on those SAIL roles are BLOCKED from Purchasing until they are remapped.`,
+    );
+  }
+  res.json({ availableRoles, mappings, staleCount });
 }
 
 export async function putRoleMappingsHandler(req: AuthenticatedRequest, res: Response) {

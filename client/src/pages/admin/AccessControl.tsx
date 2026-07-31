@@ -410,8 +410,10 @@ export default function AccessControl() {
 // ── Shipskart Role Mapping (Purchasing SSO) ─────────────────────────────────
 // UI-configurable, MANY-TO-ONE: several SAIL roles may map to the same Shipskart
 // role. The dropdown options come from GET /shipskart/role-mappings.availableRoles —
-// the single role-source seam (today the static 3; later Shipskart's Get Role API) —
-// NEVER hardcode the list here. Unmapped roles are BLOCKED from Purchasing with the
+// the single role-source seam, which now returns the tenant's LIVE Shipskart roles
+// (fetched from their get-all-roles API) — NEVER hardcode the list here. A saved row
+// whose role is not in that live list comes back flagged `stale` and is shown as
+// "needs remapping": those users are blocked from Purchasing until it is fixed. Unmapped roles are BLOCKED from Purchasing with the
 // existing "not available for your role" panel (block-not-default by design).
 // Visible/editable only for Sail Admin / Super Admin (backend re-checks on PUT).
 
@@ -419,7 +421,8 @@ const UNMAPPED = "__unmapped__";
 
 interface RoleMappingData {
   availableRoles: string[];
-  mappings: Array<{ sailRole: string; shipskartRole: string }>;
+  mappings: Array<{ sailRole: string; shipskartRole: string; stale?: boolean }>;
+  staleCount?: number;
 }
 
 // ── Role → View-Mode Mapping (Task #324) ────────────────────────────────────
@@ -616,7 +619,10 @@ function ShipskartRoleMappingCard({ roles }: { roles: Array<{ assignedRole: stri
   if (!canEdit) return null;
 
   const available = mappingQuery.data?.availableRoles ?? [];
-  const label = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const staleRows = (mappingQuery.data?.mappings ?? []).filter((m) => m.stale);
+  // Live role names arrive already formatted (e.g. WAH-KWONG-PUCHASER); only the old
+  // lowercase names needed prettifying, so leave anything containing a capital alone.
+  const label = (s: string) => (/[A-Z]/.test(s) ? s : s.charAt(0).toUpperCase() + s.slice(1));
 
   return (
     <div className="flex-shrink-0 mb-4 border border-gray-200 rounded-lg bg-white" data-testid="shipskart-role-mapping-card">
@@ -638,6 +644,20 @@ function ShipskartRoleMappingCard({ roles }: { roles: Array<{ assignedRole: stri
             <div className="flex items-center gap-2 text-gray-500 py-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading mapping…</div>
           ) : (
             <>
+              {available.length === 0 && (
+                <div className="mb-3 px-3 py-2 rounded border border-amber-300 bg-amber-50 text-sm text-amber-800" data-testid="shipskart-roles-unavailable">
+                  Shipskart roles could not be loaded, so there is nothing to choose from. Check the
+                  Shipskart connection before mapping — saving is blocked until roles are available.
+                </div>
+              )}
+              {staleRows.length > 0 && (
+                <div className="mb-3 px-3 py-2 rounded border border-red-300 bg-red-50 text-sm text-red-800" data-testid="shipskart-mapping-stale">
+                  {staleRows.length} mapping{staleRows.length > 1 ? "s" : ""} point{staleRows.length > 1 ? "" : "s"} at a
+                  Shipskart role this tenant no longer has ({staleRows.map((m) => `${m.sailRole} → ${m.shipskartRole}`).join(", ")}).
+                  Users on {staleRows.length > 1 ? "those roles are" : "that role are"} blocked from Purchasing — please remap
+                  {staleRows.length > 1 ? " them" : " it"}.
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 max-h-64 overflow-y-auto pr-2">
                 {sailRoles.map((r) => (
                   <div key={r.assignedRole} className="flex items-center justify-between gap-3 py-1" data-testid={`mapping-row-${r.assignedRole}`}>

@@ -6,12 +6,16 @@
  * Consumers are unchanged: (1) PUT /shipskart/role-mappings validation and (2) the
  * admin UI dropdown. No other code may hardcode or re-derive this list.
  *
- * FAIL-SAFE, in order: live fetch → last-known-good cache (stale OK) → the LEGACY static
- * three. The legacy names ('captain'/'purchaser'/'manager') are ALWAYS included in the
- * returned list, because existing mapping rows store them and the live SSO env bridge
- * (accountForShipskartRole) resolves ONLY them — an admin's saved mapping must never
- * become invalid because this list changed. (Proven on UAT: the WK tenant's live roles
- * are WAH-KWONG-PUCHASER / WAH-KWONG-CAPTAIN — there is NO manager role there.)
+ * LIVE ROLES ONLY (2026-07-31). The legacy static three ('captain'/'purchaser'/'manager')
+ * are NO LONGER offered: they existed for the shared per-role account bridge, which is
+ * retired. Offering them now would be actively harmful — a role mapped to a legacy name
+ * has no live roleId, so create-user records 'unmapped_role' and the user is BLOCKED from
+ * Purchasing with a confusing reason. The dropdown must only ever offer names the tenant
+ * actually has. (WK's live roles: WAH-KWONG-PUCHASER / WAH-KWONG-CAPTAIN — no manager.)
+ *
+ * FAIL-SAFE, in order: live fetch → last-known-good cache (stale OK) → empty list. An empty
+ * list is the honest answer when Shipskart is unreachable and nothing was ever cached: the
+ * admin sees no options rather than options that silently fail.
  *
  * Also exports resolveShipskartRoleId(name) for the reconciler's create-user call —
  * roleId is authoritative on Shipskart's side (roleName proven cosmetic, 2026-07-30).
@@ -19,9 +23,6 @@
 import { authorizedB2bRequest } from './shipskartTokenService';
 
 const ROLE_CACHE_TTL_MS = 10 * 60 * 1000;
-
-/** Legacy static names — permanently valid for mapping rows + the SSO env bridge. */
-const LEGACY_ROLES = ['captain', 'purchaser', 'manager'];
 
 interface ShipskartRole { id: string; name: string; isActive?: boolean }
 
@@ -52,22 +53,21 @@ async function getRoles(): Promise<ShipskartRole[]> {
     return roles;
   } catch (err: any) {
     // Fail-safe: stale cache beats an empty dropdown; the static legacy list beats both being absent.
-    console.warn(`[Shipskart b2b] role fetch failed — serving ${cache ? 'last-known-good cache' : 'legacy static list'}: ${err?.message || err}`);
+    console.warn(`[Shipskart b2b] role fetch failed — serving ${cache ? 'last-known-good cache' : 'an EMPTY list (nothing cached yet; the mapping dropdown will be empty until Shipskart is reachable)'}: ${err?.message || err}`);
     if (cache) return cache.roles;
     return [];
   }
 }
 
-/** Role NAMES for the mapping UI/validation: live tenant roles ∪ legacy three. */
+/** Role NAMES for the mapping UI/validation — the tenant's LIVE roles, nothing else. */
 export async function getAvailableShipskartRoles(): Promise<string[]> {
-  const live = (await getRoles()).map((r) => r.name);
-  return Array.from(new Set([...live, ...LEGACY_ROLES]));
+  return Array.from(new Set((await getRoles()).map((r) => r.name)));
 }
 
 /**
- * Live roleId for a role name (exact match). Returns null for unknown names —
- * including the legacy three when the tenant has no such live role (the reconciler
- * treats that as 'unmapped_role', never guesses).
+ * Live roleId for a role name (exact match). Returns null for any name the tenant does not
+ * have — including legacy names left in old mapping rows, which the reconciler then records
+ * as 'unmapped_role' rather than guessing a substitute.
  */
 export async function resolveShipskartRoleId(roleName: string): Promise<string | null> {
   const roles = await getRoles();
