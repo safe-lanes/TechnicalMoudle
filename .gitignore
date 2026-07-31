@@ -34,3 +34,8 @@ ship-deploy/
 local-test-env/bundle.json
 local-test-env/shore.log
 local-test-env/*.local
+
+# Replit working artefacts (spreadsheets, pasted notes, screenshots uploaded for
+# testing). Never part of the build; team members keep their own copies. Excluded so
+# client-supplied data cannot land permanently in repo history.
+attached_assets/
