@@ -617,6 +617,7 @@ __export(schema_exports, {
   masterData: () => masterData,
   masterListTypes: () => masterListTypes,
   masterLists: () => masterLists,
+  masterUserVessels: () => masterUserVessels,
   masterUsers: () => masterUsers,
   mocApprovers: () => mocApprovers,
   monthlySnapshots: () => monthlySnapshots,
@@ -642,6 +643,9 @@ __export(schema_exports, {
   shipSurveysLabelsConfig: () => shipSurveysLabelsConfig,
   shipSurveysMaster: () => shipSurveysMaster,
   shipskartRoleMappings: () => shipskartRoleMappings,
+  shipskartTenantConfig: () => shipskartTenantConfig,
+  shipskartUserLinks: () => shipskartUserLinks,
+  shipskartVesselLinks: () => shipskartVesselLinks,
   spareComponentLinks: () => spareComponentLinks,
   spareLocationStock: () => spareLocationStock,
   spares: () => spares,
@@ -683,7 +687,7 @@ import { pgTable as pgTable2, text as text2, integer as integer2, boolean as boo
 import { sql as sql2 } from "drizzle-orm";
 import { createInsertSchema as createInsertSchema2 } from "drizzle-zod";
 import { z } from "zod";
-var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, viewModesMaster, insertViewModesMasterSchema, roleViewModeMapping, insertRoleViewModeMappingSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, syncTableCheckpoints, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncFieldLogFailures, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
+var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, viewModesMaster, insertViewModesMasterSchema, roleViewModeMapping, insertRoleViewModeMappingSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, syncTableCheckpoints, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncFieldLogFailures, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, shipskartTenantConfig, shipskartUserLinks, shipskartVesselLinks, masterUserVessels, insertMocApproverSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -4163,6 +4167,8 @@ var init_schema = __esm({
       // Path to any attached documents
       approvalWorkflowSnapshot: jsonb("approval_workflow_snapshot"),
       // Snapshot of level1/level2 config at submission time
+      requestType: text2("request_type"),
+      // 'Postponement' | 'Re-Postponement'; NULL treated as 'Postponement' for pre-migration rows
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
       isSync: boolean2("is_sync").default(false),
@@ -4196,6 +4202,8 @@ var init_schema = __esm({
       actionByUserId: text2("action_by_user_id"),
       actionAt: timestamp3("action_at", { withTimezone: true }),
       remarks: text2("remarks"),
+      requestType: text2("request_type"),
+      // 'Postponement' | 'Re-Postponement'; NULL treated as 'Postponement' for pre-migration rows
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
       createdByUuid: text2("created_by_uuid"),
@@ -4951,6 +4959,54 @@ var init_schema = __esm({
       updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date()),
       updatedByUuid: text2("updated_by_uuid")
     });
+    shipskartTenantConfig = pgTable2("shipskart_tenant_config", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      tenantId: text2("tenant_id").notNull().unique(),
+      enabled: boolean2("enabled").notNull().default(false),
+      reconcilerEnabled: boolean2("reconciler_enabled").notNull().default(false),
+      accessToken: text2("access_token"),
+      refreshToken: text2("refresh_token"),
+      accessExpiresAt: timestamp3("access_expires_at", { withTimezone: true }),
+      refreshExpiresAt: timestamp3("refresh_expires_at", { withTimezone: true }),
+      lastBootstrapAt: timestamp3("last_bootstrap_at", { withTimezone: true }),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    shipskartUserLinks = pgTable2("shipskart_user_links", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      userUuid: text2("user_uuid").notNull().unique(),
+      shipskartUserId: text2("shipskart_user_id"),
+      pushStatus: text2("push_status").notNull().default("pending"),
+      lastError: text2("last_error"),
+      pushedAt: timestamp3("pushed_at", { withTimezone: true }),
+      createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    shipskartVesselLinks = pgTable2("shipskart_vessel_links", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      vesselVuuid: text2("vessel_vuuid").notNull().unique(),
+      imoNumber: text2("imo_number"),
+      shipskartVesselId: text2("shipskart_vessel_id"),
+      pushStatus: text2("push_status").notNull().default("pending"),
+      lastError: text2("last_error"),
+      pushedAt: timestamp3("pushed_at", { withTimezone: true }),
+      createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    masterUserVessels = pgTable2("master_user_vessels", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      userUuid: text2("user_uuid").notNull(),
+      vesselId: text2("vessel_id").notNull(),
+      isActive: boolean2("is_active").notNull().default(true),
+      shipskartMappingId: text2("shipskart_mapping_id"),
+      mapStatus: text2("map_status").notNull().default("pending"),
+      lastError: text2("last_error"),
+      mappedAt: timestamp3("mapped_at", { withTimezone: true }),
+      createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    }, (table) => ({
+      userVesselUnique: unique("master_user_vessels_user_vessel_unique").on(table.userUuid, table.vesselId),
+      userIdx: index2("idx_master_user_vessels_user").on(table.userUuid)
+    }));
     insertMocApproverSchema = createInsertSchema2(mocApprovers).omit({
       id: true,
       mauuid: true,
@@ -6309,6 +6365,56 @@ var init_syncConfig = __esm({
         isConfigurable: false,
         businessRules: null,
         notes: "Per-table one-way watermarks (migration 148). Runtime infrastructure \u2014 each instance owns its own; must NEVER sync, exactly like sync_metadata."
+      },
+      // Shipskart b2b integration (migration 149) — SHORE-ONLY. Ships never talk to Shipskart;
+      // tokens, external ids and push bookkeeping must never travel to a vessel.
+      shipskart_tenant_config: {
+        tableName: "shipskart_tenant_config",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Shipskart b2b per-tenant state incl. ROTATING TOKEN PAIR \u2014 secrets-adjacent, shore-only, never sync."
+      },
+      shipskart_user_links: {
+        tableName: "shipskart_user_links",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "SAILERP user \u2192 Shipskart user link + push status (migration 149). Shore-only reconciler bookkeeping."
+      },
+      shipskart_vessel_links: {
+        tableName: "shipskart_vessel_links",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Vessel \u2192 Shipskart vessel link + push status (migration 149). Shore-only reconciler bookkeeping."
+      },
+      master_user_vessels: {
+        tableName: "master_user_vessels",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "SAILERP myVessels assignments captured at login + Shipskart mapping status (migration 149). Shore-only."
       },
       sync_field_log: {
         tableName: "sync_field_log",
@@ -19578,8 +19684,12 @@ var init_workOrderStatus = __esm({
       "in_progress",
       "inprogress",
       "open",
-      "rejected"
+      "rejected",
       // Rejected WOs block new generation - work needs rework before cycle can advance
+      "awaiting office approval",
+      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
+      "postponement approved"
+      // Postponement approved — WO is still active, scanner must not re-generate
     ]);
     COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
       "completed",
@@ -25029,7 +25139,7 @@ var init_postgresStorage = __esm({
           const latestAudit = await db2.select().from(runningHoursAudit).where(or(eq3(runningHoursAudit.componentId, resolvedParentId), eq3(runningHoursAudit.componentId, parentComponentId))).orderBy(desc2(runningHoursAudit.enteredAtUTC)).limit(1);
           if (latestAudit.length > 0) {
             const latestDate = latestAudit[0].dateUpdatedLocal;
-            const parseDate5 = (dateStr) => {
+            const parseDate6 = (dateStr) => {
               const months = { "Jan": 0, "Feb": 1, "Mar": 2, "Apr": 3, "May": 4, "Jun": 5, "Jul": 6, "Aug": 7, "Sep": 8, "Oct": 9, "Nov": 10, "Dec": 11 };
               const parts = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{4})\s*(\d{2})?:?(\d{2})?/);
               if (parts) {
@@ -25038,8 +25148,8 @@ var init_postgresStorage = __esm({
               }
               return new Date(dateStr);
             };
-            const latestParsedDate = parseDate5(latestDate);
-            const newParsedDate = parseDate5(dateUpdated);
+            const latestParsedDate = parseDate6(latestDate);
+            const newParsedDate = parseDate6(dateUpdated);
             if (newParsedDate < latestParsedDate) {
               throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${latestDate}).`);
             }
@@ -32209,11 +32319,13 @@ var workOrderService_exports = {};
 __export(workOrderService_exports, {
   applyAssignmentSync: () => applyAssignmentSync,
   approvePostponement: () => approvePostponement,
+  approveRePostponement: () => approveRePostponement,
   calculateApprovalTier: () => calculateApprovalTier,
   createSuperintendentNotificationForWO: () => createSuperintendentNotificationForWO,
   createWorkOrder: () => createWorkOrder,
   deleteWorkOrder: () => deleteWorkOrder,
   editPostponeRequest: () => editPostponeRequest,
+  editRePostponeRequest: () => editRePostponeRequest,
   getRejectionHistory: () => getRejectionHistory,
   getScopedOperationData: () => getScopedOperationData,
   getWorkOrder: () => getWorkOrder,
@@ -32223,9 +32335,11 @@ __export(workOrderService_exports, {
   listWorkOrdersPaged: () => listWorkOrdersPaged,
   rejectCompletedWorkOrder: () => rejectCompletedWorkOrder,
   rejectPostponement: () => rejectPostponement,
+  rejectRePostponement: () => rejectRePostponement,
   reopenCompletedWorkOrder: () => reopenCompletedWorkOrder,
   saveOverdueReason: () => saveOverdueReason,
   submitPostponeRequest: () => submitPostponeRequest,
+  submitRePostponeRequest: () => submitRePostponeRequest,
   updateWorkOrder: () => updateWorkOrder
 });
 import { eq as eq10 } from "drizzle-orm";
@@ -34437,6 +34551,302 @@ async function rejectPostponement(id, body) {
   });
   return updatedWO;
 }
+async function classifyWoForRePostponement(wo) {
+  if (!wo.jobId) {
+    const allConfigs2 = await storage.getApprovalWorkflowConfig();
+    const cfg = allConfigs2.find(
+      (c) => c.functionId === "pms-wo-re-postponement" && c.variableName === "Normal WO" && !c.isDeleted
+    );
+    if (!cfg) {
+      throw new ValidationError(
+        "Re-Postponement approval configuration is not yet available on this vessel. Please sync and try again."
+      );
+    }
+    return { classification: "normal", level1Enabled: cfg.level1Enabled ?? false, level2Enabled: cfg.level2Enabled ?? false };
+  }
+  let classification = "normal";
+  const job = await findJob(wo.jobId);
+  if (job) {
+    let isOnCriticalEquipment = false;
+    if (job.componentId) {
+      const comp = await findComponent2(job.componentId);
+      isOnCriticalEquipment = comp?.critical === true;
+    }
+    if (isOnCriticalEquipment) {
+      classification = "criticalEquipment";
+    } else if (job.criticality === "Yes") {
+      classification = "critical";
+    }
+  }
+  const variableNameMap = {
+    criticalEquipment: "Critical Equipment WO",
+    critical: "Critical WO",
+    normal: "Normal WO"
+  };
+  const allConfigs = await storage.getApprovalWorkflowConfig();
+  const config = allConfigs.find(
+    (c) => c.functionId === "pms-wo-re-postponement" && c.variableName === variableNameMap[classification] && !c.isDeleted
+  );
+  if (!config) {
+    throw new ValidationError(
+      "Re-Postponement approval configuration is not yet available on this vessel. Please sync and try again."
+    );
+  }
+  return {
+    classification,
+    level1Enabled: config.level1Enabled ?? false,
+    level2Enabled: config.level2Enabled ?? false
+  };
+}
+async function createRePostponementRecord(wo, body, dueDateSnapshot) {
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const classification = await classifyWoForRePostponement(wo);
+  const approvalWorkflowSnapshot = {
+    woClassification: classification.classification,
+    level1Enabled: classification.level1Enabled,
+    level2Enabled: classification.level2Enabled
+  };
+  const updatedWO = await update5(wo.wouuid, {
+    status: "Awaiting Office Approval",
+    postponeRequestedDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    postponeApprover: body.approver || "Office",
+    postponementApprovalDate: null,
+    postponementApprovalRemarks: null
+  });
+  try {
+    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.userId || body.performedBy || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO re-postpone-request:", err);
+  }
+  const prevMax = await getMaxPostponementNumber(wo.wouuid);
+  const postponementId = crypto.randomUUID();
+  await createPostponement({
+    id: postponementId,
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId,
+    postponementNumber: prevMax + 1,
+    originalDueDate: dueDateSnapshot,
+    // snapshot: used by rejectRePostponement to restore date
+    newDueDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    approver: body.approver || "Office",
+    postponeDate: body.postponeDate,
+    durationDays: body.duration ? parseInt(String(body.duration), 10) : null,
+    submittedDate: today,
+    status: "Awaiting Approval",
+    informOffice: true,
+    approvalWorkflowSnapshot,
+    requestType: "Re-Postponement"
+  });
+  if (classification.level1Enabled) {
+    await createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: "Level 1",
+      status: "Pending",
+      requestType: "Re-Postponement"
+    });
+  }
+  if (classification.level2Enabled) {
+    await createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: "Level 2",
+      status: "Pending",
+      requestType: "Re-Postponement"
+    });
+  }
+  return updatedWO;
+}
+async function submitRePostponeRequest(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Postponement Approved") {
+    throw new ValidationError(
+      `Only work orders with status "Postponement Approved" can submit a Re-Postponement. Current status: ${wo.status}`
+    );
+  }
+  const dueDateSnapshot = wo.dueDate;
+  return createRePostponementRecord(wo, body, dueDateSnapshot);
+}
+async function editRePostponeRequest(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Awaiting Office Approval") {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can edit a Re-Postponement. Current status: ${wo.status}`
+    );
+  }
+  const pending = await getLatestAwaitingPostponement(wo.wouuid);
+  const dueDateSnapshot = pending?.originalDueDate ?? wo.dueDate;
+  return createRePostponementRecord(wo, body, dueDateSnapshot);
+}
+async function approveRePostponement(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Awaiting Office Approval") {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
+    );
+  }
+  const awaitingPostponement = await getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) {
+    const steps = await getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const now = /* @__PURE__ */ new Date();
+      const activeStep = steps.find((s) => s.status === "Pending");
+      if (!activeStep) {
+        throw new ValidationError("No pending approval step found \u2014 this request may have already been fully approved");
+      }
+      const isSailAdmin = body.sessionRole === "Sail Admin" || body.role === "Sail Admin";
+      if (!isSailAdmin) {
+        const reviewerId = body.userUuid || body.approvedBy;
+        const isAuthorised = await verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+        if (!isAuthorised) {
+          throw new ValidationError(`Not authorised to approve at ${activeStep.approvalLevel}`);
+        }
+      }
+      const remaining = steps.filter((s) => s.id !== activeStep.id && s.status === "Pending");
+      await updateWoPostponementApprovalStep(activeStep.id, {
+        status: "Approved",
+        actionByUserId: body.approvedBy,
+        actionAt: now,
+        remarks: body.approvalRemarks || null
+      });
+      if (remaining.length > 0) {
+        console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} \u2014 ${activeStep.approvalLevel} approved; awaiting ${remaining.length} more level(s)`);
+        return await findById3(id) || wo;
+      }
+      console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} \u2014 all approval levels satisfied, finalising`);
+    }
+  }
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const newDueDate = wo.postponeRequestedDate || body.newDueDate;
+  const updatedWO = await update5(id, {
+    status: "Postponement Approved",
+    dueDate: newDueDate,
+    postponementEndDate: newDueDate,
+    postponeApprover: body.approvedBy || "Office",
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null
+  });
+  try {
+    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO re-postpone-approve:", err);
+  }
+  const existingRows = await findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxApprove = existingRows?.length ? existingRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ).postponementNumber || 1 : 1;
+  const latestApprove = existingRows?.length ? existingRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ) : null;
+  await createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId,
+    postponementNumber: prevMaxApprove + 1,
+    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate,
+    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || "Office",
+    approvedBy: body.approvedBy || "Office",
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || "Office",
+    durationDays: latestApprove?.durationDays || null,
+    submittedDate: today,
+    status: "Approved",
+    informOffice: true,
+    requestType: "Re-Postponement"
+  });
+  return updatedWO;
+}
+async function rejectRePostponement(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Awaiting Office Approval") {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be rejected. Current status: ${wo.status}`
+    );
+  }
+  const awaitingPostponement = await getLatestAwaitingPostponement(wo.wouuid);
+  let dueDateToRestore = null;
+  if (awaitingPostponement) {
+    dueDateToRestore = awaitingPostponement.originalDueDate || null;
+    const steps = await getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const activeStep = steps.find((s) => s.status === "Pending");
+      if (activeStep) {
+        const isSailAdmin = body.sessionRole === "Sail Admin" || body.role === "Sail Admin";
+        if (!isSailAdmin) {
+          const reviewerId = body.userUuid || body.approvedBy;
+          const isAuthorised = await verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+          if (!isAuthorised) {
+            throw new ValidationError(`Not authorised to reject at ${activeStep.approvalLevel}`);
+          }
+        }
+        await updateWoPostponementApprovalStep(activeStep.id, {
+          status: "Rejected",
+          actionByUserId: body.approvedBy,
+          actionAt: /* @__PURE__ */ new Date(),
+          remarks: body.approvalRemarks || null
+        });
+      }
+    }
+  }
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const updatedWO = await update5(id, {
+    status: "Postponement Approved",
+    // Restore the due date that was active before the re-postponement was submitted
+    ...dueDateToRestore ? { dueDate: dueDateToRestore, postponementEndDate: dueDateToRestore } : {},
+    postponeApprover: body.approvedBy || "Office",
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null
+  });
+  try {
+    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO re-postpone-reject:", err);
+  }
+  const rejectRows = await findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxReject = rejectRows?.length ? rejectRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ).postponementNumber || 1 : 1;
+  const latestReject = rejectRows?.length ? rejectRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ) : null;
+  await createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId,
+    postponementNumber: prevMaxReject + 1,
+    originalDueDate: latestReject?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: latestReject?.newDueDate || wo.postponeRequestedDate,
+    postponementReason: latestReject?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestReject?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || "Office",
+    approvedBy: body.approvedBy || "Office",
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || "Office",
+    durationDays: latestReject?.durationDays || null,
+    submittedDate: today,
+    status: "Rejected",
+    informOffice: true,
+    requestType: "Re-Postponement"
+  });
+  return updatedWO;
+}
 async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   let existingWO2 = await findById3(id);
   if (!existingWO2) existingWO2 = await findByCode(id);
@@ -35985,6 +36395,876 @@ var init_pmsAlertEngine = __esm({
   }
 });
 
+// server/modules/shipskart/services/identityGuard.ts
+function forwardedUserUuid(req, context) {
+  const raw = req.headers["x-user-id"];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  let decoded = null;
+  if (typeof value === "string" && value.trim()) {
+    try {
+      decoded = decodeURIComponent(value).trim() || null;
+    } catch {
+      decoded = value.trim();
+    }
+  }
+  if (!decoded) {
+    if (!warnedThisProcess) {
+      warnedThisProcess = true;
+      console.warn(
+        `${IDENTITY_MISSING_TAG} ${context}: request arrived with NO x-user-id header. This shore is NOT identity-integrated, so per-user Purchasing accounts cannot be used and callers fall back to the LEGACY SHARED account. If this is the WK trial or any production shore, FIX THE INTEGRATION \u2014 every user would otherwise share one Shipskart identity and requisitions would be attributed to the wrong person. (This warning prints once per process.)`
+      );
+    } else {
+      console.warn(`${IDENTITY_MISSING_TAG} ${context}: no x-user-id header (see the first occurrence for detail).`);
+    }
+    return null;
+  }
+  if (decoded === MOCK_DEFAULT_USER_UUID) {
+    console.warn(
+      `${IDENTITY_MISSING_TAG} ${context}: x-user-id is the MOCK DEFAULT uuid (${MOCK_DEFAULT_USER_UUID}). Treating as no identity so users cannot silently share one Shipskart account. Real identities must come from the SAILERP profile.`
+    );
+    return null;
+  }
+  return decoded;
+}
+function logIdentityIntegrationExpectation() {
+  console.log(
+    `[Shipskart][IDENTITY] Per-user Purchasing SSO requires the x-user-id header forwarded by the frontend (SAILERP profile). Any request without it falls back to the legacy shared account and logs "${IDENTITY_MISSING_TAG}" \u2014 grep that tag to confirm this deployment is identity-integrated.`
+  );
+}
+var MOCK_DEFAULT_USER_UUID, IDENTITY_MISSING_TAG, warnedThisProcess;
+var init_identityGuard = __esm({
+  "server/modules/shipskart/services/identityGuard.ts"() {
+    "use strict";
+    MOCK_DEFAULT_USER_UUID = "00000000-0000-0000-0000-000000000001";
+    IDENTITY_MISSING_TAG = "[Shipskart][IDENTITY-MISSING]";
+    warnedThisProcess = false;
+  }
+});
+
+// server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
+import { eq as eq28 } from "drizzle-orm";
+async function getAllMappings() {
+  const db2 = await getDb();
+  return db2.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
+}
+async function getMappingForSailRole(sailRole) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole)).limit(1);
+  return rows[0];
+}
+async function upsertMapping2(sailRole, shipskartRole, updatedByUuid) {
+  const db2 = await getDb();
+  await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
+    target: shipskartRoleMappings.sailRole,
+    set: { shipskartRole, updatedByUuid: updatedByUuid ?? null, updatedAt: /* @__PURE__ */ new Date() }
+  });
+}
+async function deleteMapping(sailRole) {
+  const db2 = await getDb();
+  await db2.delete(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole));
+}
+var init_shipskartRoleMappingRepository = __esm({
+  "server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts"() {
+    "use strict";
+    init_db();
+    init_schema();
+  }
+});
+
+// server/modules/shipskart/repositories/shipskartB2bRepository.ts
+var shipskartB2bRepository_exports = {};
+__export(shipskartB2bRepository_exports, {
+  failingRows: () => failingRows,
+  getActiveVesselIdsForUser: () => getActiveVesselIdsForUser,
+  getAssignment: () => getAssignment,
+  getTenantConfig: () => getTenantConfig,
+  getUserLink: () => getUserLink,
+  getVesselLink: () => getVesselLink,
+  linkStatusCounts: () => linkStatusCounts,
+  replaceAssignmentsForUser: () => replaceAssignmentsForUser,
+  resetForRetry: () => resetForRetry,
+  upsertAssignment: () => upsertAssignment,
+  upsertTokenState: () => upsertTokenState,
+  upsertUserLink: () => upsertUserLink,
+  upsertVesselLink: () => upsertVesselLink
+});
+import { and as and25, eq as eq29, ne as ne2, notInArray as notInArray3 } from "drizzle-orm";
+async function getTenantConfig(tenantId) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(shipskartTenantConfig).where(eq29(shipskartTenantConfig.tenantId, tenantId)).limit(1);
+  return rows[0];
+}
+async function upsertTokenState(tenantId, state) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(shipskartTenantConfig).values({
+    tenantId,
+    enabled: true,
+    accessToken: state.accessToken,
+    refreshToken: state.refreshToken,
+    accessExpiresAt: state.accessExpiresAt,
+    refreshExpiresAt: state.refreshExpiresAt,
+    lastBootstrapAt: state.isBootstrap ? now : null
+  }).onConflictDoUpdate({
+    target: shipskartTenantConfig.tenantId,
+    set: {
+      accessToken: state.accessToken,
+      refreshToken: state.refreshToken,
+      accessExpiresAt: state.accessExpiresAt,
+      refreshExpiresAt: state.refreshExpiresAt,
+      ...state.isBootstrap ? { lastBootstrapAt: now } : {},
+      updatedAt: now
+    }
+  });
+}
+async function getUserLink(userUuid) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(shipskartUserLinks).where(eq29(shipskartUserLinks.userUuid, userUuid)).limit(1);
+  return rows[0];
+}
+async function upsertUserLink(userUuid, patch) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  const pushedAt = patch.pushStatus === "pushed" ? now : void 0;
+  await db2.insert(shipskartUserLinks).values({
+    userUuid,
+    shipskartUserId: patch.shipskartUserId ?? null,
+    pushStatus: patch.pushStatus,
+    lastError: patch.lastError ?? null,
+    pushedAt: pushedAt ?? null
+  }).onConflictDoUpdate({
+    target: shipskartUserLinks.userUuid,
+    set: {
+      ...patch.shipskartUserId !== void 0 ? { shipskartUserId: patch.shipskartUserId } : {},
+      pushStatus: patch.pushStatus,
+      lastError: patch.lastError ?? null,
+      ...pushedAt ? { pushedAt } : {},
+      updatedAt: now
+    }
+  });
+}
+async function getVesselLink(vesselVuuid) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(shipskartVesselLinks).where(eq29(shipskartVesselLinks.vesselVuuid, vesselVuuid)).limit(1);
+  return rows[0];
+}
+async function upsertVesselLink(vesselVuuid, patch) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  const pushedAt = patch.pushStatus === "pushed" ? now : void 0;
+  await db2.insert(shipskartVesselLinks).values({
+    vesselVuuid,
+    imoNumber: patch.imoNumber ?? null,
+    shipskartVesselId: patch.shipskartVesselId ?? null,
+    pushStatus: patch.pushStatus,
+    lastError: patch.lastError ?? null,
+    pushedAt: pushedAt ?? null
+  }).onConflictDoUpdate({
+    target: shipskartVesselLinks.vesselVuuid,
+    set: {
+      ...patch.imoNumber !== void 0 ? { imoNumber: patch.imoNumber } : {},
+      ...patch.shipskartVesselId !== void 0 ? { shipskartVesselId: patch.shipskartVesselId } : {},
+      pushStatus: patch.pushStatus,
+      lastError: patch.lastError ?? null,
+      ...pushedAt ? { pushedAt } : {},
+      updatedAt: now
+    }
+  });
+}
+async function getAssignment(userUuid, vesselId) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(masterUserVessels).where(and25(eq29(masterUserVessels.userUuid, userUuid), eq29(masterUserVessels.vesselId, vesselId))).limit(1);
+  return rows[0];
+}
+async function upsertAssignment(userUuid, vesselId, patch) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  const mappedAt = patch.mapStatus === "mapped" ? now : void 0;
+  await db2.insert(masterUserVessels).values({
+    userUuid,
+    vesselId,
+    isActive: patch.isActive ?? true,
+    shipskartMappingId: patch.shipskartMappingId ?? null,
+    mapStatus: patch.mapStatus ?? "pending",
+    lastError: patch.lastError ?? null,
+    mappedAt: mappedAt ?? null
+  }).onConflictDoUpdate({
+    target: [masterUserVessels.userUuid, masterUserVessels.vesselId],
+    set: {
+      ...patch.isActive !== void 0 ? { isActive: patch.isActive } : {},
+      ...patch.shipskartMappingId !== void 0 ? { shipskartMappingId: patch.shipskartMappingId } : {},
+      ...patch.mapStatus !== void 0 ? { mapStatus: patch.mapStatus } : {},
+      lastError: patch.lastError ?? null,
+      ...mappedAt ? { mappedAt } : {},
+      updatedAt: now
+    }
+  });
+}
+async function replaceAssignmentsForUser(userUuid, vesselVuuids) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  let activated = 0;
+  for (const vesselId of vesselVuuids) {
+    const existing = await getAssignment(userUuid, vesselId);
+    const mapStatus = existing?.shipskartMappingId && existing.isActive ? void 0 : "pending";
+    await upsertAssignment(userUuid, vesselId, { isActive: true, ...mapStatus ? { mapStatus } : {} });
+    activated++;
+  }
+  const keep = vesselVuuids.length > 0 ? vesselVuuids : ["__none__"];
+  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", updatedAt: now }).where(and25(
+    eq29(masterUserVessels.userUuid, userUuid),
+    eq29(masterUserVessels.isActive, true),
+    notInArray3(masterUserVessels.vesselId, keep)
+  )).returning({ id: masterUserVessels.id });
+  return { activated, deactivated: deactivatedRows.length };
+}
+async function getActiveVesselIdsForUser(userUuid) {
+  const db2 = await getDb();
+  const rows = await db2.select({ v: masterUserVessels.vesselId }).from(masterUserVessels).where(and25(eq29(masterUserVessels.userUuid, userUuid), eq29(masterUserVessels.isActive, true)));
+  return rows.map((r) => r.v);
+}
+async function failingRows(limit = 100) {
+  const db2 = await getDb();
+  const users2 = await db2.select({
+    userUuid: shipskartUserLinks.userUuid,
+    pushStatus: shipskartUserLinks.pushStatus,
+    lastError: shipskartUserLinks.lastError
+  }).from(shipskartUserLinks).where(ne2(shipskartUserLinks.pushStatus, "pushed")).limit(limit);
+  const vessels2 = await db2.select({
+    vesselVuuid: shipskartVesselLinks.vesselVuuid,
+    imoNumber: shipskartVesselLinks.imoNumber,
+    pushStatus: shipskartVesselLinks.pushStatus,
+    lastError: shipskartVesselLinks.lastError
+  }).from(shipskartVesselLinks).where(ne2(shipskartVesselLinks.pushStatus, "pushed")).limit(limit);
+  const assignments = await db2.select({
+    userUuid: masterUserVessels.userUuid,
+    vesselId: masterUserVessels.vesselId,
+    mapStatus: masterUserVessels.mapStatus,
+    lastError: masterUserVessels.lastError
+  }).from(masterUserVessels).where(and25(eq29(masterUserVessels.isActive, true), ne2(masterUserVessels.mapStatus, "mapped"))).limit(limit);
+  return { users: users2, vessels: vessels2, assignments };
+}
+async function resetForRetry(kind, id) {
+  const db2 = await getDb();
+  if (kind === "user") {
+    const existing2 = await getUserLink(id);
+    if (!existing2) return { reset: false, reason: "no link row" };
+    if (existing2.shipskartUserId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
+    await db2.update(shipskartUserLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(shipskartUserLinks.userUuid, id));
+    return { reset: true };
+  }
+  const existing = await getVesselLink(id);
+  if (!existing) return { reset: false, reason: "no link row" };
+  if (existing.shipskartVesselId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
+  await db2.update(shipskartVesselLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(shipskartVesselLinks.vesselVuuid, id));
+  return { reset: true };
+}
+async function linkStatusCounts() {
+  const db2 = await getDb();
+  const count2 = (rows) => rows.reduce((acc, r) => {
+    acc[r.s] = (acc[r.s] || 0) + 1;
+    return acc;
+  }, {});
+  const u = await db2.select({ s: shipskartUserLinks.pushStatus }).from(shipskartUserLinks);
+  const v = await db2.select({ s: shipskartVesselLinks.pushStatus }).from(shipskartVesselLinks);
+  const a = await db2.select({ s: masterUserVessels.mapStatus }).from(masterUserVessels);
+  return { users: count2(u), vessels: count2(v), assignments: count2(a) };
+}
+var init_shipskartB2bRepository = __esm({
+  "server/modules/shipskart/repositories/shipskartB2bRepository.ts"() {
+    "use strict";
+    init_db();
+    init_schema();
+  }
+});
+
+// server/modules/shipskart/services/shipskartB2bClient.ts
+var shipskartB2bClient_exports = {};
+__export(shipskartB2bClient_exports, {
+  getB2bConfig: () => getB2bConfig,
+  signedB2bRequest: () => signedB2bRequest
+});
+import crypto5 from "crypto";
+function getB2bConfig() {
+  const baseUrl = (process.env.SHIPSKART_B2B_BASE_URL || "").replace(/\/+$/, "");
+  const apiKey = process.env.SHIPSKART_B2B_API_KEY || "";
+  const clientSecret = process.env.SHIPSKART_B2B_CLIENT_SECRET || "";
+  const tenantId = process.env.SHIPSKART_B2B_TENANT_ID || "";
+  if (!baseUrl || !apiKey || !clientSecret || !tenantId) {
+    throw Object.assign(
+      new Error("[Shipskart b2b] Missing SHIPSKART_B2B_BASE_URL / _API_KEY / _CLIENT_SECRET / _TENANT_ID env"),
+      { statusCode: 503 }
+    );
+  }
+  return {
+    baseUrl,
+    apiKey,
+    clientSecret,
+    tenantId,
+    bootstrapUserName: process.env.SHIPSKART_B2B_BOOTSTRAP_USERNAME || null,
+    bootstrapPassword: process.env.SHIPSKART_B2B_BOOTSTRAP_PASSWORD || null,
+    bootstrapOtp: process.env.SHIPSKART_B2B_BOOTSTRAP_OTP || null,
+    signQuery: (process.env.SHIPSKART_B2B_SIGN_QUERY || "").toLowerCase() === "true"
+  };
+}
+function assertNoTenantInBody(body) {
+  if (body && typeof body === "object") {
+    const b = body;
+    if ("tenantId" in b || b.data && typeof b.data === "object" && "tenantId" in b.data) {
+      throw new Error(
+        "[Shipskart b2b] tenantId must NEVER be in a request body \u2014 it travels in the x-tenant-id header only (Sachin, 2026-07-30). Remove it from the payload."
+      );
+    }
+  }
+}
+async function signedB2bRequest(method, pathAndQuery, opts = {}) {
+  const cfg = getB2bConfig();
+  assertNoTenantInBody(opts.body);
+  const raw = opts.body === void 0 ? "" : JSON.stringify(opts.body);
+  const ts = Math.floor(Date.now() / 1e3).toString();
+  const signedPath = cfg.signQuery ? pathAndQuery : pathAndQuery.split("?")[0];
+  const signature = "sha256=" + crypto5.createHmac("sha256", cfg.clientSecret).update(`${ts}
+${method}
+${signedPath}
+${raw}`, "utf8").digest("hex");
+  const headers = {
+    "X-Api-Key": cfg.apiKey,
+    "X-Timestamp": ts,
+    "X-Nonce": crypto5.randomUUID(),
+    "X-Signature": signature,
+    "x-tenant-id": cfg.tenantId
+  };
+  if (opts.bearer) headers["Authorization"] = `Bearer ${opts.bearer}`;
+  if (method === "POST") headers["Content-Type"] = "application/json";
+  let response;
+  try {
+    response = await fetch(`${cfg.baseUrl}${pathAndQuery}`, {
+      method,
+      headers,
+      body: method === "POST" ? raw : void 0,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    });
+  } catch (err) {
+    const code = err?.cause?.code ? ` (${err.cause.code})` : "";
+    throw new Error(`[Shipskart b2b] Network error calling ${pathAndQuery}${code}: ${err?.message || err}`);
+  }
+  const text4 = await response.text();
+  let json2 = null;
+  try {
+    json2 = JSON.parse(text4);
+  } catch {
+  }
+  return { status: response.status, ok: response.ok, json: json2, text: json2 ? void 0 : text4.slice(0, 300) };
+}
+var REQUEST_TIMEOUT_MS;
+var init_shipskartB2bClient = __esm({
+  "server/modules/shipskart/services/shipskartB2bClient.ts"() {
+    "use strict";
+    REQUEST_TIMEOUT_MS = 3e4;
+  }
+});
+
+// server/modules/shipskart/services/shipskartTokenService.ts
+function parseDate5(v) {
+  if (!v || typeof v !== "string") return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function warnOnRefreshExpiry(refreshExpiresAt) {
+  if (!refreshExpiresAt) return;
+  const left = refreshExpiresAt.getTime() - Date.now();
+  if (left < WARN_3D_MS) {
+    console.error(`[Shipskart b2b] \u{1F534} refresh token expires ${refreshExpiresAt.toISOString()} (<3 days) and auto-bootstrap has NOT renewed it \u2014 check for ${BOOTSTRAP_FAILED_TAG} lines; Purchasing dies when it lapses.`);
+  } else if (left < WARN_14D_MS) {
+    console.warn(`[Shipskart b2b] \u26A0\uFE0F refresh token expires ${refreshExpiresAt.toISOString()} (<14 days). Auto-bootstrap renews a week early \u2014 if this keeps appearing, it is failing.`);
+  }
+}
+async function bootstrap(otp) {
+  const cfg = getB2bConfig();
+  const userName = cfg.bootstrapUserName;
+  const password = cfg.bootstrapPassword;
+  const effectiveOtp = otp || cfg.bootstrapOtp;
+  if (!userName || !password) throw Object.assign(new Error("[Shipskart b2b] SHIPSKART_B2B_BOOTSTRAP_USERNAME/_PASSWORD not configured"), { statusCode: 503 });
+  if (!effectiveOtp) throw Object.assign(new Error("[Shipskart b2b] OTP required \u2014 it was emailed to the API user (UAT: set SHIPSKART_B2B_BOOTSTRAP_OTP)"), { statusCode: 400 });
+  const login = await signedB2bRequest("POST", "/integration/SAIL/tenant-login-api", { body: { userName, password } });
+  if (!login.ok || !login.json?.preAuthToken) {
+    throw Object.assign(new Error(`[Shipskart b2b] tenant-login failed (${login.status}): ${JSON.stringify(login.json ?? login.text)?.slice(0, 200)}`), { statusCode: 502 });
+  }
+  const auth = await signedB2bRequest("POST", "/integration/SAIL/tenant-auth-token-api", { body: { preAuthToken: login.json.preAuthToken, otp: effectiveOtp } });
+  const accessToken = auth.json?.token || auth.json?.accessToken;
+  if (!auth.ok || !accessToken || !auth.json?.refreshToken) {
+    throw Object.assign(new Error(`[Shipskart b2b] tenant-auth-token failed (${auth.status}): ${JSON.stringify(auth.json ?? auth.text)?.slice(0, 200)}`), { statusCode: 502 });
+  }
+  const accessExpiresAt = parseDate5(auth.json.expiresAt);
+  const refreshExpiresAt = parseDate5(auth.json.refreshTokenExpiresAt);
+  await upsertTokenState(cfg.tenantId, {
+    accessToken,
+    refreshToken: auth.json.refreshToken,
+    accessExpiresAt,
+    refreshExpiresAt,
+    isBootstrap: true
+  });
+  console.log(`[Shipskart b2b] bootstrap OK \u2014 access until ${accessExpiresAt?.toISOString() ?? "?"}, refresh until ${refreshExpiresAt?.toISOString() ?? "?"}`);
+  return { accessExpiresAt: accessExpiresAt?.toISOString() ?? null, refreshExpiresAt: refreshExpiresAt?.toISOString() ?? null };
+}
+async function refreshNow() {
+  const cfg = getB2bConfig();
+  const row = await getTenantConfig(cfg.tenantId);
+  if (!row?.refreshToken) {
+    throw Object.assign(new Error("[Shipskart b2b] No refresh token stored \u2014 auto-bootstrap should have run; see BOOTSTRAP-FAILED lines"), { statusCode: 503 });
+  }
+  const res = await signedB2bRequest("POST", "/integration/SAIL/tenant-refresh-token-api", { body: { refreshToken: row.refreshToken } });
+  const accessToken = res.json?.accessToken || res.json?.token;
+  if (!res.ok || !accessToken) {
+    throw Object.assign(new Error(`[Shipskart b2b] token refresh failed (${res.status}): ${JSON.stringify(res.json ?? res.text)?.slice(0, 200)} \u2014 if the refresh token expired, re-bootstrap manually`), { statusCode: 502 });
+  }
+  const accessExpiresAt = parseDate5(res.json.expiresAt);
+  const refreshExpiresAt = parseDate5(res.json.refreshTokenExpiresAt) ?? row.refreshExpiresAt ?? null;
+  await upsertTokenState(cfg.tenantId, {
+    accessToken,
+    refreshToken: res.json.refreshToken || row.refreshToken,
+    accessExpiresAt,
+    refreshExpiresAt
+  });
+  warnOnRefreshExpiry(refreshExpiresAt);
+  return accessToken;
+}
+function needsBootstrap(row) {
+  if (!row?.refreshToken) return "no refresh token stored";
+  if (!row.refreshExpiresAt) return null;
+  const left = row.refreshExpiresAt.getTime() - Date.now();
+  if (left <= 0) return `refresh token expired ${row.refreshExpiresAt.toISOString()}`;
+  if (left < AUTO_BOOTSTRAP_LEAD_MS) return `refresh token expires ${row.refreshExpiresAt.toISOString()} (<7 days) \u2014 renewing early`;
+  return null;
+}
+async function autoBootstrap(reason) {
+  const cfg = getB2bConfig();
+  if (!cfg.bootstrapUserName || !cfg.bootstrapPassword || !cfg.bootstrapOtp) {
+    console.error(
+      `${BOOTSTRAP_FAILED_TAG} cannot auto-bootstrap (${reason}): missing SHIPSKART_B2B_BOOTSTRAP_USERNAME / _PASSWORD / _OTP. Purchasing will stop working when the current token expires. Set them, or run POST /shipskart/b2b/bootstrap manually with the OTP.`
+    );
+    return false;
+  }
+  const sinceLast = Date.now() - lastAutoBootstrapAttempt;
+  if (sinceLast < AUTO_BOOTSTRAP_COOLDOWN_MS) {
+    console.warn(
+      `${BOOTSTRAP_FAILED_TAG} auto-bootstrap needed (${reason}) but the last attempt was ${Math.round(sinceLast / 1e3)}s ago \u2014 waiting out the ${AUTO_BOOTSTRAP_COOLDOWN_MS / 6e4}min cooldown so repeated failures cannot lock the Shipskart account.`
+    );
+    return false;
+  }
+  if (autoBootstrapInFlight) {
+    await autoBootstrapInFlight;
+    return true;
+  }
+  lastAutoBootstrapAttempt = Date.now();
+  console.warn(`[Shipskart b2b] AUTO-BOOTSTRAP starting \u2014 ${reason}. (Static OTP; no human needed, confirmed by Shipskart 2026-07-31.)`);
+  autoBootstrapInFlight = bootstrap().then((r) => {
+    consecutiveBootstrapFailures = 0;
+    console.log(`[Shipskart b2b] AUTO-BOOTSTRAP OK \u2014 refresh valid until ${r.refreshExpiresAt ?? "?"}`);
+  }).finally(() => {
+    autoBootstrapInFlight = null;
+  });
+  try {
+    await autoBootstrapInFlight;
+    return true;
+  } catch (err) {
+    consecutiveBootstrapFailures++;
+    console.error(
+      `${BOOTSTRAP_FAILED_TAG} auto-bootstrap FAILED (attempt ${consecutiveBootstrapFailures}, ${reason}): ${err?.message || err}. Purchasing will stop working when the current token expires \u2014 check the credentials and whether the Shipskart account is locked. Retrying no sooner than ${AUTO_BOOTSTRAP_COOLDOWN_MS / 6e4}min from now.`
+    );
+    return false;
+  }
+}
+async function getAccessToken() {
+  const cfg = getB2bConfig();
+  let row = await getTenantConfig(cfg.tenantId);
+  const bootstrapReason = needsBootstrap(row ?? void 0);
+  if (bootstrapReason) {
+    if (await autoBootstrap(bootstrapReason)) {
+      row = await getTenantConfig(cfg.tenantId);
+    }
+  }
+  if (!row?.accessToken) {
+    throw Object.assign(
+      new Error("[Shipskart b2b] No usable token for this tenant and auto-bootstrap did not succeed \u2014 see the BOOTSTRAP-FAILED log line"),
+      { statusCode: 503 }
+    );
+  }
+  warnOnRefreshExpiry(row.refreshExpiresAt ?? null);
+  const expiresSoon = !row.accessExpiresAt || row.accessExpiresAt.getTime() - Date.now() < REFRESH_SKEW_MS;
+  if (!expiresSoon) return row.accessToken;
+  if (!refreshInFlight) {
+    refreshInFlight = refreshNow().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  try {
+    return await refreshInFlight;
+  } catch (err) {
+    console.warn(`[Shipskart b2b] refresh failed (${err?.message || err}) \u2014 attempting auto-bootstrap`);
+    if (await autoBootstrap("refresh rejected by Shipskart")) {
+      const fresh = await getTenantConfig(cfg.tenantId);
+      if (fresh?.accessToken) return fresh.accessToken;
+    }
+    throw err;
+  }
+}
+async function authorizedB2bRequest(method, pathAndQuery, opts = {}) {
+  const first = await signedB2bRequest(method, pathAndQuery, { ...opts, bearer: await getAccessToken() });
+  if (first.status !== 401) return first;
+  console.warn(`[Shipskart b2b] 401 on ${pathAndQuery} \u2014 forcing one token refresh and retrying once`);
+  if (!refreshInFlight) refreshInFlight = refreshNow().finally(() => {
+    refreshInFlight = null;
+  });
+  const fresh = await refreshInFlight;
+  return signedB2bRequest(method, pathAndQuery, { ...opts, bearer: fresh });
+}
+async function tokenStatus() {
+  const cfg = getB2bConfig();
+  const row = await getTenantConfig(cfg.tenantId);
+  const daysLeft = row?.refreshExpiresAt ? Math.round((row.refreshExpiresAt.getTime() - Date.now()) / 864e5) : null;
+  return {
+    tenantId: cfg.tenantId,
+    bootstrapped: !!row?.refreshToken,
+    accessExpiresAt: row?.accessExpiresAt?.toISOString() ?? null,
+    refreshExpiresAt: row?.refreshExpiresAt?.toISOString() ?? null,
+    refreshDaysLeft: daysLeft,
+    lastBootstrapAt: row?.lastBootstrapAt?.toISOString() ?? null,
+    reconcilerEnabled: row?.reconcilerEnabled ?? false,
+    // Auto-bootstrap health — the alert Ghazi asked to keep even with automation:
+    // a non-zero failure count means the integration is heading for a silent death.
+    autoBootstrap: {
+      configured: !!(cfg.bootstrapUserName && cfg.bootstrapPassword && cfg.bootstrapOtp),
+      consecutiveFailures: consecutiveBootstrapFailures,
+      lastAttemptAt: lastAutoBootstrapAttempt ? new Date(lastAutoBootstrapAttempt).toISOString() : null
+    }
+  };
+}
+var REFRESH_SKEW_MS, WARN_14D_MS, WARN_3D_MS, AUTO_BOOTSTRAP_LEAD_MS, AUTO_BOOTSTRAP_COOLDOWN_MS, BOOTSTRAP_FAILED_TAG, refreshInFlight, autoBootstrapInFlight, lastAutoBootstrapAttempt, consecutiveBootstrapFailures;
+var init_shipskartTokenService = __esm({
+  "server/modules/shipskart/services/shipskartTokenService.ts"() {
+    "use strict";
+    init_shipskartB2bClient();
+    init_shipskartB2bRepository();
+    REFRESH_SKEW_MS = 2 * 60 * 1e3;
+    WARN_14D_MS = 14 * 24 * 60 * 60 * 1e3;
+    WARN_3D_MS = 3 * 24 * 60 * 60 * 1e3;
+    AUTO_BOOTSTRAP_LEAD_MS = 7 * 24 * 60 * 60 * 1e3;
+    AUTO_BOOTSTRAP_COOLDOWN_MS = 15 * 60 * 1e3;
+    BOOTSTRAP_FAILED_TAG = "[Shipskart][BOOTSTRAP-FAILED]";
+    refreshInFlight = null;
+    autoBootstrapInFlight = null;
+    lastAutoBootstrapAttempt = 0;
+    consecutiveBootstrapFailures = 0;
+  }
+});
+
+// server/modules/shipskart/services/shipskartRoleSource.ts
+async function fetchAllRolesLive() {
+  const all = [];
+  let page = 1;
+  for (; ; ) {
+    const res = await authorizedB2bRequest("GET", `/integration/SAIL/get-all-roles?pageNumber=${page}&pageSize=100`);
+    if (!res.ok || !Array.isArray(res.json?.items)) {
+      throw new Error(`[Shipskart b2b] get-all-roles page ${page} failed (${res.status}): ${JSON.stringify(res.json ?? res.text)?.slice(0, 200)}`);
+    }
+    all.push(...res.json.items.filter((r) => r?.isActive !== false));
+    const totalPages = Number(res.json.totalPages ?? 1);
+    if (page >= totalPages) break;
+    page++;
+  }
+  return all;
+}
+async function getRoles() {
+  if (cache2 && Date.now() - cache2.fetchedAt < ROLE_CACHE_TTL_MS) return cache2.roles;
+  try {
+    const roles = await fetchAllRolesLive();
+    cache2 = { roles, fetchedAt: Date.now() };
+    return roles;
+  } catch (err) {
+    console.warn(`[Shipskart b2b] role fetch failed \u2014 serving ${cache2 ? "last-known-good cache" : "an EMPTY list (nothing cached yet; the mapping dropdown will be empty until Shipskart is reachable)"}: ${err?.message || err}`);
+    if (cache2) return cache2.roles;
+    return [];
+  }
+}
+async function getAvailableShipskartRoles() {
+  return Array.from(new Set((await getRoles()).map((r) => r.name)));
+}
+async function resolveShipskartRoleId(roleName) {
+  const roles = await getRoles();
+  return roles.find((r) => r.name === roleName)?.id ?? null;
+}
+var ROLE_CACHE_TTL_MS, cache2;
+var init_shipskartRoleSource = __esm({
+  "server/modules/shipskart/services/shipskartRoleSource.ts"() {
+    "use strict";
+    init_shipskartTokenService();
+    ROLE_CACHE_TTL_MS = 10 * 60 * 1e3;
+    cache2 = null;
+  }
+});
+
+// server/modules/shipskart/services/shipskartReconcilerService.ts
+var shipskartReconcilerService_exports = {};
+__export(shipskartReconcilerService_exports, {
+  ensureUserPushed: () => ensureUserPushed,
+  mapUserToVessel: () => mapUserToVessel,
+  pushUser: () => pushUser,
+  pushVessel: () => pushVessel,
+  resolveCallSign: () => resolveCallSign,
+  runReconciliation: () => runReconciliation
+});
+import crypto6 from "crypto";
+import { inArray as inArray8, eq as eq30, and as and26 } from "drizzle-orm";
+function resolveCallSign(v) {
+  return v.imoNumber;
+}
+function resolveVesselTypeCode(vesselType) {
+  const t = (vesselType || "").toLowerCase();
+  if (t.includes("tank")) return "1";
+  if (t.includes("container")) return "2";
+  if (t.includes("bulk")) return "3";
+  if (t.includes("general")) return "4";
+  if (t.includes("passenger")) return "5";
+  if (t.includes("roro") || t.includes("ro-ro")) return "6";
+  if (t.includes("lng") || t.includes("gas")) return "7";
+  return "99";
+}
+async function pushVessel(v) {
+  const existing = await getVesselLink(v.vuuid);
+  if (existing?.pushStatus === "pushed" && existing.shipskartVesselId) {
+    return { status: "already_pushed", shipskartId: existing.shipskartVesselId };
+  }
+  if (!v.imoNumber || !/^\d{7}$/.test(v.imoNumber)) {
+    await upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber ?? null, pushStatus: "invalid_imo", lastError: `IMO must be exactly 7 digits, got '${v.imoNumber ?? ""}'` });
+    return { status: "invalid_imo" };
+  }
+  const vesselEndpoint = process.env.SHIPSKART_B2B_VESSEL_ENDPOINT || "/integration/SAIL/create-vessel-new";
+  const cfg = getB2bConfig();
+  const res = await authorizedB2bRequest("POST", vesselEndpoint, {
+    body: { data: {
+      name: v.name,
+      imoNumber: v.imoNumber,
+      callSign: resolveCallSign(v),
+      type: resolveVesselTypeCode(v.vesselType ?? null),
+      operationalStatus: "1",
+      // smcId IS required in practice: create accepts its omission, but map-user-to-vessel
+      // then rejects the vessel ("Vessel does not have a valid SMCTenantId") — proven
+      // end-to-end 2026-07-30. It is a per-tenant constant equal to the tenant id
+      // (their own example does the same); override via SHIPSKART_B2B_SMC_ID if that
+      // ever stops being true.
+      smcId: process.env.SHIPSKART_B2B_SMC_ID || cfg.tenantId,
+      smcName: process.env.SHIPSKART_B2B_SMC_NAME || null
+    } }
+  });
+  const shipskartId = res.json?.data?.id;
+  if (res.ok && shipskartId) {
+    await upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber, shipskartVesselId: shipskartId, pushStatus: "pushed", lastError: null });
+    return { status: "pushed", shipskartId };
+  }
+  const status = isDuplicate400(res) ? "blocked_duplicate" : "error";
+  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
+  await upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber, pushStatus: status, lastError: error });
+  return { status, error };
+}
+async function pushUser(mu) {
+  const existing = await getUserLink(mu.id);
+  if (existing?.pushStatus === "pushed" && existing.shipskartUserId) {
+    return { status: "already_pushed", shipskartId: existing.shipskartUserId };
+  }
+  if (!mu.email) {
+    await upsertUserLink(mu.id, { pushStatus: "missing_email", lastError: "master_users row has no email \u2014 Shipskart requires one" });
+    return { status: "missing_email" };
+  }
+  const mapping = mu.role ? await getMappingForSailRole(mu.role) : void 0;
+  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  if (!mapping || !roleId) {
+    await upsertUserLink(mu.id, {
+      pushStatus: "unmapped_role",
+      lastError: mapping ? `mapped Shipskart role '${mapping.shipskartRole}' has no live roleId on this tenant` : `SAIL role '${mu.role ?? ""}' has no shipskart_role_mappings row`
+    });
+    return { status: "unmapped_role" };
+  }
+  const nameParts = (mu.fullName || "").trim().split(/\s+/);
+  const firstName = nameParts[0] || "User";
+  const lastName = nameParts.slice(1).join(" ") || firstName;
+  const userName = `sail_${mu.id.replace(/[^a-z0-9]/gi, "").slice(0, 16).toLowerCase()}`;
+  const res = await authorizedB2bRequest("POST", "/integration/SAIL/create-user", {
+    body: { data: {
+      firstName,
+      lastName,
+      middleName: null,
+      email: mu.email,
+      userName,
+      // SSO is the only entry path — nobody ever types this password; strong throwaway.
+      passwordHash: crypto6.randomBytes(16).toString("base64") + "aA1!",
+      roleId,
+      roleName: mapping.shipskartRole,
+      // roleName cosmetic (proven); roleId decides
+      rank: mu.designation ?? null,
+      status: "1",
+      externalUserId: mu.id
+      // OUR SAILERP uuid — the value Shipskart SSO keys on (proven)
+    } }
+  });
+  const shipskartId = res.json?.data?.id;
+  if (res.ok && shipskartId) {
+    await upsertUserLink(mu.id, { shipskartUserId: shipskartId, pushStatus: "pushed", lastError: null });
+    return { status: "pushed", shipskartId };
+  }
+  const status = isDuplicate400(res) ? "blocked_duplicate" : "error";
+  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
+  await upsertUserLink(mu.id, { pushStatus: status, lastError: error });
+  return { status, error };
+}
+async function mapUserToVessel(userUuid, vesselVuuid, ctx) {
+  const assignment = await getAssignment(userUuid, vesselVuuid);
+  if (assignment?.mapStatus === "mapped" && assignment.shipskartMappingId) {
+    return { status: "already_mapped", shipskartId: assignment.shipskartMappingId };
+  }
+  const userLink = await getUserLink(userUuid);
+  const vesselLink = await getVesselLink(vesselVuuid);
+  if (userLink?.pushStatus !== "pushed" || !userLink.shipskartUserId) {
+    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_user", lastError: `user link status: ${userLink?.pushStatus ?? "absent"}` });
+    return { status: "awaiting_user" };
+  }
+  if (vesselLink?.pushStatus !== "pushed" || !vesselLink.shipskartVesselId) {
+    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_vessel", lastError: `vessel link status: ${vesselLink?.pushStatus ?? "absent"}` });
+    return { status: "awaiting_vessel" };
+  }
+  const res = await authorizedB2bRequest("POST", "/integration/SAIL/map-user-to-vessel", {
+    body: { data: {
+      vesselId: vesselLink.shipskartVesselId,
+      vesselName: ctx?.vesselName ?? null,
+      userId: userLink.shipskartUserId,
+      userFullName: ctx?.userFullName ?? null,
+      isActive: true
+    } }
+  });
+  const mappingId = res.json?.data?.id;
+  if (res.ok && mappingId) {
+    await upsertAssignment(userUuid, vesselVuuid, { shipskartMappingId: mappingId, mapStatus: "mapped", lastError: null });
+    return { status: "mapped", shipskartId: mappingId };
+  }
+  const status = isDuplicate400(res) ? "blocked_duplicate" : "error";
+  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
+  await upsertAssignment(userUuid, vesselVuuid, { mapStatus: status, lastError: error });
+  return { status, error };
+}
+async function ensureUserPushed(userUuid, sailRole) {
+  const existing = await getUserLink(userUuid);
+  if (existing?.pushStatus === "pushed" && existing.shipskartUserId) {
+    return { pushed: true, reason: "already_pushed" };
+  }
+  if (existing?.pushStatus === "blocked_duplicate") {
+    return { pushed: false, reason: "blocked_duplicate" };
+  }
+  const attempts = jitAttempts.get(userUuid) ?? 0;
+  if (attempts >= JIT_MAX_ATTEMPTS) {
+    return { pushed: false, reason: `jit_attempt_cap_reached (${attempts}) \u2014 the reconciler keeps retrying durably` };
+  }
+  jitAttempts.set(userUuid, attempts + 1);
+  const db2 = await getDb();
+  const rows = await db2.select({
+    id: masterUsers.id,
+    fullName: masterUsers.fullName,
+    email: masterUsers.email,
+    role: masterUsers.role,
+    designation: masterUsers.designation
+  }).from(masterUsers).where(eq30(masterUsers.id, userUuid)).limit(1);
+  const mu = rows[0];
+  if (!mu) {
+    await upsertUserLink(userUuid, {
+      pushStatus: "no_master_row",
+      lastError: "no master_users row \u2014 run Admin \u2192 sync-masters so this user can be pushed"
+    });
+    return { pushed: false, reason: "no_master_row" };
+  }
+  const push = await pushUser({ ...mu, role: mu.role ?? sailRole ?? null });
+  if (push.status !== "pushed" && push.status !== "already_pushed") {
+    return { pushed: false, reason: push.status };
+  }
+  jitAttempts.delete(userUuid);
+  const mappings = {};
+  try {
+    const vesselIds = await getActiveVesselIdsForUser(userUuid);
+    for (const vesselId of vesselIds) {
+      const m = await mapUserToVessel(userUuid, vesselId, { userFullName: mu.fullName });
+      tally(mappings, m.status);
+    }
+  } catch (err) {
+    console.warn(`[Shipskart JIT] mapping sweep failed for ${userUuid} (user is still in; reconciler will retry): ${err?.message || err}`);
+  }
+  return { pushed: true, reason: "pushed_jit", mappings };
+}
+async function runReconciliation(opts = {}) {
+  const limit = Math.max(1, Math.min(200, opts.limit ?? DEFAULT_BATCH_LIMIT));
+  const summary = { ran: false, vessels: {}, users: {}, mappings: {} };
+  if (await isShipInstance()) {
+    summary.reason = "ship instance \u2014 the reconciler is shore-only";
+    return summary;
+  }
+  const cfg = getB2bConfig();
+  const tenant = await getTenantConfig(cfg.tenantId);
+  if (!tenant?.reconcilerEnabled) {
+    summary.reason = "reconciler_enabled is false for this tenant (default) \u2014 enable it in shipskart_tenant_config to start pushing";
+    return summary;
+  }
+  summary.ran = true;
+  const db2 = await getDb();
+  const pushedVessels = await db2.select({ v: shipskartVesselLinks.vesselVuuid }).from(shipskartVesselLinks).where(eq30(shipskartVesselLinks.pushStatus, "pushed"));
+  const pushedVesselSet = new Set(pushedVessels.map((r) => r.v));
+  const vesselRows = await db2.select({
+    vuuid: vessels.vuuid,
+    name: vessels.name,
+    imoNumber: vessels.imoNumber,
+    vesselType: vessels.vesselType
+  }).from(vessels).where(eq30(vessels.isActive, true));
+  for (const v of vesselRows.filter((r) => !pushedVesselSet.has(r.vuuid)).slice(0, limit)) {
+    tally(summary.vessels, (await pushVessel(v)).status);
+  }
+  const pushedUsers = await db2.select({ u: shipskartUserLinks.userUuid }).from(shipskartUserLinks).where(eq30(shipskartUserLinks.pushStatus, "pushed"));
+  const pushedUserSet = new Set(pushedUsers.map((r) => r.u));
+  const userRows = await db2.select({
+    id: masterUsers.id,
+    fullName: masterUsers.fullName,
+    email: masterUsers.email,
+    role: masterUsers.role,
+    designation: masterUsers.designation
+  }).from(masterUsers).where(eq30(masterUsers.isDeleted, false));
+  for (const mu of userRows.filter((r) => !pushedUserSet.has(r.id)).slice(0, limit)) {
+    tally(summary.users, (await pushUser(mu)).status);
+  }
+  const pendingAssignments = await db2.select().from(masterUserVessels).where(and26(eq30(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, ["pending", "awaiting_user", "awaiting_vessel"])));
+  for (const a of pendingAssignments.slice(0, limit)) {
+    tally(summary.mappings, (await mapUserToVessel(a.userUuid, a.vesselId)).status);
+  }
+  console.log(`[Shipskart b2b] reconciliation pass: vessels=${JSON.stringify(summary.vessels)} users=${JSON.stringify(summary.users)} mappings=${JSON.stringify(summary.mappings)}`);
+  return summary;
+}
+var DEFAULT_BATCH_LIMIT, tally, isDuplicate400, JIT_MAX_ATTEMPTS, jitAttempts;
+var init_shipskartReconcilerService = __esm({
+  "server/modules/shipskart/services/shipskartReconcilerService.ts"() {
+    "use strict";
+    init_db();
+    init_schema();
+    init_syncRole();
+    init_shipskartTokenService();
+    init_shipskartRoleSource();
+    init_shipskartRoleMappingRepository();
+    init_shipskartB2bRepository();
+    init_shipskartB2bClient();
+    DEFAULT_BATCH_LIMIT = 25;
+    tally = (acc, s) => {
+      acc[s] = (acc[s] || 0) + 1;
+      return acc;
+    };
+    isDuplicate400 = (res) => res.status === 400 && /already in use|already exists|duplicate/i.test(JSON.stringify(res.json ?? ""));
+    JIT_MAX_ATTEMPTS = 3;
+    jitAttempts = /* @__PURE__ */ new Map();
+  }
+});
+
 // server/modules/noon-report/utils/fuelConversionFactors.ts
 function computeCiiRefLine(dwt) {
   if (!dwt || dwt <= 0) return null;
@@ -36037,7 +37317,7 @@ var alertEngine_exports = {};
 __export(alertEngine_exports, {
   generateAlerts: () => generateAlerts
 });
-import { eq as eq31, and as and26, isNull as isNull4, ne as ne2, desc as desc7, inArray as inArray8 } from "drizzle-orm";
+import { eq as eq33, and as and28, isNull as isNull4, ne as ne3, desc as desc7, inArray as inArray10 } from "drizzle-orm";
 async function generateAlerts(report) {
   const [consumed, cleared] = await Promise.all([
     evaluateRules(report),
@@ -36059,7 +37339,7 @@ async function ruleConsumptionSpike(report) {
   const db2 = await getDb();
   const todayTotal = (toNum(report.hfoConsumption) ?? 0) + (toNum(report.lsmgoConsumption) ?? 0) + (toNum(report.mgoConsumption) ?? 0) + (toNum(report.vlsfoConsumption) ?? 0) + (toNum(report.lpgConsumption) ?? 0);
   if (todayTotal <= 0) return;
-  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, report.vesselId));
   const avg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (avg7Day <= 0) return;
   const pctAbove = (todayTotal - avg7Day) / avg7Day;
@@ -36089,7 +37369,7 @@ async function ruleConsumptionSpike(report) {
 }
 async function ruleRobEndurance(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (totalAvg7Day <= 0) return;
@@ -36122,10 +37402,10 @@ async function ruleAeHoursSpike(report) {
   const db2 = await getDb();
   const currentAeHours = toNum(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
-  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and26(
-    eq31(nrNoonReports.vesselId, report.vesselId),
-    eq31(nrNoonReports.status, "submitted"),
-    ne2(nrNoonReports.id, report.id)
+  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and28(
+    eq33(nrNoonReports.vesselId, report.vesselId),
+    eq33(nrNoonReports.status, "submitted"),
+    ne3(nrNoonReports.id, report.id)
   )).orderBy(desc7(nrNoonReports.reportDate)).limit(7);
   const priorHours = prior.map((r) => toNum(r.aeRunningHours)).filter((v) => v !== null && v > 0);
   if (priorHours.length < ALERT_THRESHOLDS.aeMinDataPoints) return;
@@ -36147,7 +37427,7 @@ async function ruleAeHoursSpike(report) {
 async function ruleCiiBandDrop(report) {
   const db2 = await getDb();
   const year = new Date(report.reportDate).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and28(eq33(nrCiiTracking.vesselId, report.vesselId), eq33(nrCiiTracking.year, year))).limit(1);
   const row = ciiRows[0] ?? null;
   if (!row || !row.ciiRating || !row.previousCiiRating) return;
   const prevOrder = CII_ORDER[row.previousCiiRating] ?? 0;
@@ -36191,7 +37471,7 @@ async function ruleNegativeRobRisk(report) {
 }
 async function autoResolveCleared(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   const enduranceDays = totalAvg7Day > 0 ? totalRob / totalAvg7Day : null;
@@ -36214,25 +37494,25 @@ async function autoResolveCleared(report) {
   await db2.update(nrAlerts).set({
     acknowledgedAt: /* @__PURE__ */ new Date(),
     acknowledgedBy: "system"
-  }).where(and26(
-    eq31(nrAlerts.vesselId, report.vesselId),
+  }).where(and28(
+    eq33(nrAlerts.vesselId, report.vesselId),
     isNull4(nrAlerts.acknowledgedAt),
-    inArray8(nrAlerts.alertType, toResolve)
+    inArray10(nrAlerts.alertType, toResolve)
   ));
 }
 async function resolveOpenAlert(vesselId, alertType) {
   const db2 = await getDb();
-  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and26(
-    eq31(nrAlerts.vesselId, vesselId),
-    eq31(nrAlerts.alertType, alertType),
+  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and28(
+    eq33(nrAlerts.vesselId, vesselId),
+    eq33(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   ));
 }
 async function upsertAlert(vesselId, reportId, alertType, severity, message, metricValue, thresholdValue) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and26(
-    eq31(nrAlerts.vesselId, vesselId),
-    eq31(nrAlerts.alertType, alertType),
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and28(
+    eq33(nrAlerts.vesselId, vesselId),
+    eq33(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   )).limit(1);
   if (existing.length > 0) {
@@ -36242,7 +37522,7 @@ async function upsertAlert(vesselId, reportId, alertType, severity, message, met
       message,
       metricValue: metricValue !== null ? String(metricValue) : null,
       thresholdValue: thresholdValue !== null ? String(thresholdValue) : null
-    }).where(eq31(nrAlerts.id, existing[0].id));
+    }).where(eq33(nrAlerts.id, existing[0].id));
   } else {
     await db2.insert(nrAlerts).values({
       vesselId,
@@ -36394,6 +37674,83 @@ var init_maintenanceOrchestrator = __esm({
       }
     };
     maintenanceOrchestrator = new MaintenanceOrchestrator();
+  }
+});
+
+// server/modules/shipskart/services/shipskartReconcilerScheduler.ts
+var shipskartReconcilerScheduler_exports = {};
+__export(shipskartReconcilerScheduler_exports, {
+  ShipskartReconcilerScheduler: () => ShipskartReconcilerScheduler,
+  shipskartReconcilerScheduler: () => shipskartReconcilerScheduler
+});
+var DEFAULT_INTERVAL_MS, DEFAULT_BOOT_DELAY_MS, ShipskartReconcilerScheduler, shipskartReconcilerScheduler;
+var init_shipskartReconcilerScheduler = __esm({
+  "server/modules/shipskart/services/shipskartReconcilerScheduler.ts"() {
+    "use strict";
+    init_shipskartReconcilerService();
+    init_syncRole();
+    init_identityGuard();
+    DEFAULT_INTERVAL_MS = 60 * 60 * 1e3;
+    DEFAULT_BOOT_DELAY_MS = 5 * 60 * 1e3;
+    ShipskartReconcilerScheduler = class {
+      timer = null;
+      bootTimer = null;
+      inProgress = false;
+      started = false;
+      async start() {
+        if (this.started) return;
+        if (await isShipInstance()) {
+          console.log("[ShipskartReconciler] Ship instance \u2014 scheduler NOT started (Shipskart integration is shore-only)");
+          return;
+        }
+        const intervalMs = parseInt(process.env.SHIPSKART_RECONCILE_INTERVAL_MS || "", 10) || DEFAULT_INTERVAL_MS;
+        const bootDelayMs = parseInt(process.env.SHIPSKART_RECONCILE_BOOT_DELAY_MS || "", 10) || DEFAULT_BOOT_DELAY_MS;
+        const limit = parseInt(process.env.SHIPSKART_RECONCILE_BATCH || "", 10) || void 0;
+        this.bootTimer = setTimeout(() => {
+          void this.tick(limit);
+        }, bootDelayMs);
+        this.timer = setInterval(() => {
+          void this.tick(limit);
+        }, intervalMs);
+        this.started = true;
+        logIdentityIntegrationExpectation();
+        console.log(
+          `[ShipskartReconciler] Shore instance \u2014 scheduler started (every ${Math.round(intervalMs / 6e4)}min, first run in ${Math.round(bootDelayMs / 6e4)}min). Each tick still requires reconciler_enabled=true for the tenant.`
+        );
+      }
+      async tick(limit) {
+        if (this.inProgress) {
+          console.log("[ShipskartReconciler] previous pass still running \u2014 skipping this tick");
+          return;
+        }
+        this.inProgress = true;
+        try {
+          const summary = await runReconciliation({ limit });
+          if (!summary.ran) return;
+          console.log(`[ShipskartReconciler] pass done: vessels=${JSON.stringify(summary.vessels)} users=${JSON.stringify(summary.users)} mappings=${JSON.stringify(summary.mappings)}`);
+        } catch (err) {
+          console.error(`[ShipskartReconciler] pass failed: ${err?.message || err}`);
+        } finally {
+          this.inProgress = false;
+        }
+      }
+      stop() {
+        if (this.bootTimer) {
+          clearTimeout(this.bootTimer);
+          this.bootTimer = null;
+        }
+        if (this.timer) {
+          clearInterval(this.timer);
+          this.timer = null;
+        }
+        this.started = false;
+        console.log("[ShipskartReconciler] Scheduler stopped");
+      }
+      isStarted() {
+        return this.started;
+      }
+    };
+    shipskartReconcilerScheduler = new ShipskartReconcilerScheduler();
   }
 });
 
@@ -43623,6 +44980,70 @@ async function getPostponementApprovalSteps(req, res) {
   const steps = await storage.getWoPostponementApprovalSteps(awaitingPostponement.id);
   res.json(steps);
 }
+async function submitRePostponeRequest2(req, res) {
+  try {
+    const result = await submitRePostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function editRePostponeRequest2(req, res) {
+  try {
+    const result = await editRePostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function approveRePostponement2(req, res) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const authReq = req;
+    const result = await approveRePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || "Office",
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role
+    });
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function rejectRePostponement2(req, res) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const authReq = req;
+    const result = await rejectRePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || "Office",
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role
+    });
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function getRePostponementApprovalSteps(req, res) {
+  const woId = req.params.id;
+  let wo = await storage.getWorkOrder(woId);
+  if (!wo) wo = await storage.getWorkOrderByCode(woId);
+  if (!wo) return res.status(404).json({ error: "Work order not found" });
+  const awaitingPostponement = await storage.getLatestAwaitingPostponement(wo.wouuid);
+  if (!awaitingPostponement) return res.json([]);
+  const steps = await storage.getWoPostponementApprovalSteps(awaitingPostponement.id);
+  res.json(steps);
+}
 async function getExecutions2(req, res) {
   const result = await getExecutions(req.params.componentId);
   res.json(result);
@@ -44121,6 +45542,19 @@ router5.post(
   asyncHandler(rejectPostponement2)
 );
 router5.get("/work-orders/:id/postpone-approval-steps", asyncHandler(getPostponementApprovalSteps));
+router5.post("/work-orders/:id/re-postpone-request", asyncHandler(submitRePostponeRequest2));
+router5.put("/work-orders/:id/re-postpone-request", asyncHandler(editRePostponeRequest2));
+router5.post(
+  "/work-orders/:id/re-postpone-approve",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(approveRePostponement2)
+);
+router5.post(
+  "/work-orders/:id/re-postpone-reject",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(rejectRePostponement2)
+);
+router5.get("/work-orders/:id/re-postpone-approval-steps", asyncHandler(getRePostponementApprovalSteps));
 router5.get("/work-order-executions/:componentId", asyncHandler(getExecutions2));
 router5.get("/work-order-executions/details/:id", asyncHandler(getExecution2));
 router5.post("/work-order-executions", asyncHandler(createExecution3));
@@ -55593,13 +57027,13 @@ async function getChemicalsExpiry(vesselId, expired, expiring_soon, hazard_class
   }
   const today = /* @__PURE__ */ new Date();
   today.setHours(0, 0, 0, 0);
-  const parseDate5 = (dateStr) => {
+  const parseDate6 = (dateStr) => {
     if (!dateStr) return null;
     const d = new Date(dateStr);
     return isNaN(d.getTime()) ? null : d;
   };
   const enriched = chemicals.map((item) => {
-    const expiryParsed = parseDate5(item.expiryDate);
+    const expiryParsed = parseDate6(item.expiryDate);
     let daysUntilExpiry = null;
     let expiryStatus = "No Date";
     if (expiryParsed) {
@@ -55963,7 +57397,7 @@ async function getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr, ve
     (c) => c.isActive !== false && (c.critical === true || c.classItem === true)
   );
   const allWorkOrders = await getWorkOrdersComputed(vesselId, vesselIds);
-  const parseDate5 = (dateStr) => {
+  const parseDate6 = (dateStr) => {
     if (!dateStr) return null;
     try {
       const d = new Date(dateStr);
@@ -55990,7 +57424,7 @@ async function getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr, ve
     let relevantWOs = activeWOs;
     if (filterStartDate || filterEndDate) {
       relevantWOs = activeWOs.filter((wo) => {
-        const dueDate = parseDate5(wo.dueDate || wo.nextDueDate);
+        const dueDate = parseDate6(wo.dueDate || wo.nextDueDate);
         if (!dueDate) return false;
         if (filterStartDate && dueDate < filterStartDate) return false;
         if (filterEndDate && dueDate > filterEndDate) return false;
@@ -55999,15 +57433,15 @@ async function getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr, ve
     }
     const overdueCount = relevantWOs.filter((wo) => wo.status === "Overdue").length;
     const dueSoonCount = relevantWOs.filter((wo) => {
-      const dueDate = parseDate5(wo.dueDate || wo.nextDueDate);
+      const dueDate = parseDate6(wo.dueDate || wo.nextDueDate);
       if (!dueDate) return false;
       return dueDate >= dueSoonStart && dueDate <= dueSoonEnd;
     }).length;
     const totalActiveWOs = relevantWOs.length;
-    const dueDates = relevantWOs.map((wo) => parseDate5(wo.dueDate || wo.nextDueDate)).filter((d) => d !== null).sort((a, b) => a.getTime() - b.getTime());
+    const dueDates = relevantWOs.map((wo) => parseDate6(wo.dueDate || wo.nextDueDate)).filter((d) => d !== null).sort((a, b) => a.getTime() - b.getTime());
     const nextDueDate = dueDates.length > 0 ? dueDates[0] : null;
     const completedWOs = componentWOs.filter((wo) => wo.status === "Completed");
-    const completionDates = completedWOs.map((wo) => parseDate5(wo.dateCompleted)).filter((d) => d !== null).sort((a, b) => b.getTime() - a.getTime());
+    const completionDates = completedWOs.map((wo) => parseDate6(wo.dateCompleted)).filter((d) => d !== null).sort((a, b) => b.getTime() - a.getTime());
     const lastDoneDate = completionDates.length > 0 ? completionDates[0] : null;
     const daysUntilDue = nextDueDate ? Math.ceil((nextDueDate.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24)) : null;
     return {
@@ -56159,7 +57593,7 @@ async function getUnplannedBreakdownJobs(vesselId, startDate, endDate, vesselIds
   const allVesselsForLookup = await getVessels6();
   const vesselMap = new Map(allVesselsForLookup.map((v) => [v.id, v.name || v.id]));
   const allWorkOrders = await getWorkOrdersComputed(vesselId, vesselIds);
-  const parseDate5 = (dateStr) => {
+  const parseDate6 = (dateStr) => {
     if (!dateStr) return null;
     try {
       const d = new Date(dateStr);
@@ -56177,7 +57611,7 @@ async function getUnplannedBreakdownJobs(vesselId, startDate, endDate, vesselIds
     if (!isUnplanned) return false;
     if (wo.status !== "Completed") return false;
     const completedDateStr = wo.dateCompleted ? wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted) : null;
-    const completedDate = parseDate5(completedDateStr);
+    const completedDate = parseDate6(completedDateStr);
     if (!completedDate) return false;
     return completedDate >= startDateObj && completedDate <= endDateObj;
   });
@@ -56250,7 +57684,7 @@ async function exportUnplannedBreakdownJobsExcel(vesselId, startDate, endDate, c
   const allVessels = await getVessels6();
   const vessel = allVessels.find((v) => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;
-  const parseDate5 = (dateStr2) => {
+  const parseDate6 = (dateStr2) => {
     if (!dateStr2) return null;
     try {
       const d = new Date(dateStr2);
@@ -56268,7 +57702,7 @@ async function exportUnplannedBreakdownJobsExcel(vesselId, startDate, endDate, c
     if (!isUnplanned) return false;
     if (wo.status !== "Completed") return false;
     const completedDateStr = wo.dateCompleted ? wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted) : null;
-    const completedDate = parseDate5(completedDateStr);
+    const completedDate = parseDate6(completedDateStr);
     if (!completedDate) return false;
     return completedDate >= startDateObj && completedDate <= endDateObj;
   });
@@ -56971,7 +58405,7 @@ function _ciParseDate(s) {
 async function getClassItemsMasterList(vesselId, componentSearch, departmentFilter, format3, vesselIds) {
   const { getDb: getDb7 } = await Promise.resolve().then(() => (init_db(), db_exports));
   const { componentClassRegulatory: componentClassRegulatory2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { inArray: inArray9 } = await import("drizzle-orm");
+  const { inArray: inArray11 } = await import("drizzle-orm");
   const allVessels = await getVessels6();
   const scopedVessels = vesselId === "all" && vesselIds?.length ? allVessels.filter((v) => vesselIds.includes(v.id)) : vesselId === "all" ? allVessels : allVessels.filter((v) => v.id === vesselId);
   const vesselNameMap = new Map(allVessels.map((v) => [v.id, v.name || v.id]));
@@ -56998,7 +58432,7 @@ async function getClassItemsMasterList(vesselId, componentSearch, departmentFilt
   let classRegRows = [];
   if (classComps.length > 0) {
     const db2 = await getDb7();
-    classRegRows = await db2.select().from(componentClassRegulatory2).where(inArray9(componentClassRegulatory2.componentId, classComps.map((c) => c.cuuid)));
+    classRegRows = await db2.select().from(componentClassRegulatory2).where(inArray11(componentClassRegulatory2.componentId, classComps.map((c) => c.cuuid)));
   }
   const regByComponent = /* @__PURE__ */ new Map();
   for (const cr of classRegRows) {
@@ -76022,7 +77456,7 @@ async function buildAuditTrailWorkbook(rows, meta) {
 var VALID_LOG_TYPES = ["all", "work_orders", "components", "running_hours", "permissions", "postponements"];
 function parseFilters(src) {
   const logType = VALID_LOG_TYPES.includes(src.logType) ? src.logType : "all";
-  const parseDate5 = (v) => {
+  const parseDate6 = (v) => {
     if (!v) return void 0;
     const d = new Date(v);
     return isNaN(d.getTime()) ? void 0 : d;
@@ -76030,8 +77464,8 @@ function parseFilters(src) {
   const str = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
   return {
     logType,
-    startDate: parseDate5(src.startDate),
-    endDate: parseDate5(src.endDate),
+    startDate: parseDate6(src.startDate),
+    endDate: parseDate6(src.endDate),
     actor: str(src.actor),
     entityCode: str(src.entityCode),
     actionType: str(src.actionType)
@@ -77100,42 +78534,29 @@ var routes_default23 = router23;
 init_middleware();
 import { Router as Router24 } from "express";
 
+// server/modules/shipskart/controllers/shipskartSsoController.ts
+init_identityGuard();
+
 // server/modules/shipskart/services/shipskartSsoService.ts
 init_errors();
-import crypto5 from "crypto";
-
-// server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
-init_db();
-init_schema();
-import { eq as eq28 } from "drizzle-orm";
-async function getAllMappings() {
-  const db2 = await getDb();
-  return db2.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
-}
-async function getMappingForSailRole(sailRole) {
-  const db2 = await getDb();
-  const rows = await db2.select().from(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole)).limit(1);
-  return rows[0];
-}
-async function upsertMapping2(sailRole, shipskartRole, updatedByUuid) {
-  const db2 = await getDb();
-  await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
-    target: shipskartRoleMappings.sailRole,
-    set: { shipskartRole, updatedByUuid: updatedByUuid ?? null, updatedAt: /* @__PURE__ */ new Date() }
-  });
-}
-async function deleteMapping(sailRole) {
-  const db2 = await getDb();
-  await db2.delete(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole));
-}
-
-// server/modules/shipskart/services/shipskartSsoService.ts
-var REQUEST_TIMEOUT_MS = 15e3;
+init_shipskartRoleMappingRepository();
+init_identityGuard();
+import crypto7 from "crypto";
+var REQUEST_TIMEOUT_MS2 = 15e3;
+var LEGACY_SHARED_ACCOUNT_ENABLED = false;
 var ShipskartRoleNotMappedError = class extends Error {
   constructor(userRole) {
     super(`No Shipskart externalUserId mapping for role "${userRole || "(none)"}".`);
     this.userRole = userRole;
     this.name = "ShipskartRoleNotMappedError";
+  }
+};
+var ShipskartUserNotProvisionedError = class extends Error {
+  constructor(userUuid, reason) {
+    super(`Shipskart account not provisioned for user ${userUuid}: ${reason}`);
+    this.userUuid = userUuid;
+    this.reason = reason;
+    this.name = "ShipskartUserNotProvisionedError";
   }
 };
 var _cachedConfig = null;
@@ -77177,7 +78598,7 @@ function maskUrl2(url) {
   }
 }
 function computeHmacSignature(raw, hmacSecret) {
-  return crypto5.createHmac("sha256", hmacSecret).update(raw, "utf8").digest("hex");
+  return crypto7.createHmac("sha256", hmacSecret).update(raw, "utf8").digest("hex");
 }
 async function signedPost(path14, body) {
   const cfg = getShipskartConfig();
@@ -77195,7 +78616,7 @@ async function signedPost(path14, body) {
       },
       body: raw,
       // never the object — that would re-serialize and break the signature
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS2)
     });
   } catch (err) {
     const code = err?.cause?.code ? ` (${err.cause.code})` : "";
@@ -77223,12 +78644,74 @@ function accountForShipskartRole(shipskartRole) {
     purchaser: process.env.SHIPSKART_USER_PURCHASER || process.env.SHIPSKART_USER_ADMIN,
     manager: process.env.SHIPSKART_USER_MANAGER || process.env.SHIPSKART_USER_REGULAR
   };
-  return accounts[shipskartRole] ?? null;
+  const exact = accounts[shipskartRole];
+  if (exact) return exact;
+  const envKey = `SHIPSKART_USER_${shipskartRole.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
+  const explicit = process.env[envKey];
+  if (explicit) return explicit;
+  const upper = shipskartRole.toUpperCase();
+  const bucket = /CAPTAIN|MASTER/.test(upper) ? "captain" : /PURCHAS|PUCHAS|BUYER/.test(upper) ? "purchaser" : /MANAGER|SUPER/.test(upper) ? "manager" : null;
+  if (bucket && accounts[bucket]) {
+    console.warn(
+      `[Shipskart] Live role '${shipskartRole}' has no account env; using the '${bucket}' shared account as a TRANSITIONAL fallback for users not yet pushed to Shipskart. Set ${envKey} to be explicit.`
+    );
+    return accounts[bucket];
+  }
+  return null;
 }
-async function resolveExternalUserId(userRole) {
+async function resolveExternalUserId(userRole, userUuid) {
+  if (userUuid) {
+    const { getUserLink: getUserLink2 } = await Promise.resolve().then(() => (init_shipskartB2bRepository(), shipskartB2bRepository_exports));
+    let link;
+    let lookupError = null;
+    try {
+      link = await getUserLink2(userUuid);
+    } catch (err) {
+      lookupError = `link lookup failed: ${err?.message || err}`;
+      link = void 0;
+    }
+    let jitReason = null;
+    if (!lookupError && link?.pushStatus !== "pushed" && (process.env.SHIPSKART_B2B_JIT || "").toLowerCase() !== "false") {
+      try {
+        const { ensureUserPushed: ensureUserPushed2 } = await Promise.resolve().then(() => (init_shipskartReconcilerService(), shipskartReconcilerService_exports));
+        const jit = await ensureUserPushed2(userUuid, userRole || null);
+        jitReason = jit.reason;
+        if (jit.pushed) {
+          link = await getUserLink2(userUuid);
+        }
+      } catch (err) {
+        jitReason = `jit threw: ${err?.message || err}`;
+      }
+    }
+    if (link?.pushStatus === "pushed") return userUuid;
+    const mappingForUser = userRole ? await getMappingForSailRole(userRole) : void 0;
+    if (mappingForUser) {
+      const reason = lookupError ?? jitReason ?? (link ? `link status '${link.pushStatus}'${link.lastError ? `: ${link.lastError}` : ""}` : "no link row yet");
+      console.warn(
+        `[Shipskart] BLOCKING Purchasing for user ${userUuid} (role '${userRole}' is mapped to '${mappingForUser.shipskartRole}') \u2014 own Shipskart account not provisioned: ${reason}. No shared-account fallback by design; the reconciler will retry.`
+      );
+      if (!link || lookupError || (jitReason ?? "").startsWith("jit threw")) {
+        try {
+          const { upsertUserLink: upsertUserLink2 } = await Promise.resolve().then(() => (init_shipskartB2bRepository(), shipskartB2bRepository_exports));
+          await upsertUserLink2(userUuid, { pushStatus: "jit_failed", lastError: reason.slice(0, 400) });
+        } catch (writeErr) {
+          console.warn(`[Shipskart] could not record the block reason for ${userUuid}: ${writeErr?.message || writeErr}`);
+        }
+      }
+      throw new ShipskartUserNotProvisionedError(userUuid, reason);
+    }
+  } else if (!LEGACY_SHARED_ACCOUNT_ENABLED) {
+    console.warn(
+      `${IDENTITY_MISSING_TAG} sso: refusing to open Purchasing without a forwarded user identity (role='${userRole}'). The legacy shared-account fallback is RETIRED \u2014 wire the x-user-id header (SAILERP profile) on this deployment.`
+    );
+    throw new ShipskartUserNotProvisionedError("(no identity)", "identity_not_configured");
+  }
   if (!userRole) return null;
   const mapping = await getMappingForSailRole(userRole);
   if (!mapping) return null;
+  console.warn(
+    `[Shipskart] No forwarded user identity (x-user-id) \u2014 using the LEGACY shared '${mapping.shipskartRole}' account for role '${userRole}'. Per-user SSO requires the identity header.`
+  );
   const account = accountForShipskartRole(mapping.shipskartRole);
   if (!account) {
     console.warn(
@@ -77238,26 +78721,47 @@ async function resolveExternalUserId(userRole) {
   }
   return account;
 }
-async function initiateSso(userRole) {
-  const cfg = getShipskartConfig();
-  const externalUserId = await resolveExternalUserId(userRole);
+async function initiateSso(userRole, userUuid) {
+  const externalUserId = await resolveExternalUserId(userRole, userUuid);
   if (externalUserId === null) {
     throw new ShipskartRoleNotMappedError(userRole);
   }
+  if (userUuid && externalUserId === userUuid) {
+    const { signedB2bRequest: signedB2bRequest2 } = await Promise.resolve().then(() => (init_shipskartB2bClient(), shipskartB2bClient_exports));
+    const res = await signedB2bRequest2("POST", "/integration/SAIL/sso/initiate", { body: { externalUserId } });
+    if (!res.ok || !res.json?.iframeUrl) {
+      const errorCode = res.json?.errorCode || res.json?.error?.code || `HTTP_${res.status}`;
+      throw new AppError(res.status || 502, `[Shipskart] per-user SSO initiate failed (${errorCode})`, { errorCode });
+    }
+    console.log(`[Shipskart] SSO initiate OK \u2014 PER-USER (role=${userRole}, partner=${res.json.partnerName}, expiresIn=${res.json.expiresIn}s)`);
+    return res.json;
+  }
+  const cfg = getShipskartConfig();
   const body = {
     externalUserId,
     tenantId: cfg.tenantId
   };
   const result = await signedPost("/api/v1/sso/initiate", body);
   console.log(
-    `[Shipskart] SSO initiate OK (role=${userRole}, partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`
+    `[Shipskart] SSO initiate OK \u2014 legacy shared account (role=${userRole}, partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`
   );
   return result;
 }
-async function logoutSso(userRole) {
-  const externalUserId = await resolveExternalUserId(userRole);
+async function logoutSso(userRole, userUuid) {
+  let externalUserId;
+  try {
+    externalUserId = await resolveExternalUserId(userRole, userUuid);
+  } catch (err) {
+    return { success: true, message: `No Shipskart session to evict (${err?.name || "resolve failed"})` };
+  }
   if (externalUserId === null) {
     return { success: true, message: "No Shipskart mapping for role \u2014 logout skipped" };
+  }
+  if (userUuid && externalUserId === userUuid) {
+    const { signedB2bRequest: signedB2bRequest2 } = await Promise.resolve().then(() => (init_shipskartB2bClient(), shipskartB2bClient_exports));
+    const res = await signedB2bRequest2("POST", "/integration/SAIL/sso/logout", { body: { externalUserId } });
+    console.log(`[Shipskart] SSO logout (per-user) \u2192 ${res.status}`);
+    return { success: res.ok, message: res.ok ? void 0 : `remote status ${res.status}` };
   }
   const body = { externalUserId };
   const result = await signedPost("/api/v1/sso/logout", body);
@@ -77269,8 +78773,9 @@ async function logoutSso(userRole) {
 async function initiateHandler(req, res) {
   const bodyRole = typeof req.body?.role === "string" ? req.body.role.trim() : "";
   const userRole = bodyRole || req.user?.role || "";
+  const userUuid = forwardedUserUuid(req, "sso/initiate");
   try {
-    const result = await initiateSso(userRole);
+    const result = await initiateSso(userRole, userUuid);
     res.json({
       success: true,
       iframeUrl: result.iframeUrl,
@@ -77285,6 +78790,14 @@ async function initiateHandler(req, res) {
         message: "Purchasing is not available for your role."
       });
     }
+    if (err instanceof ShipskartUserNotProvisionedError) {
+      const identityMissing = err.reason === "identity_not_configured";
+      return res.status(409).json({
+        success: false,
+        errorCode: "USER_NOT_PROVISIONED",
+        message: identityMissing ? "Purchasing is unavailable: user identity is not configured for this deployment. Please contact your administrator." : "Purchasing is not available yet. Please contact your administrator."
+      });
+    }
     throw err;
   }
 }
@@ -77292,7 +78805,7 @@ async function logoutHandler(req, res) {
   const bodyRole = typeof req.body?.role === "string" ? req.body.role.trim() : "";
   const userRole = bodyRole || req.user?.role || "";
   try {
-    const result = await logoutSso(userRole);
+    const result = await logoutSso(userRole, forwardedUserUuid(req, "sso/logout"));
     res.json({ success: true, message: result?.message });
   } catch (err) {
     console.error("[Shipskart] logout failed (non-blocking):", err?.message || err);
@@ -77300,22 +78813,28 @@ async function logoutHandler(req, res) {
   }
 }
 
-// server/modules/shipskart/services/shipskartRoleSource.ts
-async function getAvailableShipskartRoles() {
-  return ["captain", "purchaser", "manager"];
-}
-
 // server/modules/shipskart/controllers/shipskartRoleMappingController.ts
+init_shipskartRoleMappingRepository();
+init_shipskartRoleSource();
 var EDITOR_ROLES2 = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
 async function getRoleMappingsHandler(req, res) {
   const [availableRoles, rows] = await Promise.all([
     getAvailableShipskartRoles(),
     getAllMappings()
   ]);
-  res.json({
-    availableRoles,
-    mappings: rows.map((r) => ({ sailRole: r.sailRole, shipskartRole: r.shipskartRole }))
-  });
+  const live = new Set(availableRoles);
+  const mappings = rows.map((r) => ({
+    sailRole: r.sailRole,
+    shipskartRole: r.shipskartRole,
+    stale: !live.has(r.shipskartRole)
+  }));
+  const staleCount = mappings.filter((m) => m.stale).length;
+  if (staleCount > 0) {
+    console.warn(
+      `[Shipskart] ${staleCount} role mapping(s) point at a Shipskart role this tenant does not have (${mappings.filter((m) => m.stale).map((m) => `${m.sailRole}\u2192${m.shipskartRole}`).join(", ")}) \u2014 users on those SAIL roles are BLOCKED from Purchasing until they are remapped.`
+    );
+  }
+  res.json({ availableRoles, mappings, staleCount });
 }
 async function putRoleMappingsHandler(req, res) {
   const userRole = req.user?.role || "";
@@ -77353,12 +78872,123 @@ async function putRoleMappingsHandler(req, res) {
   });
 }
 
+// server/modules/shipskart/controllers/shipskartB2bController.ts
+init_shipskartTokenService();
+init_shipskartReconcilerService();
+init_shipskartB2bRepository();
+
+// server/modules/shipskart/services/vesselAssignmentService.ts
+init_db();
+init_schema();
+init_shipskartB2bRepository();
+import { inArray as inArray9 } from "drizzle-orm";
+function extractVesselIds(payload) {
+  let raw = payload;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const obj = raw;
+    raw = obj.myVessels ?? obj.my_vessels ?? obj.assignments ?? obj.vesselIds ?? [];
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[")) {
+      try {
+        raw = JSON.parse(trimmed);
+      } catch {
+        raw = trimmed.split(/[,;]/);
+      }
+    } else {
+      raw = trimmed.split(/[,;]/);
+    }
+  }
+  if (!Array.isArray(raw)) return [];
+  const ids = raw.map((entry) => {
+    if (typeof entry === "string") return entry.trim();
+    if (entry && typeof entry === "object") {
+      const e = entry;
+      const v = e.vesselId ?? e.vessel_id ?? e.vuuid ?? e.id;
+      return typeof v === "string" ? v.trim() : "";
+    }
+    return "";
+  }).filter(Boolean);
+  return Array.from(new Set(ids));
+}
+async function captureAssignments(userUuid, payload, opts = {}) {
+  const incoming = extractVesselIds(payload);
+  const db2 = await getDb();
+  if (incoming.length === 0 && !opts.allowEmpty) {
+    console.warn(
+      `[VesselAssignments] user ${userUuid}: empty assignment set received \u2014 treating as a NO-OP (an unreadable userProfile must not revoke access). Pass allowEmpty to revoke deliberately.`
+    );
+    return { activated: 0, deactivated: 0, unknownVesselIds: [], received: 0 };
+  }
+  const known = incoming.length ? (await db2.select({ v: vessels.vuuid }).from(vessels).where(inArray9(vessels.vuuid, incoming))).map((r) => r.v) : [];
+  const knownSet = new Set(known);
+  const unknownVesselIds = incoming.filter((id) => !knownSet.has(id));
+  if (incoming.length > 0 && known.length === 0) {
+    console.warn(
+      `[VesselAssignments] user ${userUuid}: ${incoming.length} vessel id(s) sent, NONE matched vessels.vuuid \u2014 refusing to deactivate existing assignments (possible id-format change). Unknown: ${unknownVesselIds.slice(0, 5).join(", ")}`
+    );
+    return { activated: 0, deactivated: 0, unknownVesselIds, received: incoming.length };
+  }
+  const { activated, deactivated } = await replaceAssignmentsForUser(userUuid, known);
+  if (unknownVesselIds.length) {
+    console.warn(`[VesselAssignments] user ${userUuid}: ignored ${unknownVesselIds.length} unknown vessel id(s): ${unknownVesselIds.slice(0, 5).join(", ")}`);
+  }
+  console.log(`[VesselAssignments] user ${userUuid}: ${activated} active, ${deactivated} revoked, ${unknownVesselIds.length} unknown`);
+  return { activated, deactivated, unknownVesselIds, received: incoming.length };
+}
+
+// server/modules/shipskart/controllers/shipskartB2bController.ts
+init_identityGuard();
+async function bootstrapHandler(req, res) {
+  const otp = typeof req.body?.otp === "string" ? req.body.otp : void 0;
+  const result = await bootstrap(otp);
+  res.json({ success: true, ...result });
+}
+async function statusHandler2(_req, res) {
+  const [token, links, failing] = await Promise.all([
+    tokenStatus(),
+    linkStatusCounts(),
+    failingRows(100)
+  ]);
+  res.json({ token, links, failing });
+}
+async function retryHandler(req, res) {
+  const kind = req.body?.kind;
+  const id = typeof req.body?.id === "string" ? req.body.id.trim() : "";
+  if (kind !== "user" && kind !== "vessel" || !id) {
+    return res.status(400).json({ success: false, message: "body must be { kind: 'user'|'vessel', id: string }" });
+  }
+  const result = await resetForRetry(kind, id);
+  res.status(result.reset ? 200 : 409).json({ success: result.reset, ...result });
+}
+async function reconcileHandler(req, res) {
+  const limit = Number.isInteger(req.body?.limit) ? req.body.limit : void 0;
+  const summary = await runReconciliation({ limit });
+  res.status(summary.ran ? 200 : 409).json(summary);
+}
+async function vesselAssignmentsHandler(req, res) {
+  const userUuid = forwardedUserUuid(req, "vessel-assignments");
+  if (!userUuid) {
+    return res.status(401).json({ success: false, errorCode: "NO_FORWARDED_IDENTITY", message: "No forwarded user identity (x-user-id) \u2014 cannot record vessel assignments." });
+  }
+  const allowEmpty = req.body?.allowEmpty === true;
+  const result = await captureAssignments(userUuid, req.body, { allowEmpty });
+  res.json({ success: true, ...result });
+}
+
 // server/modules/shipskart/routes.ts
 var router24 = Router24();
 router24.post("/shipskart/sso/initiate", asyncHandler(initiateHandler));
 router24.post("/shipskart/sso/logout", asyncHandler(logoutHandler));
 router24.get("/shipskart/role-mappings", asyncHandler(getRoleMappingsHandler));
 router24.put("/shipskart/role-mappings", asyncHandler(putRoleMappingsHandler));
+router24.post("/shipskart/b2b/bootstrap", asyncHandler(bootstrapHandler));
+router24.get("/shipskart/b2b/status", asyncHandler(statusHandler2));
+router24.post("/shipskart/b2b/reconcile", asyncHandler(reconcileHandler));
+router24.post("/shipskart/b2b/retry", asyncHandler(retryHandler));
+router24.post("/shipskart/vessel-assignments", asyncHandler(vesselAssignmentsHandler));
 var routes_default24 = router24;
 
 // server/modules/noon-report/routes.ts
@@ -77373,21 +79003,21 @@ init_middleware();
 // server/modules/noon-report/repositories/noonReportRepository.ts
 init_db();
 init_schema();
-import { eq as eq29, and as and25, desc as desc6 } from "drizzle-orm";
+import { eq as eq31, and as and27, desc as desc6 } from "drizzle-orm";
 async function getNoonReports(filters) {
   const db2 = await getDb();
   let query = db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate));
   const conditions = [];
-  if (filters.vesselId) conditions.push(eq29(nrNoonReports.vesselId, filters.vesselId));
-  if (filters.status) conditions.push(eq29(nrNoonReports.status, filters.status));
+  if (filters.vesselId) conditions.push(eq31(nrNoonReports.vesselId, filters.vesselId));
+  if (filters.status) conditions.push(eq31(nrNoonReports.status, filters.status));
   if (conditions.length > 0) {
-    return db2.select().from(nrNoonReports).where(and25(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
+    return db2.select().from(nrNoonReports).where(and27(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
   }
   return db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
 }
 async function getNoonReportById(id) {
   const db2 = await getDb();
-  const result = await db2.select().from(nrNoonReports).where(eq29(nrNoonReports.id, id)).limit(1);
+  const result = await db2.select().from(nrNoonReports).where(eq31(nrNoonReports.id, id)).limit(1);
   return result[0] || null;
 }
 async function createNoonReport(data) {
@@ -77400,7 +79030,7 @@ async function createNoonReport(data) {
 }
 async function updateNoonReport(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function submitNoonReport(id, submittedBy) {
@@ -77410,27 +79040,27 @@ async function submitNoonReport(id, submittedBy) {
     submittedAt: /* @__PURE__ */ new Date(),
     submittedBy,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq29(nrNoonReports.id, id)).returning();
+  }).where(eq31(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function deleteNoonReport(id) {
   const db2 = await getDb();
-  await db2.delete(nrNoonReports).where(and25(eq29(nrNoonReports.id, id), eq29(nrNoonReports.status, "draft")));
+  await db2.delete(nrNoonReports).where(and27(eq31(nrNoonReports.id, id), eq31(nrNoonReports.status, "draft")));
 }
 async function saveDraft(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq29(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq31(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function getFuelRobByVessel(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrFuelRob).where(eq29(nrFuelRob.vesselId, vesselId));
+  return db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, vesselId));
 }
 async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
   const db2 = await getDb();
-  const existing = await db2.select().from(nrFuelRob).where(and25(eq29(nrFuelRob.vesselId, vesselId), eq29(nrFuelRob.fuelType, fuelType))).limit(1);
+  const existing = await db2.select().from(nrFuelRob).where(and27(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and25(eq29(nrFuelRob.vesselId, vesselId), eq29(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and27(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType)));
   } else {
     await db2.insert(nrFuelRob).values({
       vesselId,
@@ -77442,23 +79072,23 @@ async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
 }
 async function getLastNReports(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and25(eq29(nrNoonReports.vesselId, vesselId), eq29(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and27(eq31(nrNoonReports.vesselId, vesselId), eq31(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
 }
 
 // server/modules/noon-report/services/noonReportService.ts
 init_db();
 init_schema();
-import { eq as eq33, and as and28, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
+import { eq as eq35, and as and30, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
 
 // server/modules/noon-report/services/calculationEngine.ts
 init_db();
 init_schema();
-import { eq as eq32, and as and27, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
+import { eq as eq34, and as and29, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
 
 // server/modules/noon-report/utils/existingDataAdapter.ts
 init_db();
 init_schema();
-import { eq as eq30, sql as sql22 } from "drizzle-orm";
+import { eq as eq32, sql as sql22 } from "drizzle-orm";
 async function getVesselById(vesselId) {
   const db2 = await getDb();
   const result = await db2.execute(
@@ -77488,7 +79118,7 @@ async function getVesselDwt(vesselId) {
 init_fuelConversionFactors();
 async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrFuelRob).where(and27(eq32(nrFuelRob.vesselId, vesselId), eq32(nrFuelRob.fuelType, fuelType))).limit(1);
+  const rows = await db2.select().from(nrFuelRob).where(and29(eq34(nrFuelRob.vesselId, vesselId), eq34(nrFuelRob.fuelType, fuelType))).limit(1);
   if (rows.length === 0) {
     const newRob = Math.max(0, deltaMt);
     await db2.insert(nrFuelRob).values({
@@ -77500,7 +79130,7 @@ async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   } else {
     const current = Number(rows[0].currentRob) || 0;
     const updated = Math.max(0, current + deltaMt);
-    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and27(eq32(nrFuelRob.vesselId, vesselId), eq32(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and29(eq34(nrFuelRob.vesselId, vesselId), eq34(nrFuelRob.fuelType, fuelType)));
   }
 }
 var PHASE1_STEPS = ["rollingAverages", "ciiTracking", "eeoi"];
@@ -77545,7 +79175,7 @@ async function computeRollingAveragesAndEndurance(report) {
     const cons3 = last3.map((r) => getReportConsumption(r, fuelType)).filter((v) => v !== null);
     const avg7Day = cons7.length > 0 ? cons7.reduce((a, b) => a + b, 0) / cons7.length : null;
     const avg3Day = cons3.length > 0 ? cons3.reduce((a, b) => a + b, 0) / cons3.length : null;
-    const robRows = await db2.select().from(nrFuelRob).where(and27(eq32(nrFuelRob.vesselId, report.vesselId), eq32(nrFuelRob.fuelType, fuelType))).limit(1);
+    const robRows = await db2.select().from(nrFuelRob).where(and29(eq34(nrFuelRob.vesselId, report.vesselId), eq34(nrFuelRob.fuelType, fuelType))).limit(1);
     const robRow = robRows[0] ?? null;
     const currentRob = robRow !== null ? Math.max(0, toNum2(robRow.currentRob) ?? 0) : null;
     let enduranceDays = null;
@@ -77561,7 +79191,7 @@ async function computeRollingAveragesAndEndurance(report) {
         avg7Day: avg7Day !== null ? String(avg7Day) : null,
         enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
         enduranceNm: enduranceNM !== null ? String(enduranceNM) : null
-      }).where(and27(eq32(nrFuelRob.vesselId, report.vesselId), eq32(nrFuelRob.fuelType, fuelType)));
+      }).where(and29(eq34(nrFuelRob.vesselId, report.vesselId), eq34(nrFuelRob.fuelType, fuelType)));
     } else if (avg7Day !== null) {
       await db2.insert(nrFuelRob).values({
         vesselId: report.vesselId,
@@ -77582,9 +79212,9 @@ async function computeCiiTracking(report) {
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
   const yearReports = await db2.select().from(nrNoonReports).where(
-    and27(
-      eq32(nrNoonReports.vesselId, report.vesselId),
-      eq32(nrNoonReports.status, "submitted"),
+    and29(
+      eq34(nrNoonReports.vesselId, report.vesselId),
+      eq34(nrNoonReports.status, "submitted"),
       gte5(nrNoonReports.reportDate, yearStart),
       lte3(nrNoonReports.reportDate, yearEnd)
     )
@@ -77611,7 +79241,7 @@ async function computeCiiTracking(report) {
     const refLine = computeCiiRefLine(dwt);
     ciiRating = assignCiiRating(aer, refLine);
   }
-  const existing = await db2.select().from(nrCiiTracking).where(and27(eq32(nrCiiTracking.vesselId, report.vesselId), eq32(nrCiiTracking.year, year))).limit(1);
+  const existing = await db2.select().from(nrCiiTracking).where(and29(eq34(nrCiiTracking.vesselId, report.vesselId), eq34(nrCiiTracking.year, year))).limit(1);
   const previousCiiRating = existing[0]?.ciiRating ?? null;
   if (existing.length > 0) {
     await db2.update(nrCiiTracking).set({
@@ -77622,7 +79252,7 @@ async function computeCiiTracking(report) {
       previousCiiRating,
       // store old rating before overwriting
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(and27(eq32(nrCiiTracking.vesselId, report.vesselId), eq32(nrCiiTracking.year, year)));
+    }).where(and29(eq34(nrCiiTracking.vesselId, report.vesselId), eq34(nrCiiTracking.year, year)));
   } else {
     await db2.insert(nrCiiTracking).values({
       vesselId: report.vesselId,
@@ -77653,9 +79283,9 @@ async function computeEeoi(report) {
     }
   }
   const eeoi = totalCo2Mt / (cargoMt * distanceSailed);
-  const existing = await db2.select().from(nrVoyageLegs).where(and27(eq32(nrVoyageLegs.vesselId, report.vesselId), eq32(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
+  const existing = await db2.select().from(nrVoyageLegs).where(and29(eq34(nrVoyageLegs.vesselId, report.vesselId), eq34(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq32(nrVoyageLegs.id, existing[0].id));
+    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrVoyageLegs.id, existing[0].id));
   } else {
     await db2.insert(nrVoyageLegs).values({
       vesselId: report.vesselId,
@@ -77682,7 +79312,7 @@ function getReportConsumption(report, fuelType) {
 }
 async function getLastNSubmitted(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and29(eq34(nrNoonReports.vesselId, vesselId), eq34(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
 }
 function toNum2(val) {
   if (val === null || val === void 0 || val === "") return null;
@@ -77755,7 +79385,7 @@ async function updateFuelRobFromReport(report) {
 }
 async function getFuelDashboard(vesselId) {
   const db2 = await getDb();
-  const robRecords = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
+  const robRecords = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, vesselId));
   const robByFuelType = {};
   const enduranceDaysByFuel = {};
   const avg7DayByFuel = {};
@@ -77786,11 +79416,11 @@ async function getFuelDashboard(vesselId) {
     recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
   }
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and28(eq33(nrCiiTracking.vesselId, vesselId), eq33(nrCiiTracking.year, currentYear))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and30(eq35(nrCiiTracking.vesselId, vesselId), eq35(nrCiiTracking.year, currentYear))).limit(1);
   const ciiTracking = ciiRows[0] ?? null;
   const dwt = await getVesselDwt(vesselId);
   const ciiRefLine = dwt !== null ? computeCiiRefLine(dwt) : null;
-  const last30Raw = await db2.select().from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
+  const last30Raw = await db2.select().from(nrNoonReports).where(and30(eq35(nrNoonReports.vesselId, vesselId), eq35(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
   const last30 = [...last30Raw].reverse().map((r) => {
     const hfo = toNum3(r.hfoConsumption) ?? 0;
     const lsmgo = toNum3(r.lsmgoConsumption) ?? 0;
@@ -77820,7 +79450,7 @@ async function getFuelDashboard(vesselId) {
     vlsfoConsumption: nrNoonReports.vlsfoConsumption,
     lpgConsumption: nrNoonReports.lpgConsumption,
     reportDate: nrNoonReports.reportDate
-  }).from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
+  }).from(nrNoonReports).where(and30(eq35(nrNoonReports.vesselId, vesselId), eq35(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
   const speedConsumptionData = allReports.flatMap((r) => {
     const speed = toNum3(r.speed);
     if (speed === null) return [];
@@ -77854,7 +79484,7 @@ async function getVesselKPIs(vesselId) {
 }
 async function getActiveAlerts(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
+  return db2.select().from(nrAlerts).where(and30(eq35(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
 }
 async function getAllAlerts(vesselId, page, limit) {
   const db2 = await getDb();
@@ -77862,8 +79492,8 @@ async function getAllAlerts(vesselId, page, limit) {
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * safeLimit;
   const [data, totalRows] = await Promise.all([
-    db2.select().from(nrAlerts).where(eq33(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
-    db2.select({ total: count() }).from(nrAlerts).where(eq33(nrAlerts.vesselId, vesselId))
+    db2.select().from(nrAlerts).where(eq35(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
+    db2.select({ total: count() }).from(nrAlerts).where(eq35(nrAlerts.vesselId, vesselId))
   ]);
   const total = totalRows[0]?.total ?? 0;
   return {
@@ -77876,28 +79506,28 @@ async function getAllAlerts(vesselId, page, limit) {
 }
 async function getActiveAlertCount(vesselId) {
   const db2 = await getDb();
-  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and30(eq35(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
   return rows[0]?.total ?? 0;
 }
 async function acknowledgeAlert(alertId, acknowledgedBy) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq33(nrAlerts.id, alertId)).limit(1);
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq35(nrAlerts.id, alertId)).limit(1);
   if (existing.length === 0) return null;
-  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq33(nrAlerts.id, alertId)).returning();
+  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq35(nrAlerts.id, alertId)).returning();
   return updated[0] ?? null;
 }
 async function getFleetSummary(vesselIds) {
   const db2 = await getDb();
   const results = [];
   for (const vesselId of vesselIds) {
-    const latestReports = await db2.select().from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
+    const latestReports = await db2.select().from(nrNoonReports).where(and30(eq35(nrNoonReports.vesselId, vesselId), eq35(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
     const latest = latestReports[0] ?? null;
-    const allReports = await db2.select().from(nrNoonReports).where(eq33(nrNoonReports.vesselId, vesselId));
+    const allReports = await db2.select().from(nrNoonReports).where(eq35(nrNoonReports.vesselId, vesselId));
     const totalReports = allReports.length;
     const submittedReports = allReports.filter((r) => r.status === "submitted").length;
-    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and30(eq35(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
     const activeAlerts = alertRows[0]?.total ?? 0;
-    const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
+    const robRows = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, vesselId));
     const totalHfoRob = toNum3(robRows.find((r) => r.fuelType === "HFO")?.currentRob) ?? 0;
     const totalAllRob = robRows.reduce((acc, r) => acc + (toNum3(r.currentRob) ?? 0), 0);
     const avg7Day = robRows.reduce((acc, r) => acc + (toNum3(r.avg7Day) ?? 0), 0) || null;
@@ -77936,16 +79566,16 @@ function round4(n) {
 // server/modules/noon-report/repositories/bunkerRepository.ts
 init_db();
 init_schema();
-import { eq as eq34, and as and29, desc as desc10, sum } from "drizzle-orm";
+import { eq as eq36, and as and31, desc as desc10, sum } from "drizzle-orm";
 async function getBunkerRecords(filters) {
   const db2 = await getDb();
-  const conditions = [eq34(nrBunkerRecords.vesselId, filters.vesselId)];
-  if (filters.voyageNo) conditions.push(eq34(nrBunkerRecords.voyageNo, filters.voyageNo));
-  return db2.select().from(nrBunkerRecords).where(and29(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
+  const conditions = [eq36(nrBunkerRecords.vesselId, filters.vesselId)];
+  if (filters.voyageNo) conditions.push(eq36(nrBunkerRecords.voyageNo, filters.voyageNo));
+  return db2.select().from(nrBunkerRecords).where(and31(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
 }
 async function getBunkerRecordById(id) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrBunkerRecords).where(eq34(nrBunkerRecords.id, id)).limit(1);
+  const rows = await db2.select().from(nrBunkerRecords).where(eq36(nrBunkerRecords.id, id)).limit(1);
   return rows[0] ?? null;
 }
 async function createBunkerRecord(data) {
@@ -77955,22 +79585,22 @@ async function createBunkerRecord(data) {
 }
 async function updateBunkerRecord(id, data) {
   const db2 = await getDb();
-  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrBunkerRecords.id, id)).returning();
+  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq36(nrBunkerRecords.id, id)).returning();
   return rows[0] ?? null;
 }
 async function deleteBunkerRecord(id) {
   const db2 = await getDb();
-  await db2.delete(nrBunkerRecords).where(eq34(nrBunkerRecords.id, id));
+  await db2.delete(nrBunkerRecords).where(eq36(nrBunkerRecords.id, id));
 }
 async function getBunkerCostSummary(vesselId, voyageNo) {
   const db2 = await getDb();
-  const conditions = [eq34(nrBunkerRecords.vesselId, vesselId)];
-  if (voyageNo) conditions.push(eq34(nrBunkerRecords.voyageNo, voyageNo));
+  const conditions = [eq36(nrBunkerRecords.vesselId, vesselId)];
+  if (voyageNo) conditions.push(eq36(nrBunkerRecords.voyageNo, voyageNo));
   const rows = await db2.select({
     fuelType: nrBunkerRecords.fuelType,
     totalQuantityMt: sum(nrBunkerRecords.quantityMt),
     totalCost: sum(nrBunkerRecords.totalCost)
-  }).from(nrBunkerRecords).where(and29(...conditions)).groupBy(nrBunkerRecords.fuelType);
+  }).from(nrBunkerRecords).where(and31(...conditions)).groupBy(nrBunkerRecords.fuelType);
   return rows.map((r) => ({
     fuelType: r.fuelType,
     totalQuantityMt: r.totalQuantityMt ?? "0",
@@ -79101,6 +80731,8 @@ async function registerRoutes(app2) {
   } else {
     console.log("[AutoSync] Shore instance detected \u2014 auto-sync scheduler not started (sync is ship-initiated)");
   }
+  const { shipskartReconcilerScheduler: shipskartReconcilerScheduler2 } = await Promise.resolve().then(() => (init_shipskartReconcilerScheduler(), shipskartReconcilerScheduler_exports));
+  await shipskartReconcilerScheduler2.start();
   const { schedulerRoleWatchdog: schedulerRoleWatchdog2 } = await Promise.resolve().then(() => (init_schedulerRoleWatchdog(), schedulerRoleWatchdog_exports));
   schedulerRoleWatchdog2.start({
     jobDueScanIntervalMs: JOB_DUE_SCAN_INTERVAL_MS,
@@ -79422,6 +81054,7 @@ async function registerRoutes(app2) {
     jobDueScanner2.stop();
     maintenanceOrchestrator2.stop();
     syncAutoScheduler2.stop();
+    shipskartReconcilerScheduler2.stop();
   };
   process.on("SIGTERM", stopAllSchedulers);
   process.on("SIGINT", stopAllSchedulers);
