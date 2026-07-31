@@ -38,4 +38,16 @@ local-test-env/*.local
 # Replit working artefacts (spreadsheets, pasted notes, screenshots uploaded for
 # testing). Never part of the build; team members keep their own copies. Excluded so
 # client-supplied data cannot land permanently in repo history.
-attached_assets/
+# NOTE: this MUST be `attached_assets/*` (contents), not `attached_assets/` (the
+# directory). Git cannot re-include a file whose parent DIRECTORY is excluded, so the
+# negations below would silently do nothing.
+attached_assets/*
+
+# ── EXCEPT the two files that ARE build inputs ──────────────────────────────
+# The @assets alias (vite.config.ts) points at attached_assets/, so anything imported
+# through it must stay tracked or `npm run build` fails with ENOENT. sfiLookup.ts also
+# reads the component-tree CSV from disk at runtime.
+# If you add a NEW import from @assets, add the file here too — or better, put it in
+# client/src/assets/ so this list stops growing.
+!attached_assets/SAIL logo Transparent_1753957135582.png
+!attached_assets/component tree_1761646533252.csv
