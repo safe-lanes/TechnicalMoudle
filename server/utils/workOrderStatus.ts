@@ -36,6 +36,8 @@ const BLOCKING_STATUSES_EXACT = new Set([
   'inprogress',
   'open',
   'rejected',  // Rejected WOs block new generation - work needs rework before cycle can advance
+  'awaiting office approval', // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
+  'postponement approved',    // Postponement approved — WO is still active, scanner must not re-generate
 ]);
 
 /**

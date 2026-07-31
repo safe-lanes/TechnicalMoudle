@@ -470,6 +470,77 @@ export async function getPostponementApprovalSteps(req: Request, res: Response) 
   res.json(steps);
 }
 
+// ── Re-Postponement Approval Workflow ──
+
+export async function submitRePostponeRequest(req: Request, res: Response) {
+  try {
+    const result = await woService.submitRePostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function editRePostponeRequest(req: Request, res: Response) {
+  try {
+    const result = await woService.editRePostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function approveRePostponement(req: Request, res: Response) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const authReq = req as AuthenticatedRequest;
+    const result = await woService.approveRePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || 'Office',
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role,
+    });
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function rejectRePostponement(req: Request, res: Response) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const authReq = req as AuthenticatedRequest;
+    const result = await woService.rejectRePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || 'Office',
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role,
+    });
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function getRePostponementApprovalSteps(req: Request, res: Response) {
+  const woId = req.params.id;
+  let wo = await storage.getWorkOrder(woId);
+  if (!wo) wo = await storage.getWorkOrderByCode(woId);
+  if (!wo) return res.status(404).json({ error: 'Work order not found' });
+  const awaitingPostponement = await storage.getLatestAwaitingPostponement(wo.wouuid);
+  if (!awaitingPostponement) return res.json([]);
+  const steps = await storage.getWoPostponementApprovalSteps(awaitingPostponement.id);
+  res.json(steps);
+}
+
 // ── Work Order Executions ──
 
 export async function getExecutions(req: Request, res: Response) {

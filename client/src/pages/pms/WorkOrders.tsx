@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import PostponeWorkOrderDialog from "@/components/PostponeWorkOrderDialog";
+import RePostponeWorkOrderDialog from "@/components/RePostponeWorkOrderDialog";
 import PostponeApprovalDialog from "@/components/PostponeApprovalDialog";
 import OverdueReasonDialog from "@/components/OverdueReasonDialog";
 import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
@@ -209,6 +210,7 @@ const WorkOrders: React.FC = () => {
   }, [activeTab]);
   const [showPlanner, setShowPlanner] = useState(false);
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
+  const [rePostponeDialogOpen, setRePostponeDialogOpen] = useState(false);
   const [postponeApprovalDialogOpen, setPostponeApprovalDialogOpen] = useState(false);
   const [postponeApprovalWorkOrder, setPostponeApprovalWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [overdueReasonDialogOpen, setOverdueReasonDialogOpen] = useState(false);
@@ -995,6 +997,12 @@ const WorkOrders: React.FC = () => {
         }
       } catch { /* fall through to postpone form on network error */ }
     }
+    // WO already has an approved postponement — open the Re-Postponement screen
+    if (workOrder.status === 'Postponement Approved' || workOrder.computedStatus === 'Postponement Approved') {
+      setSelectedWorkOrder(workOrder);
+      setRePostponeDialogOpen(true);
+      return;
+    }
     setSelectedWorkOrder(workOrder);
     setPostponeDialogOpen(true);
   };
@@ -1114,6 +1122,21 @@ const WorkOrders: React.FC = () => {
     },
   });
 
+  const rePostponeRequestMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await apiRequest('POST', `/technical/api/work-orders/${id}/re-postpone-request`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
+      toast({ title: "Re-Postponement Submitted", description: "Your re-postponement request has been sent to the office for approval." });
+      setRePostponeDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to submit re-postponement request", variant: "destructive" });
+    },
+  });
+
   const handlePostponeConfirm = (workOrderId: string, postponeData: any) => {
     const wo = paginatedWorkOrders.find(w => w.id === workOrderId);
     const isResubmit = wo?.status === 'Awaiting Office Approval' || wo?.computedStatus === 'Awaiting Office Approval' ||
@@ -1121,6 +1144,20 @@ const WorkOrders: React.FC = () => {
     postponeRequestMutation.mutate({
       id: workOrderId,
       method: isResubmit ? 'PUT' : 'POST',
+      data: {
+        postponeDate: postponeData.postponeDate,
+        nextDueDate: postponeData.nextDueDate,
+        reason: postponeData.reason,
+        postponementRemarks: postponeData.postponementRemarks,
+        approver: postponeData.approver || 'Office',
+        duration: postponeData.duration,
+      },
+    });
+  };
+
+  const handleRePostponeConfirm = (workOrderId: string, postponeData: any) => {
+    rePostponeRequestMutation.mutate({
+      id: workOrderId,
       data: {
         postponeDate: postponeData.postponeDate,
         nextDueDate: postponeData.nextDueDate,
@@ -1787,6 +1824,14 @@ const WorkOrders: React.FC = () => {
         onClose={() => setPostponeDialogOpen(false)}
         workOrder={selectedWorkOrder}
         onConfirm={handlePostponeConfirm}
+      />
+
+      {/* Re-Postponement Dialog — opened when WO status is 'Postponement Approved' */}
+      <RePostponeWorkOrderDialog
+        isOpen={rePostponeDialogOpen}
+        onClose={() => setRePostponeDialogOpen(false)}
+        workOrder={selectedWorkOrder}
+        onConfirm={handleRePostponeConfirm}
       />
 
       {/* Office: Postponement Approval Dialog */}

@@ -2958,6 +2958,434 @@ export async function rejectPostponement(id: string, body: any) {
   return updatedWO;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WO Re-Postponement
+// Mirrors the base Postponement flow but uses pms-wo-re-postponement config,
+// always reverts to 'Postponement Approved' on reject, and fails fast if the
+// approval config has not yet arrived on this vessel via sync.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Classify a WO for Re-Postponement and look up the pms-wo-re-postponement
+ * approval workflow config. Returns the classification and enabled levels.
+ * Returns { level1Enabled: false, level2Enabled: false } for WOs without a
+ * linked job (same behaviour as the base postponement classifier).
+ *
+ * Unlike the base classifier this function throws a ValidationError when the
+ * config rows for pms-wo-re-postponement do not exist (they arrive via
+ * ONE_WAY sync from shore after migration 150 runs). The caller must NOT
+ * proceed if config is absent — a missing config produces a stuck WO that
+ * cannot be approved or rejected through the normal UI.
+ */
+async function classifyWoForRePostponement(wo: any): Promise<{
+  classification: 'criticalEquipment' | 'critical' | 'normal';
+  level1Enabled: boolean;
+  level2Enabled: boolean;
+}> {
+  // WOs with no linked job always fall into normal
+  if (!wo.jobId) {
+    // Still need to verify config exists even for normal WOs — fail fast if not
+    const allConfigs = await storage.getApprovalWorkflowConfig();
+    const cfg = allConfigs.find(
+      (c: any) => c.functionId === 'pms-wo-re-postponement' && c.variableName === 'Normal WO' && !c.isDeleted
+    );
+    if (!cfg) {
+      throw new ValidationError(
+        'Re-Postponement approval configuration is not yet available on this vessel. ' +
+        'Please sync and try again.'
+      );
+    }
+    return { classification: 'normal', level1Enabled: cfg.level1Enabled ?? false, level2Enabled: cfg.level2Enabled ?? false };
+  }
+
+  let classification: 'criticalEquipment' | 'critical' | 'normal' = 'normal';
+
+  const job = await repo.findJob(wo.jobId);
+  if (job) {
+    let isOnCriticalEquipment = false;
+    if ((job as any).componentId) {
+      const comp = await repo.findComponent((job as any).componentId);
+      isOnCriticalEquipment = (comp as any)?.critical === true;
+    }
+    if (isOnCriticalEquipment) {
+      classification = 'criticalEquipment';
+    } else if ((job as any).criticality === 'Yes') {
+      classification = 'critical';
+    }
+  }
+
+  const variableNameMap: Record<'criticalEquipment' | 'critical' | 'normal', string> = {
+    criticalEquipment: 'Critical Equipment WO',
+    critical: 'Critical WO',
+    normal: 'Normal WO',
+  };
+
+  const allConfigs = await storage.getApprovalWorkflowConfig();
+  const config = allConfigs.find(
+    (c: any) =>
+      c.functionId === 'pms-wo-re-postponement' &&
+      c.variableName === variableNameMap[classification] &&
+      !c.isDeleted
+  );
+
+  if (!config) {
+    throw new ValidationError(
+      'Re-Postponement approval configuration is not yet available on this vessel. ' +
+      'Please sync and try again.'
+    );
+  }
+
+  return {
+    classification,
+    level1Enabled: config.level1Enabled ?? false,
+    level2Enabled: config.level2Enabled ?? false,
+  };
+}
+
+/**
+ * Core logic for creating a re-postponement audit row and approval steps.
+ * Shared by submit (new) and edit (resubmit) paths.
+ *
+ * @param wo           - Resolved work order record (pre-update)
+ * @param body         - Request body
+ * @param dueDateSnapshot - The due date to store as originalDueDate (pre-submission value)
+ */
+async function createRePostponementRecord(wo: any, body: any, dueDateSnapshot: string | null) {
+  const today = new Date().toISOString().split('T')[0];
+
+  const classification = await classifyWoForRePostponement(wo);
+  const approvalWorkflowSnapshot = {
+    woClassification: classification.classification,
+    level1Enabled: classification.level1Enabled,
+    level2Enabled: classification.level2Enabled,
+  };
+
+  // Update WO status to Awaiting Office Approval (idempotent on re-submit)
+  const updatedWO = await repo.update(wo.wouuid, {
+    status: 'Awaiting Office Approval',
+    postponeRequestedDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    postponeApprover: body.approver || 'Office',
+    postponementApprovalDate: null,
+    postponementApprovalRemarks: null,
+  });
+
+  // Field-log the WO update so it reaches the office via sync
+  try {
+    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.userId || body.performedBy || 'system');
+  } catch (err) { console.error('[FieldLogger] WO re-postpone-request:', err); }
+
+  // Create audit row — postponementNumber continues the same sequence across all types
+  const prevMax = await repo.getMaxPostponementNumber(wo.wouuid);
+  const postponementId = crypto.randomUUID();
+  await repo.createPostponement({
+    id: postponementId,
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMax + 1,
+    originalDueDate: dueDateSnapshot,   // snapshot: used by rejectRePostponement to restore date
+    newDueDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    approver: body.approver || 'Office',
+    postponeDate: body.postponeDate,
+    durationDays: body.duration ? parseInt(String(body.duration), 10) : null,
+    submittedDate: today,
+    status: 'Awaiting Approval',
+    informOffice: true,
+    approvalWorkflowSnapshot,
+    requestType: 'Re-Postponement',
+  } as any);
+
+  // Create level approval step rows
+  if (classification.level1Enabled) {
+    await repo.createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: 'Level 1',
+      status: 'Pending',
+      requestType: 'Re-Postponement',
+    } as any);
+  }
+  if (classification.level2Enabled) {
+    await repo.createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: 'Level 2',
+      status: 'Pending',
+      requestType: 'Re-Postponement',
+    } as any);
+  }
+
+  return updatedWO;
+}
+
+/**
+ * Ship submits a NEW Re-Postponement request.
+ * Eligibility: WO status must be 'Postponement Approved'.
+ * Snapshots wo.dueDate as originalDueDate for use by rejectRePostponement.
+ */
+export async function submitRePostponeRequest(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Postponement Approved') {
+    throw new ValidationError(
+      `Only work orders with status "Postponement Approved" can submit a Re-Postponement. Current status: ${wo.status}`
+    );
+  }
+
+  // Snapshot the current due date before the WO is updated — this is the date
+  // that rejectRePostponement must restore if the request is rejected
+  const dueDateSnapshot = wo.dueDate;
+
+  return createRePostponementRecord(wo, body, dueDateSnapshot);
+}
+
+/**
+ * Ship edits and resubmits a pending Re-Postponement request.
+ * Eligibility: WO status must be 'Awaiting Office Approval' (a re-postponement
+ * is in progress). Always creates a new audit row (same as base editPostponeRequest).
+ *
+ * The originalDueDate carried forward is sourced from the current pending
+ * re-postponement record to preserve the pre-submission due date even across
+ * multiple resubmits.
+ */
+export async function editRePostponeRequest(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Awaiting Office Approval') {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can edit a Re-Postponement. Current status: ${wo.status}`
+    );
+  }
+
+  // Recover the originalDueDate from the currently pending re-postponement record
+  // so that on rejection the due date is always restored to the pre-submission value,
+  // not to whatever the WO fields hold mid-flow.
+  const pending = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  const dueDateSnapshot = pending?.originalDueDate ?? wo.dueDate;
+
+  return createRePostponementRecord(wo, body, dueDateSnapshot);
+}
+
+/**
+ * Office approves a Re-Postponement request.
+ * Gates on multi-level approval steps if configured; finalises when all levels
+ * are satisfied. Final WO status is always 'Postponement Approved'.
+ */
+export async function approveRePostponement(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Awaiting Office Approval') {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
+    );
+  }
+
+  // ── Multi-level approval gate ────────────────────────────────────────────
+  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) {
+    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const now = new Date();
+      const activeStep = steps.find((s: any) => s.status === 'Pending');
+      if (!activeStep) {
+        throw new ValidationError('No pending approval step found — this request may have already been fully approved');
+      }
+
+      const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
+      if (!isSailAdmin) {
+        const reviewerId = body.userUuid || body.approvedBy;
+        const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+        if (!isAuthorised) {
+          throw new ValidationError(`Not authorised to approve at ${activeStep.approvalLevel}`);
+        }
+      }
+
+      const remaining = steps.filter((s: any) => s.id !== activeStep.id && s.status === 'Pending');
+      await repo.updateWoPostponementApprovalStep(activeStep.id, {
+        status: 'Approved',
+        actionByUserId: body.approvedBy,
+        actionAt: now,
+        remarks: body.approvalRemarks || null,
+      });
+
+      if (remaining.length > 0) {
+        console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} — ${activeStep.approvalLevel} approved; awaiting ${remaining.length} more level(s)`);
+        return (await repo.findById(id)) || wo;
+      }
+      console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} — all approval levels satisfied, finalising`);
+    }
+  }
+  // ── End gate — fall through to finalisation ──────────────────────────────
+
+  const today = new Date().toISOString().split('T')[0];
+  const newDueDate = wo.postponeRequestedDate || body.newDueDate;
+
+  const updatedWO = await repo.update(id, {
+    status: 'Postponement Approved',
+    dueDate: newDueDate,
+    postponementEndDate: newDueDate,
+    postponeApprover: body.approvedBy || 'Office',
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null,
+  });
+
+  // Field-log so the approved due date syncs back to the vessel
+  try {
+    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || 'system');
+  } catch (err) { console.error('[FieldLogger] WO re-postpone-approve:', err); }
+
+  // Insert immutable decision audit row (approve)
+  const existingRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxApprove = existingRows?.length
+    ? existingRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      ).postponementNumber || 1
+    : 1;
+  const latestApprove = existingRows?.length
+    ? existingRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      )
+    : null;
+
+  await repo.createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMaxApprove + 1,
+    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: newDueDate,
+    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || 'Office',
+    approvedBy: body.approvedBy || 'Office',
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || 'Office',
+    durationDays: latestApprove?.durationDays || null,
+    submittedDate: today,
+    status: 'Approved',
+    informOffice: true,
+    requestType: 'Re-Postponement',
+  } as any);
+
+  return updatedWO;
+}
+
+/**
+ * Office rejects a Re-Postponement request.
+ * Records the rejection on the active approval step, then reverts the WO to
+ * 'Postponement Approved' and restores the due date that was snapshotted at
+ * submission time (the originalDueDate stored on the Awaiting Approval record).
+ *
+ * Unlike rejectPostponement, this function does NOT call computeWorkOrderStatus —
+ * the WO was already in 'Postponement Approved' before the re-postponement was
+ * submitted, and it must return to that state unconditionally.
+ */
+export async function rejectRePostponement(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Awaiting Office Approval') {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be rejected. Current status: ${wo.status}`
+    );
+  }
+
+  // ── Mark the active approval step as Rejected ────────────────────────────
+  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  let dueDateToRestore: string | null = null;
+
+  if (awaitingPostponement) {
+    // The originalDueDate on the pending record is the due date that was active
+    // when the re-postponement was submitted — restore it on rejection
+    dueDateToRestore = awaitingPostponement.originalDueDate || null;
+
+    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const activeStep = steps.find((s: any) => s.status === 'Pending');
+      if (activeStep) {
+        const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
+        if (!isSailAdmin) {
+          const reviewerId = body.userUuid || body.approvedBy;
+          const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+          if (!isAuthorised) {
+            throw new ValidationError(`Not authorised to reject at ${activeStep.approvalLevel}`);
+          }
+        }
+        await repo.updateWoPostponementApprovalStep(activeStep.id, {
+          status: 'Rejected',
+          actionByUserId: body.approvedBy,
+          actionAt: new Date(),
+          remarks: body.approvalRemarks || null,
+        });
+      }
+    }
+  }
+  // ── End step rejection — revert WO to Postponement Approved ─────────────
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const updatedWO = await repo.update(id, {
+    status: 'Postponement Approved',
+    // Restore the due date that was active before the re-postponement was submitted
+    ...(dueDateToRestore ? { dueDate: dueDateToRestore, postponementEndDate: dueDateToRestore } : {}),
+    postponeApprover: body.approvedBy || 'Office',
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null,
+  });
+
+  // Field-log so the revert syncs to the vessel
+  try {
+    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || 'system');
+  } catch (err) { console.error('[FieldLogger] WO re-postpone-reject:', err); }
+
+  // Insert immutable decision audit row (reject)
+  const rejectRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxReject = rejectRows?.length
+    ? rejectRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      ).postponementNumber || 1
+    : 1;
+  const latestReject = rejectRows?.length
+    ? rejectRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      )
+    : null;
+
+  await repo.createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMaxReject + 1,
+    originalDueDate: latestReject?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: latestReject?.newDueDate || wo.postponeRequestedDate,
+    postponementReason: latestReject?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestReject?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || 'Office',
+    approvedBy: body.approvedBy || 'Office',
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || 'Office',
+    durationDays: latestReject?.durationDays || null,
+    submittedDate: today,
+    status: 'Rejected',
+    informOffice: true,
+    requestType: 'Re-Postponement',
+  } as any);
+
+  return updatedWO;
+}
+
 export async function reopenCompletedWorkOrder(
   id: string,
   remarks: string,

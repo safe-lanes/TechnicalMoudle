@@ -3580,6 +3580,7 @@ export const workOrderPostponements = pgTable("work_order_postponements", {
   informOffice: boolean("inform_office").notNull().default(false), // Whether office was informed
   attachmentPath: text("attachment_path"), // Path to any attached documents
   approvalWorkflowSnapshot: jsonb("approval_workflow_snapshot"), // Snapshot of level1/level2 config at submission time
+  requestType: text("request_type"), // 'Postponement' | 'Re-Postponement'; NULL treated as 'Postponement' for pre-migration rows
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
   isSync: boolean("is_sync").default(false),
@@ -3613,6 +3614,7 @@ export const woPostponementApprovals = pgTable("wo_postponement_approvals", {
   actionByUserId: text("action_by_user_id"),
   actionAt: timestamp("action_at", { withTimezone: true }),
   remarks: text("remarks"),
+  requestType: text("request_type"), // 'Postponement' | 'Re-Postponement'; NULL treated as 'Postponement' for pre-migration rows
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
   createdByUuid: text("created_by_uuid"),

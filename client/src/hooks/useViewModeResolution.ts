@@ -15,13 +15,38 @@
 import { useQuery } from "@tanstack/react-query";
 import type { UIRole } from "@shared/uiRoles";
 import { UI_ROLES } from "@shared/uiRoles";
+import { peekAccessToken } from "@/lib/authToken";
 
 export const SAIL_ADMIN_BYPASS: { userType: string; role: string } = {
   userType: "Office",
   role: "Sail Admin",
 };
 
-export type ViewModeStatus = "idle" | "loading" | "error" | "blocked" | "resolved";
+export type ViewModeStatus =
+  | "idle"
+  | "loading"
+  | "error"
+  | "blocked"
+  | "resolved"
+  | "unauthenticated";
+
+/** Error carrying the HTTP status so auth failures (401/403) are distinguishable. */
+class ResolveHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    /** Whether an Authorization header was attached to the failed request. */
+    public readonly hadToken: boolean,
+  ) {
+    super(`resolve failed: ${status}`);
+  }
+}
+
+function isAuthFailure(error: unknown): boolean {
+  return (
+    error instanceof ResolveHttpError &&
+    (error.status === 401 || error.status === 403)
+  );
+}
 
 export interface ViewModeResolution {
   uiRole: UIRole | null;
@@ -56,18 +81,41 @@ export function useViewModeResolution(
         userType: userType || "",
         role: role || "",
       });
+      // Attach the Bearer explicitly (same pattern as apiRequest/getQueryFn in
+      // lib/queryClient) instead of relying solely on the global fetch
+      // interceptor — a silent token-read failure would otherwise send this
+      // request with no Authorization header at all. peekAccessToken (not
+      // getAccessToken) so a missing token does NOT trigger the token-layer
+      // redirect: the request goes out, the server 401s, and the gate — the
+      // single redirect authority — clears the stale session before /login.
+      const token = peekAccessToken();
       const res = await fetch(
         `/technical/api/admin/role-view-mappings/resolve?${params.toString()}`,
-        { credentials: "include" },
+        {
+          credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        },
       );
       if (!res.ok) {
-        throw new Error(`resolve failed: ${res.status}`);
+        if (res.status === 401 || res.status === 403) {
+          // Field-diagnosable 401s: say whether a token was even attached, so
+          // "server rejected the session" vs "token never decrypted locally"
+          // can be told apart from the vessel's browser console.
+          console.warn(
+            `[view-mode] resolve returned ${res.status} — access token ${
+              token ? "WAS attached (server rejected the session)" : "was NOT attached (local token read/decrypt failed)"
+            }`,
+          );
+        }
+        throw new ResolveHttpError(res.status, !!token);
       }
       return res.json();
     },
     enabled: hasInputs && !isBypass,
     staleTime: 5 * 60 * 1000,
-    retry: 1,
+    // Retrying an expired/invalid session (401/403) can never succeed — skip
+    // the retry for auth failures; transient failures keep one retry.
+    retry: (failureCount, error) => !isAuthFailure(error) && failureCount < 1,
   });
 
   if (isBypass) {
@@ -78,6 +126,11 @@ export function useViewModeResolution(
   }
   if (query.isLoading) {
     return { uiRole: null, status: "loading", reason: null, retry: () => query.refetch() };
+  }
+  if (query.isError && isAuthFailure(query.error)) {
+    // Session expired/invalid (401/403). Still fail-closed — no mode is ever
+    // guessed — but the gate can send the user back to login (non-Replit only).
+    return { uiRole: null, status: "unauthenticated", reason: "UNAUTHENTICATED", retry: () => query.refetch() };
   }
   if (query.isError || !query.data) {
     // FAIL CLOSED on transport/server failure — never guess a mode.
