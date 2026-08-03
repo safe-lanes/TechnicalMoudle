@@ -454,6 +454,19 @@ reconciler/telemetry can use the same verdicts.
 - The 189 existing Gas Mia duplicates are **OUT OF SCOPE** — manual one-off cleanup, Jeevan
   decides how. The reconciler handles NEW duplicates only.
 
+## 9.9 Adjacent findings (2026-08-03 audit — not chased yet, must not get lost)
+
+- `component_documents` and `component_requisitions`: same serial-id/identity-null shape as
+  ihm, live code paths (components module), zero rows on the pilot, production usage
+  UNQUANTIFIED. Exposed only for a row created post-provisioning on one side then updated
+  from the other.
+- `defect_sequences`: live counter (bumped on every defect creation) with the same shape.
+  Fix planned separately (natural key `(vessel_id, year)` → COMPOSITE_KEY_TABLES); awaiting
+  Nilesh's production check + explicit applier sign-off. NOTE: defect NUMBERS come from
+  max+1 over the defects table, not this counter — and `defects.id` (= the number) is the
+  PK, so a cross-writer number collision would be silently MERGED by the applier's 23505
+  fallback, not stored as a visible duplicate.
+
 ## 10. Status log
 
 - 2026-07-31 — root cause found, reproduced on pilot with negative control, plan approved in
@@ -464,3 +477,11 @@ reconciler/telemetry can use the same verdicts.
   proven recoverable from `sync_field_log.instance_id` — no schema change. Precedence rules
   1–3 approved by Sahil (all auto-resolve; case-3 loser archived + flagged, never deleted).
   **Reconciler, scheduler, archive table (mig 151): NOT BUILT.**
+- 2026-08-03 (later) — **RECONCILER BUILT** (mig 151 + repository + service + shore daily
+  sweep + watchdog management + status endpoint). PROVEN on the pilot: 4 controlled pairs
+  (case 1 with execution repoint · case 2 via real ship-origin log · case 3 both-touched ·
+  case 2 via created_at fallback, noted) = 13/13 assertions, PLUS ~149 historic duplicate
+  groups on the pilot resolved by the same run; idempotent re-run = 0 groups; full ship
+  convergence after sync (153 live both sides, 149 archived). E2E additionally caught that
+  `component_maintenance_history` is IMMUTABLE by DB trigger → it joins ihm as
+  LEFT-IN-PLACE (recorded in child_moves). tsc 291.

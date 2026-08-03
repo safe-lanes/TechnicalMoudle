@@ -198,6 +198,18 @@ export async function generateNow(req: Request, res: Response) {
   });
 }
 
+// GET /work-orders/reconciler/status — telemetry for the duplicate reconciler (plan §9.6):
+// per-vessel resolved counts by case from the archive, plus the last sweep's summary.
+// Case-3 volume is the signal that would have caught Gas Mia in week one.
+export async function getReconcilerStatus(req: Request, res: Response) {
+  const reconciler = await import('../services/workOrderReconcilerService');
+  const reconRepo = await import('../repositories/workOrderReconcileRepository');
+  res.json({
+    archive: await reconRepo.archiveSummary(),
+    lastRun: reconciler.getLastRunSummary(),
+  });
+}
+
 export async function getWorkOrderContext(req: Request, res: Response) {
   const result = await woContextService.getWorkOrderContext(req.params.id);
   res.json(result);

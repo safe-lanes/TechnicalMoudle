@@ -166,11 +166,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Start Job Due Scanner - scans jobs and auto-generates work orders when due
   const { jobDueScanner } = await import("./services/jobDueScanner");
+  // Dual-writer design (plan §9.7): shore runs its OWN daily generation+reconcile sweep
+  // over PROVISIONED vessels, so the office sees work orders even while a ship's sync
+  // lags on VSAT; the post-sync reconciler resolves the duplicates the two writers
+  // produce. Imported unconditionally so stopAllSchedulers can reference it either way;
+  // start() is role-gated here and re-converged by schedulerRoleWatchdog.
+  const { shoreWoDailyScheduler } = await import('./services/shoreWoDailyScheduler');
   if (isShip) {
     jobDueScanner.start(JOB_DUE_SCAN_INTERVAL_MS);
     console.log(`[JobDueScanner] Ship instance — scheduler started (interval: ${JOB_DUE_SCAN_INTERVAL_MS / 3600000}h)`);
   } else {
-    console.log('[JobDueScanner] Shore instance — auto scan NOT started (office uses on-demand "Generate Now")');
+    shoreWoDailyScheduler.start();
+    console.log('[JobDueScanner] Shore instance — ship scanner off; shore daily WO sweep started (generation + reconciler)');
   }
 
   // NOTE: the former every-minute Work Order Status Recalculator has been REMOVED
@@ -631,6 +638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('Cleaning up scheduled tasks...');
     schedulerRoleWatchdog.stop(); // first, so it can't restart what we stop below
     jobDueScanner.stop();
+    shoreWoDailyScheduler.stop();
     maintenanceOrchestrator.stop(); // stops alerts + sync-health + sync-pruning timers
     syncAutoScheduler.stop();
     shipskartReconcilerScheduler.stop();

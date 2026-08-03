@@ -75,7 +75,17 @@ export class SchedulerRoleWatchdog {
       }
       this.lastRole = role;
 
+      // Shore-only scheduler — the dual-writer daily sweep (plan §9.7). Managed here for
+      // the same reason as the ship schedulers: the boot-time role snapshot cannot be
+      // trusted (the 28-Jul root cause), so the watchdog converges it on every check.
+      const { shoreWoDailyScheduler } = await import('./shoreWoDailyScheduler');
+
       if (ship) {
+        if (shoreWoDailyScheduler.isRunning()) {
+          console.warn('[RoleWatchdog] Instance resolves as SHIP — stopping the shore WO sweep (shore-only).');
+          syncDiag('[RoleWatchdog] Instance resolves as SHIP — shore WO sweep stopped.');
+          shoreWoDailyScheduler.stop();
+        }
         if (!syncAutoScheduler.isStarted()) {
           console.warn(
             '[RoleWatchdog] 🩹 SELF-HEAL: this instance resolves as a SHIP but the auto-sync ' +
@@ -97,6 +107,14 @@ export class SchedulerRoleWatchdog {
           jobDueScanner.start(this.jobDueScanIntervalMs);
         }
       } else {
+        if (!shoreWoDailyScheduler.isRunning()) {
+          console.warn(
+            '[RoleWatchdog] 🩹 SELF-HEAL: this instance resolves as SHORE but the shore WO sweep ' +
+              'is not running — starting it now.',
+          );
+          syncDiag('[RoleWatchdog] SELF-HEAL: instance resolves as SHORE but shore WO sweep was not running — started late.');
+          shoreWoDailyScheduler.start();
+        }
         if (syncAutoScheduler.isStarted() || jobDueScanner.isStarted()) {
           console.warn(
             '[RoleWatchdog] Instance now resolves as SHORE — stopping ship-only schedulers ' +

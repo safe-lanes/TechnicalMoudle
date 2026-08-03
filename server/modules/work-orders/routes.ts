@@ -92,6 +92,11 @@ router.get('/work-orders/:id/rejection-history', asyncHandler(woCtrl.getRejectio
 // (registered before POST /work-orders; distinct path, no :param collision)
 router.post('/work-orders/generate-now', asyncHandler(woCtrl.generateNow));
 
+// GET /work-orders/reconciler/status — duplicate-reconciler telemetry (plan §9.6).
+// No collision with GET /work-orders/:id — that is a single-segment param and cannot
+// match this two-segment path.
+router.get('/work-orders/reconciler/status', asyncHandler(woCtrl.getReconcilerStatus));
+
 // POST /work-orders — create work order
 router.post('/work-orders', asyncHandler(woCtrl.createWorkOrder));
 
