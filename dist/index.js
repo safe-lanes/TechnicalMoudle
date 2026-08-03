@@ -5043,15 +5043,15 @@ async function resolvePostgres() {
     return void 0;
   }
   try {
-    const pool2 = new Pool({
+    const pool3 = new Pool({
       connectionString: process.env.DATABASE_URL,
       max: Number(process.env.DB_POOL_MAX) || 25,
       connectionTimeoutMillis: Number(process.env.DB_CONNECT_TIMEOUT_MS) || 1e4,
       idleTimeoutMillis: 3e4
     });
-    const db2 = drizzle(pool2, { schema: schema_exports });
+    const db2 = drizzle(pool3, { schema: schema_exports });
     await db2.execute(sql3`SELECT 1`);
-    cachedPostgres = { db: db2, pool: pool2 };
+    cachedPostgres = { db: db2, pool: pool3 };
     cacheInitialized = true;
     return cachedPostgres;
   } catch (error) {
@@ -6952,7 +6952,7 @@ var init_rhValidation = __esm({
 });
 
 // server/modules/sync/oneWayApplier.ts
-async function getColumnMeta(pool2, tableName) {
+async function getColumnMeta(pool3, tableName) {
   if (columnMetaCache.has(tableName)) return columnMetaCache.get(tableName);
   let identityAlwaysCols = /* @__PURE__ */ new Set();
   let jsonCols = /* @__PURE__ */ new Set();
@@ -6960,7 +6960,7 @@ async function getColumnMeta(pool2, tableName) {
   let arrayCols = /* @__PURE__ */ new Set();
   let requiredCols = /* @__PURE__ */ new Set();
   try {
-    const identityResult = await pool2.query(
+    const identityResult = await pool3.query(
       `SELECT a.attname FROM pg_attribute a
        JOIN pg_class c ON a.attrelid = c.oid
        JOIN pg_namespace n ON c.relnamespace = n.oid
@@ -6968,7 +6968,7 @@ async function getColumnMeta(pool2, tableName) {
       [tableName]
     );
     identityAlwaysCols = new Set((identityResult.rows || []).map((r) => r.attname));
-    const serialResult = await pool2.query(
+    const serialResult = await pool3.query(
       `SELECT a.attname FROM pg_attribute a
        JOIN pg_class c ON a.attrelid = c.oid
        JOIN pg_namespace n ON c.relnamespace = n.oid
@@ -6983,7 +6983,7 @@ async function getColumnMeta(pool2, tableName) {
   } catch {
   }
   try {
-    const jsonResult = await pool2.query(
+    const jsonResult = await pool3.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1
        AND data_type IN ('json', 'jsonb')`,
@@ -6993,7 +6993,7 @@ async function getColumnMeta(pool2, tableName) {
   } catch {
   }
   try {
-    const colResult = await pool2.query(
+    const colResult = await pool3.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1`,
       [tableName]
@@ -7002,7 +7002,7 @@ async function getColumnMeta(pool2, tableName) {
   } catch {
   }
   try {
-    const arrResult = await pool2.query(
+    const arrResult = await pool3.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1 AND data_type = 'ARRAY'`,
       [tableName]
@@ -7011,7 +7011,7 @@ async function getColumnMeta(pool2, tableName) {
   } catch {
   }
   try {
-    const reqResult = await pool2.query(
+    const reqResult = await pool3.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1
        AND is_nullable = 'NO' AND column_default IS NULL`,
@@ -7039,8 +7039,8 @@ async function applyOneWayRows(tableName, rows) {
   }
   const identityCol = config.identityColumn;
   const lookupColumn = identityCol || "id";
-  const pool2 = await getPool();
-  const meta = await getColumnMeta(pool2, tableName);
+  const pool3 = await getPool();
+  const meta = await getColumnMeta(pool3, tableName);
   const COMPOSITE_KEY_TABLES = {
     vessel_certificate_applicability: ["vessel_id", "master_id"],
     vessel_survey_applicability: ["vessel_id", "master_id"],
@@ -7102,7 +7102,7 @@ async function applyOneWayRows(tableName, rows) {
         } else {
           whereClause = conditions.join(" AND ");
         }
-        existCheck = await pool2.query(
+        existCheck = await pool3.query(
           `SELECT "id" FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
           whereValues
         );
@@ -7114,14 +7114,14 @@ async function applyOneWayRows(tableName, rows) {
         }
         whereClause = `"${lookupColumn}" = $1`;
         whereValues = [lookupValue];
-        existCheck = await pool2.query(
+        existCheck = await pool3.query(
           `SELECT 1 FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
           whereValues
         );
       }
       if (existCheck.rows.length > 0) {
         if (isDeleted) {
-          await pool2.query(
+          await pool3.query(
             `UPDATE "${tableName}" SET is_deleted = true, updated_at = NOW() WHERE ${whereClause}`,
             whereValues
           );
@@ -7132,7 +7132,7 @@ async function applyOneWayRows(tableName, rows) {
             const offset = updatePairs.values.length;
             const reindexedWhere = whereClause.replace(/\$(\d+)/g, (_, n) => `$${Number(n) + offset}`);
             const updateSQL = `UPDATE "${tableName}" SET ${updatePairs.setClauses.join(", ")}, updated_at = NOW() WHERE ${reindexedWhere}`;
-            await pool2.query(updateSQL, [...updatePairs.values, ...whereValues]);
+            await pool3.query(updateSQL, [...updatePairs.values, ...whereValues]);
           }
           result.updated++;
         }
@@ -7144,7 +7144,7 @@ async function applyOneWayRows(tableName, rows) {
         const insertParts = buildInsertParts(row, meta, useCompositeKey);
         if (insertParts.columns.length > 0) {
           const insertSQL = `INSERT INTO "${tableName}" (${insertParts.columns.join(", ")}) VALUES (${insertParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
-          const ins = await pool2.query(insertSQL, insertParts.values);
+          const ins = await pool3.query(insertSQL, insertParts.values);
           if ((ins.rowCount ?? 0) > 0) {
             result.inserted++;
           } else {
@@ -7153,7 +7153,7 @@ async function applyOneWayRows(tableName, rows) {
             try {
               const pkVal = row["id"] ?? row["ID"];
               if (pkVal !== void 0 && pkVal !== null && lookupColumn) {
-                const clash = await pool2.query(
+                const clash = await pool3.query(
                   `SELECT "${lookupColumn}" AS existing FROM "${tableName}" WHERE "id" = $1 LIMIT 1`,
                   [pkVal]
                 );
@@ -7179,7 +7179,7 @@ async function applyOneWayRows(tableName, rows) {
   if (meta.identityAlwaysCols.size > 0) {
     for (const col of Array.from(meta.identityAlwaysCols)) {
       try {
-        await pool2.query(
+        await pool3.query(
           `SELECT setval(pg_get_serial_sequence('"${tableName}"', '${col}'), GREATEST(COALESCE((SELECT MAX("${col}") FROM "${tableName}"), 0), 1))`
         );
       } catch (e) {
@@ -7284,7 +7284,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
     return { insertedRows: 0, updateLogs: [], errors: [], failedRowUuids: [], needsFullRows: [] };
   }
   syncDiag(`FIELD-LOG-INSERT START: ${fieldLogs.length} logs`);
-  const pool2 = externalClient || await getPool();
+  const pool3 = externalClient || await getPool();
   let insertedRows = 0;
   const updateLogs = [];
   const errors = [];
@@ -7315,7 +7315,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
     let isRecoveryInsert = false;
     if (!isInsertGroup && !hasAnyInsertLogs) {
       try {
-        const exist = await pool2.query(`SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [rowUuid]);
+        const exist = await pool3.query(`SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [rowUuid]);
         if (exist.rows.length > 0) {
           if (isImmutable) {
             syncDiag(`FIELD-LOG-INSERT IMMUTABLE-ACK: ${tableName}.${rowUuid} exists on receiver \u2014 re-delivered log acked as already-applied (immutable; no UPDATE issued)`);
@@ -7339,12 +7339,12 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
     const savepointName = `ins_${tableName.replace(/[^a-z0-9_]/gi, "")}_${rowUuid.replace(/[^a-z0-9]/gi, "").substring(0, 8)}`;
     if (externalClient) {
       try {
-        await pool2.query(`SAVEPOINT ${savepointName}`);
+        await pool3.query(`SAVEPOINT ${savepointName}`);
       } catch {
       }
     }
     try {
-      const existCheck = await pool2.query(
+      const existCheck = await pool3.query(
         `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
         [rowUuid]
       );
@@ -7352,7 +7352,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
         if (isImmutable) {
           if (externalClient) {
             try {
-              await pool2.query(`RELEASE SAVEPOINT ${savepointName}`);
+              await pool3.query(`RELEASE SAVEPOINT ${savepointName}`);
             } catch {
             }
           }
@@ -7362,7 +7362,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
         updateLogs.push(...logs);
         continue;
       }
-      meta = await getColumnMeta(pool2, tableName);
+      meta = await getColumnMeta(pool3, tableName);
       rowData = {};
       rowData[identityCol] = rowUuid;
       if (config.vesselScopeColumn && logs[0].vesselId) {
@@ -7410,7 +7410,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
           failedRowUuids.push(rowUuid);
           if (externalClient) {
             try {
-              await pool2.query(`RELEASE SAVEPOINT ${savepointName}`);
+              await pool3.query(`RELEASE SAVEPOINT ${savepointName}`);
             } catch {
             }
           }
@@ -7440,7 +7440,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
         continue;
       }
       const insertSQL = `INSERT INTO "${tableName}" (${columns.join(", ")}) VALUES (${placeholders.join(", ")}) ON CONFLICT ("${identityCol}") DO NOTHING`;
-      await pool2.query(insertSQL, values);
+      await pool3.query(insertSQL, values);
       insertedRows++;
       syncDiag(`FIELD-LOG-INSERT OK: ${tableName} row=${rowUuid} (${columns.length} columns)`);
       console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
@@ -7449,7 +7449,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
           const compId = rowData["component_id"];
           const newRH = rowData["cumulative_rh"] || rowData["new_rh"];
           if (newRH !== void 0 && newRH !== null) {
-            const oldRow = await pool2.query(
+            const oldRow = await pool3.query(
               `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
               [compId]
             );
@@ -7457,7 +7457,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
             const rhUpdatedAt = rowData["entered_at_utc"] || /* @__PURE__ */ new Date();
             const lastUpdatedText = rowData["date_updated_local"] || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
             const rhMasterUpdatedAtVal = safeParseDate(rowData["date_updated_local"]) || rhUpdatedAt;
-            await pool2.query(
+            await pool3.query(
               `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
               [String(newRH), compId, rhMasterUpdatedAtVal, lastUpdatedText]
             );
@@ -7469,12 +7469,12 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       }
       if ((tableName === "spare_location_stock" || tableName === "inventory_transactions") && rowData["location_uuid"]) {
         try {
-          const locLookup = await pool2.query(
+          const locLookup = await pool3.query(
             `SELECT id FROM locations WHERE luuid = $1 LIMIT 1`,
             [rowData["location_uuid"]]
           );
           if (locLookup.rows.length > 0) {
-            await pool2.query(
+            await pool3.query(
               `UPDATE "${tableName}" SET "location_id" = $1 WHERE "${identityCol}" = $2`,
               [locLookup.rows[0].id, rowUuid]
             );
@@ -7488,12 +7488,12 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       }
       if (tableName === "change_request_approval" && rowData["change_request_uuid"]) {
         try {
-          const crLookup = await pool2.query(
+          const crLookup = await pool3.query(
             `SELECT id FROM change_request WHERE cruuid = $1 LIMIT 1`,
             [rowData["change_request_uuid"]]
           );
           if (crLookup.rows.length > 0) {
-            await pool2.query(
+            await pool3.query(
               `UPDATE "${tableName}" SET "change_request_id" = $1 WHERE "${identityCol}" = $2`,
               [crLookup.rows[0].id, rowUuid]
             );
@@ -7507,14 +7507,14 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       }
       if (externalClient) {
         try {
-          await pool2.query(`RELEASE SAVEPOINT ${savepointName}`);
+          await pool3.query(`RELEASE SAVEPOINT ${savepointName}`);
         } catch {
         }
       }
     } catch (err) {
       if (externalClient) {
         try {
-          await pool2.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          await pool3.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
         } catch {
         }
       }
@@ -7524,7 +7524,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
           `[FieldLogInsert] Unique constraint hit for ${tableName}.${rowUuid} \u2014 falling back to field-level UPDATE (constraint: ${err.constraint || "unknown"})`
         );
         try {
-          if (!meta) meta = await getColumnMeta(pool2, tableName);
+          if (!meta) meta = await getColumnMeta(pool3, tableName);
           const vesselScopeCol = config.vesselScopeColumn;
           const vesselIdVal = logs[0].vesselId;
           let existingIdentity = null;
@@ -7536,7 +7536,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
             if (constraintCols.length > 0 && constraintCols.length === constraintVals.length) {
               const whereParts = constraintCols.map((col, i) => `"${col}" = $${i + 1}`);
               const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${whereParts.join(" AND ")} LIMIT 1`;
-              const constraintResult = await pool2.query(lookupSQL, constraintVals);
+              const constraintResult = await pool3.query(lookupSQL, constraintVals);
               if (constraintResult.rows.length > 0) {
                 existingIdentity = constraintResult.rows[0][identityCol];
                 syncDiag(`FIELD-LOG-INSERT CONFLICT FOUND: ${tableName} existing identity=${existingIdentity} via constraint columns`);
@@ -7544,7 +7544,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
             }
           }
           if (!existingIdentity && vesselScopeCol && vesselIdVal) {
-            const lookupResult = await pool2.query(
+            const lookupResult = await pool3.query(
               `SELECT "${identityCol}" FROM "${tableName}" WHERE "${vesselScopeCol}" = $1 LIMIT 2`,
               [vesselIdVal]
             );
@@ -7565,7 +7565,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
               }
               if (lookupCols.length > 0) {
                 const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${lookupCols.join(" AND ")} LIMIT 1`;
-                const specificResult = await pool2.query(lookupSQL, lookupVals);
+                const specificResult = await pool3.query(lookupSQL, lookupVals);
                 if (specificResult.rows.length > 0) {
                   existingIdentity = specificResult.rows[0][identityCol];
                 }
@@ -7590,7 +7590,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
               }
               try {
                 const logTs = log2.changedAt instanceof Date ? log2.changedAt : log2.changedAt ? new Date(String(log2.changedAt)) : /* @__PURE__ */ new Date();
-                await pool2.query(
+                await pool3.query(
                   `UPDATE "${tableName}" SET "${fieldSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
                   [valueToApply, existingIdentity, logTs]
                 );
@@ -7601,7 +7601,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
             }
             if (existingIdentity !== rowUuid) {
               try {
-                await pool2.query(
+                await pool3.query(
                   `UPDATE "${tableName}" SET "${identityCol}" = $1 WHERE "${identityCol}" = $2`,
                   [rowUuid, existingIdentity]
                 );
@@ -7649,16 +7649,16 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
           try {
             if (externalClient) {
               try {
-                await pool2.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+                await pool3.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
               } catch {
               }
               try {
-                await pool2.query(`SAVEPOINT ${savepointName}`);
+                await pool3.query(`SAVEPOINT ${savepointName}`);
               } catch {
               }
             }
             rowData[fkColumn] = null;
-            if (!meta) meta = await getColumnMeta(pool2, tableName);
+            if (!meta) meta = await getColumnMeta(pool3, tableName);
             const cols2 = [];
             const phs2 = [];
             const vals2 = [];
@@ -7671,19 +7671,19 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
               pi2++;
             }
             const retrySQL = `INSERT INTO "${tableName}" (${cols2.join(", ")}) VALUES (${phs2.join(", ")}) ON CONFLICT ("${identityCol}") DO NOTHING`;
-            await pool2.query(retrySQL, vals2);
+            await pool3.query(retrySQL, vals2);
             insertedRows++;
             syncDiag(`FK-NULL RETRY OK: ${tableName} row=${rowUuid} \u2014 inserted with ${fkColumn}=NULL (will be filled by future sync)`);
             if (externalClient) {
               try {
-                await pool2.query(`RELEASE SAVEPOINT ${savepointName}`);
+                await pool3.query(`RELEASE SAVEPOINT ${savepointName}`);
               } catch {
               }
             }
           } catch (retryErr) {
             if (externalClient) {
               try {
-                await pool2.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+                await pool3.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
               } catch {
               }
             }
@@ -7699,7 +7699,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       } else {
         if (externalClient) {
           try {
-            await pool2.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+            await pool3.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           } catch {
           }
         }
@@ -7722,8 +7722,8 @@ async function applyFullRowsIfAbsent(tableName, rows) {
     return out;
   }
   const identityCol = config.identityColumn || "id";
-  const pool2 = await getPool();
-  const meta = await getColumnMeta(pool2, tableName);
+  const pool3 = await getPool();
+  const meta = await getColumnMeta(pool3, tableName);
   for (const row of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
     const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
     if (!identity) {
@@ -7731,7 +7731,7 @@ async function applyFullRowsIfAbsent(tableName, rows) {
       continue;
     }
     try {
-      const exist = await pool2.query(
+      const exist = await pool3.query(
         `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
         [identity]
       );
@@ -7752,12 +7752,12 @@ async function applyFullRowsIfAbsent(tableName, rows) {
       }
       const sqlText = `INSERT INTO "${tableName}" (${parts.columns.join(", ")}) VALUES (${parts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
       try {
-        await pool2.query(sqlText, parts.values);
+        await pool3.query(sqlText, parts.values);
       } catch (insErr) {
         if (insErr.code === "23505" && tableName === "work_orders") {
           const retryRow = { ...row, id: `WO-SYNC-${identity}` };
           const retryParts = buildInsertParts(retryRow, meta, true);
-          await pool2.query(
+          await pool3.query(
             `INSERT INTO "${tableName}" (${retryParts.columns.join(", ")}) VALUES (${retryParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`,
             retryParts.values
           );
@@ -7765,7 +7765,7 @@ async function applyFullRowsIfAbsent(tableName, rows) {
           throw insErr;
         }
       }
-      const landed = await pool2.query(
+      const landed = await pool3.query(
         `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
         [identity]
       );
@@ -7789,7 +7789,7 @@ async function applyFullRowsIfAbsent(tableName, rows) {
 }
 async function gatherFullRows(requests) {
   const out = [];
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   let budget = SELF_HEAL_MAX_ROWS_PER_CYCLE;
   for (const req of requests) {
     if (budget <= 0) break;
@@ -7798,7 +7798,7 @@ async function gatherFullRows(requests) {
     const identityCol = config.identityColumn || "id";
     const uuids = req.rowUuids.slice(0, budget);
     try {
-      const r = await pool2.query(
+      const r = await pool3.query(
         `SELECT * FROM "${req.tableName}" WHERE "${identityCol}" = ANY($1)`,
         [uuids]
       );
@@ -8012,11 +8012,11 @@ function retryDelayMs(attempts) {
   return tier ? map[tier.interval] : 7 * D;
 }
 async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e3) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool3.query(
     `WITH picked AS (
        SELECT table_name, row_uuid
        FROM (
@@ -8038,7 +8038,7 @@ async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e
   return result.rows;
 }
 async function getFieldLogsSinceCheckpoint(vesselId, sinceTimestamp, excludeInstanceId, vesselCode, limit = 5e3) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const vesselPlaceholders = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
@@ -8060,25 +8060,25 @@ async function getFieldLogsSinceCheckpoint(vesselId, sinceTimestamp, excludeInst
      JOIN picked p ON s.table_name = p.table_name AND s.row_uuid = p.row_uuid
      WHERE ${whereClause}
      ORDER BY s.changed_at ASC, s.row_uuid, s.id`;
-  const result = await pool2.query(query, params);
+  const result = await pool3.query(query, params);
   if (result.rows.length === 0) {
     try {
       const vp = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
-      const totalCount = await pool2.query(
+      const totalCount = await pool3.query(
         `SELECT count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp})`,
         vesselValues
       );
       const total = totalCount.rows[0]?.c || 0;
       if (total > 0) {
-        const unsyncedCount = await pool2.query(
+        const unsyncedCount = await pool3.query(
           `SELECT count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp}) AND is_synced = false`,
           vesselValues
         );
-        const instanceCount = await pool2.query(
+        const instanceCount = await pool3.query(
           `SELECT count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp}) AND is_synced = false AND instance_id != $${vesselValues.length + 1}`,
           [...vesselValues, excludeInstanceId]
         );
-        const instanceSample = await pool2.query(
+        const instanceSample = await pool3.query(
           `SELECT DISTINCT instance_id, count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp}) AND is_synced = false GROUP BY instance_id LIMIT 10`,
           vesselValues
         );
@@ -8097,11 +8097,11 @@ async function markFieldLogsSynced(logUuids, batchId) {
   return logUuids.length;
 }
 async function getFieldLogCount(vesselId, isSynced, vesselCode) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool3.query(
     `SELECT count(*)::int AS count FROM sync_field_log WHERE vessel_id IN (${placeholders}) AND is_synced = $${vesselValues.length + 1}`,
     [...vesselValues, isSynced]
   );
@@ -8154,8 +8154,8 @@ async function queueFile(data) {
   return result[0];
 }
 async function queueFileWithUuid(data) {
-  const pool2 = await getPool();
-  const result = await pool2.query(
+  const pool3 = await getPool();
+  const result = await pool3.query(
     `INSERT INTO sync_file_queue (queue_uuid, table_name, row_uuid, file_key, file_name, file_size_bytes, file_hash, direction, vessel_id, instance_id, total_chunks, priority, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'in_progress')
      ON CONFLICT (queue_uuid) DO NOTHING
@@ -8198,8 +8198,8 @@ async function getPendingFiles(vesselId, direction, limit = 100) {
   )).orderBy(desc(syncFileQueue.priority), asc(syncFileQueue.fileSizeBytes), asc(syncFileQueue.createdAt)).limit(limit);
 }
 async function getPendingFileCountBySize(vesselId, direction, maxBytes) {
-  const pool2 = await getPool();
-  const result = await pool2.query(
+  const pool3 = await getPool();
+  const result = await pool3.query(
     `SELECT count(*)::int AS c FROM sync_file_queue
      WHERE vessel_id = $1 AND direction = $2 AND status = 'pending'
        AND (file_size_bytes IS NULL OR file_size_bytes <= $3)`,
@@ -8275,8 +8275,8 @@ async function getRecentBatches(vesselId, limit = 10) {
   return db2.select().from(syncBatches).where(conditions.length > 0 ? and(...conditions) : void 0).orderBy(desc(syncBatches.startedAt)).limit(limit);
 }
 async function getTableCheckpoints(instanceId) {
-  const pool2 = await getPool();
-  const r = await pool2.query(
+  const pool3 = await getPool();
+  const r = await pool3.query(
     `SELECT table_name, last_checkpoint FROM sync_table_checkpoints
       WHERE instance_id = $1 AND last_checkpoint IS NOT NULL`,
     [instanceId]
@@ -8288,11 +8288,11 @@ async function getTableCheckpoints(instanceId) {
 async function setTableCheckpoints(instanceId, checkpoints) {
   const entries = Object.entries(checkpoints || {});
   if (entries.length === 0) return 0;
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   let written = 0;
   for (const [tableName, ts] of entries) {
     if (!ts) continue;
-    const r = await pool2.query(
+    const r = await pool3.query(
       `INSERT INTO sync_table_checkpoints (instance_id, table_name, last_checkpoint, updated_at)
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (instance_id, table_name) DO UPDATE
@@ -8365,8 +8365,8 @@ async function updateSettings(settings, userId) {
   }
 }
 async function insertConnectivityLog(entry) {
-  const pool2 = await getPool();
-  await pool2.query(
+  const pool3 = await getPool();
+  await pool3.query(
     `INSERT INTO sync_connectivity_log
        (instance_id, vessel_id, outcome, error_message, error_category, latency_ms,
         batch_uuid, records_pushed, records_pulled, catch_up_cycle, trigger_type)
@@ -8387,7 +8387,7 @@ async function insertConnectivityLog(entry) {
   );
 }
 async function getConnectivityLogs(vesselId, limit = 100, sinceHoursAgo) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   let query = `SELECT * FROM sync_connectivity_log WHERE vessel_id = $1`;
   const params = [vesselId];
   if (sinceHoursAgo) {
@@ -8395,15 +8395,15 @@ async function getConnectivityLogs(vesselId, limit = 100, sinceHoursAgo) {
   }
   query += ` ORDER BY attempted_at DESC LIMIT $${params.length + 1}`;
   params.push(limit);
-  const result = await pool2.query(query, params);
+  const result = await pool3.query(query, params);
   return result.rows;
 }
 async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool3.query(
     `SELECT count(*)::int AS c FROM sync_field_log
      WHERE instance_id = $1
        AND vessel_id IN (${placeholders})
@@ -8413,11 +8413,11 @@ async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
   return result.rows[0]?.c ?? 0;
 }
 async function getDueFieldLogCount(instanceId, vesselId, vesselCode) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool3.query(
     `SELECT count(*)::int AS c FROM sync_field_log
      WHERE instance_id = $1
        AND vessel_id IN (${placeholders})
@@ -8428,11 +8428,11 @@ async function getDueFieldLogCount(instanceId, vesselId, vesselCode) {
   return result.rows[0]?.c ?? 0;
 }
 async function getShorePullRemainingCount(vesselId, excludeInstanceId, vesselCode) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool3.query(
     `SELECT count(*)::int AS c FROM sync_field_log
      WHERE vessel_id IN (${placeholders})
        AND instance_id != $${vesselValues.length + 1}
@@ -8442,17 +8442,17 @@ async function getShorePullRemainingCount(vesselId, excludeInstanceId, vesselCod
   return result.rows[0]?.c ?? 0;
 }
 async function hasDeliveredSyncHistory(vesselId, instanceId, vesselCode) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
-  const delivered = await pool2.query(
+  const delivered = await pool3.query(
     `SELECT 1 FROM sync_field_log
       WHERE vessel_id IN (${placeholders}) AND is_synced = true LIMIT 1`,
     vesselValues
   );
   if (delivered.rows.length > 0) return true;
-  const cp = await pool2.query(
+  const cp = await pool3.query(
     `SELECT 1 FROM sync_metadata
       WHERE instance_id = $1 AND last_sync_checkpoint IS NOT NULL LIMIT 1`,
     [instanceId]
@@ -8460,25 +8460,25 @@ async function hasDeliveredSyncHistory(vesselId, instanceId, vesselCode) {
   return cp.rows.length > 0;
 }
 async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, vesselCode, opts) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const vp = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
   const ip = `$${vesselValues.length + 1}`;
   const tp = `$${vesselValues.length + 2}`;
-  const batches = await pool2.query(
+  const batches = await pool3.query(
     `DELETE FROM sync_batches WHERE initiated_by_instance = $1`,
     [instanceId]
   );
   const batchesDeleted = batches.rowCount ?? 0;
   const T = opts?.snapshotAt ?? null;
   if (opts?.blunt || !T) {
-    const fl = await pool2.query(
+    const fl = await pool3.query(
       `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
         WHERE vessel_id IN (${vp}) AND instance_id != ${ip} AND is_synced = true`,
       [...vesselValues, instanceId]
     );
-    await pool2.query(
+    await pool3.query(
       `UPDATE sync_metadata SET last_sync_checkpoint = NULL, updated_at = NOW() WHERE instance_id = $1`,
       [instanceId]
     );
@@ -8488,19 +8488,19 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
     );
     return { mode: "blunt", baselineMarkedSynced: 0, postSnapshotUnsynced: postSnapshotUnsynced2, batchesDeleted, checkpoint: null };
   }
-  const a1 = await pool2.query(
+  const a1 = await pool3.query(
     `UPDATE sync_field_log SET is_synced = true
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at <= ${tp} AND is_synced = false`,
     [...vesselValues, instanceId, T]
   );
-  const a2 = await pool2.query(
+  const a2 = await pool3.query(
     `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at > ${tp} AND is_synced = true`,
     [...vesselValues, instanceId, T]
   );
-  await pool2.query(
+  await pool3.query(
     `UPDATE sync_metadata SET last_sync_checkpoint = $2, updated_at = NOW() WHERE instance_id = $1`,
     [instanceId, T]
   );
@@ -8537,9 +8537,9 @@ function canonicaliseBooleanSettings(settings) {
 }
 async function recordDeliveryAttempt(rowUuids, instanceId) {
   if (!rowUuids.length) return 0;
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const res = await pool2.query(
+  const pool3 = await getPool();
+  if (!pool3) return 0;
+  const res = await pool3.query(
     `UPDATE sync_field_log
         SET sync_attempts = sync_attempts + 1,
             last_attempt_at = now(),
@@ -8550,10 +8550,10 @@ async function recordDeliveryAttempt(rowUuids, instanceId) {
   return res.rowCount ?? 0;
 }
 async function getRetryBacklog(instanceId) {
-  const pool2 = await getPool();
-  if (!pool2) return { total: 0, stuck: 0, maxAttempts: 0 };
+  const pool3 = await getPool();
+  if (!pool3) return { total: 0, stuck: 0, maxAttempts: 0 };
   const tailFrom = RETRY_LADDER.length + 1;
-  const r = await pool2.query(
+  const r = await pool3.query(
     `SELECT count(*)::int AS total,
             count(*) FILTER (WHERE sync_attempts >= $2)::int AS stuck,
             COALESCE(max(sync_attempts), 0)::int AS max_attempts
@@ -8594,8 +8594,8 @@ __export(fieldLogger_exports, {
 async function hasSerialId(tableName) {
   if (serialIdCache.has(tableName)) return serialIdCache.get(tableName);
   try {
-    const pool2 = await getPool();
-    const meta = await getColumnMeta(pool2, tableName);
+    const pool3 = await getPool();
+    const meta = await getColumnMeta(pool3, tableName);
     const result = meta.identityAlwaysCols.has("id");
     serialIdCache.set(tableName, result);
     return result;
@@ -9595,11 +9595,11 @@ function getThresholds() {
   };
 }
 async function checkStaleSync(thresholds) {
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool3 = await getPool();
+  if (!pool3) {
     return { status: "warning", message: "Database not available", value: 0, threshold: thresholds.staleSyncHours };
   }
-  const result = await pool2.query(
+  const result = await pool3.query(
     `SELECT COUNT(*)::int AS count
      FROM sync_batches
      WHERE status = 'completed'
@@ -9615,7 +9615,7 @@ async function checkStaleSync(thresholds) {
       threshold: thresholds.staleSyncHours
     };
   }
-  const totalResult = await pool2.query(`SELECT COUNT(*)::int AS count FROM sync_batches`);
+  const totalResult = await pool3.query(`SELECT COUNT(*)::int AS count FROM sync_batches`);
   const totalBatches = totalResult.rows[0]?.count ?? 0;
   if (totalBatches === 0) {
     return {
@@ -9633,11 +9633,11 @@ async function checkStaleSync(thresholds) {
   };
 }
 async function checkUnresolvedConflicts(thresholds) {
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool3 = await getPool();
+  if (!pool3) {
     return { status: "warning", message: "Database not available", value: 0, threshold: thresholds.unresolvedConflictDays };
   }
-  const result = await pool2.query(
+  const result = await pool3.query(
     `SELECT COUNT(*)::int AS count
      FROM sync_conflicts
      WHERE resolution IS NULL
@@ -9662,11 +9662,11 @@ async function checkUnresolvedConflicts(thresholds) {
   };
 }
 async function checkStuckFiles(thresholds) {
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool3 = await getPool();
+  if (!pool3) {
     return { status: "warning", message: "Database not available", value: 0, threshold: thresholds.stuckFileHours };
   }
-  const result = await pool2.query(
+  const result = await pool3.query(
     `SELECT
        COUNT(*) FILTER (WHERE status IN ('pending','in_progress')
                           AND created_at < NOW() - INTERVAL '1 hour' * $1)::int AS stuck,
@@ -9697,11 +9697,11 @@ async function checkStuckFiles(thresholds) {
   };
 }
 async function checkLogOverflow(thresholds) {
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool3 = await getPool();
+  if (!pool3) {
     return { status: "warning", message: "Database not available", value: 0, threshold: thresholds.logOverflowCount };
   }
-  const result = await pool2.query(
+  const result = await pool3.query(
     `SELECT COUNT(*)::int AS count
      FROM sync_field_log
      WHERE is_synced = false`
@@ -9751,13 +9751,13 @@ async function runHealthCheck() {
   return result;
 }
 async function getTableStats() {
-  const pool2 = await getPool();
-  if (!pool2) return {};
+  const pool3 = await getPool();
+  if (!pool3) return {};
   const queries = [
-    pool2.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE is_synced = false)::int AS active FROM sync_field_log`),
-    pool2.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status = 'in_progress')::int AS active FROM sync_batches`),
-    pool2.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status IN ('pending', 'in_progress'))::int AS active FROM sync_file_queue`),
-    pool2.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE resolution IS NULL AND is_deleted = false)::int AS active FROM sync_conflicts`)
+    pool3.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE is_synced = false)::int AS active FROM sync_field_log`),
+    pool3.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status = 'in_progress')::int AS active FROM sync_batches`),
+    pool3.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status IN ('pending', 'in_progress'))::int AS active FROM sync_file_queue`),
+    pool3.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE resolution IS NULL AND is_deleted = false)::int AS active FROM sync_conflicts`)
   ];
   const [fieldLog, batches, fileQueue, conflicts] = await Promise.all(queries);
   return {
@@ -9940,7 +9940,7 @@ function getInstanceLabel(instanceId, vesselName) {
   }
   return instanceId;
 }
-async function getRecordLabel(pool2, tableName, rowUuid) {
+async function getRecordLabel(pool3, tableName, rowUuid) {
   const labelConfigs = {
     work_orders: {
       cols: ["job_title", "component_code"],
@@ -10000,7 +10000,7 @@ async function getRecordLabel(pool2, tableName, rowUuid) {
   const identityCol = getIdentityColumn(tableName) || "id";
   const selectCols = config.cols.map((c) => `"${c}"`).join(", ");
   try {
-    const result = await pool2.query(
+    const result = await pool3.query(
       `SELECT ${selectCols} FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
       [rowUuid]
     );
@@ -10011,12 +10011,12 @@ async function getRecordLabel(pool2, tableName, rowUuid) {
     return `${tableName} ${rowUuid.substring(0, 8)}`;
   }
 }
-async function resolveUserName(pool2, userId) {
+async function resolveUserName(pool3, userId) {
   if (!userId || userId === "system" || userId === "System" || userId === "admin") return "System";
   const parsed = parseInt(userId, 10);
   if (isNaN(parsed)) return userId;
   try {
-    const result = await pool2.query(
+    const result = await pool3.query(
       `SELECT full_name FROM users WHERE id = $1 LIMIT 1`,
       [parsed]
     );
@@ -10026,7 +10026,7 @@ async function resolveUserName(pool2, userId) {
   }
 }
 async function listConflicts(filters) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const limit = Math.min(filters.limit || 50, 200);
   const offset = filters.offset || 0;
   const source = filters.source || "all";
@@ -10056,12 +10056,12 @@ async function listConflicts(filters) {
       params.push(filters.dateTo);
     }
     const whereClause = conditions.join(" AND ");
-    const countResult = await pool2.query(
+    const countResult = await pool3.query(
       `SELECT COUNT(*) as cnt FROM sync_conflict_log cl WHERE ${whereClause}`,
       params
     );
     totalLog = parseInt(countResult.rows[0].cnt, 10);
-    const dataResult = await pool2.query(
+    const dataResult = await pool3.query(
       `SELECT cl.*
        FROM sync_conflict_log cl
        WHERE ${whereClause}
@@ -10073,7 +10073,7 @@ async function listConflicts(filters) {
       let incomingUserId = null;
       let winnerUserId = null;
       try {
-        const incomingUser = await pool2.query(
+        const incomingUser = await pool3.query(
           `SELECT changed_by_user_id FROM sync_field_log
            WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
              AND instance_id = $4
@@ -10084,7 +10084,7 @@ async function listConflicts(filters) {
       } catch {
       }
       try {
-        const winnerUser = await pool2.query(
+        const winnerUser = await pool3.query(
           `SELECT changed_by_user_id FROM sync_field_log
            WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
              AND instance_id = $4
@@ -10094,9 +10094,9 @@ async function listConflicts(filters) {
         winnerUserId = winnerUser.rows[0]?.changed_by_user_id || null;
       } catch {
       }
-      const recordDisplay = await getRecordLabel(pool2, row.table_name, row.row_uuid);
-      const incomingUserName = await resolveUserName(pool2, incomingUserId);
-      const winnerUserName = await resolveUserName(pool2, winnerUserId);
+      const recordDisplay = await getRecordLabel(pool3, row.table_name, row.row_uuid);
+      const incomingUserName = await resolveUserName(pool3, incomingUserId);
+      const winnerUserName = await resolveUserName(pool3, winnerUserId);
       logRows.push({
         id: row.id,
         source: "log",
@@ -10158,12 +10158,12 @@ async function listConflicts(filters) {
     }
     conditions.push(`(sc.is_deleted = false OR sc.is_deleted IS NULL)`);
     const whereClause = conditions.join(" AND ");
-    const countResult = await pool2.query(
+    const countResult = await pool3.query(
       `SELECT COUNT(*) as cnt FROM sync_conflicts sc WHERE ${whereClause}`,
       params
     );
     totalOld = parseInt(countResult.rows[0].cnt, 10);
-    const dataResult = await pool2.query(
+    const dataResult = await pool3.query(
       `SELECT sc.*
        FROM sync_conflicts sc
        WHERE ${whereClause}
@@ -10172,9 +10172,9 @@ async function listConflicts(filters) {
       params
     );
     for (const row of dataResult.rows) {
-      const recordDisplay = await getRecordLabel(pool2, row.table_name, row.row_uuid);
-      const shipUserName = await resolveUserName(pool2, row.ship_changed_by);
-      const shoreUserName = await resolveUserName(pool2, row.shore_changed_by);
+      const recordDisplay = await getRecordLabel(pool3, row.table_name, row.row_uuid);
+      const shipUserName = await resolveUserName(pool3, row.ship_changed_by);
+      const shoreUserName = await resolveUserName(pool3, row.shore_changed_by);
       oldRows.push({
         id: row.id,
         source: "old",
@@ -10213,7 +10213,7 @@ async function listConflicts(filters) {
   return { rows: allRows, total: totalLog + totalOld };
 }
 async function countUnresolvedConflicts(vesselId) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   let logQuery = `SELECT COUNT(*) as cnt FROM sync_conflict_log WHERE is_resolved = false`;
   let oldQuery = `SELECT COUNT(*) as cnt FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)`;
   const logParams = [];
@@ -10225,17 +10225,17 @@ async function countUnresolvedConflicts(vesselId) {
     oldParams.push(vesselId);
   }
   const [logResult, oldResult] = await Promise.all([
-    pool2.query(logQuery, logParams),
-    pool2.query(oldQuery, oldParams)
+    pool3.query(logQuery, logParams),
+    pool3.query(oldQuery, oldParams)
   ]);
   const fromLog = parseInt(logResult.rows[0].cnt, 10);
   const fromOld = parseInt(oldResult.rows[0].cnt, 10);
   return { total: fromLog + fromOld, fromLog, fromOld };
 }
 async function getConflict2(id, source) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   if (source === "log") {
-    const result = await pool2.query(
+    const result = await pool3.query(
       `SELECT * FROM sync_conflict_log WHERE id = $1`,
       [id]
     );
@@ -10244,7 +10244,7 @@ async function getConflict2(id, source) {
     let incomingUserId = null;
     let winnerUserId = null;
     try {
-      const r = await pool2.query(
+      const r = await pool3.query(
         `SELECT changed_by_user_id FROM sync_field_log
          WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
          ORDER BY changed_at DESC LIMIT 1`,
@@ -10254,7 +10254,7 @@ async function getConflict2(id, source) {
     } catch {
     }
     try {
-      const r = await pool2.query(
+      const r = await pool3.query(
         `SELECT changed_by_user_id FROM sync_field_log
          WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
          ORDER BY changed_at DESC LIMIT 1`,
@@ -10263,7 +10263,7 @@ async function getConflict2(id, source) {
       winnerUserId = r.rows[0]?.changed_by_user_id || null;
     } catch {
     }
-    const recordDisplay = await getRecordLabel(pool2, row.table_name, row.row_uuid);
+    const recordDisplay = await getRecordLabel(pool3, row.table_name, row.row_uuid);
     return {
       id: row.id,
       source: "log",
@@ -10280,7 +10280,7 @@ async function getConflict2(id, source) {
         changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
         instanceId: row.receiver_winner_instance || "",
         userId: winnerUserId,
-        userName: await resolveUserName(pool2, winnerUserId),
+        userName: await resolveUserName(pool3, winnerUserId),
         locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
       },
       rejected: {
@@ -10288,7 +10288,7 @@ async function getConflict2(id, source) {
         changedAt: row.incoming_changed_at?.toISOString?.() || null,
         instanceId: row.incoming_sender_instance || "",
         userId: incomingUserId,
-        userName: await resolveUserName(pool2, incomingUserId),
+        userName: await resolveUserName(pool3, incomingUserId),
         locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
       },
       isResolved: row.is_resolved,
@@ -10297,13 +10297,13 @@ async function getConflict2(id, source) {
       resolvedAction: row.resolved_action
     };
   } else {
-    const result = await pool2.query(
+    const result = await pool3.query(
       `SELECT * FROM sync_conflicts WHERE id = $1`,
       [id]
     );
     if (result.rows.length === 0) return null;
     const row = result.rows[0];
-    const recordDisplay = await getRecordLabel(pool2, row.table_name, row.row_uuid);
+    const recordDisplay = await getRecordLabel(pool3, row.table_name, row.row_uuid);
     return {
       id: row.id,
       source: "old",
@@ -10320,7 +10320,7 @@ async function getConflict2(id, source) {
         changedAt: row.shore_changed_at?.toISOString?.() || null,
         instanceId: "SHORE",
         userId: row.shore_changed_by,
-        userName: await resolveUserName(pool2, row.shore_changed_by),
+        userName: await resolveUserName(pool3, row.shore_changed_by),
         locationLabel: "Shore \u2014 Office"
       },
       rejected: {
@@ -10328,7 +10328,7 @@ async function getConflict2(id, source) {
         changedAt: row.ship_changed_at?.toISOString?.() || null,
         instanceId: "SHIP",
         userId: row.ship_changed_by,
-        userName: await resolveUserName(pool2, row.ship_changed_by),
+        userName: await resolveUserName(pool3, row.ship_changed_by),
         locationLabel: "Ship"
       },
       isResolved: row.resolution !== null,
@@ -10339,9 +10339,9 @@ async function getConflict2(id, source) {
   }
 }
 async function applyIncomingConflict(id, source, userId) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   if (source === "log") {
-    const conflictResult = await pool2.query(
+    const conflictResult = await pool3.query(
       `SELECT * FROM sync_conflict_log WHERE id = $1`,
       [id]
     );
@@ -10352,20 +10352,20 @@ async function applyIncomingConflict(id, source, userId) {
     }
     const identityCol = getIdentityColumn(conflict.table_name) || "id";
     const fieldNameSnake = toSnakeCase2(conflict.field_name);
-    const currentRow = await pool2.query(
+    const currentRow = await pool3.query(
       `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
       [conflict.row_uuid]
     );
     const oldValue = currentRow.rows[0]?.[fieldNameSnake] ?? null;
     const vesselId = currentRow.rows[0]?.vessel_id ?? null;
-    await pool2.query(
+    await pool3.query(
       `UPDATE "${conflict.table_name}"
        SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
        WHERE "${identityCol}" = $2`,
       [conflict.incoming_new_value, conflict.row_uuid]
     );
     const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-    await pool2.query(
+    await pool3.query(
       `INSERT INTO sync_field_log
         (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
          changed_by_user_id, instance_id, is_synced, is_sync)
@@ -10381,7 +10381,7 @@ async function applyIncomingConflict(id, source, userId) {
         instanceId
       ]
     );
-    await pool2.query(
+    await pool3.query(
       `UPDATE sync_conflict_log
        SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'APPLY_INCOMING'
        WHERE id = $2`,
@@ -10390,7 +10390,7 @@ async function applyIncomingConflict(id, source, userId) {
     syncDiag(`CONFLICT RESOLVED: id=${id} source=log action=APPLY_INCOMING by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
     return getConflict2(id, source);
   } else {
-    const conflictResult = await pool2.query(
+    const conflictResult = await pool3.query(
       `SELECT * FROM sync_conflicts WHERE id = $1`,
       [id]
     );
@@ -10401,20 +10401,20 @@ async function applyIncomingConflict(id, source, userId) {
     }
     const identityCol = getIdentityColumn(conflict.table_name) || "id";
     const fieldNameSnake = toSnakeCase2(conflict.field_name);
-    const currentOldRow = await pool2.query(
+    const currentOldRow = await pool3.query(
       `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
       [conflict.row_uuid]
     );
     const oldValOld = currentOldRow.rows[0]?.[fieldNameSnake] ?? null;
     const vesselIdOld = currentOldRow.rows[0]?.vessel_id ?? null;
-    await pool2.query(
+    await pool3.query(
       `UPDATE "${conflict.table_name}"
        SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
        WHERE "${identityCol}" = $2`,
       [conflict.ship_value, conflict.row_uuid]
     );
     const instanceIdOld = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-    await pool2.query(
+    await pool3.query(
       `INSERT INTO sync_field_log
         (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
          changed_by_user_id, instance_id, is_synced, is_sync)
@@ -10430,7 +10430,7 @@ async function applyIncomingConflict(id, source, userId) {
         instanceIdOld
       ]
     );
-    await pool2.query(
+    await pool3.query(
       `UPDATE sync_conflicts
        SET resolution = 'ship_wins', resolved_value = $1, resolved_at = NOW(), resolved_by = $2
        WHERE id = $3`,
@@ -10441,9 +10441,9 @@ async function applyIncomingConflict(id, source, userId) {
   }
 }
 async function dismissConflict(id, source, userId) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   if (source === "log") {
-    const conflictResult = await pool2.query(
+    const conflictResult = await pool3.query(
       `SELECT * FROM sync_conflict_log WHERE id = $1`,
       [id]
     );
@@ -10451,7 +10451,7 @@ async function dismissConflict(id, source, userId) {
     if (conflictResult.rows[0].is_resolved) {
       throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
     }
-    await pool2.query(
+    await pool3.query(
       `UPDATE sync_conflict_log
        SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'DISMISS'
        WHERE id = $2`,
@@ -10460,7 +10460,7 @@ async function dismissConflict(id, source, userId) {
     syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId}`);
     return getConflict2(id, source);
   } else {
-    const conflictResult = await pool2.query(
+    const conflictResult = await pool3.query(
       `SELECT * FROM sync_conflicts WHERE id = $1`,
       [id]
     );
@@ -10468,7 +10468,7 @@ async function dismissConflict(id, source, userId) {
     if (conflictResult.rows[0].resolution !== null) {
       throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
     }
-    await pool2.query(
+    await pool3.query(
       `UPDATE sync_conflicts
        SET resolution = 'dismissed', resolved_value = shore_value, resolved_at = NOW(), resolved_by = $1
        WHERE id = $2`,
@@ -10479,8 +10479,8 @@ async function dismissConflict(id, source, userId) {
   }
 }
 async function getConflictTableNames() {
-  const pool2 = await getPool();
-  const result = await pool2.query(`
+  const pool3 = await getPool();
+  const result = await pool3.query(`
     SELECT DISTINCT table_name FROM (
       SELECT table_name FROM sync_conflict_log WHERE is_resolved = false
       UNION
@@ -10511,6 +10511,7 @@ __export(service_exports, {
   getRecentBatches: () => getRecentBatches2,
   getSyncStatus: () => getSyncStatus,
   getUnresolvedConflicts: () => getUnresolvedConflicts2,
+  getVesselProvisioningState: () => getVesselProvisioningState,
   initiateSyncSession: () => initiateSyncSession,
   preparePullData: () => preparePullData,
   receivePushData: () => receivePushData,
@@ -10519,8 +10520,8 @@ __export(service_exports, {
 async function getVesselCodeForUuid(vesselId) {
   if (vesselCodeCache.has(vesselId)) return vesselCodeCache.get(vesselId);
   try {
-    const pool2 = await getPool();
-    const result = await pool2.query(
+    const pool3 = await getPool();
+    const result = await pool3.query(
       `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
       [vesselId]
     );
@@ -10655,8 +10656,8 @@ async function receivePushData(batchUuid, vesselId, payload) {
         }))
       );
       syncDiag(`RECEIVE-PUSH: ${fieldLogsStored} field logs stored in sync_field_log`);
-      const pool2 = await getPool();
-      const client = await pool2.connect();
+      const pool3 = await getPool();
+      const client = await pool3.connect();
       try {
         await client.query("BEGIN");
         await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
@@ -11181,8 +11182,8 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
     const identityCol = config.identityColumn || "id";
     const fieldNameSnake = toSnakeCase3(conflict.fieldName);
     try {
-      const pool2 = await getPool();
-      await pool2.query(
+      const pool3 = await getPool();
+      await pool3.query(
         `UPDATE "${conflict.tableName}" SET "${fieldNameSnake}" = $1, updated_at = NOW() WHERE "${identityCol}" = $2`,
         [winningValue, conflict.rowUuid]
       );
@@ -11350,7 +11351,7 @@ async function gatherOneWayShoreRows(vesselId, sinceCheckpoint, tableCheckpoints
   const oneWayTables = getTablesByCategory("ONE_WAY_SHORE_TO_SHIP");
   const results = [];
   const tableMax = {};
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const vesselCode = await getVesselCodeForUuid(vesselId);
   for (const config of oneWayTables) {
     try {
@@ -11383,7 +11384,7 @@ async function gatherOneWayShoreRows(vesselId, sinceCheckpoint, tableCheckpoints
         tableMax[config.tableName] = (/* @__PURE__ */ new Date()).toISOString();
         continue;
       }
-      const result = await pool2.query(query, params);
+      const result = await pool3.query(query, params);
       if (result.rows.length > 0) {
         const last = result.rows[result.rows.length - 1];
         if (last?.__wm) tableMax[config.tableName] = String(last.__wm);
@@ -11417,10 +11418,47 @@ function normalizeFieldLog(row) {
     syncBatchId: row.syncBatchId ?? row.sync_batch_id
   };
 }
+async function getVesselProvisioningState(vesselId) {
+  const pool3 = await getPool();
+  if (!pool3) {
+    throw Object.assign(new Error("Database unavailable \u2014 cannot resolve vessel provisioning state."), { statusCode: 503 });
+  }
+  const vessel = await pool3.query(
+    `SELECT 1 FROM vessels WHERE vuuid = $1 AND is_deleted = false LIMIT 1`,
+    [vesselId]
+  );
+  if (vessel.rowCount === 0) {
+    throw Object.assign(
+      new Error(`Unknown vessel '${vesselId}' \u2014 cannot resolve provisioning state.`),
+      { statusCode: 404 }
+    );
+  }
+  const result = await pool3.query(
+    `SELECT count(instance_id)::int              AS metadata_rows,
+            max(last_sync_at)                    AS last_sync_at,
+            coalesce(
+              array_agg(DISTINCT instance_id) FILTER (WHERE instance_id IS NOT NULL),
+              '{}'
+            )                                    AS instance_ids
+       FROM sync_metadata
+      WHERE vessel_id = $1
+        AND is_deleted = false`,
+    [vesselId]
+  );
+  const row = result.rows[0] ?? {};
+  const metadataRows = row.metadata_rows ?? 0;
+  const lastSyncAt = row.last_sync_at ?? null;
+  const instanceIds = row.instance_ids ?? [];
+  let verdict;
+  if (metadataRows === 0 && lastSyncAt === null) verdict = "NEVER_PROVISIONED";
+  else if (metadataRows > 0 && lastSyncAt !== null) verdict = "LIVE";
+  else verdict = "CHECK_ME";
+  return { metadataRows, lastSyncAt, instanceIds, verdict };
+}
 async function getFleetSyncOverview() {
-  const pool2 = await getPool();
-  if (!pool2) return [];
-  const result = await pool2.query(`
+  const pool3 = await getPool();
+  if (!pool3) return [];
+  const result = await pool3.query(`
     SELECT * FROM (
       SELECT DISTINCT ON (v.vuuid)
         v.vuuid AS vessel_id,
@@ -15997,35 +16035,35 @@ var init_tenantConnectionManager = __esm({
           const url = new URL(masterUrl);
           url.pathname = `/${databaseName}`;
           const connectionString = url.toString();
-          const pool2 = new Pool3({
+          const pool3 = new Pool3({
             connectionString,
             ssl: this.sslFor(masterUrl),
             max: this.tenantPoolMax,
             idleTimeoutMillis: 3e4,
             connectionTimeoutMillis: 1e4
           });
-          const client = await pool2.connect();
+          const client = await pool3.connect();
           await client.query("SELECT 1");
           client.release();
           this.clearCircuitBreaker(tuid);
           if (!this.migratedTenants.has(tuid)) {
             try {
-              await runMigrations(pool2);
-              await runDrizzleMigrations(pool2);
-              await initializeDatabase(pool2);
-              await ensureMaintenanceHistoryImmutability(pool2);
+              await runMigrations(pool3);
+              await runDrizzleMigrations(pool3);
+              await initializeDatabase(pool3);
+              await ensureMaintenanceHistoryImmutability(pool3);
               this.migratedTenants.add(tuid);
               this.migrationFailures.delete(tuid);
             } catch (migErr) {
               console.error(`\u274C Tenant migration failed for '${maskTuid(tuid)}':`, migErr.message);
               this.migrationFailures.set(tuid, Date.now());
-              await pool2.end().catch(() => {
+              await pool3.end().catch(() => {
               });
               throw new TenantDatabaseError(tuid, "Schema migration failed.");
             }
           }
-          const db2 = drizzle5(pool2, { schema: schema_exports });
-          const entry = { pool: pool2, db: db2, lastUsed: Date.now() };
+          const db2 = drizzle5(pool3, { schema: schema_exports });
+          const entry = { pool: pool3, db: db2, lastUsed: Date.now() };
           this.poolCache.set(tuid, entry);
           console.log(`\u{1F517} Tenant pool created for '${maskTuid(tuid)}' (active pools: ${this.poolCache.size})`);
           return entry;
@@ -16237,8 +16275,8 @@ var init_syncEngine = __esm({
       async getVesselCode(vesselId) {
         if (this.vesselCodeCache.has(vesselId)) return this.vesselCodeCache.get(vesselId);
         try {
-          const pool2 = await getPool();
-          const result = await pool2.query(
+          const pool3 = await getPool();
+          const result = await pool3.query(
             `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
             [vesselId]
           );
@@ -16619,10 +16657,10 @@ var init_syncEngine = __esm({
               certMasterIds.add(log2.newValue);
             }
           }
-          const pool2 = await getPool();
+          const pool3 = await getPool();
           if (surveyMasterIds.size > 0) {
             try {
-              const r = await pool2.query(
+              const r = await pool3.query(
                 `SELECT master_id, survey_name, category, "group", requirement_ref,
                     applicable_to_company, survey_label, company_id, company_group, company_sequence, sequence
              FROM ship_surveys_master WHERE master_id = ANY($1) AND is_deleted = false`,
@@ -16635,7 +16673,7 @@ var init_syncEngine = __esm({
           }
           if (certMasterIds.size > 0) {
             try {
-              const r = await pool2.query(
+              const r = await pool3.query(
                 `SELECT master_id, certificate_name, category, "group", requirement_ref,
                     applicable_to_company, certificate_label, company_id, company_group, company_sequence, sequence
              FROM ship_certificates_master WHERE master_id = ANY($1) AND is_deleted = false`,
@@ -16786,8 +16824,8 @@ var init_syncEngine = __esm({
         }
         let pullSelfHealRequests = [];
         if (pullData.fieldLogs && pullData.fieldLogs.length > 0) {
-          const pool2 = await getPool();
-          const client = await pool2.connect();
+          const pool3 = await getPool();
+          const client = await pool3.connect();
           try {
             await client.query("BEGIN");
             await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
@@ -17020,7 +17058,7 @@ var init_syncEngine = __esm({
       // DELTA EXTRACTION — Get rows changed since checkpoint
       // ═══════════════════════════════════════════════════════════════
       async getChangedRows(tableName, vesselId, since, vesselScopeColumn) {
-        const pool2 = await getPool();
+        const pool3 = await getPool();
         const conditions = [];
         const params = [];
         let paramIdx = 1;
@@ -17039,7 +17077,7 @@ var init_syncEngine = __esm({
           query += " WHERE " + conditions.join(" AND ");
         }
         query += ' ORDER BY "updated_at" ASC LIMIT 5000';
-        const result = await pool2.query(query, params);
+        const result = await pool3.query(query, params);
         return result.rows;
       }
       // ═══════════════════════════════════════════════════════════════
@@ -17128,8 +17166,8 @@ var init_syncEngine = __esm({
 // server/modules/sync/provisioningService.ts
 import * as crypto3 from "crypto";
 async function generateProvisioningBundle(vesselId, generatedBy, opts) {
-  const pool2 = await getPool();
-  const vesselResult = await pool2.query(
+  const pool3 = await getPool();
+  const vesselResult = await pool3.query(
     "SELECT name, id as code FROM vessels WHERE vuuid = $1",
     [vesselId]
   );
@@ -17164,7 +17202,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
     }
   }
   try {
-    const vesselRows = await pool2.query(
+    const vesselRows = await pool3.query(
       "SELECT * FROM vessels WHERE vuuid = $1",
       [vesselId]
     );
@@ -17185,14 +17223,14 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
     (t) => t.isGlobal
   );
   for (const tc of globalTables) {
-    await exportAndAdd(pool2, bundle, tc, null, null, null, "ONE_WAY (global)");
+    await exportAndAdd(pool3, bundle, tc, null, null, null, "ONE_WAY (global)");
   }
   const vesselRefTables = getTablesByCategory("ONE_WAY_SHORE_TO_SHIP").filter(
     (t) => !t.isGlobal
   );
   for (const tc of vesselRefTables) {
     await exportAndAdd(
-      pool2,
+      pool3,
       bundle,
       tc,
       vesselId,
@@ -17206,7 +17244,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
     const tc = getTableSyncConfig(tableName);
     if (!tc) continue;
     await exportAndAdd(
-      pool2,
+      pool3,
       bundle,
       tc,
       vesselId,
@@ -17221,7 +17259,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
     if (!tc) continue;
     if (tc.vesselScopeColumn) {
       await exportAndAdd(
-        pool2,
+        pool3,
         bundle,
         tc,
         vesselId,
@@ -17231,7 +17269,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
       );
     } else if (tc.vesselScopeJoinPath) {
       const rows = await exportTableWithJoin(
-        pool2,
+        pool3,
         tc.tableName,
         tc.vesselScopeJoinPath,
         vesselId
@@ -17248,7 +17286,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
   console.log(
     `[Provisioning] Bundle generated for vessel ${vesselName} (${vesselId}): ${bundle.manifest.totalRows} total rows across ${bundle.manifest.tables.length} tables`
   );
-  const exportIntegrity = await verifyBundleExportIntegrity(pool2, vesselId, vesselCode, bundle);
+  const exportIntegrity = await verifyBundleExportIntegrity(pool3, vesselId, vesselCode, bundle);
   if (!exportIntegrity.ok) {
     const summary = exportIntegrity.shortfalls.map((s) => `${s.tableName} written=${s.written} dbCount=${s.dbCount}${s.reason ? ` (${s.reason})` : ""}`).join(" | ");
     const msg = `[Provisioning] \u26A0\uFE0F EXPORT INTEGRITY FAILED for vessel ${vesselCode} \u2014 ${exportIntegrity.shortfalls.length} table(s) under-exported: ${summary}. Bundle NOT generated (a complete baseline could not be produced).`;
@@ -17278,7 +17316,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
   }
   return bundle;
 }
-async function verifyBundleExportIntegrity(pool2, vesselId, vesselCode, bundle) {
+async function verifyBundleExportIntegrity(pool3, vesselId, vesselCode, bundle) {
   const shortfalls = [];
   for (const entry of bundle.manifest.tables) {
     if (/ERROR:/.test(entry.category)) {
@@ -17293,12 +17331,12 @@ async function verifyBundleExportIntegrity(pool2, vesselId, vesselCode, bundle) 
     try {
       let dbCount;
       if (tc.isGlobal || !tc.vesselScopeColumn) {
-        const res = await pool2.query(`SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false`);
+        const res = await pool3.query(`SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false`);
         dbCount = res.rows[0]?.c ?? 0;
       } else {
         const scopeValue = tc.vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
         if (!scopeValue) continue;
-        const res = await pool2.query(
+        const res = await pool3.query(
           `SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE "${tc.vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false`,
           [scopeValue]
         );
@@ -17336,7 +17374,7 @@ function topologicalSort(rows, idCol, parentCol) {
   return sorted;
 }
 async function importProvisioningBundle(bundle) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   let tablesImported = 0;
   let rowsImported = 0;
   const errors = [];
@@ -17361,12 +17399,12 @@ async function importProvisioningBundle(bundle) {
   if (rbacCleanupNeeded) {
     console.log("[Provisioning] Clearing seeded RBAC data before import...");
     try {
-      const deleted1 = await pool2.query("DELETE FROM adm_role_menu_access");
-      const deleted2 = await pool2.query(
+      const deleted1 = await pool3.query("DELETE FROM adm_role_menu_access");
+      const deleted2 = await pool3.query(
         "DELETE FROM adm_menumaster_ac WHERE parent_menu IS NOT NULL"
       );
-      const deleted3 = await pool2.query("DELETE FROM adm_menumaster_ac");
-      const deleted4 = await pool2.query("DELETE FROM admn_role_master");
+      const deleted3 = await pool3.query("DELETE FROM adm_menumaster_ac");
+      const deleted4 = await pool3.query("DELETE FROM admn_role_master");
       console.log(
         `[Provisioning] RBAC cleanup: deleted ${deleted1.rowCount} permissions, ${(deleted2.rowCount || 0) + (deleted3.rowCount || 0)} menus, ${deleted4.rowCount} roles`
       );
@@ -17380,9 +17418,9 @@ async function importProvisioningBundle(bundle) {
   if (ranksCleanupNeeded) {
     console.log("[Provisioning] Clearing seeded ranks data before import...");
     try {
-      await pool2.query("DELETE FROM adm_vessel_org_chart");
-      await pool2.query("DELETE FROM vessel_org_chart_nodes");
-      const deletedRanks = await pool2.query(
+      await pool3.query("DELETE FROM adm_vessel_org_chart");
+      await pool3.query("DELETE FROM vessel_org_chart_nodes");
+      const deletedRanks = await pool3.query(
         "DELETE FROM adm_available_ranks"
       );
       console.log(
@@ -17396,8 +17434,8 @@ async function importProvisioningBundle(bundle) {
   }
   if (bundleTableNames.has("view_modes_master") || bundleTableNames.has("role_view_mode_mapping")) {
     try {
-      const deletedRvm = await pool2.query("DELETE FROM role_view_mode_mapping");
-      const deletedVm = await pool2.query("DELETE FROM view_modes_master");
+      const deletedRvm = await pool3.query("DELETE FROM role_view_mode_mapping");
+      const deletedVm = await pool3.query("DELETE FROM view_modes_master");
       console.log(
         `[Provisioning] View-mode cleanup: deleted ${deletedRvm.rowCount} mapping(s), ${deletedVm.rowCount} mode(s) before import`
       );
@@ -17409,7 +17447,7 @@ async function importProvisioningBundle(bundle) {
   }
   if (bundleTableNames.has("approval_workflow_config")) {
     try {
-      const deletedAwc = await pool2.query("DELETE FROM approval_workflow_config");
+      const deletedAwc = await pool3.query("DELETE FROM approval_workflow_config");
       console.log(
         `[Provisioning] approval_workflow_config cleanup: deleted ${deletedAwc.rowCount} seeded row(s) before import`
       );
@@ -17424,7 +17462,7 @@ async function importProvisioningBundle(bundle) {
     if (identityAlwaysCache.has(tableName))
       return identityAlwaysCache.get(tableName);
     try {
-      const result = await pool2.query(
+      const result = await pool3.query(
         `SELECT a.attname AS column_name
          FROM pg_attribute a
          JOIN pg_class c ON a.attrelid = c.oid
@@ -17454,7 +17492,7 @@ async function importProvisioningBundle(bundle) {
       let hasUniqueIdentity = false;
       if (identityCol) {
         try {
-          const ixResult = await pool2.query(
+          const ixResult = await pool3.query(
             `SELECT 1 FROM pg_indexes WHERE tablename = $1 AND indexdef LIKE '%UNIQUE%' AND indexdef LIKE $2 LIMIT 1`,
             [tableData.tableName, `%${identityCol}%`]
           );
@@ -17476,7 +17514,7 @@ async function importProvisioningBundle(bundle) {
       let jsonCols = /* @__PURE__ */ new Set();
       let arrayCols = /* @__PURE__ */ new Set();
       try {
-        const colResult = await pool2.query(
+        const colResult = await pool3.query(
           `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
           [tableData.tableName]
         );
@@ -17528,12 +17566,12 @@ async function importProvisioningBundle(bundle) {
           } else {
             query = `INSERT INTO "${tableData.tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`;
           }
-          await pool2.query(query, values);
+          await pool3.query(query, values);
           tableRowCount++;
         } catch (rowError) {
           if (rowError.message.includes("duplicate key") && identityCol && row[identityCol] && row.id !== void 0) {
             try {
-              await pool2.query(
+              await pool3.query(
                 `DELETE FROM "${tableData.tableName}" WHERE id = $1 AND "${identityCol}" != $2`,
                 [row.id, row[identityCol]]
               );
@@ -17563,7 +17601,7 @@ async function importProvisioningBundle(bundle) {
               const colNames = columns.map((c) => `"${c}"`).join(", ");
               const updateSet = columns.filter((c) => c !== identityCol).map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ");
               const retryQuery = `INSERT INTO "${tableData.tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT ("${identityCol}") DO UPDATE SET ${updateSet}`;
-              await pool2.query(retryQuery, values);
+              await pool3.query(retryQuery, values);
               tableRowCount++;
             } catch (retryError) {
               if (!retryError.message.includes("duplicate key")) {
@@ -17581,7 +17619,7 @@ async function importProvisioningBundle(bundle) {
       }
       if (tableRowCount > 0) {
         try {
-          const seqCols = await pool2.query(
+          const seqCols = await pool3.query(
             `SELECT a.attname AS col
              FROM pg_attribute a
              JOIN pg_class c ON a.attrelid = c.oid
@@ -17593,7 +17631,7 @@ async function importProvisioningBundle(bundle) {
           for (const r of seqCols.rows || []) {
             const col = r.col;
             try {
-              await pool2.query(
+              await pool3.query(
                 `SELECT setval(
                   pg_get_serial_sequence('"${tableData.tableName}"', '${col}'),
                   GREATEST(COALESCE((SELECT MAX("${col}") FROM "${tableData.tableName}"), 0), 1)
@@ -17685,11 +17723,11 @@ async function importProvisioningBundle(bundle) {
   };
 }
 async function verifyProvisioning(manifest) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const mismatches = [];
   for (const tableEntry of manifest.tables) {
     try {
-      const result = await pool2.query(
+      const result = await pool3.query(
         `SELECT count(*)::int AS cnt FROM "${tableEntry.tableName}"`
       );
       const actual = result.rows[0]?.cnt ?? 0;
@@ -17714,13 +17752,13 @@ async function verifyProvisioning(manifest) {
     mismatches
   };
 }
-async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScopeColumn, categoryLabel) {
+async function exportAndAdd(pool3, bundle, tc, vesselId, vesselCode, vesselScopeColumn, categoryLabel) {
   try {
     let rows;
     let orphanSkipNote = "";
     if (tc.tableName === "planner_dates" && vesselScopeColumn && (vesselId || vesselCode)) {
       const scopeValue = vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
-      const orphanResult = await pool2.query(
+      const orphanResult = await pool3.query(
         `SELECT pd.pduuid, pd.component_id,
                 CASE WHEN c.cuuid IS NULL THEN 'component missing'
                      WHEN COALESCE(c.is_deleted, false) = true THEN 'component soft-deleted'
@@ -17753,7 +17791,7 @@ async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScope
           `[Provisioning] planner_dates: skipped ${orphans.length} orphan row(s) for vessel ${scopeValue} (${reasonSummary})`
         );
       }
-      rows = await pool2.query(
+      rows = await pool3.query(
         `SELECT pd.* FROM "planner_dates" pd
            INNER JOIN "components" c ON c.cuuid = pd.component_id
            WHERE pd."${vesselScopeColumn}" = $1
@@ -17765,12 +17803,12 @@ async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScope
       ).then((r) => r.rows);
     } else if (vesselScopeColumn && (vesselId || vesselCode)) {
       const scopeValue = vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
-      rows = await pool2.query(
+      rows = await pool3.query(
         `SELECT * FROM "${tc.tableName}" WHERE "${vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false ORDER BY COALESCE(created_at, NOW()) ASC`,
         [scopeValue]
       ).then((r) => r.rows);
     } else {
-      rows = await pool2.query(
+      rows = await pool3.query(
         `SELECT * FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false ORDER BY COALESCE(created_at, NOW()) ASC`
       ).then((r) => r.rows);
     }
@@ -17793,24 +17831,24 @@ async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScope
     });
   }
 }
-async function exportTableWithJoin(pool2, tableName, joinPath, vesselId) {
+async function exportTableWithJoin(pool3, tableName, joinPath, vesselId) {
   try {
     if (tableName === "defect_actions" || tableName === "defect_attachments") {
-      const result2 = await pool2.query(
+      const result2 = await pool3.query(
         `SELECT a.* FROM "${tableName}" a JOIN defects d ON a.defect_id = d.duuid WHERE d.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
         [vesselId]
       );
       return result2.rows;
     }
     if (tableName === "change_request_attachment" || tableName === "change_request_comment" || tableName === "change_request_approval") {
-      const result2 = await pool2.query(
+      const result2 = await pool3.query(
         `SELECT a.* FROM "${tableName}" a JOIN change_request cr ON a.change_request_id = cr.id WHERE cr.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
         [vesselId]
       );
       return result2.rows;
     }
     if (tableName === "wo_postponement_approvals") {
-      const result2 = await pool2.query(
+      const result2 = await pool3.query(
         `SELECT a.* FROM "wo_postponement_approvals" a JOIN work_order_postponements p ON a.postponement_id = p.id WHERE p.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
         [vesselId]
       );
@@ -17819,7 +17857,7 @@ async function exportTableWithJoin(pool2, tableName, joinPath, vesselId) {
     console.warn(
       `[Provisioning] Unknown join path for ${tableName}, exporting all rows`
     );
-    const result = await pool2.query(
+    const result = await pool3.query(
       `SELECT * FROM "${tableName}" WHERE COALESCE(is_deleted, false) = false`
     );
     return result.rows;
@@ -17875,8 +17913,8 @@ function classifyError(error) {
 async function getVesselCode(vesselId) {
   if (vesselCodeCache2.has(vesselId)) return vesselCodeCache2.get(vesselId);
   try {
-    const pool2 = await getPool();
-    const result = await pool2.query(
+    const pool3 = await getPool();
+    const result = await pool3.query(
       `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
       [vesselId]
     );
@@ -18019,20 +18057,20 @@ var init_autoSyncScheduler = __esm({
         const MARKER = "selfheal_reoffer_v1";
         if ((settings[MARKER] || "") === "done") return;
         try {
-          const pool2 = await getPool();
-          const r = await pool2.query(
+          const pool3 = await getPool();
+          const r = await pool3.query(
             `UPDATE sync_field_log SET is_synced = false
           WHERE instance_id = $1 AND is_synced = true
             AND table_name IN ('work_orders','superintendent_notifications')
             AND changed_at >= NOW() - interval '30 days'`,
             [instanceId]
           );
-          const upd = await pool2.query(
+          const upd = await pool3.query(
             `UPDATE sync_settings SET setting_value = 'done', updated_at = NOW() WHERE setting_key = $1`,
             [MARKER]
           );
           if ((upd.rowCount ?? 0) === 0) {
-            await pool2.query(
+            await pool3.query(
               `INSERT INTO sync_settings (setting_key, setting_value) VALUES ($1, 'done')`,
               [MARKER]
             );
@@ -18201,9 +18239,9 @@ var init_autoSyncScheduler = __esm({
 async function getRetentionConfig() {
   let syncDays = null;
   try {
-    const pool2 = await getPool();
-    if (pool2) {
-      const r = await pool2.query(`SELECT retention_value, retention_unit, enabled FROM retention_settings WHERE category = 'sync_logs' LIMIT 1`);
+    const pool3 = await getPool();
+    if (pool3) {
+      const r = await pool3.query(`SELECT retention_value, retention_unit, enabled FROM retention_settings WHERE category = 'sync_logs' LIMIT 1`);
       const row = r.rows[0];
       if (row && row.enabled && row.retention_unit !== "forever") {
         const v = Number(row.retention_value);
@@ -18233,9 +18271,9 @@ async function getRetentionConfig() {
   };
 }
 async function pruneFieldLogs(config) {
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const result = await pool2.query(
+  const pool3 = await getPool();
+  if (!pool3) return 0;
+  const result = await pool3.query(
     `DELETE FROM sync_field_log
      WHERE is_synced = true
        AND changed_at < NOW() - INTERVAL '1 day' * $1
@@ -18245,9 +18283,9 @@ async function pruneFieldLogs(config) {
   return result.rowCount ?? 0;
 }
 async function pruneBatches(config) {
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const result = await pool2.query(
+  const pool3 = await getPool();
+  if (!pool3) return 0;
+  const result = await pool3.query(
     `DELETE FROM sync_batches
      WHERE status IN ('completed', 'failed')
        AND started_at < NOW() - INTERVAL '1 day' * $1
@@ -18257,9 +18295,9 @@ async function pruneBatches(config) {
   return result.rowCount ?? 0;
 }
 async function pruneFileQueue(config) {
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const result = await pool2.query(
+  const pool3 = await getPool();
+  if (!pool3) return 0;
+  const result = await pool3.query(
     `DELETE FROM sync_file_queue
      WHERE status IN ('completed', 'failed')
        AND completed_at IS NOT NULL
@@ -18270,9 +18308,9 @@ async function pruneFileQueue(config) {
   return result.rowCount ?? 0;
 }
 async function pruneConflicts(config) {
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const result = await pool2.query(
+  const pool3 = await getPool();
+  if (!pool3) return 0;
+  const result = await pool3.query(
     `DELETE FROM sync_conflicts
      WHERE resolution IS NOT NULL
        AND resolved_at IS NOT NULL
@@ -18412,8 +18450,8 @@ async function runDriftScan(opts = {}) {
   const findings = [];
   const skippedTables = [];
   let rowsCompared = 0, fieldsCompared = 0, tablesScanned = 0;
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool3 = await getPool();
+  if (!pool3) {
     return {
       tablesScanned: 0,
       rowsCompared: 0,
@@ -18427,7 +18465,7 @@ async function runDriftScan(opts = {}) {
   const targets = scannableTables().filter((t) => !opts.tables || opts.tables.includes(t.tableName));
   for (const t of targets) {
     try {
-      const latest = await pool2.query(
+      const latest = await pool3.query(
         `SELECT DISTINCT ON (row_uuid, field_name)
                 row_uuid, field_name, new_value, changed_at, vessel_id
            FROM sync_field_log
@@ -18456,7 +18494,7 @@ async function runDriftScan(opts = {}) {
         tablesScanned++;
         continue;
       }
-      const rows = await pool2.query(
+      const rows = await pool3.query(
         `SELECT * FROM "${t.tableName}" WHERE "${t.identityColumn}" = ANY($1::text[])`,
         [uuids]
       );
@@ -18507,11 +18545,11 @@ async function runDriftScan(opts = {}) {
   return result;
 }
 async function recordFindings(findings) {
-  const pool2 = await getPool();
-  if (!pool2) return;
+  const pool3 = await getPool();
+  if (!pool3) return;
   for (const f of findings) {
     try {
-      await pool2.query(
+      await pool3.query(
         `INSERT INTO sync_field_log_failures
            (kind, table_name, row_uuid, field_name, vessel_id, failed_fields, error, details, occurred_at, last_seen_at, resolved)
          VALUES ('drift', $1, $2, $3, $4, 1, $5, $6::jsonb, NOW(), NOW(), false)
@@ -18532,9 +18570,9 @@ async function recordFindings(findings) {
   }
 }
 async function getOpenDrift(limit = 500) {
-  const pool2 = await getPool();
-  if (!pool2) return [];
-  const res = await pool2.query(
+  const pool3 = await getPool();
+  if (!pool3) return [];
+  const res = await pool3.query(
     `SELECT id, table_name, row_uuid, field_name, vessel_id, error, details, occurred_at, last_seen_at
        FROM sync_field_log_failures
       WHERE kind = 'drift' AND resolved = false
@@ -18751,8 +18789,8 @@ async function statusHandler(req, res) {
       unresolved: null
     };
     try {
-      const pool2 = await getPool();
-      const r = await pool2.query(`SELECT count(*)::int AS n FROM sync_field_log_failures WHERE resolved = false`);
+      const pool3 = await getPool();
+      const r = await pool3.query(`SELECT count(*)::int AS n FROM sync_field_log_failures WHERE resolved = false`);
       fieldLogFailures.unresolved = r.rows[0]?.n ?? 0;
     } catch {
     }
@@ -19401,8 +19439,8 @@ function header(req, name) {
 async function batchInstanceMatches(req, instanceId) {
   const batchUuid = req.body && req.body.batchUuid;
   if (!batchUuid) return true;
-  const pool2 = await getPool();
-  const r = await pool2.query(
+  const pool3 = await getPool();
+  const r = await pool3.query(
     `SELECT initiated_by_instance FROM sync_batches WHERE batch_uuid = $1 LIMIT 1`,
     [batchUuid]
   );
@@ -34958,6 +34996,409 @@ var init_workOrderService2 = __esm({
   }
 });
 
+// server/modules/work-orders/services/workOrderGenerationGate.ts
+var workOrderGenerationGate_exports = {};
+__export(workOrderGenerationGate_exports, {
+  evaluateDirectGeneration: () => evaluateDirectGeneration,
+  resolveGateRole: () => resolveGateRole
+});
+function resolveGateRole(user) {
+  return (user?.forwardedRole || user?.role || "").trim();
+}
+async function evaluateDirectGeneration(opts) {
+  if (opts.isShip) return { allowed: true, state: null };
+  let state;
+  try {
+    state = await getVesselProvisioningState(opts.vesselId);
+  } catch (err) {
+    return {
+      allowed: false,
+      code: "VESSEL_STATE_UNKNOWN",
+      message: "Could not determine whether this vessel has a ship provisioned, so work-order generation was refused. Try again; if it persists, raise it with support.",
+      state: null
+    };
+  }
+  if (opts.role !== PROVISIONING_ROLE) {
+    return {
+      allowed: false,
+      code: "ROLE_NOT_PERMITTED",
+      message: `Only a ${PROVISIONING_ROLE} may generate work orders directly from the office.`,
+      state
+    };
+  }
+  return { allowed: true, state };
+}
+var PROVISIONING_ROLE;
+var init_workOrderGenerationGate = __esm({
+  "server/modules/work-orders/services/workOrderGenerationGate.ts"() {
+    "use strict";
+    init_service();
+    PROVISIONING_ROLE = "Sail Admin";
+  }
+});
+
+// server/modules/work-orders/repositories/workOrderReconcileRepository.ts
+var workOrderReconcileRepository_exports = {};
+__export(workOrderReconcileRepository_exports, {
+  archiveSummary: () => archiveSummary,
+  countChildRows: () => countChildRows,
+  countDuplicateGroups: () => countDuplicateGroups,
+  findDuplicateGroups: () => findDuplicateGroups,
+  getInsertOriginInstanceId: () => getInsertOriginInstanceId,
+  getProvisionedVesselIds: () => getProvisionedVesselIds,
+  getShipInstanceIds: () => getShipInstanceIds,
+  hasDocuments: () => hasDocuments,
+  insertArchiveRow: () => insertArchiveRow,
+  repointChildren: () => repointChildren,
+  softDeleteWorkOrder: () => softDeleteWorkOrder
+});
+import { randomUUID as randomUUID6 } from "crypto";
+async function pool2() {
+  const p = await getPool();
+  if (!p) throw Object.assign(new Error("Database not initialized"), { statusCode: 503 });
+  return p;
+}
+async function findDuplicateGroups(vesselId, cap) {
+  const p = await pool2();
+  const groups = await p.query(
+    `SELECT work_order_no
+       FROM work_orders
+      WHERE vessel_id = $1 AND data_scope = 'vessel' AND is_deleted = false
+      GROUP BY work_order_no
+     HAVING count(*) > 1
+      ORDER BY work_order_no
+      LIMIT $2`,
+    [vesselId, cap]
+  );
+  const out = [];
+  for (const g of groups.rows) {
+    const rows = await p.query(
+      `SELECT * FROM work_orders
+        WHERE vessel_id = $1 AND work_order_no = $2 AND data_scope = 'vessel' AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [vesselId, g.work_order_no]
+    );
+    out.push({ vesselId, workOrderNo: g.work_order_no, rows: rows.rows });
+  }
+  return out;
+}
+async function countDuplicateGroups(vesselId) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT count(*)::int AS n FROM (
+       SELECT 1 FROM work_orders
+        WHERE vessel_id = $1 AND data_scope = 'vessel' AND is_deleted = false
+        GROUP BY work_order_no HAVING count(*) > 1) t`,
+    [vesselId]
+  );
+  return r.rows[0]?.n ?? 0;
+}
+async function getInsertOriginInstanceId(wouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT instance_id
+       FROM sync_field_log
+      WHERE table_name = 'work_orders' AND row_uuid = $1
+        AND old_value IS NULL AND is_deleted = false
+      ORDER BY changed_at ASC
+      LIMIT 1`,
+    [wouuid]
+  );
+  return r.rows[0]?.instance_id ?? null;
+}
+async function getShipInstanceIds(vesselId) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT instance_id FROM sync_metadata WHERE vessel_id = $1 AND is_deleted = false`,
+    [vesselId]
+  );
+  return new Set(r.rows.map((x) => x.instance_id));
+}
+async function hasDocuments(wouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT 1 FROM work_order_documents WHERE work_order_id = $1 AND is_deleted = false LIMIT 1`,
+    [wouuid]
+  );
+  return r.rows.length > 0;
+}
+async function repointChildren(table, fkColumn, idColumn, loserWouuid, survivorWouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `UPDATE "${table}" SET "${fkColumn}" = $1, updated_at = now()
+      WHERE "${fkColumn}" = $2 AND is_deleted = false
+      RETURNING "${idColumn}" AS log_id`,
+    [survivorWouuid, loserWouuid]
+  );
+  return r.rows.map((x) => String(x.log_id));
+}
+async function countChildRows(table, fkColumn, loserWouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT count(*)::int AS n FROM "${table}" WHERE "${fkColumn}" = $1 AND is_deleted = false`,
+    [loserWouuid]
+  );
+  return r.rows[0]?.n ?? 0;
+}
+async function softDeleteWorkOrder(wouuid) {
+  const p = await pool2();
+  await p.query(`UPDATE work_orders SET is_deleted = true, updated_at = now() WHERE wouuid = $1`, [wouuid]);
+}
+async function insertArchiveRow(row) {
+  const p = await pool2();
+  const r = await p.query(
+    `INSERT INTO work_order_reconcile_archive
+       (archive_uuid, vessel_id, work_order_no, loser_wouuid, survivor_wouuid,
+        resolution_case, loser_row_snapshot, child_moves, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (loser_wouuid) DO NOTHING`,
+    [
+      randomUUID6(),
+      row.vesselId,
+      row.workOrderNo,
+      row.loserWouuid,
+      row.survivorWouuid,
+      row.resolutionCase,
+      JSON.stringify(row.loserRowSnapshot),
+      JSON.stringify(row.childMoves),
+      row.notes
+    ]
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+async function archiveSummary() {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT a.vessel_id, v.name AS vessel_name, a.resolution_case, count(*)::int AS resolved,
+            max(a.reconciled_at) AS last_reconciled_at
+       FROM work_order_reconcile_archive a
+       LEFT JOIN vessels v ON v.vuuid = a.vessel_id
+      GROUP BY a.vessel_id, v.name, a.resolution_case
+      ORDER BY v.name, a.resolution_case`
+  );
+  return r.rows;
+}
+async function getProvisionedVesselIds() {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT DISTINCT v.vuuid
+       FROM vessels v
+       JOIN sync_metadata sm ON sm.vessel_id = v.vuuid AND sm.is_deleted = false
+      WHERE v.is_deleted = false`
+  );
+  return r.rows.map((x) => x.vuuid);
+}
+var init_workOrderReconcileRepository = __esm({
+  "server/modules/work-orders/repositories/workOrderReconcileRepository.ts"() {
+    "use strict";
+    init_db();
+  }
+});
+
+// server/modules/work-orders/services/workOrderReconcilerService.ts
+var workOrderReconcilerService_exports = {};
+__export(workOrderReconcilerService_exports, {
+  MAX_GROUPS_PER_VESSEL_PER_RUN: () => MAX_GROUPS_PER_VESSEL_PER_RUN,
+  getLastRunSummary: () => getLastRunSummary,
+  reconcileAllProvisionedVessels: () => reconcileAllProvisionedVessels,
+  reconcileVessel: () => reconcileVessel
+});
+function getLastRunSummary() {
+  return lastRun;
+}
+function isNonEmpty(v) {
+  if (v === null || v === void 0) return false;
+  const s = String(v).trim();
+  return s !== "" && s !== "[]" && s !== "{}" && s.toLowerCase() !== "null";
+}
+async function isTouched(row) {
+  if (isNonEmpty(row.approver) || isNonEmpty(row.submitted_date) || isNonEmpty(row.date_completed) || isNonEmpty(row.work_carried_out) || isNonEmpty(row.performed_by) || isNonEmpty(row.manhours)) {
+    return true;
+  }
+  const consumed = row.consumed_spare_parts;
+  if (Array.isArray(consumed) ? consumed.length > 0 : isNonEmpty(consumed)) return true;
+  if (WORKFLOW_STATUSES.has(String(row.status || "").toLowerCase().trim())) return true;
+  return await hasDocuments(row.wouuid);
+}
+async function resolveGroup(group, shipInstanceIds) {
+  const flags = await Promise.all(group.rows.map(isTouched));
+  const touched = group.rows.filter((_, i) => flags[i]);
+  let survivor;
+  let resolutionCase;
+  let caseNote = "";
+  if (touched.length === 1) {
+    resolutionCase = 1;
+    survivor = touched[0];
+  } else {
+    resolutionCase = touched.length === 0 ? 2 : 3;
+    const pool3 = touched.length >= 2 ? touched : group.rows;
+    const origins = await Promise.all(pool3.map((r) => getInsertOriginInstanceId(r.wouuid)));
+    const shipRows = pool3.filter((_, i) => origins[i] !== null && shipInstanceIds.has(origins[i]));
+    if (shipRows.length > 0) {
+      survivor = shipRows[0];
+    } else {
+      survivor = pool3[0];
+      caseNote = "origin-logs-absent: fell back to earliest created_at";
+    }
+  }
+  for (const loser of group.rows) {
+    if (loser.wouuid === survivor.wouuid) continue;
+    const childMoves = {};
+    for (const spec of REPOINT_TABLES) {
+      const movedIds = await repointChildren(spec.table, spec.fkColumn, spec.idColumn, loser.wouuid, survivor.wouuid);
+      if (movedIds.length === 0) continue;
+      childMoves[spec.table] = { moved: movedIds.length };
+      if (spec.synced) {
+        for (const logId of movedIds) {
+          await logFieldChanges(
+            spec.table,
+            logId,
+            group.vesselId,
+            { [spec.fkColumn]: loser.wouuid },
+            { [spec.fkColumn]: survivor.wouuid },
+            RECONCILE_ACTOR
+          );
+        }
+      }
+    }
+    let leftInPlaceTotal = 0;
+    for (const spec of LEFT_IN_PLACE_TABLES) {
+      const n = await countChildRows(spec.table, spec.fkColumn, loser.wouuid);
+      if (n > 0) {
+        childMoves[spec.table] = { left_in_place: n, reason: spec.reason };
+        leftInPlaceTotal += n;
+      }
+    }
+    await insertArchiveRow({
+      vesselId: group.vesselId,
+      workOrderNo: group.workOrderNo,
+      loserWouuid: loser.wouuid,
+      survivorWouuid: survivor.wouuid,
+      resolutionCase,
+      loserRowSnapshot: loser,
+      childMoves,
+      notes: caseNote || null
+    });
+    await softDeleteWorkOrder(loser.wouuid);
+    await logFieldChanges(
+      "work_orders",
+      loser.wouuid,
+      group.vesselId,
+      { is_deleted: false },
+      { is_deleted: true },
+      RECONCILE_ACTOR
+    );
+    const line = `[WO-Reconciler] case ${resolutionCase}: ${group.workOrderNo} \u2014 loser ${loser.wouuid.slice(0, 8)} archived+retired, survivor ${survivor.wouuid.slice(0, 8)}, children moved: ${Object.keys(childMoves).filter((k) => !childMoves[k].left_in_place).join(", ") || "none"}` + (leftInPlaceTotal > 0 ? `, left-in-place: ${leftInPlaceTotal}` : "") + (caseNote ? ` (${caseNote})` : "");
+    console.log(line);
+    syncDiag(`WO-RECONCILE case=${resolutionCase} vessel=${group.vesselId} no=${group.workOrderNo} loser=${loser.wouuid} survivor=${survivor.wouuid}${caseNote ? ` note=${caseNote}` : ""}`);
+  }
+  return { resolutionCase };
+}
+async function reconcileVessel(vesselId) {
+  const result = {
+    vesselId,
+    groupsSeen: 0,
+    resolved: { case1: 0, case2: 0, case3: 0 },
+    skippedUnresolvable: 0,
+    remainingGroups: 0,
+    lockBusy: false,
+    errors: []
+  };
+  if (await isShipInstance()) {
+    result.errors.push("refused: reconciler is shore-only");
+    return result;
+  }
+  const engine = getSyncEngine();
+  if (!engine.tryAcquireVessel(vesselId)) {
+    result.lockBusy = true;
+    syncDiag(`WO-RECONCILE SKIP vessel=${vesselId} \u2014 sync in progress (lock busy)`);
+    return result;
+  }
+  try {
+    const shipInstanceIds = await getShipInstanceIds(vesselId);
+    const groups = await findDuplicateGroups(vesselId, MAX_GROUPS_PER_VESSEL_PER_RUN);
+    result.groupsSeen = groups.length;
+    for (const group of groups) {
+      try {
+        const r = await resolveGroup(group, shipInstanceIds);
+        if (r) result.resolved[`case${r.resolutionCase}`]++;
+        else result.skippedUnresolvable++;
+      } catch (err) {
+        result.errors.push(`${group.workOrderNo}: ${err?.message || err}`);
+        console.error(`[WO-Reconciler] ERROR on ${group.workOrderNo}:`, err?.message || err);
+      }
+    }
+    result.remainingGroups = await countDuplicateGroups(vesselId);
+    if (result.remainingGroups > 0) {
+      console.log(`[WO-Reconciler] vessel ${vesselId}: ${result.remainingGroups} duplicate group(s) remain \u2014 picked up next run (cap ${MAX_GROUPS_PER_VESSEL_PER_RUN}/run)`);
+    }
+  } finally {
+    engine.releaseVessel(vesselId);
+  }
+  return result;
+}
+async function reconcileAllProvisionedVessels() {
+  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const vessels2 = await getProvisionedVesselIds();
+  const results = [];
+  for (const v of vessels2) {
+    try {
+      results.push(await reconcileVessel(v));
+    } catch (err) {
+      results.push({
+        vesselId: v,
+        groupsSeen: 0,
+        resolved: { case1: 0, case2: 0, case3: 0 },
+        skippedUnresolvable: 0,
+        remainingGroups: -1,
+        lockBusy: false,
+        errors: [String(err?.message || err)]
+      });
+    }
+  }
+  lastRun = { startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), vessels: results };
+  const totals = results.reduce((a, r) => a + r.resolved.case1 + r.resolved.case2 + r.resolved.case3, 0);
+  console.log(`[WO-Reconciler] sweep done: ${vessels2.length} provisioned vessel(s), ${totals} duplicate(s) resolved`);
+  return lastRun;
+}
+var RECONCILE_ACTOR, MAX_GROUPS_PER_VESSEL_PER_RUN, WORKFLOW_STATUSES, REPOINT_TABLES, LEFT_IN_PLACE_TABLES, lastRun;
+var init_workOrderReconcilerService = __esm({
+  "server/modules/work-orders/services/workOrderReconcilerService.ts"() {
+    "use strict";
+    init_workOrderReconcileRepository();
+    init_sync();
+    init_syncDiagLogger();
+    init_syncEngine();
+    init_syncRole();
+    RECONCILE_ACTOR = "wo-reconciler";
+    MAX_GROUPS_PER_VESSEL_PER_RUN = 50;
+    WORKFLOW_STATUSES = /* @__PURE__ */ new Set([
+      "completed",
+      "pending approval",
+      "postponed",
+      "rejected",
+      "awaiting office approval",
+      "postponement approved",
+      "in progress"
+    ]);
+    REPOINT_TABLES = [
+      { table: "work_order_documents", fkColumn: "work_order_id", idColumn: "id", synced: true },
+      { table: "work_order_executions", fkColumn: "template_id", idColumn: "id", synced: true },
+      { table: "work_order_execution_details", fkColumn: "work_order_id", idColumn: "woeduuid", synced: true },
+      { table: "work_order_postponements", fkColumn: "work_order_id", idColumn: "id", synced: true },
+      { table: "superintendent_notifications", fkColumn: "work_order_id", idColumn: "snuuid", synced: true },
+      { table: "wo_postponement_approvals", fkColumn: "work_order_id", idColumn: "wpauuid", synced: true },
+      // NO_SYNC local bookkeeping — repointed so shore views stay correct; no field log.
+      { table: "work_order_anomalies", fkColumn: "work_order_id", idColumn: "id", synced: false }
+    ];
+    LEFT_IN_PLACE_TABLES = [
+      { table: "ihm_maintenance_log", fkColumn: "work_order_id", reason: "serial-id repoint mints phantoms on ship (\xA79.4)" },
+      { table: "component_maintenance_history", fkColumn: "work_order_id", reason: "immutable by DB trigger" }
+    ];
+    lastRun = null;
+  }
+});
+
 // server/modules/cert-surveys/repositories/certificateRepository.ts
 var certificateRepository_exports = {};
 __export(certificateRepository_exports, {
@@ -37551,6 +37992,95 @@ var init_alertEngine = __esm({
   }
 });
 
+// server/services/shoreWoDailyScheduler.ts
+var shoreWoDailyScheduler_exports = {};
+__export(shoreWoDailyScheduler_exports, {
+  shoreWoDailyScheduler: () => shoreWoDailyScheduler
+});
+var DEFAULT_INTERVAL_MS, FIRST_RUN_DELAY_MS, ShoreWoDailyScheduler, shoreWoDailyScheduler;
+var init_shoreWoDailyScheduler = __esm({
+  "server/services/shoreWoDailyScheduler.ts"() {
+    "use strict";
+    init_syncRole();
+    init_syncDiagLogger();
+    DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1e3;
+    FIRST_RUN_DELAY_MS = 10 * 60 * 1e3;
+    ShoreWoDailyScheduler = class {
+      timer = null;
+      firstRunTimer = null;
+      running = false;
+      // scheduler armed
+      sweepInFlight = false;
+      // a sweep is executing right now
+      intervalMs = DEFAULT_INTERVAL_MS;
+      isRunning() {
+        return this.running;
+      }
+      start(intervalMs) {
+        if (this.running) return;
+        this.intervalMs = intervalMs || parseInt(process.env.SHORE_WO_SWEEP_INTERVAL_MS || "", 10) || DEFAULT_INTERVAL_MS;
+        this.running = true;
+        this.firstRunTimer = setTimeout(() => {
+          void this.runSweep();
+        }, FIRST_RUN_DELAY_MS);
+        this.timer = setInterval(() => {
+          void this.runSweep();
+        }, this.intervalMs);
+        console.log(`[ShoreWoSweep] started \u2014 daily generation+reconcile for provisioned vessels (interval ${this.intervalMs / 36e5}h, first run in ${FIRST_RUN_DELAY_MS / 6e4}min)`);
+      }
+      stop() {
+        if (this.firstRunTimer) {
+          clearTimeout(this.firstRunTimer);
+          this.firstRunTimer = null;
+        }
+        if (this.timer) {
+          clearInterval(this.timer);
+          this.timer = null;
+        }
+        if (this.running) console.log("[ShoreWoSweep] stopped");
+        this.running = false;
+      }
+      /** One full sweep: per provisioned vessel — generate, then reconcile. */
+      async runSweep() {
+        if (this.sweepInFlight) {
+          console.warn("[ShoreWoSweep] previous sweep still in flight \u2014 skipping this tick");
+          return;
+        }
+        this.sweepInFlight = true;
+        try {
+          if (await isShipInstance()) {
+            console.warn("[ShoreWoSweep] instance resolves as SHIP \u2014 refusing to run the shore sweep");
+            return;
+          }
+          const reconRepo = await Promise.resolve().then(() => (init_workOrderReconcileRepository(), workOrderReconcileRepository_exports));
+          const reconciler = await Promise.resolve().then(() => (init_workOrderReconcilerService(), workOrderReconcilerService_exports));
+          const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
+          const vessels2 = await reconRepo.getProvisionedVesselIds();
+          syncDiag(`SHORE-WO-SWEEP START vessels=${vessels2.length}`);
+          let generated = 0, resolved = 0;
+          for (const vesselId of vessels2) {
+            try {
+              const scan = await jobDueScanner2.runScan(vesselId);
+              if (!scan.skipped) {
+                generated += scan.calendarWOsGenerated + scan.rhWOsGenerated + scan.dualWOsGenerated;
+              }
+              const r = await reconciler.reconcileVessel(vesselId);
+              resolved += r.resolved.case1 + r.resolved.case2 + r.resolved.case3;
+            } catch (err) {
+              console.error(`[ShoreWoSweep] vessel ${vesselId} failed: ${err?.message || err}`);
+            }
+          }
+          console.log(`[ShoreWoSweep] sweep complete: ${vessels2.length} vessel(s), generated=${generated}, duplicates resolved=${resolved}`);
+          syncDiag(`SHORE-WO-SWEEP END vessels=${vessels2.length} generated=${generated} resolved=${resolved}`);
+        } finally {
+          this.sweepInFlight = false;
+        }
+      }
+    };
+    shoreWoDailyScheduler = new ShoreWoDailyScheduler();
+  }
+});
+
 // server/services/maintenanceOrchestrator.ts
 var maintenanceOrchestrator_exports = {};
 __export(maintenanceOrchestrator_exports, {
@@ -37683,14 +38213,14 @@ __export(shipskartReconcilerScheduler_exports, {
   ShipskartReconcilerScheduler: () => ShipskartReconcilerScheduler,
   shipskartReconcilerScheduler: () => shipskartReconcilerScheduler
 });
-var DEFAULT_INTERVAL_MS, DEFAULT_BOOT_DELAY_MS, ShipskartReconcilerScheduler, shipskartReconcilerScheduler;
+var DEFAULT_INTERVAL_MS2, DEFAULT_BOOT_DELAY_MS, ShipskartReconcilerScheduler, shipskartReconcilerScheduler;
 var init_shipskartReconcilerScheduler = __esm({
   "server/modules/shipskart/services/shipskartReconcilerScheduler.ts"() {
     "use strict";
     init_shipskartReconcilerService();
     init_syncRole();
     init_identityGuard();
-    DEFAULT_INTERVAL_MS = 60 * 60 * 1e3;
+    DEFAULT_INTERVAL_MS2 = 60 * 60 * 1e3;
     DEFAULT_BOOT_DELAY_MS = 5 * 60 * 1e3;
     ShipskartReconcilerScheduler = class {
       timer = null;
@@ -37703,7 +38233,7 @@ var init_shipskartReconcilerScheduler = __esm({
           console.log("[ShipskartReconciler] Ship instance \u2014 scheduler NOT started (Shipskart integration is shore-only)");
           return;
         }
-        const intervalMs = parseInt(process.env.SHIPSKART_RECONCILE_INTERVAL_MS || "", 10) || DEFAULT_INTERVAL_MS;
+        const intervalMs = parseInt(process.env.SHIPSKART_RECONCILE_INTERVAL_MS || "", 10) || DEFAULT_INTERVAL_MS2;
         const bootDelayMs = parseInt(process.env.SHIPSKART_RECONCILE_BOOT_DELAY_MS || "", 10) || DEFAULT_BOOT_DELAY_MS;
         const limit = parseInt(process.env.SHIPSKART_RECONCILE_BATCH || "", 10) || void 0;
         this.bootTimer = setTimeout(() => {
@@ -37804,7 +38334,13 @@ var init_schedulerRoleWatchdog = __esm({
             );
           }
           this.lastRole = role;
+          const { shoreWoDailyScheduler: shoreWoDailyScheduler2 } = await Promise.resolve().then(() => (init_shoreWoDailyScheduler(), shoreWoDailyScheduler_exports));
           if (ship) {
+            if (shoreWoDailyScheduler2.isRunning()) {
+              console.warn("[RoleWatchdog] Instance resolves as SHIP \u2014 stopping the shore WO sweep (shore-only).");
+              syncDiag("[RoleWatchdog] Instance resolves as SHIP \u2014 shore WO sweep stopped.");
+              shoreWoDailyScheduler2.stop();
+            }
             if (!syncAutoScheduler.isStarted()) {
               console.warn(
                 "[RoleWatchdog] \u{1FA79} SELF-HEAL: this instance resolves as a SHIP but the auto-sync scheduler is not running (stale boot-time role decision) \u2014 starting it now."
@@ -37824,6 +38360,13 @@ var init_schedulerRoleWatchdog = __esm({
               jobDueScanner.start(this.jobDueScanIntervalMs);
             }
           } else {
+            if (!shoreWoDailyScheduler2.isRunning()) {
+              console.warn(
+                "[RoleWatchdog] \u{1FA79} SELF-HEAL: this instance resolves as SHORE but the shore WO sweep is not running \u2014 starting it now."
+              );
+              syncDiag("[RoleWatchdog] SELF-HEAL: instance resolves as SHORE but shore WO sweep was not running \u2014 started late.");
+              shoreWoDailyScheduler2.start();
+            }
             if (syncAutoScheduler.isStarted() || jobDueScanner.isStarted()) {
               console.warn(
                 "[RoleWatchdog] Instance now resolves as SHORE \u2014 stopping ship-only schedulers (auto-sync / job-due scanner). Sync stays ship-initiated."
@@ -38613,9 +39156,9 @@ init_schema();
 import { eq as eq4 } from "drizzle-orm";
 async function augmentWithSortOrder(components2) {
   if (components2.length === 0) return components2;
-  const { pool: pool2 } = getPostgresClient();
+  const { pool: pool3 } = getPostgresClient();
   const ids = components2.map((c) => c.id);
-  const result = await pool2.query(
+  const result = await pool3.query(
     `SELECT id, sort_order FROM components WHERE id = ANY($1)`,
     [ids]
   );
@@ -38757,10 +39300,10 @@ async function findMaintenanceHistoryByVessel(vesselId) {
   return storage.getMaintenanceHistoryByVessel(vesselId);
 }
 async function updateSortOrder(updates) {
-  const { pool: pool2 } = getPostgresClient();
+  const { pool: pool3 } = getPostgresClient();
   let totalUpdated = 0;
   for (const update6 of updates) {
-    const result = await pool2.query(
+    const result = await pool3.query(
       `UPDATE components SET sort_order = $1, updated_at = NOW() WHERE cuuid = $2`,
       [update6.sortOrder, update6.id]
     );
@@ -38772,8 +39315,8 @@ async function updateSortOrder(updates) {
   return { success: true, updated: totalUpdated };
 }
 async function updateHierarchyAndSortOrder(sortUpdates, reparents) {
-  const { pool: pool2 } = getPostgresClient();
-  const client = await pool2.connect();
+  const { pool: pool3 } = getPostgresClient();
+  const client = await pool3.connect();
   const reparentAudits = [];
   try {
     await client.query("BEGIN");
@@ -44711,6 +45254,24 @@ async function generateNow(req, res) {
   if (!vesselId || typeof vesselId !== "string" || vesselId === "all") {
     throw new ValidationError("A specific vesselId is required to generate work orders.");
   }
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  const gate = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
+  const decision = await gate.evaluateDirectGeneration({
+    vesselId,
+    role: gate.resolveGateRole(req.user),
+    isShip: await isShipInstance2()
+  });
+  if (!decision.allowed) {
+    console.warn(
+      `[WO-Gate] REFUSED direct generation: vessel=${vesselId} reason=${decision.code} verdict=${decision.state?.verdict ?? "unknown"} metadataRows=${decision.state?.metadataRows ?? "?"} lastSyncAt=${decision.state?.lastSyncAt?.toISOString() ?? "never"}`
+    );
+    return res.status(403).json({
+      success: false,
+      error: decision.code,
+      message: decision.message,
+      vesselState: decision.state ? { verdict: decision.state.verdict, lastSyncAt: decision.state.lastSyncAt } : null
+    });
+  }
   const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
   const result = await jobDueScanner2.runScan(vesselId);
   if (result.skipped) {
@@ -44728,6 +45289,14 @@ async function generateNow(req, res) {
     checked,
     breakdown: result,
     message: generated > 0 ? `Generated ${generated} work order(s) from ${checked} due job(s).` : `No work orders were due. Checked ${checked} job(s).`
+  });
+}
+async function getReconcilerStatus(req, res) {
+  const reconciler = await Promise.resolve().then(() => (init_workOrderReconcilerService(), workOrderReconcilerService_exports));
+  const reconRepo = await Promise.resolve().then(() => (init_workOrderReconcileRepository(), workOrderReconcileRepository_exports));
+  res.json({
+    archive: await reconRepo.archiveSummary(),
+    lastRun: reconciler.getLastRunSummary()
   });
 }
 async function getWorkOrderContext2(req, res) {
@@ -45493,6 +46062,7 @@ router5.get("/work-orders/:id", asyncHandler(getWorkOrder2));
 router5.get("/work-orders/:id/context", asyncHandler(getWorkOrderContext2));
 router5.get("/work-orders/:id/rejection-history", asyncHandler(getRejectionHistory2));
 router5.post("/work-orders/generate-now", asyncHandler(generateNow));
+router5.get("/work-orders/reconciler/status", asyncHandler(getReconcilerStatus));
 router5.post("/work-orders", asyncHandler(createWorkOrder2));
 router5.patch("/work-orders/:id", asyncHandler(updateWorkOrder2));
 router5.delete("/work-orders/:id", asyncHandler(deleteWorkOrder2));
@@ -50847,9 +51417,9 @@ async function updateFleetScopedComponent(id, data) {
   return storage.updateFleetScopedComponent(id, data);
 }
 async function updateComponentSortOrder(updates) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   for (const update6 of updates) {
-    await pool2.query(
+    await pool3.query(
       `UPDATE fleet_components SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
       [update6.sortOrder, update6.id]
     );
@@ -51897,7 +52467,7 @@ import { z as z6 } from "zod";
 // server/modules/fleet/services/fleetAdminService.ts
 init_schema();
 import { z as z5 } from "zod";
-import { randomUUID as randomUUID6 } from "crypto";
+import { randomUUID as randomUUID7 } from "crypto";
 import { eq as eq19, and as and16 } from "drizzle-orm";
 
 // server/modules/fleet/repositories/fleetAdminRepository.ts
@@ -52832,7 +53402,7 @@ async function copyVessel(body) {
         continue;
       }
       const newId = generateId("COMP");
-      const newCuuid = randomUUID6();
+      const newCuuid = randomUUID7();
       componentIdMap.set(comp.cuuid, newCuuid);
       try {
         await db2.insert(components2).values({
@@ -52905,7 +53475,7 @@ async function copyVessel(body) {
       try {
         await db2.insert(jobs2).values({
           id: newId,
-          juuid: randomUUID6(),
+          juuid: randomUUID7(),
           vesselId: data.targetVesselCode,
           componentId: newComponentId,
           componentCode: job.componentCode,
@@ -52974,7 +53544,7 @@ async function copyVessel(body) {
       const newComponentId = componentIdMap.get(spare.componentId || "") || spare.componentId;
       try {
         const [inserted] = await db2.insert(spares2).values({
-          suuid: randomUUID6(),
+          suuid: randomUUID7(),
           partCode: spare.partCode,
           partName: spare.partName,
           componentId: newComponentId,
@@ -53051,7 +53621,7 @@ async function copyVessel(body) {
       if (existingStoreCodes.has(storeKey)) continue;
       try {
         await db2.insert(storesItems2).values({
-          stuuid: randomUUID6(),
+          stuuid: randomUUID7(),
           vesselId: data.targetVesselCode,
           itemType: item.itemType,
           itemCode: item.itemCode,
@@ -76369,8 +76939,8 @@ async function reconcileApprovers(fetchedApprovers, now, stats) {
     }
     return null;
   };
-  const pool2 = await getPool();
-  const client = await pool2.connect();
+  const pool3 = await getPool();
+  const client = await pool3.connect();
   const technical = fetchedApprovers.filter(
     (a) => (a.modulename || a.moduleName || "") === "Technical"
   );
@@ -77299,7 +77869,7 @@ async function fetchAuditLog(f, take) {
   return { rows: rows.map(mapAuditLogRow), total };
 }
 async function fetchRunningHours(f, take) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const conds = ["(is_deleted IS DISTINCT FROM true)"];
   const vals = [];
   if (f.startDate) {
@@ -77322,8 +77892,8 @@ async function fetchRunningHours(f, take) {
     conds.push("1=0");
   }
   const where = `WHERE ${conds.join(" AND ")}`;
-  const countRes = await pool2.query(`SELECT count(*)::int n FROM running_hours_audit ${where}`, vals);
-  const rowsRes = await pool2.query(
+  const countRes = await pool3.query(`SELECT count(*)::int n FROM running_hours_audit ${where}`, vals);
+  const rowsRes = await pool3.query(
     `SELECT rhauuid, id, entered_at_utc, created_at, actor_label, user_id, previous_rh, new_rh, component_name, component_code, component_id, source, notes
      FROM running_hours_audit ${where} ORDER BY entered_at_utc DESC LIMIT ${take}`,
     vals
@@ -77331,7 +77901,7 @@ async function fetchRunningHours(f, take) {
   return { rows: rowsRes.rows.map(mapRhRow), total: Number(countRes.rows[0]?.n ?? 0) };
 }
 async function fetchPostponements(f, take) {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const conds = ["(p.is_deleted IS DISTINCT FROM true)", "p.disposed_at IS NULL"];
   const vals = [];
   if (f.startDate) {
@@ -77354,8 +77924,8 @@ async function fetchPostponements(f, take) {
     conds.push("1=0");
   }
   const where = `WHERE ${conds.join(" AND ")}`;
-  const countRes = await pool2.query(`SELECT count(*)::int n FROM work_order_postponements p LEFT JOIN work_orders w ON w.wouuid = p.work_order_id ${where}`, vals);
-  const rowsRes = await pool2.query(
+  const countRes = await pool3.query(`SELECT count(*)::int n FROM work_order_postponements p LEFT JOIN work_orders w ON w.wouuid = p.work_order_id ${where}`, vals);
+  const rowsRes = await pool3.query(
     `SELECT p.id, p.created_at, p.submitted_date, p.approved_date, p.status, p.approver, p.approved_by, p.authorized_by,
             p.created_by_uuid, p.original_due_date, p.new_due_date, p.postponement_reason, p.postponement_remarks,
             p.approval_remarks, p.work_order_id, w.work_order_no
@@ -77565,13 +78135,13 @@ function rowToSetting(r) {
   };
 }
 async function getAllSettings2() {
-  const pool2 = await getPool();
-  const r = await pool2.query("SELECT * FROM retention_settings ORDER BY id");
+  const pool3 = await getPool();
+  const r = await pool3.query("SELECT * FROM retention_settings ORDER BY id");
   return r.rows.map(rowToSetting);
 }
 async function getSetting2(category) {
-  const pool2 = await getPool();
-  const r = await pool2.query("SELECT * FROM retention_settings WHERE category = $1 LIMIT 1", [category]);
+  const pool3 = await getPool();
+  const r = await pool3.query("SELECT * FROM retention_settings WHERE category = $1 LIMIT 1", [category]);
   return r.rows[0] ? rowToSetting(r.rows[0]) : null;
 }
 function buildEligibleWhere(t, days, startIdx) {
@@ -77582,7 +78152,7 @@ function buildEligibleWhere(t, days, startIdx) {
   return { sql: conds.join(" AND "), params };
 }
 async function getEligibility() {
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   const settings = await getAllSettings2();
   const out = {};
   for (const s of settings) {
@@ -77596,14 +78166,14 @@ async function getEligibility() {
     for (const t of targets) {
       if (days !== null && s.enabled) {
         const w = buildEligibleWhere(t, days, 0);
-        const er = await pool2.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${w.sql}`, w.params);
+        const er = await pool3.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${w.sql}`, w.params);
         eligible += Number(er.rows[0]?.n ?? 0);
       }
       const dParams = [];
       let dWhere = "disposed_at IS NOT NULL";
       if (t.entityTypes) dWhere += ` AND entity_type = ANY($${dParams.push(t.entityTypes)})`;
       else if (t.entityTypesNotIn) dWhere += ` AND entity_type <> ALL($${dParams.push(t.entityTypesNotIn)})`;
-      const dr = await pool2.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${dWhere}`, dParams);
+      const dr = await pool3.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${dWhere}`, dParams);
       disposed += Number(dr.rows[0]?.n ?? 0);
     }
     out[s.category] = { eligible, disposed };
@@ -77636,8 +78206,8 @@ async function updateSetting2(category, patch, actorUuid2) {
       );
     }
   }
-  const pool2 = await getPool();
-  await pool2.query(
+  const pool3 = await getPool();
+  await pool3.query(
     `UPDATE retention_settings SET retention_value=$1, retention_unit=$2, enabled=$3, updated_at=NOW(), updated_by_uuid=$4 WHERE category=$5`,
     [newValue, newUnit, newEnabled, actorUuid2, category]
   );
@@ -77660,11 +78230,11 @@ async function dispose(category, actorUuid2) {
   if (!targets) throw new RetentionError(`Category '${category}' has no disposition flow (forever / auto-prune).`);
   const days = periodToDays(setting.retentionValue, setting.retentionUnit);
   if (days === null) throw new RetentionError(`Category '${setting.label}' is retained forever and cannot be disposed.`);
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   let count2 = 0;
   for (const t of targets) {
     const w = buildEligibleWhere(t, days, 1);
-    const res = await pool2.query(
+    const res = await pool3.query(
       `UPDATE ${t.table} SET disposed_at = NOW(), disposed_by_uuid = $1 WHERE ${w.sql}`,
       [actorUuid2, ...w.params]
     );
@@ -77694,14 +78264,14 @@ async function revert(category, _actorUuid) {
   if (!setting) throw new RetentionError(`Unknown retention category: ${category}`, 404);
   const targets = CATEGORY_TARGETS[category];
   if (!targets) throw new RetentionError(`Category '${category}' has no disposition flow.`);
-  const pool2 = await getPool();
+  const pool3 = await getPool();
   let count2 = 0;
   for (const t of targets) {
     const params = [];
     let where = "disposed_at IS NOT NULL";
     if (t.entityTypes) where += ` AND entity_type = ANY($${params.push(t.entityTypes)})`;
     else if (t.entityTypesNotIn) where += ` AND entity_type <> ALL($${params.push(t.entityTypesNotIn)})`;
-    const res = await pool2.query(`UPDATE ${t.table} SET disposed_at = NULL, disposed_by_uuid = NULL WHERE ${where}`, params);
+    const res = await pool3.query(`UPDATE ${t.table} SET disposed_at = NULL, disposed_by_uuid = NULL WHERE ${where}`, params);
     count2 += res.rowCount ?? 0;
   }
   await safeAudit({
@@ -80715,11 +81285,13 @@ async function registerRoutes(app2) {
   }
   const JOB_DUE_SCAN_INTERVAL_MS = parseInt(process.env.JOB_DUE_SCAN_INTERVAL_MS || "", 10) || 24 * 60 * 60 * 1e3;
   const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
+  const { shoreWoDailyScheduler: shoreWoDailyScheduler2 } = await Promise.resolve().then(() => (init_shoreWoDailyScheduler(), shoreWoDailyScheduler_exports));
   if (isShip) {
     jobDueScanner2.start(JOB_DUE_SCAN_INTERVAL_MS);
     console.log(`[JobDueScanner] Ship instance \u2014 scheduler started (interval: ${JOB_DUE_SCAN_INTERVAL_MS / 36e5}h)`);
   } else {
-    console.log('[JobDueScanner] Shore instance \u2014 auto scan NOT started (office uses on-demand "Generate Now")');
+    shoreWoDailyScheduler2.start();
+    console.log("[JobDueScanner] Shore instance \u2014 ship scanner off; shore daily WO sweep started (generation + reconciler)");
   }
   const { maintenanceOrchestrator: maintenanceOrchestrator2 } = await Promise.resolve().then(() => (init_maintenanceOrchestrator(), maintenanceOrchestrator_exports));
   maintenanceOrchestrator2.start();
@@ -81052,6 +81624,7 @@ async function registerRoutes(app2) {
     console.log("Cleaning up scheduled tasks...");
     schedulerRoleWatchdog2.stop();
     jobDueScanner2.stop();
+    shoreWoDailyScheduler2.stop();
     maintenanceOrchestrator2.stop();
     syncAutoScheduler2.stop();
     shipskartReconcilerScheduler2.stop();
