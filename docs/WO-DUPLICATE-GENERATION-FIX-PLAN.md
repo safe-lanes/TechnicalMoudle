@@ -1,11 +1,19 @@
-# Duplicate work-order generation — ROOT CAUSE + FIX PLAN (2026-07-31)
+# Duplicate work-order generation — ROOT CAUSE + FIX PLAN (2026-07-31, revised 2026-08-03)
 
-**Status: PLAN APPROVED IN SHAPE. NOTHING BUILT.**
-**BLOCKED on one production query (§4) — the gate's correctness rests on its answer.**
+**Status: DIRECTION CHANGED 2026-08-03 — Sahil's dual-writer + post-sync reconciler design
+APPROVED (§9). The request model (§6 B/C) is SUPERSEDED. Item A is built but REDUCED (§9.5).
+The reconciler itself is NOT built.**
+
+The §4 production check PASSED 2026-08-03 (Nilesh's table): 4 vessels LIVE (all three
+production ships + Testvessel, each exactly one `sync_metadata` row), 85 NEVER PROVISIONED
+(all with zero work orders — independent corroboration), 0 ambiguous. Production instance ids
+are `SHIP-<vessel name>` (with spaces), NOT `SHIP-<vesselCode>` — confirming the existence
+test over any prefix/convention match.
 
 Root cause proven twice: from the Gas Mia production exports, and reproduced end-to-end on
 the local pilot (shore host + ship Docker) with a negative control. Origin: Jeevan's Gas Mia
-duplicate-WO report; direction set by Jeevan + Ghazi over three review rounds.
+duplicate-WO report; direction set by Jeevan + Ghazi over three review rounds, then revised
+to Sahil's reconciler design over three further rounds.
 
 ---
 
@@ -226,7 +234,12 @@ what the vessel looked like at the time.
 
 ---
 
-## 6. Build order
+## 6. Build order — ⚠️ SUPERSEDED 2026-08-03, kept for the record. See §9.
+
+Item A was built (2026-08-03) and then REDUCED per §9.5. Items B and C (request model +
+queued UX) are SUPERSEDED by the §9 reconciler design and must not be built. Item D's concern
+(office manual single-WO numbering) is covered by the reconciler's grouping. Item E's
+detection folds into the reconciler's telemetry (§9.6).
 
 ### A. Server-side gate — DO FIRST, stands alone
 
@@ -289,7 +302,147 @@ another way.
 - **Immediate procedural mitigation, until A ships:** do not click Generate Now on a vessel
   whose sync is behind. The button gives no staleness warning today.
 
-## 8. Status log
+## 9. APPROVED DIRECTION (2026-08-03) — dual writers + post-sync reconciler (Sahil)
+
+Supersedes the request model (§6 B/C). Business requirement driving it: **on VSAT, sync WILL
+lag, and if the office sees no work orders the client concludes the system is broken.** So
+shore generates on its own once-daily scheduler, the ship keeps its scanner, sync delivers
+both copies unchanged, and a shore-side reconciler resolves duplicates after sync.
+
+**Sync stays exactly as it is — wouuid-keyed, applier untouched, no business-key matching.**
+The reconciler is a consumer of synced data, not a participant in sync.
+
+### 9.1 Origin — recoverable from sync bookkeeping, NO schema change
+
+`work_orders` has no origin column (checked every column: `is_sync` is a dead column never
+written for WOs; `created_by_uuid` identical both sides; the local `id` travels with the row
+so `WO-SYNC-*` marks only 6 of 2,890 office rows). But **`sync_field_log.instance_id` retains
+it**: row creation is an INSERT-origin log group (`old_value IS NULL`) under the creator's
+instance id. Shore stores the ship's pushed logs verbatim (`service.ts:232`) and logs its own
+creations (`workOrderService.ts:927` — the scanner goes through it). Proven on the pilot:
+ship-created WO → 41 logs, all `SHIP-WKFV`, INSERT-origin group present.
+
+Caveat: synced field-log entries prune after 90 days (default). Irrelevant at daily cadence,
+but the rule needs a fallback for a log-absent row (below), never a guess.
+
+### 9.2 Precedence — all three cases AUTO-RESOLVE (approved by Sahil 2026-08-03)
+
+Grouping key: `(vessel_id, work_order_no)` over non-deleted rows — this also resolves the
+"which shore copy" ambiguity (shore holding both copies is the designed steady state, the old
+"27" pattern made normal). "Touched" = any of: approver, submitted_date, date_completed,
+work_carried_out, performed_by, manhours, consumed spare parts, attached documents — or a
+persisted workflow status (Completed / Pending Approval / Postponed / Rejected).
+
+1. **Exactly one copy touched** → the touched copy survives, whichever side created it.
+   (Gas Mia measured ~50/50 office/ship on where the work landed — origin does NOT predict
+   where the work is, so content is the primary signal.)
+2. **Neither touched** → the **ship's copy survives** (origin per §9.1). Fallback when the
+   INSERT logs are pruned/absent: earlier `created_at` survives.
+3. **Both touched** → the **ship's copy survives automatically** — no manual step, no pending
+   queue. The office copy is **ARCHIVED AND FLAGGED, not deleted** (§9.3): nothing waits on a
+   human, nothing is destroyed, and the office's record (approval, completion, remarks) is
+   recoverable if anyone asks where it went.
+
+NOTE on case 3: only the CHILD RECORDS move to the survivor (§9.4). The loser row's own
+FIELDS (its status, approver, completion data) do NOT merge into the survivor — they live in
+the archive snapshot. A Completed office copy losing to an Overdue ship copy means the WO
+reads Overdue afterwards; the completion evidence is in the archive and its children.
+
+### 9.3 The archive — soft delete + field log + NO_SYNC bookkeeping table
+
+- **Soft delete** the losing row (`is_deleted = false → true`) **with an explicit
+  `logFieldChanges` call** — work_orders writes are NOT storage-logged (32 manual call
+  sites; the postpone-sync lesson). The flip syncs to the ship as a normal field change, so
+  both sides converge with the loser hidden.
+- **Self-heal safe — verified in code:** `applyFullRowsIfAbsent` exist-checks by identity
+  with NO `is_deleted` filter and "NEVER touch[es]" a present row. A soft-deleted row counts
+  as present on both sides, so the duplicate CANNOT be resurrected. (**Hard delete is the
+  dangerous option** — absent row + inbound logs → self-heal re-delivers it → duplicate
+  returns. Plus `work_order_documents` FK is NO ACTION → error, and the other five child FKs
+  are unmaterialised in the real DB → silent orphans.)
+- **NO_SYNC archive table** (shore-only bookkeeping, migration **151** — 144 stays RESERVED):
+  `work_order_reconcile_archive(archive_uuid, vessel_id, work_order_no, loser_wouuid,
+  survivor_wouuid, resolution_case 1|2|3, loser_row_snapshot jsonb, child_moves jsonb,
+  reconciled_at, notes)`. The jsonb snapshot preserves the loser exactly as archived even if
+  the soft-deleted row is later mutated or pruned. NOT in syncConfig (same pattern as the
+  Shipskart link tables) — zero sync surface.
+- Pure soft-delete alone was rejected: no flag, no survivor pointer, no "where did my
+  approval go" answer for support. The archive table is that answer.
+
+### 9.4 Child records — they FOLLOW THE SURVIVOR
+
+All references to the loser's `wouuid` are repointed to the survivor across the six child
+tables (documents, executions, execution details, postponements, component maintenance
+history, IHM log) plus the four denormalised reference sets (superintendent notifications,
+postponement approvals, anomalies, monthly snapshot arrays). Every repoint is field-logged so
+the ship converges. `child_moves` in the archive records exactly what moved.
+
+Two consequences to accept, one caveat to prove:
+
+- **Accepted:** in case 3 the survivor can end up with TWO sets of children (e.g. two
+  execution records — the ship's and the office's). That is honest evidence of the double
+  handling, and the archive row explains it.
+- **Accepted:** the loser's own fields do not move (see §9.2 note).
+- **⚠️ MUST PROVE AT BUILD TIME:** three of the six child tables have
+  `identityColumn: null` in syncConfig (`work_order_documents`, `work_order_executions`,
+  `ihm_maintenance_log`). How a repoint UPDATE on those propagates to the ship must be proven
+  on the pilot before the reconciler ships — if identity-less updates do not apply cleanly,
+  those tables need per-table handling. Do NOT assume.
+
+### 9.5 Item A — REDUCED (not reverted)
+
+Sahil's design requires shore to generate, so the LIVE and CHECK_ME refusals are REMOVED.
+Kept, because the endpoint having no gate at all is a separate problem from duplicates:
+
+- unknown-vessel **fail-closed** check (absence of evidence is never evidence of absence)
+- the **role restriction** (Sail Admin; enforcement-limited by the RBAC mock — documented in
+  the module; becomes real when real auth lands)
+- the 403 + named-reason response shape
+
+The provisioning-state seam (`getVesselProvisioningState`) stays: read-only, and the
+reconciler/telemetry can use the same verdicts.
+
+### 9.6 Reconciler operational rules
+
+- **Shore only.** All six child tables are BOTH_EDITABLE — running it both sides would
+  machine-generate real sync conflicts. Shore resolves; its changes sync down.
+- **Between syncs, never during.** Mid-sync it could reattach against a half-arrived picture
+  and archive a row whose children land afterwards. It must acquire the same per-vessel lock
+  the engine uses (`syncInProgress` / `tryAcquireVessel`, `autoSyncScheduler.ts:329`) and
+  skip any vessel sync currently holds.
+- **Idempotent and bounded**: re-running on an already-reconciled vessel is a no-op; per-run
+  cap with the remainder picked up next run; every action loud in the log.
+- **Telemetry**: per-vessel count of duplicates resolved per case, surfaced on the sync/fleet
+  screen — office-generated duplicate volume is exactly the signal that would have caught
+  Gas Mia in week one.
+
+### 9.7 The shore scheduler (once daily)
+
+- Role resolution via **`schedulerRoleWatchdog`**, NEVER the boot-time `isShip` snapshot
+  (the 28-Jul auto-sync root cause). The watchdog starts/stops it on role change.
+- Registered in **`stopAllSchedulers`** (routes.ts) — a missed entry orphans on PM2 restart.
+- **Per-vessel iteration** (one bad vessel must not abort the sweep), configurable interval,
+  and a run lock (the existing 409-style guard).
+- Vessels with no ship (the 85): shore is the only writer — nothing to reconcile, safe.
+
+### 9.8 Honest limits (recorded so nobody is surprised)
+
+- The reconciler's cadence does NOT bound exposure — **the vessel's connectivity does**. It
+  cannot resolve what sync has not delivered. A week offline = a week where both offices see
+  and work their own copy; that window is the price of the availability requirement, by
+  design. Gas Mia's gaps were 9–33 days.
+- Case 3 (both touched) therefore still happens in steady state — shortened, not eliminated.
+  The archive makes it lossless and answerable, not impossible.
+- The 189 existing Gas Mia duplicates are **OUT OF SCOPE** — manual one-off cleanup, Jeevan
+  decides how. The reconciler handles NEW duplicates only.
+
+## 10. Status log
 
 - 2026-07-31 — root cause found, reproduced on pilot with negative control, plan approved in
-  shape by Jeevan + Ghazi. **Blocked on the §4 production query (Nilesh).**
+  shape by Jeevan + Ghazi. Blocked on the §4 production query (Nilesh).
+- 2026-08-03 — §4 production check PASSED (4 LIVE / 85 never-provisioned / 0 ambiguous).
+  Item A built, tested 18/18 + 4/4 HTTP, committed. Same day: direction changed to Sahil's
+  dual-writer + reconciler (§9); request model superseded; item A reduced per §9.5. Origin
+  proven recoverable from `sync_field_log.instance_id` — no schema change. Precedence rules
+  1–3 approved by Sahil (all auto-resolve; case-3 loser archived + flagged, never deleted).
+  **Reconciler, scheduler, archive table (mig 151): NOT BUILT.**

@@ -143,6 +143,36 @@ export async function generateNow(req: Request, res: Response) {
     throw new ValidationError('A specific vesselId is required to generate work orders.');
   }
 
+  // ── GATE (added 2026-08-03, reduced same day — plan §9.5) ──────────────────
+  // This endpoint previously had NO server-side gate; the UI check is presentation,
+  // not enforcement. Under the dual-writer design shore generation is intended even
+  // for live vessels (the post-sync reconciler de-duplicates), so the gate refuses
+  // only unknown/unresolvable vessels (fail closed) and non-Sail-Admin callers.
+  // See workOrderGenerationGate.ts for the rule and its limits.
+  const { isShipInstance } = await import('../../sync/syncRole');
+  const gate = await import('../services/workOrderGenerationGate');
+  const decision = await gate.evaluateDirectGeneration({
+    vesselId,
+    role: gate.resolveGateRole((req as AuthenticatedRequest).user),
+    isShip: await isShipInstance(),
+  });
+
+  if (!decision.allowed) {
+    console.warn(
+      `[WO-Gate] REFUSED direct generation: vessel=${vesselId} reason=${decision.code} ` +
+        `verdict=${decision.state?.verdict ?? 'unknown'} ` +
+        `metadataRows=${decision.state?.metadataRows ?? '?'} lastSyncAt=${decision.state?.lastSyncAt?.toISOString() ?? 'never'}`,
+    );
+    return res.status(403).json({
+      success: false,
+      error: decision.code,
+      message: decision.message,
+      vesselState: decision.state
+        ? { verdict: decision.state.verdict, lastSyncAt: decision.state.lastSyncAt }
+        : null,
+    });
+  }
+
   // Dynamic import mirrors routes.ts and avoids a static cycle with the scanner.
   const { jobDueScanner } = await import('../../../services/jobDueScanner');
   const result = await jobDueScanner.runScan(vesselId);

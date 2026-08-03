@@ -1378,6 +1378,95 @@ function normalizeFieldLog(row: any) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// VESSEL PROVISIONING STATE — read-only seam for the WO generation gate
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Has a ship ever been provisioned for this vessel? READ-ONLY; no engine, no field log.
+ *
+ * WHY THIS EXISTS: work-order generation has two possible writers (the ship's daily scanner
+ * and the office's Generate Now), and BOTH the duplicate check and the running number are
+ * computed per-database. If the office generates while it is missing the ship's work order,
+ * it reproduces a number the ship already used → duplicate WOs on the vessel. Proven on the
+ * pilot 2026-07-31. See docs/WO-DUPLICATE-GENERATION-FIX-PLAN.md.
+ *
+ * THE SIGNAL: shore mints a `sync_metadata` row for the vessel when a real provisioning
+ * bundle is generated (generateProvisioningBundle, persist:true) — i.e. at the exact moment a
+ * second writer becomes possible, not at first sync (which would leave a window where the
+ * ship exists but has not yet called home).
+ *
+ * TEST ROW EXISTENCE, NEVER `instance_id LIKE 'SHIP-%'`. Existing production ships kept their
+ * original running instance ids, and the live ids are `SHIP-<vessel name>` (with spaces), not
+ * the `SHIP-<vesselCode>` convention — a convention match would be fragile and could read a
+ * real live ship as un-provisioned, reopening the bug. Verified against production 2026-08-03:
+ * 4 vessels carry rows (all LIVE), 85 carry none (all with zero work orders, which
+ * independently corroborates the classification).
+ *
+ * Verdicts (these map 1:1 onto the three allowed behaviours — see the gate):
+ *   NEVER_PROVISIONED — no bundle ever minted; no ship exists; direct generation is safe
+ *   CHECK_ME          — bundle minted but the ship never called home; audited override only
+ *   LIVE              — ship exists and has synced; request path only, no override ever
+ *
+ * FAIL CLOSED: the caller must treat a throw as "not safe", never as "un-provisioned".
+ */
+export type VesselProvisioningVerdict = 'NEVER_PROVISIONED' | 'CHECK_ME' | 'LIVE';
+
+export interface VesselProvisioningState {
+  metadataRows: number;
+  lastSyncAt: Date | null;
+  instanceIds: string[];
+  verdict: VesselProvisioningVerdict;
+}
+
+export async function getVesselProvisioningState(vesselId: string): Promise<VesselProvisioningState> {
+  const pool = await getPool();
+  if (!pool) {
+    // No DB = cannot prove the vessel is un-provisioned. Fail closed.
+    throw Object.assign(new Error('Database unavailable — cannot resolve vessel provisioning state.'), { statusCode: 503 });
+  }
+
+  // The vessel must EXIST before "no sync_metadata row" can mean "never provisioned".
+  // Without this, an unknown/typo'd/stale vessel id returns zero rows and is classified
+  // NEVER_PROVISIONED — i.e. absence of evidence read as evidence of absence, which is
+  // exactly the mistake this whole gate exists to avoid. Caught by the fail-closed test.
+  const vessel = await pool.query(
+    `SELECT 1 FROM vessels WHERE vuuid = $1 AND is_deleted = false LIMIT 1`,
+    [vesselId],
+  );
+  if (vessel.rowCount === 0) {
+    throw Object.assign(
+      new Error(`Unknown vessel '${vesselId}' — cannot resolve provisioning state.`),
+      { statusCode: 404 },
+    );
+  }
+
+  const result = await pool.query(
+    `SELECT count(instance_id)::int              AS metadata_rows,
+            max(last_sync_at)                    AS last_sync_at,
+            coalesce(
+              array_agg(DISTINCT instance_id) FILTER (WHERE instance_id IS NOT NULL),
+              '{}'
+            )                                    AS instance_ids
+       FROM sync_metadata
+      WHERE vessel_id = $1
+        AND is_deleted = false`,
+    [vesselId],
+  );
+
+  const row = result.rows[0] ?? {};
+  const metadataRows: number = row.metadata_rows ?? 0;
+  const lastSyncAt: Date | null = row.last_sync_at ?? null;
+  const instanceIds: string[] = row.instance_ids ?? [];
+
+  let verdict: VesselProvisioningVerdict;
+  if (metadataRows === 0 && lastSyncAt === null) verdict = 'NEVER_PROVISIONED';
+  else if (metadataRows > 0 && lastSyncAt !== null) verdict = 'LIVE';
+  else verdict = 'CHECK_ME';
+
+  return { metadataRows, lastSyncAt, instanceIds, verdict };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // FLEET SYNC OVERVIEW — Shore-side fleet-wide dashboard data
 // ═══════════════════════════════════════════════════════════════
 
