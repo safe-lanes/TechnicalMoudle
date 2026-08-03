@@ -383,11 +383,29 @@ Two consequences to accept, one caveat to prove:
   execution records — the ship's and the office's). That is honest evidence of the double
   handling, and the archive row explains it.
 - **Accepted:** the loser's own fields do not move (see §9.2 note).
-- **⚠️ MUST PROVE AT BUILD TIME:** three of the six child tables have
-  `identityColumn: null` in syncConfig (`work_order_documents`, `work_order_executions`,
-  `ihm_maintenance_log`). How a repoint UPDATE on those propagates to the ship must be proven
-  on the pilot before the reconciler ships — if identity-less updates do not apply cleanly,
-  those tables need per-table handling. Do NOT assume.
+- **✅ PROVEN 2026-08-03 (live pilot round-trips), with one adjustment required:**
+  - `work_order_documents` and `work_order_executions` — **repoint PROPAGATES CLEANLY.**
+    Their `id` is TEXT, minted by the creator, and the field logger logs it on INSERT, so the
+    same id exists on both sides; the applier's `identityColumn || 'id'` fallback then matches
+    correctly. Proven end-to-end: created on shore → synced → repointed on shore → synced →
+    ship rows moved to the survivor.
+  - `ihm_maintenance_log` — **repoint DOES NOT PROPAGATE and MUST NOT be attempted via
+    field-logged UPDATE.** Its `id` is INTEGER IDENTITY; the field logger deliberately skips
+    serial ids, so each side assigns its own and they diverge. Proven with diverged ids
+    (shore id=2, ship id=101): the repoint UPDATE left the ship's row on the LOSER and the
+    Issue-01 recovery path minted TWO PHANTOM ROWS attached to the survivor — every further
+    shore update would mint another. (Same reason a shore-side soft-delete of an ihm row
+    would not reach the ship either — the identity cannot be addressed.)
+  - **DESIGN ADJUSTMENT (ihm only): the reconciler LEAVES ihm rows attached to the archived
+    loser** and records them in `child_moves` as `left-in-place`. The loser is soft-deleted,
+    not gone, so the rows stay queryable and FK-intact; the archive row explains where they
+    are. IHM entries are a low-volume compliance audit trail — mis-addressed phantom rows on
+    the ship would be strictly worse than rows resting on an archived WO.
+  - **Durable fix (separate, later, sync sign-off required):** give `ihm_maintenance_log` a
+    uuid identity column + syncConfig `identityColumn`, like every other synced child. Also
+    flagged: ANY shore-side UPDATE to an ihm row already fails to propagate today — this is a
+    pre-existing sync defect independent of the reconciler, and other serial-id synced tables
+    not in `COMPOSITE_KEY_TABLES` deserve the same audit.
 
 ### 9.5 Item A — REDUCED (not reverted)
 
