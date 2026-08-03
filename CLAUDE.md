@@ -203,3 +203,55 @@ Before pushing any commit:
    edited the one on the live path.
 4. If you added an Express route: confirm no `:param` collision 
    with an earlier-registered route.
+
+## Investigation Standards (added 2026-08-03 — read before reporting any finding)
+
+These rules exist because investigations reached confident conclusions that were
+wrong: an RBAC divergence the investigation itself had engineered, stale-RH counts
+measured against the wrong column, an "SSO linkage bug" that was a tenant setting,
+IHM usage assumed without asking the product owner. Each was caught only by the
+user pushing back. The failure mode is never "didn't investigate" — it is stating
+conclusions at a confidence the evidence doesn't carry.
+
+### Label every finding with its evidence class
+
+- **PROVEN** — tested live on the pilot (or production data), with the output shown.
+- **READ** — concluded from reading code. This is a hypothesis, not a result.
+- **INFERRED** — deduction from other facts. Weakest class; say what it rests on.
+
+Never present one class in the language of a stronger one. "X happens" is reserved
+for PROVEN; code-reading gets "the code says X — untested."
+
+### Rules
+
+1. **Pilot before conclusion — and account for it either way.** If the shore+ship
+   pilot can answer the question, run it there before reporting. EVERY report states
+   explicitly whether the pilot was used; if it was not, state why not (e.g.
+   production-only data, WK-tenant-specific, VSAT behaviour). The reader sees the
+   gap — they never have to infer it. This is not left to judgement silently.
+
+2. **Name what would disprove you.** Every report states the untested assumptions
+   its conclusion rests on. The reader must never have to discover them.
+
+3. **Never assume product usage.** Whether a feature is used, by whom, in which
+   direction — that is a question for Ghazi or the product owner (Jeevan), not for
+   inference from schema or code. "I don't know — ask Jeevan" is a complete and
+   acceptable answer, and better than a wrong guess stated confidently.
+
+4. **Fixtures prove repairs, not occurrence.** A state you created to test a fix
+   proves the fix handles that state. It does NOT prove the state occurs in
+   production. Say which one you have.
+
+5. **One sample is a data point, not a pattern.** One column, one vessel, one query
+   result — report it as a data point and say what a second sample would need to
+   show before generalising.
+
+6. **Retract loudly.** When a conclusion falls, say plainly what was wrong and why
+   the process let it through — in the report and in the memory that recorded it.
+
+7. **Confirm the problem is real before designing the fix.** Before planning a
+   repair, state what evidence shows the problem occurs in production — not that
+   the mechanism exists in code, but that it has happened or can happen to a live
+   vessel. If that evidence doesn't exist, say so and ask, rather than proceeding.
+   A mechanism proven in code with no production evidence is a finding, not a
+   justification to build.
