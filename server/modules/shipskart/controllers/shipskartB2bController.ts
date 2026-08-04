@@ -108,3 +108,27 @@ export async function catalogueStatusHandler(_req: AuthenticatedRequest, res: Re
     recentFailures: await links.recentFailures(20),
   });
 }
+
+/** GET /shipskart/catalogue/status/:vesselId — the Admin card's single data source. */
+export async function catalogueVesselStatusHandler(req: AuthenticatedRequest, res: Response) {
+  const vesselId = req.params.vesselId;
+  const links = await import('../repositories/shipskartCatalogueLinkRepository');
+  const svc = await import('../services/shipskartCataloguePushService');
+  const st = await links.vesselStatus(vesselId);
+  const get = (e: string, s: string) => st.counts.find(c => c.entityType === e && c.pushStatus === s)?.n ?? 0;
+  const skuTotal = st.totals.spares + st.totals.stores;
+  res.json({
+    vesselId,
+    running: svc.isCataloguePushRunning(vesselId),
+    totals: { skus: skuTotal, products: st.totals.components, spares: st.totals.spares, stores: st.totals.stores },
+    progress: {
+      categories: { pushed: get('category', 'pushed'), failed: get('category', 'failed') },
+      products:   { pushed: get('product', 'pushed'),  failed: get('product', 'failed') },
+      skus:       { pushed: get('sku', 'pushed'),      failed: get('sku', 'failed'),
+                    remaining: Math.max(0, skuTotal - get('sku', 'pushed')) },
+      catalogue:  { pushed: get('catalogue', 'pushed'), failed: get('catalogue', 'failed'),
+                    remaining: Math.max(0, skuTotal - get('catalogue', 'pushed')) },
+    },
+    failures: st.failures,
+  });
+}

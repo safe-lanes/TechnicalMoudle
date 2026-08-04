@@ -37,6 +37,7 @@ import RetentionSettings from "./admin/RetentionSettings";
 import RanksAdmin from "./admin/RanksAdmin";
 import AddEditFleetComponent from "./admin/AddEditFleetComponent";
 import SyncDashboard from "./admin/SyncDashboard";
+import ShipskartCatalogue from "./admin/ShipskartCatalogue";
 import SyncConflictReview from "./admin/SyncConflictReview";
 import SyncProvisioning from "./admin/SyncProvisioning";
 import SyncFleetOverview from "./admin/SyncFleetOverview";
@@ -280,6 +281,8 @@ export const TechnicalModule = () => {
             <SyncProvisioning />
           ) : selectedSubModule === "admin" && selectedMenuItem === "sync-fleet" ? (
             <SyncFleetOverview />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "shipskart-catalogue" ? (
+            <ShipskartCatalogue />
           ) : selectedSubModule === "admin" && selectedMenuItem === "approval-workflow" ? (
             <ApprovalWorkflow />
           ) : selectedSubModule === "admin" && selectedMenuItem === "fleet-component-editor" ? (

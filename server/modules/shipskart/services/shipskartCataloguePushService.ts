@@ -49,6 +49,9 @@ async function requestWithBackoff(method: 'GET' | 'POST', path: string, opts?: {
 }
 const inFlight = new Set<string>();
 
+/** Is a push currently running for this vessel? (Admin card polling) */
+export function isCataloguePushRunning(vesselId: string): boolean { return inFlight.has(vesselId); }
+
 export interface PhaseCounts { pushed: number; skipped: number; failed: number; }
 export interface CataloguePushResult {
   vesselId: string;

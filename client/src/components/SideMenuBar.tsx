@@ -38,6 +38,7 @@ import {
   Globe,
   GitPullRequest,
   Workflow,
+  ShoppingCart,
 } from "lucide-react";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 
@@ -140,6 +141,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   // Conditionally add shore-only Fleet Sync Overview to admin menu
   if (subModule === "admin" && isShore) {
     allMenuItems = [...allMenuItems, { id: "sync-fleet", label: "Fleet Overview", icon: Globe }];
+    allMenuItems = [...allMenuItems, { id: "shipskart-catalogue", label: "Shipskart Catalogue", icon: ShoppingCart }];
   }
   if (subModule === "admin") {
     allMenuItems = [...allMenuItems, { id: "approval-workflow", label: "Approval Workflow", icon: Workflow }];

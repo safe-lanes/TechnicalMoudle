@@ -31,5 +31,6 @@ router.post('/shipskart/vessel-assignments', asyncHandler(shipskartB2bController
 // Stage 3D — catalogue push (shore-only inside the service; ledger-backed, resumable)
 router.post('/shipskart/catalogue/push', asyncHandler(shipskartB2bController.cataloguePushHandler));
 router.get('/shipskart/catalogue/status', asyncHandler(shipskartB2bController.catalogueStatusHandler));
+router.get('/shipskart/catalogue/status/:vesselId', asyncHandler(shipskartB2bController.catalogueVesselStatusHandler));
 
 export default router;

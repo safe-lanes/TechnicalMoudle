@@ -156,3 +156,36 @@ export async function recentFailures(limit = 20): Promise<any[]> {
   );
   return r.rows;
 }
+
+/** Per-vessel view for the Admin card: ledger counts, PMS totals, failures. */
+export async function vesselStatus(vesselId: string): Promise<{
+  counts: Array<{ entityType: string; pushStatus: string; n: number }>;
+  totals: { spares: number; stores: number; components: number };
+  failures: any[];
+}> {
+  const p = await pool();
+  const counts = (await p.query(
+    `SELECT entity_type, push_status, count(*)::int AS n
+       FROM shipskart_catalogue_links
+      WHERE vessel_id = $1 OR (entity_type = 'category' AND vessel_id IS NULL)
+      GROUP BY entity_type, push_status`,
+    [vesselId],
+  )).rows.map((r: any) => ({ entityType: r.entity_type, pushStatus: r.push_status, n: r.n }));
+  const totals = (await p.query(
+    `SELECT
+       (SELECT count(*) FROM spares WHERE vessel_id=$1 AND is_deleted=false)::int AS spares,
+       (SELECT count(*) FROM stores_items WHERE vessel_id=$1 AND deleted IS NOT TRUE)::int AS stores,
+       (SELECT count(DISTINCT c.cuuid) FROM components c
+          JOIN spares s ON s.component_id=c.cuuid AND s.is_deleted=false
+         WHERE c.vessel_id=$1 AND c.is_deleted=false)::int AS components`,
+    [vesselId],
+  )).rows[0];
+  const failures = (await p.query(
+    `SELECT entity_type, local_key, remote_code, last_error, updated_at
+       FROM shipskart_catalogue_links
+      WHERE push_status='failed' AND (vessel_id = $1 OR (entity_type='category' AND vessel_id IS NULL))
+      ORDER BY updated_at DESC LIMIT 50`,
+    [vesselId],
+  )).rows;
+  return { counts, totals, failures };
+}
