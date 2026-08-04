@@ -301,18 +301,51 @@ export async function listChildren(parentCode: string, vesselId: string) {
     throw new NotFoundError('Parent component not found');
   }
 
-  const children = await repo.getInheritedComponents(parent.cuuid, vesselId);
+  // Scope children to the parent's OWN vessel: under aggregate scope ('all')
+  // the incoming vesselId is not a concrete vessel, and component codes can
+  // repeat across vessels.
+  const children = await repo.getInheritedComponents(parent.cuuid, parent.vesselId || vesselId);
   const activeChildren = children.filter((child: any) => child.isActive !== false);
+
+  // Batch-fetch the installed stamps' OWN accrued hours per vessel (Task #372):
+  // the component counter shows the inherited engine total by design; the stamp
+  // tracks only the hours it actually ran while installed.
+  const stampsByVessel = new Map<string, string[]>();
+  for (const child of activeChildren) {
+    const cVessel = (child as any).vesselId;
+    const cStamp = (child as any).currentStamp;
+    if (cVessel && cStamp) {
+      const list = stampsByVessel.get(cVessel) || [];
+      list.push(cStamp);
+      stampsByVessel.set(cVessel, list);
+    }
+  }
+  const stampInfoByVesselStamp = new Map<string, repo.StampRhInfo>();
+  for (const [cVessel, stamps] of Array.from(stampsByVessel.entries())) {
+    const infoMap = await repo.getInstalledStampRhBatch(cVessel, stamps);
+    for (const [stamp, info] of Array.from(infoMap.entries())) {
+      stampInfoByVesselStamp.set(`${cVessel}::${stamp}`, info);
+    }
+  }
 
   const childrenWithRH = activeChildren.map(child => {
     const displayRH = child.currentCumulativeRH || child.rhCurrentInheritedCached || '0.00';
+    const stampInfo = (child as any).currentStamp && (child as any).vesselId
+      ? stampInfoByVesselStamp.get(`${(child as any).vesselId}::${(child as any).currentStamp}`) || null
+      : null;
     return {
       id: child.id,
       componentCode: child.componentCode || '',
       name: child.name || '',
       currentCumulativeRH: displayRH,
       rhCounterType: child.rhCounterType || 'INHERITED',
-      lastUpdated: child.lastUpdated || child.updatedAt || '-'
+      lastUpdated: child.lastUpdated || child.updatedAt || '-',
+      stamp: stampInfo ? {
+        stamp: stampInfo.stamp,
+        stampName: stampInfo.stampName,
+        currentRh: stampInfo.currentRh,
+        rhLastUpdated: stampInfo.rhLastUpdated
+      } : null
     };
   });
 

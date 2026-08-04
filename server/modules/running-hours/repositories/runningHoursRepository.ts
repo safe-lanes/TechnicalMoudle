@@ -1,6 +1,6 @@
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
-import { runningHoursAudit, componentMaintenanceHistory } from '@shared/schema';
+import { runningHoursAudit, componentMaintenanceHistory, rotationalItems } from '@shared/schema';
 import { desc, asc, eq, and, gte, lte, or, ilike, sql, inArray } from 'drizzle-orm';
 import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
 
@@ -24,6 +24,49 @@ export async function accrueInstalledStampRh(params: {
   userId: string | null;
 }): Promise<void> {
   return storage.accrueInstalledStampRh(params);
+}
+
+// Batch lookup of Installed rotational items by (vesselId, stamp) so the
+// Inherited Components dialog can show each stamp's OWN accrued hours next to
+// the component's inherited counter (Task #372). Returns a Map keyed by stamp.
+export interface StampRhInfo {
+  stamp: string;
+  stampName: string | null;
+  currentRh: string;
+  rhLastUpdated: string | null;
+}
+
+export async function getInstalledStampRhBatch(
+  vesselId: string,
+  stamps: string[]
+): Promise<Map<string, StampRhInfo>> {
+  const result = new Map<string, StampRhInfo>();
+  const unique = Array.from(new Set(stamps.filter(Boolean)));
+  if (!vesselId || unique.length === 0) return result;
+  const db = await getDb();
+  const rows = await db
+    .select({
+      stamp: rotationalItems.stamp,
+      stampName: rotationalItems.stampName,
+      currentRh: rotationalItems.currentRh,
+      rhLastUpdated: rotationalItems.rhLastUpdated,
+    })
+    .from(rotationalItems)
+    .where(and(
+      eq(rotationalItems.vesselId, vesselId),
+      inArray(rotationalItems.stamp, unique),
+      eq(rotationalItems.status, 'Installed'),
+      eq(rotationalItems.isDeleted, false)
+    ));
+  for (const row of rows) {
+    result.set(row.stamp, {
+      stamp: row.stamp,
+      stampName: row.stampName,
+      currentRh: row.currentRh || '0.00',
+      rhLastUpdated: row.rhLastUpdated,
+    });
+  }
+  return result;
 }
 
 export async function updateComponent(id: string, data: Partial<Component>): Promise<Component> {

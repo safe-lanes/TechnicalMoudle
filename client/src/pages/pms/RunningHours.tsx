@@ -37,6 +37,12 @@ interface ChildRHData {
   currentCumulativeRH: string;
   rhCounterType?: string;
   lastUpdated: string;
+  stamp?: {
+    stamp: string;
+    stampName: string | null;
+    currentRh: string;
+    rhLastUpdated: string | null;
+  } | null;
 }
 
 interface RunningHoursData {
@@ -159,9 +165,11 @@ const RunningHours = () => {
     parent: { componentCode: string; name: string; currentCumulativeRH: string };
     children: ChildRHData[];
   }>({
-    queryKey: ['/technical/api/running-hours/children', selectedParentForChildRH?.componentCode, vesselId],
+    queryKey: ['/technical/api/running-hours/children', selectedParentForChildRH?.componentCode, rhScopeKey],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/running-hours/children/${selectedParentForChildRH?.componentCode}?vesselId=${vesselId}`);
+      // Use the normalized scope segment ('all' under My Vessels) — the raw scope
+      // value is not a concrete vessel id and would resolve no components.
+      const response = await fetch(`/technical/api/running-hours/children/${selectedParentForChildRH?.componentCode}?vesselId=${rhScopeSegment}`);
       if (!response.ok) throw new Error('Failed to fetch children RH');
       return response.json();
     },
@@ -2157,6 +2165,7 @@ const RunningHours = () => {
                             </div>
                           </div>
                         ) : (
+                          <>
                           <div className={`grid ${isSailAdmin ? 'grid-cols-[1fr_auto_100px_120px_60px]' : 'grid-cols-[1fr_auto_100px_120px]'} gap-4 text-sm items-center`}>
                             <div className="text-gray-900">{child.name}</div>
                             <div className="text-gray-600">{child.componentCode}</div>
@@ -2183,6 +2192,23 @@ const RunningHours = () => {
                               </div>
                             )}
                           </div>
+                          {child.stamp && (
+                            <div className={`grid ${isSailAdmin ? 'grid-cols-[1fr_auto_100px_120px_60px]' : 'grid-cols-[1fr_auto_100px_120px]'} gap-4 text-xs items-center mt-1`} data-testid={`row-stamp-rh-${child.id}`}>
+                              <div className="text-amber-700">
+                                Stamp: <span className="font-medium">{child.stamp.stamp}</span>
+                                {child.stamp.stampName ? ` — ${child.stamp.stampName}` : ''}
+                              </div>
+                              <div></div>
+                              <div className="text-right font-medium text-amber-700">
+                                {parseFloat(child.stamp.currentRh || '0').toLocaleString()} hrs
+                              </div>
+                              <div className="text-amber-700">
+                                {child.stamp.rhLastUpdated ? formatProfessionalDateTime(child.stamp.rhLastUpdated) : '-'}
+                              </div>
+                              {isSailAdmin && <div></div>}
+                            </div>
+                          )}
+                          </>
                         )}
                       </div>
                     ))}
