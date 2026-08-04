@@ -4567,6 +4567,9 @@ export const shipskartUserLinks = pgTable("shipskart_user_links", {
   userUuid: text("user_uuid").notNull().unique(),
   shipskartUserId: text("shipskart_user_id"),
   pushStatus: text("push_status").notNull().default("pending"),
+  // mig 153: the Shipskart role we last pushed — role-drift detection for update-user-details
+  pushedRoleId: text("pushed_role_id"),
+  pushedRoleName: text("pushed_role_name"),
   lastError: text("last_error"),
   pushedAt: timestamp("pushed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

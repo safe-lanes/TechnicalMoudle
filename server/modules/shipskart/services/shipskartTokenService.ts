@@ -248,7 +248,7 @@ export async function getAccessToken(): Promise<string> {
  * then fail loud. This is the function everything above the transport uses.
  */
 export async function authorizedB2bRequest(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT',
   pathAndQuery: string,
   opts: { body?: unknown } = {},
 ): Promise<B2bResponse> {

@@ -27,7 +27,9 @@ import { isShipInstance } from '../../sync/syncRole';
 import * as links from '../repositories/shipskartCatalogueLinkRepository';
 import * as map from './shipskartCatalogueMapper';
 
-const PACE_MS = 500;
+// Sachin (2026-08-04): back-to-back requests trip their security throttling — space
+// writes 5–10s apart and they go through. Default 5s; SHIPSKART_CATALOGUE_PACE_MS tunes.
+const PACE_MS = Math.max(500, Number(process.env.SHIPSKART_CATALOGUE_PACE_MS ?? 5_000));
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 /**

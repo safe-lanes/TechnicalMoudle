@@ -40,6 +40,17 @@ import { getB2bConfig } from './shipskartB2bClient';
 const DEFAULT_BATCH_LIMIT = 25;
 
 /**
+ * Pacing between b2b calls in SWEEP loops (Sachin, 2026-08-04: constant back-to-back
+ * requests trip their security throttling — space them 5–10s and they go through).
+ * Applied ONLY where a real API call just happened, and NEVER on the JIT click path
+ * (interactive; 1–3 calls total is not "constant").
+ */
+const B2B_PACE_MS = Math.max(0, Number(process.env.SHIPSKART_B2B_PACE_MS ?? 5000));
+const paceB2b = () => new Promise((r) => setTimeout(r, B2B_PACE_MS));
+/** Statuses that mean a Shipskart API call was actually made (→ pace after them). */
+const API_HIT_STATUSES = new Set(['pushed', 'mapped', 'blocked_duplicate', 'error', 'role_updated', 'role_update_failed']);
+
+/**
  * CALLSIGN SEAM: Shipskart requires callSign and real call signs are not available yet —
  * agreed workaround (Shipskart-confirmed) is to pass the IMO number. When real call signs
  * land, this one function changes and nothing else does.
@@ -112,12 +123,53 @@ export async function pushVessel(v: {
 
 // ── users ──
 
+/**
+ * ROLE-DRIFT SELF-HEAL (their 03-Aug collection — item "Update User Role" =
+ * PUT /integration/SAIL/update-user-details/{userId}; the sibling update-vessel-user
+ * takes the identical body but targets vessel-user records, not the company users
+ * create-user makes — proven live, see harness). Before this, a link at 'pushed' was
+ * skipped forever and a SAILERP role change never reached Shipskart.
+ *
+ * pushedRoleId NULL = pushed before mig 153 (remote role unknown) → align once, then
+ * the stamp makes every later check a free local comparison. A currently-unmapped role
+ * updates nothing (never guess a role); the remote user keeps the last mapped role.
+ */
+async function syncRoleIfDrifted(
+  link: { userUuid: string; shipskartUserId: string; pushedRoleId: string | null },
+  sailRole: string | null,
+): Promise<PushResult> {
+  const mapping = sailRole ? await roleMappingRepo.getMappingForSailRole(sailRole) : undefined;
+  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  if (!mapping || !roleId || link.pushedRoleId === roleId) {
+    return { status: 'already_pushed', shipskartId: link.shipskartUserId };
+  }
+  const res = await authorizedB2bRequest('PUT', `/integration/SAIL/update-user-details/${link.shipskartUserId}`, {
+    body: { id: link.shipskartUserId, data: { roleId, roleName: mapping.shipskartRole } },
+  });
+  if (res.ok) {
+    await b2bRepo.upsertUserLink(link.userUuid, {
+      pushStatus: 'pushed', lastError: null,
+      pushedRoleId: roleId, pushedRoleName: mapping.shipskartRole,
+    });
+    console.log(`[Shipskart b2b] role updated for ${link.userUuid} → '${mapping.shipskartRole}'`);
+    return { status: 'role_updated', shipskartId: link.shipskartUserId };
+  }
+  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
+  // Link STAYS 'pushed' (the user exists remotely and must not be re-created); the
+  // error is recorded and the next sweep retries because the stamp was not written.
+  await b2bRepo.upsertUserLink(link.userUuid, { pushStatus: 'pushed', lastError: `role update failed: ${error}` });
+  return { status: 'role_update_failed', error };
+}
+
 export async function pushUser(mu: {
   id: string; fullName: string; email: string | null; role: string | null; designation: string | null;
 }): Promise<PushResult> {
   const existing = await b2bRepo.getUserLink(mu.id);
   if (existing?.pushStatus === 'pushed' && existing.shipskartUserId) {
-    return { status: 'already_pushed', shipskartId: existing.shipskartUserId };
+    return syncRoleIfDrifted(
+      { userUuid: mu.id, shipskartUserId: existing.shipskartUserId, pushedRoleId: existing.pushedRoleId ?? null },
+      mu.role,
+    );
   }
   if (!mu.email) {
     await b2bRepo.upsertUserLink(mu.id, { pushStatus: 'missing_email', lastError: 'master_users row has no email — Shipskart requires one' });
@@ -156,7 +208,11 @@ export async function pushUser(mu: {
   });
   const shipskartId = res.json?.data?.id;
   if (res.ok && shipskartId) {
-    await b2bRepo.upsertUserLink(mu.id, { shipskartUserId: shipskartId, pushStatus: 'pushed', lastError: null });
+    await b2bRepo.upsertUserLink(mu.id, {
+      shipskartUserId: shipskartId, pushStatus: 'pushed', lastError: null,
+      // mig 153: stamp what we pushed so later role changes are a free local comparison
+      pushedRoleId: roleId, pushedRoleName: mapping.shipskartRole,
+    });
     return { status: 'pushed', shipskartId };
   }
   const status = isDuplicate400(res) ? 'blocked_duplicate' : 'error';
@@ -232,7 +288,20 @@ export interface JitResult { pushed: boolean; reason: string; mappings?: Record<
 export async function ensureUserPushed(userUuid: string, sailRole: string | null): Promise<JitResult> {
   const existing = await b2bRepo.getUserLink(userUuid);
   if (existing?.pushStatus === 'pushed' && existing.shipskartUserId) {
-    return { pushed: true, reason: 'already_pushed' };
+    // Role-drift self-heal at click time: free local comparison when nothing changed;
+    // exactly one PUT when the SAILERP role drifted. A failed update never blocks the
+    // click — the user is in with their previous role and the sweep retries durably.
+    let reason = 'already_pushed';
+    try {
+      const drift = await syncRoleIfDrifted(
+        { userUuid, shipskartUserId: existing.shipskartUserId, pushedRoleId: existing.pushedRoleId ?? null },
+        sailRole,
+      );
+      if (drift.status === 'role_updated') reason = 'already_pushed_role_updated';
+    } catch (err: any) {
+      console.warn(`[Shipskart JIT] role-drift check failed for ${userUuid} (user is still in; sweep retries): ${err?.message || err}`);
+    }
+    return { pushed: true, reason };
   }
   // A duplicate block cannot be resolved from here — Shipskart has no lookup endpoint, so
   // retrying would fail forever. Leave it for the console/human.
@@ -322,7 +391,9 @@ export async function runReconciliation(opts: { limit?: number } = {}): Promise<
     vuuid: vessels.vuuid, name: vessels.name, imoNumber: vessels.imoNumber, vesselType: vessels.vesselType,
   }).from(vessels).where(eq(vessels.isActive, true));
   for (const v of vesselRows.filter((r) => !pushedVesselSet.has(r.vuuid)).slice(0, limit)) {
-    tally(summary.vessels, (await pushVessel(v)).status);
+    const st = (await pushVessel(v)).status;
+    tally(summary.vessels, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
 
   // 2. Users without a successful link (role-mapped only — pushUser enforces it).
@@ -334,14 +405,29 @@ export async function runReconciliation(opts: { limit?: number } = {}): Promise<
     role: masterUsers.role, designation: masterUsers.designation,
   }).from(masterUsers).where(eq(masterUsers.isDeleted, false));
   for (const mu of userRows.filter((r) => !pushedUserSet.has(r.id)).slice(0, limit)) {
-    tally(summary.users, (await pushUser(mu)).status);
+    const st = (await pushUser(mu)).status;
+    tally(summary.users, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
+  }
+
+  // 2b. Role drift for already-pushed users (their 03-Aug update endpoints). pushUser
+  // routes a pushed link through syncRoleIfDrifted — a free local comparison unless the
+  // SAILERP role actually changed (or the pre-mig-153 stamp is missing), so this pass
+  // normally makes zero API calls. 'already_pushed' is not tallied to keep the summary
+  // signal-only.
+  for (const mu of userRows.filter((r) => pushedUserSet.has(r.id)).slice(0, limit)) {
+    const st = (await pushUser(mu)).status;
+    if (st !== 'already_pushed') tally(summary.users, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
 
   // 3. Assignments not yet mapped whose both ends might now be pushed.
   const pendingAssignments = await db.select().from(masterUserVessels)
     .where(and(eq(masterUserVessels.isActive, true), inArray(masterUserVessels.mapStatus, ['pending', 'awaiting_user', 'awaiting_vessel'])));
   for (const a of pendingAssignments.slice(0, limit)) {
-    tally(summary.mappings, (await mapUserToVessel(a.userUuid, a.vesselId)).status);
+    const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
+    tally(summary.mappings, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
 
   console.log(`[Shipskart b2b] reconciliation pass: vessels=${JSON.stringify(summary.vessels)} users=${JSON.stringify(summary.users)} mappings=${JSON.stringify(summary.mappings)}`);

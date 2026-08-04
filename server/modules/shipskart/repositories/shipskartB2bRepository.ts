@@ -65,6 +65,7 @@ export async function getUserLink(userUuid: string): Promise<ShipskartUserLink |
 
 export async function upsertUserLink(userUuid: string, patch: {
   shipskartUserId?: string | null; pushStatus: string; lastError?: string | null;
+  pushedRoleId?: string | null; pushedRoleName?: string | null;
 }): Promise<void> {
   const db = await getDb();
   const now = new Date();
@@ -76,6 +77,8 @@ export async function upsertUserLink(userUuid: string, patch: {
       pushStatus: patch.pushStatus,
       lastError: patch.lastError ?? null,
       pushedAt: pushedAt ?? null,
+      pushedRoleId: patch.pushedRoleId ?? null,
+      pushedRoleName: patch.pushedRoleName ?? null,
     })
     .onConflictDoUpdate({
       target: shipskartUserLinks.userUuid,
@@ -84,6 +87,8 @@ export async function upsertUserLink(userUuid: string, patch: {
         pushStatus: patch.pushStatus,
         lastError: patch.lastError ?? null,
         ...(pushedAt ? { pushedAt } : {}),
+        ...(patch.pushedRoleId !== undefined ? { pushedRoleId: patch.pushedRoleId } : {}),
+        ...(patch.pushedRoleName !== undefined ? { pushedRoleName: patch.pushedRoleName } : {}),
         updatedAt: now,
       },
     });

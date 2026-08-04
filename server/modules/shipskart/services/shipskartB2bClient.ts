@@ -82,7 +82,7 @@ function assertNoTenantInBody(body: unknown): void {
  * this layer deliberately knows nothing about them, which keeps the dependency one-way).
  */
 export async function signedB2bRequest(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT',
   pathAndQuery: string,
   opts: { body?: unknown; bearer?: string } = {},
 ): Promise<B2bResponse> {
@@ -106,14 +106,16 @@ export async function signedB2bRequest(
     'x-tenant-id': cfg.tenantId,
   };
   if (opts.bearer) headers['Authorization'] = `Bearer ${opts.bearer}`;
-  if (method === 'POST') headers['Content-Type'] = 'application/json';
+  // PUT added 2026-08-04: their updated collection signs AND sends the body on PUT
+  // (earlier UAT rejected PUT bodies with a signature mismatch — contract now fixed).
+  if (method !== 'GET') headers['Content-Type'] = 'application/json';
 
   let response: Response;
   try {
     response = await fetch(`${cfg.baseUrl}${pathAndQuery}`, {
       method,
       headers,
-      body: method === 'POST' ? raw : undefined,
+      body: method !== 'GET' ? raw : undefined,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (err: any) {
