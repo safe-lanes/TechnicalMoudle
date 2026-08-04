@@ -123,6 +123,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     location: "",
     critical: "",
     conditionBased: "",
+    rotationalItem: "",
+    currentStamp: "",
     installationDate: "",
     commissionedDate: "",
     rating: "",
@@ -172,6 +174,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         location: comp.location || "",
         critical: toBoolString(comp.critical),
         conditionBased: toBoolString(comp.conditionBased),
+        rotationalItem: toBoolString(comp.rotationalItem) || "No",
+        currentStamp: comp.currentStamp || "",
         installationDate: comp.installationDate || "",
         commissionedDate: comp.commissionedDate || "",
         rating: comp.rating || "",
@@ -546,6 +550,54 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               }`}>
                 {componentData.conditionBased}
               </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Rotational Item</label>
+          {isChangeMode ? (
+            <select
+              value={componentData.rotationalItem || "No"}
+              onChange={(e) => {
+                handleFieldChange('rotationalItem', e.target.value);
+                if (e.target.value !== "Yes") handleFieldChange('currentStamp', "");
+              }}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('rotationalItem') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="select-rotational-item"
+            >
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-rotational-item">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                componentData.rotationalItem === "Yes"
+                  ? "bg-purple-100 text-purple-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}>
+                {componentData.rotationalItem || "No"}
+              </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Stamp</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.currentStamp}
+              onChange={(e) => handleFieldChange('currentStamp', e.target.value)}
+              disabled={componentData.rotationalItem !== "Yes"}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('currentStamp') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              } disabled:bg-gray-100 disabled:text-gray-400`}
+              data-testid="input-stamp"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-stamp">
+              {componentData.rotationalItem === "Yes" ? (componentData.currentStamp || "-") : "-"}
             </div>
           )}
         </div>
@@ -2784,6 +2836,8 @@ const Components: React.FC = () => {
         critical: originalComponentData.critical,
         classItem: originalComponentData.classItem,
         conditionBased: originalComponentData.conditionBased,
+        rotationalItem: (originalComponentData as any).rotationalItem,
+        currentStamp: (originalComponentData as any).currentStamp,
         commissionedDate: originalComponentData.commissionedDate,
         installationDate: originalComponentData.installationDate,
         rating: originalComponentData.rating,
@@ -3427,6 +3481,8 @@ const Components: React.FC = () => {
           location: comp.location || "",
           critical: comp.critical === true || comp.critical === "Yes" ? "Yes" : (comp.critical === false || comp.critical === "No" ? "No" : ""),
           conditionBased: comp.conditionBased === true || comp.conditionBased === "Yes" ? "Yes" : (comp.conditionBased === false || comp.conditionBased === "No" ? "No" : ""),
+          rotationalItem: comp.rotationalItem === true || comp.rotationalItem === "Yes" ? "Yes" : "No",
+          currentStamp: comp.currentStamp || "",
           installationDate: comp.installationDate || "",
           commissionedDate: comp.commissionedDate || "",
           rating: comp.rating || "",

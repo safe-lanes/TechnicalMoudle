@@ -116,6 +116,8 @@ export default function ComponentRegisterAddEdit({
     location: "",
     critical: "",
     conditionBased: "",
+    rotationalItem: "No",
+    currentStamp: "",
     installationDate: "",
     // Row 5: Commissioned Date, Rating, Equipment/System Department, (spacer)
     commissionedDate: "",
@@ -478,6 +480,8 @@ export default function ComponentRegisterAddEdit({
         location: comp.location || "",
         critical: comp.critical ? "Yes" : "No",
         conditionBased: comp.conditionBased ? "Yes" : "No",
+        rotationalItem: comp.rotationalItem ? "Yes" : "No",
+        currentStamp: comp.currentStamp || "",
         installationDate: comp.installationDate || "",
         // Row 5
         commissionedDate: comp.commissionedDate || "",
@@ -881,6 +885,14 @@ export default function ComponentRegisterAddEdit({
     } else if (componentData.makerCode) {
       handleFieldChange('makerCode', '');
     }
+    if (componentData.rotationalItem === "Yes" && !componentData.currentStamp.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Stamp is mandatory when Rotational Item is Yes.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (componentData.rhCounterType === "INHERITED" && !componentData.rhMasterComponentId) {
       toast({
         title: "Validation Error",
@@ -905,6 +917,8 @@ export default function ComponentRegisterAddEdit({
         location: componentData.location || null,
         critical: componentData.critical === "Yes",
         conditionBased: componentData.conditionBased === "Yes",
+        rotationalItem: componentData.rotationalItem === "Yes",
+        currentStamp: componentData.rotationalItem === "Yes" ? (componentData.currentStamp || null) : null,
         installationDate: componentData.installationDate || null,
         commissionedDate: componentData.commissionedDate || null,
         rating: componentData.rating || null,
@@ -1032,6 +1046,8 @@ export default function ComponentRegisterAddEdit({
       location: comp.location || "",
       critical: comp.critical ? "Yes" : "No",
       conditionBased: comp.conditionBased ? "Yes" : "No",
+      rotationalItem: comp.rotationalItem ? "Yes" : "No",
+      currentStamp: comp.currentStamp || "",
       installationDate: comp.installationDate || "",
       // Row 5
       commissionedDate: comp.commissionedDate || "",
@@ -1180,6 +1196,8 @@ export default function ComponentRegisterAddEdit({
                   location: "",
                   critical: "",
                   conditionBased: "",
+                  rotationalItem: "No",
+                  currentStamp: "",
                   installationDate: "",
                   commissionedDate: "",
                   rating: "",
@@ -1520,6 +1538,38 @@ export default function ComponentRegisterAddEdit({
                       onChange={(e) => handleFieldChange('installationDate', e.target.value)}
                       className="h-8 text-sm"
                       data-testid="input-installation-date"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Rotational Item</label>
+                    <select
+                      value={componentData.rotationalItem}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setComponentData(prev => ({
+                          ...prev,
+                          rotationalItem: v,
+                          currentStamp: v === "Yes" ? prev.currentStamp : "",
+                        }));
+                      }}
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      data-testid="select-rotational-item"
+                    >
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">
+                      Stamp{componentData.rotationalItem === "Yes" && <span className="text-red-500"> *</span>}
+                    </label>
+                    <Input
+                      value={componentData.currentStamp}
+                      onChange={(e) => handleFieldChange('currentStamp', e.target.value)}
+                      disabled={componentData.rotationalItem !== "Yes"}
+                      placeholder={componentData.rotationalItem === "Yes" ? "Unique stamp no." : ""}
+                      className="h-8 text-sm"
+                      data-testid="input-stamp"
                     />
                   </div>
                 </div>

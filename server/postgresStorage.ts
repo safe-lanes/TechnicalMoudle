@@ -5648,6 +5648,9 @@ export class PostgresStorage {
       return result;
     } catch (error: any) {
       console.error(`[CR_APPLY] Transaction failed for CR ${id}, all changes rolled back:`, error);
+      // Preserve domain validation errors (e.g. rotational stamp rules) so the
+      // API surfaces a 4xx with the real message instead of a generic 500.
+      if (error?.statusCode) throw error;
       throw new Error(`Failed to approve change request: ${error.message}`);
     }
   }
@@ -5841,6 +5844,35 @@ export class PostgresStorage {
       return;
     }
 
+    // Rotational Item rules (Task #356): CR approval must enforce the same stamp
+    // rules as normal component saves. Normalize Yes/No strings and validate here
+    // (throw → whole approval rolls back); registry sync happens after the update.
+    let rotationalTouched = false;
+    if ('rotationalItem' in safeUpdateData || 'currentStamp' in safeUpdateData) {
+      rotationalTouched = true;
+      const rotSvc = await import('./modules/rotational-items/services/rotationalItemService');
+      const rawFlag = safeUpdateData.rotationalItem;
+      const effectiveRotational = rawFlag !== undefined
+        ? (rawFlag === true || rawFlag === 'Yes' || rawFlag === 'yes' || rawFlag === 'true')
+        : beforeState.rotationalItem === true;
+      if ('rotationalItem' in safeUpdateData) safeUpdateData.rotationalItem = effectiveRotational;
+      let effectiveStamp = 'currentStamp' in safeUpdateData ? safeUpdateData.currentStamp : beforeState.currentStamp;
+      effectiveStamp = typeof effectiveStamp === 'string' && effectiveStamp.trim() !== '' ? effectiveStamp.trim() : null;
+      if (!effectiveRotational) {
+        effectiveStamp = null;
+      } else if (!effectiveStamp) {
+        const { ValidationError } = await import('./modules/shared/errors');
+        throw new ValidationError('Stamp is mandatory when Rotational Item is Yes');
+      } else if (beforeState.vesselId) {
+        const clash = await rotSvc.getByStamp(beforeState.vesselId, effectiveStamp);
+        if (clash && clash.status === 'Installed' && clash.componentCuuid && clash.componentCuuid !== resolvedCuuid) {
+          const { ValidationError } = await import('./modules/shared/errors');
+          throw new ValidationError(`Stamp "${effectiveStamp}" is already installed on another component on this vessel. Stamps must be unique.`);
+        }
+      }
+      safeUpdateData.currentStamp = effectiveStamp;
+    }
+
     // Log before values for each field being updated
     console.log(`[CR_APPLY] Component ${componentId} (resolved cuuid: ${resolvedCuuid}) BEFORE update:`);
     for (const field of Object.keys(safeUpdateData)) {
@@ -5858,6 +5890,17 @@ export class PostgresStorage {
     
     // Verify the update by comparing returned values
     const afterState = result[0];
+
+    // Rotational registry sync after an approved CR touched the two fields.
+    // Delegates to the shared componentService state machine (create/rename/
+    // detach/relink of spare stamps) — single source of truth with normal saves.
+    // Runs on a separate connection: if the outer approval tx still fails after this
+    // point, the next component save re-syncs the registry (sync is idempotent).
+    if (rotationalTouched) {
+      const { syncRotationalRegistry } = await import('./modules/components/services/componentService');
+      await syncRotationalRegistry(beforeState, afterState);
+    }
+
     console.log(`[CR_APPLY] Component ${componentId} AFTER update:`);
     for (const field of Object.keys(safeUpdateData)) {
       const applied = afterState[field];

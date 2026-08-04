@@ -92,11 +92,22 @@ export async function createRotationalItem(
 export async function updateRotationalItem(
   riuuid: string,
   data: Partial<Pick<InsertRotationalItem,
-    'status' | 'currentRh' | 'rhLastUpdated' | 'componentId' | 'componentCuuid' | 'componentCode' | 'componentName'>>,
+    'stamp' | 'status' | 'currentRh' | 'rhLastUpdated' | 'componentId' | 'componentCuuid' | 'componentCode' | 'componentName'>>,
 ): Promise<RotationalItem> {
   const oldRow = await repo.getByRiuuid(riuuid);
   if (!oldRow) throw new NotFoundError('Rotational item not found');
   if (data.status !== undefined) validateStatus(data.status);
+  if (data.stamp !== undefined) {
+    // Stamp rename (typo correction) — must stay unique on the vessel
+    const newStamp = normalizeStamp(data.stamp);
+    if (newStamp !== oldRow.stamp) {
+      const clash = await repo.getByStamp(oldRow.vesselId, newStamp);
+      if (clash && clash.riuuid !== riuuid) {
+        throw new RotationalItemValidationError(`Stamp "${newStamp}" already exists on this vessel`);
+      }
+    }
+    data.stamp = newStamp;
+  }
 
   const userUuid = currentUserUuid();
   const updated = await repo.update(riuuid, { ...data, updatedByUuid: userUuid });
@@ -111,6 +122,28 @@ export async function deleteRotationalItem(riuuid: string): Promise<void> {
   const userUuid = currentUserUuid();
   await repo.softDelete(riuuid, userUuid);
   await logSoftDelete(TABLE, riuuid, oldRow.vesselId, userUuid);
+}
+
+export async function getInstalledForComponent(componentCuuid: string): Promise<RotationalItem | undefined> {
+  return repo.getInstalledByComponentCuuid(componentCuuid);
+}
+
+/**
+ * Detach the item from its component (component unmarked as rotational, or item removed):
+ * snapshot the component's RH onto the stamp, mark it Spare, and clear the live link.
+ * component_code/component_name are kept as the "last fitted at" historical snapshot.
+ */
+export async function detachFromComponent(
+  riuuid: string,
+  rhSnapshot: { currentRh: string | number | null; rhLastUpdated: string | null },
+): Promise<RotationalItem> {
+  return updateRotationalItem(riuuid, {
+    status: 'Spare',
+    componentId: null,
+    componentCuuid: null,
+    currentRh: rhSnapshot.currentRh != null ? String(rhSnapshot.currentRh) : undefined,
+    rhLastUpdated: rhSnapshot.rhLastUpdated ?? undefined,
+  });
 }
 
 /**

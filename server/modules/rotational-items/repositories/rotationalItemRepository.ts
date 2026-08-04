@@ -32,6 +32,17 @@ export async function getByStamp(vesselId: string, stamp: string): Promise<Rotat
   return rows[0];
 }
 
+export async function getInstalledByComponentCuuid(componentCuuid: string): Promise<RotationalItem | undefined> {
+  const db = await getDb();
+  const rows = await db.select().from(rotationalItems)
+    .where(and(
+      eq(rotationalItems.componentCuuid, componentCuuid),
+      eq(rotationalItems.status, 'Installed'),
+      notDeleted,
+    )).limit(1);
+  return rows[0];
+}
+
 export async function create(data: InsertRotationalItem): Promise<RotationalItem> {
   const db = await getDb();
   const rows = await db.insert(rotationalItems).values(data).returning();
