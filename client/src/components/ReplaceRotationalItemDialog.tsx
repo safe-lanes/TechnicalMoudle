@@ -23,10 +23,10 @@ import { invalidateByUrlPrefix } from "@/lib/queryClient";
 interface RotationalItemRow {
   riuuid: string;
   stamp: string;
+  stampName: string | null;
   status: string;
   currentRh: string | null;
   rhLastUpdated: string | null;
-  componentCode: string | null;
 }
 
 interface Props {
@@ -47,6 +47,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [selectedRiuuid, setSelectedRiuuid] = useState("");
   const [newStamp, setNewStamp] = useState("");
+  const [newStampName, setNewStampName] = useState("");
   const [newRh, setNewRh] = useState("0");
 
   const { data: items = [], isLoading } = useQuery<RotationalItemRow[]>({
@@ -66,6 +67,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
         body.incomingRiuuid = selectedRiuuid;
       } else {
         body.newStamp = newStamp.trim();
+        body.newStampName = newStampName.trim() || null;
         body.newStampInitialRh = newRh.trim() === "" ? 0 : Number(newRh);
       }
       const res = await fetch("/technical/api/rotational-items/swap", {
@@ -93,6 +95,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
       onOpenChange(false);
       setSelectedRiuuid("");
       setNewStamp("");
+      setNewStampName("");
       setNewRh("0");
       onSwapped?.();
     },
@@ -144,6 +147,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
                     <tr>
                       <th className="p-2 text-left"></th>
                       <th className="p-2 text-left">Stamp</th>
+                      <th className="p-2 text-left">Stamp Name</th>
                       <th className="p-2 text-left">Status</th>
                       <th className="p-2 text-right">Running Hours</th>
                       <th className="p-2 text-left">RH Last Updated</th>
@@ -161,6 +165,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
                           <input type="radio" readOnly checked={selectedRiuuid === item.riuuid} />
                         </td>
                         <td className="p-2 font-medium">{item.stamp}</td>
+                        <td className="p-2">{item.stampName || "-"}</td>
                         <td className="p-2">{item.status}</td>
                         <td className="p-2 text-right">{item.currentRh ?? "0"}</td>
                         <td className="p-2">
@@ -181,6 +186,15 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
                   className="text-sm w-full px-2 py-1.5 border rounded"
                   placeholder="e.g. 555223"
                   data-testid="input-new-stamp"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Stamp Name</label>
+                <input
+                  type="text" value={newStampName} onChange={(e) => setNewStampName(e.target.value)}
+                  className="text-sm w-full px-2 py-1.5 border rounded"
+                  placeholder="e.g. ME Cylinder Liner"
+                  data-testid="input-new-stamp-name"
                 />
               </div>
               <div>

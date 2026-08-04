@@ -409,9 +409,9 @@ export type Component = typeof components.$inferSelect;
 // Rotational Items master registry (migration 152) — physical parts identified by a
 // unique Stamp; RH history follows the stamp, not the equipment position.
 // BOTH_EDITABLE sync (ship swaps; shore can create/retire stamps) — identity: riuuid.
-// component_id stores components.cuuid (schema-wide convention); populated ONLY while status='Installed'.
-// component_code/component_name are HISTORICAL SNAPSHOTS written at install/swap time
-// ("where was this item last fitted") — intentionally NOT updated on component renames.
+// PURE MASTER TABLE (Task #366): no component back-pointer. The installed-on link is
+// DERIVED via join components.current_stamp = rotational_items.stamp (per vessel).
+// Historical "where fitted" trace lives in immutable rotation_history.
 export const ROTATIONAL_ITEM_STATUSES = ['Installed', 'Spare', 'In Store', 'Retired'] as const;
 export type RotationalItemStatus = typeof ROTATIONAL_ITEM_STATUSES[number];
 
@@ -420,9 +420,7 @@ export const rotationalItems = pgTable("rotational_items", {
   riuuid: text("riuuid").notNull().unique().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   stamp: text("stamp").notNull(),
-  componentId: text("component_id"), // components.cuuid
-  componentCode: text("component_code"),
-  componentName: text("component_name"),
+  stampName: text("stamp_name"), // part description shown wherever the stamp is picked/displayed
   currentRh: decimal("current_rh", { precision: 10, scale: 2 }).notNull().default("0"),
   rhLastUpdated: text("rh_last_updated"),
   status: text("status").notNull().default("Spare"),

@@ -33,7 +33,12 @@ function normalizeRotationalPayload(data: any): void {
   }
 }
 
-/** Rotational Item = Yes → stamp mandatory and unique on the vessel (own item excluded). */
+/**
+ * Rotational Item = Yes → stamp mandatory, MUST exist in the Rotation Item Master
+ * (strict master-first, Task #366) and must not be held by another component.
+ * A Spare / In Store stamp may be claimed; Retired stamps cannot be fitted.
+ * The installed-on link is derived via components.current_stamp (pure master table).
+ */
 async function validateRotationalStamp(
   stamp: string | null | undefined,
   vesselId: string | null | undefined,
@@ -45,13 +50,21 @@ async function validateRotationalStamp(
   }
   if (!vesselId) return; // no vessel context — uniqueness is per-vessel
   const existing = await rotationalItemService.getByStamp(vesselId, s);
-  // Reject only when the stamp is currently Installed on ANOTHER component.
-  // A Spare / In Store stamp may be claimed (re-marking a component, or fitting a spare);
-  // the item is then re-linked as Installed and keeps its own RH history.
-  if (existing && existing.status === 'Installed' && existing.componentId !== ownComponentCuuid) {
+  if (!existing) {
     throw new ValidationError(
-      `Stamp "${s}" is already installed on another component${existing.componentName ? ` (${existing.componentName})` : ''} on this vessel. Stamps must be unique.`
+      `Stamp "${s}" not found in Rotation Item Master. Create it first under PMS → Admin → Master Data → Rotation Item Master List (or bulk import), then select it here.`
     );
+  }
+  if (existing.status === 'Retired') {
+    throw new ValidationError(`Stamp "${s}" is retired and cannot be fitted to a component.`);
+  }
+  if (existing.status === 'Installed') {
+    const holder = await rotationalItemService.getComponentHoldingStamp(vesselId, s);
+    if (holder && holder.cuuid !== ownComponentCuuid) {
+      throw new ValidationError(
+        `Stamp "${s}" is already installed on another component${holder.name ? ` (${holder.name})` : ''} on this vessel. Stamps must be unique.`
+      );
+    }
   }
 }
 
@@ -70,9 +83,15 @@ function componentRhSnapshot(component: Component): string | number | null {
 
 /**
  * Keep the rotational_items master table in step with the component after save.
- * - Marked rotational: upsert the stamp as Installed with the component's RH snapshot;
- *   handles stamp rename (typo fix) on the component's own installed item.
- * - Unmarked: detach the previously installed item (→ Spare, RH snapshotted onto the stamp).
+ *
+ * STRICT MASTER-FIRST (Task #366): components never create stamps. The stamp must
+ * already exist in the Rotation Item Master; selecting it claims the master row
+ * (status → Installed). The installed-on link is DERIVED from components.current_stamp
+ * (pure master table — no back-pointer columns).
+ *
+ * - Marked rotational with stamp S: S must exist in the master. If the component
+ *   previously held a different stamp, that stamp is released (→ Spare, RH snapshotted).
+ * - Unmarked / stamp cleared: release the previously held stamp.
  * Never touches items belonging to other components.
  * Exported so the change-request approval path (postgresStorage) applies the
  * exact same semantics — single source of truth for the registry state machine.
@@ -80,75 +99,54 @@ function componentRhSnapshot(component: Component): string | number | null {
 export async function syncRotationalRegistry(oldComponent: Component | null, component: Component): Promise<void> {
   const rotational = (component as any).rotationalItem === true;
   const stamp = (component as any).currentStamp as string | null;
+  const vesselId = component.vesselId;
   const rhSnapshot = {
     currentRh: componentRhSnapshot(component),
     rhLastUpdated: (component as any).lastUpdated ?? null,
   };
 
-  const installed = component.cuuid
-    ? await rotationalItemService.getInstalledForComponent(component.cuuid)
-    : undefined;
+  // Previously held stamp = old component row's current_stamp (derived link).
+  const prevStamp = oldComponent && (oldComponent as any).rotationalItem === true
+    ? ((oldComponent as any).currentStamp as string | null)
+    : null;
 
-  if (!rotational || !stamp) {
-    if (installed) {
-      await rotationalItemService.detachFromComponent(installed.riuuid, rhSnapshot);
+  // Release the previously held stamp when unmarked, cleared, or changed.
+  if (prevStamp && vesselId && (!rotational || !stamp || stamp !== prevStamp)) {
+    const prevItem = await rotationalItemService.getByStamp(vesselId, prevStamp);
+    if (prevItem && prevItem.status === 'Installed') {
+      await rotationalItemService.detachFromComponent(prevItem.riuuid, rhSnapshot);
     }
-    return;
   }
 
-  if (installed && installed.stamp !== stamp) {
-    // Same component, new stamp value. Two defined cases:
-    //  - target stamp doesn't exist → plain rename (typo correction) on the installed item
-    //  - target stamp exists as a non-installed item → the user is fitting that existing
-    //    item here: detach the current item (Spare, RH snapshotted) and relink the target
-    const target = component.vesselId
-      ? await rotationalItemService.getByStamp(component.vesselId, stamp)
-      : undefined;
-    if (target && target.riuuid !== installed.riuuid) {
-      if (target.status === 'Installed' && target.componentId && target.componentId !== component.cuuid) {
-        throw new ValidationError(
-          `Stamp "${stamp}" is already installed on another component${target.componentName ? ` (${target.componentName})` : ''} on this vessel. Stamps must be unique.`
-        );
-      }
-      await rotationalItemService.detachFromComponent(installed.riuuid, rhSnapshot);
-      await rotationalItemService.updateRotationalItem(target.riuuid, {
-        status: 'Installed',
-        componentId: component.cuuid ?? '',
-        componentCode: component.componentCode ?? null,
-        componentName: component.name ?? null,
-      });
-    } else {
-      await rotationalItemService.updateRotationalItem(installed.riuuid, { stamp });
-    }
-    return;
-  }
-  if (installed) return; // already in step
+  if (!rotational || !stamp || !vesselId) return;
 
-  const item = await rotationalItemService.ensureRotationalItemForComponent({
-    vesselId: component.vesselId!,
-    stamp,
-    componentId: component.cuuid ?? '',
-    componentCode: component.componentCode ?? null,
-    componentName: component.name ?? null,
-    currentRh: rhSnapshot.currentRh,
-    rhLastUpdated: rhSnapshot.rhLastUpdated,
-  });
-  // Hard guard against races past pre-validation: never steal a stamp that is
-  // Installed on another component — reject instead of re-linking.
-  if (item.status === 'Installed' && item.componentId && item.componentId !== component.cuuid) {
+  const item = await rotationalItemService.getByStamp(vesselId, stamp);
+  if (!item) {
     throw new ValidationError(
-      `Stamp "${stamp}" is already installed on another component${item.componentName ? ` (${item.componentName})` : ''} on this vessel. Stamps must be unique.`
+      `Stamp "${stamp}" not found in Rotation Item Master. Create it first under PMS → Admin → Master Data → Rotation Item Master List (or bulk import), then select it here.`
     );
   }
-  // ensure… returns an existing row unchanged; if that row was a detached Spare with this
-  // stamp for this same component, re-link it as Installed.
-  if (item.status !== 'Installed' || item.componentId !== component.cuuid) {
-    await rotationalItemService.updateRotationalItem(item.riuuid, {
-      status: 'Installed',
-      componentId: component.cuuid ?? '',
-      componentCode: component.componentCode ?? null,
-      componentName: component.name ?? null,
-    });
+  if (item.status === 'Retired') {
+    throw new ValidationError(`Stamp "${stamp}" is retired and cannot be fitted to a component.`);
+  }
+  if (item.status === 'Installed') {
+    // Hard guard against races past pre-validation: never steal a stamp that is
+    // Installed on another component — reject instead of re-linking.
+    const holder = await rotationalItemService.getComponentHoldingStamp(vesselId, stamp);
+    if (holder && holder.cuuid !== component.cuuid) {
+      throw new ValidationError(
+        `Stamp "${stamp}" is already installed on another component${holder.name ? ` (${holder.name})` : ''} on this vessel. Stamps must be unique.`
+      );
+    }
+    return; // already in step (this component holds it)
+  }
+  // Spare / In Store → claim it for this component (guarded write: fails with
+  // 0 rows if a concurrent save claimed/retired the stamp after our checks).
+  const claimed = await rotationalItemService.claimStamp(item.riuuid);
+  if (!claimed) {
+    throw new ValidationError(
+      `Stamp "${stamp}" was just taken or changed by another update. Refresh and pick an available stamp.`
+    );
   }
 }
 

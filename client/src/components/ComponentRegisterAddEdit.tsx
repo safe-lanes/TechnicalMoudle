@@ -6,6 +6,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import StampSelect from "@/components/StampSelect";
 import {
   Select,
   SelectContent,
@@ -1563,13 +1564,14 @@ export default function ComponentRegisterAddEdit({
                     <label className="text-xs font-medium text-gray-600 mb-1 block">
                       Stamp{componentData.rotationalItem === "Yes" && <span className="text-red-500"> *</span>}
                     </label>
-                    <Input
+                    <StampSelect
+                      vesselId={vesselId}
                       value={componentData.currentStamp}
-                      onChange={(e) => handleFieldChange('currentStamp', e.target.value)}
+                      onChange={(stamp) => handleFieldChange('currentStamp', stamp)}
                       disabled={componentData.rotationalItem !== "Yes"}
-                      placeholder={componentData.rotationalItem === "Yes" ? "Unique stamp no." : ""}
-                      className="h-8 text-sm"
-                      data-testid="input-stamp"
+                      currentStamp={isEditMode ? componentData.currentStamp || undefined : undefined}
+                      className="h-8 text-sm w-full px-2 border rounded disabled:bg-gray-100 disabled:text-gray-400"
+                      testId="input-stamp"
                     />
                   </div>
                 </div>

@@ -27,5 +27,6 @@ BEGIN
   END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_rotational_items_component
-  ON rotational_items (component_id) WHERE is_deleted = FALSE;
+-- NOTE (Task #366): the index on component_id is no longer created here. Migration 155
+-- drops component_id entirely (pure master table); recreating the index on fresh
+-- installs (where the amended 152 never adds the column) would fail.

@@ -15,13 +15,14 @@ import FleetJobsUpload from "./bulk/FleetJobsUpload";
 import FleetSparesUpload from "./bulk/FleetSparesUpload";
 import MasterListsUpload from "./bulk/MasterListsUpload";
 import LocationsUpload from "./bulk/LocationsUpload";
+import RotationalItemsUpload from "./bulk/RotationalItemsUpload";
 import WoHistoryUpload from "./bulk/WoHistoryUpload";
 import BulkImportHistory from "./bulk/BulkImportHistory";
 import { useVessels } from "@/hooks/useVessels";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 
-type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'locations' | 'wo-history';
+type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'locations' | 'rotational-items' | 'wo-history';
 type FleetTemplateType = 'maker-list' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
 type ViewMode = 'upload' | 'history';
 
@@ -243,6 +244,7 @@ const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
   spares: SPARES_PAGE_MARKERS,
   stores: STORES_PAGE_MARKERS,
   locations: LOCATIONS_PAGE_MARKERS,
+  'rotational-items': LOCATIONS_PAGE_MARKERS,
   'wo-history': WO_HISTORY_PAGE_MARKERS,
 };
 
@@ -267,7 +269,8 @@ export default function BulkDataImport() {
     { id: 'spares' as VesselTemplateType, number: 3, name: 'Spares' },
     { id: 'stores' as VesselTemplateType, number: 4, name: 'Stores' },
     { id: 'locations' as VesselTemplateType, number: 5, name: 'Locations' },
-    { id: 'wo-history' as VesselTemplateType, number: 6, name: 'History' },
+    { id: 'rotational-items' as VesselTemplateType, number: 6, name: 'Rotation Items' },
+    { id: 'wo-history' as VesselTemplateType, number: 7, name: 'History' },
   ];
 
   const fleetTemplates = [
@@ -332,6 +335,7 @@ export default function BulkDataImport() {
                 'spares': currentMarkers.templateSpares,
                 'stores': currentMarkers.templateStores,
                 'locations': `${currentMarkers.templatesHeader}-locations`,
+                'rotational-items': `${currentMarkers.templatesHeader}-rotational-items`,
                 'wo-history': `${currentMarkers.templatesHeader}-wo-history`,
               };
               const markerId = !isFleetMode ? templateMarkerMap[template.id as VesselTemplateType] : undefined;
@@ -446,6 +450,8 @@ export default function BulkDataImport() {
               <StoresUpload vesselId={selectedVessel} markers={currentMarkers} />
             ) : selectedVesselTemplate === 'locations' ? (
               <LocationsUpload vesselId={selectedVessel} />
+            ) : selectedVesselTemplate === 'rotational-items' ? (
+              <RotationalItemsUpload vesselId={selectedVessel} />
             ) : selectedVesselTemplate === 'wo-history' ? (
               <WoHistoryUpload
                 vesselId={selectedVessel}

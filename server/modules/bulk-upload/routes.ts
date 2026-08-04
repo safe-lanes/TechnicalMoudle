@@ -62,6 +62,10 @@ router.get('/bulk/locations/template', asyncHandler(ctrl.get_locations_template)
 router.post('/bulk/locations/import', requirePermission('admin-masters', ['create', 'edit']), upload.single('file'), asyncHandler(ctrl.post_locations_import));
 router.post('/bulk/locations/import-stream', requirePermission('admin-masters', ['create', 'edit']), upload.single('file'), asyncHandler(ctrl.doLocationsImportStream));
 router.get('/bulk/locations', asyncHandler(ctrl.get_locations));
+
+// Rotation Item Master bulk import (Task #366) — masters first, then component imports
+router.get('/bulk/rotational-items/template', asyncHandler(ctrl.get_rotational_items_template));
+router.post('/bulk/rotational-items/import-stream', requirePermission('admin-masters', ['create', 'edit']), upload.single('file'), asyncHandler(ctrl.doRotationalItemsImportStream));
 router.put('/bulk/locations/:id', requirePermission('admin-masters', ['create', 'edit']), asyncHandler(ctrl.put_locationsByid));
 router.delete('/bulk/locations/:id', requirePermission('admin-masters', 'delete'), asyncHandler(ctrl.delete_locationsByid));
 

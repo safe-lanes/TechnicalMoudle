@@ -10,13 +10,13 @@
 --   rotational_items.stamp. Ship-side swaps sync via the rotation event tables
 --   (Task: replacement flow), NOT via the components row.
 --
--- rotational_items — BOTH_EDITABLE master registry of physical items:
+-- rotational_items — BOTH_EDITABLE master registry of physical items (PURE MASTER,
+-- Task #366 — no component back-pointer):
 --   * riuuid: sync identity (uuid convention).
---   * component_id: stores components.cuuid (schema-wide convention); populated
---     ONLY while status='Installed'.
---   * component_code / component_name: denormalized HISTORICAL SNAPSHOTS written
---     during install/swap ("where was this item last fitted") — intentionally NOT
---     updated on component renames.
+--   * stamp_name: part description shown wherever the stamp is picked/displayed.
+--   * installed-on link is DERIVED via join components.current_stamp =
+--     rotational_items.stamp (per vessel); historical "where fitted" trace lives
+--     in the immutable rotation_history table.
 --   * status: Installed | Spare | In Store | Retired.
 --   * vessel_id is TEXT referencing vessels(vuuid) — codebase convention.
 --
@@ -34,9 +34,7 @@ CREATE TABLE IF NOT EXISTS rotational_items (
   riuuid TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid(),
   vessel_id TEXT NOT NULL REFERENCES vessels(vuuid),
   stamp TEXT NOT NULL,
-  component_id TEXT,
-  component_code TEXT,
-  component_name TEXT,
+  stamp_name TEXT,
   current_rh NUMERIC(10,2) NOT NULL DEFAULT 0,
   rh_last_updated TEXT,
   status TEXT NOT NULL DEFAULT 'Spare',
@@ -56,4 +54,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_rotational_items_vessel_stamp
 
 CREATE INDEX IF NOT EXISTS idx_rotational_items_vessel ON rotational_items (vessel_id);
 CREATE INDEX IF NOT EXISTS idx_rotational_items_status ON rotational_items (vessel_id, status);
-CREATE INDEX IF NOT EXISTS idx_rotational_items_component ON rotational_items (component_id) WHERE is_deleted = FALSE;
+
+-- Fast derived-join lookups: which component holds this stamp?
+CREATE INDEX IF NOT EXISTS idx_comp_vessel_current_stamp
+  ON components (vessel_id, current_stamp) WHERE current_stamp IS NOT NULL AND is_deleted = FALSE;

@@ -19,6 +19,7 @@ import AddEditComponentForm from "@/components/AddEditComponentForm";
 import ComponentRegisterAddEdit from "@/components/ComponentRegisterAddEdit";
 import { ReviewChangesDrawer } from "@/components/ReviewChangesDrawer";
 import { ReplaceRotationalItemDialog } from "@/components/ReplaceRotationalItemDialog";
+import StampSelect from "@/components/StampSelect";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useLocation } from "wouter";
@@ -602,15 +603,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Stamp</label>
           {isChangeMode ? (
-            <input
-              type="text"
+            <StampSelect
+              vesselId={(selectedComponent as any)?.vesselId || ""}
               value={componentData.currentStamp}
-              onChange={(e) => handleFieldChange('currentStamp', e.target.value)}
+              onChange={(stamp) => handleFieldChange('currentStamp', stamp)}
               disabled={componentData.rotationalItem !== "Yes"}
+              currentStamp={(selectedComponent as any)?.currentStamp || undefined}
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('currentStamp') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               } disabled:bg-gray-100 disabled:text-gray-400`}
-              data-testid="input-stamp"
+              testId="input-stamp"
             />
           ) : (
             <div className="text-sm text-gray-900 flex items-center gap-2" data-testid="text-stamp">

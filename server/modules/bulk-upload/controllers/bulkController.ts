@@ -2413,3 +2413,185 @@ export async function exportSummary(req: Request, res: Response) {
   }
 }
 
+
+// ============================================================================
+// Rotation Item Master bulk import (Task #366) — strict master-first workflow:
+// masters are imported here FIRST, then components can reference the stamps.
+// ============================================================================
+
+export async function get_rotational_items_template(req: Request, res: Response) {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Rotation Items');
+    sheet.columns = [
+      { header: 'Stamp No.', key: 'stamp', width: 20 },
+      { header: 'Stamp Name', key: 'stampName', width: 30 },
+      { header: 'Starting RH', key: 'startingRh', width: 14 },
+      { header: 'Date', key: 'date', width: 14 },
+      { header: 'Status', key: 'status', width: 12 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
+    sheet.addRow({ stamp: 'LINER-00005', stampName: 'ME Cylinder Liner', startingRh: 12500, date: '15-07-2026', status: 'Spare' });
+    sheet.addRow({ stamp: 'TC-ROTOR-00002', stampName: 'T/C Rotor Assembly', startingRh: 0, date: '', status: 'In Store' });
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=rotation_items_template.xlsx');
+    res.send(Buffer.from(buffer));
+  } catch (error: any) {
+    console.error('Error generating rotation items template:', error);
+    res.status(500).json({ error: 'Failed to generate rotation items template' });
+  }
+}
+
+// Strict DD-MM-YYYY parse (no Excel serials ambiguity beyond numeric serial support).
+// Returns ISO string, null for blank, or throws message string.
+function parseRotationRhDate(raw: any, rowNum: number): string | null {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return null;
+  let d: Date | null = null;
+  if (typeof raw === 'number' && isFinite(raw)) {
+    // Excel serial date
+    d = new Date(Math.round((raw - 25569) * 86400 * 1000));
+  } else {
+    const s = String(raw).trim();
+    const m = s.match(/^([0-9]{1,2})-([0-9]{1,2})-([0-9]{4})$/);
+    if (!m) throw `Row ${rowNum}: Date must be in DD-MM-YYYY format`;
+    const day = parseInt(m[1], 10), month = parseInt(m[2], 10), year = parseInt(m[3], 10);
+    d = new Date(Date.UTC(year, month - 1, day));
+    if (d.getUTCDate() !== day || d.getUTCMonth() !== month - 1) {
+      throw `Row ${rowNum}: Date is not a valid calendar date`;
+    }
+  }
+  if (!d || isNaN(d.getTime())) throw `Row ${rowNum}: Date is not a valid date`;
+  if (d.getTime() > Date.now()) throw `Row ${rowNum}: Date cannot be in the future`;
+  return d.toISOString();
+}
+
+export async function doRotationalItemsImportStream(req: Request, res: Response) {
+  // multer broke the ALS chain — re-enter from the tuid stashed on req (locations pattern).
+  const runInTenant = captureTenantFromReq(req);
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const sendEvent = (event: string, data: any) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  const heartbeat = setInterval(() => {
+    try { res.write(`: keepalive ${Date.now()}\n\n`); } catch (_e) { /* socket gone */ }
+  }, 15000);
+  req.on('close', () => clearInterval(heartbeat));
+
+  try {
+    const file = req.file;
+    if (!file) { sendEvent('error', { message: 'No file uploaded' }); return res.end(); }
+    const vesselId = req.query.vesselId as string;
+    if (!vesselId) { sendEvent('error', { message: 'vesselId query parameter is required' }); return res.end(); }
+
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames.find(name => name.toLowerCase().includes('rotation')) || workbook.SheetNames[0];
+    const data: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    const totalRows = data.length;
+
+    sendEvent('progress', { processed: 0, total: totalRows, remaining: totalRows, percent: 0, status: 'Initializing Import…', errors: 0 });
+
+    const results = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
+    const seenStamps = new Set<string>();
+
+    await runInTenant(async () => {
+      const rotSvc = await import('../../rotational-items/services/rotationalItemService');
+      // Existing masters on the vessel — an existing stamp is an ERROR (no silent upsert).
+      const existing = await rotSvc.listByVessel(vesselId);
+      const existingStamps = new Set(existing.map((it: any) => String(it.stamp).trim().toUpperCase()));
+
+      for (let i = 0; i < data.length; i++) {
+        const row: any = data[i];
+        const rowNum = i + 2;
+        const progress = () => sendEvent('progress', {
+          processed: i + 1, total: totalRows, remaining: totalRows - (i + 1),
+          percent: totalRows ? Math.round(((i + 1) / totalRows) * 100) : 100,
+          status: 'Processing Rotation Items…', errors: results.errors.length,
+        });
+
+        const stampRaw = row['Stamp No.'] ?? row['Stamp No'] ?? row['Stamp'] ?? row['stamp'];
+        const stamp = stampRaw === undefined || stampRaw === null ? '' : String(stampRaw).trim();
+        if (!stamp) {
+          results.errors.push(`Row ${rowNum}: Stamp No. is required`);
+          results.skipped++; progress(); continue;
+        }
+        const stampKey = stamp.toUpperCase();
+        if (seenStamps.has(stampKey)) {
+          results.errors.push(`Row ${rowNum}: Duplicate Stamp No. '${stamp}' within file`);
+          results.skipped++; progress(); continue;
+        }
+        seenStamps.add(stampKey);
+        if (existingStamps.has(stampKey)) {
+          results.errors.push(`Row ${rowNum}: Stamp No. '${stamp}' already exists in the Rotation Item Master for this vessel`);
+          results.skipped++; progress(); continue;
+        }
+
+        const stampNameRaw = row['Stamp Name'] ?? row['stampName'];
+        const stampName = stampNameRaw === undefined || stampNameRaw === null ? null : (String(stampNameRaw).trim() || null);
+
+        const rhRaw = row['Starting RH'] ?? row['Running Hours'] ?? row['startingRh'];
+        let startingRh = 0;
+        if (rhRaw !== undefined && rhRaw !== null && String(rhRaw).trim() !== '') {
+          startingRh = parseFloat(String(rhRaw));
+          if (isNaN(startingRh) || startingRh < 0) {
+            results.errors.push(`Row ${rowNum}: Starting RH must be a non-negative number`);
+            results.skipped++; progress(); continue;
+          }
+        }
+
+        let rhLastUpdated: string | null = null;
+        try {
+          rhLastUpdated = parseRotationRhDate(row['Date'] ?? row['RH Date'] ?? row['date'], rowNum);
+        } catch (msg: any) {
+          results.errors.push(String(msg));
+          results.skipped++; progress(); continue;
+        }
+
+        const statusRaw = row['Status'] ?? row['status'];
+        let status = 'Spare';
+        if (statusRaw !== undefined && statusRaw !== null && String(statusRaw).trim() !== '') {
+          const s = String(statusRaw).trim().toLowerCase();
+          if (s === 'spare') status = 'Spare';
+          else if (s === 'in store' || s === 'instore') status = 'In Store';
+          else {
+            results.errors.push(`Row ${rowNum}: Status must be Spare or In Store`);
+            results.skipped++; progress(); continue;
+          }
+        }
+
+        try {
+          await rotSvc.createRotationalItem({
+            vesselId,
+            stamp,
+            stampName,
+            status,
+            currentRh: startingRh.toFixed(2),
+            rhLastUpdated,
+          } as any);
+          existingStamps.add(stampKey);
+          results.created++;
+        } catch (error: any) {
+          results.errors.push(`Row ${rowNum}: ${error.message || 'Failed to create rotation item'}`);
+          results.skipped++;
+        }
+        progress();
+      }
+    });
+
+    console.log(`Rotation items import complete: ${results.created} created, ${results.skipped} skipped, ${results.errors.length} errors`);
+    sendEvent('complete', results);
+    res.end();
+  } catch (error: any) {
+    console.error('Error importing rotation items:', error);
+    sendEvent('error', { message: error.message || 'Failed to import rotation items' });
+    res.end();
+  } finally {
+    clearInterval(heartbeat);
+  }
+}

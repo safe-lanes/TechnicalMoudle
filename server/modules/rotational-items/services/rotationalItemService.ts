@@ -5,8 +5,9 @@
  * not the equipment position. rotational_items is BOTH_EDITABLE — every write
  * here MUST call logFieldChanges/logSoftDelete or the change never syncs.
  *
- * component_code/component_name are HISTORICAL SNAPSHOTS ("where was this item
- * last fitted") written at install/swap time — never updated on component renames.
+ * PURE MASTER TABLE (Task #366): no component back-pointer. The installed-on
+ * link is DERIVED via join components.current_stamp = rotational_items.stamp
+ * (per vessel). Historical "where fitted" trace lives in rotation_history.
  */
 import { and, eq } from 'drizzle-orm';
 import * as repo from '../repositories/rotationalItemRepository';
@@ -48,6 +49,16 @@ function validateStatus(status: unknown): RotationalItemStatus {
   throw new RotationalItemValidationError(
     `Invalid status "${String(status)}" — must be one of: ${ROTATIONAL_ITEM_STATUSES.join(', ')}`,
   );
+}
+
+/** Master List screen listing: items + installed-on component (derived join). */
+export async function listByVesselWithHolder(vesselId: string, status?: string) {
+  if (!vesselId) throw new ValidationError('vesselId is required');
+  return repo.listByVesselWithHolder(vesselId, status);
+}
+
+export async function getByRiuuid(riuuid: string): Promise<RotationalItem | undefined> {
+  return repo.getByRiuuid(riuuid);
 }
 
 export async function listByVessel(vesselId: string, status?: string): Promise<RotationalItem[]> {
@@ -99,7 +110,7 @@ export async function createRotationalItem(
 export async function updateRotationalItem(
   riuuid: string,
   data: Partial<Pick<InsertRotationalItem,
-    'stamp' | 'status' | 'currentRh' | 'rhLastUpdated' | 'componentId' | 'componentCode' | 'componentName'>>,
+    'stamp' | 'stampName' | 'status' | 'currentRh' | 'rhLastUpdated'>>,
 ): Promise<RotationalItem> {
   const oldRow = await repo.getByRiuuid(riuuid);
   if (!oldRow) throw new NotFoundError('Rotational item not found');
@@ -137,19 +148,47 @@ export async function getInstalledForComponent(componentCuuid: string): Promise<
 
 /**
  * Detach the item from its component (component unmarked as rotational, or item removed):
- * snapshot the component's RH onto the stamp, mark it Spare, and clear the live link.
- * component_code/component_name are kept as the "last fitted at" historical snapshot.
+ * snapshot the component's RH onto the stamp and mark it Spare. The live link is derived
+ * from components.current_stamp, which the caller clears/changes on the component row.
  */
 export async function detachFromComponent(
   riuuid: string,
   rhSnapshot: { currentRh: string | number | null; rhLastUpdated: string | null },
-): Promise<RotationalItem> {
-  return updateRotationalItem(riuuid, {
-    status: 'Spare',
-    componentId: null,
-    currentRh: rhSnapshot.currentRh != null ? String(rhSnapshot.currentRh) : undefined,
-    rhLastUpdated: rhSnapshot.rhLastUpdated ?? undefined,
-  });
+): Promise<RotationalItem | undefined> {
+  // Guarded: only releases if still Installed (no-op if already released elsewhere).
+  const oldRow = await repo.getByRiuuid(riuuid);
+  if (!oldRow) return undefined;
+  const userUuid = currentUserUuid();
+  const released = await repo.releaseStamp(riuuid, {
+    currentRh: rhSnapshot.currentRh != null ? String(rhSnapshot.currentRh) : null,
+    rhLastUpdated: rhSnapshot.rhLastUpdated ?? null,
+  }, userUuid);
+  if (released) {
+    // BOTH_EDITABLE sync contract: every write must be field-logged or it never syncs.
+    await logFieldChanges(TABLE, riuuid, released.vesselId, oldRow, released, userUuid);
+  }
+  return released;
+}
+
+/**
+ * Guarded claim (Spare/In Store → Installed). Returns undefined on conflict —
+ * the caller must throw, never fall back to an unguarded status write.
+ */
+export async function claimStamp(riuuid: string): Promise<RotationalItem | undefined> {
+  const oldRow = await repo.getByRiuuid(riuuid);
+  if (!oldRow) return undefined;
+  const userUuid = currentUserUuid();
+  const claimed = await repo.claimStamp(riuuid, userUuid);
+  if (claimed) {
+    // BOTH_EDITABLE sync contract: every write must be field-logged or it never syncs.
+    await logFieldChanges(TABLE, riuuid, claimed.vesselId, oldRow, claimed, userUuid);
+  }
+  return claimed;
+}
+
+/** Which live component currently holds this stamp? (derived reverse link) */
+export async function getComponentHoldingStamp(vesselId: string, stamp: string) {
+  return repo.getComponentHoldingStamp(vesselId, normalizeStamp(stamp));
 }
 
 /**
@@ -177,6 +216,7 @@ export async function replaceRotationalItem(params: {
   componentCuuid: string;
   incomingRiuuid?: string | null;
   newStamp?: string | null;
+  newStampName?: string | null;
   newStampInitialRh?: number | string | null;
   notes?: string | null;
   userId?: string | null;
@@ -201,6 +241,8 @@ export async function replaceRotationalItem(params: {
 
   let newStamp = '';
   let newInitialRh = 0;
+  const newStampName = typeof params.newStampName === 'string' && params.newStampName.trim() !== ''
+    ? params.newStampName.trim() : null;
   if (wantsNew) {
     newStamp = normalizeStamp(params.newStamp);
     newInitialRh = params.newStampInitialRh != null && String(params.newStampInitialRh).trim() !== ''
@@ -249,9 +291,12 @@ export async function replaceRotationalItem(params: {
       }
     }
 
+    // Derived link: the outgoing item is the registry row whose stamp equals the
+    // component's current_stamp (same vessel), still Installed.
     const outgoingRows = component.currentStamp
       ? await tx.select().from(rotationalItems).where(and(
-          eq(rotationalItems.componentId, component.cuuid),
+          eq(rotationalItems.vesselId, vesselId),
+          eq(rotationalItems.stamp, component.currentStamp),
           eq(rotationalItems.status, 'Installed'),
           eq(rotationalItems.isDeleted, false),
         )).limit(1).for('update')
@@ -269,7 +314,6 @@ export async function replaceRotationalItem(params: {
       const rows = await tx.update(rotationalItems)
         .set({
           status: 'Spare',
-          componentId: null,
           currentRh: outgoingRh,
           rhLastUpdated: outgoingRhDate,
           updatedByUuid: userUuid,
@@ -292,10 +336,8 @@ export async function replaceRotationalItem(params: {
       const rows = await tx.insert(rotationalItems).values({
         vesselId,
         stamp: newStamp,
+        stampName: newStampName || null,
         status: 'Installed',
-        componentId: component.cuuid,
-        componentCode: component.componentCode ?? null,
-        componentName: component.name ?? null,
         currentRh: newInitialRh.toFixed(2),
         rhLastUpdated: now.toISOString(),
         createdByUuid: userUuid,
@@ -307,9 +349,6 @@ export async function replaceRotationalItem(params: {
       const rows = await tx.update(rotationalItems)
         .set({
           status: 'Installed',
-          componentId: component.cuuid,
-          componentCode: component.componentCode ?? null,
-          componentName: component.name ?? null,
           updatedByUuid: userUuid,
           updatedAt: now,
         })
@@ -391,31 +430,6 @@ export async function replaceRotationalItem(params: {
   });
 }
 
-/**
- * Idempotent upsert used by component save / bulk import (Tasks #356/#357):
- * ensures a registry entry exists for a component newly marked rotational.
- * If the stamp already exists on the vessel, returns it unchanged.
- */
-export async function ensureRotationalItemForComponent(params: {
-  vesselId: string;
-  stamp: string;
-  componentId: string; // components.cuuid
-  componentCode: string | null;
-  componentName: string | null;
-  currentRh: string | number | null;
-  rhLastUpdated: string | null;
-}): Promise<RotationalItem> {
-  const stamp = normalizeStamp(params.stamp);
-  const existing = await repo.getByStamp(params.vesselId, stamp);
-  if (existing) return existing;
-  return createRotationalItem({
-    vesselId: params.vesselId,
-    stamp,
-    status: 'Installed',
-    componentId: params.componentId,
-    componentCode: params.componentCode,
-    componentName: params.componentName,
-    currentRh: params.currentRh != null ? String(params.currentRh) : '0',
-    rhLastUpdated: params.rhLastUpdated,
-  });
-}
+// NOTE (Task #366, strict master-first): the old ensureRotationalItemForComponent
+// side-effect creation is gone. Components can only SELECT existing masters; masters
+// are created via the Rotation Item Master List screen or its bulk import.

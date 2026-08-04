@@ -264,7 +264,8 @@ export async function validateData(type: string, data: any[], mode: string, vess
   // Also fetch existing component names from database for validation
   const componentNameOccurrences = new Map<string, number[]>(); // Key: uppercase trimmed name, Value: row numbers
   const stampOccurrences = new Map<string, number[]>(); // Key: uppercase trimmed stamp, Value: row numbers (rotational items)
-  const existingInstalledStamps = new Map<string, string>(); // Key: uppercase stamp Installed in DB, Value: component code it is installed on
+  const masterStamps = new Map<string, string>(); // Key: uppercase stamp in Rotation Item Master, Value: status
+  const existingInstalledStamps = new Map<string, string>(); // Key: uppercase stamp held by a live component (derived via current_stamp), Value: component code
   // Key: uppercase trimmed name, Value: set of uppercase Component Codes already using that name in the vessel.
   // The code set lets update/upsert rows keep their own existing name while still rejecting a name owned by a different component.
   const existingDbComponentNames = new Map<string, Set<string>>();
@@ -565,17 +566,27 @@ export async function validateData(type: string, data: any[], mode: string, vess
           console.error(`Failed to fetch existing components for vessel ${vesselId}:`, err);
         }
 
-        // Load rotational stamps currently Installed on this vessel (for stamp uniqueness).
-        // Spare / In Store stamps are claimable, so only Installed ones block an import row.
+        // Load the vessel's Rotation Item Master (Task #366, strict master-first):
+        // every stamp referenced by an import row must already exist in the master.
+        // Spare / In Store stamps are claimable; Installed (on another component) and
+        // Retired stamps block the row. Holder component resolved via the derived
+        // components.current_stamp link.
         try {
           const { listByVessel } = await import('../../rotational-items/services/rotationalItemService');
           const items = await listByVessel(vesselId);
           items.forEach((it: any) => {
-            if (it.stamp && it.status === 'Installed') {
-              existingInstalledStamps.set(String(it.stamp).trim().toUpperCase(), it.componentCode || '');
+            if (it.stamp) {
+              masterStamps.set(String(it.stamp).trim().toUpperCase(), it.status);
             }
           });
-          console.log(`📋 Loaded ${existingInstalledStamps.size} installed rotational stamps for vessel '${vesselId}'`);
+          const { getComponentsWithStamps } = await import('../../rotational-items/repositories/rotationalItemRepository');
+          const holders = await getComponentsWithStamps(vesselId);
+          holders.forEach((h) => {
+            if (h.currentStamp) {
+              existingInstalledStamps.set(String(h.currentStamp).trim().toUpperCase(), h.componentCode || '');
+            }
+          });
+          console.log(`📋 Loaded ${masterStamps.size} master rotational stamps (${existingInstalledStamps.size} installed) for vessel '${vesselId}'`);
         } catch (err) {
           console.error(`Failed to fetch rotational items for vessel ${vesselId}:`, err);
         }
@@ -856,13 +867,22 @@ export async function validateData(type: string, data: any[], mode: string, vess
             if (occ && occ.length > 1 && rowNum !== occ[0]) {
               errors.push(`Row ${rowNum}: Duplicate Stamp '${stampTrimmed}' - this stamp already appears in row ${occ[0]}. Each Stamp must be unique.`);
             }
-            // Against DB: block only when the stamp is Installed on a DIFFERENT component
-            const installedOnCode = existingInstalledStamps.get(stampKey);
-            const ownCode = normalized['Component Code']
-              ? String(normalized['Component Code']).trim().toUpperCase()
-              : String(row['Component Code'] || '').trim().toUpperCase();
-            if (installedOnCode !== undefined && String(installedOnCode).trim().toUpperCase() !== ownCode) {
-              errors.push(`Row ${rowNum}: Stamp '${stampTrimmed}' is already installed on another component${installedOnCode ? ` (${installedOnCode})` : ''} in vessel '${vesselId}'. Stamps must be unique.`);
+            // Strict master-first (Task #366): the stamp must already exist in the
+            // Rotation Item Master — component import no longer creates stamps.
+            const masterStatus = masterStamps.get(stampKey);
+            if (masterStatus === undefined) {
+              errors.push(`Row ${rowNum}: Stamp '${stampTrimmed}' not found in Rotation Item Master — import masters first (PMS → Admin → Master Data → Rotation Item Master List).`);
+            } else if (masterStatus === 'Retired') {
+              errors.push(`Row ${rowNum}: Stamp '${stampTrimmed}' is retired and cannot be fitted to a component.`);
+            } else {
+              // Block only when the stamp is held by a DIFFERENT component (derived link)
+              const installedOnCode = existingInstalledStamps.get(stampKey);
+              const ownCode = normalized['Component Code']
+                ? String(normalized['Component Code']).trim().toUpperCase()
+                : String(row['Component Code'] || '').trim().toUpperCase();
+              if (installedOnCode !== undefined && String(installedOnCode).trim().toUpperCase() !== ownCode) {
+                errors.push(`Row ${rowNum}: Stamp '${stampTrimmed}' is already installed on another component${installedOnCode ? ` (${installedOnCode})` : ''} in vessel '${vesselId}'. Stamps must be unique.`);
+              }
             }
           }
         } else if (stampTrimmed !== '') {

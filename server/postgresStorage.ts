@@ -1576,11 +1576,12 @@ export class PostgresStorage {
       // it is later swapped out. Field-logged inside the tx so the registry stays in sync
       // ship↔shore (rotational_items is BOTH_EDITABLE).
       try {
-        const installedRows = await tx.select().from(rotationalItems).where(and(
-          eq(rotationalItems.componentId, component.cuuid),
+        const installedRows = component.currentStamp ? await tx.select().from(rotationalItems).where(and(
+          eq(rotationalItems.vesselId, masterVesselId),
+          eq(rotationalItems.stamp, component.currentStamp),
           eq(rotationalItems.status, 'Installed'),
           eq(rotationalItems.isDeleted, false),
-        ));
+        )) : [];
         if (installedRows[0]) {
           const beforeItem = installedRows[0];
           const afterRows = await tx.update(rotationalItems)
@@ -1651,11 +1652,12 @@ export class PostgresStorage {
         try { await logFieldChanges('running_hours_audit', childRhaResult[0].rhauuid, inherited.vesselId || masterVesselId, null, childRhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha cascade create:', e); }
 
         // RH follows the Stamp: mirror the child's new RH onto its Installed rotational item too
-        const childInstalled = await tx.select().from(rotationalItems).where(and(
-          eq(rotationalItems.componentId, inherited.cuuid),
+        const childInstalled = inherited.currentStamp ? await tx.select().from(rotationalItems).where(and(
+          eq(rotationalItems.vesselId, inherited.vesselId || masterVesselId),
+          eq(rotationalItems.stamp, inherited.currentStamp),
           eq(rotationalItems.status, 'Installed'),
           eq(rotationalItems.isDeleted, false),
-        ));
+        )) : [];
         if (childInstalled[0]) {
           const beforeChildItem = childInstalled[0];
           const afterChildRows = await tx.update(rotationalItems)
@@ -5911,10 +5913,21 @@ export class PostgresStorage {
         const { ValidationError } = await import('./modules/shared/errors');
         throw new ValidationError('Stamp is mandatory when Rotational Item is Yes');
       } else if (beforeState.vesselId) {
+        // Strict master-first (Task #366): stamp must exist in the Rotation Item Master;
+        // installed-on link is derived via components.current_stamp (no back-pointer).
         const clash = await rotSvc.getByStamp(beforeState.vesselId, effectiveStamp);
-        if (clash && clash.status === 'Installed' && clash.componentId && clash.componentId !== resolvedCuuid) {
-          const { ValidationError } = await import('./modules/shared/errors');
-          throw new ValidationError(`Stamp "${effectiveStamp}" is already installed on another component on this vessel. Stamps must be unique.`);
+        const { ValidationError } = await import('./modules/shared/errors');
+        if (!clash) {
+          throw new ValidationError(`Stamp "${effectiveStamp}" not found in Rotation Item Master. Create it first under PMS → Admin → Master Data → Rotation Item Master List (or bulk import).`);
+        }
+        if (clash.status === 'Retired') {
+          throw new ValidationError(`Stamp "${effectiveStamp}" is retired and cannot be fitted to a component.`);
+        }
+        if (clash.status === 'Installed') {
+          const holder = await rotSvc.getComponentHoldingStamp(beforeState.vesselId, effectiveStamp);
+          if (holder && holder.cuuid !== resolvedCuuid) {
+            throw new ValidationError(`Stamp "${effectiveStamp}" is already installed on another component on this vessel. Stamps must be unique.`);
+          }
         }
       }
       safeUpdateData.currentStamp = effectiveStamp;

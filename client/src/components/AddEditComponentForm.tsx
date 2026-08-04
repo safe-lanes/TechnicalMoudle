@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import StampSelect from "@/components/StampSelect";
 import {
   Select,
   SelectContent,
@@ -1284,14 +1285,14 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               <label className="text-xs font-medium text-gray-600 block mb-1">
                                 Stamp{componentData.rotationalItem === "Yes" && <span className="text-red-500"> *</span>}
                               </label>
-                              <input
-                                type="text"
+                              <StampSelect
+                                vesselId={vesselId}
                                 value={componentData.currentStamp}
-                                onChange={(e) => handleFieldChange('currentStamp', e.target.value)}
+                                onChange={(stamp) => handleFieldChange('currentStamp', stamp)}
                                 disabled={componentData.rotationalItem !== "Yes"}
-                                placeholder={componentData.rotationalItem === "Yes" ? "Unique stamp no." : ""}
+                                currentStamp={isEditMode ? (existingComponent as any)?.currentStamp || undefined : undefined}
                                 className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3] disabled:bg-gray-100 disabled:text-gray-400"
-                                data-testid="input-stamp"
+                                testId="input-stamp"
                               />
                             </div>
                           </div>
