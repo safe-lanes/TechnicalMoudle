@@ -170,6 +170,23 @@ export async function completeSyncHandler(req: Request, res: Response) {
       appliedTableCheckpoints
     );
     res.json(result);
+
+    // ── POST-SYNC RECONCILE TRIGGER (2026-08-04, plan §9.6 revision — explicit instruction) ──
+    // A duplicate WO pair only becomes VISIBLE on shore when a sync delivers the ship's
+    // copy — so the sync cycle that just completed is the exact right moment to resolve
+    // it. Fire-and-forget AFTER the response: the ship's cycle is never delayed, a failure
+    // here costs nothing (the NEXT cycle fires this hook again — that is the only backup;
+    // the periodic reconciler timers were deliberately removed), and the reconciler's own
+    // per-vessel lock + shore-only guard make re-entry safe.
+    setImmediate(() => {
+      import('../work-orders/services/workOrderReconcilerService')
+        .then(svc => svc.reconcileVessel(vesselId))
+        .then(r => {
+          const n = r.resolved.case1 + r.resolved.case2 + r.resolved.case3;
+          if (n > 0) console.log(`[WO-Reconciler] post-sync trigger: resolved ${n} duplicate(s) for vessel ${vesselId}`);
+        })
+        .catch(err => console.warn(`[WO-Reconciler] post-sync trigger failed (next sync retries): ${err?.message || err}`));
+    });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] complete error:', error);

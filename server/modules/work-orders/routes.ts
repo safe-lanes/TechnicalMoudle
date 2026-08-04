@@ -97,6 +97,10 @@ router.post('/work-orders/generate-now', asyncHandler(woCtrl.generateNow));
 // match this two-segment path.
 router.get('/work-orders/reconciler/status', asyncHandler(woCtrl.getReconcilerStatus));
 
+// POST /work-orders/reconciler/run — manual one-vessel reconcile: the escape hatch for
+// vessels that never sync again (the post-sync trigger cannot reach them).
+router.post('/work-orders/reconciler/run', asyncHandler(woCtrl.runReconcilerNow));
+
 // POST /work-orders — create work order
 router.post('/work-orders', asyncHandler(woCtrl.createWorkOrder));
 

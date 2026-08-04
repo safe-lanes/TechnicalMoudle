@@ -210,6 +210,20 @@ export async function getReconcilerStatus(req: Request, res: Response) {
   });
 }
 
+// POST /work-orders/reconciler/run — manual reconcile for ONE vessel. The escape hatch
+// for the single case the post-sync trigger cannot reach: a vessel whose ship never
+// syncs again (dead/decommissioned, or import-created duplicates with no ship). Safe to
+// call anytime: shore-only guard, per-vessel lock, idempotent, archive-backed.
+export async function runReconcilerNow(req: Request, res: Response) {
+  const vesselId = ((req.body && req.body.vesselId) ?? req.query.vesselId) as string | undefined;
+  if (!vesselId || typeof vesselId !== 'string' || vesselId === 'all') {
+    throw new ValidationError('A specific vesselId is required.');
+  }
+  const reconciler = await import('../services/workOrderReconcilerService');
+  const result = await reconciler.reconcileVessel(vesselId);
+  res.json(result);
+}
+
 export async function getWorkOrderContext(req: Request, res: Response) {
   const result = await woContextService.getWorkOrderContext(req.params.id);
   res.json(result);

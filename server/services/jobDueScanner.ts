@@ -299,6 +299,7 @@ export class JobDueScannerService {
       // LEGACY FALLBACK: Check if job has any active WO with NULL/empty componentCode
       // If so, block ALL generation for this job to protect legacy data
       const legacyBlockingWO = allWorkOrders.find(wo => {
+        if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
         if (!isBlockingStatus(wo.status)) return false;
         if (wo.componentCode && wo.componentCode !== '') return false;
         if (wo.jobId === job.juuid) return true;
@@ -374,6 +375,7 @@ export class JobDueScannerService {
         
         // COMPONENT-LEVEL CHECK: Check if WO already exists for this job + component combination
         const existingWOForComponent = allWorkOrders.find(wo =>
+          (wo as any).isDeleted !== true && // archived rows never block (corpse fix)
           wo.jobId === job.juuid &&
           wo.componentCode === componentCode &&
           isBlockingStatus(wo.status)
@@ -586,6 +588,7 @@ export class JobDueScannerService {
 
       // LEGACY FALLBACK: Check for legacy WO without componentCode
       const legacyBlockingWO = allWorkOrders.find(wo => {
+        if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
         if (!isBlockingStatus(wo.status)) return false;
         if (wo.componentCode && wo.componentCode !== '') return false;
         if (wo.jobId === job.juuid) return true;
@@ -626,6 +629,7 @@ export class JobDueScannerService {
 
         // COMPONENT-LEVEL CHECK: active WO for this job + component
         const existingWOForComponent = allWorkOrders.find(wo =>
+          (wo as any).isDeleted !== true && // archived rows never block (corpse fix)
           wo.jobId === job.juuid &&
           wo.componentCode === componentCode &&
           isBlockingStatus(wo.status)
@@ -759,6 +763,7 @@ export class JobDueScannerService {
     // Step 1: Check for legacy WOs without componentCode - blocks entire job
     // Find blocking WO using Trigger 1's findBlockingWOForJob utility
     const legacyBlockingWO = allWorkOrders.find(wo => {
+      if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
       if (!isBlockingStatus(wo.status)) return false;
       if (wo.componentCode && wo.componentCode !== '') return false; // Not a legacy WO
       
@@ -792,6 +797,7 @@ export class JobDueScannerService {
     if (isJobBlockedByJobId || isJobBlockedByJobNo) {
       // Find the specific blocking WO for error message
       const existingWOForComponent = allWorkOrders.find(wo => {
+        if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
         if (!isBlockingStatus(wo.status)) return false;
         if (wo.componentCode !== effectiveComponentCode) return false;
         if (wo.jobId === job.juuid) return true;

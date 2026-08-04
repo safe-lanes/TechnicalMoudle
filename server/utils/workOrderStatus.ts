@@ -146,6 +146,14 @@ export function buildJobsWithActiveWOSet(
   const byJobNo = new Set<string>();
   
   workOrders.forEach(wo => {
+    // ARCHIVED ROWS NEVER BLOCK (corpse fix, 2026-08-04): a reconciler-retired loser is
+    // soft-deleted but storage.getWorkOrders still returns it — counting it here froze
+    // shore generation for the job+component forever (proven on the pilot). Numbering
+    // (generatePlannedWorkOrderNumber) deliberately still SEES deleted rows so an
+    // archived number is never reused.
+    if ((wo as any).isDeleted === true) {
+      return;
+    }
     // If vesselId filter is provided, only include WOs for that vessel
     if (vesselId && wo.vesselId !== vesselId) {
       return;
@@ -192,6 +200,9 @@ export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: stri
   workOrders.forEach(wo => {
     // Skip cancelled WOs - they don't count as cycle satisfaction
     // NOTE: Rejected WOs ARE included - they block new WO generation until rework is complete
+    if ((wo as any).isDeleted === true) {
+      return; // archived rows never satisfy/block a cycle (corpse fix, 2026-08-04)
+    }
     const normalizedStatus = wo.status?.toLowerCase().trim() || '';
     if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled') {
       return;
@@ -247,6 +258,9 @@ export function buildCalendarCycleWOMap<T extends { status: string; workOrderNo?
   workOrders.forEach(wo => {
     // Skip cancelled WOs - they don't count as cycle satisfaction
     // NOTE: Rejected WOs ARE included - they block new WO generation until rework is complete
+    if ((wo as any).isDeleted === true) {
+      return; // archived rows never satisfy/block a cycle (corpse fix, 2026-08-04)
+    }
     const normalizedStatus = wo.status?.toLowerCase().trim() || '';
     if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled') {
       return;
@@ -289,6 +303,7 @@ export function findBlockingWOForJob<T extends { status: string; jobId?: string 
   jobNo: string
 ): T | undefined {
   return workOrders.find(wo => {
+    if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
     if (!isBlockingStatus(wo.status)) return false;
     
     // Direct match by jobId

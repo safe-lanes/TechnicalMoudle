@@ -66,32 +66,34 @@ class ShoreWoDailyScheduler {
       }
 
       const reconRepo = await import('../modules/work-orders/repositories/workOrderReconcileRepository');
-      const reconciler = await import('../modules/work-orders/services/workOrderReconcilerService');
       const { jobDueScanner } = await import('./jobDueScanner');
 
       const vessels = await reconRepo.getProvisionedVesselIds();
       syncDiag(`SHORE-WO-SWEEP START vessels=${vessels.length}`);
-      let generated = 0, resolved = 0;
+      let generated = 0;
 
       for (const vesselId of vessels) {
         try {
-          // 1. Generate — the same sweep the ship runs, scoped to this vessel. runScan
-          //    carries its own in-progress guard (409 path) and duplicate checks.
+          // Generate ONLY — the same sweep the ship runs, scoped to this vessel. runScan
+          // carries its own in-progress guard (409 path) and duplicate checks.
+          //
+          // RECONCILIATION DELIBERATELY REMOVED FROM THIS SWEEP (2026-08-04): duplicates
+          // only become visible on shore when a sync delivers the ship's copy, and every
+          // sync-complete now fires the reconciler for that vessel (sync controller,
+          // post-sync trigger). Running it here too covered nothing extra. The only
+          // reconcile paths are: post-sync trigger (primary; next cycle retries a miss)
+          // and the manual POST /work-orders/reconciler/run (vessels that never sync).
           const scan = await jobDueScanner.runScan(vesselId);
           if (!scan.skipped) {
             generated += scan.calendarWOsGenerated + scan.rhWOsGenerated + scan.dualWOsGenerated;
           }
-          // 2. Reconcile — resolves anything the two writers duplicated once sync has
-          //    delivered both copies. Lock-aware: skips if sync holds the vessel.
-          const r = await reconciler.reconcileVessel(vesselId);
-          resolved += r.resolved.case1 + r.resolved.case2 + r.resolved.case3;
         } catch (err: any) {
           // One bad vessel must not abort the sweep for the rest.
           console.error(`[ShoreWoSweep] vessel ${vesselId} failed: ${err?.message || err}`);
         }
       }
-      console.log(`[ShoreWoSweep] sweep complete: ${vessels.length} vessel(s), generated=${generated}, duplicates resolved=${resolved}`);
-      syncDiag(`SHORE-WO-SWEEP END vessels=${vessels.length} generated=${generated} resolved=${resolved}`);
+      console.log(`[ShoreWoSweep] sweep complete: ${vessels.length} vessel(s), generated=${generated} (reconcile runs post-sync, not here)`);
+      syncDiag(`SHORE-WO-SWEEP END vessels=${vessels.length} generated=${generated}`);
     } finally {
       this.sweepInFlight = false;
     }

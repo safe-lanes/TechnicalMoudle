@@ -214,6 +214,7 @@ export class WorkOrderService {
       const newComponentCode = workOrderData.componentCode || null;
       
       const existingActiveWO = existingWOs.find(wo => {
+        if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
         if (wo.jobId !== workOrderData.jobId) return false;
         if (!isBlockingStatus(wo.status)) return false;
         
@@ -516,6 +517,7 @@ export class WorkOrderService {
         
         // Check if WO already exists for this job + component + cycle
         const existingWOForComponent = allWorkOrders.find(wo => 
+          (wo as any).isDeleted !== true && // archived rows never block (corpse fix)
           wo.jobId === job.juuid &&
           wo.componentCode === componentCode &&
           isBlockingStatus(wo.status)
