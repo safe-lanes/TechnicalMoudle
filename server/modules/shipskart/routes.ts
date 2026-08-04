@@ -28,4 +28,8 @@ router.post('/shipskart/b2b/retry', asyncHandler(shipskartB2bController.retryHan
 // user calls it, not just admins.
 router.post('/shipskart/vessel-assignments', asyncHandler(shipskartB2bController.vesselAssignmentsHandler));
 
+// Stage 3D — catalogue push (shore-only inside the service; ledger-backed, resumable)
+router.post('/shipskart/catalogue/push', asyncHandler(shipskartB2bController.cataloguePushHandler));
+router.get('/shipskart/catalogue/status', asyncHandler(shipskartB2bController.catalogueStatusHandler));
+
 export default router;

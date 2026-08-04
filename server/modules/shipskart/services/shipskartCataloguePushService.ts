@@ -82,12 +82,6 @@ export async function pushVesselCatalogue(
     const link = (await pool.query(
       `SELECT shipskart_vessel_id FROM shipskart_vessel_links WHERE vessel_vuuid=$1 AND push_status='pushed'`, [vesselId])).rows[0];
     if (!link) throw new Error(`Vessel ${v.name} has no pushed Shipskart vessel link — push the vessel first (Stage 2 reconciler)`);
-    const cfg = getB2bConfig();
-    const smc = {
-      smcId: process.env.SHIPSKART_B2B_SMC_ID || cfg.tenantId,
-      smcName: process.env.SHIPSKART_B2B_SMC_NAME || 'WAH-KWONG',
-      smcTenantId: cfg.tenantId,
-    };
     const ref = map.getReferenceIds();
 
     // ── our data ──
@@ -135,6 +129,14 @@ export async function pushVesselCatalogue(
       console.log(`[CataloguePush] DRY RUN ${v.name}: cats=${res.categories.pushed} maps=${res.mappings.pushed} products=${res.products.pushed} skus=${res.skus.pushed}`);
       return res;
     }
+
+    // b2b credentials are needed only from here on — dry runs stay credential-free.
+    const cfg = getB2bConfig();
+    const smc = {
+      smcId: process.env.SHIPSKART_B2B_SMC_ID || cfg.tenantId,
+      smcName: process.env.SHIPSKART_B2B_SMC_NAME || 'WAH-KWONG',
+      smcTenantId: cfg.tenantId,
+    };
 
     // ── remote maps (resolve-by-code for re-runs and duplicate answers) ──
     let remoteCats = new Map<string, any>((await fetchAllPaged('/integration/SAIL/get-all-categories')).map((c: any) => [c.categoryCode, c]));
@@ -254,12 +256,26 @@ export async function pushVesselCatalogue(
       })),
     ].slice(0, opts.limitSkus ?? Number.MAX_SAFE_INTEGER);
 
+    // SANITIZE-COLLISION GUARD (2026-08-04): two DIFFERENT raw codes can sanitize to the
+    // same string (e.g. 'A.B' vs 'A-B'). Zero such pairs exist on the pilot (1,125 codes
+    // audited), but production data is unaudited — and without this, the second one would
+    // ride their "already in use" answer into 'pushed', silently attached to the first's
+    // SKU. Same-vessel collisions fail loudly here; cross-vessel ones fail via the ledger.
+    const sanitizedSeen = new Map<string, string>();
+
     for (const job of skuJobs) {
       const pr = productByLocal.get(job.productKey);
       if (!pr) { res.skus.failed++; res.errors.push(`sku ${job.skuCode}: product unresolved`); continue; }
 
       // SKU phase
       const sl = await links.ensurePending('sku', job.localKey, vesselId, job.skuCode);
+      const firstHolder = sanitizedSeen.get(job.skuCode);
+      if (firstHolder && firstHolder !== job.localKey) {
+        await links.markFailed(sl.id, `SANITIZE COLLISION: code '${job.skuCode}' also produced by ${firstHolder} in this vessel — needs human decision`);
+        res.skus.failed++; res.errors.push(`sku ${job.skuCode}: same-vessel sanitize collision`);
+        continue;
+      }
+      sanitizedSeen.set(job.skuCode, job.localKey);
       if (sl.pushStatus !== 'pushed') {
         // COLLISION GUARD (mapper contract): same code under another vessel → human, never silent.
         const clash = await links.findSkuCodeOtherVessel(job.skuCode, vesselId);

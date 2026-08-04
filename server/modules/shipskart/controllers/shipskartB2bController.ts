@@ -72,3 +72,39 @@ export async function vesselAssignmentsHandler(req: AuthenticatedRequest, res: R
   const result = await vesselAssignments.captureAssignments(userUuid, req.body, { allowEmpty });
   res.json({ success: true, ...result });
 }
+
+/**
+ * POST /shipskart/catalogue/push — Stage 3D. Body: { vesselId, dryRun?, includeStores?,
+ * limitSkus? }. dryRun answers synchronously (counts only, no network). A live push runs
+ * in the BACKGROUND (a full vessel is ~25 min at API pace) — the response says started,
+ * and progress is read from GET /shipskart/catalogue/status (the mig-152 ledger is the
+ * progress record). The service refuses concurrent runs per vessel and refuses on ships.
+ */
+export async function cataloguePushHandler(req: AuthenticatedRequest, res: Response) {
+  const vesselId = req.body?.vesselId;
+  if (!vesselId || typeof vesselId !== 'string') {
+    return res.status(400).json({ error: 'vesselId is required' });
+  }
+  const svc = await import('../services/shipskartCataloguePushService');
+  const opts = {
+    dryRun: req.body?.dryRun === true,
+    includeStores: req.body?.includeStores !== false,
+    limitSkus: Number.isInteger(req.body?.limitSkus) ? req.body.limitSkus : undefined,
+  };
+  if (opts.dryRun) {
+    return res.json(await svc.pushVesselCatalogue(vesselId, opts));
+  }
+  svc.pushVesselCatalogue(vesselId, opts)
+    .then(r => console.log(`[CataloguePush] background run finished for ${vesselId}: errors=${r.errors.length} warnings=${r.warnings.length}`))
+    .catch(err => console.error(`[CataloguePush] background run crashed for ${vesselId}:`, err?.message || err));
+  res.status(202).json({ started: true, vesselId, note: 'running in background — follow GET /shipskart/catalogue/status' });
+}
+
+/** GET /shipskart/catalogue/status — per-vessel/per-entity ledger counts + recent failures. */
+export async function catalogueStatusHandler(_req: AuthenticatedRequest, res: Response) {
+  const links = await import('../repositories/shipskartCatalogueLinkRepository');
+  res.json({
+    summary: await links.statusSummary(),
+    recentFailures: await links.recentFailures(20),
+  });
+}
