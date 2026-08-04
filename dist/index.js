@@ -32913,7 +32913,8 @@ async function createSuperintendentNotificationForWO(wo, daysLate, missedCycles,
   }
 }
 async function listWorkOrders(vesselId, vesselIds) {
-  const workOrders2 = await findWorkOrders2(vesselId, vesselIds);
+  const allRows = await findWorkOrders2(vesselId, vesselIds);
+  const workOrders2 = allRows.filter((wo) => wo.isDeleted !== true);
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
   const isAllVessels = !vesselId || vesselId === "all";
