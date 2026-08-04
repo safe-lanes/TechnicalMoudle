@@ -49,6 +49,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
   const [newStamp, setNewStamp] = useState("");
   const [newStampName, setNewStampName] = useState("");
   const [newRh, setNewRh] = useState("0");
+  const [stampFilter, setStampFilter] = useState("");
 
   const { data: items = [], isLoading } = useQuery<RotationalItemRow[]>({
     queryKey: [`/technical/api/rotational-items?vesselId=${vesselId}`],
@@ -59,6 +60,24 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
     () => items.filter((i) => i.status !== "Installed" && i.status !== "Retired"),
     [items],
   );
+
+  const filteredAvailable = useMemo(() => {
+    const q = stampFilter.trim().toLowerCase();
+    if (!q) return available;
+    return available.filter(
+      (i) =>
+        i.stamp.toLowerCase().includes(q) ||
+        (i.stampName || "").toLowerCase().includes(q),
+    );
+  }, [available, stampFilter]);
+
+  // If the filter hides the selected item, clear the selection so the user
+  // cannot confirm a replacement with a candidate they can no longer see.
+  React.useEffect(() => {
+    if (selectedRiuuid && !filteredAvailable.some((i) => i.riuuid === selectedRiuuid)) {
+      setSelectedRiuuid("");
+    }
+  }, [filteredAvailable, selectedRiuuid]);
 
   const swapMutation = useMutation({
     mutationFn: async () => {
@@ -110,7 +129,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" data-testid="dialog-replace-rotational-item">
+      <DialogContent className="w-[92vw] max-w-[92vw] sm:w-[50vw] sm:max-w-[50vw]" data-testid="dialog-replace-rotational-item">
         <DialogHeader>
           <DialogTitle>Replace Rotational Item</DialogTitle>
         </DialogHeader>
@@ -134,12 +153,25 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
           </div>
 
           {mode === "existing" ? (
-            <div className="border rounded max-h-56 overflow-y-auto" data-testid="list-available-items">
+            <>
+            <input
+              type="text"
+              value={stampFilter}
+              onChange={(e) => setStampFilter(e.target.value)}
+              className="text-sm w-full px-2 py-1.5 border rounded"
+              placeholder="Filter by stamp or stamp name…"
+              data-testid="input-stamp-filter"
+            />
+            <div className="border rounded max-h-72 overflow-y-auto" data-testid="list-available-items">
               {isLoading ? (
                 <div className="p-3 text-gray-500">Loading…</div>
               ) : available.length === 0 ? (
                 <div className="p-3 text-gray-500">
                   No available rotational items on this vessel. Create a new stamp instead.
+                </div>
+              ) : filteredAvailable.length === 0 ? (
+                <div className="p-3 text-gray-500" data-testid="text-no-matching-stamps">
+                  No stamps match "{stampFilter.trim()}". Clear the filter to see all available items.
                 </div>
               ) : (
                 <table className="w-full text-xs">
@@ -154,7 +186,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {available.map((item) => (
+                    {filteredAvailable.map((item) => (
                       <tr
                         key={item.riuuid}
                         className={`border-t cursor-pointer hover:bg-blue-50 ${selectedRiuuid === item.riuuid ? "bg-blue-50" : ""}`}
@@ -177,6 +209,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
                 </table>
               )}
             </div>
+            </>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div>
