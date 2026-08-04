@@ -372,6 +372,13 @@ export const components = pgTable("components", {
   // Total RH = meterReplacedLastRh + currentCumulativeRH (new meter reading)
   meterReplacedDate: timestamp("meter_replaced_date"),
   meterReplacedLastRh: decimal("meter_replaced_last_rh", { precision: 10, scale: 2 }),
+
+  // === Rotational Items Tracking (migration 152) ===
+  // rotationalItem: flag — office-managed, flows shore→ship via normal component sync.
+  // currentStamp: MUTABLE POINTER to the currently-installed physical item; rewritten on
+  // every swap. Permanent stamp identity lives ONLY in rotational_items.stamp.
+  rotationalItem: boolean("rotational_item").notNull().default(false),
+  currentStamp: text("current_stamp"),
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
@@ -398,6 +405,49 @@ export const insertComponentSchema = createInsertSchema(components).omit({
 
 export type InsertComponent = z.infer<typeof insertComponentSchema>;
 export type Component = typeof components.$inferSelect;
+
+// Rotational Items master registry (migration 152) — physical parts identified by a
+// unique Stamp; RH history follows the stamp, not the equipment position.
+// BOTH_EDITABLE sync (ship swaps; shore can create/retire stamps) — identity: riuuid.
+// component_id/component_cuuid are populated ONLY while status='Installed'.
+// component_code/component_name are HISTORICAL SNAPSHOTS written at install/swap time
+// ("where was this item last fitted") — intentionally NOT updated on component renames.
+export const ROTATIONAL_ITEM_STATUSES = ['Installed', 'Spare', 'In Store', 'Retired'] as const;
+export type RotationalItemStatus = typeof ROTATIONAL_ITEM_STATUSES[number];
+
+export const rotationalItems = pgTable("rotational_items", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  riuuid: text("riuuid").notNull().unique().default(sql`gen_random_uuid()`),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  stamp: text("stamp").notNull(),
+  componentId: text("component_id"),
+  componentCuuid: text("component_cuuid"),
+  componentCode: text("component_code"),
+  componentName: text("component_name"),
+  currentRh: decimal("current_rh", { precision: 10, scale: 2 }).notNull().default("0"),
+  rhLastUpdated: text("rh_last_updated"),
+  status: text("status").notNull().default("Spare"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").default(false),
+  sortOrder: integer("sort_order"),
+}, (table) => ({
+  // Stamp unique per vessel among non-deleted items (partial index in migration 152)
+  vesselIdx: index("idx_rotational_items_vessel").on(table.vesselId),
+  statusIdx: index("idx_rotational_items_status").on(table.vesselId, table.status),
+}));
+
+export const insertRotationalItemSchema = createInsertSchema(rotationalItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRotationalItem = z.infer<typeof insertRotationalItemSchema>;
+export type RotationalItem = typeof rotationalItems.$inferSelect;
 
 // Form Definitions Table
 export const formDefinitions = pgTable("form_definitions", {

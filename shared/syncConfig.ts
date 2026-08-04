@@ -983,6 +983,18 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     businessRules: null,
     notes: 'Component RH log entries. Uses vessel_code not vessel_id — sync engine must map via vessel lookup.',
   },
+  rotational_items: {
+    tableName: 'rotational_items',
+    category: 'BOTH_EDITABLE',
+    direction: 'bidirectional',
+    identityColumn: 'riuuid',
+    vesselScopeColumn: 'vessel_id',
+    vesselScopeJoinPath: null,
+    isGlobal: false,
+    isConfigurable: true,
+    businessRules: null,
+    notes: 'Rotational items master registry (physical parts by Stamp, migration 152). Ship performs swaps; shore can create/retire stamps. RH follows the stamp, not the position.',
+  },
   component_maintenance_history: {
     tableName: 'component_maintenance_history',
     category: 'BOTH_EDITABLE',
@@ -1650,7 +1662,7 @@ export function getSyncPhaseOrder(): string[][] {
      'certificates', 'surveys', 'vessel_certificate_data', 'vessel_survey_data',
      'running_hours_audit', 'component_running_hours_log',
      'component_maintenance_history', 'ihm_items', 'defect_sequences',
-     'planner_dates', 'locations'],
+     'planner_dates', 'locations', 'rotational_items'],
     // Phase 4: Child entities (FK to parent rows in Phase 3)
     ['work_order_executions', 'work_order_execution_details', 'work_order_postponements',
      // wo_postponement_approvals has a REAL FK to work_order_postponements(id) —

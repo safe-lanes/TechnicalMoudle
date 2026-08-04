@@ -464,6 +464,12 @@ function buildUpdatePairs(
     if (meta.identityAlwaysCols.has(key) || meta.identityAlwaysCols.has(snakeKey)) continue;
     if (key === identityCol || snakeKey === identityCol) continue;
     if (key === 'updated_at' || key === 'updatedAt') continue; // We set this ourselves
+    // Unknown-column guard (mirrors the field-log appliers): a newer sender may include
+    // columns this side's schema doesn't have yet (mixed-version upgrade window, e.g.
+    // components.rotational_item/current_stamp from migration 152). Without this skip,
+    // EVERY row for the table fails per-row with 42703 and updates silently stall.
+    // Fail-open when allCols is unknown (empty), preserving prior behaviour.
+    if (meta.allCols.size > 0 && !meta.allCols.has(snakeKey)) continue;
 
     setClauses.push(`"${snakeKey}" = $${paramIndex}`);
     values.push(coerceValue(value, snakeKey, meta));
@@ -493,6 +499,9 @@ function buildInsertParts(
     // For composite-key tables, skip the integer PK so the receiving side
     // generates its own sequence value (avoids PK collisions between shore/ship)
     if (skipIntegerPK && (snakeKey === 'id') && typeof value === 'number') continue;
+
+    // Unknown-column guard (mirrors the field-log appliers) — see buildUpdatePairs.
+    if (meta.allCols.size > 0 && !meta.allCols.has(snakeKey)) continue;
 
     columns.push(`"${snakeKey}"`);
     placeholders.push(`$${paramIndex}`);
