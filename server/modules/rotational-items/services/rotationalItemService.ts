@@ -99,7 +99,7 @@ export async function createRotationalItem(
 export async function updateRotationalItem(
   riuuid: string,
   data: Partial<Pick<InsertRotationalItem,
-    'stamp' | 'status' | 'currentRh' | 'rhLastUpdated' | 'componentId' | 'componentCuuid' | 'componentCode' | 'componentName'>>,
+    'stamp' | 'status' | 'currentRh' | 'rhLastUpdated' | 'componentId' | 'componentCode' | 'componentName'>>,
 ): Promise<RotationalItem> {
   const oldRow = await repo.getByRiuuid(riuuid);
   if (!oldRow) throw new NotFoundError('Rotational item not found');
@@ -147,7 +147,6 @@ export async function detachFromComponent(
   return updateRotationalItem(riuuid, {
     status: 'Spare',
     componentId: null,
-    componentCuuid: null,
     currentRh: rhSnapshot.currentRh != null ? String(rhSnapshot.currentRh) : undefined,
     rhLastUpdated: rhSnapshot.rhLastUpdated ?? undefined,
   });
@@ -252,7 +251,7 @@ export async function replaceRotationalItem(params: {
 
     const outgoingRows = component.currentStamp
       ? await tx.select().from(rotationalItems).where(and(
-          eq(rotationalItems.componentCuuid, component.cuuid),
+          eq(rotationalItems.componentId, component.cuuid),
           eq(rotationalItems.status, 'Installed'),
           eq(rotationalItems.isDeleted, false),
         )).limit(1).for('update')
@@ -271,7 +270,6 @@ export async function replaceRotationalItem(params: {
         .set({
           status: 'Spare',
           componentId: null,
-          componentCuuid: null,
           currentRh: outgoingRh,
           rhLastUpdated: outgoingRhDate,
           updatedByUuid: userUuid,
@@ -296,7 +294,6 @@ export async function replaceRotationalItem(params: {
         stamp: newStamp,
         status: 'Installed',
         componentId: component.cuuid,
-        componentCuuid: component.cuuid,
         componentCode: component.componentCode ?? null,
         componentName: component.name ?? null,
         currentRh: newInitialRh.toFixed(2),
@@ -311,7 +308,6 @@ export async function replaceRotationalItem(params: {
         .set({
           status: 'Installed',
           componentId: component.cuuid,
-          componentCuuid: component.cuuid,
           componentCode: component.componentCode ?? null,
           componentName: component.name ?? null,
           updatedByUuid: userUuid,
@@ -403,8 +399,7 @@ export async function replaceRotationalItem(params: {
 export async function ensureRotationalItemForComponent(params: {
   vesselId: string;
   stamp: string;
-  componentId: string;
-  componentCuuid: string | null;
+  componentId: string; // components.cuuid
   componentCode: string | null;
   componentName: string | null;
   currentRh: string | number | null;
@@ -418,7 +413,6 @@ export async function ensureRotationalItemForComponent(params: {
     stamp,
     status: 'Installed',
     componentId: params.componentId,
-    componentCuuid: params.componentCuuid,
     componentCode: params.componentCode,
     componentName: params.componentName,
     currentRh: params.currentRh != null ? String(params.currentRh) : '0',

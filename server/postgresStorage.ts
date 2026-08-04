@@ -1577,7 +1577,7 @@ export class PostgresStorage {
       // ship↔shore (rotational_items is BOTH_EDITABLE).
       try {
         const installedRows = await tx.select().from(rotationalItems).where(and(
-          eq(rotationalItems.componentCuuid, component.cuuid),
+          eq(rotationalItems.componentId, component.cuuid),
           eq(rotationalItems.status, 'Installed'),
           eq(rotationalItems.isDeleted, false),
         ));
@@ -1652,7 +1652,7 @@ export class PostgresStorage {
 
         // RH follows the Stamp: mirror the child's new RH onto its Installed rotational item too
         const childInstalled = await tx.select().from(rotationalItems).where(and(
-          eq(rotationalItems.componentCuuid, inherited.cuuid),
+          eq(rotationalItems.componentId, inherited.cuuid),
           eq(rotationalItems.status, 'Installed'),
           eq(rotationalItems.isDeleted, false),
         ));
@@ -5912,7 +5912,7 @@ export class PostgresStorage {
         throw new ValidationError('Stamp is mandatory when Rotational Item is Yes');
       } else if (beforeState.vesselId) {
         const clash = await rotSvc.getByStamp(beforeState.vesselId, effectiveStamp);
-        if (clash && clash.status === 'Installed' && clash.componentCuuid && clash.componentCuuid !== resolvedCuuid) {
+        if (clash && clash.status === 'Installed' && clash.componentId && clash.componentId !== resolvedCuuid) {
           const { ValidationError } = await import('./modules/shared/errors');
           throw new ValidationError(`Stamp "${effectiveStamp}" is already installed on another component on this vessel. Stamps must be unique.`);
         }

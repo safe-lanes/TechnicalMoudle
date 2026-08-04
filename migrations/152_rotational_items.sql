@@ -12,7 +12,8 @@
 --
 -- rotational_items — BOTH_EDITABLE master registry of physical items:
 --   * riuuid: sync identity (uuid convention).
---   * component_id / component_cuuid: populated ONLY while status='Installed'.
+--   * component_id: stores components.cuuid (schema-wide convention); populated
+--     ONLY while status='Installed'.
 --   * component_code / component_name: denormalized HISTORICAL SNAPSHOTS written
 --     during install/swap ("where was this item last fitted") — intentionally NOT
 --     updated on component renames.
@@ -34,7 +35,6 @@ CREATE TABLE IF NOT EXISTS rotational_items (
   vessel_id TEXT NOT NULL REFERENCES vessels(vuuid),
   stamp TEXT NOT NULL,
   component_id TEXT,
-  component_cuuid TEXT,
   component_code TEXT,
   component_name TEXT,
   current_rh NUMERIC(10,2) NOT NULL DEFAULT 0,
@@ -56,4 +56,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_rotational_items_vessel_stamp
 
 CREATE INDEX IF NOT EXISTS idx_rotational_items_vessel ON rotational_items (vessel_id);
 CREATE INDEX IF NOT EXISTS idx_rotational_items_status ON rotational_items (vessel_id, status);
-CREATE INDEX IF NOT EXISTS idx_rotational_items_component ON rotational_items (component_cuuid) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_rotational_items_component ON rotational_items (component_id) WHERE is_deleted = FALSE;

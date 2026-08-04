@@ -32,11 +32,12 @@ export async function getByStamp(vesselId: string, stamp: string): Promise<Rotat
   return rows[0];
 }
 
+// componentCuuid here is components.cuuid — stored in rotational_items.component_id (schema-wide convention)
 export async function getInstalledByComponentCuuid(componentCuuid: string): Promise<RotationalItem | undefined> {
   const db = await getDb();
   const rows = await db.select().from(rotationalItems)
     .where(and(
-      eq(rotationalItems.componentCuuid, componentCuuid),
+      eq(rotationalItems.componentId, componentCuuid),
       eq(rotationalItems.status, 'Installed'),
       notDeleted,
     )).limit(1);

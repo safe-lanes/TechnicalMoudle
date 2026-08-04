@@ -48,7 +48,7 @@ async function validateRotationalStamp(
   // Reject only when the stamp is currently Installed on ANOTHER component.
   // A Spare / In Store stamp may be claimed (re-marking a component, or fitting a spare);
   // the item is then re-linked as Installed and keeps its own RH history.
-  if (existing && existing.status === 'Installed' && existing.componentCuuid !== ownComponentCuuid) {
+  if (existing && existing.status === 'Installed' && existing.componentId !== ownComponentCuuid) {
     throw new ValidationError(
       `Stamp "${s}" is already installed on another component${existing.componentName ? ` (${existing.componentName})` : ''} on this vessel. Stamps must be unique.`
     );
@@ -105,7 +105,7 @@ export async function syncRotationalRegistry(oldComponent: Component | null, com
       ? await rotationalItemService.getByStamp(component.vesselId, stamp)
       : undefined;
     if (target && target.riuuid !== installed.riuuid) {
-      if (target.status === 'Installed' && target.componentCuuid && target.componentCuuid !== component.cuuid) {
+      if (target.status === 'Installed' && target.componentId && target.componentId !== component.cuuid) {
         throw new ValidationError(
           `Stamp "${stamp}" is already installed on another component${target.componentName ? ` (${target.componentName})` : ''} on this vessel. Stamps must be unique.`
         );
@@ -113,8 +113,7 @@ export async function syncRotationalRegistry(oldComponent: Component | null, com
       await rotationalItemService.detachFromComponent(installed.riuuid, rhSnapshot);
       await rotationalItemService.updateRotationalItem(target.riuuid, {
         status: 'Installed',
-        componentId: component.id != null ? String(component.id) : (component.cuuid ?? ''),
-        componentCuuid: component.cuuid ?? null,
+        componentId: component.cuuid ?? '',
         componentCode: component.componentCode ?? null,
         componentName: component.name ?? null,
       });
@@ -128,8 +127,7 @@ export async function syncRotationalRegistry(oldComponent: Component | null, com
   const item = await rotationalItemService.ensureRotationalItemForComponent({
     vesselId: component.vesselId!,
     stamp,
-    componentId: component.id != null ? String(component.id) : (component.cuuid ?? ''),
-    componentCuuid: component.cuuid ?? null,
+    componentId: component.cuuid ?? '',
     componentCode: component.componentCode ?? null,
     componentName: component.name ?? null,
     currentRh: rhSnapshot.currentRh,
@@ -137,18 +135,17 @@ export async function syncRotationalRegistry(oldComponent: Component | null, com
   });
   // Hard guard against races past pre-validation: never steal a stamp that is
   // Installed on another component — reject instead of re-linking.
-  if (item.status === 'Installed' && item.componentCuuid && item.componentCuuid !== component.cuuid) {
+  if (item.status === 'Installed' && item.componentId && item.componentId !== component.cuuid) {
     throw new ValidationError(
       `Stamp "${stamp}" is already installed on another component${item.componentName ? ` (${item.componentName})` : ''} on this vessel. Stamps must be unique.`
     );
   }
   // ensure… returns an existing row unchanged; if that row was a detached Spare with this
   // stamp for this same component, re-link it as Installed.
-  if (item.status !== 'Installed' || item.componentCuuid !== component.cuuid) {
+  if (item.status !== 'Installed' || item.componentId !== component.cuuid) {
     await rotationalItemService.updateRotationalItem(item.riuuid, {
       status: 'Installed',
-      componentId: component.id != null ? String(component.id) : (component.cuuid ?? ''),
-      componentCuuid: component.cuuid ?? null,
+      componentId: component.cuuid ?? '',
       componentCode: component.componentCode ?? null,
       componentName: component.name ?? null,
     });
