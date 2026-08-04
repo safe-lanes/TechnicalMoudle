@@ -48,7 +48,7 @@ const DEFAULT_BATCH_LIMIT = 25;
 const B2B_PACE_MS = Math.max(0, Number(process.env.SHIPSKART_B2B_PACE_MS ?? 5000));
 const paceB2b = () => new Promise((r) => setTimeout(r, B2B_PACE_MS));
 /** Statuses that mean a Shipskart API call was actually made (→ pace after them). */
-const API_HIT_STATUSES = new Set(['pushed', 'mapped', 'blocked_duplicate', 'error', 'role_updated', 'role_update_failed']);
+const API_HIT_STATUSES = new Set(['pushed', 'mapped', 'blocked_duplicate', 'error', 'role_updated', 'role_update_failed', 'unmapped', 'mapping_update_failed']);
 
 /**
  * CALLSIGN SEAM: Shipskart requires callSign and real call signs are not available yet —
@@ -230,6 +230,13 @@ export async function mapUserToVessel(userUuid: string, vesselVuuid: string, ctx
   if (assignment?.mapStatus === 'mapped' && assignment.shipskartMappingId) {
     return { status: 'already_mapped', shipskartId: assignment.shipskartMappingId };
   }
+  // RE-ACTIVATION: a mapping that already has a Shipskart id (user was removed from the
+  // vessel and came back) must be UPDATED to active, not POSTed again — a second POST
+  // would create a duplicate mapping row on their side.
+  if (assignment?.shipskartMappingId) {
+    return updateVesselUserMapping(
+      { userUuid, vesselId: vesselVuuid, shipskartMappingId: assignment.shipskartMappingId }, true, ctx);
+  }
   const userLink = await b2bRepo.getUserLink(userUuid);
   const vesselLink = await b2bRepo.getVesselLink(vesselVuuid);
   if (userLink?.pushStatus !== 'pushed' || !userLink.shipskartUserId) {
@@ -258,6 +265,46 @@ export async function mapUserToVessel(userUuid: string, vesselVuuid: string, ctx
   const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
   await b2bRepo.upsertAssignment(userUuid, vesselVuuid, { mapStatus: status, lastError: error });
   return { status, error };
+}
+
+// ── vessel-user mapping UPDATE ──
+//
+// Shape from Sachin's 04-Aug curl (integrated ahead of their deploy, at his request, so
+// nothing changes on our side when they release): PUT /update-vessel-user/{mappingId}
+// with the FULL mapping record in `data` — vesselId/userId are THEIR ids, and isActive
+// is the on/off switch. This is how a user is REMOVED from a vessel (isActive:false);
+// there is no delete endpoint. Until their release, calls fail and are simply recorded
+// on the assignment row — every sweep retries them.
+
+export async function updateVesselUserMapping(
+  a: { userUuid: string; vesselId: string; shipskartMappingId: string },
+  isActive: boolean,
+  ctx?: { userFullName?: string | null; vesselName?: string | null },
+): Promise<PushResult> {
+  const userLink = await b2bRepo.getUserLink(a.userUuid);
+  const vesselLink = await b2bRepo.getVesselLink(a.vesselId);
+  if (!userLink?.shipskartUserId || !vesselLink?.shipskartVesselId) {
+    await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { lastError: 'mapping update needs both Shipskart ids — user or vessel link missing' });
+    return { status: 'missing_links' };
+  }
+  const res = await authorizedB2bRequest('PUT', `/integration/SAIL/update-vessel-user/${a.shipskartMappingId}`, {
+    body: { id: a.shipskartMappingId, data: {
+      vesselId: vesselLink.shipskartVesselId,
+      vesselName: ctx?.vesselName ?? null,
+      userId: userLink.shipskartUserId,
+      userFullName: ctx?.userFullName ?? null,
+      isActive,
+      updatedAt: new Date().toISOString(),
+      updatedBy: 'System',
+    } },
+  });
+  if (res.ok) {
+    await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { mapStatus: isActive ? 'mapped' : 'unmapped', lastError: null });
+    return { status: isActive ? 'mapped' : 'unmapped', shipskartId: a.shipskartMappingId };
+  }
+  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
+  await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { lastError: `mapping update failed: ${error}` });
+  return { status: 'mapping_update_failed', error };
 }
 
 // ── JIT (just-in-time) push at first Purchasing click ──
@@ -426,6 +473,23 @@ export async function runReconciliation(opts: { limit?: number } = {}): Promise<
     .where(and(eq(masterUserVessels.isActive, true), inArray(masterUserVessels.mapStatus, ['pending', 'awaiting_user', 'awaiting_vessel'])));
   for (const a of pendingAssignments.slice(0, limit)) {
     const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
+    tally(summary.mappings, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
+  }
+
+  // 3b. REVOKED assignments (capture-at-login removed the vessel) — deactivate the
+  // Shipskart mapping via update-vessel-user isActive:false. A revoked row that never
+  // reached Shipskart has nothing to undo remotely → closed out locally as 'unmapped'.
+  const revokedAssignments = await db.select().from(masterUserVessels)
+    .where(and(eq(masterUserVessels.isActive, false), eq(masterUserVessels.mapStatus, 'revoked')));
+  for (const a of revokedAssignments.slice(0, limit)) {
+    if (!a.shipskartMappingId) {
+      await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { mapStatus: 'unmapped', lastError: null });
+      tally(summary.mappings, 'unmapped_local_only');
+      continue;
+    }
+    const st = (await updateVesselUserMapping(
+      { userUuid: a.userUuid, vesselId: a.vesselId, shipskartMappingId: a.shipskartMappingId }, false)).status;
     tally(summary.mappings, st);
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
