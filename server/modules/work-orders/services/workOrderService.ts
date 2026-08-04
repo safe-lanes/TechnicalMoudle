@@ -238,7 +238,16 @@ export async function createSuperintendentNotificationForWO(wo: any, daysLate: n
 // ── List Work Orders with Enrichment ──
 
 export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
-  const workOrders = await repo.findWorkOrders(vesselId, vesselIds);
+  const allRows = await repo.findWorkOrders(vesselId, vesselIds);
+
+  // ARCHIVED ROWS ARE NOT LISTED (2026-08-04). The storage layer deliberately returns
+  // soft-deleted rows (numbering must see them so archived numbers are never reused),
+  // so every user-facing consumer must exclude them itself. This function feeds the
+  // office AND vessel Work Orders screens, the paged list, and the computed-status
+  // contract (reports/alerts) — without this filter, a reconciler-archived duplicate
+  // stayed visible next to its survivor forever, which read as "the duplicate fix
+  // doesn't work" (Jeevan, dev, 2026-08-04 — the merge itself was proven working).
+  const workOrders = allRows.filter((wo: any) => wo.isDeleted !== true);
 
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
