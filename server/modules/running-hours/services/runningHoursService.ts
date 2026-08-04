@@ -429,24 +429,23 @@ export async function updateChildRH(componentId: string, body: {
   // Do NOT update rhCurrentInheritedCached as it stores the master's value
   // Use user's entered reading date for last_updated (not server time) so the
   // overview grid MAX logic shows the correct reading date, not today's date.
-  await repo.updateComponent(componentId, {
-    currentCumulativeRH: newRHFormatted,
-    runningHours: newRHFormatted,
-    lastUpdated: dateUpdated || new Date().toISOString()
-  });
-
-  // RH follows the Stamp (Task #369): accrue the DELTA onto the Installed rotational item
+  // Component write + stamp DELTA accrual happen in ONE locked transaction (Task #374):
+  // the delta is computed from a fresh in-tx read, so a duplicate/overlapping
+  // submission sees the committed value and accrues 0 instead of double-counting.
   const stampReadingIso = (() => {
     const d = dateUpdated ? new Date(dateUpdated) : new Date();
     return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
   })();
-  await repo.accrueInstalledStampRh({
-    vesselId: component.vesselId || null,
-    currentStamp: component.currentStamp || null,
-    delta: newRHValue - currentRHValue,
+  const atomicResult = await repo.updateChildRhWithStampAccrual({
+    componentId,
+    newRHValue,
+    lastUpdated: dateUpdated || new Date().toISOString(),
     readingDateIso: stampReadingIso,
     userId: userId || null,
   });
+  // Audit the value that was actually committed as previous (fresh in-tx read),
+  // not the possibly-stale pre-validation read.
+  const committedPreviousRH = atomicResult.previousRH.toFixed(2);
 
   // dateUpdatedLocal must also use the user's entered date so the audit-based
   // MAX in listParents reads the correct reading date, not the server save time.
@@ -457,7 +456,7 @@ export async function updateChildRH(componentId: string, body: {
   await repo.createRunningHoursAudit({
     vesselId: component.vesselId || '',
     componentId: componentId,
-    previousRH: previousRH,
+    previousRH: committedPreviousRH,
     newRH: newRHFormatted,
     cumulativeRH: newRHFormatted,
     dateUpdatedLocal: auditDateLocal,
@@ -467,6 +466,7 @@ export async function updateChildRH(componentId: string, body: {
     updatedByUuid: userUuid || null,
     source: 'manual',
     notes: comments || 'Manual update of child component RH',
+    // (previousRH above reflects the committed in-tx read)
     meterReplaced: false,
     version: 1
   });

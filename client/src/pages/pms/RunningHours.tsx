@@ -1884,9 +1884,9 @@ const RunningHours = () => {
             <Button 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white" 
               onClick={handleSaveUpdate}
-              disabled={!!individualValidationError || !canEditRH}
+              disabled={!!individualValidationError || !canEditRH || cascadeUpdateMutation.isPending}
             >
-              Save
+              {cascadeUpdateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </div>
         </DialogContent>
@@ -2035,9 +2035,9 @@ const RunningHours = () => {
             <Button 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white" 
               onClick={handleBulkSave}
-              disabled={hasBulkValidationErrors || !canEditRH}
+              disabled={hasBulkValidationErrors || !canEditRH || bulkUpdateRunningHours.isPending}
             >
-              Save
+              {bulkUpdateRunningHours.isPending ? "Saving..." : "Save"}
             </Button>
           </div>
         </DialogContent>

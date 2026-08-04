@@ -26,6 +26,18 @@ export async function accrueInstalledStampRh(params: {
   return storage.accrueInstalledStampRh(params);
 }
 
+// Atomic child (INHERITED) RH update: component write + stamp accrual in one locked
+// transaction so duplicate/overlapping submissions cannot double-accrue (Task #374).
+export async function updateChildRhWithStampAccrual(params: {
+  componentId: string;
+  newRHValue: number;
+  lastUpdated: string;
+  readingDateIso: string;
+  userId: string | null;
+}): Promise<{ previousRH: number }> {
+  return storage.updateChildRhWithStampAccrual(params);
+}
+
 // Batch lookup of Installed rotational items by (vesselId, stamp) so the
 // Inherited Components dialog can show each stamp's OWN accrued hours next to
 // the component's inherited counter (Task #372). Returns a Map keyed by stamp.

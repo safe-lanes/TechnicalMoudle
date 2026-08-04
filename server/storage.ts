@@ -325,6 +325,15 @@ export interface IStorage {
     userId: string | null;
   }): Promise<void>;
 
+  // Atomic child (INHERITED) RH update with per-component lock + in-tx delta (Task #374)
+  updateChildRhWithStampAccrual(params: {
+    componentId: string;
+    newRHValue: number;
+    lastUpdated: string;
+    readingDateIso: string;
+    userId: string | null;
+  }): Promise<{ previousRH: number }>;
+
   updateMasterRunningHours(params: {
     componentId: string;
     newRHValue: number;
