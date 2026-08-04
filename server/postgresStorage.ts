@@ -19,6 +19,7 @@ import {
   sfiDetails,
   masterData,
   components,
+  rotationalItems,
   componentDocuments,
   componentClassRegulatory,
   componentMaintenanceHistory,
@@ -1570,6 +1571,35 @@ export class PostgresStorage {
       // Sync field logging — INSERT (best-effort)
       try { await logFieldChanges('running_hours_audit', rhaResult[0].rhauuid, masterVesselId, null, rhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha tx create:', e); }
 
+      // RH follows the Stamp (Rotational Items, Task #358): mirror the component's new RH
+      // onto its currently Installed rotational item so the stamp carries its own hours when
+      // it is later swapped out. Field-logged inside the tx so the registry stays in sync
+      // ship↔shore (rotational_items is BOTH_EDITABLE).
+      try {
+        const installedRows = await tx.select().from(rotationalItems).where(and(
+          eq(rotationalItems.componentCuuid, component.cuuid),
+          eq(rotationalItems.status, 'Installed'),
+          eq(rotationalItems.isDeleted, false),
+        ));
+        if (installedRows[0]) {
+          const beforeItem = installedRows[0];
+          const afterRows = await tx.update(rotationalItems)
+            .set({
+              currentRh: params.newRHValue.toFixed(2),
+              rhLastUpdated: readingDate.toISOString(),
+              updatedAt: now,
+            })
+            .where(eq(rotationalItems.riuuid, beforeItem.riuuid))
+            .returning();
+          if (afterRows[0]) {
+            await logFieldChanges('rotational_items', beforeItem.riuuid, masterVesselId, beforeItem, afterRows[0], params.userId, tx);
+          }
+        }
+      } catch (e) {
+        console.error('[RotationalItems] stamp RH mirror failed:', e);
+        throw e; // inside tx: keep stamp RH and component RH atomic
+      }
+
       // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
       // rhCurrentInheritedCached stores the master's absolute value (for display/config)
       // currentCumulativeRH tracks the child's individual running hours (delta-based)
@@ -1619,6 +1649,23 @@ export class PostgresStorage {
           componentName: inherited.name || null,
         }).returning();
         try { await logFieldChanges('running_hours_audit', childRhaResult[0].rhauuid, inherited.vesselId || masterVesselId, null, childRhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha cascade create:', e); }
+
+        // RH follows the Stamp: mirror the child's new RH onto its Installed rotational item too
+        const childInstalled = await tx.select().from(rotationalItems).where(and(
+          eq(rotationalItems.componentCuuid, inherited.cuuid),
+          eq(rotationalItems.status, 'Installed'),
+          eq(rotationalItems.isDeleted, false),
+        ));
+        if (childInstalled[0]) {
+          const beforeChildItem = childInstalled[0];
+          const afterChildRows = await tx.update(rotationalItems)
+            .set({ currentRh: newChildRH.toFixed(2), rhLastUpdated: readingDate.toISOString(), updatedAt: now })
+            .where(eq(rotationalItems.riuuid, beforeChildItem.riuuid))
+            .returning();
+          if (afterChildRows[0]) {
+            await logFieldChanges('rotational_items', beforeChildItem.riuuid, inherited.vesselId || masterVesselId, beforeChildItem, afterChildRows[0], params.userId, tx);
+          }
+        }
 
         inheritedUpdated++;
       }

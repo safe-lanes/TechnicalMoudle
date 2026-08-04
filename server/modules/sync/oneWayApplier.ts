@@ -141,6 +141,88 @@ export async function getColumnMeta(pool: any, tableName: string): Promise<Colum
 }
 
 /**
+ * Latest rotation date for a component (rotation_history, excluding an optional row).
+ * Used by the rotational-swap sync guards:
+ *  - RH-hook ordering: a running_hours_audit row whose READING DATE predates the
+ *    component's latest rotation must NOT overwrite the component's post-swap baseline.
+ *  - Shore-revert window: a components full-row apply older than the local latest
+ *    rotation must not revert current_stamp/RH (nothing would re-correct them).
+ * Fail-open (null) when the table doesn't exist yet (mixed-version upgrade window).
+ */
+export async function getLatestRotationDate(
+  conn: any,
+  componentId: string,
+  excludeRhruuid?: string,
+): Promise<Date | null> {
+  try {
+    const params: any[] = [componentId];
+    let sql = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
+    if (excludeRhruuid) {
+      sql += ` AND rhruuid <> $2`;
+      params.push(excludeRhruuid);
+    }
+    const res = await conn.query(sql, params);
+    const v = res.rows[0]?.latest;
+    if (!v) return null;
+    const d = v instanceof Date ? v : new Date(String(v));
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null; // table absent (old schema) — guards disabled, prior behaviour preserved
+  }
+}
+
+/**
+ * Precision-aware "is this RH reading pre-rotation?" comparator.
+ * date_updated_local is date-only (parses to UTC midnight) while rotation_date carries
+ * time — comparing raw timestamps would misclassify a valid SAME-DAY post-rotation
+ * reading (midnight < rotation time) as stale. So the rotation timestamp is truncated
+ * to its UTC day start: only readings from a strictly EARLIER calendar day are skipped;
+ * same-day readings always apply.
+ */
+export function isReadingPreRotation(readingDate: Date | null | undefined, latestRotation: Date | null | undefined): boolean {
+  if (!readingDate || !latestRotation) return false;
+  const rotationDayStart = Date.UTC(
+    latestRotation.getUTCFullYear(), latestRotation.getUTCMonth(), latestRotation.getUTCDate(),
+  );
+  return readingDate.getTime() < rotationDayStart;
+}
+
+/**
+ * Derived-update hook for an applied rotation_history row: re-apply the swap's
+ * stamp + RH baseline onto the receiving side's component. components is
+ * ONE_WAY_SHORE_TO_SHIP, so this hook is the ONLY way a ship-side swap reaches
+ * the shore component row (and vice-versa for shore-initiated swaps).
+ * Replay-safe: keyed by the row's own rhruuid (INSERT ... ON CONFLICT DO NOTHING
+ * upstream) and ordering-safe: applies only when this rotation is the LATEST for
+ * the component (out-of-order delivery of older rotations is a no-op).
+ */
+export async function applyRotationToComponent(conn: any, rowData: Record<string, any>, rowUuid: string): Promise<void> {
+  const compId = rowData['component_id'];
+  const inStamp = rowData['in_stamp'];
+  const inRh = rowData['in_rh'];
+  if (!compId || !inStamp || inRh === undefined || inRh === null) return;
+  const rotRaw = rowData['rotation_date'];
+  const rotDate = rotRaw instanceof Date ? rotRaw : new Date(String(rotRaw || ''));
+  if (isNaN(rotDate.getTime())) return;
+  try {
+    const latestOther = await getLatestRotationDate(conn, compId, rowUuid);
+    if (latestOther && latestOther.getTime() > rotDate.getTime()) {
+      syncDiag(`ROTATION-APPLY SKIP (stale): component=${compId} rotation=${rowUuid} (${rotDate.toISOString()}) older than latest local rotation ${latestOther.toISOString()}`);
+      return;
+    }
+    await conn.query(
+      `UPDATE components SET current_stamp = $1, current_cumulative_rh = $2, rh_current_master = $2,
+         rh_master_updated_at = $3, rh_master_update_source = 'ROTATION', last_updated = $4, updated_at = NOW()
+       WHERE cuuid = $5`,
+      [inStamp, String(inRh), rotDate, rotDate.toISOString(), compId]
+    );
+    syncDiag(`ROTATION-APPLY: component=${compId} stamp=${inStamp} baseline=${inRh} from rotation ${rowUuid}`);
+  } catch (rotErr: any) {
+    syncDiag(`ROTATION-APPLY ERROR: component=${compId} rotation=${rowUuid}: ${rotErr.message}`);
+  }
+}
+
+/**
  * Apply one-way rows — upsert by identity column (UUID).
  *
  * @param tableName - Target table name
@@ -272,8 +354,35 @@ export async function applyOneWayRows(
           );
           result.softDeleted++;
         } else {
+          // ── Rotational shore-revert guard ─────────────────────────────────
+          // components full-row apply overwrites ALL columns (there is no protected-column
+          // list). If a shore component edit was sent BEFORE shore received this side's
+          // rotation event, its stale current_stamp/RH would revert the local swap with
+          // nothing to re-correct it. When the local latest rotation for the component is
+          // newer than the incoming row's updated_at, preserve the local stamp + RH columns.
+          let rowToApply = row;
+          if (tableName === 'components') {
+            const cuuid = row['cuuid'] || row['Cuuid'] || row[toCamelCase('cuuid')];
+            if (cuuid) {
+              const latestRotation = await getLatestRotationDate(pool, cuuid);
+              if (latestRotation) {
+                const incomingUpdatedRaw = row['updated_at'] ?? row['updatedAt'];
+                const incomingUpdated = incomingUpdatedRaw instanceof Date
+                  ? incomingUpdatedRaw : new Date(String(incomingUpdatedRaw || ''));
+                if (isNaN(incomingUpdated.getTime()) || incomingUpdated.getTime() < latestRotation.getTime()) {
+                  rowToApply = { ...row };
+                  for (const col of ['current_stamp', 'currentStamp', 'current_cumulative_rh', 'currentCumulativeRH',
+                    'rh_current_master', 'rhCurrentMaster', 'rh_master_updated_at', 'rhMasterUpdatedAt',
+                    'rh_master_update_source', 'rhMasterUpdateSource', 'last_updated', 'lastUpdated']) {
+                    delete rowToApply[col];
+                  }
+                  syncDiag(`ROTATION-GUARD: components.${cuuid} incoming row (updated_at=${incomingUpdatedRaw}) predates local rotation ${latestRotation.toISOString()} — stamp/RH columns preserved`);
+                }
+              }
+            }
+          }
           // Update all columns (excluding PK and generated columns)
-          const updatePairs = buildUpdatePairs(row, lookupColumn, meta);
+          const updatePairs = buildUpdatePairs(rowToApply, lookupColumn, meta);
           if (updatePairs.setClauses.length > 0) {
             // Re-parameterize WHERE clause to follow UPDATE SET params
             const offset = updatePairs.values.length;
@@ -852,7 +961,14 @@ export async function applyFieldLogInserts(
         try {
           const compId = rowData['component_id'];
           const newRH = rowData['cumulative_rh'] || rowData['new_rh'];
-          if (newRH !== undefined && newRH !== null) {
+          // Rotation ordering guard: a pre-swap RH reading delivered AFTER the rotation
+          // applied must not clobber the post-swap baseline with the old stamp's hours.
+          const readingDate = safeParseDate(rowData['date_updated_local'])
+            || (rowData['entered_at_utc'] instanceof Date ? rowData['entered_at_utc'] : safeParseDate(rowData['entered_at_utc']));
+          const latestRotation = await getLatestRotationDate(pool, compId);
+          if (latestRotation && readingDate && isReadingPreRotation(readingDate, latestRotation)) {
+            syncDiag(`RH-APPLY INSERT SKIP (pre-rotation): component=${compId} audit=${rowUuid} reading ${readingDate.toISOString()} predates latest rotation ${latestRotation.toISOString()} — audit stored, component baseline untouched`);
+          } else if (newRH !== undefined && newRH !== null) {
             // Read old value for diag
             const oldRow = await pool.query(
               `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
@@ -880,6 +996,13 @@ export async function applyFieldLogInserts(
         } catch (rhErr: any) {
           syncDiag(`RH-APPLY INSERT ERROR: component=${rowData['component_id']} audit=${rowUuid}: ${rhErr.message}`);
         }
+      }
+
+      // ── Post-INSERT: Rotational swap derived update — apply rotation_history to the component ──
+      // components is ONE_WAY_SHORE_TO_SHIP; the rotation_history row is the sync carrier of a
+      // swap. Idempotent by rhruuid (ON CONFLICT DO NOTHING above) and latest-rotation-wins.
+      if (tableName === 'rotation_history') {
+        await applyRotationToComponent(pool, rowData, rowUuid);
       }
 
       // ── Post-INSERT: Cross-instance integer FK resolution for location_uuid → location_id ──

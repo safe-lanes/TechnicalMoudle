@@ -8,15 +8,22 @@
  * component_code/component_name are HISTORICAL SNAPSHOTS ("where was this item
  * last fitted") written at install/swap time — never updated on component renames.
  */
+import { and, eq } from 'drizzle-orm';
 import * as repo from '../repositories/rotationalItemRepository';
 import { ValidationError, NotFoundError, ConflictError } from '../../shared/errors';
 import { logFieldChanges, logSoftDelete } from '../../sync/fieldLogger';
-import { getRequestContext } from '../../../middleware/requestContext';
+import { getRequestContext, getAuditActor } from '../../../middleware/requestContext';
+import { getDb } from '../../../db';
 import {
   ROTATIONAL_ITEM_STATUSES,
+  components,
+  rotationalItems,
+  rotationHistory,
+  runningHoursAudit,
   type RotationalItem,
   type InsertRotationalItem,
   type RotationalItemStatus,
+  type RotationHistory,
 } from '@shared/schema';
 
 const TABLE = 'rotational_items';
@@ -143,6 +150,248 @@ export async function detachFromComponent(
     componentCuuid: null,
     currentRh: rhSnapshot.currentRh != null ? String(rhSnapshot.currentRh) : undefined,
     rhLastUpdated: rhSnapshot.rhLastUpdated ?? undefined,
+  });
+}
+
+/**
+ * Replace the installed rotational item on a component (the actual rotation).
+ *
+ * Atomically (one DB transaction):
+ *  - Outgoing stamp: component's current cumulative RH + last-updated date snapshotted
+ *    onto the registry row; status → Spare; live link cleared (code/name kept as the
+ *    "last fitted at" historical snapshot).
+ *  - Incoming stamp (existing spare/in-store item, or brand-new stamp created inline):
+ *    status → Installed; live link set; its stored RH becomes the component's new baseline.
+ *  - Component: current_stamp, currentCumulativeRH/rhCurrentMaster and last-updated
+ *    stamps set from the incoming item. NO cascade to INHERITED children — like a meter
+ *    replacement, this is a baseline reset, not accumulation.
+ *  - running_hours_audit row with source='rotation' (internal-only source; bypasses the
+ *    25h/day cap exactly once — from the next RH update onward normal validation applies,
+ *    measured from the new baseline/rotation date).
+ *  - rotation_history row: immutable event log AND the ship→shore sync carrier of the
+ *    swap (components is ONE_WAY_SHORE_TO_SHIP; the appliers' derived hooks re-apply
+ *    stamp + baseline from this row on the receiving side).
+ *
+ * All rotational-table writes field-log inside the same transaction (throw-to-rollback).
+ */
+export async function replaceRotationalItem(params: {
+  componentCuuid: string;
+  incomingRiuuid?: string | null;
+  newStamp?: string | null;
+  newStampInitialRh?: number | string | null;
+  notes?: string | null;
+  userId?: string | null;
+}): Promise<{ rotation: RotationHistory; component: any; incoming: RotationalItem; outgoing: RotationalItem | null }> {
+  const db = await getDb();
+  const userUuid = currentUserUuid() ?? params.userId ?? null;
+  const actorLabel = getAuditActor().actorLabel;
+  const now = new Date();
+
+  if (!params.componentCuuid) throw new RotationalItemValidationError('componentCuuid is required');
+
+  // Cheap pre-checks only; authoritative reads happen INSIDE the transaction under
+  // row locks so a concurrent RH update between read and commit cannot produce a
+  // stale outgoing-stamp snapshot ("RH follows the stamp" must hold under races).
+  const wantsNew = !!(params.newStamp && String(params.newStamp).trim());
+  if (!wantsNew && !params.incomingRiuuid) {
+    throw new RotationalItemValidationError('Select an existing rotational item or provide a new Stamp');
+  }
+  if (wantsNew && params.incomingRiuuid) {
+    throw new RotationalItemValidationError('Provide either an existing item or a new Stamp — not both');
+  }
+
+  let newStamp = '';
+  let newInitialRh = 0;
+  if (wantsNew) {
+    newStamp = normalizeStamp(params.newStamp);
+    newInitialRh = params.newStampInitialRh != null && String(params.newStampInitialRh).trim() !== ''
+      ? Number(params.newStampInitialRh) : 0;
+    if (!Number.isFinite(newInitialRh) || newInitialRh < 0) {
+      throw new RotationalItemValidationError('Starting Running Hours must be zero or a positive number');
+    }
+  }
+
+  return db.transaction(async (tx) => {
+    // 0) Authoritative reads under row locks (FOR UPDATE): the component row anchors the
+    //    outgoing RH snapshot; the incoming registry row anchors the new baseline.
+    const compRows = await tx.select().from(components)
+      .where(eq(components.cuuid, params.componentCuuid)).limit(1).for('update');
+    const component = compRows[0];
+    if (!component) throw new NotFoundError('Component not found');
+    if (!component.rotationalItem) {
+      throw new RotationalItemValidationError('Component is not marked as a Rotational Item');
+    }
+    if (!component.vesselId) throw new RotationalItemValidationError('Component has no vessel');
+    const vesselId = component.vesselId;
+
+    let incomingExisting: RotationalItem | undefined;
+    if (wantsNew) {
+      const clashRows = await tx.select().from(rotationalItems).where(and(
+        eq(rotationalItems.vesselId, vesselId),
+        eq(rotationalItems.stamp, newStamp),
+        eq(rotationalItems.isDeleted, false),
+      )).limit(1);
+      if (clashRows[0]) {
+        throw new RotationalItemValidationError(`Stamp "${newStamp}" already exists on this vessel (status: ${clashRows[0].status})`);
+      }
+    } else {
+      const incomingRows = await tx.select().from(rotationalItems)
+        .where(eq(rotationalItems.riuuid, params.incomingRiuuid!)).limit(1).for('update');
+      incomingExisting = incomingRows[0];
+      if (!incomingExisting || incomingExisting.isDeleted) throw new NotFoundError('Incoming rotational item not found');
+      if (incomingExisting.vesselId !== vesselId) {
+        throw new RotationalItemValidationError('Incoming item belongs to a different vessel');
+      }
+      if (incomingExisting.status === 'Installed') {
+        throw new RotationalItemValidationError(`Stamp "${incomingExisting.stamp}" is currently installed on another component`);
+      }
+      if (incomingExisting.status === 'Retired') {
+        throw new RotationalItemValidationError(`Stamp "${incomingExisting.stamp}" is retired and cannot be installed`);
+      }
+    }
+
+    const outgoingRows = component.currentStamp
+      ? await tx.select().from(rotationalItems).where(and(
+          eq(rotationalItems.componentCuuid, component.cuuid),
+          eq(rotationalItems.status, 'Installed'),
+          eq(rotationalItems.isDeleted, false),
+        )).limit(1).for('update')
+      : [];
+    const outgoing = outgoingRows[0];
+
+    // Outgoing snapshot: the component's CURRENT (locked) cumulative RH is the outgoing
+    // stamp's final reading.
+    const outgoingRh = component.currentCumulativeRH != null ? String(component.currentCumulativeRH) : '0';
+    const outgoingRhDate = component.lastUpdated || now.toISOString();
+
+    // 1) Outgoing → Spare with RH snapshot (guarded: only if still Installed here)
+    let outgoingAfter: RotationalItem | null = null;
+    if (outgoing) {
+      const rows = await tx.update(rotationalItems)
+        .set({
+          status: 'Spare',
+          componentId: null,
+          componentCuuid: null,
+          currentRh: outgoingRh,
+          rhLastUpdated: outgoingRhDate,
+          updatedByUuid: userUuid,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(rotationalItems.riuuid, outgoing.riuuid),
+          eq(rotationalItems.status, 'Installed'),
+          eq(rotationalItems.isDeleted, false),
+        ))
+        .returning();
+      if (!rows[0]) throw new ConflictError('Outgoing rotational item changed concurrently — please retry');
+      outgoingAfter = rows[0];
+      await logFieldChanges(TABLE, outgoing.riuuid, vesselId, outgoing, outgoingAfter, userUuid, tx);
+    }
+
+    // 2) Incoming → Installed (create inline, or guarded update of the existing spare)
+    let incomingAfter: RotationalItem;
+    if (wantsNew) {
+      const rows = await tx.insert(rotationalItems).values({
+        vesselId,
+        stamp: newStamp,
+        status: 'Installed',
+        componentId: component.cuuid,
+        componentCuuid: component.cuuid,
+        componentCode: component.componentCode ?? null,
+        componentName: component.name ?? null,
+        currentRh: newInitialRh.toFixed(2),
+        rhLastUpdated: now.toISOString(),
+        createdByUuid: userUuid,
+        updatedByUuid: userUuid,
+      }).returning();
+      incomingAfter = rows[0];
+      await logFieldChanges(TABLE, incomingAfter.riuuid, vesselId, null, incomingAfter, userUuid, tx);
+    } else {
+      const rows = await tx.update(rotationalItems)
+        .set({
+          status: 'Installed',
+          componentId: component.cuuid,
+          componentCuuid: component.cuuid,
+          componentCode: component.componentCode ?? null,
+          componentName: component.name ?? null,
+          updatedByUuid: userUuid,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(rotationalItems.riuuid, incomingExisting!.riuuid),
+          eq(rotationalItems.isDeleted, false),
+          eq(rotationalItems.status, incomingExisting!.status), // guarded: fails if installed elsewhere meanwhile
+        ))
+        .returning();
+      if (!rows[0]) throw new ConflictError('Incoming rotational item changed concurrently — please retry');
+      incomingAfter = rows[0];
+      await logFieldChanges(TABLE, incomingAfter.riuuid, vesselId, incomingExisting!, incomingAfter, userUuid, tx);
+    }
+
+    const inRh = parseFloat(incomingAfter.currentRh || '0');
+
+    // 3) Component: new stamp + RH baseline from the incoming item. Baseline reset —
+    //    NOT validated against the 25h/day cap and NOT cascaded to INHERITED children
+    //    (meter-replacement semantics). components is ONE_WAY_SHORE_TO_SHIP: no field log.
+    const compUpd = await tx.update(components)
+      .set({
+        currentStamp: incomingAfter.stamp,
+        currentCumulativeRH: inRh.toFixed(2),
+        rhCurrentMaster: inRh.toFixed(2),
+        rhMasterUpdatedAt: now,
+        rhMasterUpdateSource: 'ROTATION',
+        lastUpdated: now.toISOString(),
+        updatedAt: now,
+      })
+      .where(eq(components.cuuid, component.cuuid))
+      .returning();
+    if (!compUpd[0]) throw new NotFoundError('Component disappeared during swap');
+
+    // 4) running_hours_audit — source 'rotation' is assigned ONLY here (the public RH
+    //    endpoints' zod enums do not accept it), so the cap bypass cannot be spoofed.
+    const audit = await tx.insert(runningHoursAudit).values({
+      vesselId,
+      componentId: component.cuuid,
+      previousRH: parseFloat(outgoingRh || '0').toFixed(2),
+      newRH: inRh.toFixed(2),
+      cumulativeRH: inRh.toFixed(2),
+      dateUpdatedLocal: now.toISOString().split('T')[0],
+      dateUpdatedTZ: 'UTC',
+      enteredAtUTC: now,
+      userId: params.userId || userUuid || 'system',
+      actorLabel,
+      updatedByUuid: userUuid,
+      source: 'rotation',
+      notes: `Rotational item replacement: ${outgoing?.stamp ?? '(none)'} out @ ${outgoingRh}, ${incomingAfter.stamp} in @ ${inRh.toFixed(2)}`,
+      meterReplaced: false,
+      version: 1,
+      componentCode: component.componentCode ?? null,
+      componentName: component.name ?? null,
+    }).returning();
+    await logFieldChanges('running_hours_audit', audit[0].rhauuid, vesselId, null, audit[0], userUuid, tx);
+
+    // 5) rotation_history — immutable event log + the ship↔shore sync carrier of the swap.
+    const rotation = await tx.insert(rotationHistory).values({
+      vesselId,
+      componentId: component.cuuid,
+      componentCode: component.componentCode ?? null,
+      componentName: component.name ?? null,
+      outRiuuid: outgoing?.riuuid ?? null,
+      outStamp: outgoing?.stamp ?? component.currentStamp ?? null,
+      outRh: outgoing ? parseFloat(outgoingRh || '0').toFixed(2) : null,
+      inRiuuid: incomingAfter.riuuid,
+      inStamp: incomingAfter.stamp,
+      inRh: inRh.toFixed(2),
+      rotationDate: now,
+      userId: params.userId || userUuid,
+      actorLabel,
+      notes: params.notes ?? null,
+      createdByUuid: userUuid,
+      updatedByUuid: userUuid,
+    }).returning();
+    await logFieldChanges('rotation_history', rotation[0].rhruuid, vesselId, null, rotation[0], userUuid, tx);
+
+    return { rotation: rotation[0], component: compUpd[0], incoming: incomingAfter, outgoing: outgoingAfter };
   });
 }
 

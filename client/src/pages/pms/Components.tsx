@@ -18,6 +18,7 @@ import ComponentRegisterFormCR from "@/components/ComponentRegisterFormCR";
 import AddEditComponentForm from "@/components/AddEditComponentForm";
 import ComponentRegisterAddEdit from "@/components/ComponentRegisterAddEdit";
 import { ReviewChangesDrawer } from "@/components/ReviewChangesDrawer";
+import { ReplaceRotationalItemDialog } from "@/components/ReplaceRotationalItemDialog";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useLocation } from "wouter";
@@ -144,6 +145,9 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   
   // Track original component data for modify mode
   const [originalComponentData, setOriginalComponentData] = useState<typeof componentData | null>(null);
+
+  // Rotational item replacement dialog (visible only when Rotational Item = Yes)
+  const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   
   // Update component data when selected component changes
   useEffect(() => {
@@ -277,6 +281,19 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
 
   return (
     <div className="space-y-4">
+      {selectedComponent && (
+        <ReplaceRotationalItemDialog
+          open={showReplaceDialog}
+          onOpenChange={setShowReplaceDialog}
+          componentCuuid={(selectedComponent as any).actualId || (selectedComponent as any).cuuid || ""}
+          componentName={componentData.componentName}
+          currentStamp={componentData.currentStamp}
+          vesselId={(selectedComponent as any).vesselId || ""}
+          onSwapped={() => {
+            queryClient.invalidateQueries({ queryKey: [`/technical/api/components/${(selectedComponent as any).vesselId}`] });
+          }}
+        />
+      )}
       {/* Auto-flowing grid for component fields - visible fields fill gaps automatically */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
@@ -596,8 +613,18 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               data-testid="input-stamp"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-stamp">
-              {componentData.rotationalItem === "Yes" ? (componentData.currentStamp || "-") : "-"}
+            <div className="text-sm text-gray-900 flex items-center gap-2" data-testid="text-stamp">
+              <span>{componentData.rotationalItem === "Yes" ? (componentData.currentStamp || "-") : "-"}</span>
+              {componentData.rotationalItem === "Yes" && selectedComponent && (
+                <button
+                  type="button"
+                  onClick={() => setShowReplaceDialog(true)}
+                  className="text-xs px-2 py-0.5 rounded border border-[#52BAF3] text-[#52BAF3] hover:bg-blue-50"
+                  data-testid="button-replace-rotational-item"
+                >
+                  Replace
+                </button>
+              )}
             </div>
           )}
         </div>

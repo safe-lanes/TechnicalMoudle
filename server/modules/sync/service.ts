@@ -11,7 +11,7 @@
  */
 
 import * as repo from './repository';
-import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows , evaluateInsertOriginGuard, evaluateStaleSkipGuard } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows , evaluateInsertOriginGuard, evaluateStaleSkipGuard, getLatestRotationDate, isReadingPreRotation } from './oneWayApplier';
 import {
   getTableSyncConfig,
   getTablesByCategory,
@@ -480,6 +480,15 @@ export async function receivePushData(
                 );
                 if (auditRow.rows.length > 0) {
                   const compId = auditRow.rows[0].component_id;
+                  // Rotation ordering guard: a pre-swap RH reading applied AFTER the rotation
+                  // must not clobber the post-swap baseline with the old stamp's hours.
+                  const rotGuardReading = safeParseDate(auditRow.rows[0].date_updated_local)
+                    || (auditRow.rows[0].entered_at_utc instanceof Date ? auditRow.rows[0].entered_at_utc : safeParseDate(auditRow.rows[0].entered_at_utc));
+                  const latestRotation = await getLatestRotationDate(client, compId);
+                  if (latestRotation && isReadingPreRotation(rotGuardReading, latestRotation)) {
+                    syncDiag(`RH-APPLY UPDATE SKIP (pre-rotation): component=${compId} audit=${log.rowUuid} reading ${rotGuardReading.toISOString()} predates latest rotation ${latestRotation.toISOString()} — component baseline untouched`);
+                    continue;
+                  }
                   const rhUpdatedAt = auditRow.rows[0].entered_at_utc || new Date();
                   const oldRow = await client.query(
                     `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,

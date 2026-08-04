@@ -21,6 +21,19 @@ export async function updateRotationalItem(req: Request, res: Response) {
   res.json(item);
 }
 
+export async function replaceRotationalItem(req: Request, res: Response) {
+  const result = await service.replaceRotationalItem({
+    componentCuuid: String(req.body.componentCuuid || ''),
+    incomingRiuuid: req.body.incomingRiuuid ?? null,
+    newStamp: req.body.newStamp ?? null,
+    newStampInitialRh: req.body.newStampInitialRh ?? null,
+    notes: req.body.notes ?? null,
+    // Actor identity comes from the authenticated request context inside the service
+    // (currentUserUuid/getAuditActor) — never from the request body.
+  });
+  res.status(201).json(result);
+}
+
 export async function deleteRotationalItem(req: Request, res: Response) {
   await service.deleteRotationalItem(req.params.riuuid);
   res.json({ success: true });

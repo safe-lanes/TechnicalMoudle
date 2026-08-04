@@ -23,7 +23,8 @@
  */
 
 import * as syncRepo from './repository';
-import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows, SYNC_COLUMN_ALIASES, coerceArrayValue, evaluateInsertOriginGuard, evaluateStaleSkipGuard } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows, SYNC_COLUMN_ALIASES, coerceArrayValue, evaluateInsertOriginGuard, evaluateStaleSkipGuard, getLatestRotationDate, isReadingPreRotation } from './oneWayApplier';
+import { safeParseDate } from '../running-hours/utils/rhValidation';
 import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import {
   getTablesByCategory,
@@ -1265,11 +1266,20 @@ export class SyncEngine {
         valueToApply !== null) {
       try {
         const auditRow = await conn.query(
-          `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+          `SELECT component_id, date_updated_local, entered_at_utc FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
           [log.rowUuid]
         );
         if (auditRow.rows.length > 0) {
           const compId = auditRow.rows[0].component_id;
+          // Rotation ordering guard: a pre-swap RH reading applied AFTER the rotation
+          // must not clobber the post-swap baseline with the old stamp's hours.
+          const rotGuardReading = safeParseDate(auditRow.rows[0].date_updated_local)
+            || (auditRow.rows[0].entered_at_utc instanceof Date ? auditRow.rows[0].entered_at_utc : safeParseDate(auditRow.rows[0].entered_at_utc));
+          const latestRotation = await getLatestRotationDate(conn, compId);
+          if (latestRotation && isReadingPreRotation(rotGuardReading, latestRotation)) {
+            syncDiag(`RH-APPLY PULL SKIP (pre-rotation): component=${compId} audit=${log.rowUuid} reading ${rotGuardReading.toISOString()} predates latest rotation ${latestRotation.toISOString()} — component baseline untouched`);
+            return;
+          }
           const oldRow = await conn.query(
             `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
             [compId]
