@@ -165,7 +165,8 @@ export async function getTemplate(req: Request, res: Response) {
         'Installation Date', 'Commissioned Date', 'Rating',
         'Equipment / System Department', 'Class item', 'IS Active',
         'Vessel Code', 'IS Parent', 'Notes',
-        'RH Counter Type', 'RH Counter Source', 'Running Hours', 'Last Updated'
+        'RH Counter Type', 'RH Counter Source', 'Running Hours', 'Last Updated',
+        'Rotational Item (Yes/No)', 'Stamp'
       ];
 
       validValues = [
@@ -176,7 +177,8 @@ export async function getTemplate(req: Request, res: Response) {
         'DD-MMM-YYYY', 'DD-MMM-YYYY', 'Text (Capacity/specification)',
         'Engine/Deck/Electrical', 'Yes/No', 'Yes/No',
         'Text (e.g., V001)', 'Yes/No', 'Text (Additional notes)',
-        'MASTER/INHERITED/NOT_RH_DRIVEN', 'Text (RH source)', 'Number >= 0', 'Text (Timestamp)'
+        'MASTER/INHERITED/NOT_RH_DRIVEN', 'Text (RH source)', 'Number >= 0', 'Text (Timestamp)',
+        'Yes/No (defaults to No)', 'Text (Unique stamp — required when Rotational Item is Yes)'
       ];
 
       example = [];
@@ -323,8 +325,8 @@ export async function getTemplate(req: Request, res: Response) {
   // Create main sheet - Headers only, NO sample data row
   const mainSheet = XLSX.utils.aoa_to_sheet([headers]);
 
-  // Add data validation for components (28-column format)
-  // Columns: N=Criticality, O=Condition Based, T=Class item, U=IS Active, W=IS Parent, Y=RH Counter Type
+  // Add data validation for components (30-column format)
+  // Columns: N=Criticality, O=Condition Based, T=Class item, U=IS Active, W=IS Parent, Y=RH Counter Type, AC=Rotational Item
   if (type === 'components') {
     if (!mainSheet['!dataValidation']) {
       mainSheet['!dataValidation'] = [];
@@ -400,6 +402,18 @@ export async function getTemplate(req: Request, res: Response) {
       showErrorMessage: true,
       errorTitle: 'Invalid Value',
       error: 'Please select MASTER, INHERITED, or NOT_RH_DRIVEN'
+    });
+
+    // Column AC: Rotational Item (Yes/No) - row 2 onwards
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'AC2:AC1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
     });
   }
 
