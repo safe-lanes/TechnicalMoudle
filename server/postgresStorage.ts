@@ -1480,6 +1480,51 @@ export class PostgresStorage {
 
   // Update MASTER running hours with automatic cascade to INHERITED components
   // DELTA-BASED: Inherited components receive the change amount, not the absolute value
+  // RH follows the Stamp (Task #369): accrue the update's DELTA onto the component's
+  // currently Installed rotational item — never overwrite with the component's absolute
+  // total, because a stamp fitted mid-life carries its own service history (e.g. a stamp
+  // at 150 hrs + a 50-hr update must read 200, not the engine's 400). Field-logged
+  // (rotational_items is BOTH_EDITABLE — unlogged writes never sync ship↔shore).
+  private async accrueStampRhDelta(
+    tx: any,
+    vesselId: string | null,
+    currentStamp: string | null,
+    delta: number,
+    readingDateIso: string,
+    userId: string | null,
+  ): Promise<void> {
+    if (!vesselId || !currentStamp || !Number.isFinite(delta) || delta === 0) return;
+    const rows = await tx.select().from(rotationalItems).where(and(
+      eq(rotationalItems.vesselId, vesselId),
+      eq(rotationalItems.stamp, currentStamp),
+      eq(rotationalItems.status, 'Installed'),
+      eq(rotationalItems.isDeleted, false),
+    ));
+    const before = rows[0];
+    if (!before) return;
+    const newRh = Math.max(0, parseFloat(before.currentRh || '0') + delta);
+    const after = await tx.update(rotationalItems)
+      .set({ currentRh: newRh.toFixed(2), rhLastUpdated: readingDateIso, updatedAt: new Date() })
+      .where(eq(rotationalItems.riuuid, before.riuuid))
+      .returning();
+    if (after[0]) {
+      await logFieldChanges('rotational_items', before.riuuid, vesselId, before, after[0], userId, tx);
+    }
+  }
+
+  // Public wrapper for RH paths that live outside this class (e.g. the child-RH
+  // endpoints in the running-hours module).
+  async accrueInstalledStampRh(params: {
+    vesselId: string | null;
+    currentStamp: string | null;
+    delta: number;
+    readingDateIso: string;
+    userId: string | null;
+  }): Promise<void> {
+    const db = await getDb();
+    await this.accrueStampRhDelta(db, params.vesselId, params.currentStamp, params.delta, params.readingDateIso, params.userId);
+  }
+
   async updateMasterRunningHours(params: {
     componentId: string;
     newRHValue: number;
@@ -1571,35 +1616,9 @@ export class PostgresStorage {
       // Sync field logging — INSERT (best-effort)
       try { await logFieldChanges('running_hours_audit', rhaResult[0].rhauuid, masterVesselId, null, rhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha tx create:', e); }
 
-      // RH follows the Stamp (Rotational Items, Task #358): mirror the component's new RH
-      // onto its currently Installed rotational item so the stamp carries its own hours when
-      // it is later swapped out. Field-logged inside the tx so the registry stays in sync
-      // ship↔shore (rotational_items is BOTH_EDITABLE).
-      try {
-        const installedRows = component.currentStamp ? await tx.select().from(rotationalItems).where(and(
-          eq(rotationalItems.vesselId, masterVesselId),
-          eq(rotationalItems.stamp, component.currentStamp),
-          eq(rotationalItems.status, 'Installed'),
-          eq(rotationalItems.isDeleted, false),
-        )) : [];
-        if (installedRows[0]) {
-          const beforeItem = installedRows[0];
-          const afterRows = await tx.update(rotationalItems)
-            .set({
-              currentRh: params.newRHValue.toFixed(2),
-              rhLastUpdated: readingDate.toISOString(),
-              updatedAt: now,
-            })
-            .where(eq(rotationalItems.riuuid, beforeItem.riuuid))
-            .returning();
-          if (afterRows[0]) {
-            await logFieldChanges('rotational_items', beforeItem.riuuid, masterVesselId, beforeItem, afterRows[0], params.userId, tx);
-          }
-        }
-      } catch (e) {
-        console.error('[RotationalItems] stamp RH mirror failed:', e);
-        throw e; // inside tx: keep stamp RH and component RH atomic
-      }
+      // RH follows the Stamp: accrue the DELTA onto the master's Installed rotational item
+      // (delta-based — Task #369). Inside the tx: stamp RH and component RH stay atomic.
+      await this.accrueStampRhDelta(tx, masterVesselId, component.currentStamp, delta, readingDate.toISOString(), params.userId);
 
       // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
       // rhCurrentInheritedCached stores the master's absolute value (for display/config)
@@ -1651,23 +1670,9 @@ export class PostgresStorage {
         }).returning();
         try { await logFieldChanges('running_hours_audit', childRhaResult[0].rhauuid, inherited.vesselId || masterVesselId, null, childRhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha cascade create:', e); }
 
-        // RH follows the Stamp: mirror the child's new RH onto its Installed rotational item too
-        const childInstalled = inherited.currentStamp ? await tx.select().from(rotationalItems).where(and(
-          eq(rotationalItems.vesselId, inherited.vesselId || masterVesselId),
-          eq(rotationalItems.stamp, inherited.currentStamp),
-          eq(rotationalItems.status, 'Installed'),
-          eq(rotationalItems.isDeleted, false),
-        )) : [];
-        if (childInstalled[0]) {
-          const beforeChildItem = childInstalled[0];
-          const afterChildRows = await tx.update(rotationalItems)
-            .set({ currentRh: newChildRH.toFixed(2), rhLastUpdated: readingDate.toISOString(), updatedAt: now })
-            .where(eq(rotationalItems.riuuid, beforeChildItem.riuuid))
-            .returning();
-          if (afterChildRows[0]) {
-            await logFieldChanges('rotational_items', beforeChildItem.riuuid, inherited.vesselId || masterVesselId, beforeChildItem, afterChildRows[0], params.userId, tx);
-          }
-        }
+        // RH follows the Stamp: accrue the DELTA onto the child's Installed rotational item
+        // too (delta-based — Task #369; the child's cumulative is NOT the stamp's hours).
+        await this.accrueStampRhDelta(tx, inherited.vesselId || masterVesselId, inherited.currentStamp, delta, readingDate.toISOString(), params.userId);
 
         inheritedUpdated++;
       }
@@ -1700,14 +1705,26 @@ export class PostgresStorage {
 
     const rhValueStr = params.newRHValue.toString();
     let inheritedUpdated = 0;
+    // Reading date for the stamp accrual (WO completion date / provided date, else now)
+    const parsedReading = params.lastUpdatedDate ? new Date(params.lastUpdatedDate) : null;
+    const readingIso = parsedReading && !isNaN(parsedReading.getTime()) ? parsedReading.toISOString() : now.toISOString();
 
+    // Fetch inherited components list before the tx (read-only)
+    const inheritedComponentsPre = component.rhCounterType === 'MASTER' && component.vesselId
+      ? await this.getInheritedComponents(component.cuuid, component.vesselId)
+      : [];
+
+    // All writes in ONE transaction (Task #369): component RH, inherited cascade and
+    // stamp accruals are all-or-nothing — a mid-sequence failure must not leave the
+    // component, its children and the rotational registry out of sync.
+    return db.transaction(async (tx) => {
     if (component.rhCounterType === 'MASTER') {
       // Calculate delta: difference between new and old master RH value
       const previousMasterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
       const delta = params.newRHValue - previousMasterRH;
 
       // For MASTER components: update rhCurrentMaster AND currentCumulativeRH, then cascade
-      const result = await db.update(components)
+      const result = await tx.update(components)
         .set({
           rhCurrentMaster: rhValueStr,
           currentCumulativeRH: rhValueStr,
@@ -1724,6 +1741,9 @@ export class PostgresStorage {
         throw new Error(`Failed to update MASTER component ${params.componentId}`);
       }
 
+      // RH follows the Stamp: accrue the DELTA onto the master's Installed rotational item (Task #369)
+      await this.accrueStampRhDelta(tx, component.vesselId, component.currentStamp, delta, readingIso, params.userId);
+
       // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
       const masterVesselId = component.vesselId;
 
@@ -1733,17 +1753,14 @@ export class PostgresStorage {
         return { component: result[0], inheritedUpdated: 0 };
       }
 
-      // Get all inherited components linked to this master
-      const inheritedComponents = await this.getInheritedComponents(component.cuuid, masterVesselId);
-      
       // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
       // rhCurrentInheritedCached stores the master's absolute value (for display/config)
       // currentCumulativeRH tracks the child's individual running hours (delta-based)
-      for (const inherited of inheritedComponents) {
+      for (const inherited of inheritedComponentsPre) {
         const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
         const newChildRH = Math.max(0, currentChildRH + delta); // Apply delta, ensure non-negative
         
-        await db.update(components)
+        await tx.update(components)
           .set({
             rhCurrentInheritedCached: params.newRHValue.toString(), // Cache master's absolute value
             currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
@@ -1752,7 +1769,10 @@ export class PostgresStorage {
             updatedAt: now,
           })
           .where(eq(components.cuuid, inherited.cuuid));
-        
+
+        // RH follows the Stamp: accrue the DELTA onto the child's Installed item too (Task #369)
+        await this.accrueStampRhDelta(tx, inherited.vesselId || component.vesselId, inherited.currentStamp, delta, readingIso, params.userId);
+
         inheritedUpdated++;
       }
 
@@ -1762,7 +1782,7 @@ export class PostgresStorage {
       // For INHERITED components: only update currentCumulativeRH (child's actual hours)
       // Do NOT update rhCurrentInheritedCached as it stores the master's value
       // This is typically used for component replacement scenarios (reset to 0) or manual adjustments
-      const result = await db.update(components)
+      const result = await tx.update(components)
         .set({
           currentCumulativeRH: rhValueStr,
           rhInheritedUpdatedAt: now,
@@ -1775,11 +1795,14 @@ export class PostgresStorage {
       if (!result[0]) {
         throw new Error(`Failed to update INHERITED component ${params.componentId}`);
       }
+      // RH follows the Stamp: accrue the DELTA of the child's own cumulative hours (Task #369)
+      const inheritedDelta = params.newRHValue - parseFloat(component.currentCumulativeRH || '0');
+      await this.accrueStampRhDelta(tx, component.vesselId, component.currentStamp, inheritedDelta, readingIso, params.userId);
       return { component: result[0], inheritedUpdated: 0 };
 
     } else {
       // For NOT_RH_DRIVEN or unknown: just update currentCumulativeRH for backward compatibility
-      const result = await db.update(components)
+      const result = await tx.update(components)
         .set({
           currentCumulativeRH: rhValueStr,
           lastUpdated: lastUpdatedValue,
@@ -1791,8 +1814,12 @@ export class PostgresStorage {
       if (!result[0]) {
         throw new Error(`Failed to update component ${params.componentId}`);
       }
+      // RH follows the Stamp: accrue the DELTA onto the Installed item (Task #369)
+      const fallbackDelta = params.newRHValue - parseFloat(component.currentCumulativeRH || '0');
+      await this.accrueStampRhDelta(tx, component.vesselId, component.currentStamp, fallbackDelta, readingIso, params.userId);
       return { component: result[0], inheritedUpdated: 0 };
     }
+    });
   }
 
   // ============= MODULE 3: COMPONENT DOCUMENTS =============
@@ -7770,6 +7797,13 @@ export class PostgresStorage {
         // Sync field logging — parent audit INSERT
         try { await logFieldChanges('running_hours_audit', parentAuditResult[0].rhauuid, parentAuditResult[0].vesselId || null, null, parentAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade parent:', e); }
 
+        // RH follows the Stamp: accrue the DELTA onto the parent's Installed rotational item
+        // (Task #369). Skipped on meter replacement / renewal reset — those are baseline
+        // resets, not hours actually run by the stamp.
+        if (!meterReplaced && !isRenewalReset) {
+          await this.accrueStampRhDelta(tx, parentResult[0].vesselId, parentResult[0].currentStamp, newRH - currentRH, readingDate.toISOString(), userId || null);
+        }
+
         updatedComponents++;
         auditsCreated++;
 
@@ -7810,6 +7844,11 @@ export class PostgresStorage {
           }).returning();
           // Sync field logging — inherited audit INSERT
           try { await logFieldChanges('running_hours_audit', inheritedAuditResult[0].rhauuid, inherited.vesselId || null, null, inheritedAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade inherited:', e); }
+
+          // RH follows the Stamp: accrue the DELTA onto the inherited child's Installed item (Task #369)
+          if (!meterReplaced && !isRenewalReset) {
+            await this.accrueStampRhDelta(tx, inherited.vesselId || parentResult[0]?.vesselId || null, inherited.currentStamp, inheritedDelta, readingDate.toISOString(), userId || null);
+          }
 
           updatedComponents++;
           auditsCreated++;
@@ -7871,6 +7910,11 @@ export class PostgresStorage {
         }).returning();
         // Sync field logging — structural child audit INSERT
         try { await logFieldChanges('running_hours_audit', childAuditResult[0].rhauuid, child.vesselId || null, null, childAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade child:', e); }
+
+        // RH follows the Stamp: accrue the DELTA onto the structural child's Installed item (Task #369)
+        if (!meterReplaced && !isRenewalReset) {
+          await this.accrueStampRhDelta(tx, child.vesselId, child.currentStamp, structuralDelta, readingDate.toISOString(), userId || null);
+        }
 
         updatedComponents++;
         auditsCreated++;

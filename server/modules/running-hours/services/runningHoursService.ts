@@ -402,6 +402,19 @@ export async function updateChildRH(componentId: string, body: {
     lastUpdated: dateUpdated || new Date().toISOString()
   });
 
+  // RH follows the Stamp (Task #369): accrue the DELTA onto the Installed rotational item
+  const stampReadingIso = (() => {
+    const d = dateUpdated ? new Date(dateUpdated) : new Date();
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  })();
+  await repo.accrueInstalledStampRh({
+    vesselId: component.vesselId || null,
+    currentStamp: component.currentStamp || null,
+    delta: newRHValue - currentRHValue,
+    readingDateIso: stampReadingIso,
+    userId: userId || null,
+  });
+
   // dateUpdatedLocal must also use the user's entered date so the audit-based
   // MAX in listParents reads the correct reading date, not the server save time.
   const auditDateLocal = dateUpdated
@@ -455,6 +468,10 @@ export async function resetChildRH(componentId: string, body: {
   }
 
   const previousRH = component.currentCumulativeRH || '0.00';
+
+  // NOTE (Task #369): NO stamp accrual here by design — this is a baseline reset
+  // (component replaced / meter reset), not hours the installed stamp actually ran.
+  // The stamp keeps its own accrued service history.
 
   // Update component RH to 0
   await repo.updateComponent(componentId, {

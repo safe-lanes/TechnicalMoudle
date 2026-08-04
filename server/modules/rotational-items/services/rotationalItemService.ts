@@ -115,6 +115,14 @@ export async function updateRotationalItem(
   const oldRow = await repo.getByRiuuid(riuuid);
   if (!oldRow) throw new NotFoundError('Rotational item not found');
   if (data.status !== undefined) validateStatus(data.status);
+  if (data.rhLastUpdated !== undefined && data.rhLastUpdated !== null) {
+    // Guard against truncated/garbage date strings (e.g. "25 Jan 202") ever being stored
+    const parsed = new Date(String(data.rhLastUpdated));
+    if (isNaN(parsed.getTime())) {
+      throw new RotationalItemValidationError('RH Last Updated is not a valid date');
+    }
+    data.rhLastUpdated = parsed.toISOString();
+  }
   if (data.stamp !== undefined) {
     // Stamp rename (typo correction) — must stay unique on the vessel
     const newStamp = normalizeStamp(data.stamp);
@@ -148,20 +156,23 @@ export async function getInstalledForComponent(componentCuuid: string): Promise<
 
 /**
  * Detach the item from its component (component unmarked as rotational, or item removed):
- * snapshot the component's RH onto the stamp and mark it Spare. The live link is derived
- * from components.current_stamp, which the caller clears/changes on the component row.
+ * mark it Spare. The stamp's own hours are authoritative (delta-accrued on every RH
+ * update — Task #369), so release must NOT overwrite them with the component's total.
+ * The live link is derived from components.current_stamp, which the caller
+ * clears/changes on the component row.
  */
 export async function detachFromComponent(
   riuuid: string,
-  rhSnapshot: { currentRh: string | number | null; rhLastUpdated: string | null },
+  _rhSnapshot?: { currentRh: string | number | null; rhLastUpdated: string | null },
 ): Promise<RotationalItem | undefined> {
   // Guarded: only releases if still Installed (no-op if already released elsewhere).
   const oldRow = await repo.getByRiuuid(riuuid);
   if (!oldRow) return undefined;
   const userUuid = currentUserUuid();
+  // Keep the stamp's own accrued hours — status change only.
   const released = await repo.releaseStamp(riuuid, {
-    currentRh: rhSnapshot.currentRh != null ? String(rhSnapshot.currentRh) : null,
-    rhLastUpdated: rhSnapshot.rhLastUpdated ?? null,
+    currentRh: null,
+    rhLastUpdated: null,
   }, userUuid);
   if (released) {
     // BOTH_EDITABLE sync contract: every write must be field-logged or it never syncs.
@@ -303,19 +314,17 @@ export async function replaceRotationalItem(params: {
       : [];
     const outgoing = outgoingRows[0];
 
-    // Outgoing snapshot: the component's CURRENT (locked) cumulative RH is the outgoing
-    // stamp's final reading.
-    const outgoingRh = component.currentCumulativeRH != null ? String(component.currentCumulativeRH) : '0';
-    const outgoingRhDate = component.lastUpdated || now.toISOString();
+    // Outgoing snapshot: the stamp's OWN accrued hours are authoritative (delta-accrued
+    // on every RH update — Task #369). Never overwrite with the component's cumulative
+    // total: a stamp fitted mid-life carries its individual service history.
+    const outgoingRh = outgoing?.currentRh != null ? String(outgoing.currentRh) : '0';
 
-    // 1) Outgoing → Spare with RH snapshot (guarded: only if still Installed here)
+    // 1) Outgoing → Spare, keeping its own hours (guarded: only if still Installed here)
     let outgoingAfter: RotationalItem | null = null;
     if (outgoing) {
       const rows = await tx.update(rotationalItems)
         .set({
           status: 'Spare',
-          currentRh: outgoingRh,
-          rhLastUpdated: outgoingRhDate,
           updatedByUuid: userUuid,
           updatedAt: now,
         })

@@ -83,6 +83,19 @@ export default function RotationItemMasterList({ onBack }: { onBack?: () => void
   const [formStatus, setFormStatus] = useState("Spare");
   const [formRh, setFormRh] = useState("0");
   const [formRhDate, setFormRhDate] = useState("");
+  // Snapshot of the derived date-input value at dialog open; rhLastUpdated is only sent
+  // back if the user actually changed the date (prevents corrupting the stored value).
+  const [initialRhDate, setInitialRhDate] = useState("");
+  const [initialRh, setInitialRh] = useState("");
+
+  // Stored rhLastUpdated may be ISO or a display string like "25 Jan 2020 05:30" —
+  // parse defensively to yyyy-mm-dd for the date input (never blind .slice(0, 10)).
+  const toDateInput = (value: string | null): string => {
+    if (!value) return "";
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+  };
 
   const listUrl = `/technical/api/rotational-items?vesselId=${encodeURIComponent(selectedVesselId)}&withHolder=true`;
 
@@ -147,8 +160,9 @@ export default function RotationItemMasterList({ onBack }: { onBack?: () => void
       if (editingItem.status !== "Installed") {
         body.stamp = formStamp.trim();
         body.status = formStatus;
-        if (formRh !== "") body.currentRh = String(parseFloat(formRh));
-        if (formRhDate) body.rhLastUpdated = formRhDate;
+        if (formRh !== "" && formRh !== initialRh) body.currentRh = String(parseFloat(formRh));
+        // Only send the date if the user changed it — otherwise leave the stored value intact
+        if (formRhDate && formRhDate !== initialRhDate) body.rhLastUpdated = formRhDate;
       }
       return apiRequest("PUT", `/technical/api/rotational-items/${editingItem.riuuid}`, body);
     },
@@ -186,8 +200,12 @@ export default function RotationItemMasterList({ onBack }: { onBack?: () => void
     setFormStamp(item.stamp);
     setFormStampName(item.stampName || "");
     setFormStatus(item.status === "Installed" ? "Installed" : item.status);
-    setFormRh(item.currentRh != null ? String(parseFloat(item.currentRh)) : "0");
-    setFormRhDate(item.rhLastUpdated ? item.rhLastUpdated.slice(0, 10) : "");
+    const rhValue = item.currentRh != null ? String(parseFloat(item.currentRh)) : "0";
+    const dateValue = toDateInput(item.rhLastUpdated);
+    setFormRh(rhValue);
+    setFormRhDate(dateValue);
+    setInitialRh(rhValue);
+    setInitialRhDate(dateValue);
     setEditingItem(item);
   };
 

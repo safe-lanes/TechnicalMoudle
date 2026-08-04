@@ -317,6 +317,14 @@ export interface IStorage {
   }): Promise<Component>;
   
   // Update MASTER running hours with automatic cascade to INHERITED components
+  accrueInstalledStampRh(params: {
+    vesselId: string | null;
+    currentStamp: string | null;
+    delta: number;
+    readingDateIso: string;
+    userId: string | null;
+  }): Promise<void>;
+
   updateMasterRunningHours(params: {
     componentId: string;
     newRHValue: number;

@@ -14,6 +14,18 @@ export async function getComponent(id: string): Promise<Component | undefined> {
   return storage.getComponent(id);
 }
 
+// RH follows the Stamp (Task #369): accrue a running-hours DELTA onto the component's
+// currently Installed rotational item (field-logged; delta-based, never absolute).
+export async function accrueInstalledStampRh(params: {
+  vesselId: string | null;
+  currentStamp: string | null;
+  delta: number;
+  readingDateIso: string;
+  userId: string | null;
+}): Promise<void> {
+  return storage.accrueInstalledStampRh(params);
+}
+
 export async function updateComponent(id: string, data: Partial<Component>): Promise<Component> {
   return storage.updateComponent(id, data);
 }
