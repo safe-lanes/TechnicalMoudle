@@ -79,6 +79,18 @@ export async function markPushed(id: number, remoteId?: string | null): Promise<
   );
 }
 
+/** 'pushed' but with a preserved warning in last_error (e.g. category NAME-MISMATCH). */
+export async function markPushedWithWarning(id: number, remoteId: string | null, warning: string): Promise<void> {
+  const p = await pool();
+  await p.query(
+    `UPDATE shipskart_catalogue_links
+        SET push_status='pushed', last_error=$3, pushed_at=now(), updated_at=now(),
+            remote_id = COALESCE($2, remote_id)
+      WHERE id=$1`,
+    [id, remoteId, String(warning).slice(0, 500)],
+  );
+}
+
 export async function markFailed(id: number, error: string): Promise<void> {
   const p = await pool();
   await p.query(
@@ -101,6 +113,21 @@ export async function getStatusMap(
     [entityType, vesselId, localKeys],
   );
   return new Map(r.rows.map((row: any) => [row.local_key, rowToLink(row)]));
+}
+
+/**
+ * SKU COLLISION GUARD (mapper contract): is this skuCode already pushed/attempted under
+ * a DIFFERENT vessel? Complete locally — we are the tenant catalogue's only writer.
+ */
+export async function findSkuCodeOtherVessel(skuCode: string, vesselId: string): Promise<CatalogueLink | null> {
+  const p = await pool();
+  const r = await p.query(
+    `SELECT * FROM shipskart_catalogue_links
+      WHERE entity_type='sku' AND remote_code=$1 AND vessel_id IS DISTINCT FROM $2
+      LIMIT 1`,
+    [skuCode, vesselId],
+  );
+  return r.rows.length ? rowToLink(r.rows[0]) : null;
 }
 
 /** Per-vessel/per-entity counts for the status console. */

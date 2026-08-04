@@ -52,6 +52,15 @@ export function getReferenceIds(): CatalogueRefIds {
   };
 }
 
+/**
+ * Their productCode/skuCode charset: uppercase letters, numbers, hyphens, underscores
+ * (rejected live: "Product code can only contain uppercase letters, numbers, hyphens,
+ * and underscores" — our dotted SFI codes violated it; category codes are NOT
+ * restricted, proven by 38 dotted categories accepted). Dots and other chars → '-'.
+ */
+export const sanitizeCode = (s: string) => String(s || '').toUpperCase().trim()
+  .replace(/[^A-Z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
 const slugify = (s: string) => String(s || '').toLowerCase().trim()
   .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 
@@ -120,7 +129,7 @@ export function buildProductMasterPayload(opts: {
   const c = opts.component;
   return {
     data: {
-      productCode: `${opts.vesselCode}-${c.componentCode}`, // COLLISION SAFETY: see header
+      productCode: sanitizeCode(`${opts.vesselCode}-${c.componentCode}`), // COLLISION SAFETY: see header; charset per their validation
       name: c.name,
       categoryId: opts.categoryId,
       categoryName: opts.categoryName,
@@ -151,7 +160,7 @@ function buildSkuPayload(src: SkuSource, product: { productId: string; productNa
     data: {
       categoryId: category.categoryId, categoryName: category.categoryName,
       productId: product.productId, productName: product.productName,
-      skuCode: src.skuCode,                 // COLLISION SAFETY: pusher ledger-guards cross-vessel reuse
+      skuCode: sanitizeCode(src.skuCode),   // COLLISION SAFETY: pusher ledger-guards cross-vessel reuse; charset per their validation
       skuName: src.skuName,
       skuDescription: src.description || src.skuName,
       status: 1,
