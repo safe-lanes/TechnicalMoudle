@@ -29,6 +29,24 @@ import * as map from './shipskartCatalogueMapper';
 
 const PACE_MS = 500;
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/**
+ * 429 backoff (learned live, Stage E: their limiter cut in after ~1,150 calls and the
+ * remaining 552 items burned straight into failures). On RATE_LIMITED: wait and retry
+ * the same call up to 3 times (30s / 60s / 120s). Retries exhausted → the caller's
+ * normal failure path takes over (ledger 'failed', next run retries).
+ */
+async function requestWithBackoff(method: 'GET' | 'POST', path: string, opts?: { body?: unknown }) {
+  const waits = [30_000, 60_000, 120_000];
+  let r = await authorizedB2bRequest(method, path, opts);
+  for (const w of waits) {
+    if (r.status !== 429) return r;
+    console.warn(`[CataloguePush] 429 rate-limited on ${path} — backing off ${w / 1000}s`);
+    await sleep(w);
+    r = await authorizedB2bRequest(method, path, opts);
+  }
+  return r;
+}
 const inFlight = new Set<string>();
 
 export interface PhaseCounts { pushed: number; skipped: number; failed: number; }
@@ -48,7 +66,7 @@ const isDuplicateAnswer = (status: number, body: any) =>
 async function fetchAllPaged(path: string): Promise<any[]> {
   const all: any[] = [];
   for (let page = 1; ; page++) {
-    const r = await authorizedB2bRequest('GET', `${path}?pageNumber=${page}&pageSize=100`);
+    const r = await requestWithBackoff('GET', `${path}?pageNumber=${page}&pageSize=100`);
     if (!r.ok || !Array.isArray(r.json?.items)) break;
     all.push(...r.json.items);
     if (page >= Number(r.json.totalPages ?? 1)) break;
@@ -157,7 +175,7 @@ export async function pushVesselCatalogue(
         }
         res.categories.skipped++; continue;
       }
-      const r = await authorizedB2bRequest('POST', '/integration/SAIL/create-category',
+      const r = await requestWithBackoff('POST', '/integration/SAIL/create-category',
         { body: map.buildCategoryPayload({ name: cat.name, categoryCode: cat.code, level: cat.level, hasChildren: cat.hasChildren }) });
       await sleep(PACE_MS);
       if (r.ok) { await links.markPushed(l.id, r.json?.id ?? null); res.categories.pushed++; }
@@ -173,7 +191,7 @@ export async function pushVesselCatalogue(
       if (l.pushStatus === 'pushed') { res.mappings.skipped++; continue; }
       const child = remoteCats.get(cat.code), parent = remoteCats.get(cat.parent!);
       if (!child || !parent) { await links.markFailed(l.id, 'category id unresolved'); res.mappings.failed++; continue; }
-      const r = await authorizedB2bRequest('POST', '/integration/SAIL/category-mapping', {
+      const r = await requestWithBackoff('POST', '/integration/SAIL/category-mapping', {
         body: map.buildCategoryMappingPayload({
           categoryId: child.id, categoryName: child.name, parentCategoryId: parent.id, parentCategoryName: parent.name,
         }),
@@ -223,7 +241,7 @@ export async function pushVesselCatalogue(
         productByLocal.set(spec.localKey, { productId: remote.id, productName: remote.name, productCode: spec.code, categoryId: remote.categoryId ?? spec.payload.data.categoryId, categoryName: remote.categoryName ?? spec.payload.data.categoryName });
         res.products.skipped++; continue;
       }
-      const r = await authorizedB2bRequest('POST', '/integration/SAIL/create-product-masters', { body: spec.payload });
+      const r = await requestWithBackoff('POST', '/integration/SAIL/create-product-masters', { body: spec.payload });
       await sleep(PACE_MS);
       if (r.ok || isDuplicateAnswer(r.status, r.json)) { await links.markPushed(l.id, r.json?.id ?? null); res.products.pushed++; }
       else { await links.markFailed(l.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`); res.products.failed++; res.errors.push(`product ${spec.code}: ${r.status}`); }
@@ -263,7 +281,19 @@ export async function pushVesselCatalogue(
     // SKU. Same-vessel collisions fail loudly here; cross-vessel ones fail via the ledger.
     const sanitizedSeen = new Map<string, string>();
 
+    // QUOTA-EXHAUSTION ABORT (learned live, Stage E retry): when the limiter is a hard
+    // window (not a burst), every item burns ~3.5 min of backoff and still 429s — a
+    // 324-item remainder would grind for a day. After 5 consecutive items that exhaust
+    // their backoff on 429, STOP the run; the ledger keeps them retryable and a later
+    // run (after the window resets) picks up exactly where this one stopped.
+    let consecutive429 = 0;
+
     for (const job of skuJobs) {
+      if (consecutive429 >= 5) {
+        res.errors.push('run aborted: rate-limit quota exhausted (5 consecutive 429s after full backoff) — re-run after the window resets');
+        console.warn('[CataloguePush] quota exhausted — aborting run; ledger keeps the remainder retryable');
+        break;
+      }
       const pr = productByLocal.get(job.productKey);
       if (!pr) { res.skus.failed++; res.errors.push(`sku ${job.skuCode}: product unresolved`); continue; }
 
@@ -284,10 +314,15 @@ export async function pushVesselCatalogue(
           res.skus.failed++; res.errors.push(`sku ${job.skuCode}: cross-vessel collision`);
           continue;
         }
-        const r = await authorizedB2bRequest('POST', '/integration/SAIL/create-spare-part', { body: job.buildSku() });
+        const r = await requestWithBackoff('POST', '/integration/SAIL/create-spare-part', { body: job.buildSku() });
         await sleep(PACE_MS);
-        if (r.ok || isDuplicateAnswer(r.status, r.json)) { await links.markPushed(sl.id, r.json?.id ?? null); res.skus.pushed++; }
-        else { await links.markFailed(sl.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`); res.skus.failed++; res.errors.push(`sku ${job.skuCode}: ${r.status}`); continue; }
+        if (r.ok || isDuplicateAnswer(r.status, r.json)) { await links.markPushed(sl.id, r.json?.id ?? null); res.skus.pushed++; consecutive429 = 0; }
+        else {
+          await links.markFailed(sl.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
+          res.skus.failed++; res.errors.push(`sku ${job.skuCode}: ${r.status}`);
+          if (r.status === 429) consecutive429++; else consecutive429 = 0;
+          continue;
+        }
       } else res.skus.skipped++;
 
       // catalogue-add phase
@@ -299,7 +334,7 @@ export async function pushVesselCatalogue(
         smc, vessel: { vesselId: link.shipskart_vessel_id, vesselName: v.name },
         make: job.make ?? null, model: job.model ?? null,
       });
-      const r2 = await authorizedB2bRequest('POST', '/integration/SAIL/add-spare-part-in-company-catalogue', { body: addBody });
+      const r2 = await requestWithBackoff('POST', '/integration/SAIL/add-spare-part-in-company-catalogue', { body: addBody });
       await sleep(PACE_MS);
       if (r2.ok || isDuplicateAnswer(r2.status, r2.json)) { await links.markPushed(cl.id); res.catalogue.pushed++; }
       else { await links.markFailed(cl.id, `${r2.status} ${JSON.stringify(r2.json ?? r2.text)}`); res.catalogue.failed++; res.errors.push(`catalogue ${job.skuCode}: ${r2.status}`); }
