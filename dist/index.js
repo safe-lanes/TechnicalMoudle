@@ -18649,6 +18649,368 @@ var init_buildInfo = __esm({
   }
 });
 
+// server/modules/work-orders/repositories/workOrderReconcileRepository.ts
+var workOrderReconcileRepository_exports = {};
+__export(workOrderReconcileRepository_exports, {
+  archiveSummary: () => archiveSummary,
+  countChildRows: () => countChildRows,
+  countDuplicateGroups: () => countDuplicateGroups,
+  findDuplicateGroups: () => findDuplicateGroups,
+  getInsertOriginInstanceId: () => getInsertOriginInstanceId,
+  getProvisionedVesselIds: () => getProvisionedVesselIds,
+  getShipInstanceIds: () => getShipInstanceIds,
+  hasDocuments: () => hasDocuments,
+  insertArchiveRow: () => insertArchiveRow,
+  repointChildren: () => repointChildren,
+  softDeleteWorkOrder: () => softDeleteWorkOrder
+});
+import { randomUUID } from "crypto";
+async function pool2() {
+  const p = await getPool();
+  if (!p) throw Object.assign(new Error("Database not initialized"), { statusCode: 503 });
+  return p;
+}
+async function findDuplicateGroups(vesselId, cap) {
+  const p = await pool2();
+  const groups = await p.query(
+    `SELECT work_order_no
+       FROM work_orders
+      WHERE vessel_id = $1 AND data_scope = 'vessel' AND is_deleted = false
+      GROUP BY work_order_no
+     HAVING count(*) > 1
+      ORDER BY work_order_no
+      LIMIT $2`,
+    [vesselId, cap]
+  );
+  const out = [];
+  for (const g of groups.rows) {
+    const rows = await p.query(
+      `SELECT * FROM work_orders
+        WHERE vessel_id = $1 AND work_order_no = $2 AND data_scope = 'vessel' AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [vesselId, g.work_order_no]
+    );
+    out.push({ vesselId, workOrderNo: g.work_order_no, rows: rows.rows });
+  }
+  return out;
+}
+async function countDuplicateGroups(vesselId) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT count(*)::int AS n FROM (
+       SELECT 1 FROM work_orders
+        WHERE vessel_id = $1 AND data_scope = 'vessel' AND is_deleted = false
+        GROUP BY work_order_no HAVING count(*) > 1) t`,
+    [vesselId]
+  );
+  return r.rows[0]?.n ?? 0;
+}
+async function getInsertOriginInstanceId(wouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT instance_id
+       FROM sync_field_log
+      WHERE table_name = 'work_orders' AND row_uuid = $1
+        AND old_value IS NULL AND is_deleted = false
+      ORDER BY changed_at ASC
+      LIMIT 1`,
+    [wouuid]
+  );
+  return r.rows[0]?.instance_id ?? null;
+}
+async function getShipInstanceIds(vesselId) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT instance_id FROM sync_metadata WHERE vessel_id = $1 AND is_deleted = false`,
+    [vesselId]
+  );
+  return new Set(r.rows.map((x) => x.instance_id));
+}
+async function hasDocuments(wouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT 1 FROM work_order_documents WHERE work_order_id = $1 AND is_deleted = false LIMIT 1`,
+    [wouuid]
+  );
+  return r.rows.length > 0;
+}
+async function repointChildren(table, fkColumn, idColumn, loserWouuid, survivorWouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `UPDATE "${table}" SET "${fkColumn}" = $1, updated_at = now()
+      WHERE "${fkColumn}" = $2 AND is_deleted = false
+      RETURNING "${idColumn}" AS log_id`,
+    [survivorWouuid, loserWouuid]
+  );
+  return r.rows.map((x) => String(x.log_id));
+}
+async function countChildRows(table, fkColumn, loserWouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT count(*)::int AS n FROM "${table}" WHERE "${fkColumn}" = $1 AND is_deleted = false`,
+    [loserWouuid]
+  );
+  return r.rows[0]?.n ?? 0;
+}
+async function softDeleteWorkOrder(wouuid) {
+  const p = await pool2();
+  await p.query(`UPDATE work_orders SET is_deleted = true, updated_at = now() WHERE wouuid = $1`, [wouuid]);
+}
+async function insertArchiveRow(row) {
+  const p = await pool2();
+  const r = await p.query(
+    `INSERT INTO work_order_reconcile_archive
+       (archive_uuid, vessel_id, work_order_no, loser_wouuid, survivor_wouuid,
+        resolution_case, loser_row_snapshot, child_moves, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (loser_wouuid) DO NOTHING`,
+    [
+      randomUUID(),
+      row.vesselId,
+      row.workOrderNo,
+      row.loserWouuid,
+      row.survivorWouuid,
+      row.resolutionCase,
+      JSON.stringify(row.loserRowSnapshot),
+      JSON.stringify(row.childMoves),
+      row.notes
+    ]
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+async function archiveSummary() {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT a.vessel_id, v.name AS vessel_name, a.resolution_case, count(*)::int AS resolved,
+            max(a.reconciled_at) AS last_reconciled_at
+       FROM work_order_reconcile_archive a
+       LEFT JOIN vessels v ON v.vuuid = a.vessel_id
+      GROUP BY a.vessel_id, v.name, a.resolution_case
+      ORDER BY v.name, a.resolution_case`
+  );
+  return r.rows;
+}
+async function getProvisionedVesselIds() {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT DISTINCT v.vuuid
+       FROM vessels v
+       JOIN sync_metadata sm ON sm.vessel_id = v.vuuid AND sm.is_deleted = false
+      WHERE v.is_deleted = false`
+  );
+  return r.rows.map((x) => x.vuuid);
+}
+var init_workOrderReconcileRepository = __esm({
+  "server/modules/work-orders/repositories/workOrderReconcileRepository.ts"() {
+    "use strict";
+    init_db();
+  }
+});
+
+// server/modules/work-orders/services/workOrderReconcilerService.ts
+var workOrderReconcilerService_exports = {};
+__export(workOrderReconcilerService_exports, {
+  MAX_GROUPS_PER_VESSEL_PER_RUN: () => MAX_GROUPS_PER_VESSEL_PER_RUN,
+  getLastRunSummary: () => getLastRunSummary,
+  reconcileAllProvisionedVessels: () => reconcileAllProvisionedVessels,
+  reconcileVessel: () => reconcileVessel
+});
+function getLastRunSummary() {
+  return lastRun;
+}
+function isNonEmpty(v) {
+  if (v === null || v === void 0) return false;
+  const s = String(v).trim();
+  return s !== "" && s !== "[]" && s !== "{}" && s.toLowerCase() !== "null";
+}
+async function isTouched(row) {
+  if (isNonEmpty(row.approver) || isNonEmpty(row.submitted_date) || isNonEmpty(row.date_completed) || isNonEmpty(row.work_carried_out) || isNonEmpty(row.performed_by) || isNonEmpty(row.manhours)) {
+    return true;
+  }
+  const consumed = row.consumed_spare_parts;
+  if (Array.isArray(consumed) ? consumed.length > 0 : isNonEmpty(consumed)) return true;
+  if (WORKFLOW_STATUSES.has(String(row.status || "").toLowerCase().trim())) return true;
+  return await hasDocuments(row.wouuid);
+}
+async function resolveGroup(group, shipInstanceIds) {
+  const flags = await Promise.all(group.rows.map(isTouched));
+  const touched = group.rows.filter((_, i) => flags[i]);
+  let survivor;
+  let resolutionCase;
+  let caseNote = "";
+  if (touched.length === 1) {
+    resolutionCase = 1;
+    survivor = touched[0];
+  } else {
+    resolutionCase = touched.length === 0 ? 2 : 3;
+    const pool3 = touched.length >= 2 ? touched : group.rows;
+    const origins = await Promise.all(pool3.map((r) => getInsertOriginInstanceId(r.wouuid)));
+    const shipRows = pool3.filter((_, i) => origins[i] !== null && shipInstanceIds.has(origins[i]));
+    if (shipRows.length > 0) {
+      survivor = shipRows[0];
+    } else {
+      survivor = pool3[0];
+      caseNote = "origin-logs-absent: fell back to earliest created_at";
+    }
+  }
+  for (const loser of group.rows) {
+    if (loser.wouuid === survivor.wouuid) continue;
+    const childMoves = {};
+    for (const spec of REPOINT_TABLES) {
+      const movedIds = await repointChildren(spec.table, spec.fkColumn, spec.idColumn, loser.wouuid, survivor.wouuid);
+      if (movedIds.length === 0) continue;
+      childMoves[spec.table] = { moved: movedIds.length };
+      if (spec.synced) {
+        for (const logId of movedIds) {
+          await logFieldChanges(
+            spec.table,
+            logId,
+            group.vesselId,
+            { [spec.fkColumn]: loser.wouuid },
+            { [spec.fkColumn]: survivor.wouuid },
+            RECONCILE_ACTOR
+          );
+        }
+      }
+    }
+    let leftInPlaceTotal = 0;
+    for (const spec of LEFT_IN_PLACE_TABLES) {
+      const n = await countChildRows(spec.table, spec.fkColumn, loser.wouuid);
+      if (n > 0) {
+        childMoves[spec.table] = { left_in_place: n, reason: spec.reason };
+        leftInPlaceTotal += n;
+      }
+    }
+    await insertArchiveRow({
+      vesselId: group.vesselId,
+      workOrderNo: group.workOrderNo,
+      loserWouuid: loser.wouuid,
+      survivorWouuid: survivor.wouuid,
+      resolutionCase,
+      loserRowSnapshot: loser,
+      childMoves,
+      notes: caseNote || null
+    });
+    await softDeleteWorkOrder(loser.wouuid);
+    await logFieldChanges(
+      "work_orders",
+      loser.wouuid,
+      group.vesselId,
+      { is_deleted: false },
+      { is_deleted: true },
+      RECONCILE_ACTOR
+    );
+    const line = `[WO-Reconciler] case ${resolutionCase}: ${group.workOrderNo} \u2014 loser ${loser.wouuid.slice(0, 8)} archived+retired, survivor ${survivor.wouuid.slice(0, 8)}, children moved: ${Object.keys(childMoves).filter((k) => !childMoves[k].left_in_place).join(", ") || "none"}` + (leftInPlaceTotal > 0 ? `, left-in-place: ${leftInPlaceTotal}` : "") + (caseNote ? ` (${caseNote})` : "");
+    console.log(line);
+    syncDiag(`WO-RECONCILE case=${resolutionCase} vessel=${group.vesselId} no=${group.workOrderNo} loser=${loser.wouuid} survivor=${survivor.wouuid}${caseNote ? ` note=${caseNote}` : ""}`);
+  }
+  return { resolutionCase };
+}
+async function reconcileVessel(vesselId) {
+  const result = {
+    vesselId,
+    groupsSeen: 0,
+    resolved: { case1: 0, case2: 0, case3: 0 },
+    skippedUnresolvable: 0,
+    remainingGroups: 0,
+    lockBusy: false,
+    errors: []
+  };
+  if (await isShipInstance()) {
+    result.errors.push("refused: reconciler is shore-only");
+    return result;
+  }
+  const engine = getSyncEngine();
+  if (!engine.tryAcquireVessel(vesselId)) {
+    result.lockBusy = true;
+    syncDiag(`WO-RECONCILE SKIP vessel=${vesselId} \u2014 sync in progress (lock busy)`);
+    return result;
+  }
+  try {
+    const shipInstanceIds = await getShipInstanceIds(vesselId);
+    const groups = await findDuplicateGroups(vesselId, MAX_GROUPS_PER_VESSEL_PER_RUN);
+    result.groupsSeen = groups.length;
+    for (const group of groups) {
+      try {
+        const r = await resolveGroup(group, shipInstanceIds);
+        if (r) result.resolved[`case${r.resolutionCase}`]++;
+        else result.skippedUnresolvable++;
+      } catch (err) {
+        result.errors.push(`${group.workOrderNo}: ${err?.message || err}`);
+        console.error(`[WO-Reconciler] ERROR on ${group.workOrderNo}:`, err?.message || err);
+      }
+    }
+    result.remainingGroups = await countDuplicateGroups(vesselId);
+    if (result.remainingGroups > 0) {
+      console.log(`[WO-Reconciler] vessel ${vesselId}: ${result.remainingGroups} duplicate group(s) remain \u2014 picked up next run (cap ${MAX_GROUPS_PER_VESSEL_PER_RUN}/run)`);
+    }
+  } finally {
+    engine.releaseVessel(vesselId);
+  }
+  return result;
+}
+async function reconcileAllProvisionedVessels() {
+  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const vessels2 = await getProvisionedVesselIds();
+  const results = [];
+  for (const v of vessels2) {
+    try {
+      results.push(await reconcileVessel(v));
+    } catch (err) {
+      results.push({
+        vesselId: v,
+        groupsSeen: 0,
+        resolved: { case1: 0, case2: 0, case3: 0 },
+        skippedUnresolvable: 0,
+        remainingGroups: -1,
+        lockBusy: false,
+        errors: [String(err?.message || err)]
+      });
+    }
+  }
+  lastRun = { startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), vessels: results };
+  const totals = results.reduce((a, r) => a + r.resolved.case1 + r.resolved.case2 + r.resolved.case3, 0);
+  console.log(`[WO-Reconciler] sweep done: ${vessels2.length} provisioned vessel(s), ${totals} duplicate(s) resolved`);
+  return lastRun;
+}
+var RECONCILE_ACTOR, MAX_GROUPS_PER_VESSEL_PER_RUN, WORKFLOW_STATUSES, REPOINT_TABLES, LEFT_IN_PLACE_TABLES, lastRun;
+var init_workOrderReconcilerService = __esm({
+  "server/modules/work-orders/services/workOrderReconcilerService.ts"() {
+    "use strict";
+    init_workOrderReconcileRepository();
+    init_sync();
+    init_syncDiagLogger();
+    init_syncEngine();
+    init_syncRole();
+    RECONCILE_ACTOR = "wo-reconciler";
+    MAX_GROUPS_PER_VESSEL_PER_RUN = 50;
+    WORKFLOW_STATUSES = /* @__PURE__ */ new Set([
+      "completed",
+      "pending approval",
+      "postponed",
+      "rejected",
+      "awaiting office approval",
+      "postponement approved",
+      "in progress"
+    ]);
+    REPOINT_TABLES = [
+      { table: "work_order_documents", fkColumn: "work_order_id", idColumn: "id", synced: true },
+      { table: "work_order_executions", fkColumn: "template_id", idColumn: "id", synced: true },
+      { table: "work_order_execution_details", fkColumn: "work_order_id", idColumn: "woeduuid", synced: true },
+      { table: "work_order_postponements", fkColumn: "work_order_id", idColumn: "id", synced: true },
+      { table: "superintendent_notifications", fkColumn: "work_order_id", idColumn: "snuuid", synced: true },
+      { table: "wo_postponement_approvals", fkColumn: "work_order_id", idColumn: "wpauuid", synced: true },
+      // NO_SYNC local bookkeeping — repointed so shore views stay correct; no field log.
+      { table: "work_order_anomalies", fkColumn: "work_order_id", idColumn: "id", synced: false }
+    ];
+    LEFT_IN_PLACE_TABLES = [
+      { table: "ihm_maintenance_log", fkColumn: "work_order_id", reason: "serial-id repoint mints phantoms on ship (\xA79.4)" },
+      { table: "component_maintenance_history", fkColumn: "work_order_id", reason: "immutable by DB trigger" }
+    ];
+    lastRun = null;
+  }
+});
+
 // server/modules/sync/controller.ts
 import * as fs5 from "fs";
 import * as path5 from "path";
@@ -18770,6 +19132,12 @@ async function completeSyncHandler(req, res) {
       appliedTableCheckpoints
     );
     res.json(result);
+    setImmediate(() => {
+      Promise.resolve().then(() => (init_workOrderReconcilerService(), workOrderReconcilerService_exports)).then((svc) => svc.reconcileVessel(vesselId)).then((r) => {
+        const n = r.resolved.case1 + r.resolved.case2 + r.resolved.case3;
+        if (n > 0) console.log(`[WO-Reconciler] post-sync trigger: resolved ${n} duplicate(s) for vessel ${vesselId}`);
+      }).catch((err) => console.warn(`[WO-Reconciler] post-sync trigger failed (next sync retries): ${err?.message || err}`));
+    });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("[Sync] complete error:", error);
@@ -19628,6 +19996,9 @@ function buildJobsWithActiveWOSet(workOrders2, vesselId) {
   const byJobId = /* @__PURE__ */ new Set();
   const byJobNo = /* @__PURE__ */ new Set();
   workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
     if (vesselId && wo.vesselId !== vesselId) {
       return;
     }
@@ -19647,6 +20018,9 @@ function buildJobsWithActiveWOSet(workOrders2, vesselId) {
 function buildRhCycleWOMap(workOrders2, vesselId) {
   const cycleMap = /* @__PURE__ */ new Map();
   workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
     const normalizedStatus = wo.status?.toLowerCase().trim() || "";
     if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
       return;
@@ -19673,6 +20047,9 @@ function buildRhCycleWOMap(workOrders2, vesselId) {
 function buildCalendarCycleWOMap(workOrders2, vesselId) {
   const cycleMap = /* @__PURE__ */ new Map();
   workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
     const normalizedStatus = wo.status?.toLowerCase().trim() || "";
     if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
       return;
@@ -19698,6 +20075,7 @@ function buildCalendarCycleWOMap(workOrders2, vesselId) {
 }
 function findBlockingWOForJob(workOrders2, jobId, jobNo) {
   return workOrders2.find((wo) => {
+    if (wo.isDeleted === true) return false;
     if (!isBlockingStatus(wo.status)) return false;
     if (wo.jobId === jobId) return true;
     const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
@@ -19740,7 +20118,7 @@ var init_workOrderStatus = __esm({
 });
 
 // server/postgresStorage.ts
-import { randomUUID } from "crypto";
+import { randomUUID as randomUUID2 } from "crypto";
 import { eq as eq3, and as and3, desc as desc2, sql as sql7, inArray as inArray2, or, ilike, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
 function getWorkOrderNumericFields() {
   if (_woNumericFields) return _woNumericFields;
@@ -20435,7 +20813,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(components).values({
           ...component,
           id,
-          cuuid: randomUUID(),
+          cuuid: randomUUID2(),
           dataScope: component.dataScope || "vessel"
         }).returning();
         return result[0];
@@ -21209,7 +21587,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(jobs).values({
           ...job,
           id,
-          juuid: randomUUID(),
+          juuid: randomUUID2(),
           dataScope: job.dataScope || "vessel"
         }).returning();
         return result[0];
@@ -21235,7 +21613,7 @@ var init_postgresStorage = __esm({
           const result = await db2.insert(jobs).values({
             ...job,
             id,
-            juuid: randomUUID(),
+            juuid: randomUUID2(),
             dataScope: job.dataScope || "vessel"
           }).returning();
           results.push(result[0]);
@@ -21267,7 +21645,7 @@ var init_postgresStorage = __esm({
             await db2.insert(jobs).values({
               ...job,
               id,
-              juuid: randomUUID(),
+              juuid: randomUUID2(),
               dataScope: job.dataScope || "vessel"
             });
             created++;
@@ -21337,7 +21715,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(workOrders).values({
           ...wo,
           id,
-          wouuid: randomUUID(),
+          wouuid: randomUUID2(),
           dataScope: wo.dataScope || "vessel"
         }).returning();
         return result[0];
@@ -21369,7 +21747,7 @@ var init_postgresStorage = __esm({
           const result = await db2.insert(workOrders).values({
             ...wo,
             id,
-            wouuid: randomUUID(),
+            wouuid: randomUUID2(),
             dataScope: wo.dataScope || "vessel"
           }).returning();
           results.push(result[0]);
@@ -21415,7 +21793,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(workOrders).values({
           ...wo,
           id,
-          wouuid: randomUUID(),
+          wouuid: randomUUID2(),
           dataScope: "fleet"
         }).returning();
         return result[0];
@@ -21467,7 +21845,7 @@ var init_postgresStorage = __esm({
         const ihmSynced = spare.ihm === "Yes" ? "YES" : spare.ihm === "No" ? "NO" : spare.ihmPresence;
         const result = await db2.insert(spares).values({
           ...spare,
-          suuid: randomUUID(),
+          suuid: randomUUID2(),
           dataScope: spare.dataScope || "vessel",
           rob: spare.rob ?? 0,
           robLocationA: robA,
@@ -22197,7 +22575,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(spares).values({
           ...spare,
-          suuid: randomUUID(),
+          suuid: randomUUID2(),
           dataScope: "fleet",
           rob: spare.rob ?? 0,
           robLocationA: spare.robLocationA ?? 0,
@@ -22221,7 +22599,7 @@ var init_postgresStorage = __esm({
           const robB = spare.robLocationB ?? 0;
           const result = await db2.insert(spares).values({
             ...spare,
-            suuid: randomUUID(),
+            suuid: randomUUID2(),
             dataScope: spare.dataScope || "vessel",
             rob: spare.rob ?? 0,
             robLocationA: robA,
@@ -22309,7 +22687,7 @@ var init_postgresStorage = __esm({
             const robB = spare.robLocationB ?? 0;
             const result = await db2.insert(spares).values({
               ...spare,
-              suuid: randomUUID(),
+              suuid: randomUUID2(),
               dataScope: spare.dataScope || "vessel",
               rob: spare.rob ?? 0,
               robLocationA: robA,
@@ -22446,7 +22824,7 @@ var init_postgresStorage = __esm({
         const totalRob = robLocationA + robLocationB;
         const result = await db2.insert(storesItems).values({
           ...item,
-          stuuid: randomUUID(),
+          stuuid: randomUUID2(),
           rob: String(totalRob),
           robLocationA: String(robLocationA),
           robLocationB: String(robLocationB),
@@ -22954,7 +23332,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(defects).values({
           ...defect,
           id,
-          duuid: randomUUID()
+          duuid: randomUUID2()
         }).returning();
         try {
           await logFieldChanges("defects", result[0].duuid, defect.vesselId || null, null, result[0], "system");
@@ -23225,7 +23603,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(alertPolicies).values({
           ...policy,
-          apuuid: randomUUID()
+          apuuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -23282,7 +23660,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(alertEvents).values({
           ...event,
-          aeuuid: randomUUID()
+          aeuuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -23355,7 +23733,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(alertAcknowledgements).values({
           ...ack,
-          aauuid: randomUUID()
+          aauuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -23432,7 +23810,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(formDefinitions).values({
           ...form,
-          fduuid: randomUUID()
+          fduuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -23463,7 +23841,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(formVersions).values({
           ...version,
-          fvuuid: randomUUID()
+          fvuuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -24595,7 +24973,7 @@ var init_postgresStorage = __esm({
       async createBulkImportHistory(history) {
         const db2 = await getDb();
         const result = await db2.insert(bulkImportHistory).values({
-          biuuid: randomUUID(),
+          biuuid: randomUUID2(),
           vesselCode: history.vesselCode ?? null,
           vesselName: history.vesselName ?? null,
           moduleType: history.moduleType,
@@ -29086,6 +29464,7 @@ var init_workOrderService = __esm({
           const existingWOs = await storage.getWorkOrders(workOrderData.vesselId);
           const newComponentCode = workOrderData.componentCode || null;
           const existingActiveWO = existingWOs.find((wo) => {
+            if (wo.isDeleted === true) return false;
             if (wo.jobId !== workOrderData.jobId) return false;
             if (!isBlockingStatus(wo.status)) return false;
             const existingComponentCode = wo.componentCode || null;
@@ -29289,7 +29668,8 @@ var init_workOrderService = __esm({
             }
             const componentCycleKey = `${job.vesselId || "unknown"}|${job.jobNo}|${componentCode}|${dueDateStr}`;
             const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
+              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
+              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
             );
             if (existingWOForComponent) {
               continue;
@@ -29570,6 +29950,7 @@ var init_jobDueScanner = __esm({
           if (frequencyRH <= 0) continue;
           const generationAdvanceRH = WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS;
           const legacyBlockingWO = allWorkOrders.find((wo) => {
+            if (wo.isDeleted === true) return false;
             if (!isBlockingStatus(wo.status)) return false;
             if (wo.componentCode && wo.componentCode !== "") return false;
             if (wo.jobId === job.juuid) return true;
@@ -29623,7 +30004,8 @@ var init_jobDueScanner = __esm({
               continue;
             }
             const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
+              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
+              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
             );
             if (existingWOForComponent) {
               skipReasons.existingWO++;
@@ -29794,6 +30176,7 @@ var init_jobDueScanner = __esm({
           }
           const triggerLeg = calendarDue ? "CALENDAR" : "RH";
           const legacyBlockingWO = allWorkOrders.find((wo) => {
+            if (wo.isDeleted === true) return false;
             if (!isBlockingStatus(wo.status)) return false;
             if (wo.componentCode && wo.componentCode !== "") return false;
             if (wo.jobId === job.juuid) return true;
@@ -29824,7 +30207,8 @@ var init_jobDueScanner = __esm({
             const componentName = linkedComponent.componentName;
             if (!componentCode) continue;
             const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
+              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
+              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
             );
             if (existingWOForComponent) {
               skipReasons.existingWO++;
@@ -29932,6 +30316,7 @@ var init_jobDueScanner = __esm({
         const rhCycleMap = buildRhCycleWOMap(allWorkOrders, job.vesselId || void 0);
         const calendarCycleMap = buildCalendarCycleWOMap(allWorkOrders, job.vesselId || void 0);
         const legacyBlockingWO = allWorkOrders.find((wo) => {
+          if (wo.isDeleted === true) return false;
           if (!isBlockingStatus(wo.status)) return false;
           if (wo.componentCode && wo.componentCode !== "") return false;
           if (wo.jobId === job.juuid) return true;
@@ -29956,6 +30341,7 @@ var init_jobDueScanner = __esm({
         const isJobBlockedByJobNo = activeWOSets.byJobNo.has(vesselJobNoKey);
         if (isJobBlockedByJobId || isJobBlockedByJobNo) {
           const existingWOForComponent = allWorkOrders.find((wo) => {
+            if (wo.isDeleted === true) return false;
             if (!isBlockingStatus(wo.status)) return false;
             if (wo.componentCode !== effectiveComponentCode) return false;
             if (wo.jobId === job.juuid) return true;
@@ -35037,368 +35423,6 @@ var init_workOrderGenerationGate = __esm({
   }
 });
 
-// server/modules/work-orders/repositories/workOrderReconcileRepository.ts
-var workOrderReconcileRepository_exports = {};
-__export(workOrderReconcileRepository_exports, {
-  archiveSummary: () => archiveSummary,
-  countChildRows: () => countChildRows,
-  countDuplicateGroups: () => countDuplicateGroups,
-  findDuplicateGroups: () => findDuplicateGroups,
-  getInsertOriginInstanceId: () => getInsertOriginInstanceId,
-  getProvisionedVesselIds: () => getProvisionedVesselIds,
-  getShipInstanceIds: () => getShipInstanceIds,
-  hasDocuments: () => hasDocuments,
-  insertArchiveRow: () => insertArchiveRow,
-  repointChildren: () => repointChildren,
-  softDeleteWorkOrder: () => softDeleteWorkOrder
-});
-import { randomUUID as randomUUID6 } from "crypto";
-async function pool2() {
-  const p = await getPool();
-  if (!p) throw Object.assign(new Error("Database not initialized"), { statusCode: 503 });
-  return p;
-}
-async function findDuplicateGroups(vesselId, cap) {
-  const p = await pool2();
-  const groups = await p.query(
-    `SELECT work_order_no
-       FROM work_orders
-      WHERE vessel_id = $1 AND data_scope = 'vessel' AND is_deleted = false
-      GROUP BY work_order_no
-     HAVING count(*) > 1
-      ORDER BY work_order_no
-      LIMIT $2`,
-    [vesselId, cap]
-  );
-  const out = [];
-  for (const g of groups.rows) {
-    const rows = await p.query(
-      `SELECT * FROM work_orders
-        WHERE vessel_id = $1 AND work_order_no = $2 AND data_scope = 'vessel' AND is_deleted = false
-        ORDER BY created_at ASC`,
-      [vesselId, g.work_order_no]
-    );
-    out.push({ vesselId, workOrderNo: g.work_order_no, rows: rows.rows });
-  }
-  return out;
-}
-async function countDuplicateGroups(vesselId) {
-  const p = await pool2();
-  const r = await p.query(
-    `SELECT count(*)::int AS n FROM (
-       SELECT 1 FROM work_orders
-        WHERE vessel_id = $1 AND data_scope = 'vessel' AND is_deleted = false
-        GROUP BY work_order_no HAVING count(*) > 1) t`,
-    [vesselId]
-  );
-  return r.rows[0]?.n ?? 0;
-}
-async function getInsertOriginInstanceId(wouuid) {
-  const p = await pool2();
-  const r = await p.query(
-    `SELECT instance_id
-       FROM sync_field_log
-      WHERE table_name = 'work_orders' AND row_uuid = $1
-        AND old_value IS NULL AND is_deleted = false
-      ORDER BY changed_at ASC
-      LIMIT 1`,
-    [wouuid]
-  );
-  return r.rows[0]?.instance_id ?? null;
-}
-async function getShipInstanceIds(vesselId) {
-  const p = await pool2();
-  const r = await p.query(
-    `SELECT instance_id FROM sync_metadata WHERE vessel_id = $1 AND is_deleted = false`,
-    [vesselId]
-  );
-  return new Set(r.rows.map((x) => x.instance_id));
-}
-async function hasDocuments(wouuid) {
-  const p = await pool2();
-  const r = await p.query(
-    `SELECT 1 FROM work_order_documents WHERE work_order_id = $1 AND is_deleted = false LIMIT 1`,
-    [wouuid]
-  );
-  return r.rows.length > 0;
-}
-async function repointChildren(table, fkColumn, idColumn, loserWouuid, survivorWouuid) {
-  const p = await pool2();
-  const r = await p.query(
-    `UPDATE "${table}" SET "${fkColumn}" = $1, updated_at = now()
-      WHERE "${fkColumn}" = $2 AND is_deleted = false
-      RETURNING "${idColumn}" AS log_id`,
-    [survivorWouuid, loserWouuid]
-  );
-  return r.rows.map((x) => String(x.log_id));
-}
-async function countChildRows(table, fkColumn, loserWouuid) {
-  const p = await pool2();
-  const r = await p.query(
-    `SELECT count(*)::int AS n FROM "${table}" WHERE "${fkColumn}" = $1 AND is_deleted = false`,
-    [loserWouuid]
-  );
-  return r.rows[0]?.n ?? 0;
-}
-async function softDeleteWorkOrder(wouuid) {
-  const p = await pool2();
-  await p.query(`UPDATE work_orders SET is_deleted = true, updated_at = now() WHERE wouuid = $1`, [wouuid]);
-}
-async function insertArchiveRow(row) {
-  const p = await pool2();
-  const r = await p.query(
-    `INSERT INTO work_order_reconcile_archive
-       (archive_uuid, vessel_id, work_order_no, loser_wouuid, survivor_wouuid,
-        resolution_case, loser_row_snapshot, child_moves, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-     ON CONFLICT (loser_wouuid) DO NOTHING`,
-    [
-      randomUUID6(),
-      row.vesselId,
-      row.workOrderNo,
-      row.loserWouuid,
-      row.survivorWouuid,
-      row.resolutionCase,
-      JSON.stringify(row.loserRowSnapshot),
-      JSON.stringify(row.childMoves),
-      row.notes
-    ]
-  );
-  return (r.rowCount ?? 0) > 0;
-}
-async function archiveSummary() {
-  const p = await pool2();
-  const r = await p.query(
-    `SELECT a.vessel_id, v.name AS vessel_name, a.resolution_case, count(*)::int AS resolved,
-            max(a.reconciled_at) AS last_reconciled_at
-       FROM work_order_reconcile_archive a
-       LEFT JOIN vessels v ON v.vuuid = a.vessel_id
-      GROUP BY a.vessel_id, v.name, a.resolution_case
-      ORDER BY v.name, a.resolution_case`
-  );
-  return r.rows;
-}
-async function getProvisionedVesselIds() {
-  const p = await pool2();
-  const r = await p.query(
-    `SELECT DISTINCT v.vuuid
-       FROM vessels v
-       JOIN sync_metadata sm ON sm.vessel_id = v.vuuid AND sm.is_deleted = false
-      WHERE v.is_deleted = false`
-  );
-  return r.rows.map((x) => x.vuuid);
-}
-var init_workOrderReconcileRepository = __esm({
-  "server/modules/work-orders/repositories/workOrderReconcileRepository.ts"() {
-    "use strict";
-    init_db();
-  }
-});
-
-// server/modules/work-orders/services/workOrderReconcilerService.ts
-var workOrderReconcilerService_exports = {};
-__export(workOrderReconcilerService_exports, {
-  MAX_GROUPS_PER_VESSEL_PER_RUN: () => MAX_GROUPS_PER_VESSEL_PER_RUN,
-  getLastRunSummary: () => getLastRunSummary,
-  reconcileAllProvisionedVessels: () => reconcileAllProvisionedVessels,
-  reconcileVessel: () => reconcileVessel
-});
-function getLastRunSummary() {
-  return lastRun;
-}
-function isNonEmpty(v) {
-  if (v === null || v === void 0) return false;
-  const s = String(v).trim();
-  return s !== "" && s !== "[]" && s !== "{}" && s.toLowerCase() !== "null";
-}
-async function isTouched(row) {
-  if (isNonEmpty(row.approver) || isNonEmpty(row.submitted_date) || isNonEmpty(row.date_completed) || isNonEmpty(row.work_carried_out) || isNonEmpty(row.performed_by) || isNonEmpty(row.manhours)) {
-    return true;
-  }
-  const consumed = row.consumed_spare_parts;
-  if (Array.isArray(consumed) ? consumed.length > 0 : isNonEmpty(consumed)) return true;
-  if (WORKFLOW_STATUSES.has(String(row.status || "").toLowerCase().trim())) return true;
-  return await hasDocuments(row.wouuid);
-}
-async function resolveGroup(group, shipInstanceIds) {
-  const flags = await Promise.all(group.rows.map(isTouched));
-  const touched = group.rows.filter((_, i) => flags[i]);
-  let survivor;
-  let resolutionCase;
-  let caseNote = "";
-  if (touched.length === 1) {
-    resolutionCase = 1;
-    survivor = touched[0];
-  } else {
-    resolutionCase = touched.length === 0 ? 2 : 3;
-    const pool3 = touched.length >= 2 ? touched : group.rows;
-    const origins = await Promise.all(pool3.map((r) => getInsertOriginInstanceId(r.wouuid)));
-    const shipRows = pool3.filter((_, i) => origins[i] !== null && shipInstanceIds.has(origins[i]));
-    if (shipRows.length > 0) {
-      survivor = shipRows[0];
-    } else {
-      survivor = pool3[0];
-      caseNote = "origin-logs-absent: fell back to earliest created_at";
-    }
-  }
-  for (const loser of group.rows) {
-    if (loser.wouuid === survivor.wouuid) continue;
-    const childMoves = {};
-    for (const spec of REPOINT_TABLES) {
-      const movedIds = await repointChildren(spec.table, spec.fkColumn, spec.idColumn, loser.wouuid, survivor.wouuid);
-      if (movedIds.length === 0) continue;
-      childMoves[spec.table] = { moved: movedIds.length };
-      if (spec.synced) {
-        for (const logId of movedIds) {
-          await logFieldChanges(
-            spec.table,
-            logId,
-            group.vesselId,
-            { [spec.fkColumn]: loser.wouuid },
-            { [spec.fkColumn]: survivor.wouuid },
-            RECONCILE_ACTOR
-          );
-        }
-      }
-    }
-    let leftInPlaceTotal = 0;
-    for (const spec of LEFT_IN_PLACE_TABLES) {
-      const n = await countChildRows(spec.table, spec.fkColumn, loser.wouuid);
-      if (n > 0) {
-        childMoves[spec.table] = { left_in_place: n, reason: spec.reason };
-        leftInPlaceTotal += n;
-      }
-    }
-    await insertArchiveRow({
-      vesselId: group.vesselId,
-      workOrderNo: group.workOrderNo,
-      loserWouuid: loser.wouuid,
-      survivorWouuid: survivor.wouuid,
-      resolutionCase,
-      loserRowSnapshot: loser,
-      childMoves,
-      notes: caseNote || null
-    });
-    await softDeleteWorkOrder(loser.wouuid);
-    await logFieldChanges(
-      "work_orders",
-      loser.wouuid,
-      group.vesselId,
-      { is_deleted: false },
-      { is_deleted: true },
-      RECONCILE_ACTOR
-    );
-    const line = `[WO-Reconciler] case ${resolutionCase}: ${group.workOrderNo} \u2014 loser ${loser.wouuid.slice(0, 8)} archived+retired, survivor ${survivor.wouuid.slice(0, 8)}, children moved: ${Object.keys(childMoves).filter((k) => !childMoves[k].left_in_place).join(", ") || "none"}` + (leftInPlaceTotal > 0 ? `, left-in-place: ${leftInPlaceTotal}` : "") + (caseNote ? ` (${caseNote})` : "");
-    console.log(line);
-    syncDiag(`WO-RECONCILE case=${resolutionCase} vessel=${group.vesselId} no=${group.workOrderNo} loser=${loser.wouuid} survivor=${survivor.wouuid}${caseNote ? ` note=${caseNote}` : ""}`);
-  }
-  return { resolutionCase };
-}
-async function reconcileVessel(vesselId) {
-  const result = {
-    vesselId,
-    groupsSeen: 0,
-    resolved: { case1: 0, case2: 0, case3: 0 },
-    skippedUnresolvable: 0,
-    remainingGroups: 0,
-    lockBusy: false,
-    errors: []
-  };
-  if (await isShipInstance()) {
-    result.errors.push("refused: reconciler is shore-only");
-    return result;
-  }
-  const engine = getSyncEngine();
-  if (!engine.tryAcquireVessel(vesselId)) {
-    result.lockBusy = true;
-    syncDiag(`WO-RECONCILE SKIP vessel=${vesselId} \u2014 sync in progress (lock busy)`);
-    return result;
-  }
-  try {
-    const shipInstanceIds = await getShipInstanceIds(vesselId);
-    const groups = await findDuplicateGroups(vesselId, MAX_GROUPS_PER_VESSEL_PER_RUN);
-    result.groupsSeen = groups.length;
-    for (const group of groups) {
-      try {
-        const r = await resolveGroup(group, shipInstanceIds);
-        if (r) result.resolved[`case${r.resolutionCase}`]++;
-        else result.skippedUnresolvable++;
-      } catch (err) {
-        result.errors.push(`${group.workOrderNo}: ${err?.message || err}`);
-        console.error(`[WO-Reconciler] ERROR on ${group.workOrderNo}:`, err?.message || err);
-      }
-    }
-    result.remainingGroups = await countDuplicateGroups(vesselId);
-    if (result.remainingGroups > 0) {
-      console.log(`[WO-Reconciler] vessel ${vesselId}: ${result.remainingGroups} duplicate group(s) remain \u2014 picked up next run (cap ${MAX_GROUPS_PER_VESSEL_PER_RUN}/run)`);
-    }
-  } finally {
-    engine.releaseVessel(vesselId);
-  }
-  return result;
-}
-async function reconcileAllProvisionedVessels() {
-  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
-  const vessels2 = await getProvisionedVesselIds();
-  const results = [];
-  for (const v of vessels2) {
-    try {
-      results.push(await reconcileVessel(v));
-    } catch (err) {
-      results.push({
-        vesselId: v,
-        groupsSeen: 0,
-        resolved: { case1: 0, case2: 0, case3: 0 },
-        skippedUnresolvable: 0,
-        remainingGroups: -1,
-        lockBusy: false,
-        errors: [String(err?.message || err)]
-      });
-    }
-  }
-  lastRun = { startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), vessels: results };
-  const totals = results.reduce((a, r) => a + r.resolved.case1 + r.resolved.case2 + r.resolved.case3, 0);
-  console.log(`[WO-Reconciler] sweep done: ${vessels2.length} provisioned vessel(s), ${totals} duplicate(s) resolved`);
-  return lastRun;
-}
-var RECONCILE_ACTOR, MAX_GROUPS_PER_VESSEL_PER_RUN, WORKFLOW_STATUSES, REPOINT_TABLES, LEFT_IN_PLACE_TABLES, lastRun;
-var init_workOrderReconcilerService = __esm({
-  "server/modules/work-orders/services/workOrderReconcilerService.ts"() {
-    "use strict";
-    init_workOrderReconcileRepository();
-    init_sync();
-    init_syncDiagLogger();
-    init_syncEngine();
-    init_syncRole();
-    RECONCILE_ACTOR = "wo-reconciler";
-    MAX_GROUPS_PER_VESSEL_PER_RUN = 50;
-    WORKFLOW_STATUSES = /* @__PURE__ */ new Set([
-      "completed",
-      "pending approval",
-      "postponed",
-      "rejected",
-      "awaiting office approval",
-      "postponement approved",
-      "in progress"
-    ]);
-    REPOINT_TABLES = [
-      { table: "work_order_documents", fkColumn: "work_order_id", idColumn: "id", synced: true },
-      { table: "work_order_executions", fkColumn: "template_id", idColumn: "id", synced: true },
-      { table: "work_order_execution_details", fkColumn: "work_order_id", idColumn: "woeduuid", synced: true },
-      { table: "work_order_postponements", fkColumn: "work_order_id", idColumn: "id", synced: true },
-      { table: "superintendent_notifications", fkColumn: "work_order_id", idColumn: "snuuid", synced: true },
-      { table: "wo_postponement_approvals", fkColumn: "work_order_id", idColumn: "wpauuid", synced: true },
-      // NO_SYNC local bookkeeping — repointed so shore views stay correct; no field log.
-      { table: "work_order_anomalies", fkColumn: "work_order_id", idColumn: "id", synced: false }
-    ];
-    LEFT_IN_PLACE_TABLES = [
-      { table: "ihm_maintenance_log", fkColumn: "work_order_id", reason: "serial-id repoint mints phantoms on ship (\xA79.4)" },
-      { table: "component_maintenance_history", fkColumn: "work_order_id", reason: "immutable by DB trigger" }
-    ];
-    lastRun = null;
-  }
-});
-
 // server/modules/cert-surveys/repositories/certificateRepository.ts
 var certificateRepository_exports = {};
 __export(certificateRepository_exports, {
@@ -38053,25 +38077,22 @@ var init_shoreWoDailyScheduler = __esm({
             return;
           }
           const reconRepo = await Promise.resolve().then(() => (init_workOrderReconcileRepository(), workOrderReconcileRepository_exports));
-          const reconciler = await Promise.resolve().then(() => (init_workOrderReconcilerService(), workOrderReconcilerService_exports));
           const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
           const vessels2 = await reconRepo.getProvisionedVesselIds();
           syncDiag(`SHORE-WO-SWEEP START vessels=${vessels2.length}`);
-          let generated = 0, resolved = 0;
+          let generated = 0;
           for (const vesselId of vessels2) {
             try {
               const scan = await jobDueScanner2.runScan(vesselId);
               if (!scan.skipped) {
                 generated += scan.calendarWOsGenerated + scan.rhWOsGenerated + scan.dualWOsGenerated;
               }
-              const r = await reconciler.reconcileVessel(vesselId);
-              resolved += r.resolved.case1 + r.resolved.case2 + r.resolved.case3;
             } catch (err) {
               console.error(`[ShoreWoSweep] vessel ${vesselId} failed: ${err?.message || err}`);
             }
           }
-          console.log(`[ShoreWoSweep] sweep complete: ${vessels2.length} vessel(s), generated=${generated}, duplicates resolved=${resolved}`);
-          syncDiag(`SHORE-WO-SWEEP END vessels=${vessels2.length} generated=${generated} resolved=${resolved}`);
+          console.log(`[ShoreWoSweep] sweep complete: ${vessels2.length} vessel(s), generated=${generated} (reconcile runs post-sync, not here)`);
+          syncDiag(`SHORE-WO-SWEEP END vessels=${vessels2.length} generated=${generated}`);
         } finally {
           this.sweepInFlight = false;
         }
@@ -38480,7 +38501,7 @@ async function upsertCompanyStandardGraceSettings(settings) {
 
 // server/modules/vessels/services/vesselService.ts
 init_errors();
-import { randomUUID as randomUUID2 } from "crypto";
+import { randomUUID as randomUUID3 } from "crypto";
 async function getFleets2(includeInactive) {
   return includeInactive ? getAllFleets() : getFleets();
 }
@@ -38493,7 +38514,7 @@ async function createFleet2(data) {
   try {
     return await createFleet({
       id: data.id || data.code,
-      fuuid: randomUUID2(),
+      fuuid: randomUUID3(),
       code: data.code,
       name: data.name,
       description: data.description ?? null,
@@ -38578,7 +38599,7 @@ async function getFleetClasses2(fleetId) {
 async function createFleetClass2(fleetId, data) {
   try {
     return await createFleetClass({
-      fcuuid: randomUUID2(),
+      fcuuid: randomUUID3(),
       fleetId,
       name: data.name,
       description: data.description ?? null,
@@ -40164,7 +40185,7 @@ import * as path6 from "path";
 
 // server/objectStorage.ts
 import { Storage } from "@google-cloud/storage";
-import { randomUUID as randomUUID3 } from "crypto";
+import { randomUUID as randomUUID4 } from "crypto";
 
 // server/objectAcl.ts
 var ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
@@ -40384,7 +40405,7 @@ var ObjectStorageService = class {
         "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' tool and set PRIVATE_OBJECT_DIR env var."
       );
     }
-    const objectId = randomUUID3();
+    const objectId = randomUUID4();
     const fullPath = `${privateObjectDir}/uploads/${objectId}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
     return signObjectURL({
@@ -44407,7 +44428,7 @@ init_workOrderRepository();
 init_errors();
 
 // server/modules/work-orders/services/woDocumentService.ts
-import { randomUUID as randomUUID4 } from "crypto";
+import { randomUUID as randomUUID5 } from "crypto";
 import * as fs7 from "fs";
 import * as path7 from "path";
 import sharp from "sharp";
@@ -44573,7 +44594,7 @@ async function uploadDocument(workOrderId, vesselId, documentType, file, uploade
   if (fileBuffer.length > TARGET_FILE_SIZE) {
     console.warn(`File still ${(fileBuffer.length / (1024 * 1024)).toFixed(1)} MB after compression`);
   }
-  const docId = randomUUID4();
+  const docId = randomUUID5();
   const safeFileName = sanitizeFileName(file.originalname);
   const storageFileName = `${docId}_${safeFileName}`;
   const relativePath = `${workOrderId}/${storageFileName}`;
@@ -44764,7 +44785,7 @@ init_schema();
 init_storage();
 init_sync();
 import { eq as eq12, and as and10 } from "drizzle-orm";
-import { randomUUID as randomUUID5 } from "crypto";
+import { randomUUID as randomUUID6 } from "crypto";
 var RH_PER_DAY = 24;
 function buildVesselGraceSettings(vesselSettings) {
   if (!vesselSettings) {
@@ -45011,7 +45032,7 @@ async function savePlannedDate(vesselId, jobId, componentId, plannedDate) {
     );
     await logFieldChanges("planner_dates", oldRow.pduuid, vesselId, oldRow, { ...oldRow, plannedDate: plannedDate || null }, null);
   } else {
-    const newPduuid = randomUUID5();
+    const newPduuid = randomUUID6();
     const newRow = {
       pduuid: newPduuid,
       vesselId,
@@ -45068,7 +45089,7 @@ async function bulkSavePlannedDate(vesselId, items, plannedDate) {
         await logFieldChanges("planner_dates", oldRow.pduuid, vesselId, oldRow, { ...oldRow, plannedDate }, null, tx);
         updated++;
       } else {
-        const newPduuid = randomUUID5();
+        const newPduuid = randomUUID6();
         const newRow = {
           pduuid: newPduuid,
           vesselId,
@@ -45298,6 +45319,15 @@ async function getReconcilerStatus(req, res) {
     archive: await reconRepo.archiveSummary(),
     lastRun: reconciler.getLastRunSummary()
   });
+}
+async function runReconcilerNow(req, res) {
+  const vesselId = (req.body && req.body.vesselId) ?? req.query.vesselId;
+  if (!vesselId || typeof vesselId !== "string" || vesselId === "all") {
+    throw new ValidationError("A specific vesselId is required.");
+  }
+  const reconciler = await Promise.resolve().then(() => (init_workOrderReconcilerService(), workOrderReconcilerService_exports));
+  const result = await reconciler.reconcileVessel(vesselId);
+  res.json(result);
 }
 async function getWorkOrderContext2(req, res) {
   const result = await getWorkOrderContext(req.params.id);
@@ -46063,6 +46093,7 @@ router5.get("/work-orders/:id/context", asyncHandler(getWorkOrderContext2));
 router5.get("/work-orders/:id/rejection-history", asyncHandler(getRejectionHistory2));
 router5.post("/work-orders/generate-now", asyncHandler(generateNow));
 router5.get("/work-orders/reconciler/status", asyncHandler(getReconcilerStatus));
+router5.post("/work-orders/reconciler/run", asyncHandler(runReconcilerNow));
 router5.post("/work-orders", asyncHandler(createWorkOrder2));
 router5.patch("/work-orders/:id", asyncHandler(updateWorkOrder2));
 router5.delete("/work-orders/:id", asyncHandler(deleteWorkOrder2));
