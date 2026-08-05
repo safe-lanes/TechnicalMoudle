@@ -72,6 +72,7 @@ const MENU_NAME_MAP: Record<string, Record<string, string>> = {
     "sync-dashboard": "admin-sync-dashboard",
     "sync-provisioning": "admin-sync-provisioning",
     "sync-fleet": "admin-sync-fleet",
+    "shipskart-catalogue": "admin-shipskart-catalogue",
     "approval-workflow": "admin-approval-workflow",
   },
 };
@@ -109,6 +110,7 @@ const ROUTE_TO_MENU_NAME: Record<string, string> = {
   "/admin/sync-dashboard": "admin-sync-dashboard",
   "/admin/sync-provisioning": "admin-sync-provisioning",
   "/admin/sync-fleet": "admin-sync-fleet",
+  "/admin/shipskart-catalogue": "admin-shipskart-catalogue",
   "/admin/approval-workflow": "admin-approval-workflow",
 };
 
