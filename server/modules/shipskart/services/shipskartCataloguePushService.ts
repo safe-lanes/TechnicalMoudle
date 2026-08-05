@@ -54,6 +54,16 @@ const inFlight = new Set<string>();
 /** Is a push currently running for this vessel? (Admin card polling) */
 export function isCataloguePushRunning(vesselId: string): boolean { return inFlight.has(vesselId); }
 
+/**
+ * Last finished run per vessel, for the Admin card. Run-LEVEL failures (vessel not linked,
+ * listing 401) never reach the per-item ledger — before this, they lived only in pm2 logs
+ * and the card sat at 0% with no explanation (what the domain team hit on dev 05-Aug).
+ * In-memory by design: it's a UX aid; the ledger stays the durable record.
+ */
+export interface LastRunInfo { finishedAt: string; ok: boolean; errors: string[]; warnings: string[] }
+const lastRunByVessel = new Map<string, LastRunInfo>();
+export function getLastRunInfo(vesselId: string): LastRunInfo | null { return lastRunByVessel.get(vesselId) ?? null; }
+
 export interface PhaseCounts { pushed: number; skipped: number; failed: number; }
 export interface CataloguePushResult {
   vesselId: string;
@@ -363,5 +373,13 @@ export async function pushVesselCatalogue(
     return res;
   } finally {
     inFlight.delete(vesselId);
+    if (!dryRun) {
+      lastRunByVessel.set(vesselId, {
+        finishedAt: new Date().toISOString(),
+        ok: res.errors.length === 0,
+        errors: res.errors.slice(0, 5),
+        warnings: res.warnings.slice(0, 3),
+      });
+    }
   }
 }

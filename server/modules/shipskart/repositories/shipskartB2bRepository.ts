@@ -54,6 +54,20 @@ export async function upsertTokenState(tenantId: string, state: {
     });
 }
 
+/**
+ * The per-tenant automation master switch (default FALSE — a fresh deploy never pushes).
+ * Row may not exist yet on a brand-new tenant, hence upsert.
+ */
+export async function setReconcilerEnabled(tenantId: string, enabled: boolean): Promise<void> {
+  const db = await getDb();
+  await db.insert(shipskartTenantConfig)
+    .values({ tenantId, enabled: true, reconcilerEnabled: enabled })
+    .onConflictDoUpdate({
+      target: shipskartTenantConfig.tenantId,
+      set: { reconcilerEnabled: enabled, updatedAt: new Date() },
+    });
+}
+
 // ── user links ──
 
 export async function getUserLink(userUuid: string): Promise<ShipskartUserLink | undefined> {

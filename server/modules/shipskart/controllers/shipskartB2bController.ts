@@ -45,6 +45,31 @@ export async function retryHandler(req: Request, res: Response) {
   res.status(result.reset ? 200 : 409).json({ success: result.reset, ...result });
 }
 
+/**
+ * GET /shipskart/b2b/reconciler-config — the per-tenant automation master switch.
+ * PUT with { enabled: boolean } flips it (no restart needed — every scheduler tick and
+ * manual reconcile re-reads the flag). Default FALSE: a fresh deploy never pushes until
+ * a human consciously enables it (see the 05-Aug duplicate-vessel lesson: enabling
+ * against a tenant that already has data from another environment creates duplicates).
+ */
+export async function getReconcilerConfigHandler(_req: Request, res: Response) {
+  const { getB2bConfig } = await import('../services/shipskartB2bClient');
+  const cfg = getB2bConfig();
+  const row = await b2bRepo.getTenantConfig(cfg.tenantId);
+  res.json({ tenantId: cfg.tenantId, reconcilerEnabled: row?.reconcilerEnabled ?? false });
+}
+
+export async function putReconcilerConfigHandler(req: AuthenticatedRequest, res: Response) {
+  if (typeof req.body?.enabled !== 'boolean') {
+    return res.status(400).json({ success: false, message: 'body must be { enabled: boolean }' });
+  }
+  const { getB2bConfig } = await import('../services/shipskartB2bClient');
+  const cfg = getB2bConfig();
+  await b2bRepo.setReconcilerEnabled(cfg.tenantId, req.body.enabled);
+  console.log(`[Shipskart b2b] reconciler_enabled set to ${req.body.enabled} for tenant ${cfg.tenantId} (by user ${forwardedUserUuid(req, 'reconciler-config') ?? 'unknown'})`);
+  res.json({ success: true, tenantId: cfg.tenantId, reconcilerEnabled: req.body.enabled });
+}
+
 /** POST /shipskart/b2b/reconcile { limit? } — one bounded manual pass. */
 export async function reconcileHandler(req: Request, res: Response) {
   const limit = Number.isInteger(req.body?.limit) ? req.body.limit : undefined;
@@ -130,5 +155,8 @@ export async function catalogueVesselStatusHandler(req: AuthenticatedRequest, re
                     remaining: Math.max(0, skuTotal - get('catalogue', 'pushed')) },
     },
     failures: st.failures,
+    // Run-level outcome (vessel-not-linked / listing abort / crash) — these never reach
+    // the per-item ledger, so without this the card shows 0% with no reason.
+    lastRun: svc.getLastRunInfo(vesselId),
   });
 }

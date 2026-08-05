@@ -20,6 +20,8 @@ router.put('/shipskart/role-mappings', asyncHandler(shipskartRoleMappingControll
 router.post('/shipskart/b2b/bootstrap', asyncHandler(shipskartB2bController.bootstrapHandler));
 router.get('/shipskart/b2b/status', asyncHandler(shipskartB2bController.statusHandler));
 router.post('/shipskart/b2b/reconcile', asyncHandler(shipskartB2bController.reconcileHandler));
+router.get('/shipskart/b2b/reconciler-config', asyncHandler(shipskartB2bController.getReconcilerConfigHandler));
+router.put('/shipskart/b2b/reconciler-config', asyncHandler(shipskartB2bController.putReconcilerConfigHandler));
 router.post('/shipskart/b2b/retry', asyncHandler(shipskartB2bController.retryHandler));
 
 // CAPTURE-AT-LOGIN: the browser posts the decrypted SAILERP myVessels array once per

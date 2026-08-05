@@ -25,7 +25,12 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ShoppingCart, RefreshCw, CheckCircle2, AlertTriangle, Loader2, PackageSearch } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ShoppingCart, RefreshCw, CheckCircle2, AlertTriangle, Loader2, PackageSearch, Zap } from "lucide-react";
 
 interface VesselStatus {
   vesselId: string;
@@ -38,13 +43,36 @@ interface VesselStatus {
     catalogue: { pushed: number; failed: number; remaining: number };
   };
   failures: Array<{ entity_type: string; local_key: string; remote_code: string | null; last_error: string | null; updated_at: string }>;
+  lastRun: { finishedAt: string; ok: boolean; errors: string[]; warnings: string[] } | null;
 }
 
 export default function ShipskartCatalogue() {
   const vesselCtx = useContext(VesselContext);
   const vessels = vesselCtx?.vessels ?? [];
   const [vesselId, setVesselId] = useState<string>("");
+  const [confirmEnable, setConfirmEnable] = useState(false);
   const { toast } = useToast();
+
+  // Automation master switch (per-tenant reconciler_enabled). Turning it ON is guarded by
+  // a confirmation dialog — it starts creating this company's vessels/users on Shipskart.
+  const reconcilerQuery = useQuery<{ reconcilerEnabled: boolean }>({
+    queryKey: ["shipskart-reconciler-config"],
+    queryFn: async () => (await apiRequest("GET", "/technical/api/shipskart/b2b/reconciler-config")).json(),
+  });
+  const reconcilerMutation = useMutation({
+    mutationFn: async (enabled: boolean) =>
+      (await apiRequest("PUT", "/technical/api/shipskart/b2b/reconciler-config", { enabled })).json(),
+    onSuccess: (d: any) => {
+      toast({
+        title: d?.reconcilerEnabled ? "Automatic push enabled" : "Automatic push disabled",
+        description: d?.reconcilerEnabled
+          ? "Vessels, users and vessel assignments will now sync to Shipskart automatically (hourly)."
+          : "Nothing will be pushed to Shipskart automatically. Existing data stays as it is.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["shipskart-reconciler-config"] });
+    },
+    onError: (e: any) => toast({ title: "Could not change the setting", description: String(e?.message ?? e), variant: "destructive" }),
+  });
 
   const statusQuery = useQuery<VesselStatus>({
     queryKey: ["shipskart-catalogue-status", vesselId],
@@ -83,6 +111,49 @@ export default function ShipskartCatalogue() {
           <p className="text-sm text-gray-500">Publish this vessel's spares and stores into the Shipskart purchasing catalogue so crew can order against our own parts list.</p>
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" />Automatic sync to Shipskart</CardTitle>
+          <CardDescription>
+            When ON, the system keeps Shipskart up to date by itself (hourly): new vessels and users are created,
+            role changes and vessel assignments follow automatically. When OFF, nothing is ever pushed automatically.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center gap-3">
+          <Switch
+            checked={reconcilerQuery.data?.reconcilerEnabled ?? false}
+            disabled={reconcilerQuery.isLoading || reconcilerMutation.isPending}
+            onCheckedChange={(next) => (next ? setConfirmEnable(true) : reconcilerMutation.mutate(false))}
+            data-testid="switch-reconciler-enabled"
+          />
+          <span className="text-sm">
+            {reconcilerQuery.isLoading ? "Loading…"
+              : reconcilerQuery.data?.reconcilerEnabled
+                ? <Badge className="bg-green-600">ON — syncing automatically</Badge>
+                : <Badge variant="secondary">OFF — manual control</Badge>}
+          </span>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmEnable} onOpenChange={setConfirmEnable}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enable automatic push to Shipskart?</AlertDialogTitle>
+            <AlertDialogDescription>
+              From the next hourly run, this will start creating this company's vessels and users on Shipskart
+              and keep them in sync. Only enable it if this environment is the one that should own the Shipskart
+              data — two environments pushing to the same Shipskart company creates duplicates.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => reconcilerMutation.mutate(true)} data-testid="btn-confirm-enable-reconciler">
+              Enable automatic sync
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         <CardHeader className="pb-3">
@@ -130,6 +201,19 @@ export default function ShipskartCatalogue() {
         </CardContent></Card>
       ) : s ? (
         <>
+          {s.lastRun && !s.lastRun.ok && !s.running && (
+            <Card className="border-red-300">
+              <CardContent className="py-3">
+                <p className="text-sm text-red-700">
+                  <AlertTriangle className="h-4 w-4 inline mr-1" />
+                  <b>Last push could not run</b> ({new Date(s.lastRun.finishedAt).toLocaleString()}):
+                </p>
+                <ul className="text-sm text-red-700 mt-1 ml-6 list-disc">
+                  {s.lastRun.errors.map((e, i) => <li key={i}>{friendlyError(e)}</li>)}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Progress</CardTitle>
@@ -216,6 +300,8 @@ function StatBox({ label, value, tone }: { label: string; value: number | string
 /** Turn stored API errors into domain-readable reasons; full text stays in the tooltip. */
 function friendlyError(err: string | null): string {
   if (!err) return "Unknown error";
+  if (/no pushed Shipskart vessel link/.test(err)) return "This vessel does not exist on Shipskart yet — enable automatic sync (or ask support to link it), then push again";
+  if (/listing .* failed/.test(err)) return "Could not read Shipskart's existing catalogue (connection/signature issue) — nothing was pushed; safe to retry";
   if (/RATE_LIMITED|429/.test(err)) return "Shipskart rate limit — will succeed on retry once the limit resets";
   if (/SKU CODE COLLISION/.test(err)) return "Part code clashes with another vessel's — needs a decision (see tooltip)";
   if (/SANITIZE COLLISION/.test(err)) return "Two part codes become identical after formatting — needs a decision (see tooltip)";
