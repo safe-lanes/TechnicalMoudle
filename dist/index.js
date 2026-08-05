@@ -617,6 +617,7 @@ __export(schema_exports, {
   masterData: () => masterData,
   masterListTypes: () => masterListTypes,
   masterLists: () => masterLists,
+  masterUserVessels: () => masterUserVessels,
   masterUsers: () => masterUsers,
   mocApprovers: () => mocApprovers,
   monthlySnapshots: () => monthlySnapshots,
@@ -642,6 +643,9 @@ __export(schema_exports, {
   shipSurveysLabelsConfig: () => shipSurveysLabelsConfig,
   shipSurveysMaster: () => shipSurveysMaster,
   shipskartRoleMappings: () => shipskartRoleMappings,
+  shipskartTenantConfig: () => shipskartTenantConfig,
+  shipskartUserLinks: () => shipskartUserLinks,
+  shipskartVesselLinks: () => shipskartVesselLinks,
   spareComponentLinks: () => spareComponentLinks,
   spareLocationStock: () => spareLocationStock,
   spares: () => spares,
@@ -683,7 +687,7 @@ import { pgTable as pgTable2, text as text2, integer as integer2, boolean as boo
 import { sql as sql2 } from "drizzle-orm";
 import { createInsertSchema as createInsertSchema2 } from "drizzle-zod";
 import { z } from "zod";
-var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, viewModesMaster, insertViewModesMasterSchema, roleViewModeMapping, insertRoleViewModeMappingSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, syncTableCheckpoints, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncFieldLogFailures, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, insertMocApproverSchema;
+var userRoleEnum, users, insertUserSchema, fleets, insertFleetSchema, vessels, insertVesselSchema, fleetClasses, insertFleetClassSchema, defectSequences, insertDefectSequenceSchema, runningHoursAudit, insertRunningHoursAuditSchema, RENEWAL_ACTION_TYPES, cascadeRunningHoursSchema, RH_COUNTER_TYPES, RH_UPDATE_SOURCES, updateRHConfigSchema, updateMasterRHSchema, components, insertComponentSchema, formDefinitions, insertFormDefinitionSchema, formVersions, insertFormVersionSchema, formVersionUsage, insertFormVersionUsageSchema, ihmItems, insertIhmItemSchema, ihmMaintenanceLog, insertIhmMaintenanceLogSchema, spares, insertSpareSchema, sparesHistory, insertSpareHistorySchema, storesLedger, insertStoresLedgerSchema, storesItems, insertStoresItemSchema, changeRequest, insertChangeRequestSchema, changeRequestApproval, insertChangeRequestApprovalSchema, changeRequestAttachment, insertChangeRequestAttachmentSchema, changeRequestComment, insertChangeRequestCommentSchema, alertPolicies, insertAlertPolicySchema, alertEvents, insertAlertEventSchema, alertDeliveries, insertAlertDeliverySchema, alertConfig, insertAlertConfigSchema, alertAcknowledgements, insertAlertAcknowledgementSchema, jobs, insertJobSchema, workOrders, insertWorkOrderSchema, superintendentNotifications, insertSuperintendentNotificationSchema, workOrderExecutions, insertWorkOrderExecutionSchema, defects, insertDefectSchema, defectActions, insertDefectActionSchema, defectAttachments, insertDefectAttachmentSchema, recurringDefects, insertRecurringDefectSchema, recurringDefectLinks, insertRecurringDefectLinkSchema, importHistory, importChangeLog, insertImportHistorySchema, insertImportChangeLogSchema, makers, insertMakerSchema, masterLists, insertMasterListSchema, masterListTypes, insertMasterListTypeSchema, componentRunningHoursLog, insertComponentRunningHoursLogSchema, auditLog, insertAuditLogSchema, retentionSettings, componentDocuments, insertComponentDocumentSchema, componentClassRegulatory, insertComponentClassRegulatorySchema, componentMaintenanceHistory, insertComponentMaintenanceHistorySchema, componentRequisitions, insertComponentRequisitionSchema, pmsVesselSettings, insertPmsVesselSettingsSchema, companyStandardGraceSettings, insertCompanyStandardGraceSettingsSchema, companyApprovalSettings, makerList, insertMakerListSchema, fleetComponents, insertFleetComponentsSchema, fleetJobs, insertFleetJobsSchema, fleetSpares, insertFleetSparesSchema, sfiDetails, insertSfiDetailsSchema, masterData, insertMasterDataSchema, fleetVesselMapping, insertFleetVesselMappingSchema, fleetComponentMapping, insertFleetComponentMappingSchema, fleetJobVesselMapping, insertFleetJobVesselMappingSchema, fleetSpareVesselMapping, insertFleetSpareVesselMappingSchema, bulkImportHistory, insertBulkImportHistorySchema, bulkImportErrors, insertBulkImportErrorSchema, certificates, insertCertificateSchema, surveys, insertSurveySchema, workOrderExecutionDetails, insertWorkOrderExecutionDetailsSchema, inventoryEventTypeEnum, inventoryReferenceTypeEnum, ihmPresenceEnum, ihmEvidenceTypeEnum, locations, insertLocationSchema, spareComponentLinks, insertSpareComponentLinkSchema, spareLocationStock, insertSpareLocationStockSchema, inventoryTransactions, insertInventoryTransactionSchema, INVENTORY_EVENT_TYPES, INVENTORY_REFERENCE_TYPES, IHM_PRESENCE_VALUES, IHM_EVIDENCE_TYPES, inventoryTransactionInputSchema, jobComponentLinks, insertJobComponentLinkSchema, equipmentCategories, insertEquipmentCategorySchema, defectCategories, insertDefectCategorySchema, defectTypes, insertDefectTypeSchema, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, insertShipCertificatesLabelsConfigSchema, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, insertVesselCertificateDataSchema, shipSurveysMaster, insertShipSurveyMasterSchema, shipSurveysLabelsConfig, insertShipSurveysLabelsConfigSchema, vesselSurveyApplicability, insertVesselSurveyApplicabilitySchema, vesselSurveyData, insertVesselSurveyDataSchema, workOrderPostponements, insertWorkOrderPostponementSchema, woPostponementApprovals, insertWoPostponementApprovalSchema, reportSnapshots, insertReportSnapshotSchema, workOrderDocuments, insertWorkOrderDocumentSchema, vesselTypes, insertVesselTypeSchema, additionalGroups, insertAdditionalGroupSchema, ports, insertPortSchema, fleetGroups, insertFleetGroupSchema, masterUsers, insertMasterUserSchema, workOrderAnomalies, insertWorkOrderAnomalySchema, admnRoleMaster, insertAdmnRoleMasterSchema, viewModesMaster, insertViewModesMasterSchema, roleViewModeMapping, insertRoleViewModeMappingSchema, admMenumasterAc, insertAdmMenumasterAcSchema, admRoleMenuAccess, insertAdmRoleMenuAccessSchema, approvalWorkflowConfig, insertApprovalWorkflowConfigSchema, plannerDates, insertPlannerDateSchema, reportFavorites, insertReportFavoriteSchema, admAvailableRanks, insertAdmAvailableRanksSchema, admVesselOrgChart, insertAdmVesselOrgChartSchema, vesselOrgChartNodes, insertVesselOrgChartNodeSchema, vesselDepartmentConfig, insertVesselDepartmentConfigSchema, monthlySnapshots, insertMonthlySnapshotSchema, syncMetadata, syncTableCheckpoints, insertSyncMetadataSchema, syncFieldLog, insertSyncFieldLogSchema, syncFieldLogFailures, syncConflicts, insertSyncConflictsSchema, syncFileQueue, insertSyncFileQueueSchema, syncBatches, insertSyncBatchesSchema, syncSettings, insertSyncSettingsSchema, mocApprovers, shipskartRoleMappings, shipskartTenantConfig, shipskartUserLinks, shipskartVesselLinks, masterUserVessels, insertMocApproverSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -4163,6 +4167,8 @@ var init_schema = __esm({
       // Path to any attached documents
       approvalWorkflowSnapshot: jsonb("approval_workflow_snapshot"),
       // Snapshot of level1/level2 config at submission time
+      requestType: text2("request_type"),
+      // 'Postponement' | 'Re-Postponement'; NULL treated as 'Postponement' for pre-migration rows
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
       isSync: boolean2("is_sync").default(false),
@@ -4196,6 +4202,8 @@ var init_schema = __esm({
       actionByUserId: text2("action_by_user_id"),
       actionAt: timestamp3("action_at", { withTimezone: true }),
       remarks: text2("remarks"),
+      requestType: text2("request_type"),
+      // 'Postponement' | 'Re-Postponement'; NULL treated as 'Postponement' for pre-migration rows
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
       createdByUuid: text2("created_by_uuid"),
@@ -4951,6 +4959,57 @@ var init_schema = __esm({
       updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date()),
       updatedByUuid: text2("updated_by_uuid")
     });
+    shipskartTenantConfig = pgTable2("shipskart_tenant_config", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      tenantId: text2("tenant_id").notNull().unique(),
+      enabled: boolean2("enabled").notNull().default(false),
+      reconcilerEnabled: boolean2("reconciler_enabled").notNull().default(false),
+      accessToken: text2("access_token"),
+      refreshToken: text2("refresh_token"),
+      accessExpiresAt: timestamp3("access_expires_at", { withTimezone: true }),
+      refreshExpiresAt: timestamp3("refresh_expires_at", { withTimezone: true }),
+      lastBootstrapAt: timestamp3("last_bootstrap_at", { withTimezone: true }),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    shipskartUserLinks = pgTable2("shipskart_user_links", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      userUuid: text2("user_uuid").notNull().unique(),
+      shipskartUserId: text2("shipskart_user_id"),
+      pushStatus: text2("push_status").notNull().default("pending"),
+      // mig 153: the Shipskart role we last pushed — role-drift detection for update-user-details
+      pushedRoleId: text2("pushed_role_id"),
+      pushedRoleName: text2("pushed_role_name"),
+      lastError: text2("last_error"),
+      pushedAt: timestamp3("pushed_at", { withTimezone: true }),
+      createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    shipskartVesselLinks = pgTable2("shipskart_vessel_links", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      vesselVuuid: text2("vessel_vuuid").notNull().unique(),
+      imoNumber: text2("imo_number"),
+      shipskartVesselId: text2("shipskart_vessel_id"),
+      pushStatus: text2("push_status").notNull().default("pending"),
+      lastError: text2("last_error"),
+      pushedAt: timestamp3("pushed_at", { withTimezone: true }),
+      createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    masterUserVessels = pgTable2("master_user_vessels", {
+      id: integer2("id").primaryKey().generatedAlwaysAsIdentity(),
+      userUuid: text2("user_uuid").notNull(),
+      vesselId: text2("vessel_id").notNull(),
+      isActive: boolean2("is_active").notNull().default(true),
+      shipskartMappingId: text2("shipskart_mapping_id"),
+      mapStatus: text2("map_status").notNull().default("pending"),
+      lastError: text2("last_error"),
+      mappedAt: timestamp3("mapped_at", { withTimezone: true }),
+      createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    }, (table) => ({
+      userVesselUnique: unique("master_user_vessels_user_vessel_unique").on(table.userUuid, table.vesselId),
+      userIdx: index2("idx_master_user_vessels_user").on(table.userUuid)
+    }));
     insertMocApproverSchema = createInsertSchema2(mocApprovers).omit({
       id: true,
       mauuid: true,
@@ -4987,15 +5046,15 @@ async function resolvePostgres() {
     return void 0;
   }
   try {
-    const pool2 = new Pool({
+    const pool4 = new Pool({
       connectionString: process.env.DATABASE_URL,
       max: Number(process.env.DB_POOL_MAX) || 25,
       connectionTimeoutMillis: Number(process.env.DB_CONNECT_TIMEOUT_MS) || 1e4,
       idleTimeoutMillis: 3e4
     });
-    const db2 = drizzle(pool2, { schema: schema_exports });
+    const db2 = drizzle(pool4, { schema: schema_exports });
     await db2.execute(sql3`SELECT 1`);
-    cachedPostgres = { db: db2, pool: pool2 };
+    cachedPostgres = { db: db2, pool: pool4 };
     cacheInitialized = true;
     return cachedPostgres;
   } catch (error) {
@@ -6310,6 +6369,56 @@ var init_syncConfig = __esm({
         businessRules: null,
         notes: "Per-table one-way watermarks (migration 148). Runtime infrastructure \u2014 each instance owns its own; must NEVER sync, exactly like sync_metadata."
       },
+      // Shipskart b2b integration (migration 149) — SHORE-ONLY. Ships never talk to Shipskart;
+      // tokens, external ids and push bookkeeping must never travel to a vessel.
+      shipskart_tenant_config: {
+        tableName: "shipskart_tenant_config",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Shipskart b2b per-tenant state incl. ROTATING TOKEN PAIR \u2014 secrets-adjacent, shore-only, never sync."
+      },
+      shipskart_user_links: {
+        tableName: "shipskart_user_links",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "SAILERP user \u2192 Shipskart user link + push status (migration 149). Shore-only reconciler bookkeeping."
+      },
+      shipskart_vessel_links: {
+        tableName: "shipskart_vessel_links",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "Vessel \u2192 Shipskart vessel link + push status (migration 149). Shore-only reconciler bookkeeping."
+      },
+      master_user_vessels: {
+        tableName: "master_user_vessels",
+        category: "NO_SYNC",
+        direction: "none",
+        identityColumn: null,
+        vesselScopeColumn: null,
+        vesselScopeJoinPath: null,
+        isGlobal: true,
+        isConfigurable: false,
+        businessRules: null,
+        notes: "SAILERP myVessels assignments captured at login + Shipskart mapping status (migration 149). Shore-only."
+      },
       sync_field_log: {
         tableName: "sync_field_log",
         category: "NO_SYNC",
@@ -6846,7 +6955,7 @@ var init_rhValidation = __esm({
 });
 
 // server/modules/sync/oneWayApplier.ts
-async function getColumnMeta(pool2, tableName) {
+async function getColumnMeta(pool4, tableName) {
   if (columnMetaCache.has(tableName)) return columnMetaCache.get(tableName);
   let identityAlwaysCols = /* @__PURE__ */ new Set();
   let jsonCols = /* @__PURE__ */ new Set();
@@ -6854,7 +6963,7 @@ async function getColumnMeta(pool2, tableName) {
   let arrayCols = /* @__PURE__ */ new Set();
   let requiredCols = /* @__PURE__ */ new Set();
   try {
-    const identityResult = await pool2.query(
+    const identityResult = await pool4.query(
       `SELECT a.attname FROM pg_attribute a
        JOIN pg_class c ON a.attrelid = c.oid
        JOIN pg_namespace n ON c.relnamespace = n.oid
@@ -6862,7 +6971,7 @@ async function getColumnMeta(pool2, tableName) {
       [tableName]
     );
     identityAlwaysCols = new Set((identityResult.rows || []).map((r) => r.attname));
-    const serialResult = await pool2.query(
+    const serialResult = await pool4.query(
       `SELECT a.attname FROM pg_attribute a
        JOIN pg_class c ON a.attrelid = c.oid
        JOIN pg_namespace n ON c.relnamespace = n.oid
@@ -6877,7 +6986,7 @@ async function getColumnMeta(pool2, tableName) {
   } catch {
   }
   try {
-    const jsonResult = await pool2.query(
+    const jsonResult = await pool4.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1
        AND data_type IN ('json', 'jsonb')`,
@@ -6887,7 +6996,7 @@ async function getColumnMeta(pool2, tableName) {
   } catch {
   }
   try {
-    const colResult = await pool2.query(
+    const colResult = await pool4.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1`,
       [tableName]
@@ -6896,7 +7005,7 @@ async function getColumnMeta(pool2, tableName) {
   } catch {
   }
   try {
-    const arrResult = await pool2.query(
+    const arrResult = await pool4.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1 AND data_type = 'ARRAY'`,
       [tableName]
@@ -6905,7 +7014,7 @@ async function getColumnMeta(pool2, tableName) {
   } catch {
   }
   try {
-    const reqResult = await pool2.query(
+    const reqResult = await pool4.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1
        AND is_nullable = 'NO' AND column_default IS NULL`,
@@ -6933,8 +7042,8 @@ async function applyOneWayRows(tableName, rows) {
   }
   const identityCol = config.identityColumn;
   const lookupColumn = identityCol || "id";
-  const pool2 = await getPool();
-  const meta = await getColumnMeta(pool2, tableName);
+  const pool4 = await getPool();
+  const meta = await getColumnMeta(pool4, tableName);
   const COMPOSITE_KEY_TABLES = {
     vessel_certificate_applicability: ["vessel_id", "master_id"],
     vessel_survey_applicability: ["vessel_id", "master_id"],
@@ -6996,7 +7105,7 @@ async function applyOneWayRows(tableName, rows) {
         } else {
           whereClause = conditions.join(" AND ");
         }
-        existCheck = await pool2.query(
+        existCheck = await pool4.query(
           `SELECT "id" FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
           whereValues
         );
@@ -7008,14 +7117,14 @@ async function applyOneWayRows(tableName, rows) {
         }
         whereClause = `"${lookupColumn}" = $1`;
         whereValues = [lookupValue];
-        existCheck = await pool2.query(
+        existCheck = await pool4.query(
           `SELECT 1 FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
           whereValues
         );
       }
       if (existCheck.rows.length > 0) {
         if (isDeleted) {
-          await pool2.query(
+          await pool4.query(
             `UPDATE "${tableName}" SET is_deleted = true, updated_at = NOW() WHERE ${whereClause}`,
             whereValues
           );
@@ -7026,7 +7135,7 @@ async function applyOneWayRows(tableName, rows) {
             const offset = updatePairs.values.length;
             const reindexedWhere = whereClause.replace(/\$(\d+)/g, (_, n) => `$${Number(n) + offset}`);
             const updateSQL = `UPDATE "${tableName}" SET ${updatePairs.setClauses.join(", ")}, updated_at = NOW() WHERE ${reindexedWhere}`;
-            await pool2.query(updateSQL, [...updatePairs.values, ...whereValues]);
+            await pool4.query(updateSQL, [...updatePairs.values, ...whereValues]);
           }
           result.updated++;
         }
@@ -7038,7 +7147,7 @@ async function applyOneWayRows(tableName, rows) {
         const insertParts = buildInsertParts(row, meta, useCompositeKey);
         if (insertParts.columns.length > 0) {
           const insertSQL = `INSERT INTO "${tableName}" (${insertParts.columns.join(", ")}) VALUES (${insertParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
-          const ins = await pool2.query(insertSQL, insertParts.values);
+          const ins = await pool4.query(insertSQL, insertParts.values);
           if ((ins.rowCount ?? 0) > 0) {
             result.inserted++;
           } else {
@@ -7047,7 +7156,7 @@ async function applyOneWayRows(tableName, rows) {
             try {
               const pkVal = row["id"] ?? row["ID"];
               if (pkVal !== void 0 && pkVal !== null && lookupColumn) {
-                const clash = await pool2.query(
+                const clash = await pool4.query(
                   `SELECT "${lookupColumn}" AS existing FROM "${tableName}" WHERE "id" = $1 LIMIT 1`,
                   [pkVal]
                 );
@@ -7073,7 +7182,7 @@ async function applyOneWayRows(tableName, rows) {
   if (meta.identityAlwaysCols.size > 0) {
     for (const col of Array.from(meta.identityAlwaysCols)) {
       try {
-        await pool2.query(
+        await pool4.query(
           `SELECT setval(pg_get_serial_sequence('"${tableName}"', '${col}'), GREATEST(COALESCE((SELECT MAX("${col}") FROM "${tableName}"), 0), 1))`
         );
       } catch (e) {
@@ -7178,7 +7287,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
     return { insertedRows: 0, updateLogs: [], errors: [], failedRowUuids: [], needsFullRows: [] };
   }
   syncDiag(`FIELD-LOG-INSERT START: ${fieldLogs.length} logs`);
-  const pool2 = externalClient || await getPool();
+  const pool4 = externalClient || await getPool();
   let insertedRows = 0;
   const updateLogs = [];
   const errors = [];
@@ -7209,7 +7318,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
     let isRecoveryInsert = false;
     if (!isInsertGroup && !hasAnyInsertLogs) {
       try {
-        const exist = await pool2.query(`SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [rowUuid]);
+        const exist = await pool4.query(`SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [rowUuid]);
         if (exist.rows.length > 0) {
           if (isImmutable) {
             syncDiag(`FIELD-LOG-INSERT IMMUTABLE-ACK: ${tableName}.${rowUuid} exists on receiver \u2014 re-delivered log acked as already-applied (immutable; no UPDATE issued)`);
@@ -7233,12 +7342,12 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
     const savepointName = `ins_${tableName.replace(/[^a-z0-9_]/gi, "")}_${rowUuid.replace(/[^a-z0-9]/gi, "").substring(0, 8)}`;
     if (externalClient) {
       try {
-        await pool2.query(`SAVEPOINT ${savepointName}`);
+        await pool4.query(`SAVEPOINT ${savepointName}`);
       } catch {
       }
     }
     try {
-      const existCheck = await pool2.query(
+      const existCheck = await pool4.query(
         `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
         [rowUuid]
       );
@@ -7246,7 +7355,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
         if (isImmutable) {
           if (externalClient) {
             try {
-              await pool2.query(`RELEASE SAVEPOINT ${savepointName}`);
+              await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
             } catch {
             }
           }
@@ -7256,7 +7365,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
         updateLogs.push(...logs);
         continue;
       }
-      meta = await getColumnMeta(pool2, tableName);
+      meta = await getColumnMeta(pool4, tableName);
       rowData = {};
       rowData[identityCol] = rowUuid;
       if (config.vesselScopeColumn && logs[0].vesselId) {
@@ -7304,7 +7413,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
           failedRowUuids.push(rowUuid);
           if (externalClient) {
             try {
-              await pool2.query(`RELEASE SAVEPOINT ${savepointName}`);
+              await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
             } catch {
             }
           }
@@ -7334,7 +7443,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
         continue;
       }
       const insertSQL = `INSERT INTO "${tableName}" (${columns.join(", ")}) VALUES (${placeholders.join(", ")}) ON CONFLICT ("${identityCol}") DO NOTHING`;
-      await pool2.query(insertSQL, values);
+      await pool4.query(insertSQL, values);
       insertedRows++;
       syncDiag(`FIELD-LOG-INSERT OK: ${tableName} row=${rowUuid} (${columns.length} columns)`);
       console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
@@ -7343,7 +7452,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
           const compId = rowData["component_id"];
           const newRH = rowData["cumulative_rh"] || rowData["new_rh"];
           if (newRH !== void 0 && newRH !== null) {
-            const oldRow = await pool2.query(
+            const oldRow = await pool4.query(
               `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
               [compId]
             );
@@ -7351,7 +7460,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
             const rhUpdatedAt = rowData["entered_at_utc"] || /* @__PURE__ */ new Date();
             const lastUpdatedText = rowData["date_updated_local"] || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
             const rhMasterUpdatedAtVal = safeParseDate(rowData["date_updated_local"]) || rhUpdatedAt;
-            await pool2.query(
+            await pool4.query(
               `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
               [String(newRH), compId, rhMasterUpdatedAtVal, lastUpdatedText]
             );
@@ -7363,12 +7472,12 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       }
       if ((tableName === "spare_location_stock" || tableName === "inventory_transactions") && rowData["location_uuid"]) {
         try {
-          const locLookup = await pool2.query(
+          const locLookup = await pool4.query(
             `SELECT id FROM locations WHERE luuid = $1 LIMIT 1`,
             [rowData["location_uuid"]]
           );
           if (locLookup.rows.length > 0) {
-            await pool2.query(
+            await pool4.query(
               `UPDATE "${tableName}" SET "location_id" = $1 WHERE "${identityCol}" = $2`,
               [locLookup.rows[0].id, rowUuid]
             );
@@ -7382,12 +7491,12 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       }
       if (tableName === "change_request_approval" && rowData["change_request_uuid"]) {
         try {
-          const crLookup = await pool2.query(
+          const crLookup = await pool4.query(
             `SELECT id FROM change_request WHERE cruuid = $1 LIMIT 1`,
             [rowData["change_request_uuid"]]
           );
           if (crLookup.rows.length > 0) {
-            await pool2.query(
+            await pool4.query(
               `UPDATE "${tableName}" SET "change_request_id" = $1 WHERE "${identityCol}" = $2`,
               [crLookup.rows[0].id, rowUuid]
             );
@@ -7401,14 +7510,14 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       }
       if (externalClient) {
         try {
-          await pool2.query(`RELEASE SAVEPOINT ${savepointName}`);
+          await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
         } catch {
         }
       }
     } catch (err) {
       if (externalClient) {
         try {
-          await pool2.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
         } catch {
         }
       }
@@ -7418,7 +7527,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
           `[FieldLogInsert] Unique constraint hit for ${tableName}.${rowUuid} \u2014 falling back to field-level UPDATE (constraint: ${err.constraint || "unknown"})`
         );
         try {
-          if (!meta) meta = await getColumnMeta(pool2, tableName);
+          if (!meta) meta = await getColumnMeta(pool4, tableName);
           const vesselScopeCol = config.vesselScopeColumn;
           const vesselIdVal = logs[0].vesselId;
           let existingIdentity = null;
@@ -7430,7 +7539,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
             if (constraintCols.length > 0 && constraintCols.length === constraintVals.length) {
               const whereParts = constraintCols.map((col, i) => `"${col}" = $${i + 1}`);
               const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${whereParts.join(" AND ")} LIMIT 1`;
-              const constraintResult = await pool2.query(lookupSQL, constraintVals);
+              const constraintResult = await pool4.query(lookupSQL, constraintVals);
               if (constraintResult.rows.length > 0) {
                 existingIdentity = constraintResult.rows[0][identityCol];
                 syncDiag(`FIELD-LOG-INSERT CONFLICT FOUND: ${tableName} existing identity=${existingIdentity} via constraint columns`);
@@ -7438,7 +7547,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
             }
           }
           if (!existingIdentity && vesselScopeCol && vesselIdVal) {
-            const lookupResult = await pool2.query(
+            const lookupResult = await pool4.query(
               `SELECT "${identityCol}" FROM "${tableName}" WHERE "${vesselScopeCol}" = $1 LIMIT 2`,
               [vesselIdVal]
             );
@@ -7459,7 +7568,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
               }
               if (lookupCols.length > 0) {
                 const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${lookupCols.join(" AND ")} LIMIT 1`;
-                const specificResult = await pool2.query(lookupSQL, lookupVals);
+                const specificResult = await pool4.query(lookupSQL, lookupVals);
                 if (specificResult.rows.length > 0) {
                   existingIdentity = specificResult.rows[0][identityCol];
                 }
@@ -7484,7 +7593,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
               }
               try {
                 const logTs = log2.changedAt instanceof Date ? log2.changedAt : log2.changedAt ? new Date(String(log2.changedAt)) : /* @__PURE__ */ new Date();
-                await pool2.query(
+                await pool4.query(
                   `UPDATE "${tableName}" SET "${fieldSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
                   [valueToApply, existingIdentity, logTs]
                 );
@@ -7495,7 +7604,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
             }
             if (existingIdentity !== rowUuid) {
               try {
-                await pool2.query(
+                await pool4.query(
                   `UPDATE "${tableName}" SET "${identityCol}" = $1 WHERE "${identityCol}" = $2`,
                   [rowUuid, existingIdentity]
                 );
@@ -7543,16 +7652,16 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
           try {
             if (externalClient) {
               try {
-                await pool2.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+                await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
               } catch {
               }
               try {
-                await pool2.query(`SAVEPOINT ${savepointName}`);
+                await pool4.query(`SAVEPOINT ${savepointName}`);
               } catch {
               }
             }
             rowData[fkColumn] = null;
-            if (!meta) meta = await getColumnMeta(pool2, tableName);
+            if (!meta) meta = await getColumnMeta(pool4, tableName);
             const cols2 = [];
             const phs2 = [];
             const vals2 = [];
@@ -7565,19 +7674,19 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
               pi2++;
             }
             const retrySQL = `INSERT INTO "${tableName}" (${cols2.join(", ")}) VALUES (${phs2.join(", ")}) ON CONFLICT ("${identityCol}") DO NOTHING`;
-            await pool2.query(retrySQL, vals2);
+            await pool4.query(retrySQL, vals2);
             insertedRows++;
             syncDiag(`FK-NULL RETRY OK: ${tableName} row=${rowUuid} \u2014 inserted with ${fkColumn}=NULL (will be filled by future sync)`);
             if (externalClient) {
               try {
-                await pool2.query(`RELEASE SAVEPOINT ${savepointName}`);
+                await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
               } catch {
               }
             }
           } catch (retryErr) {
             if (externalClient) {
               try {
-                await pool2.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+                await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
               } catch {
               }
             }
@@ -7593,7 +7702,7 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       } else {
         if (externalClient) {
           try {
-            await pool2.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+            await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           } catch {
           }
         }
@@ -7616,8 +7725,8 @@ async function applyFullRowsIfAbsent(tableName, rows) {
     return out;
   }
   const identityCol = config.identityColumn || "id";
-  const pool2 = await getPool();
-  const meta = await getColumnMeta(pool2, tableName);
+  const pool4 = await getPool();
+  const meta = await getColumnMeta(pool4, tableName);
   for (const row of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
     const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
     if (!identity) {
@@ -7625,7 +7734,7 @@ async function applyFullRowsIfAbsent(tableName, rows) {
       continue;
     }
     try {
-      const exist = await pool2.query(
+      const exist = await pool4.query(
         `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
         [identity]
       );
@@ -7646,12 +7755,12 @@ async function applyFullRowsIfAbsent(tableName, rows) {
       }
       const sqlText = `INSERT INTO "${tableName}" (${parts.columns.join(", ")}) VALUES (${parts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
       try {
-        await pool2.query(sqlText, parts.values);
+        await pool4.query(sqlText, parts.values);
       } catch (insErr) {
         if (insErr.code === "23505" && tableName === "work_orders") {
           const retryRow = { ...row, id: `WO-SYNC-${identity}` };
           const retryParts = buildInsertParts(retryRow, meta, true);
-          await pool2.query(
+          await pool4.query(
             `INSERT INTO "${tableName}" (${retryParts.columns.join(", ")}) VALUES (${retryParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`,
             retryParts.values
           );
@@ -7659,7 +7768,7 @@ async function applyFullRowsIfAbsent(tableName, rows) {
           throw insErr;
         }
       }
-      const landed = await pool2.query(
+      const landed = await pool4.query(
         `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
         [identity]
       );
@@ -7683,7 +7792,7 @@ async function applyFullRowsIfAbsent(tableName, rows) {
 }
 async function gatherFullRows(requests) {
   const out = [];
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   let budget = SELF_HEAL_MAX_ROWS_PER_CYCLE;
   for (const req of requests) {
     if (budget <= 0) break;
@@ -7692,7 +7801,7 @@ async function gatherFullRows(requests) {
     const identityCol = config.identityColumn || "id";
     const uuids = req.rowUuids.slice(0, budget);
     try {
-      const r = await pool2.query(
+      const r = await pool4.query(
         `SELECT * FROM "${req.tableName}" WHERE "${identityCol}" = ANY($1)`,
         [uuids]
       );
@@ -7906,11 +8015,11 @@ function retryDelayMs(attempts) {
   return tier ? map[tier.interval] : 7 * D;
 }
 async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e3) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool4.query(
     `WITH picked AS (
        SELECT table_name, row_uuid
        FROM (
@@ -7932,7 +8041,7 @@ async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e
   return result.rows;
 }
 async function getFieldLogsSinceCheckpoint(vesselId, sinceTimestamp, excludeInstanceId, vesselCode, limit = 5e3) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const vesselPlaceholders = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
@@ -7954,25 +8063,25 @@ async function getFieldLogsSinceCheckpoint(vesselId, sinceTimestamp, excludeInst
      JOIN picked p ON s.table_name = p.table_name AND s.row_uuid = p.row_uuid
      WHERE ${whereClause}
      ORDER BY s.changed_at ASC, s.row_uuid, s.id`;
-  const result = await pool2.query(query, params);
+  const result = await pool4.query(query, params);
   if (result.rows.length === 0) {
     try {
       const vp = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
-      const totalCount = await pool2.query(
+      const totalCount = await pool4.query(
         `SELECT count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp})`,
         vesselValues
       );
       const total = totalCount.rows[0]?.c || 0;
       if (total > 0) {
-        const unsyncedCount = await pool2.query(
+        const unsyncedCount = await pool4.query(
           `SELECT count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp}) AND is_synced = false`,
           vesselValues
         );
-        const instanceCount = await pool2.query(
+        const instanceCount = await pool4.query(
           `SELECT count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp}) AND is_synced = false AND instance_id != $${vesselValues.length + 1}`,
           [...vesselValues, excludeInstanceId]
         );
-        const instanceSample = await pool2.query(
+        const instanceSample = await pool4.query(
           `SELECT DISTINCT instance_id, count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp}) AND is_synced = false GROUP BY instance_id LIMIT 10`,
           vesselValues
         );
@@ -7991,11 +8100,11 @@ async function markFieldLogsSynced(logUuids, batchId) {
   return logUuids.length;
 }
 async function getFieldLogCount(vesselId, isSynced, vesselCode) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool4.query(
     `SELECT count(*)::int AS count FROM sync_field_log WHERE vessel_id IN (${placeholders}) AND is_synced = $${vesselValues.length + 1}`,
     [...vesselValues, isSynced]
   );
@@ -8048,8 +8157,8 @@ async function queueFile(data) {
   return result[0];
 }
 async function queueFileWithUuid(data) {
-  const pool2 = await getPool();
-  const result = await pool2.query(
+  const pool4 = await getPool();
+  const result = await pool4.query(
     `INSERT INTO sync_file_queue (queue_uuid, table_name, row_uuid, file_key, file_name, file_size_bytes, file_hash, direction, vessel_id, instance_id, total_chunks, priority, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'in_progress')
      ON CONFLICT (queue_uuid) DO NOTHING
@@ -8092,8 +8201,8 @@ async function getPendingFiles(vesselId, direction, limit = 100) {
   )).orderBy(desc(syncFileQueue.priority), asc(syncFileQueue.fileSizeBytes), asc(syncFileQueue.createdAt)).limit(limit);
 }
 async function getPendingFileCountBySize(vesselId, direction, maxBytes) {
-  const pool2 = await getPool();
-  const result = await pool2.query(
+  const pool4 = await getPool();
+  const result = await pool4.query(
     `SELECT count(*)::int AS c FROM sync_file_queue
      WHERE vessel_id = $1 AND direction = $2 AND status = 'pending'
        AND (file_size_bytes IS NULL OR file_size_bytes <= $3)`,
@@ -8169,8 +8278,8 @@ async function getRecentBatches(vesselId, limit = 10) {
   return db2.select().from(syncBatches).where(conditions.length > 0 ? and(...conditions) : void 0).orderBy(desc(syncBatches.startedAt)).limit(limit);
 }
 async function getTableCheckpoints(instanceId) {
-  const pool2 = await getPool();
-  const r = await pool2.query(
+  const pool4 = await getPool();
+  const r = await pool4.query(
     `SELECT table_name, last_checkpoint FROM sync_table_checkpoints
       WHERE instance_id = $1 AND last_checkpoint IS NOT NULL`,
     [instanceId]
@@ -8182,11 +8291,11 @@ async function getTableCheckpoints(instanceId) {
 async function setTableCheckpoints(instanceId, checkpoints) {
   const entries = Object.entries(checkpoints || {});
   if (entries.length === 0) return 0;
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   let written = 0;
   for (const [tableName, ts] of entries) {
     if (!ts) continue;
-    const r = await pool2.query(
+    const r = await pool4.query(
       `INSERT INTO sync_table_checkpoints (instance_id, table_name, last_checkpoint, updated_at)
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (instance_id, table_name) DO UPDATE
@@ -8259,8 +8368,8 @@ async function updateSettings(settings, userId) {
   }
 }
 async function insertConnectivityLog(entry) {
-  const pool2 = await getPool();
-  await pool2.query(
+  const pool4 = await getPool();
+  await pool4.query(
     `INSERT INTO sync_connectivity_log
        (instance_id, vessel_id, outcome, error_message, error_category, latency_ms,
         batch_uuid, records_pushed, records_pulled, catch_up_cycle, trigger_type)
@@ -8281,7 +8390,7 @@ async function insertConnectivityLog(entry) {
   );
 }
 async function getConnectivityLogs(vesselId, limit = 100, sinceHoursAgo) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   let query = `SELECT * FROM sync_connectivity_log WHERE vessel_id = $1`;
   const params = [vesselId];
   if (sinceHoursAgo) {
@@ -8289,15 +8398,15 @@ async function getConnectivityLogs(vesselId, limit = 100, sinceHoursAgo) {
   }
   query += ` ORDER BY attempted_at DESC LIMIT $${params.length + 1}`;
   params.push(limit);
-  const result = await pool2.query(query, params);
+  const result = await pool4.query(query, params);
   return result.rows;
 }
 async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool4.query(
     `SELECT count(*)::int AS c FROM sync_field_log
      WHERE instance_id = $1
        AND vessel_id IN (${placeholders})
@@ -8307,11 +8416,11 @@ async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
   return result.rows[0]?.c ?? 0;
 }
 async function getDueFieldLogCount(instanceId, vesselId, vesselCode) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool4.query(
     `SELECT count(*)::int AS c FROM sync_field_log
      WHERE instance_id = $1
        AND vessel_id IN (${placeholders})
@@ -8322,11 +8431,11 @@ async function getDueFieldLogCount(instanceId, vesselId, vesselCode) {
   return result.rows[0]?.c ?? 0;
 }
 async function getShorePullRemainingCount(vesselId, excludeInstanceId, vesselCode) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await pool2.query(
+  const result = await pool4.query(
     `SELECT count(*)::int AS c FROM sync_field_log
      WHERE vessel_id IN (${placeholders})
        AND instance_id != $${vesselValues.length + 1}
@@ -8336,17 +8445,17 @@ async function getShorePullRemainingCount(vesselId, excludeInstanceId, vesselCod
   return result.rows[0]?.c ?? 0;
 }
 async function hasDeliveredSyncHistory(vesselId, instanceId, vesselCode) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
-  const delivered = await pool2.query(
+  const delivered = await pool4.query(
     `SELECT 1 FROM sync_field_log
       WHERE vessel_id IN (${placeholders}) AND is_synced = true LIMIT 1`,
     vesselValues
   );
   if (delivered.rows.length > 0) return true;
-  const cp = await pool2.query(
+  const cp = await pool4.query(
     `SELECT 1 FROM sync_metadata
       WHERE instance_id = $1 AND last_sync_checkpoint IS NOT NULL LIMIT 1`,
     [instanceId]
@@ -8354,25 +8463,25 @@ async function hasDeliveredSyncHistory(vesselId, instanceId, vesselCode) {
   return cp.rows.length > 0;
 }
 async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, vesselCode, opts) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
   const vp = vesselValues.map((_, i) => `$${i + 1}`).join(", ");
   const ip = `$${vesselValues.length + 1}`;
   const tp = `$${vesselValues.length + 2}`;
-  const batches = await pool2.query(
+  const batches = await pool4.query(
     `DELETE FROM sync_batches WHERE initiated_by_instance = $1`,
     [instanceId]
   );
   const batchesDeleted = batches.rowCount ?? 0;
   const T = opts?.snapshotAt ?? null;
   if (opts?.blunt || !T) {
-    const fl = await pool2.query(
+    const fl = await pool4.query(
       `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
         WHERE vessel_id IN (${vp}) AND instance_id != ${ip} AND is_synced = true`,
       [...vesselValues, instanceId]
     );
-    await pool2.query(
+    await pool4.query(
       `UPDATE sync_metadata SET last_sync_checkpoint = NULL, updated_at = NOW() WHERE instance_id = $1`,
       [instanceId]
     );
@@ -8382,19 +8491,19 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
     );
     return { mode: "blunt", baselineMarkedSynced: 0, postSnapshotUnsynced: postSnapshotUnsynced2, batchesDeleted, checkpoint: null };
   }
-  const a1 = await pool2.query(
+  const a1 = await pool4.query(
     `UPDATE sync_field_log SET is_synced = true
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at <= ${tp} AND is_synced = false`,
     [...vesselValues, instanceId, T]
   );
-  const a2 = await pool2.query(
+  const a2 = await pool4.query(
     `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at > ${tp} AND is_synced = true`,
     [...vesselValues, instanceId, T]
   );
-  await pool2.query(
+  await pool4.query(
     `UPDATE sync_metadata SET last_sync_checkpoint = $2, updated_at = NOW() WHERE instance_id = $1`,
     [instanceId, T]
   );
@@ -8431,9 +8540,9 @@ function canonicaliseBooleanSettings(settings) {
 }
 async function recordDeliveryAttempt(rowUuids, instanceId) {
   if (!rowUuids.length) return 0;
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const res = await pool2.query(
+  const pool4 = await getPool();
+  if (!pool4) return 0;
+  const res = await pool4.query(
     `UPDATE sync_field_log
         SET sync_attempts = sync_attempts + 1,
             last_attempt_at = now(),
@@ -8444,10 +8553,10 @@ async function recordDeliveryAttempt(rowUuids, instanceId) {
   return res.rowCount ?? 0;
 }
 async function getRetryBacklog(instanceId) {
-  const pool2 = await getPool();
-  if (!pool2) return { total: 0, stuck: 0, maxAttempts: 0 };
+  const pool4 = await getPool();
+  if (!pool4) return { total: 0, stuck: 0, maxAttempts: 0 };
   const tailFrom = RETRY_LADDER.length + 1;
-  const r = await pool2.query(
+  const r = await pool4.query(
     `SELECT count(*)::int AS total,
             count(*) FILTER (WHERE sync_attempts >= $2)::int AS stuck,
             COALESCE(max(sync_attempts), 0)::int AS max_attempts
@@ -8488,8 +8597,8 @@ __export(fieldLogger_exports, {
 async function hasSerialId(tableName) {
   if (serialIdCache.has(tableName)) return serialIdCache.get(tableName);
   try {
-    const pool2 = await getPool();
-    const meta = await getColumnMeta(pool2, tableName);
+    const pool4 = await getPool();
+    const meta = await getColumnMeta(pool4, tableName);
     const result = meta.identityAlwaysCols.has("id");
     serialIdCache.set(tableName, result);
     return result;
@@ -9489,11 +9598,11 @@ function getThresholds() {
   };
 }
 async function checkStaleSync(thresholds) {
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool4 = await getPool();
+  if (!pool4) {
     return { status: "warning", message: "Database not available", value: 0, threshold: thresholds.staleSyncHours };
   }
-  const result = await pool2.query(
+  const result = await pool4.query(
     `SELECT COUNT(*)::int AS count
      FROM sync_batches
      WHERE status = 'completed'
@@ -9509,7 +9618,7 @@ async function checkStaleSync(thresholds) {
       threshold: thresholds.staleSyncHours
     };
   }
-  const totalResult = await pool2.query(`SELECT COUNT(*)::int AS count FROM sync_batches`);
+  const totalResult = await pool4.query(`SELECT COUNT(*)::int AS count FROM sync_batches`);
   const totalBatches = totalResult.rows[0]?.count ?? 0;
   if (totalBatches === 0) {
     return {
@@ -9527,11 +9636,11 @@ async function checkStaleSync(thresholds) {
   };
 }
 async function checkUnresolvedConflicts(thresholds) {
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool4 = await getPool();
+  if (!pool4) {
     return { status: "warning", message: "Database not available", value: 0, threshold: thresholds.unresolvedConflictDays };
   }
-  const result = await pool2.query(
+  const result = await pool4.query(
     `SELECT COUNT(*)::int AS count
      FROM sync_conflicts
      WHERE resolution IS NULL
@@ -9556,11 +9665,11 @@ async function checkUnresolvedConflicts(thresholds) {
   };
 }
 async function checkStuckFiles(thresholds) {
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool4 = await getPool();
+  if (!pool4) {
     return { status: "warning", message: "Database not available", value: 0, threshold: thresholds.stuckFileHours };
   }
-  const result = await pool2.query(
+  const result = await pool4.query(
     `SELECT
        COUNT(*) FILTER (WHERE status IN ('pending','in_progress')
                           AND created_at < NOW() - INTERVAL '1 hour' * $1)::int AS stuck,
@@ -9591,11 +9700,11 @@ async function checkStuckFiles(thresholds) {
   };
 }
 async function checkLogOverflow(thresholds) {
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool4 = await getPool();
+  if (!pool4) {
     return { status: "warning", message: "Database not available", value: 0, threshold: thresholds.logOverflowCount };
   }
-  const result = await pool2.query(
+  const result = await pool4.query(
     `SELECT COUNT(*)::int AS count
      FROM sync_field_log
      WHERE is_synced = false`
@@ -9645,13 +9754,13 @@ async function runHealthCheck() {
   return result;
 }
 async function getTableStats() {
-  const pool2 = await getPool();
-  if (!pool2) return {};
+  const pool4 = await getPool();
+  if (!pool4) return {};
   const queries = [
-    pool2.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE is_synced = false)::int AS active FROM sync_field_log`),
-    pool2.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status = 'in_progress')::int AS active FROM sync_batches`),
-    pool2.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status IN ('pending', 'in_progress'))::int AS active FROM sync_file_queue`),
-    pool2.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE resolution IS NULL AND is_deleted = false)::int AS active FROM sync_conflicts`)
+    pool4.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE is_synced = false)::int AS active FROM sync_field_log`),
+    pool4.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status = 'in_progress')::int AS active FROM sync_batches`),
+    pool4.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status IN ('pending', 'in_progress'))::int AS active FROM sync_file_queue`),
+    pool4.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE resolution IS NULL AND is_deleted = false)::int AS active FROM sync_conflicts`)
   ];
   const [fieldLog, batches, fileQueue, conflicts] = await Promise.all(queries);
   return {
@@ -9834,7 +9943,7 @@ function getInstanceLabel(instanceId, vesselName) {
   }
   return instanceId;
 }
-async function getRecordLabel(pool2, tableName, rowUuid) {
+async function getRecordLabel(pool4, tableName, rowUuid) {
   const labelConfigs = {
     work_orders: {
       cols: ["job_title", "component_code"],
@@ -9894,7 +10003,7 @@ async function getRecordLabel(pool2, tableName, rowUuid) {
   const identityCol = getIdentityColumn(tableName) || "id";
   const selectCols = config.cols.map((c) => `"${c}"`).join(", ");
   try {
-    const result = await pool2.query(
+    const result = await pool4.query(
       `SELECT ${selectCols} FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
       [rowUuid]
     );
@@ -9905,12 +10014,12 @@ async function getRecordLabel(pool2, tableName, rowUuid) {
     return `${tableName} ${rowUuid.substring(0, 8)}`;
   }
 }
-async function resolveUserName(pool2, userId) {
+async function resolveUserName(pool4, userId) {
   if (!userId || userId === "system" || userId === "System" || userId === "admin") return "System";
   const parsed = parseInt(userId, 10);
   if (isNaN(parsed)) return userId;
   try {
-    const result = await pool2.query(
+    const result = await pool4.query(
       `SELECT full_name FROM users WHERE id = $1 LIMIT 1`,
       [parsed]
     );
@@ -9920,7 +10029,7 @@ async function resolveUserName(pool2, userId) {
   }
 }
 async function listConflicts(filters) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const limit = Math.min(filters.limit || 50, 200);
   const offset = filters.offset || 0;
   const source = filters.source || "all";
@@ -9950,12 +10059,12 @@ async function listConflicts(filters) {
       params.push(filters.dateTo);
     }
     const whereClause = conditions.join(" AND ");
-    const countResult = await pool2.query(
+    const countResult = await pool4.query(
       `SELECT COUNT(*) as cnt FROM sync_conflict_log cl WHERE ${whereClause}`,
       params
     );
     totalLog = parseInt(countResult.rows[0].cnt, 10);
-    const dataResult = await pool2.query(
+    const dataResult = await pool4.query(
       `SELECT cl.*
        FROM sync_conflict_log cl
        WHERE ${whereClause}
@@ -9967,7 +10076,7 @@ async function listConflicts(filters) {
       let incomingUserId = null;
       let winnerUserId = null;
       try {
-        const incomingUser = await pool2.query(
+        const incomingUser = await pool4.query(
           `SELECT changed_by_user_id FROM sync_field_log
            WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
              AND instance_id = $4
@@ -9978,7 +10087,7 @@ async function listConflicts(filters) {
       } catch {
       }
       try {
-        const winnerUser = await pool2.query(
+        const winnerUser = await pool4.query(
           `SELECT changed_by_user_id FROM sync_field_log
            WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
              AND instance_id = $4
@@ -9988,9 +10097,9 @@ async function listConflicts(filters) {
         winnerUserId = winnerUser.rows[0]?.changed_by_user_id || null;
       } catch {
       }
-      const recordDisplay = await getRecordLabel(pool2, row.table_name, row.row_uuid);
-      const incomingUserName = await resolveUserName(pool2, incomingUserId);
-      const winnerUserName = await resolveUserName(pool2, winnerUserId);
+      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+      const incomingUserName = await resolveUserName(pool4, incomingUserId);
+      const winnerUserName = await resolveUserName(pool4, winnerUserId);
       logRows.push({
         id: row.id,
         source: "log",
@@ -10052,12 +10161,12 @@ async function listConflicts(filters) {
     }
     conditions.push(`(sc.is_deleted = false OR sc.is_deleted IS NULL)`);
     const whereClause = conditions.join(" AND ");
-    const countResult = await pool2.query(
+    const countResult = await pool4.query(
       `SELECT COUNT(*) as cnt FROM sync_conflicts sc WHERE ${whereClause}`,
       params
     );
     totalOld = parseInt(countResult.rows[0].cnt, 10);
-    const dataResult = await pool2.query(
+    const dataResult = await pool4.query(
       `SELECT sc.*
        FROM sync_conflicts sc
        WHERE ${whereClause}
@@ -10066,9 +10175,9 @@ async function listConflicts(filters) {
       params
     );
     for (const row of dataResult.rows) {
-      const recordDisplay = await getRecordLabel(pool2, row.table_name, row.row_uuid);
-      const shipUserName = await resolveUserName(pool2, row.ship_changed_by);
-      const shoreUserName = await resolveUserName(pool2, row.shore_changed_by);
+      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+      const shipUserName = await resolveUserName(pool4, row.ship_changed_by);
+      const shoreUserName = await resolveUserName(pool4, row.shore_changed_by);
       oldRows.push({
         id: row.id,
         source: "old",
@@ -10107,7 +10216,7 @@ async function listConflicts(filters) {
   return { rows: allRows, total: totalLog + totalOld };
 }
 async function countUnresolvedConflicts(vesselId) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   let logQuery = `SELECT COUNT(*) as cnt FROM sync_conflict_log WHERE is_resolved = false`;
   let oldQuery = `SELECT COUNT(*) as cnt FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)`;
   const logParams = [];
@@ -10119,17 +10228,17 @@ async function countUnresolvedConflicts(vesselId) {
     oldParams.push(vesselId);
   }
   const [logResult, oldResult] = await Promise.all([
-    pool2.query(logQuery, logParams),
-    pool2.query(oldQuery, oldParams)
+    pool4.query(logQuery, logParams),
+    pool4.query(oldQuery, oldParams)
   ]);
   const fromLog = parseInt(logResult.rows[0].cnt, 10);
   const fromOld = parseInt(oldResult.rows[0].cnt, 10);
   return { total: fromLog + fromOld, fromLog, fromOld };
 }
 async function getConflict2(id, source) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   if (source === "log") {
-    const result = await pool2.query(
+    const result = await pool4.query(
       `SELECT * FROM sync_conflict_log WHERE id = $1`,
       [id]
     );
@@ -10138,7 +10247,7 @@ async function getConflict2(id, source) {
     let incomingUserId = null;
     let winnerUserId = null;
     try {
-      const r = await pool2.query(
+      const r = await pool4.query(
         `SELECT changed_by_user_id FROM sync_field_log
          WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
          ORDER BY changed_at DESC LIMIT 1`,
@@ -10148,7 +10257,7 @@ async function getConflict2(id, source) {
     } catch {
     }
     try {
-      const r = await pool2.query(
+      const r = await pool4.query(
         `SELECT changed_by_user_id FROM sync_field_log
          WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
          ORDER BY changed_at DESC LIMIT 1`,
@@ -10157,7 +10266,7 @@ async function getConflict2(id, source) {
       winnerUserId = r.rows[0]?.changed_by_user_id || null;
     } catch {
     }
-    const recordDisplay = await getRecordLabel(pool2, row.table_name, row.row_uuid);
+    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
     return {
       id: row.id,
       source: "log",
@@ -10174,7 +10283,7 @@ async function getConflict2(id, source) {
         changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
         instanceId: row.receiver_winner_instance || "",
         userId: winnerUserId,
-        userName: await resolveUserName(pool2, winnerUserId),
+        userName: await resolveUserName(pool4, winnerUserId),
         locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
       },
       rejected: {
@@ -10182,7 +10291,7 @@ async function getConflict2(id, source) {
         changedAt: row.incoming_changed_at?.toISOString?.() || null,
         instanceId: row.incoming_sender_instance || "",
         userId: incomingUserId,
-        userName: await resolveUserName(pool2, incomingUserId),
+        userName: await resolveUserName(pool4, incomingUserId),
         locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
       },
       isResolved: row.is_resolved,
@@ -10191,13 +10300,13 @@ async function getConflict2(id, source) {
       resolvedAction: row.resolved_action
     };
   } else {
-    const result = await pool2.query(
+    const result = await pool4.query(
       `SELECT * FROM sync_conflicts WHERE id = $1`,
       [id]
     );
     if (result.rows.length === 0) return null;
     const row = result.rows[0];
-    const recordDisplay = await getRecordLabel(pool2, row.table_name, row.row_uuid);
+    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
     return {
       id: row.id,
       source: "old",
@@ -10214,7 +10323,7 @@ async function getConflict2(id, source) {
         changedAt: row.shore_changed_at?.toISOString?.() || null,
         instanceId: "SHORE",
         userId: row.shore_changed_by,
-        userName: await resolveUserName(pool2, row.shore_changed_by),
+        userName: await resolveUserName(pool4, row.shore_changed_by),
         locationLabel: "Shore \u2014 Office"
       },
       rejected: {
@@ -10222,7 +10331,7 @@ async function getConflict2(id, source) {
         changedAt: row.ship_changed_at?.toISOString?.() || null,
         instanceId: "SHIP",
         userId: row.ship_changed_by,
-        userName: await resolveUserName(pool2, row.ship_changed_by),
+        userName: await resolveUserName(pool4, row.ship_changed_by),
         locationLabel: "Ship"
       },
       isResolved: row.resolution !== null,
@@ -10233,9 +10342,9 @@ async function getConflict2(id, source) {
   }
 }
 async function applyIncomingConflict(id, source, userId) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   if (source === "log") {
-    const conflictResult = await pool2.query(
+    const conflictResult = await pool4.query(
       `SELECT * FROM sync_conflict_log WHERE id = $1`,
       [id]
     );
@@ -10246,20 +10355,20 @@ async function applyIncomingConflict(id, source, userId) {
     }
     const identityCol = getIdentityColumn(conflict.table_name) || "id";
     const fieldNameSnake = toSnakeCase2(conflict.field_name);
-    const currentRow = await pool2.query(
+    const currentRow = await pool4.query(
       `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
       [conflict.row_uuid]
     );
     const oldValue = currentRow.rows[0]?.[fieldNameSnake] ?? null;
     const vesselId = currentRow.rows[0]?.vessel_id ?? null;
-    await pool2.query(
+    await pool4.query(
       `UPDATE "${conflict.table_name}"
        SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
        WHERE "${identityCol}" = $2`,
       [conflict.incoming_new_value, conflict.row_uuid]
     );
     const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-    await pool2.query(
+    await pool4.query(
       `INSERT INTO sync_field_log
         (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
          changed_by_user_id, instance_id, is_synced, is_sync)
@@ -10275,7 +10384,7 @@ async function applyIncomingConflict(id, source, userId) {
         instanceId
       ]
     );
-    await pool2.query(
+    await pool4.query(
       `UPDATE sync_conflict_log
        SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'APPLY_INCOMING'
        WHERE id = $2`,
@@ -10284,7 +10393,7 @@ async function applyIncomingConflict(id, source, userId) {
     syncDiag(`CONFLICT RESOLVED: id=${id} source=log action=APPLY_INCOMING by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
     return getConflict2(id, source);
   } else {
-    const conflictResult = await pool2.query(
+    const conflictResult = await pool4.query(
       `SELECT * FROM sync_conflicts WHERE id = $1`,
       [id]
     );
@@ -10295,20 +10404,20 @@ async function applyIncomingConflict(id, source, userId) {
     }
     const identityCol = getIdentityColumn(conflict.table_name) || "id";
     const fieldNameSnake = toSnakeCase2(conflict.field_name);
-    const currentOldRow = await pool2.query(
+    const currentOldRow = await pool4.query(
       `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
       [conflict.row_uuid]
     );
     const oldValOld = currentOldRow.rows[0]?.[fieldNameSnake] ?? null;
     const vesselIdOld = currentOldRow.rows[0]?.vessel_id ?? null;
-    await pool2.query(
+    await pool4.query(
       `UPDATE "${conflict.table_name}"
        SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
        WHERE "${identityCol}" = $2`,
       [conflict.ship_value, conflict.row_uuid]
     );
     const instanceIdOld = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-    await pool2.query(
+    await pool4.query(
       `INSERT INTO sync_field_log
         (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
          changed_by_user_id, instance_id, is_synced, is_sync)
@@ -10324,7 +10433,7 @@ async function applyIncomingConflict(id, source, userId) {
         instanceIdOld
       ]
     );
-    await pool2.query(
+    await pool4.query(
       `UPDATE sync_conflicts
        SET resolution = 'ship_wins', resolved_value = $1, resolved_at = NOW(), resolved_by = $2
        WHERE id = $3`,
@@ -10335,9 +10444,9 @@ async function applyIncomingConflict(id, source, userId) {
   }
 }
 async function dismissConflict(id, source, userId) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   if (source === "log") {
-    const conflictResult = await pool2.query(
+    const conflictResult = await pool4.query(
       `SELECT * FROM sync_conflict_log WHERE id = $1`,
       [id]
     );
@@ -10345,7 +10454,7 @@ async function dismissConflict(id, source, userId) {
     if (conflictResult.rows[0].is_resolved) {
       throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
     }
-    await pool2.query(
+    await pool4.query(
       `UPDATE sync_conflict_log
        SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'DISMISS'
        WHERE id = $2`,
@@ -10354,7 +10463,7 @@ async function dismissConflict(id, source, userId) {
     syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId}`);
     return getConflict2(id, source);
   } else {
-    const conflictResult = await pool2.query(
+    const conflictResult = await pool4.query(
       `SELECT * FROM sync_conflicts WHERE id = $1`,
       [id]
     );
@@ -10362,7 +10471,7 @@ async function dismissConflict(id, source, userId) {
     if (conflictResult.rows[0].resolution !== null) {
       throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
     }
-    await pool2.query(
+    await pool4.query(
       `UPDATE sync_conflicts
        SET resolution = 'dismissed', resolved_value = shore_value, resolved_at = NOW(), resolved_by = $1
        WHERE id = $2`,
@@ -10373,8 +10482,8 @@ async function dismissConflict(id, source, userId) {
   }
 }
 async function getConflictTableNames() {
-  const pool2 = await getPool();
-  const result = await pool2.query(`
+  const pool4 = await getPool();
+  const result = await pool4.query(`
     SELECT DISTINCT table_name FROM (
       SELECT table_name FROM sync_conflict_log WHERE is_resolved = false
       UNION
@@ -10405,6 +10514,7 @@ __export(service_exports, {
   getRecentBatches: () => getRecentBatches2,
   getSyncStatus: () => getSyncStatus,
   getUnresolvedConflicts: () => getUnresolvedConflicts2,
+  getVesselProvisioningState: () => getVesselProvisioningState,
   initiateSyncSession: () => initiateSyncSession,
   preparePullData: () => preparePullData,
   receivePushData: () => receivePushData,
@@ -10413,8 +10523,8 @@ __export(service_exports, {
 async function getVesselCodeForUuid(vesselId) {
   if (vesselCodeCache.has(vesselId)) return vesselCodeCache.get(vesselId);
   try {
-    const pool2 = await getPool();
-    const result = await pool2.query(
+    const pool4 = await getPool();
+    const result = await pool4.query(
       `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
       [vesselId]
     );
@@ -10549,8 +10659,8 @@ async function receivePushData(batchUuid, vesselId, payload) {
         }))
       );
       syncDiag(`RECEIVE-PUSH: ${fieldLogsStored} field logs stored in sync_field_log`);
-      const pool2 = await getPool();
-      const client = await pool2.connect();
+      const pool4 = await getPool();
+      const client = await pool4.connect();
       try {
         await client.query("BEGIN");
         await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
@@ -11075,8 +11185,8 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
     const identityCol = config.identityColumn || "id";
     const fieldNameSnake = toSnakeCase3(conflict.fieldName);
     try {
-      const pool2 = await getPool();
-      await pool2.query(
+      const pool4 = await getPool();
+      await pool4.query(
         `UPDATE "${conflict.tableName}" SET "${fieldNameSnake}" = $1, updated_at = NOW() WHERE "${identityCol}" = $2`,
         [winningValue, conflict.rowUuid]
       );
@@ -11244,7 +11354,7 @@ async function gatherOneWayShoreRows(vesselId, sinceCheckpoint, tableCheckpoints
   const oneWayTables = getTablesByCategory("ONE_WAY_SHORE_TO_SHIP");
   const results = [];
   const tableMax = {};
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const vesselCode = await getVesselCodeForUuid(vesselId);
   for (const config of oneWayTables) {
     try {
@@ -11277,7 +11387,7 @@ async function gatherOneWayShoreRows(vesselId, sinceCheckpoint, tableCheckpoints
         tableMax[config.tableName] = (/* @__PURE__ */ new Date()).toISOString();
         continue;
       }
-      const result = await pool2.query(query, params);
+      const result = await pool4.query(query, params);
       if (result.rows.length > 0) {
         const last = result.rows[result.rows.length - 1];
         if (last?.__wm) tableMax[config.tableName] = String(last.__wm);
@@ -11311,10 +11421,47 @@ function normalizeFieldLog(row) {
     syncBatchId: row.syncBatchId ?? row.sync_batch_id
   };
 }
+async function getVesselProvisioningState(vesselId) {
+  const pool4 = await getPool();
+  if (!pool4) {
+    throw Object.assign(new Error("Database unavailable \u2014 cannot resolve vessel provisioning state."), { statusCode: 503 });
+  }
+  const vessel = await pool4.query(
+    `SELECT 1 FROM vessels WHERE vuuid = $1 AND is_deleted = false LIMIT 1`,
+    [vesselId]
+  );
+  if (vessel.rowCount === 0) {
+    throw Object.assign(
+      new Error(`Unknown vessel '${vesselId}' \u2014 cannot resolve provisioning state.`),
+      { statusCode: 404 }
+    );
+  }
+  const result = await pool4.query(
+    `SELECT count(instance_id)::int              AS metadata_rows,
+            max(last_sync_at)                    AS last_sync_at,
+            coalesce(
+              array_agg(DISTINCT instance_id) FILTER (WHERE instance_id IS NOT NULL),
+              '{}'
+            )                                    AS instance_ids
+       FROM sync_metadata
+      WHERE vessel_id = $1
+        AND is_deleted = false`,
+    [vesselId]
+  );
+  const row = result.rows[0] ?? {};
+  const metadataRows = row.metadata_rows ?? 0;
+  const lastSyncAt = row.last_sync_at ?? null;
+  const instanceIds = row.instance_ids ?? [];
+  let verdict;
+  if (metadataRows === 0 && lastSyncAt === null) verdict = "NEVER_PROVISIONED";
+  else if (metadataRows > 0 && lastSyncAt !== null) verdict = "LIVE";
+  else verdict = "CHECK_ME";
+  return { metadataRows, lastSyncAt, instanceIds, verdict };
+}
 async function getFleetSyncOverview() {
-  const pool2 = await getPool();
-  if (!pool2) return [];
-  const result = await pool2.query(`
+  const pool4 = await getPool();
+  if (!pool4) return [];
+  const result = await pool4.query(`
     SELECT * FROM (
       SELECT DISTINCT ON (v.vuuid)
         v.vuuid AS vessel_id,
@@ -15891,35 +16038,35 @@ var init_tenantConnectionManager = __esm({
           const url = new URL(masterUrl);
           url.pathname = `/${databaseName}`;
           const connectionString = url.toString();
-          const pool2 = new Pool3({
+          const pool4 = new Pool3({
             connectionString,
             ssl: this.sslFor(masterUrl),
             max: this.tenantPoolMax,
             idleTimeoutMillis: 3e4,
             connectionTimeoutMillis: 1e4
           });
-          const client = await pool2.connect();
+          const client = await pool4.connect();
           await client.query("SELECT 1");
           client.release();
           this.clearCircuitBreaker(tuid);
           if (!this.migratedTenants.has(tuid)) {
             try {
-              await runMigrations(pool2);
-              await runDrizzleMigrations(pool2);
-              await initializeDatabase(pool2);
-              await ensureMaintenanceHistoryImmutability(pool2);
+              await runMigrations(pool4);
+              await runDrizzleMigrations(pool4);
+              await initializeDatabase(pool4);
+              await ensureMaintenanceHistoryImmutability(pool4);
               this.migratedTenants.add(tuid);
               this.migrationFailures.delete(tuid);
             } catch (migErr) {
               console.error(`\u274C Tenant migration failed for '${maskTuid(tuid)}':`, migErr.message);
               this.migrationFailures.set(tuid, Date.now());
-              await pool2.end().catch(() => {
+              await pool4.end().catch(() => {
               });
               throw new TenantDatabaseError(tuid, "Schema migration failed.");
             }
           }
-          const db2 = drizzle5(pool2, { schema: schema_exports });
-          const entry = { pool: pool2, db: db2, lastUsed: Date.now() };
+          const db2 = drizzle5(pool4, { schema: schema_exports });
+          const entry = { pool: pool4, db: db2, lastUsed: Date.now() };
           this.poolCache.set(tuid, entry);
           console.log(`\u{1F517} Tenant pool created for '${maskTuid(tuid)}' (active pools: ${this.poolCache.size})`);
           return entry;
@@ -16131,8 +16278,8 @@ var init_syncEngine = __esm({
       async getVesselCode(vesselId) {
         if (this.vesselCodeCache.has(vesselId)) return this.vesselCodeCache.get(vesselId);
         try {
-          const pool2 = await getPool();
-          const result = await pool2.query(
+          const pool4 = await getPool();
+          const result = await pool4.query(
             `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
             [vesselId]
           );
@@ -16513,10 +16660,10 @@ var init_syncEngine = __esm({
               certMasterIds.add(log2.newValue);
             }
           }
-          const pool2 = await getPool();
+          const pool4 = await getPool();
           if (surveyMasterIds.size > 0) {
             try {
-              const r = await pool2.query(
+              const r = await pool4.query(
                 `SELECT master_id, survey_name, category, "group", requirement_ref,
                     applicable_to_company, survey_label, company_id, company_group, company_sequence, sequence
              FROM ship_surveys_master WHERE master_id = ANY($1) AND is_deleted = false`,
@@ -16529,7 +16676,7 @@ var init_syncEngine = __esm({
           }
           if (certMasterIds.size > 0) {
             try {
-              const r = await pool2.query(
+              const r = await pool4.query(
                 `SELECT master_id, certificate_name, category, "group", requirement_ref,
                     applicable_to_company, certificate_label, company_id, company_group, company_sequence, sequence
              FROM ship_certificates_master WHERE master_id = ANY($1) AND is_deleted = false`,
@@ -16680,8 +16827,8 @@ var init_syncEngine = __esm({
         }
         let pullSelfHealRequests = [];
         if (pullData.fieldLogs && pullData.fieldLogs.length > 0) {
-          const pool2 = await getPool();
-          const client = await pool2.connect();
+          const pool4 = await getPool();
+          const client = await pool4.connect();
           try {
             await client.query("BEGIN");
             await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
@@ -16914,7 +17061,7 @@ var init_syncEngine = __esm({
       // DELTA EXTRACTION — Get rows changed since checkpoint
       // ═══════════════════════════════════════════════════════════════
       async getChangedRows(tableName, vesselId, since, vesselScopeColumn) {
-        const pool2 = await getPool();
+        const pool4 = await getPool();
         const conditions = [];
         const params = [];
         let paramIdx = 1;
@@ -16933,7 +17080,7 @@ var init_syncEngine = __esm({
           query += " WHERE " + conditions.join(" AND ");
         }
         query += ' ORDER BY "updated_at" ASC LIMIT 5000';
-        const result = await pool2.query(query, params);
+        const result = await pool4.query(query, params);
         return result.rows;
       }
       // ═══════════════════════════════════════════════════════════════
@@ -17022,8 +17169,8 @@ var init_syncEngine = __esm({
 // server/modules/sync/provisioningService.ts
 import * as crypto3 from "crypto";
 async function generateProvisioningBundle(vesselId, generatedBy, opts) {
-  const pool2 = await getPool();
-  const vesselResult = await pool2.query(
+  const pool4 = await getPool();
+  const vesselResult = await pool4.query(
     "SELECT name, id as code FROM vessels WHERE vuuid = $1",
     [vesselId]
   );
@@ -17058,7 +17205,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
     }
   }
   try {
-    const vesselRows = await pool2.query(
+    const vesselRows = await pool4.query(
       "SELECT * FROM vessels WHERE vuuid = $1",
       [vesselId]
     );
@@ -17079,14 +17226,14 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
     (t) => t.isGlobal
   );
   for (const tc of globalTables) {
-    await exportAndAdd(pool2, bundle, tc, null, null, null, "ONE_WAY (global)");
+    await exportAndAdd(pool4, bundle, tc, null, null, null, "ONE_WAY (global)");
   }
   const vesselRefTables = getTablesByCategory("ONE_WAY_SHORE_TO_SHIP").filter(
     (t) => !t.isGlobal
   );
   for (const tc of vesselRefTables) {
     await exportAndAdd(
-      pool2,
+      pool4,
       bundle,
       tc,
       vesselId,
@@ -17100,7 +17247,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
     const tc = getTableSyncConfig(tableName);
     if (!tc) continue;
     await exportAndAdd(
-      pool2,
+      pool4,
       bundle,
       tc,
       vesselId,
@@ -17115,7 +17262,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
     if (!tc) continue;
     if (tc.vesselScopeColumn) {
       await exportAndAdd(
-        pool2,
+        pool4,
         bundle,
         tc,
         vesselId,
@@ -17125,7 +17272,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
       );
     } else if (tc.vesselScopeJoinPath) {
       const rows = await exportTableWithJoin(
-        pool2,
+        pool4,
         tc.tableName,
         tc.vesselScopeJoinPath,
         vesselId
@@ -17142,7 +17289,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
   console.log(
     `[Provisioning] Bundle generated for vessel ${vesselName} (${vesselId}): ${bundle.manifest.totalRows} total rows across ${bundle.manifest.tables.length} tables`
   );
-  const exportIntegrity = await verifyBundleExportIntegrity(pool2, vesselId, vesselCode, bundle);
+  const exportIntegrity = await verifyBundleExportIntegrity(pool4, vesselId, vesselCode, bundle);
   if (!exportIntegrity.ok) {
     const summary = exportIntegrity.shortfalls.map((s) => `${s.tableName} written=${s.written} dbCount=${s.dbCount}${s.reason ? ` (${s.reason})` : ""}`).join(" | ");
     const msg = `[Provisioning] \u26A0\uFE0F EXPORT INTEGRITY FAILED for vessel ${vesselCode} \u2014 ${exportIntegrity.shortfalls.length} table(s) under-exported: ${summary}. Bundle NOT generated (a complete baseline could not be produced).`;
@@ -17172,7 +17319,7 @@ async function generateProvisioningBundle(vesselId, generatedBy, opts) {
   }
   return bundle;
 }
-async function verifyBundleExportIntegrity(pool2, vesselId, vesselCode, bundle) {
+async function verifyBundleExportIntegrity(pool4, vesselId, vesselCode, bundle) {
   const shortfalls = [];
   for (const entry of bundle.manifest.tables) {
     if (/ERROR:/.test(entry.category)) {
@@ -17187,12 +17334,12 @@ async function verifyBundleExportIntegrity(pool2, vesselId, vesselCode, bundle) 
     try {
       let dbCount;
       if (tc.isGlobal || !tc.vesselScopeColumn) {
-        const res = await pool2.query(`SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false`);
+        const res = await pool4.query(`SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false`);
         dbCount = res.rows[0]?.c ?? 0;
       } else {
         const scopeValue = tc.vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
         if (!scopeValue) continue;
-        const res = await pool2.query(
+        const res = await pool4.query(
           `SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE "${tc.vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false`,
           [scopeValue]
         );
@@ -17230,7 +17377,7 @@ function topologicalSort(rows, idCol, parentCol) {
   return sorted;
 }
 async function importProvisioningBundle(bundle) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   let tablesImported = 0;
   let rowsImported = 0;
   const errors = [];
@@ -17255,12 +17402,12 @@ async function importProvisioningBundle(bundle) {
   if (rbacCleanupNeeded) {
     console.log("[Provisioning] Clearing seeded RBAC data before import...");
     try {
-      const deleted1 = await pool2.query("DELETE FROM adm_role_menu_access");
-      const deleted2 = await pool2.query(
+      const deleted1 = await pool4.query("DELETE FROM adm_role_menu_access");
+      const deleted2 = await pool4.query(
         "DELETE FROM adm_menumaster_ac WHERE parent_menu IS NOT NULL"
       );
-      const deleted3 = await pool2.query("DELETE FROM adm_menumaster_ac");
-      const deleted4 = await pool2.query("DELETE FROM admn_role_master");
+      const deleted3 = await pool4.query("DELETE FROM adm_menumaster_ac");
+      const deleted4 = await pool4.query("DELETE FROM admn_role_master");
       console.log(
         `[Provisioning] RBAC cleanup: deleted ${deleted1.rowCount} permissions, ${(deleted2.rowCount || 0) + (deleted3.rowCount || 0)} menus, ${deleted4.rowCount} roles`
       );
@@ -17274,9 +17421,9 @@ async function importProvisioningBundle(bundle) {
   if (ranksCleanupNeeded) {
     console.log("[Provisioning] Clearing seeded ranks data before import...");
     try {
-      await pool2.query("DELETE FROM adm_vessel_org_chart");
-      await pool2.query("DELETE FROM vessel_org_chart_nodes");
-      const deletedRanks = await pool2.query(
+      await pool4.query("DELETE FROM adm_vessel_org_chart");
+      await pool4.query("DELETE FROM vessel_org_chart_nodes");
+      const deletedRanks = await pool4.query(
         "DELETE FROM adm_available_ranks"
       );
       console.log(
@@ -17290,8 +17437,8 @@ async function importProvisioningBundle(bundle) {
   }
   if (bundleTableNames.has("view_modes_master") || bundleTableNames.has("role_view_mode_mapping")) {
     try {
-      const deletedRvm = await pool2.query("DELETE FROM role_view_mode_mapping");
-      const deletedVm = await pool2.query("DELETE FROM view_modes_master");
+      const deletedRvm = await pool4.query("DELETE FROM role_view_mode_mapping");
+      const deletedVm = await pool4.query("DELETE FROM view_modes_master");
       console.log(
         `[Provisioning] View-mode cleanup: deleted ${deletedRvm.rowCount} mapping(s), ${deletedVm.rowCount} mode(s) before import`
       );
@@ -17303,7 +17450,7 @@ async function importProvisioningBundle(bundle) {
   }
   if (bundleTableNames.has("approval_workflow_config")) {
     try {
-      const deletedAwc = await pool2.query("DELETE FROM approval_workflow_config");
+      const deletedAwc = await pool4.query("DELETE FROM approval_workflow_config");
       console.log(
         `[Provisioning] approval_workflow_config cleanup: deleted ${deletedAwc.rowCount} seeded row(s) before import`
       );
@@ -17318,7 +17465,7 @@ async function importProvisioningBundle(bundle) {
     if (identityAlwaysCache.has(tableName))
       return identityAlwaysCache.get(tableName);
     try {
-      const result = await pool2.query(
+      const result = await pool4.query(
         `SELECT a.attname AS column_name
          FROM pg_attribute a
          JOIN pg_class c ON a.attrelid = c.oid
@@ -17348,7 +17495,7 @@ async function importProvisioningBundle(bundle) {
       let hasUniqueIdentity = false;
       if (identityCol) {
         try {
-          const ixResult = await pool2.query(
+          const ixResult = await pool4.query(
             `SELECT 1 FROM pg_indexes WHERE tablename = $1 AND indexdef LIKE '%UNIQUE%' AND indexdef LIKE $2 LIMIT 1`,
             [tableData.tableName, `%${identityCol}%`]
           );
@@ -17370,7 +17517,7 @@ async function importProvisioningBundle(bundle) {
       let jsonCols = /* @__PURE__ */ new Set();
       let arrayCols = /* @__PURE__ */ new Set();
       try {
-        const colResult = await pool2.query(
+        const colResult = await pool4.query(
           `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
           [tableData.tableName]
         );
@@ -17422,12 +17569,12 @@ async function importProvisioningBundle(bundle) {
           } else {
             query = `INSERT INTO "${tableData.tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`;
           }
-          await pool2.query(query, values);
+          await pool4.query(query, values);
           tableRowCount++;
         } catch (rowError) {
           if (rowError.message.includes("duplicate key") && identityCol && row[identityCol] && row.id !== void 0) {
             try {
-              await pool2.query(
+              await pool4.query(
                 `DELETE FROM "${tableData.tableName}" WHERE id = $1 AND "${identityCol}" != $2`,
                 [row.id, row[identityCol]]
               );
@@ -17457,7 +17604,7 @@ async function importProvisioningBundle(bundle) {
               const colNames = columns.map((c) => `"${c}"`).join(", ");
               const updateSet = columns.filter((c) => c !== identityCol).map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ");
               const retryQuery = `INSERT INTO "${tableData.tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT ("${identityCol}") DO UPDATE SET ${updateSet}`;
-              await pool2.query(retryQuery, values);
+              await pool4.query(retryQuery, values);
               tableRowCount++;
             } catch (retryError) {
               if (!retryError.message.includes("duplicate key")) {
@@ -17475,7 +17622,7 @@ async function importProvisioningBundle(bundle) {
       }
       if (tableRowCount > 0) {
         try {
-          const seqCols = await pool2.query(
+          const seqCols = await pool4.query(
             `SELECT a.attname AS col
              FROM pg_attribute a
              JOIN pg_class c ON a.attrelid = c.oid
@@ -17487,7 +17634,7 @@ async function importProvisioningBundle(bundle) {
           for (const r of seqCols.rows || []) {
             const col = r.col;
             try {
-              await pool2.query(
+              await pool4.query(
                 `SELECT setval(
                   pg_get_serial_sequence('"${tableData.tableName}"', '${col}'),
                   GREATEST(COALESCE((SELECT MAX("${col}") FROM "${tableData.tableName}"), 0), 1)
@@ -17579,11 +17726,11 @@ async function importProvisioningBundle(bundle) {
   };
 }
 async function verifyProvisioning(manifest) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const mismatches = [];
   for (const tableEntry of manifest.tables) {
     try {
-      const result = await pool2.query(
+      const result = await pool4.query(
         `SELECT count(*)::int AS cnt FROM "${tableEntry.tableName}"`
       );
       const actual = result.rows[0]?.cnt ?? 0;
@@ -17608,13 +17755,13 @@ async function verifyProvisioning(manifest) {
     mismatches
   };
 }
-async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScopeColumn, categoryLabel) {
+async function exportAndAdd(pool4, bundle, tc, vesselId, vesselCode, vesselScopeColumn, categoryLabel) {
   try {
     let rows;
     let orphanSkipNote = "";
     if (tc.tableName === "planner_dates" && vesselScopeColumn && (vesselId || vesselCode)) {
       const scopeValue = vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
-      const orphanResult = await pool2.query(
+      const orphanResult = await pool4.query(
         `SELECT pd.pduuid, pd.component_id,
                 CASE WHEN c.cuuid IS NULL THEN 'component missing'
                      WHEN COALESCE(c.is_deleted, false) = true THEN 'component soft-deleted'
@@ -17647,7 +17794,7 @@ async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScope
           `[Provisioning] planner_dates: skipped ${orphans.length} orphan row(s) for vessel ${scopeValue} (${reasonSummary})`
         );
       }
-      rows = await pool2.query(
+      rows = await pool4.query(
         `SELECT pd.* FROM "planner_dates" pd
            INNER JOIN "components" c ON c.cuuid = pd.component_id
            WHERE pd."${vesselScopeColumn}" = $1
@@ -17659,12 +17806,12 @@ async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScope
       ).then((r) => r.rows);
     } else if (vesselScopeColumn && (vesselId || vesselCode)) {
       const scopeValue = vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
-      rows = await pool2.query(
+      rows = await pool4.query(
         `SELECT * FROM "${tc.tableName}" WHERE "${vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false ORDER BY COALESCE(created_at, NOW()) ASC`,
         [scopeValue]
       ).then((r) => r.rows);
     } else {
-      rows = await pool2.query(
+      rows = await pool4.query(
         `SELECT * FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false ORDER BY COALESCE(created_at, NOW()) ASC`
       ).then((r) => r.rows);
     }
@@ -17687,24 +17834,24 @@ async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScope
     });
   }
 }
-async function exportTableWithJoin(pool2, tableName, joinPath, vesselId) {
+async function exportTableWithJoin(pool4, tableName, joinPath, vesselId) {
   try {
     if (tableName === "defect_actions" || tableName === "defect_attachments") {
-      const result2 = await pool2.query(
+      const result2 = await pool4.query(
         `SELECT a.* FROM "${tableName}" a JOIN defects d ON a.defect_id = d.duuid WHERE d.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
         [vesselId]
       );
       return result2.rows;
     }
     if (tableName === "change_request_attachment" || tableName === "change_request_comment" || tableName === "change_request_approval") {
-      const result2 = await pool2.query(
+      const result2 = await pool4.query(
         `SELECT a.* FROM "${tableName}" a JOIN change_request cr ON a.change_request_id = cr.id WHERE cr.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
         [vesselId]
       );
       return result2.rows;
     }
     if (tableName === "wo_postponement_approvals") {
-      const result2 = await pool2.query(
+      const result2 = await pool4.query(
         `SELECT a.* FROM "wo_postponement_approvals" a JOIN work_order_postponements p ON a.postponement_id = p.id WHERE p.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
         [vesselId]
       );
@@ -17713,7 +17860,7 @@ async function exportTableWithJoin(pool2, tableName, joinPath, vesselId) {
     console.warn(
       `[Provisioning] Unknown join path for ${tableName}, exporting all rows`
     );
-    const result = await pool2.query(
+    const result = await pool4.query(
       `SELECT * FROM "${tableName}" WHERE COALESCE(is_deleted, false) = false`
     );
     return result.rows;
@@ -17769,8 +17916,8 @@ function classifyError(error) {
 async function getVesselCode(vesselId) {
   if (vesselCodeCache2.has(vesselId)) return vesselCodeCache2.get(vesselId);
   try {
-    const pool2 = await getPool();
-    const result = await pool2.query(
+    const pool4 = await getPool();
+    const result = await pool4.query(
       `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
       [vesselId]
     );
@@ -17913,20 +18060,20 @@ var init_autoSyncScheduler = __esm({
         const MARKER = "selfheal_reoffer_v1";
         if ((settings[MARKER] || "") === "done") return;
         try {
-          const pool2 = await getPool();
-          const r = await pool2.query(
+          const pool4 = await getPool();
+          const r = await pool4.query(
             `UPDATE sync_field_log SET is_synced = false
           WHERE instance_id = $1 AND is_synced = true
             AND table_name IN ('work_orders','superintendent_notifications')
             AND changed_at >= NOW() - interval '30 days'`,
             [instanceId]
           );
-          const upd = await pool2.query(
+          const upd = await pool4.query(
             `UPDATE sync_settings SET setting_value = 'done', updated_at = NOW() WHERE setting_key = $1`,
             [MARKER]
           );
           if ((upd.rowCount ?? 0) === 0) {
-            await pool2.query(
+            await pool4.query(
               `INSERT INTO sync_settings (setting_key, setting_value) VALUES ($1, 'done')`,
               [MARKER]
             );
@@ -18095,9 +18242,9 @@ var init_autoSyncScheduler = __esm({
 async function getRetentionConfig() {
   let syncDays = null;
   try {
-    const pool2 = await getPool();
-    if (pool2) {
-      const r = await pool2.query(`SELECT retention_value, retention_unit, enabled FROM retention_settings WHERE category = 'sync_logs' LIMIT 1`);
+    const pool4 = await getPool();
+    if (pool4) {
+      const r = await pool4.query(`SELECT retention_value, retention_unit, enabled FROM retention_settings WHERE category = 'sync_logs' LIMIT 1`);
       const row = r.rows[0];
       if (row && row.enabled && row.retention_unit !== "forever") {
         const v = Number(row.retention_value);
@@ -18127,9 +18274,9 @@ async function getRetentionConfig() {
   };
 }
 async function pruneFieldLogs(config) {
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const result = await pool2.query(
+  const pool4 = await getPool();
+  if (!pool4) return 0;
+  const result = await pool4.query(
     `DELETE FROM sync_field_log
      WHERE is_synced = true
        AND changed_at < NOW() - INTERVAL '1 day' * $1
@@ -18139,9 +18286,9 @@ async function pruneFieldLogs(config) {
   return result.rowCount ?? 0;
 }
 async function pruneBatches(config) {
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const result = await pool2.query(
+  const pool4 = await getPool();
+  if (!pool4) return 0;
+  const result = await pool4.query(
     `DELETE FROM sync_batches
      WHERE status IN ('completed', 'failed')
        AND started_at < NOW() - INTERVAL '1 day' * $1
@@ -18151,9 +18298,9 @@ async function pruneBatches(config) {
   return result.rowCount ?? 0;
 }
 async function pruneFileQueue(config) {
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const result = await pool2.query(
+  const pool4 = await getPool();
+  if (!pool4) return 0;
+  const result = await pool4.query(
     `DELETE FROM sync_file_queue
      WHERE status IN ('completed', 'failed')
        AND completed_at IS NOT NULL
@@ -18164,9 +18311,9 @@ async function pruneFileQueue(config) {
   return result.rowCount ?? 0;
 }
 async function pruneConflicts(config) {
-  const pool2 = await getPool();
-  if (!pool2) return 0;
-  const result = await pool2.query(
+  const pool4 = await getPool();
+  if (!pool4) return 0;
+  const result = await pool4.query(
     `DELETE FROM sync_conflicts
      WHERE resolution IS NOT NULL
        AND resolved_at IS NOT NULL
@@ -18306,8 +18453,8 @@ async function runDriftScan(opts = {}) {
   const findings = [];
   const skippedTables = [];
   let rowsCompared = 0, fieldsCompared = 0, tablesScanned = 0;
-  const pool2 = await getPool();
-  if (!pool2) {
+  const pool4 = await getPool();
+  if (!pool4) {
     return {
       tablesScanned: 0,
       rowsCompared: 0,
@@ -18321,7 +18468,7 @@ async function runDriftScan(opts = {}) {
   const targets = scannableTables().filter((t) => !opts.tables || opts.tables.includes(t.tableName));
   for (const t of targets) {
     try {
-      const latest = await pool2.query(
+      const latest = await pool4.query(
         `SELECT DISTINCT ON (row_uuid, field_name)
                 row_uuid, field_name, new_value, changed_at, vessel_id
            FROM sync_field_log
@@ -18350,7 +18497,7 @@ async function runDriftScan(opts = {}) {
         tablesScanned++;
         continue;
       }
-      const rows = await pool2.query(
+      const rows = await pool4.query(
         `SELECT * FROM "${t.tableName}" WHERE "${t.identityColumn}" = ANY($1::text[])`,
         [uuids]
       );
@@ -18401,11 +18548,11 @@ async function runDriftScan(opts = {}) {
   return result;
 }
 async function recordFindings(findings) {
-  const pool2 = await getPool();
-  if (!pool2) return;
+  const pool4 = await getPool();
+  if (!pool4) return;
   for (const f of findings) {
     try {
-      await pool2.query(
+      await pool4.query(
         `INSERT INTO sync_field_log_failures
            (kind, table_name, row_uuid, field_name, vessel_id, failed_fields, error, details, occurred_at, last_seen_at, resolved)
          VALUES ('drift', $1, $2, $3, $4, 1, $5, $6::jsonb, NOW(), NOW(), false)
@@ -18426,9 +18573,9 @@ async function recordFindings(findings) {
   }
 }
 async function getOpenDrift(limit = 500) {
-  const pool2 = await getPool();
-  if (!pool2) return [];
-  const res = await pool2.query(
+  const pool4 = await getPool();
+  if (!pool4) return [];
+  const res = await pool4.query(
     `SELECT id, table_name, row_uuid, field_name, vessel_id, error, details, occurred_at, last_seen_at
        FROM sync_field_log_failures
       WHERE kind = 'drift' AND resolved = false
@@ -18502,6 +18649,368 @@ var init_buildInfo = __esm({
   "server/utils/buildInfo.ts"() {
     "use strict";
     cached = null;
+  }
+});
+
+// server/modules/work-orders/repositories/workOrderReconcileRepository.ts
+var workOrderReconcileRepository_exports = {};
+__export(workOrderReconcileRepository_exports, {
+  archiveSummary: () => archiveSummary,
+  countChildRows: () => countChildRows,
+  countDuplicateGroups: () => countDuplicateGroups,
+  findDuplicateGroups: () => findDuplicateGroups,
+  getInsertOriginInstanceId: () => getInsertOriginInstanceId,
+  getProvisionedVesselIds: () => getProvisionedVesselIds,
+  getShipInstanceIds: () => getShipInstanceIds,
+  hasDocuments: () => hasDocuments,
+  insertArchiveRow: () => insertArchiveRow,
+  repointChildren: () => repointChildren,
+  softDeleteWorkOrder: () => softDeleteWorkOrder
+});
+import { randomUUID } from "crypto";
+async function pool2() {
+  const p = await getPool();
+  if (!p) throw Object.assign(new Error("Database not initialized"), { statusCode: 503 });
+  return p;
+}
+async function findDuplicateGroups(vesselId, cap) {
+  const p = await pool2();
+  const groups = await p.query(
+    `SELECT work_order_no
+       FROM work_orders
+      WHERE vessel_id = $1 AND data_scope = 'vessel' AND is_deleted = false
+      GROUP BY work_order_no
+     HAVING count(*) > 1
+      ORDER BY work_order_no
+      LIMIT $2`,
+    [vesselId, cap]
+  );
+  const out = [];
+  for (const g of groups.rows) {
+    const rows = await p.query(
+      `SELECT * FROM work_orders
+        WHERE vessel_id = $1 AND work_order_no = $2 AND data_scope = 'vessel' AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [vesselId, g.work_order_no]
+    );
+    out.push({ vesselId, workOrderNo: g.work_order_no, rows: rows.rows });
+  }
+  return out;
+}
+async function countDuplicateGroups(vesselId) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT count(*)::int AS n FROM (
+       SELECT 1 FROM work_orders
+        WHERE vessel_id = $1 AND data_scope = 'vessel' AND is_deleted = false
+        GROUP BY work_order_no HAVING count(*) > 1) t`,
+    [vesselId]
+  );
+  return r.rows[0]?.n ?? 0;
+}
+async function getInsertOriginInstanceId(wouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT instance_id
+       FROM sync_field_log
+      WHERE table_name = 'work_orders' AND row_uuid = $1
+        AND old_value IS NULL AND is_deleted = false
+      ORDER BY changed_at ASC
+      LIMIT 1`,
+    [wouuid]
+  );
+  return r.rows[0]?.instance_id ?? null;
+}
+async function getShipInstanceIds(vesselId) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT instance_id FROM sync_metadata WHERE vessel_id = $1 AND is_deleted = false`,
+    [vesselId]
+  );
+  return new Set(r.rows.map((x) => x.instance_id));
+}
+async function hasDocuments(wouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT 1 FROM work_order_documents WHERE work_order_id = $1 AND is_deleted = false LIMIT 1`,
+    [wouuid]
+  );
+  return r.rows.length > 0;
+}
+async function repointChildren(table, fkColumn, idColumn, loserWouuid, survivorWouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `UPDATE "${table}" SET "${fkColumn}" = $1, updated_at = now()
+      WHERE "${fkColumn}" = $2 AND is_deleted = false
+      RETURNING "${idColumn}" AS log_id`,
+    [survivorWouuid, loserWouuid]
+  );
+  return r.rows.map((x) => String(x.log_id));
+}
+async function countChildRows(table, fkColumn, loserWouuid) {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT count(*)::int AS n FROM "${table}" WHERE "${fkColumn}" = $1 AND is_deleted = false`,
+    [loserWouuid]
+  );
+  return r.rows[0]?.n ?? 0;
+}
+async function softDeleteWorkOrder(wouuid) {
+  const p = await pool2();
+  await p.query(`UPDATE work_orders SET is_deleted = true, updated_at = now() WHERE wouuid = $1`, [wouuid]);
+}
+async function insertArchiveRow(row) {
+  const p = await pool2();
+  const r = await p.query(
+    `INSERT INTO work_order_reconcile_archive
+       (archive_uuid, vessel_id, work_order_no, loser_wouuid, survivor_wouuid,
+        resolution_case, loser_row_snapshot, child_moves, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (loser_wouuid) DO NOTHING`,
+    [
+      randomUUID(),
+      row.vesselId,
+      row.workOrderNo,
+      row.loserWouuid,
+      row.survivorWouuid,
+      row.resolutionCase,
+      JSON.stringify(row.loserRowSnapshot),
+      JSON.stringify(row.childMoves),
+      row.notes
+    ]
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+async function archiveSummary() {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT a.vessel_id, v.name AS vessel_name, a.resolution_case, count(*)::int AS resolved,
+            max(a.reconciled_at) AS last_reconciled_at
+       FROM work_order_reconcile_archive a
+       LEFT JOIN vessels v ON v.vuuid = a.vessel_id
+      GROUP BY a.vessel_id, v.name, a.resolution_case
+      ORDER BY v.name, a.resolution_case`
+  );
+  return r.rows;
+}
+async function getProvisionedVesselIds() {
+  const p = await pool2();
+  const r = await p.query(
+    `SELECT DISTINCT v.vuuid
+       FROM vessels v
+       JOIN sync_metadata sm ON sm.vessel_id = v.vuuid AND sm.is_deleted = false
+      WHERE v.is_deleted = false`
+  );
+  return r.rows.map((x) => x.vuuid);
+}
+var init_workOrderReconcileRepository = __esm({
+  "server/modules/work-orders/repositories/workOrderReconcileRepository.ts"() {
+    "use strict";
+    init_db();
+  }
+});
+
+// server/modules/work-orders/services/workOrderReconcilerService.ts
+var workOrderReconcilerService_exports = {};
+__export(workOrderReconcilerService_exports, {
+  MAX_GROUPS_PER_VESSEL_PER_RUN: () => MAX_GROUPS_PER_VESSEL_PER_RUN,
+  getLastRunSummary: () => getLastRunSummary,
+  reconcileAllProvisionedVessels: () => reconcileAllProvisionedVessels,
+  reconcileVessel: () => reconcileVessel
+});
+function getLastRunSummary() {
+  return lastRun;
+}
+function isNonEmpty(v) {
+  if (v === null || v === void 0) return false;
+  const s = String(v).trim();
+  return s !== "" && s !== "[]" && s !== "{}" && s.toLowerCase() !== "null";
+}
+async function isTouched(row) {
+  if (isNonEmpty(row.approver) || isNonEmpty(row.submitted_date) || isNonEmpty(row.date_completed) || isNonEmpty(row.work_carried_out) || isNonEmpty(row.performed_by) || isNonEmpty(row.manhours)) {
+    return true;
+  }
+  const consumed = row.consumed_spare_parts;
+  if (Array.isArray(consumed) ? consumed.length > 0 : isNonEmpty(consumed)) return true;
+  if (WORKFLOW_STATUSES.has(String(row.status || "").toLowerCase().trim())) return true;
+  return await hasDocuments(row.wouuid);
+}
+async function resolveGroup(group, shipInstanceIds) {
+  const flags = await Promise.all(group.rows.map(isTouched));
+  const touched = group.rows.filter((_, i) => flags[i]);
+  let survivor;
+  let resolutionCase;
+  let caseNote = "";
+  if (touched.length === 1) {
+    resolutionCase = 1;
+    survivor = touched[0];
+  } else {
+    resolutionCase = touched.length === 0 ? 2 : 3;
+    const pool4 = touched.length >= 2 ? touched : group.rows;
+    const origins = await Promise.all(pool4.map((r) => getInsertOriginInstanceId(r.wouuid)));
+    const shipRows = pool4.filter((_, i) => origins[i] !== null && shipInstanceIds.has(origins[i]));
+    if (shipRows.length > 0) {
+      survivor = shipRows[0];
+    } else {
+      survivor = pool4[0];
+      caseNote = "origin-logs-absent: fell back to earliest created_at";
+    }
+  }
+  for (const loser of group.rows) {
+    if (loser.wouuid === survivor.wouuid) continue;
+    const childMoves = {};
+    for (const spec of REPOINT_TABLES) {
+      const movedIds = await repointChildren(spec.table, spec.fkColumn, spec.idColumn, loser.wouuid, survivor.wouuid);
+      if (movedIds.length === 0) continue;
+      childMoves[spec.table] = { moved: movedIds.length };
+      if (spec.synced) {
+        for (const logId of movedIds) {
+          await logFieldChanges(
+            spec.table,
+            logId,
+            group.vesselId,
+            { [spec.fkColumn]: loser.wouuid },
+            { [spec.fkColumn]: survivor.wouuid },
+            RECONCILE_ACTOR
+          );
+        }
+      }
+    }
+    let leftInPlaceTotal = 0;
+    for (const spec of LEFT_IN_PLACE_TABLES) {
+      const n = await countChildRows(spec.table, spec.fkColumn, loser.wouuid);
+      if (n > 0) {
+        childMoves[spec.table] = { left_in_place: n, reason: spec.reason };
+        leftInPlaceTotal += n;
+      }
+    }
+    await insertArchiveRow({
+      vesselId: group.vesselId,
+      workOrderNo: group.workOrderNo,
+      loserWouuid: loser.wouuid,
+      survivorWouuid: survivor.wouuid,
+      resolutionCase,
+      loserRowSnapshot: loser,
+      childMoves,
+      notes: caseNote || null
+    });
+    await softDeleteWorkOrder(loser.wouuid);
+    await logFieldChanges(
+      "work_orders",
+      loser.wouuid,
+      group.vesselId,
+      { is_deleted: false },
+      { is_deleted: true },
+      RECONCILE_ACTOR
+    );
+    const line = `[WO-Reconciler] case ${resolutionCase}: ${group.workOrderNo} \u2014 loser ${loser.wouuid.slice(0, 8)} archived+retired, survivor ${survivor.wouuid.slice(0, 8)}, children moved: ${Object.keys(childMoves).filter((k) => !childMoves[k].left_in_place).join(", ") || "none"}` + (leftInPlaceTotal > 0 ? `, left-in-place: ${leftInPlaceTotal}` : "") + (caseNote ? ` (${caseNote})` : "");
+    console.log(line);
+    syncDiag(`WO-RECONCILE case=${resolutionCase} vessel=${group.vesselId} no=${group.workOrderNo} loser=${loser.wouuid} survivor=${survivor.wouuid}${caseNote ? ` note=${caseNote}` : ""}`);
+  }
+  return { resolutionCase };
+}
+async function reconcileVessel(vesselId) {
+  const result = {
+    vesselId,
+    groupsSeen: 0,
+    resolved: { case1: 0, case2: 0, case3: 0 },
+    skippedUnresolvable: 0,
+    remainingGroups: 0,
+    lockBusy: false,
+    errors: []
+  };
+  if (await isShipInstance()) {
+    result.errors.push("refused: reconciler is shore-only");
+    return result;
+  }
+  const engine = getSyncEngine();
+  if (!engine.tryAcquireVessel(vesselId)) {
+    result.lockBusy = true;
+    syncDiag(`WO-RECONCILE SKIP vessel=${vesselId} \u2014 sync in progress (lock busy)`);
+    return result;
+  }
+  try {
+    const shipInstanceIds = await getShipInstanceIds(vesselId);
+    const groups = await findDuplicateGroups(vesselId, MAX_GROUPS_PER_VESSEL_PER_RUN);
+    result.groupsSeen = groups.length;
+    for (const group of groups) {
+      try {
+        const r = await resolveGroup(group, shipInstanceIds);
+        if (r) result.resolved[`case${r.resolutionCase}`]++;
+        else result.skippedUnresolvable++;
+      } catch (err) {
+        result.errors.push(`${group.workOrderNo}: ${err?.message || err}`);
+        console.error(`[WO-Reconciler] ERROR on ${group.workOrderNo}:`, err?.message || err);
+      }
+    }
+    result.remainingGroups = await countDuplicateGroups(vesselId);
+    if (result.remainingGroups > 0) {
+      console.log(`[WO-Reconciler] vessel ${vesselId}: ${result.remainingGroups} duplicate group(s) remain \u2014 picked up next run (cap ${MAX_GROUPS_PER_VESSEL_PER_RUN}/run)`);
+    }
+  } finally {
+    engine.releaseVessel(vesselId);
+  }
+  return result;
+}
+async function reconcileAllProvisionedVessels() {
+  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const vessels2 = await getProvisionedVesselIds();
+  const results = [];
+  for (const v of vessels2) {
+    try {
+      results.push(await reconcileVessel(v));
+    } catch (err) {
+      results.push({
+        vesselId: v,
+        groupsSeen: 0,
+        resolved: { case1: 0, case2: 0, case3: 0 },
+        skippedUnresolvable: 0,
+        remainingGroups: -1,
+        lockBusy: false,
+        errors: [String(err?.message || err)]
+      });
+    }
+  }
+  lastRun = { startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), vessels: results };
+  const totals = results.reduce((a, r) => a + r.resolved.case1 + r.resolved.case2 + r.resolved.case3, 0);
+  console.log(`[WO-Reconciler] sweep done: ${vessels2.length} provisioned vessel(s), ${totals} duplicate(s) resolved`);
+  return lastRun;
+}
+var RECONCILE_ACTOR, MAX_GROUPS_PER_VESSEL_PER_RUN, WORKFLOW_STATUSES, REPOINT_TABLES, LEFT_IN_PLACE_TABLES, lastRun;
+var init_workOrderReconcilerService = __esm({
+  "server/modules/work-orders/services/workOrderReconcilerService.ts"() {
+    "use strict";
+    init_workOrderReconcileRepository();
+    init_sync();
+    init_syncDiagLogger();
+    init_syncEngine();
+    init_syncRole();
+    RECONCILE_ACTOR = "wo-reconciler";
+    MAX_GROUPS_PER_VESSEL_PER_RUN = 50;
+    WORKFLOW_STATUSES = /* @__PURE__ */ new Set([
+      "completed",
+      "pending approval",
+      "postponed",
+      "rejected",
+      "awaiting office approval",
+      "postponement approved",
+      "in progress"
+    ]);
+    REPOINT_TABLES = [
+      { table: "work_order_documents", fkColumn: "work_order_id", idColumn: "id", synced: true },
+      { table: "work_order_executions", fkColumn: "template_id", idColumn: "id", synced: true },
+      { table: "work_order_execution_details", fkColumn: "work_order_id", idColumn: "woeduuid", synced: true },
+      { table: "work_order_postponements", fkColumn: "work_order_id", idColumn: "id", synced: true },
+      { table: "superintendent_notifications", fkColumn: "work_order_id", idColumn: "snuuid", synced: true },
+      { table: "wo_postponement_approvals", fkColumn: "work_order_id", idColumn: "wpauuid", synced: true },
+      // NO_SYNC local bookkeeping — repointed so shore views stay correct; no field log.
+      { table: "work_order_anomalies", fkColumn: "work_order_id", idColumn: "id", synced: false }
+    ];
+    LEFT_IN_PLACE_TABLES = [
+      { table: "ihm_maintenance_log", fkColumn: "work_order_id", reason: "serial-id repoint mints phantoms on ship (\xA79.4)" },
+      { table: "component_maintenance_history", fkColumn: "work_order_id", reason: "immutable by DB trigger" }
+    ];
+    lastRun = null;
   }
 });
 
@@ -18626,6 +19135,12 @@ async function completeSyncHandler(req, res) {
       appliedTableCheckpoints
     );
     res.json(result);
+    setImmediate(() => {
+      Promise.resolve().then(() => (init_workOrderReconcilerService(), workOrderReconcilerService_exports)).then((svc) => svc.reconcileVessel(vesselId)).then((r) => {
+        const n = r.resolved.case1 + r.resolved.case2 + r.resolved.case3;
+        if (n > 0) console.log(`[WO-Reconciler] post-sync trigger: resolved ${n} duplicate(s) for vessel ${vesselId}`);
+      }).catch((err) => console.warn(`[WO-Reconciler] post-sync trigger failed (next sync retries): ${err?.message || err}`));
+    });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("[Sync] complete error:", error);
@@ -18645,8 +19160,8 @@ async function statusHandler(req, res) {
       unresolved: null
     };
     try {
-      const pool2 = await getPool();
-      const r = await pool2.query(`SELECT count(*)::int AS n FROM sync_field_log_failures WHERE resolved = false`);
+      const pool4 = await getPool();
+      const r = await pool4.query(`SELECT count(*)::int AS n FROM sync_field_log_failures WHERE resolved = false`);
       fieldLogFailures.unresolved = r.rows[0]?.n ?? 0;
     } catch {
     }
@@ -19295,8 +19810,8 @@ function header(req, name) {
 async function batchInstanceMatches(req, instanceId) {
   const batchUuid = req.body && req.body.batchUuid;
   if (!batchUuid) return true;
-  const pool2 = await getPool();
-  const r = await pool2.query(
+  const pool4 = await getPool();
+  const r = await pool4.query(
     `SELECT initiated_by_instance FROM sync_batches WHERE batch_uuid = $1 LIMIT 1`,
     [batchUuid]
   );
@@ -19484,6 +19999,9 @@ function buildJobsWithActiveWOSet(workOrders2, vesselId) {
   const byJobId = /* @__PURE__ */ new Set();
   const byJobNo = /* @__PURE__ */ new Set();
   workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
     if (vesselId && wo.vesselId !== vesselId) {
       return;
     }
@@ -19503,6 +20021,9 @@ function buildJobsWithActiveWOSet(workOrders2, vesselId) {
 function buildRhCycleWOMap(workOrders2, vesselId) {
   const cycleMap = /* @__PURE__ */ new Map();
   workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
     const normalizedStatus = wo.status?.toLowerCase().trim() || "";
     if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
       return;
@@ -19529,6 +20050,9 @@ function buildRhCycleWOMap(workOrders2, vesselId) {
 function buildCalendarCycleWOMap(workOrders2, vesselId) {
   const cycleMap = /* @__PURE__ */ new Map();
   workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
     const normalizedStatus = wo.status?.toLowerCase().trim() || "";
     if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
       return;
@@ -19554,6 +20078,7 @@ function buildCalendarCycleWOMap(workOrders2, vesselId) {
 }
 function findBlockingWOForJob(workOrders2, jobId, jobNo) {
   return workOrders2.find((wo) => {
+    if (wo.isDeleted === true) return false;
     if (!isBlockingStatus(wo.status)) return false;
     if (wo.jobId === jobId) return true;
     const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
@@ -19578,8 +20103,12 @@ var init_workOrderStatus = __esm({
       "in_progress",
       "inprogress",
       "open",
-      "rejected"
+      "rejected",
       // Rejected WOs block new generation - work needs rework before cycle can advance
+      "awaiting office approval",
+      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
+      "postponement approved"
+      // Postponement approved — WO is still active, scanner must not re-generate
     ]);
     COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
       "completed",
@@ -19592,7 +20121,7 @@ var init_workOrderStatus = __esm({
 });
 
 // server/postgresStorage.ts
-import { randomUUID } from "crypto";
+import { randomUUID as randomUUID2 } from "crypto";
 import { eq as eq3, and as and3, desc as desc2, sql as sql7, inArray as inArray2, or, ilike, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
 function getWorkOrderNumericFields() {
   if (_woNumericFields) return _woNumericFields;
@@ -20287,7 +20816,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(components).values({
           ...component,
           id,
-          cuuid: randomUUID(),
+          cuuid: randomUUID2(),
           dataScope: component.dataScope || "vessel"
         }).returning();
         return result[0];
@@ -21061,7 +21590,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(jobs).values({
           ...job,
           id,
-          juuid: randomUUID(),
+          juuid: randomUUID2(),
           dataScope: job.dataScope || "vessel"
         }).returning();
         return result[0];
@@ -21087,7 +21616,7 @@ var init_postgresStorage = __esm({
           const result = await db2.insert(jobs).values({
             ...job,
             id,
-            juuid: randomUUID(),
+            juuid: randomUUID2(),
             dataScope: job.dataScope || "vessel"
           }).returning();
           results.push(result[0]);
@@ -21119,7 +21648,7 @@ var init_postgresStorage = __esm({
             await db2.insert(jobs).values({
               ...job,
               id,
-              juuid: randomUUID(),
+              juuid: randomUUID2(),
               dataScope: job.dataScope || "vessel"
             });
             created++;
@@ -21189,7 +21718,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(workOrders).values({
           ...wo,
           id,
-          wouuid: randomUUID(),
+          wouuid: randomUUID2(),
           dataScope: wo.dataScope || "vessel"
         }).returning();
         return result[0];
@@ -21221,7 +21750,7 @@ var init_postgresStorage = __esm({
           const result = await db2.insert(workOrders).values({
             ...wo,
             id,
-            wouuid: randomUUID(),
+            wouuid: randomUUID2(),
             dataScope: wo.dataScope || "vessel"
           }).returning();
           results.push(result[0]);
@@ -21267,7 +21796,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(workOrders).values({
           ...wo,
           id,
-          wouuid: randomUUID(),
+          wouuid: randomUUID2(),
           dataScope: "fleet"
         }).returning();
         return result[0];
@@ -21319,7 +21848,7 @@ var init_postgresStorage = __esm({
         const ihmSynced = spare.ihm === "Yes" ? "YES" : spare.ihm === "No" ? "NO" : spare.ihmPresence;
         const result = await db2.insert(spares).values({
           ...spare,
-          suuid: randomUUID(),
+          suuid: randomUUID2(),
           dataScope: spare.dataScope || "vessel",
           rob: spare.rob ?? 0,
           robLocationA: robA,
@@ -22049,7 +22578,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(spares).values({
           ...spare,
-          suuid: randomUUID(),
+          suuid: randomUUID2(),
           dataScope: "fleet",
           rob: spare.rob ?? 0,
           robLocationA: spare.robLocationA ?? 0,
@@ -22073,7 +22602,7 @@ var init_postgresStorage = __esm({
           const robB = spare.robLocationB ?? 0;
           const result = await db2.insert(spares).values({
             ...spare,
-            suuid: randomUUID(),
+            suuid: randomUUID2(),
             dataScope: spare.dataScope || "vessel",
             rob: spare.rob ?? 0,
             robLocationA: robA,
@@ -22161,7 +22690,7 @@ var init_postgresStorage = __esm({
             const robB = spare.robLocationB ?? 0;
             const result = await db2.insert(spares).values({
               ...spare,
-              suuid: randomUUID(),
+              suuid: randomUUID2(),
               dataScope: spare.dataScope || "vessel",
               rob: spare.rob ?? 0,
               robLocationA: robA,
@@ -22298,7 +22827,7 @@ var init_postgresStorage = __esm({
         const totalRob = robLocationA + robLocationB;
         const result = await db2.insert(storesItems).values({
           ...item,
-          stuuid: randomUUID(),
+          stuuid: randomUUID2(),
           rob: String(totalRob),
           robLocationA: String(robLocationA),
           robLocationB: String(robLocationB),
@@ -22806,7 +23335,7 @@ var init_postgresStorage = __esm({
         const result = await db2.insert(defects).values({
           ...defect,
           id,
-          duuid: randomUUID()
+          duuid: randomUUID2()
         }).returning();
         try {
           await logFieldChanges("defects", result[0].duuid, defect.vesselId || null, null, result[0], "system");
@@ -23077,7 +23606,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(alertPolicies).values({
           ...policy,
-          apuuid: randomUUID()
+          apuuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -23134,7 +23663,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(alertEvents).values({
           ...event,
-          aeuuid: randomUUID()
+          aeuuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -23207,7 +23736,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(alertAcknowledgements).values({
           ...ack,
-          aauuid: randomUUID()
+          aauuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -23284,7 +23813,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(formDefinitions).values({
           ...form,
-          fduuid: randomUUID()
+          fduuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -23315,7 +23844,7 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.insert(formVersions).values({
           ...version,
-          fvuuid: randomUUID()
+          fvuuid: randomUUID2()
         }).returning();
         return result[0];
       }
@@ -24447,7 +24976,7 @@ var init_postgresStorage = __esm({
       async createBulkImportHistory(history) {
         const db2 = await getDb();
         const result = await db2.insert(bulkImportHistory).values({
-          biuuid: randomUUID(),
+          biuuid: randomUUID2(),
           vesselCode: history.vesselCode ?? null,
           vesselName: history.vesselName ?? null,
           moduleType: history.moduleType,
@@ -25029,7 +25558,7 @@ var init_postgresStorage = __esm({
           const latestAudit = await db2.select().from(runningHoursAudit).where(or(eq3(runningHoursAudit.componentId, resolvedParentId), eq3(runningHoursAudit.componentId, parentComponentId))).orderBy(desc2(runningHoursAudit.enteredAtUTC)).limit(1);
           if (latestAudit.length > 0) {
             const latestDate = latestAudit[0].dateUpdatedLocal;
-            const parseDate5 = (dateStr) => {
+            const parseDate6 = (dateStr) => {
               const months = { "Jan": 0, "Feb": 1, "Mar": 2, "Apr": 3, "May": 4, "Jun": 5, "Jul": 6, "Aug": 7, "Sep": 8, "Oct": 9, "Nov": 10, "Dec": 11 };
               const parts = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{4})\s*(\d{2})?:?(\d{2})?/);
               if (parts) {
@@ -25038,8 +25567,8 @@ var init_postgresStorage = __esm({
               }
               return new Date(dateStr);
             };
-            const latestParsedDate = parseDate5(latestDate);
-            const newParsedDate = parseDate5(dateUpdated);
+            const latestParsedDate = parseDate6(latestDate);
+            const newParsedDate = parseDate6(dateUpdated);
             if (newParsedDate < latestParsedDate) {
               throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${latestDate}).`);
             }
@@ -28938,6 +29467,7 @@ var init_workOrderService = __esm({
           const existingWOs = await storage.getWorkOrders(workOrderData.vesselId);
           const newComponentCode = workOrderData.componentCode || null;
           const existingActiveWO = existingWOs.find((wo) => {
+            if (wo.isDeleted === true) return false;
             if (wo.jobId !== workOrderData.jobId) return false;
             if (!isBlockingStatus(wo.status)) return false;
             const existingComponentCode = wo.componentCode || null;
@@ -29141,7 +29671,8 @@ var init_workOrderService = __esm({
             }
             const componentCycleKey = `${job.vesselId || "unknown"}|${job.jobNo}|${componentCode}|${dueDateStr}`;
             const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
+              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
+              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
             );
             if (existingWOForComponent) {
               continue;
@@ -29422,6 +29953,7 @@ var init_jobDueScanner = __esm({
           if (frequencyRH <= 0) continue;
           const generationAdvanceRH = WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS;
           const legacyBlockingWO = allWorkOrders.find((wo) => {
+            if (wo.isDeleted === true) return false;
             if (!isBlockingStatus(wo.status)) return false;
             if (wo.componentCode && wo.componentCode !== "") return false;
             if (wo.jobId === job.juuid) return true;
@@ -29475,7 +30007,8 @@ var init_jobDueScanner = __esm({
               continue;
             }
             const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
+              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
+              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
             );
             if (existingWOForComponent) {
               skipReasons.existingWO++;
@@ -29646,6 +30179,7 @@ var init_jobDueScanner = __esm({
           }
           const triggerLeg = calendarDue ? "CALENDAR" : "RH";
           const legacyBlockingWO = allWorkOrders.find((wo) => {
+            if (wo.isDeleted === true) return false;
             if (!isBlockingStatus(wo.status)) return false;
             if (wo.componentCode && wo.componentCode !== "") return false;
             if (wo.jobId === job.juuid) return true;
@@ -29676,7 +30210,8 @@ var init_jobDueScanner = __esm({
             const componentName = linkedComponent.componentName;
             if (!componentCode) continue;
             const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
+              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
+              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
             );
             if (existingWOForComponent) {
               skipReasons.existingWO++;
@@ -29784,6 +30319,7 @@ var init_jobDueScanner = __esm({
         const rhCycleMap = buildRhCycleWOMap(allWorkOrders, job.vesselId || void 0);
         const calendarCycleMap = buildCalendarCycleWOMap(allWorkOrders, job.vesselId || void 0);
         const legacyBlockingWO = allWorkOrders.find((wo) => {
+          if (wo.isDeleted === true) return false;
           if (!isBlockingStatus(wo.status)) return false;
           if (wo.componentCode && wo.componentCode !== "") return false;
           if (wo.jobId === job.juuid) return true;
@@ -29808,6 +30344,7 @@ var init_jobDueScanner = __esm({
         const isJobBlockedByJobNo = activeWOSets.byJobNo.has(vesselJobNoKey);
         if (isJobBlockedByJobId || isJobBlockedByJobNo) {
           const existingWOForComponent = allWorkOrders.find((wo) => {
+            if (wo.isDeleted === true) return false;
             if (!isBlockingStatus(wo.status)) return false;
             if (wo.componentCode !== effectiveComponentCode) return false;
             if (wo.jobId === job.juuid) return true;
@@ -32209,11 +32746,13 @@ var workOrderService_exports = {};
 __export(workOrderService_exports, {
   applyAssignmentSync: () => applyAssignmentSync,
   approvePostponement: () => approvePostponement,
+  approveRePostponement: () => approveRePostponement,
   calculateApprovalTier: () => calculateApprovalTier,
   createSuperintendentNotificationForWO: () => createSuperintendentNotificationForWO,
   createWorkOrder: () => createWorkOrder,
   deleteWorkOrder: () => deleteWorkOrder,
   editPostponeRequest: () => editPostponeRequest,
+  editRePostponeRequest: () => editRePostponeRequest,
   getRejectionHistory: () => getRejectionHistory,
   getScopedOperationData: () => getScopedOperationData,
   getWorkOrder: () => getWorkOrder,
@@ -32223,9 +32762,11 @@ __export(workOrderService_exports, {
   listWorkOrdersPaged: () => listWorkOrdersPaged,
   rejectCompletedWorkOrder: () => rejectCompletedWorkOrder,
   rejectPostponement: () => rejectPostponement,
+  rejectRePostponement: () => rejectRePostponement,
   reopenCompletedWorkOrder: () => reopenCompletedWorkOrder,
   saveOverdueReason: () => saveOverdueReason,
   submitPostponeRequest: () => submitPostponeRequest,
+  submitRePostponeRequest: () => submitRePostponeRequest,
   updateWorkOrder: () => updateWorkOrder
 });
 import { eq as eq10 } from "drizzle-orm";
@@ -32375,7 +32916,8 @@ async function createSuperintendentNotificationForWO(wo, daysLate, missedCycles,
   }
 }
 async function listWorkOrders(vesselId, vesselIds) {
-  const workOrders2 = await findWorkOrders2(vesselId, vesselIds);
+  const allRows = await findWorkOrders2(vesselId, vesselIds);
+  const workOrders2 = allRows.filter((wo) => wo.isDeleted !== true);
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
   const isAllVessels = !vesselId || vesselId === "all";
@@ -34437,6 +34979,302 @@ async function rejectPostponement(id, body) {
   });
   return updatedWO;
 }
+async function classifyWoForRePostponement(wo) {
+  if (!wo.jobId) {
+    const allConfigs2 = await storage.getApprovalWorkflowConfig();
+    const cfg = allConfigs2.find(
+      (c) => c.functionId === "pms-wo-re-postponement" && c.variableName === "Normal WO" && !c.isDeleted
+    );
+    if (!cfg) {
+      throw new ValidationError(
+        "Re-Postponement approval configuration is not yet available on this vessel. Please sync and try again."
+      );
+    }
+    return { classification: "normal", level1Enabled: cfg.level1Enabled ?? false, level2Enabled: cfg.level2Enabled ?? false };
+  }
+  let classification = "normal";
+  const job = await findJob(wo.jobId);
+  if (job) {
+    let isOnCriticalEquipment = false;
+    if (job.componentId) {
+      const comp = await findComponent2(job.componentId);
+      isOnCriticalEquipment = comp?.critical === true;
+    }
+    if (isOnCriticalEquipment) {
+      classification = "criticalEquipment";
+    } else if (job.criticality === "Yes") {
+      classification = "critical";
+    }
+  }
+  const variableNameMap = {
+    criticalEquipment: "Critical Equipment WO",
+    critical: "Critical WO",
+    normal: "Normal WO"
+  };
+  const allConfigs = await storage.getApprovalWorkflowConfig();
+  const config = allConfigs.find(
+    (c) => c.functionId === "pms-wo-re-postponement" && c.variableName === variableNameMap[classification] && !c.isDeleted
+  );
+  if (!config) {
+    throw new ValidationError(
+      "Re-Postponement approval configuration is not yet available on this vessel. Please sync and try again."
+    );
+  }
+  return {
+    classification,
+    level1Enabled: config.level1Enabled ?? false,
+    level2Enabled: config.level2Enabled ?? false
+  };
+}
+async function createRePostponementRecord(wo, body, dueDateSnapshot) {
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const classification = await classifyWoForRePostponement(wo);
+  const approvalWorkflowSnapshot = {
+    woClassification: classification.classification,
+    level1Enabled: classification.level1Enabled,
+    level2Enabled: classification.level2Enabled
+  };
+  const updatedWO = await update5(wo.wouuid, {
+    status: "Awaiting Office Approval",
+    postponeRequestedDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    postponeApprover: body.approver || "Office",
+    postponementApprovalDate: null,
+    postponementApprovalRemarks: null
+  });
+  try {
+    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.userId || body.performedBy || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO re-postpone-request:", err);
+  }
+  const prevMax = await getMaxPostponementNumber(wo.wouuid);
+  const postponementId = crypto.randomUUID();
+  await createPostponement({
+    id: postponementId,
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId,
+    postponementNumber: prevMax + 1,
+    originalDueDate: dueDateSnapshot,
+    // snapshot: used by rejectRePostponement to restore date
+    newDueDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    approver: body.approver || "Office",
+    postponeDate: body.postponeDate,
+    durationDays: body.duration ? parseInt(String(body.duration), 10) : null,
+    submittedDate: today,
+    status: "Awaiting Approval",
+    informOffice: true,
+    approvalWorkflowSnapshot,
+    requestType: "Re-Postponement"
+  });
+  if (classification.level1Enabled) {
+    await createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: "Level 1",
+      status: "Pending",
+      requestType: "Re-Postponement"
+    });
+  }
+  if (classification.level2Enabled) {
+    await createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: "Level 2",
+      status: "Pending",
+      requestType: "Re-Postponement"
+    });
+  }
+  return updatedWO;
+}
+async function submitRePostponeRequest(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Postponement Approved") {
+    throw new ValidationError(
+      `Only work orders with status "Postponement Approved" can submit a Re-Postponement. Current status: ${wo.status}`
+    );
+  }
+  const dueDateSnapshot = wo.dueDate;
+  return createRePostponementRecord(wo, body, dueDateSnapshot);
+}
+async function editRePostponeRequest(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Awaiting Office Approval") {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can edit a Re-Postponement. Current status: ${wo.status}`
+    );
+  }
+  const pending = await getLatestAwaitingPostponement(wo.wouuid);
+  const dueDateSnapshot = pending?.originalDueDate ?? wo.dueDate;
+  return createRePostponementRecord(wo, body, dueDateSnapshot);
+}
+async function approveRePostponement(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Awaiting Office Approval") {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
+    );
+  }
+  const awaitingPostponement = await getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) {
+    const steps = await getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const now = /* @__PURE__ */ new Date();
+      const activeStep = steps.find((s) => s.status === "Pending");
+      if (!activeStep) {
+        throw new ValidationError("No pending approval step found \u2014 this request may have already been fully approved");
+      }
+      const isSailAdmin = body.sessionRole === "Sail Admin" || body.role === "Sail Admin";
+      if (!isSailAdmin) {
+        const reviewerId = body.userUuid || body.approvedBy;
+        const isAuthorised = await verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+        if (!isAuthorised) {
+          throw new ValidationError(`Not authorised to approve at ${activeStep.approvalLevel}`);
+        }
+      }
+      const remaining = steps.filter((s) => s.id !== activeStep.id && s.status === "Pending");
+      await updateWoPostponementApprovalStep(activeStep.id, {
+        status: "Approved",
+        actionByUserId: body.approvedBy,
+        actionAt: now,
+        remarks: body.approvalRemarks || null
+      });
+      if (remaining.length > 0) {
+        console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} \u2014 ${activeStep.approvalLevel} approved; awaiting ${remaining.length} more level(s)`);
+        return await findById3(id) || wo;
+      }
+      console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} \u2014 all approval levels satisfied, finalising`);
+    }
+  }
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const newDueDate = wo.postponeRequestedDate || body.newDueDate;
+  const updatedWO = await update5(id, {
+    status: "Postponement Approved",
+    dueDate: newDueDate,
+    postponementEndDate: newDueDate,
+    postponeApprover: body.approvedBy || "Office",
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null
+  });
+  try {
+    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO re-postpone-approve:", err);
+  }
+  const existingRows = await findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxApprove = existingRows?.length ? existingRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ).postponementNumber || 1 : 1;
+  const latestApprove = existingRows?.length ? existingRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ) : null;
+  await createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId,
+    postponementNumber: prevMaxApprove + 1,
+    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate,
+    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || "Office",
+    approvedBy: body.approvedBy || "Office",
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || "Office",
+    durationDays: latestApprove?.durationDays || null,
+    submittedDate: today,
+    status: "Approved",
+    informOffice: true,
+    requestType: "Re-Postponement"
+  });
+  return updatedWO;
+}
+async function rejectRePostponement(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Awaiting Office Approval") {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be rejected. Current status: ${wo.status}`
+    );
+  }
+  const awaitingPostponement = await getLatestAwaitingPostponement(wo.wouuid);
+  let dueDateToRestore = null;
+  if (awaitingPostponement) {
+    dueDateToRestore = awaitingPostponement.originalDueDate || null;
+    const steps = await getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const activeStep = steps.find((s) => s.status === "Pending");
+      if (activeStep) {
+        const isSailAdmin = body.sessionRole === "Sail Admin" || body.role === "Sail Admin";
+        if (!isSailAdmin) {
+          const reviewerId = body.userUuid || body.approvedBy;
+          const isAuthorised = await verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+          if (!isAuthorised) {
+            throw new ValidationError(`Not authorised to reject at ${activeStep.approvalLevel}`);
+          }
+        }
+        await updateWoPostponementApprovalStep(activeStep.id, {
+          status: "Rejected",
+          actionByUserId: body.approvedBy,
+          actionAt: /* @__PURE__ */ new Date(),
+          remarks: body.approvalRemarks || null
+        });
+      }
+    }
+  }
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const updatedWO = await update5(id, {
+    status: "Postponement Approved",
+    // Restore the due date that was active before the re-postponement was submitted
+    ...dueDateToRestore ? { dueDate: dueDateToRestore, postponementEndDate: dueDateToRestore } : {},
+    postponeApprover: body.approvedBy || "Office",
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null
+  });
+  try {
+    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO re-postpone-reject:", err);
+  }
+  const rejectRows = await findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxReject = rejectRows?.length ? rejectRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ).postponementNumber || 1 : 1;
+  const latestReject = rejectRows?.length ? rejectRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ) : null;
+  await createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId,
+    postponementNumber: prevMaxReject + 1,
+    originalDueDate: latestReject?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: latestReject?.newDueDate || wo.postponeRequestedDate,
+    postponementReason: latestReject?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestReject?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || "Office",
+    approvedBy: body.approvedBy || "Office",
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || "Office",
+    durationDays: latestReject?.durationDays || null,
+    submittedDate: today,
+    status: "Rejected",
+    informOffice: true,
+    requestType: "Re-Postponement"
+  });
+  return updatedWO;
+}
 async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   let existingWO2 = await findById3(id);
   if (!existingWO2) existingWO2 = await findByCode(id);
@@ -34545,6 +35383,47 @@ var init_workOrderService2 = __esm({
     init_schema();
     init_sync();
     init_workOrderFilters();
+  }
+});
+
+// server/modules/work-orders/services/workOrderGenerationGate.ts
+var workOrderGenerationGate_exports = {};
+__export(workOrderGenerationGate_exports, {
+  evaluateDirectGeneration: () => evaluateDirectGeneration,
+  resolveGateRole: () => resolveGateRole
+});
+function resolveGateRole(user) {
+  return (user?.forwardedRole || user?.role || "").trim();
+}
+async function evaluateDirectGeneration(opts) {
+  if (opts.isShip) return { allowed: true, state: null };
+  let state;
+  try {
+    state = await getVesselProvisioningState(opts.vesselId);
+  } catch (err) {
+    return {
+      allowed: false,
+      code: "VESSEL_STATE_UNKNOWN",
+      message: "Could not determine whether this vessel has a ship provisioned, so work-order generation was refused. Try again; if it persists, raise it with support.",
+      state: null
+    };
+  }
+  if (opts.role !== PROVISIONING_ROLE) {
+    return {
+      allowed: false,
+      code: "ROLE_NOT_PERMITTED",
+      message: `Only a ${PROVISIONING_ROLE} may generate work orders directly from the office.`,
+      state
+    };
+  }
+  return { allowed: true, state };
+}
+var PROVISIONING_ROLE;
+var init_workOrderGenerationGate = __esm({
+  "server/modules/work-orders/services/workOrderGenerationGate.ts"() {
+    "use strict";
+    init_service();
+    PROVISIONING_ROLE = "Sail Admin";
   }
 });
 
@@ -35985,6 +36864,1721 @@ var init_pmsAlertEngine = __esm({
   }
 });
 
+// server/modules/shipskart/services/identityGuard.ts
+function forwardedUserUuid(req, context) {
+  const raw = req.headers["x-user-id"];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  let decoded = null;
+  if (typeof value === "string" && value.trim()) {
+    try {
+      decoded = decodeURIComponent(value).trim() || null;
+    } catch {
+      decoded = value.trim();
+    }
+  }
+  if (!decoded) {
+    if (!warnedThisProcess) {
+      warnedThisProcess = true;
+      console.warn(
+        `${IDENTITY_MISSING_TAG} ${context}: request arrived with NO x-user-id header. This shore is NOT identity-integrated, so per-user Purchasing accounts cannot be used and callers fall back to the LEGACY SHARED account. If this is the WK trial or any production shore, FIX THE INTEGRATION \u2014 every user would otherwise share one Shipskart identity and requisitions would be attributed to the wrong person. (This warning prints once per process.)`
+      );
+    } else {
+      console.warn(`${IDENTITY_MISSING_TAG} ${context}: no x-user-id header (see the first occurrence for detail).`);
+    }
+    return null;
+  }
+  if (decoded === MOCK_DEFAULT_USER_UUID) {
+    console.warn(
+      `${IDENTITY_MISSING_TAG} ${context}: x-user-id is the MOCK DEFAULT uuid (${MOCK_DEFAULT_USER_UUID}). Treating as no identity so users cannot silently share one Shipskart account. Real identities must come from the SAILERP profile.`
+    );
+    return null;
+  }
+  return decoded;
+}
+function logIdentityIntegrationExpectation() {
+  console.log(
+    `[Shipskart][IDENTITY] Per-user Purchasing SSO requires the x-user-id header forwarded by the frontend (SAILERP profile). Any request without it falls back to the legacy shared account and logs "${IDENTITY_MISSING_TAG}" \u2014 grep that tag to confirm this deployment is identity-integrated.`
+  );
+}
+var MOCK_DEFAULT_USER_UUID, IDENTITY_MISSING_TAG, warnedThisProcess;
+var init_identityGuard = __esm({
+  "server/modules/shipskart/services/identityGuard.ts"() {
+    "use strict";
+    MOCK_DEFAULT_USER_UUID = "00000000-0000-0000-0000-000000000001";
+    IDENTITY_MISSING_TAG = "[Shipskart][IDENTITY-MISSING]";
+    warnedThisProcess = false;
+  }
+});
+
+// server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
+import { eq as eq28 } from "drizzle-orm";
+async function getAllMappings() {
+  const db2 = await getDb();
+  return db2.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
+}
+async function getMappingForSailRole(sailRole) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole)).limit(1);
+  return rows[0];
+}
+async function upsertMapping2(sailRole, shipskartRole, updatedByUuid) {
+  const db2 = await getDb();
+  await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
+    target: shipskartRoleMappings.sailRole,
+    set: { shipskartRole, updatedByUuid: updatedByUuid ?? null, updatedAt: /* @__PURE__ */ new Date() }
+  });
+}
+async function deleteMapping(sailRole) {
+  const db2 = await getDb();
+  await db2.delete(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole));
+}
+var init_shipskartRoleMappingRepository = __esm({
+  "server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts"() {
+    "use strict";
+    init_db();
+    init_schema();
+  }
+});
+
+// server/modules/shipskart/repositories/shipskartB2bRepository.ts
+var shipskartB2bRepository_exports = {};
+__export(shipskartB2bRepository_exports, {
+  failingRows: () => failingRows,
+  getActiveVesselIdsForUser: () => getActiveVesselIdsForUser,
+  getAssignment: () => getAssignment,
+  getTenantConfig: () => getTenantConfig,
+  getUserLink: () => getUserLink,
+  getVesselLink: () => getVesselLink,
+  linkStatusCounts: () => linkStatusCounts,
+  replaceAssignmentsForUser: () => replaceAssignmentsForUser,
+  resetForRetry: () => resetForRetry,
+  setReconcilerEnabled: () => setReconcilerEnabled,
+  upsertAssignment: () => upsertAssignment,
+  upsertTokenState: () => upsertTokenState,
+  upsertUserLink: () => upsertUserLink,
+  upsertVesselLink: () => upsertVesselLink
+});
+import { and as and25, eq as eq29, ne as ne2, notInArray as notInArray3 } from "drizzle-orm";
+async function getTenantConfig(tenantId) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(shipskartTenantConfig).where(eq29(shipskartTenantConfig.tenantId, tenantId)).limit(1);
+  return rows[0];
+}
+async function upsertTokenState(tenantId, state) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(shipskartTenantConfig).values({
+    tenantId,
+    enabled: true,
+    accessToken: state.accessToken,
+    refreshToken: state.refreshToken,
+    accessExpiresAt: state.accessExpiresAt,
+    refreshExpiresAt: state.refreshExpiresAt,
+    lastBootstrapAt: state.isBootstrap ? now : null
+  }).onConflictDoUpdate({
+    target: shipskartTenantConfig.tenantId,
+    set: {
+      accessToken: state.accessToken,
+      refreshToken: state.refreshToken,
+      accessExpiresAt: state.accessExpiresAt,
+      refreshExpiresAt: state.refreshExpiresAt,
+      ...state.isBootstrap ? { lastBootstrapAt: now } : {},
+      updatedAt: now
+    }
+  });
+}
+async function setReconcilerEnabled(tenantId, enabled) {
+  const db2 = await getDb();
+  await db2.insert(shipskartTenantConfig).values({ tenantId, enabled: true, reconcilerEnabled: enabled }).onConflictDoUpdate({
+    target: shipskartTenantConfig.tenantId,
+    set: { reconcilerEnabled: enabled, updatedAt: /* @__PURE__ */ new Date() }
+  });
+}
+async function getUserLink(userUuid) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(shipskartUserLinks).where(eq29(shipskartUserLinks.userUuid, userUuid)).limit(1);
+  return rows[0];
+}
+async function upsertUserLink(userUuid, patch) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  const pushedAt = patch.pushStatus === "pushed" ? now : void 0;
+  await db2.insert(shipskartUserLinks).values({
+    userUuid,
+    shipskartUserId: patch.shipskartUserId ?? null,
+    pushStatus: patch.pushStatus,
+    lastError: patch.lastError ?? null,
+    pushedAt: pushedAt ?? null,
+    pushedRoleId: patch.pushedRoleId ?? null,
+    pushedRoleName: patch.pushedRoleName ?? null
+  }).onConflictDoUpdate({
+    target: shipskartUserLinks.userUuid,
+    set: {
+      ...patch.shipskartUserId !== void 0 ? { shipskartUserId: patch.shipskartUserId } : {},
+      pushStatus: patch.pushStatus,
+      lastError: patch.lastError ?? null,
+      ...pushedAt ? { pushedAt } : {},
+      ...patch.pushedRoleId !== void 0 ? { pushedRoleId: patch.pushedRoleId } : {},
+      ...patch.pushedRoleName !== void 0 ? { pushedRoleName: patch.pushedRoleName } : {},
+      updatedAt: now
+    }
+  });
+}
+async function getVesselLink(vesselVuuid) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(shipskartVesselLinks).where(eq29(shipskartVesselLinks.vesselVuuid, vesselVuuid)).limit(1);
+  return rows[0];
+}
+async function upsertVesselLink(vesselVuuid, patch) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  const pushedAt = patch.pushStatus === "pushed" ? now : void 0;
+  await db2.insert(shipskartVesselLinks).values({
+    vesselVuuid,
+    imoNumber: patch.imoNumber ?? null,
+    shipskartVesselId: patch.shipskartVesselId ?? null,
+    pushStatus: patch.pushStatus,
+    lastError: patch.lastError ?? null,
+    pushedAt: pushedAt ?? null
+  }).onConflictDoUpdate({
+    target: shipskartVesselLinks.vesselVuuid,
+    set: {
+      ...patch.imoNumber !== void 0 ? { imoNumber: patch.imoNumber } : {},
+      ...patch.shipskartVesselId !== void 0 ? { shipskartVesselId: patch.shipskartVesselId } : {},
+      pushStatus: patch.pushStatus,
+      lastError: patch.lastError ?? null,
+      ...pushedAt ? { pushedAt } : {},
+      updatedAt: now
+    }
+  });
+}
+async function getAssignment(userUuid, vesselId) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(masterUserVessels).where(and25(eq29(masterUserVessels.userUuid, userUuid), eq29(masterUserVessels.vesselId, vesselId))).limit(1);
+  return rows[0];
+}
+async function upsertAssignment(userUuid, vesselId, patch) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  const mappedAt = patch.mapStatus === "mapped" ? now : void 0;
+  await db2.insert(masterUserVessels).values({
+    userUuid,
+    vesselId,
+    isActive: patch.isActive ?? true,
+    shipskartMappingId: patch.shipskartMappingId ?? null,
+    mapStatus: patch.mapStatus ?? "pending",
+    lastError: patch.lastError ?? null,
+    mappedAt: mappedAt ?? null
+  }).onConflictDoUpdate({
+    target: [masterUserVessels.userUuid, masterUserVessels.vesselId],
+    set: {
+      ...patch.isActive !== void 0 ? { isActive: patch.isActive } : {},
+      ...patch.shipskartMappingId !== void 0 ? { shipskartMappingId: patch.shipskartMappingId } : {},
+      ...patch.mapStatus !== void 0 ? { mapStatus: patch.mapStatus } : {},
+      lastError: patch.lastError ?? null,
+      ...mappedAt ? { mappedAt } : {},
+      updatedAt: now
+    }
+  });
+}
+async function replaceAssignmentsForUser(userUuid, vesselVuuids) {
+  const db2 = await getDb();
+  const now = /* @__PURE__ */ new Date();
+  let activated = 0;
+  for (const vesselId of vesselVuuids) {
+    const existing = await getAssignment(userUuid, vesselId);
+    const mapStatus = existing?.shipskartMappingId && existing.isActive ? void 0 : "pending";
+    await upsertAssignment(userUuid, vesselId, { isActive: true, ...mapStatus ? { mapStatus } : {} });
+    activated++;
+  }
+  const keep = vesselVuuids.length > 0 ? vesselVuuids : ["__none__"];
+  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", updatedAt: now }).where(and25(
+    eq29(masterUserVessels.userUuid, userUuid),
+    eq29(masterUserVessels.isActive, true),
+    notInArray3(masterUserVessels.vesselId, keep)
+  )).returning({ id: masterUserVessels.id });
+  return { activated, deactivated: deactivatedRows.length };
+}
+async function getActiveVesselIdsForUser(userUuid) {
+  const db2 = await getDb();
+  const rows = await db2.select({ v: masterUserVessels.vesselId }).from(masterUserVessels).where(and25(eq29(masterUserVessels.userUuid, userUuid), eq29(masterUserVessels.isActive, true)));
+  return rows.map((r) => r.v);
+}
+async function failingRows(limit = 100) {
+  const db2 = await getDb();
+  const users2 = await db2.select({
+    userUuid: shipskartUserLinks.userUuid,
+    pushStatus: shipskartUserLinks.pushStatus,
+    lastError: shipskartUserLinks.lastError
+  }).from(shipskartUserLinks).where(ne2(shipskartUserLinks.pushStatus, "pushed")).limit(limit);
+  const vessels2 = await db2.select({
+    vesselVuuid: shipskartVesselLinks.vesselVuuid,
+    imoNumber: shipskartVesselLinks.imoNumber,
+    pushStatus: shipskartVesselLinks.pushStatus,
+    lastError: shipskartVesselLinks.lastError
+  }).from(shipskartVesselLinks).where(ne2(shipskartVesselLinks.pushStatus, "pushed")).limit(limit);
+  const assignments = await db2.select({
+    userUuid: masterUserVessels.userUuid,
+    vesselId: masterUserVessels.vesselId,
+    mapStatus: masterUserVessels.mapStatus,
+    lastError: masterUserVessels.lastError
+  }).from(masterUserVessels).where(and25(eq29(masterUserVessels.isActive, true), ne2(masterUserVessels.mapStatus, "mapped"))).limit(limit);
+  return { users: users2, vessels: vessels2, assignments };
+}
+async function resetForRetry(kind, id) {
+  const db2 = await getDb();
+  if (kind === "user") {
+    const existing2 = await getUserLink(id);
+    if (!existing2) return { reset: false, reason: "no link row" };
+    if (existing2.shipskartUserId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
+    await db2.update(shipskartUserLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(shipskartUserLinks.userUuid, id));
+    return { reset: true };
+  }
+  const existing = await getVesselLink(id);
+  if (!existing) return { reset: false, reason: "no link row" };
+  if (existing.shipskartVesselId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
+  await db2.update(shipskartVesselLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(shipskartVesselLinks.vesselVuuid, id));
+  return { reset: true };
+}
+async function linkStatusCounts() {
+  const db2 = await getDb();
+  const count2 = (rows) => rows.reduce((acc, r) => {
+    acc[r.s] = (acc[r.s] || 0) + 1;
+    return acc;
+  }, {});
+  const u = await db2.select({ s: shipskartUserLinks.pushStatus }).from(shipskartUserLinks);
+  const v = await db2.select({ s: shipskartVesselLinks.pushStatus }).from(shipskartVesselLinks);
+  const a = await db2.select({ s: masterUserVessels.mapStatus }).from(masterUserVessels);
+  return { users: count2(u), vessels: count2(v), assignments: count2(a) };
+}
+var init_shipskartB2bRepository = __esm({
+  "server/modules/shipskart/repositories/shipskartB2bRepository.ts"() {
+    "use strict";
+    init_db();
+    init_schema();
+  }
+});
+
+// server/modules/shipskart/services/shipskartB2bClient.ts
+var shipskartB2bClient_exports = {};
+__export(shipskartB2bClient_exports, {
+  getB2bConfig: () => getB2bConfig,
+  signedB2bRequest: () => signedB2bRequest
+});
+import crypto5 from "crypto";
+function getB2bConfig() {
+  const baseUrl = (process.env.SHIPSKART_B2B_BASE_URL || "").replace(/\/+$/, "");
+  const apiKey = process.env.SHIPSKART_B2B_API_KEY || "";
+  const clientSecret = process.env.SHIPSKART_B2B_CLIENT_SECRET || "";
+  const tenantId = process.env.SHIPSKART_B2B_TENANT_ID || "";
+  if (!baseUrl || !apiKey || !clientSecret || !tenantId) {
+    throw Object.assign(
+      new Error("[Shipskart b2b] Missing SHIPSKART_B2B_BASE_URL / _API_KEY / _CLIENT_SECRET / _TENANT_ID env"),
+      { statusCode: 503 }
+    );
+  }
+  return {
+    baseUrl,
+    apiKey,
+    clientSecret,
+    tenantId,
+    bootstrapUserName: process.env.SHIPSKART_B2B_BOOTSTRAP_USERNAME || null,
+    bootstrapPassword: process.env.SHIPSKART_B2B_BOOTSTRAP_PASSWORD || null,
+    bootstrapOtp: process.env.SHIPSKART_B2B_BOOTSTRAP_OTP || null,
+    signQuery: (process.env.SHIPSKART_B2B_SIGN_QUERY || "").toLowerCase() === "true"
+  };
+}
+function assertNoTenantInBody(body) {
+  if (body && typeof body === "object") {
+    const b = body;
+    if ("tenantId" in b || b.data && typeof b.data === "object" && "tenantId" in b.data) {
+      throw new Error(
+        "[Shipskart b2b] tenantId must NEVER be in a request body \u2014 it travels in the x-tenant-id header only (Sachin, 2026-07-30). Remove it from the payload."
+      );
+    }
+  }
+}
+async function signedB2bRequest(method, pathAndQuery, opts = {}) {
+  const cfg = getB2bConfig();
+  assertNoTenantInBody(opts.body);
+  const raw = opts.body === void 0 ? "" : JSON.stringify(opts.body);
+  const ts = Math.floor(Date.now() / 1e3).toString();
+  const signedPath = cfg.signQuery ? pathAndQuery : pathAndQuery.split("?")[0];
+  const signature = "sha256=" + crypto5.createHmac("sha256", cfg.clientSecret).update(`${ts}
+${method}
+${signedPath}
+${raw}`, "utf8").digest("hex");
+  const headers = {
+    "X-Api-Key": cfg.apiKey,
+    "X-Timestamp": ts,
+    "X-Nonce": crypto5.randomUUID(),
+    "X-Signature": signature,
+    "x-tenant-id": cfg.tenantId
+  };
+  if (opts.bearer) headers["Authorization"] = `Bearer ${opts.bearer}`;
+  if (method !== "GET") headers["Content-Type"] = "application/json";
+  let response;
+  try {
+    response = await fetch(`${cfg.baseUrl}${pathAndQuery}`, {
+      method,
+      headers,
+      body: method !== "GET" ? raw : void 0,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    });
+  } catch (err) {
+    const code = err?.cause?.code ? ` (${err.cause.code})` : "";
+    throw new Error(`[Shipskart b2b] Network error calling ${pathAndQuery}${code}: ${err?.message || err}`);
+  }
+  const text4 = await response.text();
+  let json2 = null;
+  try {
+    json2 = JSON.parse(text4);
+  } catch {
+  }
+  return { status: response.status, ok: response.ok, json: json2, text: json2 ? void 0 : text4.slice(0, 300) };
+}
+var REQUEST_TIMEOUT_MS;
+var init_shipskartB2bClient = __esm({
+  "server/modules/shipskart/services/shipskartB2bClient.ts"() {
+    "use strict";
+    REQUEST_TIMEOUT_MS = 3e4;
+  }
+});
+
+// server/modules/shipskart/services/shipskartTokenService.ts
+function parseDate5(v) {
+  if (!v || typeof v !== "string") return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function warnOnRefreshExpiry(refreshExpiresAt) {
+  if (!refreshExpiresAt) return;
+  const left = refreshExpiresAt.getTime() - Date.now();
+  if (left < WARN_3D_MS) {
+    console.error(`[Shipskart b2b] \u{1F534} refresh token expires ${refreshExpiresAt.toISOString()} (<3 days) and auto-bootstrap has NOT renewed it \u2014 check for ${BOOTSTRAP_FAILED_TAG} lines; Purchasing dies when it lapses.`);
+  } else if (left < WARN_14D_MS) {
+    console.warn(`[Shipskart b2b] \u26A0\uFE0F refresh token expires ${refreshExpiresAt.toISOString()} (<14 days). Auto-bootstrap renews a week early \u2014 if this keeps appearing, it is failing.`);
+  }
+}
+async function bootstrap(otp) {
+  const cfg = getB2bConfig();
+  const userName = cfg.bootstrapUserName;
+  const password = cfg.bootstrapPassword;
+  const effectiveOtp = otp || cfg.bootstrapOtp;
+  if (!userName || !password) throw Object.assign(new Error("[Shipskart b2b] SHIPSKART_B2B_BOOTSTRAP_USERNAME/_PASSWORD not configured"), { statusCode: 503 });
+  if (!effectiveOtp) throw Object.assign(new Error("[Shipskart b2b] OTP required \u2014 it was emailed to the API user (UAT: set SHIPSKART_B2B_BOOTSTRAP_OTP)"), { statusCode: 400 });
+  const login = await signedB2bRequest("POST", "/integration/SAIL/tenant-login-api", { body: { userName, password } });
+  if (!login.ok || !login.json?.preAuthToken) {
+    throw Object.assign(new Error(`[Shipskart b2b] tenant-login failed (${login.status}): ${JSON.stringify(login.json ?? login.text)?.slice(0, 200)}`), { statusCode: 502 });
+  }
+  const auth = await signedB2bRequest("POST", "/integration/SAIL/tenant-auth-token-api", { body: { preAuthToken: login.json.preAuthToken, otp: effectiveOtp } });
+  const accessToken = auth.json?.token || auth.json?.accessToken;
+  if (!auth.ok || !accessToken || !auth.json?.refreshToken) {
+    throw Object.assign(new Error(`[Shipskart b2b] tenant-auth-token failed (${auth.status}): ${JSON.stringify(auth.json ?? auth.text)?.slice(0, 200)}`), { statusCode: 502 });
+  }
+  const accessExpiresAt = parseDate5(auth.json.expiresAt);
+  const refreshExpiresAt = parseDate5(auth.json.refreshTokenExpiresAt);
+  await upsertTokenState(cfg.tenantId, {
+    accessToken,
+    refreshToken: auth.json.refreshToken,
+    accessExpiresAt,
+    refreshExpiresAt,
+    isBootstrap: true
+  });
+  console.log(`[Shipskart b2b] bootstrap OK \u2014 access until ${accessExpiresAt?.toISOString() ?? "?"}, refresh until ${refreshExpiresAt?.toISOString() ?? "?"}`);
+  return { accessExpiresAt: accessExpiresAt?.toISOString() ?? null, refreshExpiresAt: refreshExpiresAt?.toISOString() ?? null };
+}
+async function refreshNow() {
+  const cfg = getB2bConfig();
+  const row = await getTenantConfig(cfg.tenantId);
+  if (!row?.refreshToken) {
+    throw Object.assign(new Error("[Shipskart b2b] No refresh token stored \u2014 auto-bootstrap should have run; see BOOTSTRAP-FAILED lines"), { statusCode: 503 });
+  }
+  const res = await signedB2bRequest("POST", "/integration/SAIL/tenant-refresh-token-api", { body: { refreshToken: row.refreshToken } });
+  const accessToken = res.json?.accessToken || res.json?.token;
+  if (!res.ok || !accessToken) {
+    throw Object.assign(new Error(`[Shipskart b2b] token refresh failed (${res.status}): ${JSON.stringify(res.json ?? res.text)?.slice(0, 200)} \u2014 if the refresh token expired, re-bootstrap manually`), { statusCode: 502 });
+  }
+  const accessExpiresAt = parseDate5(res.json.expiresAt);
+  const refreshExpiresAt = parseDate5(res.json.refreshTokenExpiresAt) ?? row.refreshExpiresAt ?? null;
+  await upsertTokenState(cfg.tenantId, {
+    accessToken,
+    refreshToken: res.json.refreshToken || row.refreshToken,
+    accessExpiresAt,
+    refreshExpiresAt
+  });
+  warnOnRefreshExpiry(refreshExpiresAt);
+  return accessToken;
+}
+function needsBootstrap(row) {
+  if (!row?.refreshToken) return "no refresh token stored";
+  if (!row.refreshExpiresAt) return null;
+  const left = row.refreshExpiresAt.getTime() - Date.now();
+  if (left <= 0) return `refresh token expired ${row.refreshExpiresAt.toISOString()}`;
+  if (left < AUTO_BOOTSTRAP_LEAD_MS) return `refresh token expires ${row.refreshExpiresAt.toISOString()} (<7 days) \u2014 renewing early`;
+  return null;
+}
+async function autoBootstrap(reason) {
+  const cfg = getB2bConfig();
+  if (!cfg.bootstrapUserName || !cfg.bootstrapPassword || !cfg.bootstrapOtp) {
+    console.error(
+      `${BOOTSTRAP_FAILED_TAG} cannot auto-bootstrap (${reason}): missing SHIPSKART_B2B_BOOTSTRAP_USERNAME / _PASSWORD / _OTP. Purchasing will stop working when the current token expires. Set them, or run POST /shipskart/b2b/bootstrap manually with the OTP.`
+    );
+    return false;
+  }
+  const sinceLast = Date.now() - lastAutoBootstrapAttempt;
+  if (sinceLast < AUTO_BOOTSTRAP_COOLDOWN_MS) {
+    console.warn(
+      `${BOOTSTRAP_FAILED_TAG} auto-bootstrap needed (${reason}) but the last attempt was ${Math.round(sinceLast / 1e3)}s ago \u2014 waiting out the ${AUTO_BOOTSTRAP_COOLDOWN_MS / 6e4}min cooldown so repeated failures cannot lock the Shipskart account.`
+    );
+    return false;
+  }
+  if (autoBootstrapInFlight) {
+    await autoBootstrapInFlight;
+    return true;
+  }
+  lastAutoBootstrapAttempt = Date.now();
+  console.warn(`[Shipskart b2b] AUTO-BOOTSTRAP starting \u2014 ${reason}. (Static OTP; no human needed, confirmed by Shipskart 2026-07-31.)`);
+  autoBootstrapInFlight = bootstrap().then((r) => {
+    consecutiveBootstrapFailures = 0;
+    console.log(`[Shipskart b2b] AUTO-BOOTSTRAP OK \u2014 refresh valid until ${r.refreshExpiresAt ?? "?"}`);
+  }).finally(() => {
+    autoBootstrapInFlight = null;
+  });
+  try {
+    await autoBootstrapInFlight;
+    return true;
+  } catch (err) {
+    consecutiveBootstrapFailures++;
+    console.error(
+      `${BOOTSTRAP_FAILED_TAG} auto-bootstrap FAILED (attempt ${consecutiveBootstrapFailures}, ${reason}): ${err?.message || err}. Purchasing will stop working when the current token expires \u2014 check the credentials and whether the Shipskart account is locked. Retrying no sooner than ${AUTO_BOOTSTRAP_COOLDOWN_MS / 6e4}min from now.`
+    );
+    return false;
+  }
+}
+async function getAccessToken() {
+  const cfg = getB2bConfig();
+  let row = await getTenantConfig(cfg.tenantId);
+  const bootstrapReason = needsBootstrap(row ?? void 0);
+  if (bootstrapReason) {
+    if (await autoBootstrap(bootstrapReason)) {
+      row = await getTenantConfig(cfg.tenantId);
+    }
+  }
+  if (!row?.accessToken) {
+    throw Object.assign(
+      new Error("[Shipskart b2b] No usable token for this tenant and auto-bootstrap did not succeed \u2014 see the BOOTSTRAP-FAILED log line"),
+      { statusCode: 503 }
+    );
+  }
+  warnOnRefreshExpiry(row.refreshExpiresAt ?? null);
+  const expiresSoon = !row.accessExpiresAt || row.accessExpiresAt.getTime() - Date.now() < REFRESH_SKEW_MS;
+  if (!expiresSoon) return row.accessToken;
+  if (!refreshInFlight) {
+    refreshInFlight = refreshNow().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  try {
+    return await refreshInFlight;
+  } catch (err) {
+    console.warn(`[Shipskart b2b] refresh failed (${err?.message || err}) \u2014 attempting auto-bootstrap`);
+    if (await autoBootstrap("refresh rejected by Shipskart")) {
+      const fresh = await getTenantConfig(cfg.tenantId);
+      if (fresh?.accessToken) return fresh.accessToken;
+    }
+    throw err;
+  }
+}
+async function authorizedB2bRequest(method, pathAndQuery, opts = {}) {
+  const first = await signedB2bRequest(method, pathAndQuery, { ...opts, bearer: await getAccessToken() });
+  if (first.status !== 401) return first;
+  console.warn(`[Shipskart b2b] 401 on ${pathAndQuery} \u2014 forcing one token refresh and retrying once`);
+  if (!refreshInFlight) refreshInFlight = refreshNow().finally(() => {
+    refreshInFlight = null;
+  });
+  const fresh = await refreshInFlight;
+  return signedB2bRequest(method, pathAndQuery, { ...opts, bearer: fresh });
+}
+async function tokenStatus() {
+  const cfg = getB2bConfig();
+  const row = await getTenantConfig(cfg.tenantId);
+  const daysLeft = row?.refreshExpiresAt ? Math.round((row.refreshExpiresAt.getTime() - Date.now()) / 864e5) : null;
+  return {
+    tenantId: cfg.tenantId,
+    bootstrapped: !!row?.refreshToken,
+    accessExpiresAt: row?.accessExpiresAt?.toISOString() ?? null,
+    refreshExpiresAt: row?.refreshExpiresAt?.toISOString() ?? null,
+    refreshDaysLeft: daysLeft,
+    lastBootstrapAt: row?.lastBootstrapAt?.toISOString() ?? null,
+    reconcilerEnabled: row?.reconcilerEnabled ?? false,
+    // Auto-bootstrap health — the alert Ghazi asked to keep even with automation:
+    // a non-zero failure count means the integration is heading for a silent death.
+    autoBootstrap: {
+      configured: !!(cfg.bootstrapUserName && cfg.bootstrapPassword && cfg.bootstrapOtp),
+      consecutiveFailures: consecutiveBootstrapFailures,
+      lastAttemptAt: lastAutoBootstrapAttempt ? new Date(lastAutoBootstrapAttempt).toISOString() : null
+    }
+  };
+}
+var REFRESH_SKEW_MS, WARN_14D_MS, WARN_3D_MS, AUTO_BOOTSTRAP_LEAD_MS, AUTO_BOOTSTRAP_COOLDOWN_MS, BOOTSTRAP_FAILED_TAG, refreshInFlight, autoBootstrapInFlight, lastAutoBootstrapAttempt, consecutiveBootstrapFailures;
+var init_shipskartTokenService = __esm({
+  "server/modules/shipskart/services/shipskartTokenService.ts"() {
+    "use strict";
+    init_shipskartB2bClient();
+    init_shipskartB2bRepository();
+    REFRESH_SKEW_MS = 2 * 60 * 1e3;
+    WARN_14D_MS = 14 * 24 * 60 * 60 * 1e3;
+    WARN_3D_MS = 3 * 24 * 60 * 60 * 1e3;
+    AUTO_BOOTSTRAP_LEAD_MS = 7 * 24 * 60 * 60 * 1e3;
+    AUTO_BOOTSTRAP_COOLDOWN_MS = 15 * 60 * 1e3;
+    BOOTSTRAP_FAILED_TAG = "[Shipskart][BOOTSTRAP-FAILED]";
+    refreshInFlight = null;
+    autoBootstrapInFlight = null;
+    lastAutoBootstrapAttempt = 0;
+    consecutiveBootstrapFailures = 0;
+  }
+});
+
+// server/modules/shipskart/services/shipskartRoleSource.ts
+async function fetchAllRolesLive() {
+  const all = [];
+  let page = 1;
+  for (; ; ) {
+    const res = await authorizedB2bRequest("GET", `/integration/SAIL/get-all-roles?pageNumber=${page}&pageSize=100`);
+    if (!res.ok || !Array.isArray(res.json?.items)) {
+      throw new Error(`[Shipskart b2b] get-all-roles page ${page} failed (${res.status}): ${JSON.stringify(res.json ?? res.text)?.slice(0, 200)}`);
+    }
+    all.push(...res.json.items.filter((r) => r?.isActive !== false));
+    const totalPages = Number(res.json.totalPages ?? 1);
+    if (page >= totalPages) break;
+    page++;
+  }
+  return all;
+}
+async function getRoles() {
+  if (cache2 && Date.now() - cache2.fetchedAt < ROLE_CACHE_TTL_MS) return cache2.roles;
+  try {
+    const roles = await fetchAllRolesLive();
+    cache2 = { roles, fetchedAt: Date.now() };
+    return roles;
+  } catch (err) {
+    console.warn(`[Shipskart b2b] role fetch failed \u2014 serving ${cache2 ? "last-known-good cache" : "an EMPTY list (nothing cached yet; the mapping dropdown will be empty until Shipskart is reachable)"}: ${err?.message || err}`);
+    if (cache2) return cache2.roles;
+    return [];
+  }
+}
+async function getAvailableShipskartRoles() {
+  return Array.from(new Set((await getRoles()).map((r) => r.name)));
+}
+async function resolveShipskartRoleId(roleName) {
+  const roles = await getRoles();
+  return roles.find((r) => r.name === roleName)?.id ?? null;
+}
+var ROLE_CACHE_TTL_MS, cache2;
+var init_shipskartRoleSource = __esm({
+  "server/modules/shipskart/services/shipskartRoleSource.ts"() {
+    "use strict";
+    init_shipskartTokenService();
+    ROLE_CACHE_TTL_MS = 10 * 60 * 1e3;
+    cache2 = null;
+  }
+});
+
+// server/modules/shipskart/services/shipskartReconcilerService.ts
+var shipskartReconcilerService_exports = {};
+__export(shipskartReconcilerService_exports, {
+  deleteVesselUserMapping: () => deleteVesselUserMapping,
+  ensureUserPushed: () => ensureUserPushed,
+  mapUserToVessel: () => mapUserToVessel,
+  pushUser: () => pushUser,
+  pushVessel: () => pushVessel,
+  resolveCallSign: () => resolveCallSign,
+  runReconciliation: () => runReconciliation
+});
+import crypto6 from "crypto";
+import { inArray as inArray8, eq as eq30, and as and26 } from "drizzle-orm";
+function resolveCallSign(v) {
+  return v.imoNumber;
+}
+function resolveVesselTypeCode(vesselType) {
+  const t = (vesselType || "").toLowerCase();
+  if (t.includes("tank")) return "1";
+  if (t.includes("container")) return "2";
+  if (t.includes("bulk")) return "3";
+  if (t.includes("general")) return "4";
+  if (t.includes("passenger")) return "5";
+  if (t.includes("roro") || t.includes("ro-ro")) return "6";
+  if (t.includes("lng") || t.includes("gas")) return "7";
+  return "99";
+}
+async function pushVessel(v) {
+  const existing = await getVesselLink(v.vuuid);
+  if (existing?.pushStatus === "pushed" && existing.shipskartVesselId) {
+    return { status: "already_pushed", shipskartId: existing.shipskartVesselId };
+  }
+  if (!v.imoNumber || !/^\d{7}$/.test(v.imoNumber)) {
+    await upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber ?? null, pushStatus: "invalid_imo", lastError: `IMO must be exactly 7 digits, got '${v.imoNumber ?? ""}'` });
+    return { status: "invalid_imo" };
+  }
+  const vesselEndpoint = process.env.SHIPSKART_B2B_VESSEL_ENDPOINT || "/integration/SAIL/create-vessel-new";
+  const cfg = getB2bConfig();
+  const res = await authorizedB2bRequest("POST", vesselEndpoint, {
+    body: { data: {
+      name: v.name,
+      imoNumber: v.imoNumber,
+      callSign: resolveCallSign(v),
+      type: resolveVesselTypeCode(v.vesselType ?? null),
+      operationalStatus: "1",
+      // smcId IS required in practice: create accepts its omission, but map-user-to-vessel
+      // then rejects the vessel ("Vessel does not have a valid SMCTenantId") — proven
+      // end-to-end 2026-07-30. It is a per-tenant constant equal to the tenant id
+      // (their own example does the same); override via SHIPSKART_B2B_SMC_ID if that
+      // ever stops being true.
+      smcId: process.env.SHIPSKART_B2B_SMC_ID || cfg.tenantId,
+      smcName: process.env.SHIPSKART_B2B_SMC_NAME || null
+    } }
+  });
+  const shipskartId = res.json?.data?.id;
+  if (res.ok && shipskartId) {
+    await upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber, shipskartVesselId: shipskartId, pushStatus: "pushed", lastError: null });
+    return { status: "pushed", shipskartId };
+  }
+  const status = isDuplicate400(res) ? "blocked_duplicate" : "error";
+  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
+  await upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber, pushStatus: status, lastError: error });
+  return { status, error };
+}
+async function syncRoleIfDrifted(link, sailRole) {
+  const mapping = sailRole ? await getMappingForSailRole(sailRole) : void 0;
+  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  if (!mapping || !roleId || link.pushedRoleId === roleId) {
+    return { status: "already_pushed", shipskartId: link.shipskartUserId };
+  }
+  const res = await authorizedB2bRequest("PUT", `/integration/SAIL/update-user-details/${link.shipskartUserId}`, {
+    body: { id: link.shipskartUserId, data: { roleId, roleName: mapping.shipskartRole } }
+  });
+  if (res.ok) {
+    await upsertUserLink(link.userUuid, {
+      pushStatus: "pushed",
+      lastError: null,
+      pushedRoleId: roleId,
+      pushedRoleName: mapping.shipskartRole
+    });
+    console.log(`[Shipskart b2b] role updated for ${link.userUuid} \u2192 '${mapping.shipskartRole}'`);
+    return { status: "role_updated", shipskartId: link.shipskartUserId };
+  }
+  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
+  await upsertUserLink(link.userUuid, { pushStatus: "pushed", lastError: `role update failed: ${error}` });
+  return { status: "role_update_failed", error };
+}
+async function pushUser(mu) {
+  const existing = await getUserLink(mu.id);
+  if (existing?.pushStatus === "pushed" && existing.shipskartUserId) {
+    return syncRoleIfDrifted(
+      { userUuid: mu.id, shipskartUserId: existing.shipskartUserId, pushedRoleId: existing.pushedRoleId ?? null },
+      mu.role
+    );
+  }
+  if (!mu.email) {
+    await upsertUserLink(mu.id, { pushStatus: "missing_email", lastError: "master_users row has no email \u2014 Shipskart requires one" });
+    return { status: "missing_email" };
+  }
+  const mapping = mu.role ? await getMappingForSailRole(mu.role) : void 0;
+  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  if (!mapping || !roleId) {
+    await upsertUserLink(mu.id, {
+      pushStatus: "unmapped_role",
+      lastError: mapping ? `mapped Shipskart role '${mapping.shipskartRole}' has no live roleId on this tenant` : `SAIL role '${mu.role ?? ""}' has no shipskart_role_mappings row`
+    });
+    return { status: "unmapped_role" };
+  }
+  const nameParts = (mu.fullName || "").trim().split(/\s+/);
+  const firstName = nameParts[0] || "User";
+  const lastName = nameParts.slice(1).join(" ") || firstName;
+  const userName = `sail_${mu.id.replace(/[^a-z0-9]/gi, "").slice(0, 16).toLowerCase()}`;
+  const res = await authorizedB2bRequest("POST", "/integration/SAIL/create-user", {
+    body: { data: {
+      firstName,
+      lastName,
+      middleName: null,
+      email: mu.email,
+      userName,
+      // SSO is the only entry path — nobody ever types this password; strong throwaway.
+      passwordHash: crypto6.randomBytes(16).toString("base64") + "aA1!",
+      roleId,
+      roleName: mapping.shipskartRole,
+      // roleName cosmetic (proven); roleId decides
+      rank: mu.designation ?? null,
+      status: "1",
+      externalUserId: mu.id
+      // OUR SAILERP uuid — the value Shipskart SSO keys on (proven)
+    } }
+  });
+  const shipskartId = res.json?.data?.id;
+  if (res.ok && shipskartId) {
+    await upsertUserLink(mu.id, {
+      shipskartUserId: shipskartId,
+      pushStatus: "pushed",
+      lastError: null,
+      // mig 153: stamp what we pushed so later role changes are a free local comparison
+      pushedRoleId: roleId,
+      pushedRoleName: mapping.shipskartRole
+    });
+    return { status: "pushed", shipskartId };
+  }
+  const status = isDuplicate400(res) ? "blocked_duplicate" : "error";
+  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
+  await upsertUserLink(mu.id, { pushStatus: status, lastError: error });
+  return { status, error };
+}
+async function mapUserToVessel(userUuid, vesselVuuid, ctx) {
+  const assignment = await getAssignment(userUuid, vesselVuuid);
+  if (assignment?.mapStatus === "mapped" && assignment.shipskartMappingId) {
+    return { status: "already_mapped", shipskartId: assignment.shipskartMappingId };
+  }
+  if (assignment?.shipskartMappingId) {
+    const del = await deleteVesselUserMapping(
+      { userUuid, vesselId: vesselVuuid, shipskartMappingId: assignment.shipskartMappingId },
+      "pending"
+    );
+    if (del.status !== "unmapped") return del;
+    await paceB2b();
+  }
+  const userLink = await getUserLink(userUuid);
+  const vesselLink = await getVesselLink(vesselVuuid);
+  if (userLink?.pushStatus !== "pushed" || !userLink.shipskartUserId) {
+    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_user", lastError: `user link status: ${userLink?.pushStatus ?? "absent"}` });
+    return { status: "awaiting_user" };
+  }
+  if (vesselLink?.pushStatus !== "pushed" || !vesselLink.shipskartVesselId) {
+    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_vessel", lastError: `vessel link status: ${vesselLink?.pushStatus ?? "absent"}` });
+    return { status: "awaiting_vessel" };
+  }
+  const res = await authorizedB2bRequest("POST", "/integration/SAIL/map-user-to-vessel", {
+    body: { data: {
+      vesselId: vesselLink.shipskartVesselId,
+      vesselName: ctx?.vesselName ?? null,
+      userId: userLink.shipskartUserId,
+      userFullName: ctx?.userFullName ?? null,
+      isActive: true
+    } }
+  });
+  const mappingId = res.json?.data?.id;
+  if (res.ok && mappingId) {
+    await upsertAssignment(userUuid, vesselVuuid, { shipskartMappingId: mappingId, mapStatus: "mapped", lastError: null });
+    return { status: "mapped", shipskartId: mappingId };
+  }
+  const status = isDuplicate400(res) ? "blocked_duplicate" : "error";
+  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
+  await upsertAssignment(userUuid, vesselVuuid, { mapStatus: status, lastError: error });
+  return { status, error };
+}
+async function deleteVesselUserMapping(a, after = "unmapped") {
+  const res = await authorizedB2bRequest("DELETE", `/integration/SAIL/delete-vessel-user/${a.shipskartMappingId}`, { body: {} });
+  const alreadyGone = !res.ok && /not found|does not exist|no record/i.test(JSON.stringify(res.json ?? res.text ?? ""));
+  if (res.ok || alreadyGone) {
+    await upsertAssignment(a.userUuid, a.vesselId, { shipskartMappingId: null, mapStatus: after, lastError: null });
+    if (alreadyGone) console.log(`[Shipskart b2b] delete-vessel-user ${a.shipskartMappingId}: already gone remotely \u2014 closed locally as ${after}`);
+    return { status: "unmapped", shipskartId: a.shipskartMappingId };
+  }
+  const error = `HTTP ${res.status} ${JSON.stringify(res.json ?? res.text)?.slice(0, 380)}`;
+  await upsertAssignment(a.userUuid, a.vesselId, { lastError: `mapping delete failed: ${error}` });
+  return { status: "mapping_delete_failed", error };
+}
+async function ensureUserPushed(userUuid, sailRole) {
+  const existing = await getUserLink(userUuid);
+  if (existing?.pushStatus === "pushed" && existing.shipskartUserId) {
+    let reason = "already_pushed";
+    try {
+      const drift = await syncRoleIfDrifted(
+        { userUuid, shipskartUserId: existing.shipskartUserId, pushedRoleId: existing.pushedRoleId ?? null },
+        sailRole
+      );
+      if (drift.status === "role_updated") reason = "already_pushed_role_updated";
+    } catch (err) {
+      console.warn(`[Shipskart JIT] role-drift check failed for ${userUuid} (user is still in; sweep retries): ${err?.message || err}`);
+    }
+    return { pushed: true, reason };
+  }
+  if (existing?.pushStatus === "blocked_duplicate") {
+    return { pushed: false, reason: "blocked_duplicate" };
+  }
+  const attempts = jitAttempts.get(userUuid) ?? 0;
+  if (attempts >= JIT_MAX_ATTEMPTS) {
+    return { pushed: false, reason: `jit_attempt_cap_reached (${attempts}) \u2014 the reconciler keeps retrying durably` };
+  }
+  jitAttempts.set(userUuid, attempts + 1);
+  const db2 = await getDb();
+  const rows = await db2.select({
+    id: masterUsers.id,
+    fullName: masterUsers.fullName,
+    email: masterUsers.email,
+    role: masterUsers.role,
+    designation: masterUsers.designation
+  }).from(masterUsers).where(eq30(masterUsers.id, userUuid)).limit(1);
+  const mu = rows[0];
+  if (!mu) {
+    await upsertUserLink(userUuid, {
+      pushStatus: "no_master_row",
+      lastError: "no master_users row \u2014 run Admin \u2192 sync-masters so this user can be pushed"
+    });
+    return { pushed: false, reason: "no_master_row" };
+  }
+  const push = await pushUser({ ...mu, role: mu.role ?? sailRole ?? null });
+  if (push.status !== "pushed" && push.status !== "already_pushed") {
+    return { pushed: false, reason: push.status };
+  }
+  jitAttempts.delete(userUuid);
+  const mappings = {};
+  try {
+    const vesselIds = await getActiveVesselIdsForUser(userUuid);
+    for (const vesselId of vesselIds) {
+      const m = await mapUserToVessel(userUuid, vesselId, { userFullName: mu.fullName });
+      tally(mappings, m.status);
+    }
+  } catch (err) {
+    console.warn(`[Shipskart JIT] mapping sweep failed for ${userUuid} (user is still in; reconciler will retry): ${err?.message || err}`);
+  }
+  return { pushed: true, reason: "pushed_jit", mappings };
+}
+async function runReconciliation(opts = {}) {
+  const limit = Math.max(1, Math.min(200, opts.limit ?? DEFAULT_BATCH_LIMIT));
+  const summary = { ran: false, vessels: {}, users: {}, mappings: {} };
+  if (await isShipInstance()) {
+    summary.reason = "ship instance \u2014 the reconciler is shore-only";
+    return summary;
+  }
+  const cfg = getB2bConfig();
+  const tenant = await getTenantConfig(cfg.tenantId);
+  if (!tenant?.reconcilerEnabled) {
+    summary.reason = "reconciler_enabled is false for this tenant (default) \u2014 enable it in shipskart_tenant_config to start pushing";
+    return summary;
+  }
+  summary.ran = true;
+  const db2 = await getDb();
+  const pushedVessels = await db2.select({ v: shipskartVesselLinks.vesselVuuid }).from(shipskartVesselLinks).where(eq30(shipskartVesselLinks.pushStatus, "pushed"));
+  const pushedVesselSet = new Set(pushedVessels.map((r) => r.v));
+  const vesselRows = await db2.select({
+    vuuid: vessels.vuuid,
+    name: vessels.name,
+    imoNumber: vessels.imoNumber,
+    vesselType: vessels.vesselType
+  }).from(vessels).where(eq30(vessels.isActive, true));
+  for (const v of vesselRows.filter((r) => !pushedVesselSet.has(r.vuuid)).slice(0, limit)) {
+    const st = (await pushVessel(v)).status;
+    tally(summary.vessels, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
+  }
+  const pushedUsers = await db2.select({ u: shipskartUserLinks.userUuid }).from(shipskartUserLinks).where(eq30(shipskartUserLinks.pushStatus, "pushed"));
+  const pushedUserSet = new Set(pushedUsers.map((r) => r.u));
+  const userRows = await db2.select({
+    id: masterUsers.id,
+    fullName: masterUsers.fullName,
+    email: masterUsers.email,
+    role: masterUsers.role,
+    designation: masterUsers.designation
+  }).from(masterUsers).where(eq30(masterUsers.isDeleted, false));
+  for (const mu of userRows.filter((r) => !pushedUserSet.has(r.id)).slice(0, limit)) {
+    const st = (await pushUser(mu)).status;
+    tally(summary.users, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
+  }
+  for (const mu of userRows.filter((r) => pushedUserSet.has(r.id)).slice(0, limit)) {
+    const st = (await pushUser(mu)).status;
+    if (st !== "already_pushed") tally(summary.users, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
+  }
+  const pendingAssignments = await db2.select().from(masterUserVessels).where(and26(eq30(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, ["pending", "awaiting_user", "awaiting_vessel"])));
+  for (const a of pendingAssignments.slice(0, limit)) {
+    const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
+    tally(summary.mappings, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
+  }
+  const revokedAssignments = await db2.select().from(masterUserVessels).where(and26(eq30(masterUserVessels.isActive, false), eq30(masterUserVessels.mapStatus, "revoked")));
+  for (const a of revokedAssignments.slice(0, limit)) {
+    if (!a.shipskartMappingId) {
+      await upsertAssignment(a.userUuid, a.vesselId, { mapStatus: "unmapped", lastError: null });
+      tally(summary.mappings, "unmapped_local_only");
+      continue;
+    }
+    const st = (await deleteVesselUserMapping(
+      { userUuid: a.userUuid, vesselId: a.vesselId, shipskartMappingId: a.shipskartMappingId },
+      "unmapped"
+    )).status;
+    tally(summary.mappings, st);
+    if (API_HIT_STATUSES.has(st)) await paceB2b();
+  }
+  console.log(`[Shipskart b2b] reconciliation pass: vessels=${JSON.stringify(summary.vessels)} users=${JSON.stringify(summary.users)} mappings=${JSON.stringify(summary.mappings)}`);
+  return summary;
+}
+var DEFAULT_BATCH_LIMIT, B2B_PACE_MS, paceB2b, API_HIT_STATUSES, tally, isDuplicate400, JIT_MAX_ATTEMPTS, jitAttempts;
+var init_shipskartReconcilerService = __esm({
+  "server/modules/shipskart/services/shipskartReconcilerService.ts"() {
+    "use strict";
+    init_db();
+    init_schema();
+    init_syncRole();
+    init_shipskartTokenService();
+    init_shipskartRoleSource();
+    init_shipskartRoleMappingRepository();
+    init_shipskartB2bRepository();
+    init_shipskartB2bClient();
+    DEFAULT_BATCH_LIMIT = 25;
+    B2B_PACE_MS = Math.max(0, Number(process.env.SHIPSKART_B2B_PACE_MS ?? 5e3));
+    paceB2b = () => new Promise((r) => setTimeout(r, B2B_PACE_MS));
+    API_HIT_STATUSES = /* @__PURE__ */ new Set(["pushed", "mapped", "blocked_duplicate", "error", "role_updated", "role_update_failed", "unmapped", "mapping_delete_failed"]);
+    tally = (acc, s) => {
+      acc[s] = (acc[s] || 0) + 1;
+      return acc;
+    };
+    isDuplicate400 = (res) => res.status === 400 && /already in use|already exists|duplicate/i.test(JSON.stringify(res.json ?? ""));
+    JIT_MAX_ATTEMPTS = 3;
+    jitAttempts = /* @__PURE__ */ new Map();
+  }
+});
+
+// server/modules/shipskart/repositories/shipskartCatalogueLinkRepository.ts
+var shipskartCatalogueLinkRepository_exports = {};
+__export(shipskartCatalogueLinkRepository_exports, {
+  ensurePending: () => ensurePending,
+  findSkuCodeOtherVessel: () => findSkuCodeOtherVessel,
+  getStatusMap: () => getStatusMap,
+  markFailed: () => markFailed,
+  markPushed: () => markPushed,
+  markPushedWithWarning: () => markPushedWithWarning,
+  recentFailures: () => recentFailures,
+  statusSummary: () => statusSummary,
+  vesselStatus: () => vesselStatus
+});
+async function pool3() {
+  const p = await getPool();
+  if (!p) throw Object.assign(new Error("Database not initialized"), { statusCode: 503 });
+  return p;
+}
+function rowToLink(r) {
+  return {
+    id: r.id,
+    entityType: r.entity_type,
+    localKey: r.local_key,
+    vesselId: r.vessel_id,
+    remoteCode: r.remote_code,
+    remoteId: r.remote_id,
+    pushStatus: r.push_status,
+    lastError: r.last_error,
+    pushedAt: r.pushed_at
+  };
+}
+async function ensurePending(entityType, localKey, vesselId, remoteCode) {
+  const p = await pool3();
+  const existing = await p.query(
+    `SELECT * FROM shipskart_catalogue_links
+      WHERE entity_type=$1 AND local_key=$2 AND vessel_id IS NOT DISTINCT FROM $3`,
+    [entityType, localKey, vesselId]
+  );
+  if (existing.rows.length > 0) {
+    const row = existing.rows[0];
+    if (remoteCode && row.remote_code !== remoteCode) {
+      await p.query(`UPDATE shipskart_catalogue_links SET remote_code=$2, updated_at=now() WHERE id=$1`, [row.id, remoteCode]);
+      row.remote_code = remoteCode;
+    }
+    return rowToLink(row);
+  }
+  const ins = await p.query(
+    `INSERT INTO shipskart_catalogue_links (entity_type, local_key, vessel_id, remote_code)
+     VALUES ($1,$2,$3,$4) RETURNING *`,
+    [entityType, localKey, vesselId, remoteCode ?? null]
+  );
+  return rowToLink(ins.rows[0]);
+}
+async function markPushed(id, remoteId) {
+  const p = await pool3();
+  await p.query(
+    `UPDATE shipskart_catalogue_links
+        SET push_status='pushed', last_error=NULL, pushed_at=now(), updated_at=now(),
+            remote_id = COALESCE($2, remote_id)
+      WHERE id=$1`,
+    [id, remoteId ?? null]
+  );
+}
+async function markPushedWithWarning(id, remoteId, warning) {
+  const p = await pool3();
+  await p.query(
+    `UPDATE shipskart_catalogue_links
+        SET push_status='pushed', last_error=$3, pushed_at=now(), updated_at=now(),
+            remote_id = COALESCE($2, remote_id)
+      WHERE id=$1`,
+    [id, remoteId, String(warning).slice(0, 500)]
+  );
+}
+async function markFailed(id, error) {
+  const p = await pool3();
+  await p.query(
+    `UPDATE shipskart_catalogue_links
+        SET push_status='failed', last_error=$2, updated_at=now()
+      WHERE id=$1`,
+    [id, String(error).slice(0, 500)]
+  );
+}
+async function getStatusMap(entityType, vesselId, localKeys) {
+  if (localKeys.length === 0) return /* @__PURE__ */ new Map();
+  const p = await pool3();
+  const r = await p.query(
+    `SELECT * FROM shipskart_catalogue_links
+      WHERE entity_type=$1 AND vessel_id IS NOT DISTINCT FROM $2 AND local_key = ANY($3)`,
+    [entityType, vesselId, localKeys]
+  );
+  return new Map(r.rows.map((row) => [row.local_key, rowToLink(row)]));
+}
+async function findSkuCodeOtherVessel(skuCode, vesselId) {
+  const p = await pool3();
+  const r = await p.query(
+    `SELECT * FROM shipskart_catalogue_links
+      WHERE entity_type='sku' AND remote_code=$1 AND vessel_id IS DISTINCT FROM $2
+      LIMIT 1`,
+    [skuCode, vesselId]
+  );
+  return r.rows.length ? rowToLink(r.rows[0]) : null;
+}
+async function statusSummary() {
+  const p = await pool3();
+  const r = await p.query(
+    `SELECT l.vessel_id, v.name AS vessel_name, l.entity_type, l.push_status,
+            count(*)::int AS n, max(l.updated_at) AS last_activity
+       FROM shipskart_catalogue_links l
+       LEFT JOIN vessels v ON v.vuuid = l.vessel_id
+      GROUP BY l.vessel_id, v.name, l.entity_type, l.push_status
+      ORDER BY v.name NULLS FIRST, l.entity_type, l.push_status`
+  );
+  return r.rows;
+}
+async function recentFailures(limit = 20) {
+  const p = await pool3();
+  const r = await p.query(
+    `SELECT entity_type, local_key, vessel_id, remote_code, last_error, updated_at
+       FROM shipskart_catalogue_links
+      WHERE push_status='failed'
+      ORDER BY updated_at DESC LIMIT $1`,
+    [limit]
+  );
+  return r.rows;
+}
+async function vesselStatus(vesselId) {
+  const p = await pool3();
+  const counts = (await p.query(
+    `SELECT entity_type, push_status, count(*)::int AS n
+       FROM shipskart_catalogue_links
+      WHERE vessel_id = $1 OR (entity_type = 'category' AND vessel_id IS NULL)
+      GROUP BY entity_type, push_status`,
+    [vesselId]
+  )).rows.map((r) => ({ entityType: r.entity_type, pushStatus: r.push_status, n: r.n }));
+  const totals = (await p.query(
+    `SELECT
+       (SELECT count(*) FROM spares WHERE vessel_id=$1 AND is_deleted=false)::int AS spares,
+       (SELECT count(*) FROM stores_items WHERE vessel_id=$1 AND deleted IS NOT TRUE)::int AS stores,
+       (SELECT count(DISTINCT c.cuuid) FROM components c
+          JOIN spares s ON s.component_id=c.cuuid AND s.is_deleted=false
+         WHERE c.vessel_id=$1 AND c.is_deleted=false)::int AS components`,
+    [vesselId]
+  )).rows[0];
+  const failures = (await p.query(
+    `SELECT entity_type, local_key, remote_code, last_error, updated_at
+       FROM shipskart_catalogue_links
+      WHERE push_status='failed' AND (vessel_id = $1 OR (entity_type='category' AND vessel_id IS NULL))
+      ORDER BY updated_at DESC LIMIT 50`,
+    [vesselId]
+  )).rows;
+  return { counts, totals, failures };
+}
+var init_shipskartCatalogueLinkRepository = __esm({
+  "server/modules/shipskart/repositories/shipskartCatalogueLinkRepository.ts"() {
+    "use strict";
+    init_db();
+  }
+});
+
+// server/modules/shipskart/services/shipskartCatalogueMapper.ts
+function getReferenceIds() {
+  return {
+    brandId: process.env.SHIPSKART_REF_BRAND_ID || "0ae2195e-c619-4264-a1de-b427c7db4ae2",
+    brandName: process.env.SHIPSKART_REF_BRAND_NAME || "N/A",
+    manufacturerId: process.env.SHIPSKART_REF_MANUFACTURER_ID || "903017a4-9e70-4582-bed5-671c2a43cb38",
+    unitOfMeasurementId: process.env.SHIPSKART_REF_UOM_ID || "38243d79-af02-4efd-89bb-83d45ca59997",
+    unitOfMeasurementName: process.env.SHIPSKART_REF_UOM_NAME || "N/A",
+    packTypeId: null,
+    packTypeName: null
+  };
+}
+function deriveCodeChain(componentCode) {
+  const code = String(componentCode || "").trim();
+  if (!code) return [];
+  if (code.includes(".")) {
+    const parts = code.split(".");
+    return parts.map((_, i) => parts.slice(0, i + 1).join("."));
+  }
+  if (/^\d{6,}$/.test(code)) {
+    const chain = [];
+    for (let len = 3; len < code.length; len += 3) chain.push(code.slice(0, len));
+    chain.push(code);
+    return chain;
+  }
+  return [code];
+}
+function buildCategoryPayload(opts) {
+  return {
+    data: {
+      name: opts.name,
+      categoryCode: opts.categoryCode,
+      allowChildren: opts.hasChildren,
+      status: 1,
+      description: opts.name,
+      impaChapterId: null,
+      impaChapterName: null,
+      impaGroupId: null,
+      impaGroupName: null,
+      impaSubGroupId: null,
+      impaSubGroupName: null,
+      level: opts.level,
+      path: null,
+      isActive: true
+    }
+  };
+}
+function buildCategoryMappingPayload(opts) {
+  return {
+    data: {
+      categoryId: opts.categoryId,
+      categoryName: opts.categoryName,
+      parentCategoryId: opts.parentCategoryId,
+      parentCategoryName: opts.parentCategoryName,
+      isActive: true
+    }
+  };
+}
+function buildProductMasterPayload(opts) {
+  const c = opts.component;
+  return {
+    data: {
+      productCode: sanitizeCode(`${opts.vesselCode}-${c.componentCode}`),
+      // COLLISION SAFETY: see header; charset per their validation
+      name: c.name,
+      categoryId: opts.categoryId,
+      categoryName: opts.categoryName,
+      description: c.name,
+      status: "Active",
+      impaCode: null,
+      issaCode: null,
+      hsnCode: null,
+      featuredImage: null,
+      slug: slugify(`${opts.vesselCode}-${c.name}`),
+      isActive: true,
+      searchKeywords: slugify(c.name),
+      make: c.maker ?? null,
+      model: c.model ?? null,
+      serialNumber: c.serialNo ?? null,
+      year: null,
+      partNumber: null
+    }
+  };
+}
+function buildSkuPayload(src, product, category, ref) {
+  return {
+    data: {
+      categoryId: category.categoryId,
+      categoryName: category.categoryName,
+      productId: product.productId,
+      productName: product.productName,
+      skuCode: sanitizeCode(src.skuCode),
+      // COLLISION SAFETY: pusher ledger-guards cross-vessel reuse; charset per their validation
+      skuName: src.skuName,
+      skuDescription: src.description || src.skuName,
+      status: 1,
+      brandId: ref.brandId,
+      brandName: ref.brandName,
+      manufacturerId: ref.manufacturerId,
+      manufacturerName: src.manufacturerName || "N/A",
+      partNumber: src.partNumber ?? null,
+      make: src.make ?? null,
+      model: src.model ?? null,
+      modelNumber: null,
+      year: null,
+      serialNumber: null,
+      baseMrp: src.unitCost ?? null,
+      averagePrice: null,
+      featuredImage: null,
+      isActive: true,
+      packTypeId: ref.packTypeId,
+      packTypeName: ref.packTypeName,
+      packSize: null,
+      unitOfMeasurementId: ref.unitOfMeasurementId,
+      unitOfMeasurementName: src.uomName || ref.unitOfMeasurementName,
+      countryId: null,
+      countryOfOrigin: null,
+      productSpecifications: {}
+      // Sachin §3: {} on create; free text lives in skuDescription
+    }
+  };
+}
+function buildSkuFromSpare(spare, product, category, ref) {
+  return buildSkuPayload({
+    skuCode: spare.partCode,
+    skuName: spare.partName,
+    description: [spare.specification, spare.note].filter(Boolean).join(" | ") || null,
+    partNumber: spare.partNumber,
+    make: spare.maker,
+    model: spare.model,
+    manufacturerName: spare.maker,
+    uomName: spare.uom,
+    unitCost: spare.unitCost != null ? Number(spare.unitCost) : null
+  }, product, category, ref);
+}
+function buildSkuFromStoreItem(item, product, category, ref) {
+  return buildSkuPayload({
+    skuCode: item.itemCode,
+    skuName: item.itemName,
+    description: item.specification || null,
+    manufacturerName: item.supplier,
+    uomName: item.uom,
+    unitCost: item.unitCost != null ? Number(item.unitCost) : null
+  }, product, category, ref);
+}
+function buildCatalogueAddPayload(opts) {
+  return {
+    data: {
+      skuCode: opts.skuCode,
+      productName: opts.skuName,
+      smcId: opts.smc.smcId,
+      smcName: opts.smc.smcName,
+      smcTenantId: opts.smc.smcTenantId,
+      vesselId: opts.vessel.vesselId,
+      vesselName: opts.vessel.vesselName,
+      productId: opts.productId,
+      status: 1,
+      isLocked: false,
+      type: "ProductMaster",
+      productMasterSKU: opts.productMasterCode,
+      categoryId: opts.categoryId,
+      make: opts.make ?? null,
+      model: opts.model ?? null,
+      productSpecifications: ""
+      // Sachin §3: blank string here
+    }
+  };
+}
+var sanitizeCode, slugify;
+var init_shipskartCatalogueMapper = __esm({
+  "server/modules/shipskart/services/shipskartCatalogueMapper.ts"() {
+    "use strict";
+    sanitizeCode = (s) => String(s || "").toUpperCase().trim().replace(/[^A-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    slugify = (s) => String(s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+  }
+});
+
+// server/modules/shipskart/services/shipskartCataloguePushService.ts
+var shipskartCataloguePushService_exports = {};
+__export(shipskartCataloguePushService_exports, {
+  getLastRunInfo: () => getLastRunInfo,
+  isCataloguePushRunning: () => isCataloguePushRunning,
+  pushVesselCatalogue: () => pushVesselCatalogue
+});
+async function requestWithBackoff(method, path14, opts) {
+  const waits = [3e4, 6e4, 12e4];
+  let r = await authorizedB2bRequest(method, path14, opts);
+  for (const w of waits) {
+    if (r.status !== 429) return r;
+    console.warn(`[CataloguePush] 429 rate-limited on ${path14} \u2014 backing off ${w / 1e3}s`);
+    await sleep(w);
+    r = await authorizedB2bRequest(method, path14, opts);
+  }
+  return r;
+}
+function isCataloguePushRunning(vesselId) {
+  return inFlight.has(vesselId);
+}
+function getLastRunInfo(vesselId) {
+  return lastRunByVessel.get(vesselId) ?? null;
+}
+async function fetchAllPaged(path14) {
+  const all = [];
+  for (let page = 1; ; page++) {
+    const r = await requestWithBackoff("GET", `${path14}?pageNumber=${page}&pageSize=100`);
+    if (!r.ok || !Array.isArray(r.json?.items)) {
+      throw new Error(
+        `listing ${path14} page ${page} failed: HTTP ${r.status} ${JSON.stringify(r.json ?? r.text)?.slice(0, 200)} \u2014 aborting push before any create (cannot see existing remote entities)`
+      );
+    }
+    all.push(...r.json.items);
+    if (page >= Number(r.json.totalPages ?? 1)) break;
+    await sleep(PACE_MS);
+  }
+  return all;
+}
+async function pushVesselCatalogue(vesselId, opts = {}) {
+  const includeStores = opts.includeStores !== false;
+  const dryRun2 = opts.dryRun === true;
+  const res = {
+    vesselId,
+    dryRun: dryRun2,
+    categories: zero(),
+    mappings: zero(),
+    products: zero(),
+    skus: zero(),
+    catalogue: zero(),
+    warnings: [],
+    errors: []
+  };
+  if (await isShipInstance()) {
+    res.errors.push("refused: catalogue push is shore-only");
+    return res;
+  }
+  if (inFlight.has(vesselId)) {
+    res.errors.push("a push for this vessel is already running");
+    return res;
+  }
+  inFlight.add(vesselId);
+  try {
+    const pool4 = await getPool();
+    if (!pool4) throw new Error("Database not initialized");
+    const v = (await pool4.query(`SELECT vuuid, name, id AS code FROM vessels WHERE vuuid=$1 AND is_deleted=false`, [vesselId])).rows[0];
+    if (!v) throw new Error(`Unknown vessel ${vesselId}`);
+    const vesselCode = v.code || v.name.replace(/\s+/g, "").slice(0, 8).toUpperCase();
+    const link = (await pool4.query(
+      `SELECT shipskart_vessel_id FROM shipskart_vessel_links WHERE vessel_vuuid=$1 AND push_status='pushed'`,
+      [vesselId]
+    )).rows[0];
+    if (!link) throw new Error(`Vessel ${v.name} has no pushed Shipskart vessel link \u2014 push the vessel first (Stage 2 reconciler)`);
+    const ref = getReferenceIds();
+    const comps = (await pool4.query(
+      `SELECT DISTINCT c.cuuid, c.component_code, c.name, c.maker, c.model, c.serial_no
+         FROM components c JOIN spares s ON s.component_id=c.cuuid AND s.is_deleted=false
+        WHERE c.vessel_id=$1 AND c.is_deleted=false AND c.component_code IS NOT NULL`,
+      [vesselId]
+    )).rows;
+    const allComps = (await pool4.query(
+      `SELECT component_code, name FROM components WHERE vessel_id=$1 AND is_deleted=false AND component_code IS NOT NULL`,
+      [vesselId]
+    )).rows;
+    const nameByCode = new Map(allComps.map((c) => [c.component_code, c.name]));
+    const spares2 = (await pool4.query(
+      `SELECT suuid, component_id, part_code "partCode", part_name "partName", part_number "partNumber",
+              maker, model, uom, unit_cost "unitCost", specification, note
+         FROM spares WHERE vessel_id=$1 AND is_deleted=false ORDER BY part_code`,
+      [vesselId]
+    )).rows;
+    const stores = includeStores ? (await pool4.query(
+      `SELECT id, item_code "itemCode", item_name "itemName", category, specification, uom, supplier, unit_cost "unitCost"
+         FROM stores_items WHERE vessel_id=$1 AND deleted IS NOT TRUE ORDER BY item_code`,
+      [vesselId]
+    )).rows : [];
+    const cats = /* @__PURE__ */ new Map();
+    for (const c of comps) {
+      const chain = deriveCodeChain(c.component_code);
+      const catChain = chain.slice(0, -1);
+      catChain.forEach((code, i) => {
+        if (!cats.has(code)) cats.set(code, {
+          code,
+          name: nameByCode.get(code) || code,
+          level: i + 1,
+          parent: i > 0 ? catChain[i - 1] : null,
+          hasChildren: true
+        });
+      });
+    }
+    for (const s of stores) {
+      const cat = (s.category || "General").trim();
+      const code = `STORES-${cat.toUpperCase().replace(/[^A-Z0-9]+/g, "-")}`;
+      if (!cats.has(code)) cats.set(code, { code, name: `Stores \u2014 ${cat}`, level: 1, parent: null, hasChildren: false });
+    }
+    if (dryRun2) {
+      res.categories.pushed = cats.size;
+      res.mappings.pushed = Array.from(cats.values()).filter((c) => c.parent).length;
+      res.products.pushed = comps.length + new Set(stores.map((s) => s.category || "General")).size;
+      res.skus.pushed = spares2.length + stores.length;
+      res.catalogue.pushed = res.skus.pushed;
+      console.log(`[CataloguePush] DRY RUN ${v.name}: cats=${res.categories.pushed} maps=${res.mappings.pushed} products=${res.products.pushed} skus=${res.skus.pushed}`);
+      return res;
+    }
+    const cfg = getB2bConfig();
+    const smc = {
+      smcId: process.env.SHIPSKART_B2B_SMC_ID || cfg.tenantId,
+      smcName: process.env.SHIPSKART_B2B_SMC_NAME || "WAH-KWONG",
+      smcTenantId: cfg.tenantId
+    };
+    let remoteCats = new Map((await fetchAllPaged("/integration/SAIL/get-all-categories")).map((c) => [c.categoryCode, c]));
+    for (const cat of Array.from(cats.values()).sort((a, b) => a.level - b.level)) {
+      const l = await ensurePending("category", cat.code, null, cat.code);
+      const remote = remoteCats.get(cat.code);
+      if (l.pushStatus === "pushed" && remote) {
+        res.categories.skipped++;
+        continue;
+      }
+      if (remote) {
+        if (String(remote.name).trim() !== cat.name.trim()) {
+          const w = `NAME-MISMATCH category ${cat.code}: ours='${cat.name}' theirs='${remote.name}' \u2014 shared category kept, review classification`;
+          res.warnings.push(w);
+          console.warn(`[CataloguePush] \u26A0\uFE0F ${w}`);
+          await markPushedWithWarning(l.id, remote.id, w);
+        } else {
+          await markPushed(l.id, remote.id);
+        }
+        res.categories.skipped++;
+        continue;
+      }
+      const r = await requestWithBackoff(
+        "POST",
+        "/integration/SAIL/create-category",
+        { body: buildCategoryPayload({ name: cat.name, categoryCode: cat.code, level: cat.level, hasChildren: cat.hasChildren }) }
+      );
+      await sleep(PACE_MS);
+      if (r.ok) {
+        await markPushed(l.id, r.json?.id ?? null);
+        res.categories.pushed++;
+      } else if (isDuplicateAnswer(r.status, r.json)) {
+        await markPushed(l.id);
+        res.categories.pushed++;
+      } else {
+        await markFailed(l.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
+        res.categories.failed++;
+        res.errors.push(`category ${cat.code}: ${r.status}`);
+      }
+    }
+    remoteCats = new Map((await fetchAllPaged("/integration/SAIL/get-all-categories")).map((c) => [c.categoryCode, c]));
+    for (const cat of Array.from(cats.values()).filter((c) => c.parent)) {
+      const l = await ensurePending("category", `MAP:${cat.code}`, null, cat.code);
+      if (l.pushStatus === "pushed") {
+        res.mappings.skipped++;
+        continue;
+      }
+      const child = remoteCats.get(cat.code), parent = remoteCats.get(cat.parent);
+      if (!child || !parent) {
+        await markFailed(l.id, "category id unresolved");
+        res.mappings.failed++;
+        continue;
+      }
+      const r = await requestWithBackoff("POST", "/integration/SAIL/category-mapping", {
+        body: buildCategoryMappingPayload({
+          categoryId: child.id,
+          categoryName: child.name,
+          parentCategoryId: parent.id,
+          parentCategoryName: parent.name
+        })
+      });
+      await sleep(PACE_MS);
+      if (r.ok || isDuplicateAnswer(r.status, r.json)) {
+        await markPushed(l.id);
+        res.mappings.pushed++;
+      } else {
+        await markFailed(l.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
+        res.mappings.failed++;
+      }
+    }
+    const productByLocal = /* @__PURE__ */ new Map();
+    let remoteProds = new Map((await fetchAllPaged("/integration/SAIL/get-all-product-masters")).map((p) => [p.productCode, p]));
+    const productSpecs = [];
+    for (const c of comps) {
+      const chain = deriveCodeChain(c.component_code);
+      const catCode = chain.length > 1 ? chain[chain.length - 2] : chain[0];
+      const rc = remoteCats.get(catCode);
+      if (!rc) {
+        res.products.failed++;
+        res.errors.push(`product ${c.component_code}: category ${catCode} unresolved`);
+        continue;
+      }
+      productSpecs.push({
+        localKey: c.cuuid,
+        code: sanitizeCode(`${vesselCode}-${c.component_code}`),
+        catCode,
+        payload: buildProductMasterPayload({
+          vesselCode,
+          component: { componentCode: c.component_code, name: c.name, maker: c.maker, model: c.model, serialNo: c.serial_no },
+          categoryId: rc.id,
+          categoryName: rc.name
+        })
+      });
+    }
+    for (const cat of Array.from(new Set(stores.map((s) => (s.category || "General").trim())))) {
+      const code = `STORES-${String(cat).toUpperCase().replace(/[^A-Z0-9]+/g, "-")}`;
+      const rc = remoteCats.get(code);
+      if (!rc) {
+        res.products.failed++;
+        res.errors.push(`stores product for ${cat}: category unresolved`);
+        continue;
+      }
+      productSpecs.push({
+        localKey: `STORES:${cat}`,
+        code: sanitizeCode(`${vesselCode}-${code}`),
+        catCode: code,
+        payload: buildProductMasterPayload({
+          vesselCode,
+          component: { componentCode: code, name: `Stores \u2014 ${cat}` },
+          categoryId: rc.id,
+          categoryName: rc.name
+        })
+      });
+    }
+    for (const spec of productSpecs) {
+      const l = await ensurePending("product", spec.localKey, vesselId, spec.code);
+      const remote = remoteProds.get(spec.code);
+      if ((l.pushStatus === "pushed" || remote) && remote) {
+        await markPushed(l.id, remote.id);
+        productByLocal.set(spec.localKey, { productId: remote.id, productName: remote.name, productCode: spec.code, categoryId: remote.categoryId ?? spec.payload.data.categoryId, categoryName: remote.categoryName ?? spec.payload.data.categoryName });
+        res.products.skipped++;
+        continue;
+      }
+      const r = await requestWithBackoff("POST", "/integration/SAIL/create-product-masters", { body: spec.payload });
+      await sleep(PACE_MS);
+      if (r.ok || isDuplicateAnswer(r.status, r.json)) {
+        await markPushed(l.id, r.json?.id ?? null);
+        res.products.pushed++;
+      } else {
+        await markFailed(l.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
+        res.products.failed++;
+        res.errors.push(`product ${spec.code}: ${r.status}`);
+      }
+    }
+    remoteProds = new Map((await fetchAllPaged("/integration/SAIL/get-all-product-masters")).map((p) => [p.productCode, p]));
+    for (const spec of productSpecs) {
+      const remote = remoteProds.get(spec.code);
+      if (remote && !productByLocal.has(spec.localKey)) {
+        productByLocal.set(spec.localKey, { productId: remote.id, productName: remote.name, productCode: spec.code, categoryId: remote.categoryId ?? spec.payload.data.categoryId, categoryName: remote.categoryName ?? spec.payload.data.categoryName });
+      }
+    }
+    const skuJobs = [
+      ...spares2.map((s) => ({
+        localKey: s.suuid,
+        skuCode: sanitizeCode(s.partCode),
+        skuName: s.partName,
+        make: s.maker,
+        model: s.model,
+        productKey: s.component_id,
+        buildSku: () => {
+          const pr = productByLocal.get(s.component_id);
+          return buildSkuFromSpare(s, { productId: pr.productId, productName: pr.productName }, { categoryId: pr.categoryId, categoryName: pr.categoryName }, ref);
+        }
+      })),
+      ...stores.map((s) => ({
+        localKey: `STORE:${s.id}`,
+        skuCode: sanitizeCode(s.itemCode),
+        skuName: s.itemName,
+        make: void 0,
+        model: void 0,
+        productKey: `STORES:${(s.category || "General").trim()}`,
+        buildSku: () => {
+          const pr = productByLocal.get(`STORES:${(s.category || "General").trim()}`);
+          return buildSkuFromStoreItem(s, { productId: pr.productId, productName: pr.productName }, { categoryId: pr.categoryId, categoryName: pr.categoryName }, ref);
+        }
+      }))
+    ].slice(0, opts.limitSkus ?? Number.MAX_SAFE_INTEGER);
+    const sanitizedSeen = /* @__PURE__ */ new Map();
+    let consecutive429 = 0;
+    for (const job of skuJobs) {
+      if (consecutive429 >= 5) {
+        res.errors.push("run aborted: rate-limit quota exhausted (5 consecutive 429s after full backoff) \u2014 re-run after the window resets");
+        console.warn("[CataloguePush] quota exhausted \u2014 aborting run; ledger keeps the remainder retryable");
+        break;
+      }
+      const pr = productByLocal.get(job.productKey);
+      if (!pr) {
+        res.skus.failed++;
+        res.errors.push(`sku ${job.skuCode}: product unresolved`);
+        continue;
+      }
+      const sl = await ensurePending("sku", job.localKey, vesselId, job.skuCode);
+      const firstHolder = sanitizedSeen.get(job.skuCode);
+      if (firstHolder && firstHolder !== job.localKey) {
+        await markFailed(sl.id, `SANITIZE COLLISION: code '${job.skuCode}' also produced by ${firstHolder} in this vessel \u2014 needs human decision`);
+        res.skus.failed++;
+        res.errors.push(`sku ${job.skuCode}: same-vessel sanitize collision`);
+        continue;
+      }
+      sanitizedSeen.set(job.skuCode, job.localKey);
+      if (sl.pushStatus !== "pushed") {
+        const clash = await findSkuCodeOtherVessel(job.skuCode, vesselId);
+        if (clash) {
+          await markFailed(sl.id, `SKU CODE COLLISION: '${job.skuCode}' already pushed for vessel ${clash.vesselId} \u2014 needs human decision`);
+          res.skus.failed++;
+          res.errors.push(`sku ${job.skuCode}: cross-vessel collision`);
+          continue;
+        }
+        const r = await requestWithBackoff("POST", "/integration/SAIL/create-spare-part", { body: job.buildSku() });
+        await sleep(PACE_MS);
+        if (r.ok || isDuplicateAnswer(r.status, r.json)) {
+          await markPushed(sl.id, r.json?.id ?? null);
+          res.skus.pushed++;
+          consecutive429 = 0;
+        } else {
+          await markFailed(sl.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
+          res.skus.failed++;
+          res.errors.push(`sku ${job.skuCode}: ${r.status}`);
+          if (r.status === 429) consecutive429++;
+          else consecutive429 = 0;
+          continue;
+        }
+      } else res.skus.skipped++;
+      const cl = await ensurePending("catalogue", job.localKey, vesselId, job.skuCode);
+      if (cl.pushStatus === "pushed") {
+        res.catalogue.skipped++;
+        continue;
+      }
+      const addBody = buildCatalogueAddPayload({
+        skuCode: job.skuCode,
+        skuName: job.skuName,
+        productId: pr.productId,
+        productMasterCode: pr.productCode,
+        categoryId: pr.categoryId,
+        smc,
+        vessel: { vesselId: link.shipskart_vessel_id, vesselName: v.name },
+        make: job.make ?? null,
+        model: job.model ?? null
+      });
+      const r2 = await requestWithBackoff("POST", "/integration/SAIL/add-spare-part-in-company-catalogue", { body: addBody });
+      await sleep(PACE_MS);
+      if (r2.ok || isDuplicateAnswer(r2.status, r2.json)) {
+        await markPushed(cl.id);
+        res.catalogue.pushed++;
+      } else {
+        await markFailed(cl.id, `${r2.status} ${JSON.stringify(r2.json ?? r2.text)}`);
+        res.catalogue.failed++;
+        res.errors.push(`catalogue ${job.skuCode}: ${r2.status}`);
+      }
+    }
+    console.log(`[CataloguePush] ${v.name}: cats +${res.categories.pushed}/~${res.categories.skipped} maps +${res.mappings.pushed} products +${res.products.pushed}/~${res.products.skipped} skus +${res.skus.pushed}/~${res.skus.skipped}/x${res.skus.failed} catalogue +${res.catalogue.pushed} warnings=${res.warnings.length}`);
+    return res;
+  } catch (err) {
+    res.errors.push(String(err?.message || err));
+    console.error(`[CataloguePush] FAILED for ${vesselId}: ${err?.message || err}`);
+    return res;
+  } finally {
+    inFlight.delete(vesselId);
+    if (!dryRun2) {
+      lastRunByVessel.set(vesselId, {
+        finishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        ok: res.errors.length === 0,
+        errors: res.errors.slice(0, 5),
+        warnings: res.warnings.slice(0, 3)
+      });
+    }
+  }
+}
+var PACE_MS, sleep, inFlight, lastRunByVessel, zero, isDuplicateAnswer;
+var init_shipskartCataloguePushService = __esm({
+  "server/modules/shipskart/services/shipskartCataloguePushService.ts"() {
+    "use strict";
+    init_db();
+    init_shipskartTokenService();
+    init_shipskartB2bClient();
+    init_syncRole();
+    init_shipskartCatalogueLinkRepository();
+    init_shipskartCatalogueMapper();
+    PACE_MS = Math.max(500, Number(process.env.SHIPSKART_CATALOGUE_PACE_MS ?? 5e3));
+    sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    inFlight = /* @__PURE__ */ new Set();
+    lastRunByVessel = /* @__PURE__ */ new Map();
+    zero = () => ({ pushed: 0, skipped: 0, failed: 0 });
+    isDuplicateAnswer = (status, body) => status === 400 && /already (exists|in use)/i.test(JSON.stringify(body ?? ""));
+  }
+});
+
 // server/modules/noon-report/utils/fuelConversionFactors.ts
 function computeCiiRefLine(dwt) {
   if (!dwt || dwt <= 0) return null;
@@ -36037,7 +38631,7 @@ var alertEngine_exports = {};
 __export(alertEngine_exports, {
   generateAlerts: () => generateAlerts
 });
-import { eq as eq31, and as and26, isNull as isNull4, ne as ne2, desc as desc7, inArray as inArray8 } from "drizzle-orm";
+import { eq as eq33, and as and28, isNull as isNull4, ne as ne3, desc as desc7, inArray as inArray10 } from "drizzle-orm";
 async function generateAlerts(report) {
   const [consumed, cleared] = await Promise.all([
     evaluateRules(report),
@@ -36059,7 +38653,7 @@ async function ruleConsumptionSpike(report) {
   const db2 = await getDb();
   const todayTotal = (toNum(report.hfoConsumption) ?? 0) + (toNum(report.lsmgoConsumption) ?? 0) + (toNum(report.mgoConsumption) ?? 0) + (toNum(report.vlsfoConsumption) ?? 0) + (toNum(report.lpgConsumption) ?? 0);
   if (todayTotal <= 0) return;
-  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, report.vesselId));
   const avg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (avg7Day <= 0) return;
   const pctAbove = (todayTotal - avg7Day) / avg7Day;
@@ -36089,7 +38683,7 @@ async function ruleConsumptionSpike(report) {
 }
 async function ruleRobEndurance(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (totalAvg7Day <= 0) return;
@@ -36122,10 +38716,10 @@ async function ruleAeHoursSpike(report) {
   const db2 = await getDb();
   const currentAeHours = toNum(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
-  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and26(
-    eq31(nrNoonReports.vesselId, report.vesselId),
-    eq31(nrNoonReports.status, "submitted"),
-    ne2(nrNoonReports.id, report.id)
+  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and28(
+    eq33(nrNoonReports.vesselId, report.vesselId),
+    eq33(nrNoonReports.status, "submitted"),
+    ne3(nrNoonReports.id, report.id)
   )).orderBy(desc7(nrNoonReports.reportDate)).limit(7);
   const priorHours = prior.map((r) => toNum(r.aeRunningHours)).filter((v) => v !== null && v > 0);
   if (priorHours.length < ALERT_THRESHOLDS.aeMinDataPoints) return;
@@ -36147,7 +38741,7 @@ async function ruleAeHoursSpike(report) {
 async function ruleCiiBandDrop(report) {
   const db2 = await getDb();
   const year = new Date(report.reportDate).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and26(eq31(nrCiiTracking.vesselId, report.vesselId), eq31(nrCiiTracking.year, year))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and28(eq33(nrCiiTracking.vesselId, report.vesselId), eq33(nrCiiTracking.year, year))).limit(1);
   const row = ciiRows[0] ?? null;
   if (!row || !row.ciiRating || !row.previousCiiRating) return;
   const prevOrder = CII_ORDER[row.previousCiiRating] ?? 0;
@@ -36191,7 +38785,7 @@ async function ruleNegativeRobRisk(report) {
 }
 async function autoResolveCleared(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   const enduranceDays = totalAvg7Day > 0 ? totalRob / totalAvg7Day : null;
@@ -36214,25 +38808,25 @@ async function autoResolveCleared(report) {
   await db2.update(nrAlerts).set({
     acknowledgedAt: /* @__PURE__ */ new Date(),
     acknowledgedBy: "system"
-  }).where(and26(
-    eq31(nrAlerts.vesselId, report.vesselId),
+  }).where(and28(
+    eq33(nrAlerts.vesselId, report.vesselId),
     isNull4(nrAlerts.acknowledgedAt),
-    inArray8(nrAlerts.alertType, toResolve)
+    inArray10(nrAlerts.alertType, toResolve)
   ));
 }
 async function resolveOpenAlert(vesselId, alertType) {
   const db2 = await getDb();
-  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and26(
-    eq31(nrAlerts.vesselId, vesselId),
-    eq31(nrAlerts.alertType, alertType),
+  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and28(
+    eq33(nrAlerts.vesselId, vesselId),
+    eq33(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   ));
 }
 async function upsertAlert(vesselId, reportId, alertType, severity, message, metricValue, thresholdValue) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and26(
-    eq31(nrAlerts.vesselId, vesselId),
-    eq31(nrAlerts.alertType, alertType),
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and28(
+    eq33(nrAlerts.vesselId, vesselId),
+    eq33(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   )).limit(1);
   if (existing.length > 0) {
@@ -36242,7 +38836,7 @@ async function upsertAlert(vesselId, reportId, alertType, severity, message, met
       message,
       metricValue: metricValue !== null ? String(metricValue) : null,
       thresholdValue: thresholdValue !== null ? String(thresholdValue) : null
-    }).where(eq31(nrAlerts.id, existing[0].id));
+    }).where(eq33(nrAlerts.id, existing[0].id));
   } else {
     await db2.insert(nrAlerts).values({
       vesselId,
@@ -36271,6 +38865,92 @@ var init_alertEngine = __esm({
   }
 });
 
+// server/services/shoreWoDailyScheduler.ts
+var shoreWoDailyScheduler_exports = {};
+__export(shoreWoDailyScheduler_exports, {
+  shoreWoDailyScheduler: () => shoreWoDailyScheduler
+});
+var DEFAULT_INTERVAL_MS, FIRST_RUN_DELAY_MS, ShoreWoDailyScheduler, shoreWoDailyScheduler;
+var init_shoreWoDailyScheduler = __esm({
+  "server/services/shoreWoDailyScheduler.ts"() {
+    "use strict";
+    init_syncRole();
+    init_syncDiagLogger();
+    DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1e3;
+    FIRST_RUN_DELAY_MS = 10 * 60 * 1e3;
+    ShoreWoDailyScheduler = class {
+      timer = null;
+      firstRunTimer = null;
+      running = false;
+      // scheduler armed
+      sweepInFlight = false;
+      // a sweep is executing right now
+      intervalMs = DEFAULT_INTERVAL_MS;
+      isRunning() {
+        return this.running;
+      }
+      start(intervalMs) {
+        if (this.running) return;
+        this.intervalMs = intervalMs || parseInt(process.env.SHORE_WO_SWEEP_INTERVAL_MS || "", 10) || DEFAULT_INTERVAL_MS;
+        this.running = true;
+        this.firstRunTimer = setTimeout(() => {
+          void this.runSweep();
+        }, FIRST_RUN_DELAY_MS);
+        this.timer = setInterval(() => {
+          void this.runSweep();
+        }, this.intervalMs);
+        console.log(`[ShoreWoSweep] started \u2014 daily generation+reconcile for provisioned vessels (interval ${this.intervalMs / 36e5}h, first run in ${FIRST_RUN_DELAY_MS / 6e4}min)`);
+      }
+      stop() {
+        if (this.firstRunTimer) {
+          clearTimeout(this.firstRunTimer);
+          this.firstRunTimer = null;
+        }
+        if (this.timer) {
+          clearInterval(this.timer);
+          this.timer = null;
+        }
+        if (this.running) console.log("[ShoreWoSweep] stopped");
+        this.running = false;
+      }
+      /** One full sweep: per provisioned vessel — generate, then reconcile. */
+      async runSweep() {
+        if (this.sweepInFlight) {
+          console.warn("[ShoreWoSweep] previous sweep still in flight \u2014 skipping this tick");
+          return;
+        }
+        this.sweepInFlight = true;
+        try {
+          if (await isShipInstance()) {
+            console.warn("[ShoreWoSweep] instance resolves as SHIP \u2014 refusing to run the shore sweep");
+            return;
+          }
+          const reconRepo = await Promise.resolve().then(() => (init_workOrderReconcileRepository(), workOrderReconcileRepository_exports));
+          const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
+          const vessels2 = await reconRepo.getProvisionedVesselIds();
+          syncDiag(`SHORE-WO-SWEEP START vessels=${vessels2.length}`);
+          let generated = 0;
+          for (const vesselId of vessels2) {
+            try {
+              const scan = await jobDueScanner2.runScan(vesselId);
+              if (!scan.skipped) {
+                generated += scan.calendarWOsGenerated + scan.rhWOsGenerated + scan.dualWOsGenerated;
+              }
+            } catch (err) {
+              console.error(`[ShoreWoSweep] vessel ${vesselId} failed: ${err?.message || err}`);
+            }
+          }
+          console.log(`[ShoreWoSweep] sweep complete: ${vessels2.length} vessel(s), generated=${generated} (reconcile runs post-sync, not here)`);
+          syncDiag(`SHORE-WO-SWEEP END vessels=${vessels2.length} generated=${generated}`);
+        } finally {
+          this.sweepInFlight = false;
+        }
+      }
+    };
+    shoreWoDailyScheduler = new ShoreWoDailyScheduler();
+  }
+});
+
 // server/services/maintenanceOrchestrator.ts
 var maintenanceOrchestrator_exports = {};
 __export(maintenanceOrchestrator_exports, {
@@ -36283,7 +38963,7 @@ function envInt(name, def) {
   const n = parseInt(v, 10);
   return Number.isFinite(n) ? n : def;
 }
-var BOOT_DELAY_MS2, CONCURRENCY, JITTER_MS, TIMEOUT_ALERTS_MS, TIMEOUT_HEALTH_MS, TIMEOUT_PRUNING_MS, TIMEOUT_DRIFT_MS, sleep, MaintenanceOrchestrator, maintenanceOrchestrator;
+var BOOT_DELAY_MS2, CONCURRENCY, JITTER_MS, TIMEOUT_ALERTS_MS, TIMEOUT_HEALTH_MS, TIMEOUT_PRUNING_MS, TIMEOUT_DRIFT_MS, sleep2, MaintenanceOrchestrator, maintenanceOrchestrator;
 var init_maintenanceOrchestrator = __esm({
   "server/services/maintenanceOrchestrator.ts"() {
     "use strict";
@@ -36299,7 +38979,7 @@ var init_maintenanceOrchestrator = __esm({
     TIMEOUT_HEALTH_MS = envInt("MAINT_HEALTH_TIMEOUT_MS", 5 * 6e4);
     TIMEOUT_PRUNING_MS = envInt("MAINT_PRUNING_TIMEOUT_MS", 30 * 6e4);
     TIMEOUT_DRIFT_MS = envInt("MAINT_DRIFT_TIMEOUT_MS", 15 * 6e4);
-    sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
     MaintenanceOrchestrator = class {
       tasks = [
         { name: "alerts", intervalMs: 5 * 6e4, timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
@@ -36349,7 +39029,7 @@ var init_maintenanceOrchestrator = __esm({
           }
           const tenants2 = await tenantConnectionManager.getActiveTenants();
           await this.runWithConcurrency(tenants2, CONCURRENCY, async (t) => {
-            await sleep(Math.floor(Math.random() * JITTER_MS));
+            await sleep2(Math.floor(Math.random() * JITTER_MS));
             await this.runOne(task, t.tuid, t.tuid);
           });
         } catch (err) {
@@ -36374,7 +39054,7 @@ var init_maintenanceOrchestrator = __esm({
         });
         await Promise.race([
           real,
-          sleep(task.timeoutMs).then(() => {
+          sleep2(task.timeoutMs).then(() => {
             if (this.inProgress.get(guardKey)) {
               console.warn(`[Maint] ${guardKey} exceeded ${task.timeoutMs}ms \u2014 slot freed; guard held until completion`);
             }
@@ -36394,6 +39074,83 @@ var init_maintenanceOrchestrator = __esm({
       }
     };
     maintenanceOrchestrator = new MaintenanceOrchestrator();
+  }
+});
+
+// server/modules/shipskart/services/shipskartReconcilerScheduler.ts
+var shipskartReconcilerScheduler_exports = {};
+__export(shipskartReconcilerScheduler_exports, {
+  ShipskartReconcilerScheduler: () => ShipskartReconcilerScheduler,
+  shipskartReconcilerScheduler: () => shipskartReconcilerScheduler
+});
+var DEFAULT_INTERVAL_MS2, DEFAULT_BOOT_DELAY_MS, ShipskartReconcilerScheduler, shipskartReconcilerScheduler;
+var init_shipskartReconcilerScheduler = __esm({
+  "server/modules/shipskart/services/shipskartReconcilerScheduler.ts"() {
+    "use strict";
+    init_shipskartReconcilerService();
+    init_syncRole();
+    init_identityGuard();
+    DEFAULT_INTERVAL_MS2 = 60 * 60 * 1e3;
+    DEFAULT_BOOT_DELAY_MS = 5 * 60 * 1e3;
+    ShipskartReconcilerScheduler = class {
+      timer = null;
+      bootTimer = null;
+      inProgress = false;
+      started = false;
+      async start() {
+        if (this.started) return;
+        if (await isShipInstance()) {
+          console.log("[ShipskartReconciler] Ship instance \u2014 scheduler NOT started (Shipskart integration is shore-only)");
+          return;
+        }
+        const intervalMs = parseInt(process.env.SHIPSKART_RECONCILE_INTERVAL_MS || "", 10) || DEFAULT_INTERVAL_MS2;
+        const bootDelayMs = parseInt(process.env.SHIPSKART_RECONCILE_BOOT_DELAY_MS || "", 10) || DEFAULT_BOOT_DELAY_MS;
+        const limit = parseInt(process.env.SHIPSKART_RECONCILE_BATCH || "", 10) || void 0;
+        this.bootTimer = setTimeout(() => {
+          void this.tick(limit);
+        }, bootDelayMs);
+        this.timer = setInterval(() => {
+          void this.tick(limit);
+        }, intervalMs);
+        this.started = true;
+        logIdentityIntegrationExpectation();
+        console.log(
+          `[ShipskartReconciler] Shore instance \u2014 scheduler started (every ${Math.round(intervalMs / 6e4)}min, first run in ${Math.round(bootDelayMs / 6e4)}min). Each tick still requires reconciler_enabled=true for the tenant.`
+        );
+      }
+      async tick(limit) {
+        if (this.inProgress) {
+          console.log("[ShipskartReconciler] previous pass still running \u2014 skipping this tick");
+          return;
+        }
+        this.inProgress = true;
+        try {
+          const summary = await runReconciliation({ limit });
+          if (!summary.ran) return;
+          console.log(`[ShipskartReconciler] pass done: vessels=${JSON.stringify(summary.vessels)} users=${JSON.stringify(summary.users)} mappings=${JSON.stringify(summary.mappings)}`);
+        } catch (err) {
+          console.error(`[ShipskartReconciler] pass failed: ${err?.message || err}`);
+        } finally {
+          this.inProgress = false;
+        }
+      }
+      stop() {
+        if (this.bootTimer) {
+          clearTimeout(this.bootTimer);
+          this.bootTimer = null;
+        }
+        if (this.timer) {
+          clearInterval(this.timer);
+          this.timer = null;
+        }
+        this.started = false;
+        console.log("[ShipskartReconciler] Scheduler stopped");
+      }
+      isStarted() {
+        return this.started;
+      }
+    };
+    shipskartReconcilerScheduler = new ShipskartReconcilerScheduler();
   }
 });
 
@@ -36447,7 +39204,13 @@ var init_schedulerRoleWatchdog = __esm({
             );
           }
           this.lastRole = role;
+          const { shoreWoDailyScheduler: shoreWoDailyScheduler2 } = await Promise.resolve().then(() => (init_shoreWoDailyScheduler(), shoreWoDailyScheduler_exports));
           if (ship) {
+            if (shoreWoDailyScheduler2.isRunning()) {
+              console.warn("[RoleWatchdog] Instance resolves as SHIP \u2014 stopping the shore WO sweep (shore-only).");
+              syncDiag("[RoleWatchdog] Instance resolves as SHIP \u2014 shore WO sweep stopped.");
+              shoreWoDailyScheduler2.stop();
+            }
             if (!syncAutoScheduler.isStarted()) {
               console.warn(
                 "[RoleWatchdog] \u{1FA79} SELF-HEAL: this instance resolves as a SHIP but the auto-sync scheduler is not running (stale boot-time role decision) \u2014 starting it now."
@@ -36467,6 +39230,13 @@ var init_schedulerRoleWatchdog = __esm({
               jobDueScanner.start(this.jobDueScanIntervalMs);
             }
           } else {
+            if (!shoreWoDailyScheduler2.isRunning()) {
+              console.warn(
+                "[RoleWatchdog] \u{1FA79} SELF-HEAL: this instance resolves as SHORE but the shore WO sweep is not running \u2014 starting it now."
+              );
+              syncDiag("[RoleWatchdog] SELF-HEAL: instance resolves as SHORE but shore WO sweep was not running \u2014 started late.");
+              shoreWoDailyScheduler2.start();
+            }
             if (syncAutoScheduler.isStarted() || jobDueScanner.isStarted()) {
               console.warn(
                 "[RoleWatchdog] Instance now resolves as SHORE \u2014 stopping ship-only schedulers (auto-sync / job-due scanner). Sync stays ship-initiated."
@@ -36580,7 +39350,7 @@ async function upsertCompanyStandardGraceSettings(settings) {
 
 // server/modules/vessels/services/vesselService.ts
 init_errors();
-import { randomUUID as randomUUID2 } from "crypto";
+import { randomUUID as randomUUID3 } from "crypto";
 async function getFleets2(includeInactive) {
   return includeInactive ? getAllFleets() : getFleets();
 }
@@ -36593,7 +39363,7 @@ async function createFleet2(data) {
   try {
     return await createFleet({
       id: data.id || data.code,
-      fuuid: randomUUID2(),
+      fuuid: randomUUID3(),
       code: data.code,
       name: data.name,
       description: data.description ?? null,
@@ -36678,7 +39448,7 @@ async function getFleetClasses2(fleetId) {
 async function createFleetClass2(fleetId, data) {
   try {
     return await createFleetClass({
-      fcuuid: randomUUID2(),
+      fcuuid: randomUUID3(),
       fleetId,
       name: data.name,
       description: data.description ?? null,
@@ -37256,9 +40026,9 @@ init_schema();
 import { eq as eq4 } from "drizzle-orm";
 async function augmentWithSortOrder(components2) {
   if (components2.length === 0) return components2;
-  const { pool: pool2 } = getPostgresClient();
+  const { pool: pool4 } = getPostgresClient();
   const ids = components2.map((c) => c.id);
-  const result = await pool2.query(
+  const result = await pool4.query(
     `SELECT id, sort_order FROM components WHERE id = ANY($1)`,
     [ids]
   );
@@ -37400,10 +40170,10 @@ async function findMaintenanceHistoryByVessel(vesselId) {
   return storage.getMaintenanceHistoryByVessel(vesselId);
 }
 async function updateSortOrder(updates) {
-  const { pool: pool2 } = getPostgresClient();
+  const { pool: pool4 } = getPostgresClient();
   let totalUpdated = 0;
   for (const update6 of updates) {
-    const result = await pool2.query(
+    const result = await pool4.query(
       `UPDATE components SET sort_order = $1, updated_at = NOW() WHERE cuuid = $2`,
       [update6.sortOrder, update6.id]
     );
@@ -37415,8 +40185,8 @@ async function updateSortOrder(updates) {
   return { success: true, updated: totalUpdated };
 }
 async function updateHierarchyAndSortOrder(sortUpdates, reparents) {
-  const { pool: pool2 } = getPostgresClient();
-  const client = await pool2.connect();
+  const { pool: pool4 } = getPostgresClient();
+  const client = await pool4.connect();
   const reparentAudits = [];
   try {
     await client.query("BEGIN");
@@ -38264,7 +41034,7 @@ import * as path6 from "path";
 
 // server/objectStorage.ts
 import { Storage } from "@google-cloud/storage";
-import { randomUUID as randomUUID3 } from "crypto";
+import { randomUUID as randomUUID4 } from "crypto";
 
 // server/objectAcl.ts
 var ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
@@ -38484,7 +41254,7 @@ var ObjectStorageService = class {
         "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' tool and set PRIVATE_OBJECT_DIR env var."
       );
     }
-    const objectId = randomUUID3();
+    const objectId = randomUUID4();
     const fullPath = `${privateObjectDir}/uploads/${objectId}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
     return signObjectURL({
@@ -42507,7 +45277,7 @@ init_workOrderRepository();
 init_errors();
 
 // server/modules/work-orders/services/woDocumentService.ts
-import { randomUUID as randomUUID4 } from "crypto";
+import { randomUUID as randomUUID5 } from "crypto";
 import * as fs7 from "fs";
 import * as path7 from "path";
 import sharp from "sharp";
@@ -42673,7 +45443,7 @@ async function uploadDocument(workOrderId, vesselId, documentType, file, uploade
   if (fileBuffer.length > TARGET_FILE_SIZE) {
     console.warn(`File still ${(fileBuffer.length / (1024 * 1024)).toFixed(1)} MB after compression`);
   }
-  const docId = randomUUID4();
+  const docId = randomUUID5();
   const safeFileName = sanitizeFileName(file.originalname);
   const storageFileName = `${docId}_${safeFileName}`;
   const relativePath = `${workOrderId}/${storageFileName}`;
@@ -42864,7 +45634,7 @@ init_schema();
 init_storage();
 init_sync();
 import { eq as eq12, and as and10 } from "drizzle-orm";
-import { randomUUID as randomUUID5 } from "crypto";
+import { randomUUID as randomUUID6 } from "crypto";
 var RH_PER_DAY = 24;
 function buildVesselGraceSettings(vesselSettings) {
   if (!vesselSettings) {
@@ -43111,7 +45881,7 @@ async function savePlannedDate(vesselId, jobId, componentId, plannedDate) {
     );
     await logFieldChanges("planner_dates", oldRow.pduuid, vesselId, oldRow, { ...oldRow, plannedDate: plannedDate || null }, null);
   } else {
-    const newPduuid = randomUUID5();
+    const newPduuid = randomUUID6();
     const newRow = {
       pduuid: newPduuid,
       vesselId,
@@ -43168,7 +45938,7 @@ async function bulkSavePlannedDate(vesselId, items, plannedDate) {
         await logFieldChanges("planner_dates", oldRow.pduuid, vesselId, oldRow, { ...oldRow, plannedDate }, null, tx);
         updated++;
       } else {
-        const newPduuid = randomUUID5();
+        const newPduuid = randomUUID6();
         const newRow = {
           pduuid: newPduuid,
           vesselId,
@@ -43354,6 +46124,24 @@ async function generateNow(req, res) {
   if (!vesselId || typeof vesselId !== "string" || vesselId === "all") {
     throw new ValidationError("A specific vesselId is required to generate work orders.");
   }
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  const gate = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
+  const decision = await gate.evaluateDirectGeneration({
+    vesselId,
+    role: gate.resolveGateRole(req.user),
+    isShip: await isShipInstance2()
+  });
+  if (!decision.allowed) {
+    console.warn(
+      `[WO-Gate] REFUSED direct generation: vessel=${vesselId} reason=${decision.code} verdict=${decision.state?.verdict ?? "unknown"} metadataRows=${decision.state?.metadataRows ?? "?"} lastSyncAt=${decision.state?.lastSyncAt?.toISOString() ?? "never"}`
+    );
+    return res.status(403).json({
+      success: false,
+      error: decision.code,
+      message: decision.message,
+      vesselState: decision.state ? { verdict: decision.state.verdict, lastSyncAt: decision.state.lastSyncAt } : null
+    });
+  }
   const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
   const result = await jobDueScanner2.runScan(vesselId);
   if (result.skipped) {
@@ -43372,6 +46160,23 @@ async function generateNow(req, res) {
     breakdown: result,
     message: generated > 0 ? `Generated ${generated} work order(s) from ${checked} due job(s).` : `No work orders were due. Checked ${checked} job(s).`
   });
+}
+async function getReconcilerStatus(req, res) {
+  const reconciler = await Promise.resolve().then(() => (init_workOrderReconcilerService(), workOrderReconcilerService_exports));
+  const reconRepo = await Promise.resolve().then(() => (init_workOrderReconcileRepository(), workOrderReconcileRepository_exports));
+  res.json({
+    archive: await reconRepo.archiveSummary(),
+    lastRun: reconciler.getLastRunSummary()
+  });
+}
+async function runReconcilerNow(req, res) {
+  const vesselId = (req.body && req.body.vesselId) ?? req.query.vesselId;
+  if (!vesselId || typeof vesselId !== "string" || vesselId === "all") {
+    throw new ValidationError("A specific vesselId is required.");
+  }
+  const reconciler = await Promise.resolve().then(() => (init_workOrderReconcilerService(), workOrderReconcilerService_exports));
+  const result = await reconciler.reconcileVessel(vesselId);
+  res.json(result);
 }
 async function getWorkOrderContext2(req, res) {
   const result = await getWorkOrderContext(req.params.id);
@@ -43614,6 +46419,70 @@ async function rejectPostponement2(req, res) {
   }
 }
 async function getPostponementApprovalSteps(req, res) {
+  const woId = req.params.id;
+  let wo = await storage.getWorkOrder(woId);
+  if (!wo) wo = await storage.getWorkOrderByCode(woId);
+  if (!wo) return res.status(404).json({ error: "Work order not found" });
+  const awaitingPostponement = await storage.getLatestAwaitingPostponement(wo.wouuid);
+  if (!awaitingPostponement) return res.json([]);
+  const steps = await storage.getWoPostponementApprovalSteps(awaitingPostponement.id);
+  res.json(steps);
+}
+async function submitRePostponeRequest2(req, res) {
+  try {
+    const result = await submitRePostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function editRePostponeRequest2(req, res) {
+  try {
+    const result = await editRePostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function approveRePostponement2(req, res) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const authReq = req;
+    const result = await approveRePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || "Office",
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role
+    });
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function rejectRePostponement2(req, res) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const authReq = req;
+    const result = await rejectRePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || "Office",
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role
+    });
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function getRePostponementApprovalSteps(req, res) {
   const woId = req.params.id;
   let wo = await storage.getWorkOrder(woId);
   if (!wo) wo = await storage.getWorkOrderByCode(woId);
@@ -44072,6 +46941,8 @@ router5.get("/work-orders/:id", asyncHandler(getWorkOrder2));
 router5.get("/work-orders/:id/context", asyncHandler(getWorkOrderContext2));
 router5.get("/work-orders/:id/rejection-history", asyncHandler(getRejectionHistory2));
 router5.post("/work-orders/generate-now", asyncHandler(generateNow));
+router5.get("/work-orders/reconciler/status", asyncHandler(getReconcilerStatus));
+router5.post("/work-orders/reconciler/run", asyncHandler(runReconcilerNow));
 router5.post("/work-orders", asyncHandler(createWorkOrder2));
 router5.patch("/work-orders/:id", asyncHandler(updateWorkOrder2));
 router5.delete("/work-orders/:id", asyncHandler(deleteWorkOrder2));
@@ -44121,6 +46992,19 @@ router5.post(
   asyncHandler(rejectPostponement2)
 );
 router5.get("/work-orders/:id/postpone-approval-steps", asyncHandler(getPostponementApprovalSteps));
+router5.post("/work-orders/:id/re-postpone-request", asyncHandler(submitRePostponeRequest2));
+router5.put("/work-orders/:id/re-postpone-request", asyncHandler(editRePostponeRequest2));
+router5.post(
+  "/work-orders/:id/re-postpone-approve",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(approveRePostponement2)
+);
+router5.post(
+  "/work-orders/:id/re-postpone-reject",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(rejectRePostponement2)
+);
+router5.get("/work-orders/:id/re-postpone-approval-steps", asyncHandler(getRePostponementApprovalSteps));
 router5.get("/work-order-executions/:componentId", asyncHandler(getExecutions2));
 router5.get("/work-order-executions/details/:id", asyncHandler(getExecution2));
 router5.post("/work-order-executions", asyncHandler(createExecution3));
@@ -49413,9 +52297,9 @@ async function updateFleetScopedComponent(id, data) {
   return storage.updateFleetScopedComponent(id, data);
 }
 async function updateComponentSortOrder(updates) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   for (const update6 of updates) {
-    await pool2.query(
+    await pool4.query(
       `UPDATE fleet_components SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
       [update6.sortOrder, update6.id]
     );
@@ -50463,7 +53347,7 @@ import { z as z6 } from "zod";
 // server/modules/fleet/services/fleetAdminService.ts
 init_schema();
 import { z as z5 } from "zod";
-import { randomUUID as randomUUID6 } from "crypto";
+import { randomUUID as randomUUID7 } from "crypto";
 import { eq as eq19, and as and16 } from "drizzle-orm";
 
 // server/modules/fleet/repositories/fleetAdminRepository.ts
@@ -51398,7 +54282,7 @@ async function copyVessel(body) {
         continue;
       }
       const newId = generateId("COMP");
-      const newCuuid = randomUUID6();
+      const newCuuid = randomUUID7();
       componentIdMap.set(comp.cuuid, newCuuid);
       try {
         await db2.insert(components2).values({
@@ -51471,7 +54355,7 @@ async function copyVessel(body) {
       try {
         await db2.insert(jobs2).values({
           id: newId,
-          juuid: randomUUID6(),
+          juuid: randomUUID7(),
           vesselId: data.targetVesselCode,
           componentId: newComponentId,
           componentCode: job.componentCode,
@@ -51540,7 +54424,7 @@ async function copyVessel(body) {
       const newComponentId = componentIdMap.get(spare.componentId || "") || spare.componentId;
       try {
         const [inserted] = await db2.insert(spares2).values({
-          suuid: randomUUID6(),
+          suuid: randomUUID7(),
           partCode: spare.partCode,
           partName: spare.partName,
           componentId: newComponentId,
@@ -51617,7 +54501,7 @@ async function copyVessel(body) {
       if (existingStoreCodes.has(storeKey)) continue;
       try {
         await db2.insert(storesItems2).values({
-          stuuid: randomUUID6(),
+          stuuid: randomUUID7(),
           vesselId: data.targetVesselCode,
           itemType: item.itemType,
           itemCode: item.itemCode,
@@ -55593,13 +58477,13 @@ async function getChemicalsExpiry(vesselId, expired, expiring_soon, hazard_class
   }
   const today = /* @__PURE__ */ new Date();
   today.setHours(0, 0, 0, 0);
-  const parseDate5 = (dateStr) => {
+  const parseDate6 = (dateStr) => {
     if (!dateStr) return null;
     const d = new Date(dateStr);
     return isNaN(d.getTime()) ? null : d;
   };
   const enriched = chemicals.map((item) => {
-    const expiryParsed = parseDate5(item.expiryDate);
+    const expiryParsed = parseDate6(item.expiryDate);
     let daysUntilExpiry = null;
     let expiryStatus = "No Date";
     if (expiryParsed) {
@@ -55963,7 +58847,7 @@ async function getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr, ve
     (c) => c.isActive !== false && (c.critical === true || c.classItem === true)
   );
   const allWorkOrders = await getWorkOrdersComputed(vesselId, vesselIds);
-  const parseDate5 = (dateStr) => {
+  const parseDate6 = (dateStr) => {
     if (!dateStr) return null;
     try {
       const d = new Date(dateStr);
@@ -55990,7 +58874,7 @@ async function getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr, ve
     let relevantWOs = activeWOs;
     if (filterStartDate || filterEndDate) {
       relevantWOs = activeWOs.filter((wo) => {
-        const dueDate = parseDate5(wo.dueDate || wo.nextDueDate);
+        const dueDate = parseDate6(wo.dueDate || wo.nextDueDate);
         if (!dueDate) return false;
         if (filterStartDate && dueDate < filterStartDate) return false;
         if (filterEndDate && dueDate > filterEndDate) return false;
@@ -55999,15 +58883,15 @@ async function getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr, ve
     }
     const overdueCount = relevantWOs.filter((wo) => wo.status === "Overdue").length;
     const dueSoonCount = relevantWOs.filter((wo) => {
-      const dueDate = parseDate5(wo.dueDate || wo.nextDueDate);
+      const dueDate = parseDate6(wo.dueDate || wo.nextDueDate);
       if (!dueDate) return false;
       return dueDate >= dueSoonStart && dueDate <= dueSoonEnd;
     }).length;
     const totalActiveWOs = relevantWOs.length;
-    const dueDates = relevantWOs.map((wo) => parseDate5(wo.dueDate || wo.nextDueDate)).filter((d) => d !== null).sort((a, b) => a.getTime() - b.getTime());
+    const dueDates = relevantWOs.map((wo) => parseDate6(wo.dueDate || wo.nextDueDate)).filter((d) => d !== null).sort((a, b) => a.getTime() - b.getTime());
     const nextDueDate = dueDates.length > 0 ? dueDates[0] : null;
     const completedWOs = componentWOs.filter((wo) => wo.status === "Completed");
-    const completionDates = completedWOs.map((wo) => parseDate5(wo.dateCompleted)).filter((d) => d !== null).sort((a, b) => b.getTime() - a.getTime());
+    const completionDates = completedWOs.map((wo) => parseDate6(wo.dateCompleted)).filter((d) => d !== null).sort((a, b) => b.getTime() - a.getTime());
     const lastDoneDate = completionDates.length > 0 ? completionDates[0] : null;
     const daysUntilDue = nextDueDate ? Math.ceil((nextDueDate.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24)) : null;
     return {
@@ -56159,7 +59043,7 @@ async function getUnplannedBreakdownJobs(vesselId, startDate, endDate, vesselIds
   const allVesselsForLookup = await getVessels6();
   const vesselMap = new Map(allVesselsForLookup.map((v) => [v.id, v.name || v.id]));
   const allWorkOrders = await getWorkOrdersComputed(vesselId, vesselIds);
-  const parseDate5 = (dateStr) => {
+  const parseDate6 = (dateStr) => {
     if (!dateStr) return null;
     try {
       const d = new Date(dateStr);
@@ -56177,7 +59061,7 @@ async function getUnplannedBreakdownJobs(vesselId, startDate, endDate, vesselIds
     if (!isUnplanned) return false;
     if (wo.status !== "Completed") return false;
     const completedDateStr = wo.dateCompleted ? wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted) : null;
-    const completedDate = parseDate5(completedDateStr);
+    const completedDate = parseDate6(completedDateStr);
     if (!completedDate) return false;
     return completedDate >= startDateObj && completedDate <= endDateObj;
   });
@@ -56250,7 +59134,7 @@ async function exportUnplannedBreakdownJobsExcel(vesselId, startDate, endDate, c
   const allVessels = await getVessels6();
   const vessel = allVessels.find((v) => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;
-  const parseDate5 = (dateStr2) => {
+  const parseDate6 = (dateStr2) => {
     if (!dateStr2) return null;
     try {
       const d = new Date(dateStr2);
@@ -56268,7 +59152,7 @@ async function exportUnplannedBreakdownJobsExcel(vesselId, startDate, endDate, c
     if (!isUnplanned) return false;
     if (wo.status !== "Completed") return false;
     const completedDateStr = wo.dateCompleted ? wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted) : null;
-    const completedDate = parseDate5(completedDateStr);
+    const completedDate = parseDate6(completedDateStr);
     if (!completedDate) return false;
     return completedDate >= startDateObj && completedDate <= endDateObj;
   });
@@ -56971,7 +59855,7 @@ function _ciParseDate(s) {
 async function getClassItemsMasterList(vesselId, componentSearch, departmentFilter, format3, vesselIds) {
   const { getDb: getDb7 } = await Promise.resolve().then(() => (init_db(), db_exports));
   const { componentClassRegulatory: componentClassRegulatory2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { inArray: inArray9 } = await import("drizzle-orm");
+  const { inArray: inArray11 } = await import("drizzle-orm");
   const allVessels = await getVessels6();
   const scopedVessels = vesselId === "all" && vesselIds?.length ? allVessels.filter((v) => vesselIds.includes(v.id)) : vesselId === "all" ? allVessels : allVessels.filter((v) => v.id === vesselId);
   const vesselNameMap = new Map(allVessels.map((v) => [v.id, v.name || v.id]));
@@ -56998,7 +59882,7 @@ async function getClassItemsMasterList(vesselId, componentSearch, departmentFilt
   let classRegRows = [];
   if (classComps.length > 0) {
     const db2 = await getDb7();
-    classRegRows = await db2.select().from(componentClassRegulatory2).where(inArray9(componentClassRegulatory2.componentId, classComps.map((c) => c.cuuid)));
+    classRegRows = await db2.select().from(componentClassRegulatory2).where(inArray11(componentClassRegulatory2.componentId, classComps.map((c) => c.cuuid)));
   }
   const regByComponent = /* @__PURE__ */ new Map();
   for (const cr of classRegRows) {
@@ -58386,10 +61270,10 @@ async function exportAllJobs(vesselId, dateFrom, dateTo, componentFilter, depart
   worksheet.getRow(6).height = 5;
   const statusCounts = filteredStatusCounts;
   void summary;
-  const statusSummary = Object.entries(statusCounts).map(([s, c]) => `${s}: ${c}`).join(" | ") || `Total: ${rows.length}`;
+  const statusSummary2 = Object.entries(statusCounts).map(([s, c]) => `${s}: ${c}`).join(" | ") || `Total: ${rows.length}`;
   worksheet.mergeCells(`A7:${lastColLetter}7`);
   const statusCell = worksheet.getCell("A7");
-  statusCell.value = `Total: ${rows.length}  |  ${statusSummary}`;
+  statusCell.value = `Total: ${rows.length}  |  ${statusSummary2}`;
   statusCell.font = { italic: true, size: 10 };
   statusCell.alignment = { horizontal: "left", vertical: "middle" };
   const headerRow = worksheet.getRow(headerRowNum);
@@ -74935,8 +77819,8 @@ async function reconcileApprovers(fetchedApprovers, now, stats) {
     }
     return null;
   };
-  const pool2 = await getPool();
-  const client = await pool2.connect();
+  const pool4 = await getPool();
+  const client = await pool4.connect();
   const technical = fetchedApprovers.filter(
     (a) => (a.modulename || a.moduleName || "") === "Technical"
   );
@@ -75865,7 +78749,7 @@ async function fetchAuditLog(f, take) {
   return { rows: rows.map(mapAuditLogRow), total };
 }
 async function fetchRunningHours(f, take) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const conds = ["(is_deleted IS DISTINCT FROM true)"];
   const vals = [];
   if (f.startDate) {
@@ -75888,8 +78772,8 @@ async function fetchRunningHours(f, take) {
     conds.push("1=0");
   }
   const where = `WHERE ${conds.join(" AND ")}`;
-  const countRes = await pool2.query(`SELECT count(*)::int n FROM running_hours_audit ${where}`, vals);
-  const rowsRes = await pool2.query(
+  const countRes = await pool4.query(`SELECT count(*)::int n FROM running_hours_audit ${where}`, vals);
+  const rowsRes = await pool4.query(
     `SELECT rhauuid, id, entered_at_utc, created_at, actor_label, user_id, previous_rh, new_rh, component_name, component_code, component_id, source, notes
      FROM running_hours_audit ${where} ORDER BY entered_at_utc DESC LIMIT ${take}`,
     vals
@@ -75897,7 +78781,7 @@ async function fetchRunningHours(f, take) {
   return { rows: rowsRes.rows.map(mapRhRow), total: Number(countRes.rows[0]?.n ?? 0) };
 }
 async function fetchPostponements(f, take) {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const conds = ["(p.is_deleted IS DISTINCT FROM true)", "p.disposed_at IS NULL"];
   const vals = [];
   if (f.startDate) {
@@ -75920,8 +78804,8 @@ async function fetchPostponements(f, take) {
     conds.push("1=0");
   }
   const where = `WHERE ${conds.join(" AND ")}`;
-  const countRes = await pool2.query(`SELECT count(*)::int n FROM work_order_postponements p LEFT JOIN work_orders w ON w.wouuid = p.work_order_id ${where}`, vals);
-  const rowsRes = await pool2.query(
+  const countRes = await pool4.query(`SELECT count(*)::int n FROM work_order_postponements p LEFT JOIN work_orders w ON w.wouuid = p.work_order_id ${where}`, vals);
+  const rowsRes = await pool4.query(
     `SELECT p.id, p.created_at, p.submitted_date, p.approved_date, p.status, p.approver, p.approved_by, p.authorized_by,
             p.created_by_uuid, p.original_due_date, p.new_due_date, p.postponement_reason, p.postponement_remarks,
             p.approval_remarks, p.work_order_id, w.work_order_no
@@ -76022,7 +78906,7 @@ async function buildAuditTrailWorkbook(rows, meta) {
 var VALID_LOG_TYPES = ["all", "work_orders", "components", "running_hours", "permissions", "postponements"];
 function parseFilters(src) {
   const logType = VALID_LOG_TYPES.includes(src.logType) ? src.logType : "all";
-  const parseDate5 = (v) => {
+  const parseDate6 = (v) => {
     if (!v) return void 0;
     const d = new Date(v);
     return isNaN(d.getTime()) ? void 0 : d;
@@ -76030,8 +78914,8 @@ function parseFilters(src) {
   const str = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
   return {
     logType,
-    startDate: parseDate5(src.startDate),
-    endDate: parseDate5(src.endDate),
+    startDate: parseDate6(src.startDate),
+    endDate: parseDate6(src.endDate),
     actor: str(src.actor),
     entityCode: str(src.entityCode),
     actionType: str(src.actionType)
@@ -76131,13 +79015,13 @@ function rowToSetting(r) {
   };
 }
 async function getAllSettings2() {
-  const pool2 = await getPool();
-  const r = await pool2.query("SELECT * FROM retention_settings ORDER BY id");
+  const pool4 = await getPool();
+  const r = await pool4.query("SELECT * FROM retention_settings ORDER BY id");
   return r.rows.map(rowToSetting);
 }
 async function getSetting2(category) {
-  const pool2 = await getPool();
-  const r = await pool2.query("SELECT * FROM retention_settings WHERE category = $1 LIMIT 1", [category]);
+  const pool4 = await getPool();
+  const r = await pool4.query("SELECT * FROM retention_settings WHERE category = $1 LIMIT 1", [category]);
   return r.rows[0] ? rowToSetting(r.rows[0]) : null;
 }
 function buildEligibleWhere(t, days, startIdx) {
@@ -76148,7 +79032,7 @@ function buildEligibleWhere(t, days, startIdx) {
   return { sql: conds.join(" AND "), params };
 }
 async function getEligibility() {
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   const settings = await getAllSettings2();
   const out = {};
   for (const s of settings) {
@@ -76162,14 +79046,14 @@ async function getEligibility() {
     for (const t of targets) {
       if (days !== null && s.enabled) {
         const w = buildEligibleWhere(t, days, 0);
-        const er = await pool2.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${w.sql}`, w.params);
+        const er = await pool4.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${w.sql}`, w.params);
         eligible += Number(er.rows[0]?.n ?? 0);
       }
       const dParams = [];
       let dWhere = "disposed_at IS NOT NULL";
       if (t.entityTypes) dWhere += ` AND entity_type = ANY($${dParams.push(t.entityTypes)})`;
       else if (t.entityTypesNotIn) dWhere += ` AND entity_type <> ALL($${dParams.push(t.entityTypesNotIn)})`;
-      const dr = await pool2.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${dWhere}`, dParams);
+      const dr = await pool4.query(`SELECT count(*)::int n FROM ${t.table} WHERE ${dWhere}`, dParams);
       disposed += Number(dr.rows[0]?.n ?? 0);
     }
     out[s.category] = { eligible, disposed };
@@ -76202,8 +79086,8 @@ async function updateSetting2(category, patch, actorUuid2) {
       );
     }
   }
-  const pool2 = await getPool();
-  await pool2.query(
+  const pool4 = await getPool();
+  await pool4.query(
     `UPDATE retention_settings SET retention_value=$1, retention_unit=$2, enabled=$3, updated_at=NOW(), updated_by_uuid=$4 WHERE category=$5`,
     [newValue, newUnit, newEnabled, actorUuid2, category]
   );
@@ -76226,11 +79110,11 @@ async function dispose(category, actorUuid2) {
   if (!targets) throw new RetentionError(`Category '${category}' has no disposition flow (forever / auto-prune).`);
   const days = periodToDays(setting.retentionValue, setting.retentionUnit);
   if (days === null) throw new RetentionError(`Category '${setting.label}' is retained forever and cannot be disposed.`);
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   let count2 = 0;
   for (const t of targets) {
     const w = buildEligibleWhere(t, days, 1);
-    const res = await pool2.query(
+    const res = await pool4.query(
       `UPDATE ${t.table} SET disposed_at = NOW(), disposed_by_uuid = $1 WHERE ${w.sql}`,
       [actorUuid2, ...w.params]
     );
@@ -76260,14 +79144,14 @@ async function revert(category, _actorUuid) {
   if (!setting) throw new RetentionError(`Unknown retention category: ${category}`, 404);
   const targets = CATEGORY_TARGETS[category];
   if (!targets) throw new RetentionError(`Category '${category}' has no disposition flow.`);
-  const pool2 = await getPool();
+  const pool4 = await getPool();
   let count2 = 0;
   for (const t of targets) {
     const params = [];
     let where = "disposed_at IS NOT NULL";
     if (t.entityTypes) where += ` AND entity_type = ANY($${params.push(t.entityTypes)})`;
     else if (t.entityTypesNotIn) where += ` AND entity_type <> ALL($${params.push(t.entityTypesNotIn)})`;
-    const res = await pool2.query(`UPDATE ${t.table} SET disposed_at = NULL, disposed_by_uuid = NULL WHERE ${where}`, params);
+    const res = await pool4.query(`UPDATE ${t.table} SET disposed_at = NULL, disposed_by_uuid = NULL WHERE ${where}`, params);
     count2 += res.rowCount ?? 0;
   }
   await safeAudit({
@@ -77100,42 +79984,29 @@ var routes_default23 = router23;
 init_middleware();
 import { Router as Router24 } from "express";
 
+// server/modules/shipskart/controllers/shipskartSsoController.ts
+init_identityGuard();
+
 // server/modules/shipskart/services/shipskartSsoService.ts
 init_errors();
-import crypto5 from "crypto";
-
-// server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
-init_db();
-init_schema();
-import { eq as eq28 } from "drizzle-orm";
-async function getAllMappings() {
-  const db2 = await getDb();
-  return db2.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
-}
-async function getMappingForSailRole(sailRole) {
-  const db2 = await getDb();
-  const rows = await db2.select().from(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole)).limit(1);
-  return rows[0];
-}
-async function upsertMapping2(sailRole, shipskartRole, updatedByUuid) {
-  const db2 = await getDb();
-  await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
-    target: shipskartRoleMappings.sailRole,
-    set: { shipskartRole, updatedByUuid: updatedByUuid ?? null, updatedAt: /* @__PURE__ */ new Date() }
-  });
-}
-async function deleteMapping(sailRole) {
-  const db2 = await getDb();
-  await db2.delete(shipskartRoleMappings).where(eq28(shipskartRoleMappings.sailRole, sailRole));
-}
-
-// server/modules/shipskart/services/shipskartSsoService.ts
-var REQUEST_TIMEOUT_MS = 15e3;
+init_shipskartRoleMappingRepository();
+init_identityGuard();
+import crypto7 from "crypto";
+var REQUEST_TIMEOUT_MS2 = 15e3;
+var LEGACY_SHARED_ACCOUNT_ENABLED = false;
 var ShipskartRoleNotMappedError = class extends Error {
   constructor(userRole) {
     super(`No Shipskart externalUserId mapping for role "${userRole || "(none)"}".`);
     this.userRole = userRole;
     this.name = "ShipskartRoleNotMappedError";
+  }
+};
+var ShipskartUserNotProvisionedError = class extends Error {
+  constructor(userUuid, reason) {
+    super(`Shipskart account not provisioned for user ${userUuid}: ${reason}`);
+    this.userUuid = userUuid;
+    this.reason = reason;
+    this.name = "ShipskartUserNotProvisionedError";
   }
 };
 var _cachedConfig = null;
@@ -77177,7 +80048,7 @@ function maskUrl2(url) {
   }
 }
 function computeHmacSignature(raw, hmacSecret) {
-  return crypto5.createHmac("sha256", hmacSecret).update(raw, "utf8").digest("hex");
+  return crypto7.createHmac("sha256", hmacSecret).update(raw, "utf8").digest("hex");
 }
 async function signedPost(path14, body) {
   const cfg = getShipskartConfig();
@@ -77195,7 +80066,7 @@ async function signedPost(path14, body) {
       },
       body: raw,
       // never the object — that would re-serialize and break the signature
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS2)
     });
   } catch (err) {
     const code = err?.cause?.code ? ` (${err.cause.code})` : "";
@@ -77223,12 +80094,74 @@ function accountForShipskartRole(shipskartRole) {
     purchaser: process.env.SHIPSKART_USER_PURCHASER || process.env.SHIPSKART_USER_ADMIN,
     manager: process.env.SHIPSKART_USER_MANAGER || process.env.SHIPSKART_USER_REGULAR
   };
-  return accounts[shipskartRole] ?? null;
+  const exact = accounts[shipskartRole];
+  if (exact) return exact;
+  const envKey = `SHIPSKART_USER_${shipskartRole.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
+  const explicit = process.env[envKey];
+  if (explicit) return explicit;
+  const upper = shipskartRole.toUpperCase();
+  const bucket = /CAPTAIN|MASTER/.test(upper) ? "captain" : /PURCHAS|PUCHAS|BUYER/.test(upper) ? "purchaser" : /MANAGER|SUPER/.test(upper) ? "manager" : null;
+  if (bucket && accounts[bucket]) {
+    console.warn(
+      `[Shipskart] Live role '${shipskartRole}' has no account env; using the '${bucket}' shared account as a TRANSITIONAL fallback for users not yet pushed to Shipskart. Set ${envKey} to be explicit.`
+    );
+    return accounts[bucket];
+  }
+  return null;
 }
-async function resolveExternalUserId(userRole) {
+async function resolveExternalUserId(userRole, userUuid) {
+  if (userUuid) {
+    const { getUserLink: getUserLink2 } = await Promise.resolve().then(() => (init_shipskartB2bRepository(), shipskartB2bRepository_exports));
+    let link;
+    let lookupError = null;
+    try {
+      link = await getUserLink2(userUuid);
+    } catch (err) {
+      lookupError = `link lookup failed: ${err?.message || err}`;
+      link = void 0;
+    }
+    let jitReason = null;
+    if (!lookupError && link?.pushStatus !== "pushed" && (process.env.SHIPSKART_B2B_JIT || "").toLowerCase() !== "false") {
+      try {
+        const { ensureUserPushed: ensureUserPushed2 } = await Promise.resolve().then(() => (init_shipskartReconcilerService(), shipskartReconcilerService_exports));
+        const jit = await ensureUserPushed2(userUuid, userRole || null);
+        jitReason = jit.reason;
+        if (jit.pushed) {
+          link = await getUserLink2(userUuid);
+        }
+      } catch (err) {
+        jitReason = `jit threw: ${err?.message || err}`;
+      }
+    }
+    if (link?.pushStatus === "pushed") return userUuid;
+    const mappingForUser = userRole ? await getMappingForSailRole(userRole) : void 0;
+    if (mappingForUser) {
+      const reason = lookupError ?? jitReason ?? (link ? `link status '${link.pushStatus}'${link.lastError ? `: ${link.lastError}` : ""}` : "no link row yet");
+      console.warn(
+        `[Shipskart] BLOCKING Purchasing for user ${userUuid} (role '${userRole}' is mapped to '${mappingForUser.shipskartRole}') \u2014 own Shipskart account not provisioned: ${reason}. No shared-account fallback by design; the reconciler will retry.`
+      );
+      if (!link || lookupError || (jitReason ?? "").startsWith("jit threw")) {
+        try {
+          const { upsertUserLink: upsertUserLink2 } = await Promise.resolve().then(() => (init_shipskartB2bRepository(), shipskartB2bRepository_exports));
+          await upsertUserLink2(userUuid, { pushStatus: "jit_failed", lastError: reason.slice(0, 400) });
+        } catch (writeErr) {
+          console.warn(`[Shipskart] could not record the block reason for ${userUuid}: ${writeErr?.message || writeErr}`);
+        }
+      }
+      throw new ShipskartUserNotProvisionedError(userUuid, reason);
+    }
+  } else if (!LEGACY_SHARED_ACCOUNT_ENABLED) {
+    console.warn(
+      `${IDENTITY_MISSING_TAG} sso: refusing to open Purchasing without a forwarded user identity (role='${userRole}'). The legacy shared-account fallback is RETIRED \u2014 wire the x-user-id header (SAILERP profile) on this deployment.`
+    );
+    throw new ShipskartUserNotProvisionedError("(no identity)", "identity_not_configured");
+  }
   if (!userRole) return null;
   const mapping = await getMappingForSailRole(userRole);
   if (!mapping) return null;
+  console.warn(
+    `[Shipskart] No forwarded user identity (x-user-id) \u2014 using the LEGACY shared '${mapping.shipskartRole}' account for role '${userRole}'. Per-user SSO requires the identity header.`
+  );
   const account = accountForShipskartRole(mapping.shipskartRole);
   if (!account) {
     console.warn(
@@ -77238,26 +80171,47 @@ async function resolveExternalUserId(userRole) {
   }
   return account;
 }
-async function initiateSso(userRole) {
-  const cfg = getShipskartConfig();
-  const externalUserId = await resolveExternalUserId(userRole);
+async function initiateSso(userRole, userUuid) {
+  const externalUserId = await resolveExternalUserId(userRole, userUuid);
   if (externalUserId === null) {
     throw new ShipskartRoleNotMappedError(userRole);
   }
+  if (userUuid && externalUserId === userUuid) {
+    const { signedB2bRequest: signedB2bRequest2 } = await Promise.resolve().then(() => (init_shipskartB2bClient(), shipskartB2bClient_exports));
+    const res = await signedB2bRequest2("POST", "/integration/SAIL/sso/initiate", { body: { externalUserId } });
+    if (!res.ok || !res.json?.iframeUrl) {
+      const errorCode = res.json?.errorCode || res.json?.error?.code || `HTTP_${res.status}`;
+      throw new AppError(res.status || 502, `[Shipskart] per-user SSO initiate failed (${errorCode})`, { errorCode });
+    }
+    console.log(`[Shipskart] SSO initiate OK \u2014 PER-USER (role=${userRole}, partner=${res.json.partnerName}, expiresIn=${res.json.expiresIn}s)`);
+    return res.json;
+  }
+  const cfg = getShipskartConfig();
   const body = {
     externalUserId,
     tenantId: cfg.tenantId
   };
   const result = await signedPost("/api/v1/sso/initiate", body);
   console.log(
-    `[Shipskart] SSO initiate OK (role=${userRole}, partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`
+    `[Shipskart] SSO initiate OK \u2014 legacy shared account (role=${userRole}, partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`
   );
   return result;
 }
-async function logoutSso(userRole) {
-  const externalUserId = await resolveExternalUserId(userRole);
+async function logoutSso(userRole, userUuid) {
+  let externalUserId;
+  try {
+    externalUserId = await resolveExternalUserId(userRole, userUuid);
+  } catch (err) {
+    return { success: true, message: `No Shipskart session to evict (${err?.name || "resolve failed"})` };
+  }
   if (externalUserId === null) {
     return { success: true, message: "No Shipskart mapping for role \u2014 logout skipped" };
+  }
+  if (userUuid && externalUserId === userUuid) {
+    const { signedB2bRequest: signedB2bRequest2 } = await Promise.resolve().then(() => (init_shipskartB2bClient(), shipskartB2bClient_exports));
+    const res = await signedB2bRequest2("POST", "/integration/SAIL/sso/logout", { body: { externalUserId } });
+    console.log(`[Shipskart] SSO logout (per-user) \u2192 ${res.status}`);
+    return { success: res.ok, message: res.ok ? void 0 : `remote status ${res.status}` };
   }
   const body = { externalUserId };
   const result = await signedPost("/api/v1/sso/logout", body);
@@ -77269,8 +80223,9 @@ async function logoutSso(userRole) {
 async function initiateHandler(req, res) {
   const bodyRole = typeof req.body?.role === "string" ? req.body.role.trim() : "";
   const userRole = bodyRole || req.user?.role || "";
+  const userUuid = forwardedUserUuid(req, "sso/initiate");
   try {
-    const result = await initiateSso(userRole);
+    const result = await initiateSso(userRole, userUuid);
     res.json({
       success: true,
       iframeUrl: result.iframeUrl,
@@ -77285,6 +80240,14 @@ async function initiateHandler(req, res) {
         message: "Purchasing is not available for your role."
       });
     }
+    if (err instanceof ShipskartUserNotProvisionedError) {
+      const identityMissing = err.reason === "identity_not_configured";
+      return res.status(409).json({
+        success: false,
+        errorCode: "USER_NOT_PROVISIONED",
+        message: identityMissing ? "Purchasing is unavailable: user identity is not configured for this deployment. Please contact your administrator." : "Purchasing is not available yet. Please contact your administrator."
+      });
+    }
     throw err;
   }
 }
@@ -77292,7 +80255,7 @@ async function logoutHandler(req, res) {
   const bodyRole = typeof req.body?.role === "string" ? req.body.role.trim() : "";
   const userRole = bodyRole || req.user?.role || "";
   try {
-    const result = await logoutSso(userRole);
+    const result = await logoutSso(userRole, forwardedUserUuid(req, "sso/logout"));
     res.json({ success: true, message: result?.message });
   } catch (err) {
     console.error("[Shipskart] logout failed (non-blocking):", err?.message || err);
@@ -77300,22 +80263,28 @@ async function logoutHandler(req, res) {
   }
 }
 
-// server/modules/shipskart/services/shipskartRoleSource.ts
-async function getAvailableShipskartRoles() {
-  return ["captain", "purchaser", "manager"];
-}
-
 // server/modules/shipskart/controllers/shipskartRoleMappingController.ts
+init_shipskartRoleMappingRepository();
+init_shipskartRoleSource();
 var EDITOR_ROLES2 = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
 async function getRoleMappingsHandler(req, res) {
   const [availableRoles, rows] = await Promise.all([
     getAvailableShipskartRoles(),
     getAllMappings()
   ]);
-  res.json({
-    availableRoles,
-    mappings: rows.map((r) => ({ sailRole: r.sailRole, shipskartRole: r.shipskartRole }))
-  });
+  const live = new Set(availableRoles);
+  const mappings = rows.map((r) => ({
+    sailRole: r.sailRole,
+    shipskartRole: r.shipskartRole,
+    stale: !live.has(r.shipskartRole)
+  }));
+  const staleCount = mappings.filter((m) => m.stale).length;
+  if (staleCount > 0) {
+    console.warn(
+      `[Shipskart] ${staleCount} role mapping(s) point at a Shipskart role this tenant does not have (${mappings.filter((m) => m.stale).map((m) => `${m.sailRole}\u2192${m.shipskartRole}`).join(", ")}) \u2014 users on those SAIL roles are BLOCKED from Purchasing until they are remapped.`
+    );
+  }
+  res.json({ availableRoles, mappings, staleCount });
 }
 async function putRoleMappingsHandler(req, res) {
   const userRole = req.user?.role || "";
@@ -77353,12 +80322,199 @@ async function putRoleMappingsHandler(req, res) {
   });
 }
 
+// server/modules/shipskart/controllers/shipskartB2bController.ts
+init_shipskartTokenService();
+init_shipskartReconcilerService();
+init_shipskartB2bRepository();
+
+// server/modules/shipskart/services/vesselAssignmentService.ts
+init_db();
+init_schema();
+init_shipskartB2bRepository();
+import { inArray as inArray9 } from "drizzle-orm";
+function extractVesselIds(payload) {
+  let raw = payload;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const obj = raw;
+    raw = obj.myVessels ?? obj.my_vessels ?? obj.assignments ?? obj.vesselIds ?? [];
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[")) {
+      try {
+        raw = JSON.parse(trimmed);
+      } catch {
+        raw = trimmed.split(/[,;]/);
+      }
+    } else {
+      raw = trimmed.split(/[,;]/);
+    }
+  }
+  if (!Array.isArray(raw)) return [];
+  const ids = raw.map((entry) => {
+    if (typeof entry === "string") return entry.trim();
+    if (entry && typeof entry === "object") {
+      const e = entry;
+      const v = e.vesselId ?? e.vessel_id ?? e.vuuid ?? e.id;
+      return typeof v === "string" ? v.trim() : "";
+    }
+    return "";
+  }).filter(Boolean);
+  return Array.from(new Set(ids));
+}
+async function captureAssignments(userUuid, payload, opts = {}) {
+  const incoming = extractVesselIds(payload);
+  const db2 = await getDb();
+  if (incoming.length === 0 && !opts.allowEmpty) {
+    console.warn(
+      `[VesselAssignments] user ${userUuid}: empty assignment set received \u2014 treating as a NO-OP (an unreadable userProfile must not revoke access). Pass allowEmpty to revoke deliberately.`
+    );
+    return { activated: 0, deactivated: 0, unknownVesselIds: [], received: 0 };
+  }
+  const known = incoming.length ? (await db2.select({ v: vessels.vuuid }).from(vessels).where(inArray9(vessels.vuuid, incoming))).map((r) => r.v) : [];
+  const knownSet = new Set(known);
+  const unknownVesselIds = incoming.filter((id) => !knownSet.has(id));
+  if (incoming.length > 0 && known.length === 0) {
+    console.warn(
+      `[VesselAssignments] user ${userUuid}: ${incoming.length} vessel id(s) sent, NONE matched vessels.vuuid \u2014 refusing to deactivate existing assignments (possible id-format change). Unknown: ${unknownVesselIds.slice(0, 5).join(", ")}`
+    );
+    return { activated: 0, deactivated: 0, unknownVesselIds, received: incoming.length };
+  }
+  const { activated, deactivated } = await replaceAssignmentsForUser(userUuid, known);
+  if (unknownVesselIds.length) {
+    console.warn(`[VesselAssignments] user ${userUuid}: ignored ${unknownVesselIds.length} unknown vessel id(s): ${unknownVesselIds.slice(0, 5).join(", ")}`);
+  }
+  console.log(`[VesselAssignments] user ${userUuid}: ${activated} active, ${deactivated} revoked, ${unknownVesselIds.length} unknown`);
+  return { activated, deactivated, unknownVesselIds, received: incoming.length };
+}
+
+// server/modules/shipskart/controllers/shipskartB2bController.ts
+init_identityGuard();
+async function bootstrapHandler(req, res) {
+  const otp = typeof req.body?.otp === "string" ? req.body.otp : void 0;
+  const result = await bootstrap(otp);
+  res.json({ success: true, ...result });
+}
+async function statusHandler2(_req, res) {
+  const [token, links, failing] = await Promise.all([
+    tokenStatus(),
+    linkStatusCounts(),
+    failingRows(100)
+  ]);
+  res.json({ token, links, failing });
+}
+async function retryHandler(req, res) {
+  const kind = req.body?.kind;
+  const id = typeof req.body?.id === "string" ? req.body.id.trim() : "";
+  if (kind !== "user" && kind !== "vessel" || !id) {
+    return res.status(400).json({ success: false, message: "body must be { kind: 'user'|'vessel', id: string }" });
+  }
+  const result = await resetForRetry(kind, id);
+  res.status(result.reset ? 200 : 409).json({ success: result.reset, ...result });
+}
+async function getReconcilerConfigHandler(_req, res) {
+  const { getB2bConfig: getB2bConfig2 } = await Promise.resolve().then(() => (init_shipskartB2bClient(), shipskartB2bClient_exports));
+  const cfg = getB2bConfig2();
+  const row = await getTenantConfig(cfg.tenantId);
+  res.json({ tenantId: cfg.tenantId, reconcilerEnabled: row?.reconcilerEnabled ?? false });
+}
+async function putReconcilerConfigHandler(req, res) {
+  if (typeof req.body?.enabled !== "boolean") {
+    return res.status(400).json({ success: false, message: "body must be { enabled: boolean }" });
+  }
+  const { getB2bConfig: getB2bConfig2 } = await Promise.resolve().then(() => (init_shipskartB2bClient(), shipskartB2bClient_exports));
+  const cfg = getB2bConfig2();
+  await setReconcilerEnabled(cfg.tenantId, req.body.enabled);
+  console.log(`[Shipskart b2b] reconciler_enabled set to ${req.body.enabled} for tenant ${cfg.tenantId} (by user ${forwardedUserUuid(req, "reconciler-config") ?? "unknown"})`);
+  res.json({ success: true, tenantId: cfg.tenantId, reconcilerEnabled: req.body.enabled });
+}
+async function reconcileHandler(req, res) {
+  const limit = Number.isInteger(req.body?.limit) ? req.body.limit : void 0;
+  const summary = await runReconciliation({ limit });
+  res.status(summary.ran ? 200 : 409).json(summary);
+}
+async function vesselAssignmentsHandler(req, res) {
+  const userUuid = forwardedUserUuid(req, "vessel-assignments");
+  if (!userUuid) {
+    return res.status(401).json({ success: false, errorCode: "NO_FORWARDED_IDENTITY", message: "No forwarded user identity (x-user-id) \u2014 cannot record vessel assignments." });
+  }
+  const allowEmpty = req.body?.allowEmpty === true;
+  const result = await captureAssignments(userUuid, req.body, { allowEmpty });
+  res.json({ success: true, ...result });
+}
+async function cataloguePushHandler(req, res) {
+  const vesselId = req.body?.vesselId;
+  if (!vesselId || typeof vesselId !== "string") {
+    return res.status(400).json({ error: "vesselId is required" });
+  }
+  const svc = await Promise.resolve().then(() => (init_shipskartCataloguePushService(), shipskartCataloguePushService_exports));
+  const opts = {
+    dryRun: req.body?.dryRun === true,
+    includeStores: req.body?.includeStores !== false,
+    limitSkus: Number.isInteger(req.body?.limitSkus) ? req.body.limitSkus : void 0
+  };
+  if (opts.dryRun) {
+    return res.json(await svc.pushVesselCatalogue(vesselId, opts));
+  }
+  svc.pushVesselCatalogue(vesselId, opts).then((r) => console.log(`[CataloguePush] background run finished for ${vesselId}: errors=${r.errors.length} warnings=${r.warnings.length}`)).catch((err) => console.error(`[CataloguePush] background run crashed for ${vesselId}:`, err?.message || err));
+  res.status(202).json({ started: true, vesselId, note: "running in background \u2014 follow GET /shipskart/catalogue/status" });
+}
+async function catalogueStatusHandler(_req, res) {
+  const links = await Promise.resolve().then(() => (init_shipskartCatalogueLinkRepository(), shipskartCatalogueLinkRepository_exports));
+  res.json({
+    summary: await links.statusSummary(),
+    recentFailures: await links.recentFailures(20)
+  });
+}
+async function catalogueVesselStatusHandler(req, res) {
+  const vesselId = req.params.vesselId;
+  const links = await Promise.resolve().then(() => (init_shipskartCatalogueLinkRepository(), shipskartCatalogueLinkRepository_exports));
+  const svc = await Promise.resolve().then(() => (init_shipskartCataloguePushService(), shipskartCataloguePushService_exports));
+  const st = await links.vesselStatus(vesselId);
+  const get = (e, s) => st.counts.find((c) => c.entityType === e && c.pushStatus === s)?.n ?? 0;
+  const skuTotal = st.totals.spares + st.totals.stores;
+  res.json({
+    vesselId,
+    running: svc.isCataloguePushRunning(vesselId),
+    totals: { skus: skuTotal, products: st.totals.components, spares: st.totals.spares, stores: st.totals.stores },
+    progress: {
+      categories: { pushed: get("category", "pushed"), failed: get("category", "failed") },
+      products: { pushed: get("product", "pushed"), failed: get("product", "failed") },
+      skus: {
+        pushed: get("sku", "pushed"),
+        failed: get("sku", "failed"),
+        remaining: Math.max(0, skuTotal - get("sku", "pushed"))
+      },
+      catalogue: {
+        pushed: get("catalogue", "pushed"),
+        failed: get("catalogue", "failed"),
+        remaining: Math.max(0, skuTotal - get("catalogue", "pushed"))
+      }
+    },
+    failures: st.failures,
+    // Run-level outcome (vessel-not-linked / listing abort / crash) — these never reach
+    // the per-item ledger, so without this the card shows 0% with no reason.
+    lastRun: svc.getLastRunInfo(vesselId)
+  });
+}
+
 // server/modules/shipskart/routes.ts
 var router24 = Router24();
 router24.post("/shipskart/sso/initiate", asyncHandler(initiateHandler));
 router24.post("/shipskart/sso/logout", asyncHandler(logoutHandler));
 router24.get("/shipskart/role-mappings", asyncHandler(getRoleMappingsHandler));
 router24.put("/shipskart/role-mappings", asyncHandler(putRoleMappingsHandler));
+router24.post("/shipskart/b2b/bootstrap", asyncHandler(bootstrapHandler));
+router24.get("/shipskart/b2b/status", asyncHandler(statusHandler2));
+router24.post("/shipskart/b2b/reconcile", asyncHandler(reconcileHandler));
+router24.get("/shipskart/b2b/reconciler-config", asyncHandler(getReconcilerConfigHandler));
+router24.put("/shipskart/b2b/reconciler-config", asyncHandler(putReconcilerConfigHandler));
+router24.post("/shipskart/b2b/retry", asyncHandler(retryHandler));
+router24.post("/shipskart/vessel-assignments", asyncHandler(vesselAssignmentsHandler));
+router24.post("/shipskart/catalogue/push", asyncHandler(cataloguePushHandler));
+router24.get("/shipskart/catalogue/status", asyncHandler(catalogueStatusHandler));
+router24.get("/shipskart/catalogue/status/:vesselId", asyncHandler(catalogueVesselStatusHandler));
 var routes_default24 = router24;
 
 // server/modules/noon-report/routes.ts
@@ -77373,21 +80529,21 @@ init_middleware();
 // server/modules/noon-report/repositories/noonReportRepository.ts
 init_db();
 init_schema();
-import { eq as eq29, and as and25, desc as desc6 } from "drizzle-orm";
+import { eq as eq31, and as and27, desc as desc6 } from "drizzle-orm";
 async function getNoonReports(filters) {
   const db2 = await getDb();
   let query = db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate));
   const conditions = [];
-  if (filters.vesselId) conditions.push(eq29(nrNoonReports.vesselId, filters.vesselId));
-  if (filters.status) conditions.push(eq29(nrNoonReports.status, filters.status));
+  if (filters.vesselId) conditions.push(eq31(nrNoonReports.vesselId, filters.vesselId));
+  if (filters.status) conditions.push(eq31(nrNoonReports.status, filters.status));
   if (conditions.length > 0) {
-    return db2.select().from(nrNoonReports).where(and25(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
+    return db2.select().from(nrNoonReports).where(and27(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
   }
   return db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
 }
 async function getNoonReportById(id) {
   const db2 = await getDb();
-  const result = await db2.select().from(nrNoonReports).where(eq29(nrNoonReports.id, id)).limit(1);
+  const result = await db2.select().from(nrNoonReports).where(eq31(nrNoonReports.id, id)).limit(1);
   return result[0] || null;
 }
 async function createNoonReport(data) {
@@ -77400,7 +80556,7 @@ async function createNoonReport(data) {
 }
 async function updateNoonReport(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function submitNoonReport(id, submittedBy) {
@@ -77410,27 +80566,27 @@ async function submitNoonReport(id, submittedBy) {
     submittedAt: /* @__PURE__ */ new Date(),
     submittedBy,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq29(nrNoonReports.id, id)).returning();
+  }).where(eq31(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function deleteNoonReport(id) {
   const db2 = await getDb();
-  await db2.delete(nrNoonReports).where(and25(eq29(nrNoonReports.id, id), eq29(nrNoonReports.status, "draft")));
+  await db2.delete(nrNoonReports).where(and27(eq31(nrNoonReports.id, id), eq31(nrNoonReports.status, "draft")));
 }
 async function saveDraft(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq29(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq31(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function getFuelRobByVessel(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrFuelRob).where(eq29(nrFuelRob.vesselId, vesselId));
+  return db2.select().from(nrFuelRob).where(eq31(nrFuelRob.vesselId, vesselId));
 }
 async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
   const db2 = await getDb();
-  const existing = await db2.select().from(nrFuelRob).where(and25(eq29(nrFuelRob.vesselId, vesselId), eq29(nrFuelRob.fuelType, fuelType))).limit(1);
+  const existing = await db2.select().from(nrFuelRob).where(and27(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and25(eq29(nrFuelRob.vesselId, vesselId), eq29(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and27(eq31(nrFuelRob.vesselId, vesselId), eq31(nrFuelRob.fuelType, fuelType)));
   } else {
     await db2.insert(nrFuelRob).values({
       vesselId,
@@ -77442,23 +80598,23 @@ async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
 }
 async function getLastNReports(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and25(eq29(nrNoonReports.vesselId, vesselId), eq29(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and27(eq31(nrNoonReports.vesselId, vesselId), eq31(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
 }
 
 // server/modules/noon-report/services/noonReportService.ts
 init_db();
 init_schema();
-import { eq as eq33, and as and28, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
+import { eq as eq35, and as and30, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
 
 // server/modules/noon-report/services/calculationEngine.ts
 init_db();
 init_schema();
-import { eq as eq32, and as and27, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
+import { eq as eq34, and as and29, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
 
 // server/modules/noon-report/utils/existingDataAdapter.ts
 init_db();
 init_schema();
-import { eq as eq30, sql as sql22 } from "drizzle-orm";
+import { eq as eq32, sql as sql22 } from "drizzle-orm";
 async function getVesselById(vesselId) {
   const db2 = await getDb();
   const result = await db2.execute(
@@ -77488,7 +80644,7 @@ async function getVesselDwt(vesselId) {
 init_fuelConversionFactors();
 async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrFuelRob).where(and27(eq32(nrFuelRob.vesselId, vesselId), eq32(nrFuelRob.fuelType, fuelType))).limit(1);
+  const rows = await db2.select().from(nrFuelRob).where(and29(eq34(nrFuelRob.vesselId, vesselId), eq34(nrFuelRob.fuelType, fuelType))).limit(1);
   if (rows.length === 0) {
     const newRob = Math.max(0, deltaMt);
     await db2.insert(nrFuelRob).values({
@@ -77500,7 +80656,7 @@ async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   } else {
     const current = Number(rows[0].currentRob) || 0;
     const updated = Math.max(0, current + deltaMt);
-    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and27(eq32(nrFuelRob.vesselId, vesselId), eq32(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and29(eq34(nrFuelRob.vesselId, vesselId), eq34(nrFuelRob.fuelType, fuelType)));
   }
 }
 var PHASE1_STEPS = ["rollingAverages", "ciiTracking", "eeoi"];
@@ -77545,7 +80701,7 @@ async function computeRollingAveragesAndEndurance(report) {
     const cons3 = last3.map((r) => getReportConsumption(r, fuelType)).filter((v) => v !== null);
     const avg7Day = cons7.length > 0 ? cons7.reduce((a, b) => a + b, 0) / cons7.length : null;
     const avg3Day = cons3.length > 0 ? cons3.reduce((a, b) => a + b, 0) / cons3.length : null;
-    const robRows = await db2.select().from(nrFuelRob).where(and27(eq32(nrFuelRob.vesselId, report.vesselId), eq32(nrFuelRob.fuelType, fuelType))).limit(1);
+    const robRows = await db2.select().from(nrFuelRob).where(and29(eq34(nrFuelRob.vesselId, report.vesselId), eq34(nrFuelRob.fuelType, fuelType))).limit(1);
     const robRow = robRows[0] ?? null;
     const currentRob = robRow !== null ? Math.max(0, toNum2(robRow.currentRob) ?? 0) : null;
     let enduranceDays = null;
@@ -77561,7 +80717,7 @@ async function computeRollingAveragesAndEndurance(report) {
         avg7Day: avg7Day !== null ? String(avg7Day) : null,
         enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
         enduranceNm: enduranceNM !== null ? String(enduranceNM) : null
-      }).where(and27(eq32(nrFuelRob.vesselId, report.vesselId), eq32(nrFuelRob.fuelType, fuelType)));
+      }).where(and29(eq34(nrFuelRob.vesselId, report.vesselId), eq34(nrFuelRob.fuelType, fuelType)));
     } else if (avg7Day !== null) {
       await db2.insert(nrFuelRob).values({
         vesselId: report.vesselId,
@@ -77582,9 +80738,9 @@ async function computeCiiTracking(report) {
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
   const yearReports = await db2.select().from(nrNoonReports).where(
-    and27(
-      eq32(nrNoonReports.vesselId, report.vesselId),
-      eq32(nrNoonReports.status, "submitted"),
+    and29(
+      eq34(nrNoonReports.vesselId, report.vesselId),
+      eq34(nrNoonReports.status, "submitted"),
       gte5(nrNoonReports.reportDate, yearStart),
       lte3(nrNoonReports.reportDate, yearEnd)
     )
@@ -77611,7 +80767,7 @@ async function computeCiiTracking(report) {
     const refLine = computeCiiRefLine(dwt);
     ciiRating = assignCiiRating(aer, refLine);
   }
-  const existing = await db2.select().from(nrCiiTracking).where(and27(eq32(nrCiiTracking.vesselId, report.vesselId), eq32(nrCiiTracking.year, year))).limit(1);
+  const existing = await db2.select().from(nrCiiTracking).where(and29(eq34(nrCiiTracking.vesselId, report.vesselId), eq34(nrCiiTracking.year, year))).limit(1);
   const previousCiiRating = existing[0]?.ciiRating ?? null;
   if (existing.length > 0) {
     await db2.update(nrCiiTracking).set({
@@ -77622,7 +80778,7 @@ async function computeCiiTracking(report) {
       previousCiiRating,
       // store old rating before overwriting
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(and27(eq32(nrCiiTracking.vesselId, report.vesselId), eq32(nrCiiTracking.year, year)));
+    }).where(and29(eq34(nrCiiTracking.vesselId, report.vesselId), eq34(nrCiiTracking.year, year)));
   } else {
     await db2.insert(nrCiiTracking).values({
       vesselId: report.vesselId,
@@ -77653,9 +80809,9 @@ async function computeEeoi(report) {
     }
   }
   const eeoi = totalCo2Mt / (cargoMt * distanceSailed);
-  const existing = await db2.select().from(nrVoyageLegs).where(and27(eq32(nrVoyageLegs.vesselId, report.vesselId), eq32(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
+  const existing = await db2.select().from(nrVoyageLegs).where(and29(eq34(nrVoyageLegs.vesselId, report.vesselId), eq34(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq32(nrVoyageLegs.id, existing[0].id));
+    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrVoyageLegs.id, existing[0].id));
   } else {
     await db2.insert(nrVoyageLegs).values({
       vesselId: report.vesselId,
@@ -77682,7 +80838,7 @@ function getReportConsumption(report, fuelType) {
 }
 async function getLastNSubmitted(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and27(eq32(nrNoonReports.vesselId, vesselId), eq32(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and29(eq34(nrNoonReports.vesselId, vesselId), eq34(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
 }
 function toNum2(val) {
   if (val === null || val === void 0 || val === "") return null;
@@ -77755,7 +80911,7 @@ async function updateFuelRobFromReport(report) {
 }
 async function getFuelDashboard(vesselId) {
   const db2 = await getDb();
-  const robRecords = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
+  const robRecords = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, vesselId));
   const robByFuelType = {};
   const enduranceDaysByFuel = {};
   const avg7DayByFuel = {};
@@ -77786,11 +80942,11 @@ async function getFuelDashboard(vesselId) {
     recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
   }
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and28(eq33(nrCiiTracking.vesselId, vesselId), eq33(nrCiiTracking.year, currentYear))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and30(eq35(nrCiiTracking.vesselId, vesselId), eq35(nrCiiTracking.year, currentYear))).limit(1);
   const ciiTracking = ciiRows[0] ?? null;
   const dwt = await getVesselDwt(vesselId);
   const ciiRefLine = dwt !== null ? computeCiiRefLine(dwt) : null;
-  const last30Raw = await db2.select().from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
+  const last30Raw = await db2.select().from(nrNoonReports).where(and30(eq35(nrNoonReports.vesselId, vesselId), eq35(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
   const last30 = [...last30Raw].reverse().map((r) => {
     const hfo = toNum3(r.hfoConsumption) ?? 0;
     const lsmgo = toNum3(r.lsmgoConsumption) ?? 0;
@@ -77820,7 +80976,7 @@ async function getFuelDashboard(vesselId) {
     vlsfoConsumption: nrNoonReports.vlsfoConsumption,
     lpgConsumption: nrNoonReports.lpgConsumption,
     reportDate: nrNoonReports.reportDate
-  }).from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
+  }).from(nrNoonReports).where(and30(eq35(nrNoonReports.vesselId, vesselId), eq35(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
   const speedConsumptionData = allReports.flatMap((r) => {
     const speed = toNum3(r.speed);
     if (speed === null) return [];
@@ -77854,7 +81010,7 @@ async function getVesselKPIs(vesselId) {
 }
 async function getActiveAlerts(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
+  return db2.select().from(nrAlerts).where(and30(eq35(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
 }
 async function getAllAlerts(vesselId, page, limit) {
   const db2 = await getDb();
@@ -77862,8 +81018,8 @@ async function getAllAlerts(vesselId, page, limit) {
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * safeLimit;
   const [data, totalRows] = await Promise.all([
-    db2.select().from(nrAlerts).where(eq33(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
-    db2.select({ total: count() }).from(nrAlerts).where(eq33(nrAlerts.vesselId, vesselId))
+    db2.select().from(nrAlerts).where(eq35(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
+    db2.select({ total: count() }).from(nrAlerts).where(eq35(nrAlerts.vesselId, vesselId))
   ]);
   const total = totalRows[0]?.total ?? 0;
   return {
@@ -77876,28 +81032,28 @@ async function getAllAlerts(vesselId, page, limit) {
 }
 async function getActiveAlertCount(vesselId) {
   const db2 = await getDb();
-  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and30(eq35(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
   return rows[0]?.total ?? 0;
 }
 async function acknowledgeAlert(alertId, acknowledgedBy) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq33(nrAlerts.id, alertId)).limit(1);
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq35(nrAlerts.id, alertId)).limit(1);
   if (existing.length === 0) return null;
-  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq33(nrAlerts.id, alertId)).returning();
+  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq35(nrAlerts.id, alertId)).returning();
   return updated[0] ?? null;
 }
 async function getFleetSummary(vesselIds) {
   const db2 = await getDb();
   const results = [];
   for (const vesselId of vesselIds) {
-    const latestReports = await db2.select().from(nrNoonReports).where(and28(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
+    const latestReports = await db2.select().from(nrNoonReports).where(and30(eq35(nrNoonReports.vesselId, vesselId), eq35(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
     const latest = latestReports[0] ?? null;
-    const allReports = await db2.select().from(nrNoonReports).where(eq33(nrNoonReports.vesselId, vesselId));
+    const allReports = await db2.select().from(nrNoonReports).where(eq35(nrNoonReports.vesselId, vesselId));
     const totalReports = allReports.length;
     const submittedReports = allReports.filter((r) => r.status === "submitted").length;
-    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and28(eq33(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and30(eq35(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
     const activeAlerts = alertRows[0]?.total ?? 0;
-    const robRows = await db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
+    const robRows = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, vesselId));
     const totalHfoRob = toNum3(robRows.find((r) => r.fuelType === "HFO")?.currentRob) ?? 0;
     const totalAllRob = robRows.reduce((acc, r) => acc + (toNum3(r.currentRob) ?? 0), 0);
     const avg7Day = robRows.reduce((acc, r) => acc + (toNum3(r.avg7Day) ?? 0), 0) || null;
@@ -77936,16 +81092,16 @@ function round4(n) {
 // server/modules/noon-report/repositories/bunkerRepository.ts
 init_db();
 init_schema();
-import { eq as eq34, and as and29, desc as desc10, sum } from "drizzle-orm";
+import { eq as eq36, and as and31, desc as desc10, sum } from "drizzle-orm";
 async function getBunkerRecords(filters) {
   const db2 = await getDb();
-  const conditions = [eq34(nrBunkerRecords.vesselId, filters.vesselId)];
-  if (filters.voyageNo) conditions.push(eq34(nrBunkerRecords.voyageNo, filters.voyageNo));
-  return db2.select().from(nrBunkerRecords).where(and29(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
+  const conditions = [eq36(nrBunkerRecords.vesselId, filters.vesselId)];
+  if (filters.voyageNo) conditions.push(eq36(nrBunkerRecords.voyageNo, filters.voyageNo));
+  return db2.select().from(nrBunkerRecords).where(and31(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
 }
 async function getBunkerRecordById(id) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrBunkerRecords).where(eq34(nrBunkerRecords.id, id)).limit(1);
+  const rows = await db2.select().from(nrBunkerRecords).where(eq36(nrBunkerRecords.id, id)).limit(1);
   return rows[0] ?? null;
 }
 async function createBunkerRecord(data) {
@@ -77955,22 +81111,22 @@ async function createBunkerRecord(data) {
 }
 async function updateBunkerRecord(id, data) {
   const db2 = await getDb();
-  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrBunkerRecords.id, id)).returning();
+  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq36(nrBunkerRecords.id, id)).returning();
   return rows[0] ?? null;
 }
 async function deleteBunkerRecord(id) {
   const db2 = await getDb();
-  await db2.delete(nrBunkerRecords).where(eq34(nrBunkerRecords.id, id));
+  await db2.delete(nrBunkerRecords).where(eq36(nrBunkerRecords.id, id));
 }
 async function getBunkerCostSummary(vesselId, voyageNo) {
   const db2 = await getDb();
-  const conditions = [eq34(nrBunkerRecords.vesselId, vesselId)];
-  if (voyageNo) conditions.push(eq34(nrBunkerRecords.voyageNo, voyageNo));
+  const conditions = [eq36(nrBunkerRecords.vesselId, vesselId)];
+  if (voyageNo) conditions.push(eq36(nrBunkerRecords.voyageNo, voyageNo));
   const rows = await db2.select({
     fuelType: nrBunkerRecords.fuelType,
     totalQuantityMt: sum(nrBunkerRecords.quantityMt),
     totalCost: sum(nrBunkerRecords.totalCost)
-  }).from(nrBunkerRecords).where(and29(...conditions)).groupBy(nrBunkerRecords.fuelType);
+  }).from(nrBunkerRecords).where(and31(...conditions)).groupBy(nrBunkerRecords.fuelType);
   return rows.map((r) => ({
     fuelType: r.fuelType,
     totalQuantityMt: r.totalQuantityMt ?? "0",
@@ -79085,11 +82241,13 @@ async function registerRoutes(app2) {
   }
   const JOB_DUE_SCAN_INTERVAL_MS = parseInt(process.env.JOB_DUE_SCAN_INTERVAL_MS || "", 10) || 24 * 60 * 60 * 1e3;
   const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
+  const { shoreWoDailyScheduler: shoreWoDailyScheduler2 } = await Promise.resolve().then(() => (init_shoreWoDailyScheduler(), shoreWoDailyScheduler_exports));
   if (isShip) {
     jobDueScanner2.start(JOB_DUE_SCAN_INTERVAL_MS);
     console.log(`[JobDueScanner] Ship instance \u2014 scheduler started (interval: ${JOB_DUE_SCAN_INTERVAL_MS / 36e5}h)`);
   } else {
-    console.log('[JobDueScanner] Shore instance \u2014 auto scan NOT started (office uses on-demand "Generate Now")');
+    shoreWoDailyScheduler2.start();
+    console.log("[JobDueScanner] Shore instance \u2014 ship scanner off; shore daily WO sweep started (generation + reconciler)");
   }
   const { maintenanceOrchestrator: maintenanceOrchestrator2 } = await Promise.resolve().then(() => (init_maintenanceOrchestrator(), maintenanceOrchestrator_exports));
   maintenanceOrchestrator2.start();
@@ -79101,6 +82259,8 @@ async function registerRoutes(app2) {
   } else {
     console.log("[AutoSync] Shore instance detected \u2014 auto-sync scheduler not started (sync is ship-initiated)");
   }
+  const { shipskartReconcilerScheduler: shipskartReconcilerScheduler2 } = await Promise.resolve().then(() => (init_shipskartReconcilerScheduler(), shipskartReconcilerScheduler_exports));
+  await shipskartReconcilerScheduler2.start();
   const { schedulerRoleWatchdog: schedulerRoleWatchdog2 } = await Promise.resolve().then(() => (init_schedulerRoleWatchdog(), schedulerRoleWatchdog_exports));
   schedulerRoleWatchdog2.start({
     jobDueScanIntervalMs: JOB_DUE_SCAN_INTERVAL_MS,
@@ -79420,8 +82580,10 @@ async function registerRoutes(app2) {
     console.log("Cleaning up scheduled tasks...");
     schedulerRoleWatchdog2.stop();
     jobDueScanner2.stop();
+    shoreWoDailyScheduler2.stop();
     maintenanceOrchestrator2.stop();
     syncAutoScheduler2.stop();
+    shipskartReconcilerScheduler2.stop();
   };
   process.on("SIGTERM", stopAllSchedulers);
   process.on("SIGINT", stopAllSchedulers);
