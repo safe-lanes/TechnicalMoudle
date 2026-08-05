@@ -48,7 +48,7 @@ const DEFAULT_BATCH_LIMIT = 25;
 const B2B_PACE_MS = Math.max(0, Number(process.env.SHIPSKART_B2B_PACE_MS ?? 5000));
 const paceB2b = () => new Promise((r) => setTimeout(r, B2B_PACE_MS));
 /** Statuses that mean a Shipskart API call was actually made (→ pace after them). */
-const API_HIT_STATUSES = new Set(['pushed', 'mapped', 'blocked_duplicate', 'error', 'role_updated', 'role_update_failed', 'unmapped', 'mapping_update_failed']);
+const API_HIT_STATUSES = new Set(['pushed', 'mapped', 'blocked_duplicate', 'error', 'role_updated', 'role_update_failed', 'unmapped', 'mapping_delete_failed']);
 
 /**
  * CALLSIGN SEAM: Shipskart requires callSign and real call signs are not available yet —
@@ -231,11 +231,14 @@ export async function mapUserToVessel(userUuid: string, vesselVuuid: string, ctx
     return { status: 'already_mapped', shipskartId: assignment.shipskartMappingId };
   }
   // RE-ACTIVATION: a mapping that already has a Shipskart id (user was removed from the
-  // vessel and came back) must be UPDATED to active, not POSTed again — a second POST
-  // would create a duplicate mapping row on their side.
+  // vessel and came back) follows Sachin's delete-then-recreate flow — the old mapping is
+  // deleted first, then the normal POST below creates a fresh one. A failed delete is
+  // recorded and returned so the sweep retries; we never POST on top of a live mapping.
   if (assignment?.shipskartMappingId) {
-    return updateVesselUserMapping(
-      { userUuid, vesselId: vesselVuuid, shipskartMappingId: assignment.shipskartMappingId }, true, ctx);
+    const del = await deleteVesselUserMapping(
+      { userUuid, vesselId: vesselVuuid, shipskartMappingId: assignment.shipskartMappingId }, 'pending');
+    if (del.status !== 'unmapped') return del;
+    await paceB2b(); // two real API calls in this path — keep the mandatory gap between them
   }
   const userLink = await b2bRepo.getUserLink(userUuid);
   const vesselLink = await b2bRepo.getVesselLink(vesselVuuid);
@@ -267,44 +270,37 @@ export async function mapUserToVessel(userUuid: string, vesselVuuid: string, ctx
   return { status, error };
 }
 
-// ── vessel-user mapping UPDATE ──
+// ── vessel-user mapping REMOVAL ──
 //
-// Shape from Sachin's 04-Aug curl (integrated ahead of their deploy, at his request, so
-// nothing changes on our side when they release): PUT /update-vessel-user/{mappingId}
-// with the FULL mapping record in `data` — vesselId/userId are THEIR ids, and isActive
-// is the on/off switch. This is how a user is REMOVED from a vessel (isActive:false);
-// there is no delete endpoint. Until their release, calls fail and are simply recorded
-// on the assignment row — every sweep retries them.
+// Sachin's prescribed flow (05-Aug, replaces the never-released PUT update-vessel-user):
+// a mapping change is DELETE /delete-vessel-user/{mappingId}, then — if the user should
+// be on a vessel again — a fresh POST map-user-to-vessel. Both halves proven live on UAT
+// 05-Aug (delete → 200 "Record deleted successfully", gone from get-all-map-vessel-users;
+// re-create → 201 with a NEW mappingId). The stored mappingId is therefore cleared on
+// every successful delete — it never survives to be reused.
+//
+// `after` = the local mapStatus once the remote mapping is gone: 'unmapped' closes a
+// revoked assignment; 'pending' queues a reactivated one for the fresh POST (sweep step 3
+// only picks up pending/awaiting_* — leaving it 'unmapped' would strand it).
 
-export async function updateVesselUserMapping(
+export async function deleteVesselUserMapping(
   a: { userUuid: string; vesselId: string; shipskartMappingId: string },
-  isActive: boolean,
-  ctx?: { userFullName?: string | null; vesselName?: string | null },
+  after: 'unmapped' | 'pending' = 'unmapped',
 ): Promise<PushResult> {
-  const userLink = await b2bRepo.getUserLink(a.userUuid);
-  const vesselLink = await b2bRepo.getVesselLink(a.vesselId);
-  if (!userLink?.shipskartUserId || !vesselLink?.shipskartVesselId) {
-    await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { lastError: 'mapping update needs both Shipskart ids — user or vessel link missing' });
-    return { status: 'missing_links' };
+  const res = await authorizedB2bRequest('DELETE', `/integration/SAIL/delete-vessel-user/${a.shipskartMappingId}`, { body: {} });
+  // Not-found = already deleted remotely (a retry after a lost response) — close it out
+  // the same as success. PROVEN 05-Aug (harness T1): delete of a nonexistent id answers
+  // with not-found wording that this matcher closes. Matched loosely on wording so a plain
+  // routing 404 ("Cannot DELETE …") does NOT match and keeps retrying instead of lying.
+  const alreadyGone = !res.ok && /not found|does not exist|no record/i.test(JSON.stringify(res.json ?? res.text ?? ''));
+  if (res.ok || alreadyGone) {
+    await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { shipskartMappingId: null, mapStatus: after, lastError: null });
+    if (alreadyGone) console.log(`[Shipskart b2b] delete-vessel-user ${a.shipskartMappingId}: already gone remotely — closed locally as ${after}`);
+    return { status: 'unmapped', shipskartId: a.shipskartMappingId };
   }
-  const res = await authorizedB2bRequest('PUT', `/integration/SAIL/update-vessel-user/${a.shipskartMappingId}`, {
-    body: { id: a.shipskartMappingId, data: {
-      vesselId: vesselLink.shipskartVesselId,
-      vesselName: ctx?.vesselName ?? null,
-      userId: userLink.shipskartUserId,
-      userFullName: ctx?.userFullName ?? null,
-      isActive,
-      updatedAt: new Date().toISOString(),
-      updatedBy: 'System',
-    } },
-  });
-  if (res.ok) {
-    await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { mapStatus: isActive ? 'mapped' : 'unmapped', lastError: null });
-    return { status: isActive ? 'mapped' : 'unmapped', shipskartId: a.shipskartMappingId };
-  }
-  const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
-  await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { lastError: `mapping update failed: ${error}` });
-  return { status: 'mapping_update_failed', error };
+  const error = `HTTP ${res.status} ${JSON.stringify(res.json ?? res.text)?.slice(0, 380)}`;
+  await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { lastError: `mapping delete failed: ${error}` });
+  return { status: 'mapping_delete_failed', error };
 }
 
 // ── JIT (just-in-time) push at first Purchasing click ──
@@ -477,8 +473,8 @@ export async function runReconciliation(opts: { limit?: number } = {}): Promise<
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
 
-  // 3b. REVOKED assignments (capture-at-login removed the vessel) — deactivate the
-  // Shipskart mapping via update-vessel-user isActive:false. A revoked row that never
+  // 3b. REVOKED assignments (capture-at-login removed the vessel) — remove the Shipskart
+  // mapping via delete-vessel-user (Sachin's 05-Aug flow). A revoked row that never
   // reached Shipskart has nothing to undo remotely → closed out locally as 'unmapped'.
   const revokedAssignments = await db.select().from(masterUserVessels)
     .where(and(eq(masterUserVessels.isActive, false), eq(masterUserVessels.mapStatus, 'revoked')));
@@ -488,8 +484,8 @@ export async function runReconciliation(opts: { limit?: number } = {}): Promise<
       tally(summary.mappings, 'unmapped_local_only');
       continue;
     }
-    const st = (await updateVesselUserMapping(
-      { userUuid: a.userUuid, vesselId: a.vesselId, shipskartMappingId: a.shipskartMappingId }, false)).status;
+    const st = (await deleteVesselUserMapping(
+      { userUuid: a.userUuid, vesselId: a.vesselId, shipskartMappingId: a.shipskartMappingId }, 'unmapped')).status;
     tally(summary.mappings, st);
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }

@@ -82,7 +82,7 @@ function assertNoTenantInBody(body: unknown): void {
  * this layer deliberately knows nothing about them, which keeps the dependency one-way).
  */
 export async function signedB2bRequest(
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   pathAndQuery: string,
   opts: { body?: unknown; bearer?: string } = {},
 ): Promise<B2bResponse> {
@@ -108,6 +108,8 @@ export async function signedB2bRequest(
   if (opts.bearer) headers['Authorization'] = `Bearer ${opts.bearer}`;
   // PUT added 2026-08-04: their updated collection signs AND sends the body on PUT
   // (earlier UAT rejected PUT bodies with a signature mismatch — contract now fixed).
+  // DELETE added 2026-08-05: their delete-vessel-user curl sends --data '{}', so DELETE
+  // carries an (empty-object) body and signs it like any non-GET — proven live on UAT.
   if (method !== 'GET') headers['Content-Type'] = 'application/json';
 
   let response: Response;

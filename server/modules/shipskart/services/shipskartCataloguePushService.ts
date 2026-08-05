@@ -72,9 +72,19 @@ async function fetchAllPaged(path: string): Promise<any[]> {
   const all: any[] = [];
   for (let page = 1; ; page++) {
     const r = await requestWithBackoff('GET', `${path}?pageNumber=${page}&pageSize=100`);
-    if (!r.ok || !Array.isArray(r.json?.items)) break;
+    if (!r.ok || !Array.isArray(r.json?.items)) {
+      // ABORT LOUDLY (05-Aug lesson). This listing is what lets the push adopt entities
+      // that already exist on Shipskart; when it failed silently (401 SIGNATURE_INVALID
+      // after their verifier change) the empty result read as "nothing exists" and the
+      // push re-created every category — duplicate-create crashes at best, real
+      // duplicates at worst. No trustworthy remote list → no writes.
+      throw new Error(
+        `listing ${path} page ${page} failed: HTTP ${r.status} ${JSON.stringify(r.json ?? r.text)?.slice(0, 200)} — aborting push before any create (cannot see existing remote entities)`,
+      );
+    }
     all.push(...r.json.items);
     if (page >= Number(r.json.totalPages ?? 1)) break;
+    await sleep(PACE_MS); // same mandatory gap between paged listing calls
   }
   return all;
 }
