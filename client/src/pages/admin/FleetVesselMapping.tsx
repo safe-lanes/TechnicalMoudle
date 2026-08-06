@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Ship, Box, Wrench, Package, Search, Link2, ArrowLeft, RefreshCw, Zap, CheckCircle2, Anchor, ChevronRight, ChevronDown, FolderTree, Trash2, Download, AlertTriangle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Component, FleetComponents, FleetJobs, FleetSpares, FleetSpareVesselMapping } from "@shared/schema";
 
@@ -92,6 +93,10 @@ interface FleetJobMapping {
 
 export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateMasters = canCreate("admin-masters");
+  const canEditMasters = canEdit("admin-masters");
+  const canDeleteMasters = canDelete("admin-masters");
   const [activeTab, setActiveTab] = useState<MappingTab>("components");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVessel, setSelectedVessel] = useState<string>("");
@@ -1431,27 +1436,31 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAutoMatch}
-                disabled={!selectedVessel || isLoading}
-                className="border-cyan-500 text-cyan-600"
-                data-testid="button-component-auto-match"
-              >
-                <Zap className="h-3.5 w-3.5 mr-1.5" />
-                Auto-Match
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleResync}
-                disabled={isLoading}
-                data-testid="button-component-resync"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
-                Re-sync
-              </Button>
+              {canCreateMasters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAutoMatch}
+                  disabled={!selectedVessel || isLoading}
+                  className="border-cyan-500 text-cyan-600"
+                  data-testid="button-component-auto-match"
+                >
+                  <Zap className="h-3.5 w-3.5 mr-1.5" />
+                  Auto-Match
+                </Button>
+              )}
+              {canEditMasters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResync}
+                  disabled={isLoading}
+                  data-testid="button-component-resync"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+                  Re-sync
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -1524,7 +1533,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <div className="text-xs font-medium text-gray-500">Linked Components ({selectedFleetMappings.length})</div>
-                            {selectedFleetMappings.length > 1 && (
+                            {selectedFleetMappings.length > 1 && canDeleteMasters && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1542,15 +1551,17 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                                 <div className="text-xs font-medium truncate">{m.componentCode}</div>
                                 <div className="text-xs text-gray-500 truncate">{m.componentName}</div>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveMapping(m)}
-                                className="text-red-500 shrink-0"
-                                data-testid={`button-remove-mapping-${m.componentCode}`}
-                              >
-                                <span className="text-xs">x</span>
-                              </Button>
+                              {canDeleteMasters && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveMapping(m)}
+                                  className="text-red-500 shrink-0"
+                                  data-testid={`button-remove-mapping-${m.componentCode}`}
+                                >
+                                  <span className="text-xs">x</span>
+                                </Button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1561,7 +1572,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         </div>
                       )}
 
-                      {selectedVesselItems.size > 0 && selectedFleetItem && (
+                      {selectedVesselItems.size > 0 && selectedFleetItem && canCreateMasters && (
                         <div className="space-y-2">
                           <div className="text-xs text-gray-500 text-center">
                             {selectedVesselItems.size} vessel component{selectedVesselItems.size > 1 ? "s" : ""} selected
@@ -1629,27 +1640,31 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!selectedVessel || isLoading}
-                className="border-cyan-500 text-cyan-600"
-                onClick={handleJobAutoMatch}
-                data-testid="button-job-auto-match"
-              >
-                <Zap className="h-3.5 w-3.5 mr-1.5" />
-                Auto-Match
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleJobsResync}
-                disabled={isLoading}
-                data-testid="button-job-resync"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
-                Re-sync
-              </Button>
+              {canCreateMasters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!selectedVessel || isLoading}
+                  className="border-cyan-500 text-cyan-600"
+                  onClick={handleJobAutoMatch}
+                  data-testid="button-job-auto-match"
+                >
+                  <Zap className="h-3.5 w-3.5 mr-1.5" />
+                  Auto-Match
+                </Button>
+              )}
+              {canEditMasters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleJobsResync}
+                  disabled={isLoading}
+                  data-testid="button-job-resync"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+                  Re-sync
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -1750,7 +1765,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <div className="text-xs font-medium text-gray-500">Linked Vessel Jobs ({selectedFleetJobLinkedDetails.length})</div>
-                            {selectedFleetJobLinkedDetails.length > 1 && (
+                            {selectedFleetJobLinkedDetails.length > 1 && canDeleteMasters && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1769,15 +1784,17 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                                 <div className="text-xs font-medium truncate">{m.vesselJobNo}</div>
                                 <div className="text-xs text-gray-500 truncate">{m.vesselJobTitle}</div>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveJobMapping(m)}
-                                className="text-red-500 shrink-0"
-                                data-testid={`button-remove-job-mapping-${m.jobCode}`}
-                              >
-                                <span className="text-xs">x</span>
-                              </Button>
+                              {canDeleteMasters && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveJobMapping(m)}
+                                  className="text-red-500 shrink-0"
+                                  data-testid={`button-remove-job-mapping-${m.jobCode}`}
+                                >
+                                  <span className="text-xs">x</span>
+                                </Button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1788,7 +1805,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         </div>
                       )}
 
-                      {selectedVesselJobs.size > 0 && selectedFleetJob && (
+                      {selectedVesselJobs.size > 0 && selectedFleetJob && canCreateMasters && (
                         <div className="space-y-2">
                           <div className="text-xs text-gray-500 text-center">
                             {selectedVesselJobs.size} vessel job{selectedVesselJobs.size > 1 ? "s" : ""} selected
@@ -1920,27 +1937,31 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!selectedVessel || isLoading}
-                className="border-cyan-500 text-cyan-600"
-                onClick={handleSpareAutoMatch}
-                data-testid="button-spare-auto-match"
-              >
-                <Zap className="h-3.5 w-3.5 mr-1.5" />
-                Auto-Match
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSparesResync}
-                disabled={isLoading}
-                data-testid="button-spare-resync"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
-                Re-sync
-              </Button>
+              {canCreateMasters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!selectedVessel || isLoading}
+                  className="border-cyan-500 text-cyan-600"
+                  onClick={handleSpareAutoMatch}
+                  data-testid="button-spare-auto-match"
+                >
+                  <Zap className="h-3.5 w-3.5 mr-1.5" />
+                  Auto-Match
+                </Button>
+              )}
+              {canEditMasters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSparesResync}
+                  disabled={isLoading}
+                  data-testid="button-spare-resync"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+                  Re-sync
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -2041,7 +2062,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <div className="text-xs font-medium text-gray-500">Linked Vessel Spares ({selectedFleetSpareLinkedDetails.length})</div>
-                            {selectedFleetSpareLinkedDetails.length > 1 && (
+                            {selectedFleetSpareLinkedDetails.length > 1 && canDeleteMasters && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -2060,15 +2081,17 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                                 <div className="text-xs font-medium truncate">{m.vesselPartCode}</div>
                                 <div className="text-xs text-gray-500 truncate">{m.vesselPartName}</div>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveSpareMapping(m)}
-                                className="text-red-500 shrink-0"
-                                data-testid={`button-remove-spare-mapping-${m.partCode}`}
-                              >
-                                <span className="text-xs">x</span>
-                              </Button>
+                              {canDeleteMasters && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveSpareMapping(m)}
+                                  className="text-red-500 shrink-0"
+                                  data-testid={`button-remove-spare-mapping-${m.partCode}`}
+                                >
+                                  <span className="text-xs">x</span>
+                                </Button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2079,7 +2102,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         </div>
                       )}
 
-                      {selectedVesselSpares.size > 0 && selectedFleetSpare && (
+                      {selectedVesselSpares.size > 0 && selectedFleetSpare && canCreateMasters && (
                         <div className="space-y-2">
                           <div className="text-xs text-gray-500 text-center">
                             {selectedVesselSpares.size} vessel spare{selectedVesselSpares.size > 1 ? "s" : ""} selected

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FiltersToggle } from '@/components/filters/VesselFilter';
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from '@/components/filters/VesselFleetGroupFilter';
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { usePermissions } from '@/contexts/PermissionsContext';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
@@ -104,6 +105,8 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
 
 export default function SurveysPage() {
   const { isClientAdmin, isSailAdmin, isTechSuperintendent } = useUIRole();
+  const { canEdit } = usePermissions();
+  const canEditSurvey = canEdit('cert-surveys-page');
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
   const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
@@ -310,6 +313,7 @@ export default function SurveysPage() {
   }, []);
 
   const handleAttachmentsChange = useCallback((attachments: FileAttachment[]) => {
+    if (!canEditSurvey) return;
     if (selectedSurvey && selectedSurvey.vesselId && selectedSurvey.masterId) {
       const compoundId = `${selectedSurvey.vesselId}::${selectedSurvey.masterId}`;
       updateSurveyMutation.mutate({
@@ -318,7 +322,7 @@ export default function SurveysPage() {
       });
       setSelectedSurvey(prev => prev ? { ...prev, attachments } : null);
     }
-  }, [selectedSurvey, updateSurveyMutation]);
+  }, [canEditSurvey, selectedSurvey, updateSurveyMutation]);
 
   const handleCellEditingStopped = useCallback((event: CellEditingStoppedEvent) => {
     const { data, colDef, value, oldValue } = event;
@@ -414,7 +418,7 @@ export default function SurveysPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditSurvey,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
     },
@@ -455,7 +459,7 @@ export default function SurveysPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditSurvey,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
     },
@@ -467,7 +471,7 @@ export default function SurveysPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditSurvey,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
     },
@@ -479,7 +483,7 @@ export default function SurveysPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditSurvey,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
     },
@@ -491,7 +495,7 @@ export default function SurveysPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditSurvey,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
     },
@@ -516,7 +520,7 @@ export default function SurveysPage() {
       pinned: 'right',
       lockPosition: true,
     },
-  ], []);
+  ], [canEditSurvey]);
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     setGridApi(params.api);

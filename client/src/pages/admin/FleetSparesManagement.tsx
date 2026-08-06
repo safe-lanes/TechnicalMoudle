@@ -11,11 +11,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Search, Pencil, Trash2, Download, Wrench, Package, ArrowLeft, Info, Save, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Marker } from "@/components/Marker";
 import { SectionBlock } from "@/components/SectionBlock";
 
 export default function FleetSparesManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateMasters = canCreate("admin-masters");
+  const canEditMasters = canEdit("admin-masters");
+  const canDeleteMasters = canDelete("admin-masters");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEquipment, setSelectedEquipment] = useState<string>("all");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -697,16 +702,18 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
-              onClick={() => handleEdit(detailSpare)}
-              data-testid="btn-edit-spare"
-            >
-              <Pencil className="h-4 w-4" />
-              Edit
-            </Button>
+            {canEditMasters && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+                onClick={() => handleEdit(detailSpare)}
+                data-testid="btn-edit-spare"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+            )}
           </div>
         </div>
 
@@ -849,16 +856,18 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
             <Download className="h-4 w-4" />
             Export
           </Button>
-          <Button
-            size="sm"
-            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-            onClick={handleAddNew}
-            data-testid="I4.QL5.5.14"
-          >
-            <Marker id="I4.QL5.5.14" />
-            <Plus className="h-4 w-4 mr-1" />
-            Add New Spare
-          </Button>
+          {canCreateMasters && (
+            <Button
+              size="sm"
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+              onClick={handleAddNew}
+              data-testid="I4.QL5.5.14"
+            >
+              <Marker id="I4.QL5.5.14" />
+              <Plus className="h-4 w-4 mr-1" />
+              Add New Spare
+            </Button>
+          )}
         </div>
       </div>
 
@@ -988,22 +997,26 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex justify-end gap-1">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleEdit(spare); }}
-                              className="p-1 hover:bg-gray-200 rounded"
-                              data-testid={isFirstRow ? "I4.QL5.5.28" : `button-edit-${spare.id}`}
-                            >
-                              {isFirstRow && <Marker id="I4.QL5.5.28" />}
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteClick(spare); }}
-                              className="p-1 hover:bg-gray-200 rounded text-red-500"
-                              data-testid={isFirstRow ? "I4.QL5.5.29" : `button-delete-${spare.id}`}
-                            >
-                              {isFirstRow && <Marker id="I4.QL5.5.29" />}
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            {canEditMasters && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleEdit(spare); }}
+                                className="p-1 hover:bg-gray-200 rounded"
+                                data-testid={isFirstRow ? "I4.QL5.5.28" : `button-edit-${spare.id}`}
+                              >
+                                {isFirstRow && <Marker id="I4.QL5.5.28" />}
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDeleteMasters && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(spare); }}
+                                className="p-1 hover:bg-gray-200 rounded text-red-500"
+                                data-testid={isFirstRow ? "I4.QL5.5.29" : `button-delete-${spare.id}`}
+                              >
+                                {isFirstRow && <Marker id="I4.QL5.5.29" />}
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

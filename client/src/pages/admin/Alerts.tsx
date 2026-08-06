@@ -4,6 +4,7 @@ import { queryClient } from '@/lib/queryClient';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/contexts/PermissionsContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -132,6 +133,8 @@ const priorityBadgeColors: Record<string, string> = {
 
 export default function Alerts() {
   const { toast } = useToast();
+  const { canEdit } = usePermissions();
+  const canEditAlerts = canEdit('admin-alerts');
   const { vesselId: selectedVesselId = 'V001' } = useVessel();
   const [selectedPolicy, setSelectedPolicy] = useState<AlertPolicy | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -361,12 +364,14 @@ export default function Alerts() {
                 </div>
                 
                 <div className="mt-4 flex justify-end">
-                  <Button 
-                    onClick={handleSaveConfiguration}
-                    disabled={updatePoliciesMutation.isPending}
-                  >
-                    {updatePoliciesMutation.isPending ? 'Saving...' : 'Save Alert Configuration'}
-                  </Button>
+                  {canEditAlerts && (
+                    <Button 
+                      onClick={handleSaveConfiguration}
+                      disabled={updatePoliciesMutation.isPending}
+                    >
+                      {updatePoliciesMutation.isPending ? 'Saving...' : 'Save Alert Configuration'}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

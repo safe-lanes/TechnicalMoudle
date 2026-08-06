@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import StampSelect from "@/components/StampSelect";
 import {
   Select,
   SelectContent,
@@ -344,6 +345,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     location: "",
     critical: "No",
     conditionBased: "No",
+    rotationalItem: "No",
+    currentStamp: "",
     installationDate: "",
     commissionedDate: "",
     rating: "",
@@ -573,6 +576,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         location: existingComponent.location || "",
         critical: toBoolString(existingComponent.critical),
         conditionBased: toBoolString(existingComponent.conditionBased),
+        rotationalItem: toBoolString(existingComponent.rotationalItem),
+        currentStamp: existingComponent.currentStamp || "",
         installationDate: existingComponent.installationDate || "",
         commissionedDate: existingComponent.commissionedDate || "",
         rating: existingComponent.rating || "",
@@ -777,6 +782,14 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     } else if (componentData.makerCode) {
       handleFieldChange('makerCode', '');
     }
+    if (componentData.rotationalItem === "Yes" && !componentData.currentStamp.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Stamp is mandatory when Rotational Item is Yes.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (componentData.rhCounterType === "INHERITED" && !componentData.rhMasterComponentId) {
       toast({
         title: "Validation Error",
@@ -804,6 +817,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         location: componentData.location || null,
         critical: toBool(componentData.critical),
         conditionBased: toBool(componentData.conditionBased),
+        rotationalItem: toBool(componentData.rotationalItem),
+        currentStamp: toBool(componentData.rotationalItem) ? (componentData.currentStamp || null) : null,
         installationDate: componentData.installationDate || null,
         commissionedDate: componentData.commissionedDate || null,
         rating: componentData.rating || null,
@@ -1245,6 +1260,39 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 onChange={(e) => handleFieldChange('installationDate', e.target.value)}
                                 className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
                                 data-testid="input-installation-date"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Rotational Item</label>
+                              <select
+                                value={componentData.rotationalItem}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setComponentData(prev => ({
+                                    ...prev,
+                                    rotationalItem: v,
+                                    currentStamp: v === "Yes" ? prev.currentStamp : "",
+                                  }));
+                                }}
+                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                data-testid="select-rotational-item"
+                              >
+                                <option value="No">No</option>
+                                <option value="Yes">Yes</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">
+                                Stamp{componentData.rotationalItem === "Yes" && <span className="text-red-500"> *</span>}
+                              </label>
+                              <StampSelect
+                                vesselId={vesselId}
+                                value={componentData.currentStamp}
+                                onChange={(stamp) => handleFieldChange('currentStamp', stamp)}
+                                disabled={componentData.rotationalItem !== "Yes"}
+                                currentStamp={isEditMode ? (existingComponent as any)?.currentStamp || undefined : undefined}
+                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3] disabled:bg-gray-100 disabled:text-gray-400"
+                                testId="input-stamp"
                               />
                             </div>
                           </div>

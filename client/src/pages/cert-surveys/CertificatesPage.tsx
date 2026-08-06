@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FiltersToggle } from '@/components/filters/VesselFilter';
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from '@/components/filters/VesselFleetGroupFilter';
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { usePermissions } from '@/contexts/PermissionsContext';
 import { apiRequest, queryClient, invalidateByUrlPrefix } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
@@ -299,6 +300,8 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
 
 export default function CertificatesPage() {
   const { isClientAdmin, isSailAdmin, isTechSuperintendent } = useUIRole();
+  const { canEdit } = usePermissions();
+  const canEditCert = canEdit('cert-certificates');
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
   const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
@@ -430,6 +433,7 @@ export default function CertificatesPage() {
   }, []);
 
   const handleAttachmentsChange = useCallback((attachments: FileAttachment[]) => {
+    if (!canEditCert) return;
     if (selectedCertificate) {
       const apiId = getCertificateApiId(selectedCertificate);
       updateCertificateMutation.mutate({
@@ -438,7 +442,7 @@ export default function CertificatesPage() {
       });
       setSelectedCertificate(prev => prev ? { ...prev, attachments } : null);
     }
-  }, [selectedCertificate, updateCertificateMutation, getCertificateApiId]);
+  }, [canEditCert, selectedCertificate, updateCertificateMutation, getCertificateApiId]);
 
   const handleCellEditingStopped = useCallback((event: CellEditingStoppedEvent) => {
     const { data, colDef, value, oldValue } = event;
@@ -639,7 +643,7 @@ export default function CertificatesPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditCert,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
       valueSetter: (params: any) => {
@@ -693,7 +697,7 @@ export default function CertificatesPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditCert,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
       valueSetter: (params: any) => {
@@ -718,7 +722,7 @@ export default function CertificatesPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditCert,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
       valueSetter: (params: any) => {
@@ -737,7 +741,7 @@ export default function CertificatesPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditCert,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
       valueSetter: (params: any) => {
@@ -756,7 +760,7 @@ export default function CertificatesPage() {
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
-      editable: true,
+      editable: canEditCert,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
       valueSetter: (params: any) => {
@@ -788,7 +792,7 @@ export default function CertificatesPage() {
       pinned: 'right',
       lockPosition: true,
     },
-  ], []);
+  ], [canEditCert]);
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     setGridApi(params.api);

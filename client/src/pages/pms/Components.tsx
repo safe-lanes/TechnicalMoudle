@@ -18,6 +18,8 @@ import ComponentRegisterFormCR from "@/components/ComponentRegisterFormCR";
 import AddEditComponentForm from "@/components/AddEditComponentForm";
 import ComponentRegisterAddEdit from "@/components/ComponentRegisterAddEdit";
 import { ReviewChangesDrawer } from "@/components/ReviewChangesDrawer";
+import { ReplaceRotationalItemDialog } from "@/components/ReplaceRotationalItemDialog";
+import StampSelect from "@/components/StampSelect";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useLocation } from "wouter";
@@ -123,6 +125,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     location: "",
     critical: "",
     conditionBased: "",
+    rotationalItem: "",
+    currentStamp: "",
     installationDate: "",
     commissionedDate: "",
     rating: "",
@@ -142,6 +146,9 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   
   // Track original component data for modify mode
   const [originalComponentData, setOriginalComponentData] = useState<typeof componentData | null>(null);
+
+  // Rotational item replacement dialog (visible only when Rotational Item = Yes)
+  const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   
   // Update component data when selected component changes
   useEffect(() => {
@@ -172,6 +179,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         location: comp.location || "",
         critical: toBoolString(comp.critical),
         conditionBased: toBoolString(comp.conditionBased),
+        rotationalItem: toBoolString(comp.rotationalItem) || "No",
+        currentStamp: comp.currentStamp || "",
         installationDate: comp.installationDate || "",
         commissionedDate: comp.commissionedDate || "",
         rating: comp.rating || "",
@@ -273,6 +282,19 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
 
   return (
     <div className="space-y-4">
+      {selectedComponent && (
+        <ReplaceRotationalItemDialog
+          open={showReplaceDialog}
+          onOpenChange={setShowReplaceDialog}
+          componentCuuid={(selectedComponent as any).actualId || (selectedComponent as any).cuuid || ""}
+          componentName={componentData.componentName}
+          currentStamp={componentData.currentStamp}
+          vesselId={(selectedComponent as any).vesselId || ""}
+          onSwapped={() => {
+            queryClient.invalidateQueries({ queryKey: [`/technical/api/components/${(selectedComponent as any).vesselId}`] });
+          }}
+        />
+      )}
       {/* Auto-flowing grid for component fields - visible fields fill gaps automatically */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
@@ -546,6 +568,65 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               }`}>
                 {componentData.conditionBased}
               </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Rotational Item</label>
+          {isChangeMode ? (
+            <select
+              value={componentData.rotationalItem || "No"}
+              onChange={(e) => {
+                handleFieldChange('rotationalItem', e.target.value);
+                if (e.target.value !== "Yes") handleFieldChange('currentStamp', "");
+              }}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('rotationalItem') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="select-rotational-item"
+            >
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-rotational-item">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                componentData.rotationalItem === "Yes"
+                  ? "bg-purple-100 text-purple-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}>
+                {componentData.rotationalItem || "No"}
+              </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Stamp</label>
+          {isChangeMode ? (
+            <StampSelect
+              vesselId={(selectedComponent as any)?.vesselId || ""}
+              value={componentData.currentStamp}
+              onChange={(stamp) => handleFieldChange('currentStamp', stamp)}
+              disabled={componentData.rotationalItem !== "Yes"}
+              currentStamp={(selectedComponent as any)?.currentStamp || undefined}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('currentStamp') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              } disabled:bg-gray-100 disabled:text-gray-400`}
+              testId="input-stamp"
+            />
+          ) : (
+            <div className="text-sm text-gray-900 flex items-center gap-2" data-testid="text-stamp">
+              <span>{componentData.rotationalItem === "Yes" ? (componentData.currentStamp || "-") : "-"}</span>
+              {componentData.rotationalItem === "Yes" && selectedComponent && (
+                <button
+                  type="button"
+                  onClick={() => setShowReplaceDialog(true)}
+                  className="text-xs px-2 py-0.5 rounded border border-[#52BAF3] text-[#52BAF3] hover:bg-blue-50"
+                  data-testid="button-replace-rotational-item"
+                >
+                  Replace
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -2784,6 +2865,8 @@ const Components: React.FC = () => {
         critical: originalComponentData.critical,
         classItem: originalComponentData.classItem,
         conditionBased: originalComponentData.conditionBased,
+        rotationalItem: (originalComponentData as any).rotationalItem,
+        currentStamp: (originalComponentData as any).currentStamp,
         commissionedDate: originalComponentData.commissionedDate,
         installationDate: originalComponentData.installationDate,
         rating: originalComponentData.rating,
@@ -3427,6 +3510,8 @@ const Components: React.FC = () => {
           location: comp.location || "",
           critical: comp.critical === true || comp.critical === "Yes" ? "Yes" : (comp.critical === false || comp.critical === "No" ? "No" : ""),
           conditionBased: comp.conditionBased === true || comp.conditionBased === "Yes" ? "Yes" : (comp.conditionBased === false || comp.conditionBased === "No" ? "No" : ""),
+          rotationalItem: comp.rotationalItem === true || comp.rotationalItem === "Yes" ? "Yes" : "No",
+          currentStamp: comp.currentStamp || "",
           installationDate: comp.installationDate || "",
           commissionedDate: comp.commissionedDate || "",
           rating: comp.rating || "",

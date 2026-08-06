@@ -15,6 +15,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
 import type { UIRole } from "@shared/uiRoles";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import VesselOrgChartModal from "./VesselOrgChartModal";
 
 interface RankRow {
@@ -40,6 +41,10 @@ const RANK_CATEGORIES = [
 
 export default function RanksAdmin() {
   const { toast } = useToast();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canEditRanks = canEdit("admin-ranks");
+  const canCreateRanks = canCreate("admin-ranks");
+  const canDeleteRanks = canDelete("admin-ranks");
   const [isEditMode, setIsEditMode] = useState(false);
   const [hasSavedInSession, setHasSavedInSession] = useState<Record<string, boolean>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -257,7 +262,7 @@ export default function RanksAdmin() {
                       >
                         <ChevronDown className="h-4 w-4" />
                       </button>
-                      {!rank.isSystemRank && (
+                      {!rank.isSystemRank && canDeleteRanks && (
                         <Button variant="ghost" size="sm" onClick={() => deleteRank(rank.rankId)} className="text-red-500 hover:text-red-700 ml-1 h-6 w-6 p-0" data-testid={`button-delete-rank-${rank.rankId}`}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -288,7 +293,7 @@ export default function RanksAdmin() {
               Vessel Org Chart
             </Button>
             {!isEditMode ? (
-              <Button variant="outline" size="sm" onClick={toggleViewMode} data-testid="button-edit-mode">Edit</Button>
+              canEditRanks && <Button variant="outline" size="sm" onClick={toggleViewMode} data-testid="button-edit-mode">Edit</Button>
             ) : (
               <>
                 <Button variant="outline" size="sm" onClick={exitEditMode} data-testid="button-cancel">
@@ -304,9 +309,11 @@ export default function RanksAdmin() {
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   Save
                 </Button>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 gap-1" onClick={addNewRank} data-testid="button-add-rank">
-                  <Plus className="h-4 w-4" /> New
-                </Button>
+                {canCreateRanks && (
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 gap-1" onClick={addNewRank} data-testid="button-add-rank">
+                    <Plus className="h-4 w-4" /> New
+                  </Button>
+                )}
               </>
             )}
           </div>

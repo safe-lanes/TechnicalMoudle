@@ -301,18 +301,51 @@ export async function listChildren(parentCode: string, vesselId: string) {
     throw new NotFoundError('Parent component not found');
   }
 
-  const children = await repo.getInheritedComponents(parent.cuuid, vesselId);
+  // Scope children to the parent's OWN vessel: under aggregate scope ('all')
+  // the incoming vesselId is not a concrete vessel, and component codes can
+  // repeat across vessels.
+  const children = await repo.getInheritedComponents(parent.cuuid, parent.vesselId || vesselId);
   const activeChildren = children.filter((child: any) => child.isActive !== false);
+
+  // Batch-fetch the installed stamps' OWN accrued hours per vessel (Task #372):
+  // the component counter shows the inherited engine total by design; the stamp
+  // tracks only the hours it actually ran while installed.
+  const stampsByVessel = new Map<string, string[]>();
+  for (const child of activeChildren) {
+    const cVessel = (child as any).vesselId;
+    const cStamp = (child as any).currentStamp;
+    if (cVessel && cStamp) {
+      const list = stampsByVessel.get(cVessel) || [];
+      list.push(cStamp);
+      stampsByVessel.set(cVessel, list);
+    }
+  }
+  const stampInfoByVesselStamp = new Map<string, repo.StampRhInfo>();
+  for (const [cVessel, stamps] of Array.from(stampsByVessel.entries())) {
+    const infoMap = await repo.getInstalledStampRhBatch(cVessel, stamps);
+    for (const [stamp, info] of Array.from(infoMap.entries())) {
+      stampInfoByVesselStamp.set(`${cVessel}::${stamp}`, info);
+    }
+  }
 
   const childrenWithRH = activeChildren.map(child => {
     const displayRH = child.currentCumulativeRH || child.rhCurrentInheritedCached || '0.00';
+    const stampInfo = (child as any).currentStamp && (child as any).vesselId
+      ? stampInfoByVesselStamp.get(`${(child as any).vesselId}::${(child as any).currentStamp}`) || null
+      : null;
     return {
       id: child.id,
       componentCode: child.componentCode || '',
       name: child.name || '',
       currentCumulativeRH: displayRH,
       rhCounterType: child.rhCounterType || 'INHERITED',
-      lastUpdated: child.lastUpdated || child.updatedAt || '-'
+      lastUpdated: child.lastUpdated || child.updatedAt || '-',
+      stamp: stampInfo ? {
+        stamp: stampInfo.stamp,
+        stampName: stampInfo.stampName,
+        currentRh: stampInfo.currentRh,
+        rhLastUpdated: stampInfo.rhLastUpdated
+      } : null
     };
   });
 
@@ -396,11 +429,23 @@ export async function updateChildRH(componentId: string, body: {
   // Do NOT update rhCurrentInheritedCached as it stores the master's value
   // Use user's entered reading date for last_updated (not server time) so the
   // overview grid MAX logic shows the correct reading date, not today's date.
-  await repo.updateComponent(componentId, {
-    currentCumulativeRH: newRHFormatted,
-    runningHours: newRHFormatted,
-    lastUpdated: dateUpdated || new Date().toISOString()
+  // Component write + stamp DELTA accrual happen in ONE locked transaction (Task #374):
+  // the delta is computed from a fresh in-tx read, so a duplicate/overlapping
+  // submission sees the committed value and accrues 0 instead of double-counting.
+  const stampReadingIso = (() => {
+    const d = dateUpdated ? new Date(dateUpdated) : new Date();
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  })();
+  const atomicResult = await repo.updateChildRhWithStampAccrual({
+    componentId,
+    newRHValue,
+    lastUpdated: dateUpdated || new Date().toISOString(),
+    readingDateIso: stampReadingIso,
+    userId: userId || null,
   });
+  // Audit the value that was actually committed as previous (fresh in-tx read),
+  // not the possibly-stale pre-validation read.
+  const committedPreviousRH = atomicResult.previousRH.toFixed(2);
 
   // dateUpdatedLocal must also use the user's entered date so the audit-based
   // MAX in listParents reads the correct reading date, not the server save time.
@@ -411,7 +456,7 @@ export async function updateChildRH(componentId: string, body: {
   await repo.createRunningHoursAudit({
     vesselId: component.vesselId || '',
     componentId: componentId,
-    previousRH: previousRH,
+    previousRH: committedPreviousRH,
     newRH: newRHFormatted,
     cumulativeRH: newRHFormatted,
     dateUpdatedLocal: auditDateLocal,
@@ -421,6 +466,7 @@ export async function updateChildRH(componentId: string, body: {
     updatedByUuid: userUuid || null,
     source: 'manual',
     notes: comments || 'Manual update of child component RH',
+    // (previousRH above reflects the committed in-tx read)
     meterReplaced: false,
     version: 1
   });
@@ -455,6 +501,10 @@ export async function resetChildRH(componentId: string, body: {
   }
 
   const previousRH = component.currentCumulativeRH || '0.00';
+
+  // NOTE (Task #369): NO stamp accrual here by design — this is a baseline reset
+  // (component replaced / meter reset), not hours the installed stamp actually ran.
+  // The stamp keeps its own accrued service history.
 
   // Update component RH to 0
   await repo.updateComponent(componentId, {

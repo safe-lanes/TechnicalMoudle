@@ -2877,6 +2877,15 @@ export async function createComponentFromRow(row: any, vesselId?: string) {
   // Support Class Item field (both "Class Item" and "Class item" headers)
   const classItemValue = row['Class Item'] ?? row['Class item'];
   const isClassItem = classItemValue === true || classItemValue === 'Yes';
+
+  // Rotational Item / Stamp (Task #357) — tolerant Yes/No parsing, stamp only kept when Yes
+  const rotationalRawImport = row['Rotational Item (Yes/No)'] ?? row['Rotational Item'];
+  const isRotationalImport = rotationalRawImport === true ||
+    (rotationalRawImport !== undefined && rotationalRawImport !== null &&
+      ['yes', 'y', 'true', '1'].includes(String(rotationalRawImport).trim().toLowerCase()));
+  const stampImportValue = row['Stamp'] !== undefined && row['Stamp'] !== null && String(row['Stamp']).trim() !== ''
+    ? String(row['Stamp']).trim()
+    : null;
   
   // Parse RH Counter Type and determine appropriate field mappings
   const rhCounterType = (row['RH Counter Type'] || 'NOT_RH_DRIVEN').toString().toUpperCase().trim();
@@ -2966,12 +2975,33 @@ export async function createComponentFromRow(row: any, vesselId?: string) {
     rhCurrentInheritedCached: rhCurrentInheritedCached,
     rhInheritedUpdatedAt: rhInheritedUpdatedAt,
     // Last Updated
-    lastUpdated: lastUpdatedValue
+    lastUpdated: lastUpdatedValue,
+    // Rotational Item / Stamp (Task #357) — validated upstream; blank/No → not rotational
+    rotationalItem: isRotationalImport,
+    currentStamp: isRotationalImport ? stampImportValue : null
   };
 
   console.log(`📦 Creating component: ${componentCode} - ${componentData.name}`);
   const result = await storage.createComponent(componentData);
   console.log(`✅ Component created: ${componentCode}`);
+
+  // Rotational registry upsert — same shared state machine as the manual save path,
+  // so behavior cannot diverge (Installed row with RH snapshot, guards against stealing
+  // stamps installed elsewhere). Mirrors the manual create path's consistency model:
+  // if the registry write fails, undo the component insert so no drift is left behind.
+  if (isRotationalImport && stampImportValue) {
+    const { syncRotationalRegistry } = await import('../../components/services/componentService');
+    try {
+      await syncRotationalRegistry(null, result);
+    } catch (rotErr) {
+      try {
+        await storage.deleteComponent(result.cuuid ?? String(result.id));
+      } catch (undoErr) {
+        console.error('[ROTATIONAL] Failed to undo imported component after registry error:', undoErr);
+      }
+      throw rotErr;
+    }
+  }
   return result;
 }
 
@@ -3156,6 +3186,34 @@ export async function updateComponentFromRow(componentCode: string, row: any, ve
     throw new Error(`Component code '${componentCode}' not found for vessel '${lookupVesselId}'. Verify that the component exists in this vessel and that the component_code matches exactly.`);
   }
   
+  // Rotational Item / Stamp (Task #357) — only when the upload actually carries the
+  // columns (legacy templates without them leave the fields untouched).
+  const rotationalRawUpdate = row['Rotational Item (Yes/No)'] ?? row['Rotational Item'];
+  const stampRawUpdate = row['Stamp'];
+  const rotationalTouched = rotationalRawUpdate !== undefined || stampRawUpdate !== undefined;
+  if (rotationalTouched) {
+    const isRotational = rotationalRawUpdate !== undefined && rotationalRawUpdate !== null && String(rotationalRawUpdate).trim() !== ''
+      ? (rotationalRawUpdate === true || ['yes', 'y', 'true', '1'].includes(String(rotationalRawUpdate).trim().toLowerCase()))
+      : component.rotationalItem === true;
+    const stampValue = stampRawUpdate !== undefined && stampRawUpdate !== null && String(stampRawUpdate).trim() !== ''
+      ? String(stampRawUpdate).trim()
+      : (rotationalRawUpdate !== undefined ? null : component.currentStamp ?? null);
+    updateData.rotationalItem = isRotational;
+    updateData.currentStamp = isRotational ? stampValue : null;
+
+    // Same shared registry state machine as the manual save path, and the same
+    // ordering: registry sync BEFORE the component write. The registry operations
+    // are the ones that can fail (stamp unique conflicts), so a failure leaves the
+    // component row untouched; sync is idempotent, so a subsequent component-write
+    // failure is repaired by the next successful save.
+    const { syncRotationalRegistry } = await import('../../components/services/componentService');
+    await syncRotationalRegistry(component, {
+      ...component,
+      rotationalItem: updateData.rotationalItem,
+      currentStamp: updateData.currentStamp,
+    });
+  }
+
   return await storage.updateComponent(component.cuuid, updateData);
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, MapPin, ChevronRight } from "lucide-react";
+import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, MapPin, ChevronRight, Stamp } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -13,8 +13,9 @@ import FleetEquipmentTreeView from "./FleetEquipmentTreeView";
 import FleetVesselManager from "./FleetVesselManager";
 import FleetDataView from "./FleetDataView";
 import LocationManagement from "./LocationManagement";
+import RotationItemMasterList from "./RotationItemMasterList";
 
-type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data' | 'locations';
+type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data' | 'locations' | 'rotation-items';
 
 export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?: (isSubView: boolean) => void }) {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -38,6 +39,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
   if (currentView === 'fleet-vessel-manager') return <FleetVesselManager onBack={handleBackToDashboard} />;
   if (currentView === 'fleet-data') return <FleetDataView onBack={handleBackToDashboard} />;
   if (currentView === 'locations') return <LocationManagement onBack={handleBackToDashboard} />;
+  if (currentView === 'rotation-items') return <RotationItemMasterList onBack={handleBackToDashboard} />;
 
   /* ── Section 1 card ── */
   const Card1 = ({
@@ -155,6 +157,13 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
           colorBg="bg-emerald-50" colorIcon="text-emerald-500" colorUnderline="bg-emerald-400"
           colorChevron="group-hover:text-emerald-400"
           testId="card-locations"
+        />
+        <Card1
+          view="rotation-items" icon={Stamp} label="Rotation Item Master List"
+          description="Manage rotational item stamps and their running hours."
+          colorBg="bg-indigo-50" colorIcon="text-indigo-500" colorUnderline="bg-indigo-400"
+          colorChevron="group-hover:text-indigo-400"
+          testId="card-rotation-items"
         />
         <Card1
           view="master-data-table" icon={FileCode2} label="Master Data"

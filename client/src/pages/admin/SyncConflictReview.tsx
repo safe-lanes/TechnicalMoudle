@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -113,6 +114,8 @@ function truncateValue(value: string | null, max = 120): string {
 
 export default function SyncConflictReview() {
   const { toast } = useToast();
+  const { canEdit } = usePermissions();
+  const canEditConflicts = canEdit("admin-sync-conflicts");
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<string>("unresolved");
@@ -452,6 +455,8 @@ export default function SyncConflictReview() {
                   </div>
                 ) : (
                   <div className="flex items-center justify-end gap-2">
+                    {canEditConflicts && (
+                      <>
                     <Button
                       variant="outline"
                       size="sm"
@@ -481,6 +486,8 @@ export default function SyncConflictReview() {
                     >
                       Dismiss
                     </Button>
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>

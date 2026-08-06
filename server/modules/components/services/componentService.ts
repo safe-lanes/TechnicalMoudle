@@ -5,8 +5,150 @@ import { makerList, masterLists } from '@shared/schema';
 import { eq, and, ilike } from 'drizzle-orm';
 import { getDb } from '../../../db';
 import { validateSFICode, stripSFISuffix } from '@shared/utils/sfiCode';
+import * as rotationalItemService from '../../rotational-items/services/rotationalItemService';
 
 const ALLOWED_DEPARTMENTS = ['Engine', 'Deck', 'Electrical', 'Galley', 'LSA', 'FFA'];
+
+/**
+ * Rotational Item rules (Task #356).
+ * Normalizes payload in place: rotationalItem → boolean, currentStamp → trimmed string|null.
+ * Accepts `stamp` as an alias for `currentStamp` from older clients/imports.
+ */
+function normalizeRotationalPayload(data: any): void {
+  if ('stamp' in data && !('currentStamp' in data)) {
+    data.currentStamp = data.stamp;
+  }
+  delete data.stamp; // not a components column
+  if ('rotationalItem' in data) {
+    data.rotationalItem = data.rotationalItem === true || data.rotationalItem === 'Yes' || data.rotationalItem === 'yes' || data.rotationalItem === 'true';
+  }
+  if ('currentStamp' in data) {
+    data.currentStamp = typeof data.currentStamp === 'string' && data.currentStamp.trim() !== ''
+      ? data.currentStamp.trim()
+      : null;
+  }
+  // Rotational Item = No → stamp must be blank
+  if (data.rotationalItem === false) {
+    data.currentStamp = null;
+  }
+}
+
+/**
+ * Rotational Item = Yes → stamp mandatory, MUST exist in the Rotation Item Master
+ * (strict master-first, Task #366) and must not be held by another component.
+ * A Spare / In Store stamp may be claimed; Retired stamps cannot be fitted.
+ * The installed-on link is derived via components.current_stamp (pure master table).
+ */
+async function validateRotationalStamp(
+  stamp: string | null | undefined,
+  vesselId: string | null | undefined,
+  ownComponentCuuid: string | null,
+): Promise<void> {
+  const s = typeof stamp === 'string' ? stamp.trim() : '';
+  if (!s) {
+    throw new ValidationError('Stamp is mandatory when Rotational Item is Yes');
+  }
+  if (!vesselId) return; // no vessel context — uniqueness is per-vessel
+  const existing = await rotationalItemService.getByStamp(vesselId, s);
+  if (!existing) {
+    throw new ValidationError(
+      `Stamp "${s}" not found in Rotation Item Master. Create it first under PMS → Admin → Master Data → Rotation Item Master List (or bulk import), then select it here.`
+    );
+  }
+  if (existing.status === 'Retired') {
+    throw new ValidationError(`Stamp "${s}" is retired and cannot be fitted to a component.`);
+  }
+  if (existing.status === 'Installed') {
+    const holder = await rotationalItemService.getComponentHoldingStamp(vesselId, s);
+    if (holder && holder.cuuid !== ownComponentCuuid) {
+      throw new ValidationError(
+        `Stamp "${s}" is already installed on another component${holder.name ? ` (${holder.name})` : ''} on this vessel. Stamps must be unique.`
+      );
+    }
+  }
+}
+
+/**
+ * Component's current RH for the registry snapshot: currentCumulativeRH is the canonical
+ * counter, but on fresh creates it may still be 0 while the form's runningHours holds the
+ * real reading — prefer the non-zero value.
+ */
+function componentRhSnapshot(component: Component): string | number | null {
+  const ccrh = parseFloat(String((component as any).currentCumulativeRH ?? ''));
+  if (!isNaN(ccrh) && ccrh > 0) return (component as any).currentCumulativeRH;
+  const rh = parseFloat(String((component as any).runningHours ?? ''));
+  if (!isNaN(rh) && rh > 0) return (component as any).runningHours;
+  return (component as any).currentCumulativeRH ?? (component as any).runningHours ?? null;
+}
+
+/**
+ * Keep the rotational_items master table in step with the component after save.
+ *
+ * STRICT MASTER-FIRST (Task #366): components never create stamps. The stamp must
+ * already exist in the Rotation Item Master; selecting it claims the master row
+ * (status → Installed). The installed-on link is DERIVED from components.current_stamp
+ * (pure master table — no back-pointer columns).
+ *
+ * - Marked rotational with stamp S: S must exist in the master. If the component
+ *   previously held a different stamp, that stamp is released (→ Spare, RH snapshotted).
+ * - Unmarked / stamp cleared: release the previously held stamp.
+ * Never touches items belonging to other components.
+ * Exported so the change-request approval path (postgresStorage) applies the
+ * exact same semantics — single source of truth for the registry state machine.
+ */
+export async function syncRotationalRegistry(oldComponent: Component | null, component: Component): Promise<void> {
+  const rotational = (component as any).rotationalItem === true;
+  const stamp = (component as any).currentStamp as string | null;
+  const vesselId = component.vesselId;
+  const rhSnapshot = {
+    currentRh: componentRhSnapshot(component),
+    rhLastUpdated: (component as any).lastUpdated ?? null,
+  };
+
+  // Previously held stamp = old component row's current_stamp (derived link).
+  const prevStamp = oldComponent && (oldComponent as any).rotationalItem === true
+    ? ((oldComponent as any).currentStamp as string | null)
+    : null;
+
+  // Release the previously held stamp when unmarked, cleared, or changed.
+  if (prevStamp && vesselId && (!rotational || !stamp || stamp !== prevStamp)) {
+    const prevItem = await rotationalItemService.getByStamp(vesselId, prevStamp);
+    if (prevItem && prevItem.status === 'Installed') {
+      await rotationalItemService.detachFromComponent(prevItem.riuuid, rhSnapshot);
+    }
+  }
+
+  if (!rotational || !stamp || !vesselId) return;
+
+  const item = await rotationalItemService.getByStamp(vesselId, stamp);
+  if (!item) {
+    throw new ValidationError(
+      `Stamp "${stamp}" not found in Rotation Item Master. Create it first under PMS → Admin → Master Data → Rotation Item Master List (or bulk import), then select it here.`
+    );
+  }
+  if (item.status === 'Retired') {
+    throw new ValidationError(`Stamp "${stamp}" is retired and cannot be fitted to a component.`);
+  }
+  if (item.status === 'Installed') {
+    // Hard guard against races past pre-validation: never steal a stamp that is
+    // Installed on another component — reject instead of re-linking.
+    const holder = await rotationalItemService.getComponentHoldingStamp(vesselId, stamp);
+    if (holder && holder.cuuid !== component.cuuid) {
+      throw new ValidationError(
+        `Stamp "${stamp}" is already installed on another component${holder.name ? ` (${holder.name})` : ''} on this vessel. Stamps must be unique.`
+      );
+    }
+    return; // already in step (this component holds it)
+  }
+  // Spare / In Store → claim it for this component (guarded write: fails with
+  // 0 rows if a concurrent save claimed/retired the stamp after our checks).
+  const claimed = await rotationalItemService.claimStamp(item.riuuid);
+  if (!claimed) {
+    throw new ValidationError(
+      `Stamp "${stamp}" was just taken or changed by another update. Refresh and pick an available stamp.`
+    );
+  }
+}
 
 const SFI_FORMAT_HINT = 'Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.';
 
@@ -200,6 +342,12 @@ export async function create(data: any): Promise<Component> {
 
   await validateMaker(data.maker, data.makerCode);
 
+  // Rotational Item rules (Task #356): Yes → stamp mandatory & unique; No → stamp cleared
+  normalizeRotationalPayload(data);
+  if (data.rotationalItem === true) {
+    await validateRotationalStamp(data.currentStamp, data.vesselId, null);
+  }
+
   // Duplicate component code check
   if (data.componentCode && data.vesselId) {
     const existing = await repo.findByCodeAndVessel(data.componentCode, data.vesselId);
@@ -254,6 +402,18 @@ export async function create(data: any): Promise<Component> {
   }
 
   const component = await repo.create(data);
+  try {
+    await syncRotationalRegistry(null, component);
+  } catch (rotErr) {
+    // Keep component and registry consistent: if the registry write fails
+    // (e.g. a stamp-unique race), undo the component insert and surface the error.
+    try {
+      await repo.remove(component.cuuid ?? String(component.id));
+    } catch (undoErr) {
+      console.error('[ROTATIONAL] Failed to undo component create after registry error:', undoErr);
+    }
+    throw rotErr;
+  }
   console.log('[API_CREATE] New component:', {
     id: component.cuuid,
     code: component.componentCode,
@@ -331,6 +491,26 @@ export async function update(id: string, data: any, userId: string): Promise<Com
 
   if (data.maker !== undefined || data.makerCode !== undefined) {
     await validateMaker(data.maker, data.makerCode);
+  }
+
+  // Rotational Item rules (Task #356) — effective (post-update) values decide
+  if ('rotationalItem' in data || 'currentStamp' in data || 'stamp' in data) {
+    normalizeRotationalPayload(data);
+    const effectiveRotational = data.rotationalItem !== undefined
+      ? data.rotationalItem === true
+      : (existingComponent as any).rotationalItem === true;
+    const effectiveStamp = data.currentStamp !== undefined
+      ? data.currentStamp
+      : (existingComponent as any).currentStamp;
+    if (effectiveRotational) {
+      await validateRotationalStamp(effectiveStamp, existingComponent.vesselId ?? data.vesselId, existingComponent.cuuid);
+      data.rotationalItem = true;
+      data.currentStamp = typeof effectiveStamp === 'string' ? effectiveStamp.trim() : effectiveStamp;
+    } else {
+      // Not rotational → stamp must be blank
+      data.rotationalItem = false;
+      data.currentStamp = null;
+    }
   }
 
   // Duplicate component code check (only when code is actually changing)
@@ -414,6 +594,18 @@ export async function update(id: string, data: any, userId: string): Promise<Com
     }
   }
 
+  // Rotational registry sync BEFORE the component write: the registry operations are
+  // the ones that can fail (stamp unique conflicts), so run them first — a failure
+  // leaves the component row untouched. The registry ops themselves are idempotent,
+  // so a subsequent component-write failure is repaired by the next successful save.
+  if ('rotationalItem' in data || 'currentStamp' in data) {
+    await syncRotationalRegistry(existingComponent, {
+      ...(existingComponent as any),
+      rotationalItem: data.rotationalItem,
+      currentStamp: data.currentStamp,
+    } as Component);
+  }
+
   // INTERCEPT RH UPDATES
   let component;
   if (data.currentCumulativeRH !== undefined || data.runningHours !== undefined) {
@@ -479,6 +671,18 @@ export async function updateSortOrder(body: any) {
 }
 
 export async function remove(id: string): Promise<void> {
+  // Detach any installed rotational item first so the registry never keeps an
+  // "Installed" link to a deleted component (item becomes Spare, keeps its RH).
+  const existing = await repo.findById(id);
+  if (existing?.cuuid) {
+    const installed = await rotationalItemService.getInstalledForComponent(existing.cuuid);
+    if (installed) {
+      await rotationalItemService.detachFromComponent(installed.riuuid, {
+        currentRh: componentRhSnapshot(existing),
+        rhLastUpdated: (existing as any).lastUpdated ?? null,
+      });
+    }
+  }
   return repo.remove(id);
 }
 

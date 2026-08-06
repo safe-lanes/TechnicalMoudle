@@ -32,6 +32,8 @@ const ComponentChangeRequestForm: React.FC<ComponentChangeRequestFormProps> = ({
     commissioned: initialData.commissioned || "2020-02-01",
     rating: initialData.rating || "12000 kW",
     conditionBased: initialData.conditionBased || "Yes",
+    rotationalItem: initialData.rotationalItem || "No",
+    currentStamp: initialData.currentStamp || "",
     noOfUnits: initialData.noOfUnits || "1",
     equipmentDepartment: initialData.equipmentDepartment || "Engine",
     parentComponent: initialData.parentComponent || "Propulsion System",
@@ -293,6 +295,42 @@ const ComponentChangeRequestForm: React.FC<ComponentChangeRequestFormProps> = ({
                     <SelectItem value="No">No</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-[#52baf3]">Rotational Item</Label>
+                  <Edit className="h-3 w-3 text-[#52baf3] cursor-pointer" />
+                  <Trash2 className="h-3 w-3 text-[#52baf3] cursor-pointer" />
+                </div>
+                <Select
+                  value={componentData.rotationalItem}
+                  onValueChange={(value) => {
+                    handleInputChange('rotationalItem', value);
+                    if (value !== "Yes") handleInputChange('currentStamp', "");
+                  }}
+                >
+                  <SelectTrigger className={`text-sm ${getInputStyle("rotationalItem")}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Yes">Yes</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-[#52baf3]">Stamp{componentData.rotationalItem === "Yes" ? " *" : ""}</Label>
+                  <Edit className="h-3 w-3 text-[#52baf3] cursor-pointer" />
+                  <Trash2 className="h-3 w-3 text-[#52baf3] cursor-pointer" />
+                </div>
+                <Input
+                  value={componentData.currentStamp}
+                  onChange={(e) => handleInputChange('currentStamp', e.target.value)}
+                  disabled={componentData.rotationalItem !== "Yes"}
+                  className={`text-sm ${getInputStyle("currentStamp")}`}
+                />
               </div>
 
               {/* Row 4 */}

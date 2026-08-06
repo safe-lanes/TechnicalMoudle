@@ -983,6 +983,31 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     businessRules: null,
     notes: 'Component RH log entries. Uses vessel_code not vessel_id — sync engine must map via vessel lookup.',
   },
+  rotational_items: {
+    tableName: 'rotational_items',
+    category: 'BOTH_EDITABLE',
+    direction: 'bidirectional',
+    identityColumn: 'riuuid',
+    vesselScopeColumn: 'vessel_id',
+    vesselScopeJoinPath: null,
+    isGlobal: false,
+    isConfigurable: true,
+    businessRules: null,
+    notes: 'Rotational items master registry (physical parts by Stamp, migration 156). Ship performs swaps; shore can create/retire stamps. RH follows the stamp, not the position.',
+  },
+  rotation_history: {
+    tableName: 'rotation_history',
+    category: 'BOTH_EDITABLE',
+    direction: 'bidirectional',
+    identityColumn: 'rhruuid',
+    vesselScopeColumn: 'vessel_id',
+    vesselScopeJoinPath: null,
+    isGlobal: false,
+    isConfigurable: true,
+    businessRules: null,
+    immutable: true,
+    notes: 'Rotational item swap events (migration 157). Insert-only immutable log AND the sync carrier of a swap: components is ONE_WAY_SHORE_TO_SHIP, so derived-update hooks in the appliers re-apply stamp + RH baseline from this row onto the receiving side\'s component (idempotent by rhruuid, latest rotation per component wins). UPDATE trigger (prevent_rotation_history_update) hard-blocks modifications; immutable:true makes appliers ACK re-delivered rows.',
+  },
   component_maintenance_history: {
     tableName: 'component_maintenance_history',
     category: 'BOTH_EDITABLE',
@@ -1650,7 +1675,7 @@ export function getSyncPhaseOrder(): string[][] {
      'certificates', 'surveys', 'vessel_certificate_data', 'vessel_survey_data',
      'running_hours_audit', 'component_running_hours_log',
      'component_maintenance_history', 'ihm_items', 'defect_sequences',
-     'planner_dates', 'locations'],
+     'planner_dates', 'locations', 'rotational_items'],
     // Phase 4: Child entities (FK to parent rows in Phase 3)
     ['work_order_executions', 'work_order_execution_details', 'work_order_postponements',
      // wo_postponement_approvals has a REAL FK to work_order_postponements(id) —
@@ -1660,6 +1685,8 @@ export function getSyncPhaseOrder(): string[][] {
      'spares_history', 'spare_location_stock', 'spare_component_links',
      'stores_ledger', 'inventory_transactions',
      'change_request_attachment', 'change_request_comment', 'change_request_approval',
+     // rotation_history references rotational_items (riuuid) + components — Phase 4 after Phase 3 parents.
+     'rotation_history',
      'ihm_maintenance_log', 'component_documents', 'component_requisitions',
      'superintendent_notifications'],
     // Phase 5: SHIP_ONLY tables
