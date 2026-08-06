@@ -326,6 +326,14 @@ export async function deleteVesselUserMapping(
 const JIT_MAX_ATTEMPTS = 3;
 const jitAttempts = new Map<string, number>();
 
+/**
+ * Drop a user's click-attempt counter. The cap is checked BEFORE the push, so once it is
+ * reached the click path stops even trying — and since the counter is in memory, a restart
+ * was the only cure (proven on production 05-Aug). The sweep calls this after it pushes the
+ * user successfully, so the next click goes straight through.
+ */
+export function clearJitAttempts(userUuid: string): void { jitAttempts.delete(userUuid); }
+
 export interface JitResult { pushed: boolean; reason: string; mappings?: Record<string, number> }
 
 export async function ensureUserPushed(userUuid: string, sailRole: string | null): Promise<JitResult> {
@@ -439,16 +447,29 @@ export async function runReconciliation(opts: { limit?: number } = {}): Promise<
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
 
-  // 2. Users without a successful link (role-mapped only — pushUser enforces it).
-  const pushedUsers = await db.select({ u: shipskartUserLinks.userUuid })
-    .from(shipskartUserLinks).where(eq(shipskartUserLinks.pushStatus, 'pushed'));
-  const pushedUserSet = new Set(pushedUsers.map((r) => r.u));
+  // 2. RETRY-ONLY, NEVER ENROL (06-Aug, Ghazi). This pass used to scan every
+  //    master_users row and push anyone whose SAIL role happened to be mapped. Roles are
+  //    shared across modules, so mapping a role for Purchasing silently enrolled every
+  //    holder of it — that is how ~300 Wah Kwong crew accounts reached the Shipskart
+  //    tenant. Enrolment is now the JIT click's job ALONE (a user exists on Shipskart only
+  //    if they personally opened Purchasing); this pass exists purely so a JIT attempt
+  //    that FAILED is retried durably. Selection is therefore the link table, not the
+  //    user table: no link row = never clicked = nothing to do here.
+  const allUserLinks = await db.select({ u: shipskartUserLinks.userUuid, s: shipskartUserLinks.pushStatus })
+    .from(shipskartUserLinks);
+  const pushedUserSet = new Set(allUserLinks.filter((r) => r.s === 'pushed').map((r) => r.u));
+  const retryUuids = new Set(allUserLinks.filter((r) => r.s !== 'pushed').map((r) => r.u));
   const userRows = await db.select({
     id: masterUsers.id, fullName: masterUsers.fullName, email: masterUsers.email,
     role: masterUsers.role, designation: masterUsers.designation,
   }).from(masterUsers).where(eq(masterUsers.isDeleted, false));
-  for (const mu of userRows.filter((r) => !pushedUserSet.has(r.id)).slice(0, limit)) {
+  for (const mu of userRows.filter((r) => retryUuids.has(r.id)).slice(0, limit)) {
     const st = (await pushUser(mu)).status;
+    // The JIT cap is in memory and is checked BEFORE the push, so a user who burned their
+    // 3 click-attempts stays blocked at the click even after the cause is fixed — until a
+    // process restart. When this pass succeeds, clear the counter so the very next click
+    // works (proven on production 05-Aug: restart was the only cure).
+    if (st === 'pushed' || st === 'already_pushed') clearJitAttempts(mu.id);
     tally(summary.users, st);
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
@@ -465,8 +486,16 @@ export async function runReconciliation(opts: { limit?: number } = {}): Promise<
   }
 
   // 3. Assignments not yet mapped whose both ends might now be pushed.
-  const pendingAssignments = await db.select().from(masterUserVessels)
-    .where(and(eq(masterUserVessels.isActive, true), inArray(masterUserVessels.mapStatus, ['pending', 'awaiting_user', 'awaiting_vessel'])));
+  //    SCOPED TO LINKED USERS (06-Aug): capture-at-login writes an assignment row for
+  //    EVERY user who logs in, crew included. Without this filter the pass would walk all
+  //    of them on every tick and rewrite 'awaiting_user' forever — no Shipskart traffic
+  //    (mapUserToVessel returns before any API call when the user link is absent) but
+  //    pointless DB churn and a summary full of noise. A user with no link row has not
+  //    opened Purchasing, so their vessels are not Shipskart's business yet.
+  const linkedUserUuids = new Set(allUserLinks.map((r) => r.u));
+  const pendingAssignments = (await db.select().from(masterUserVessels)
+    .where(and(eq(masterUserVessels.isActive, true), inArray(masterUserVessels.mapStatus, ['pending', 'awaiting_user', 'awaiting_vessel']))))
+    .filter((a) => linkedUserUuids.has(a.userUuid));
   for (const a of pendingAssignments.slice(0, limit)) {
     const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
     tally(summary.mappings, st);
