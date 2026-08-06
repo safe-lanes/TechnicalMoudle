@@ -30,7 +30,16 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ShoppingCart, RefreshCw, CheckCircle2, AlertTriangle, Loader2, PackageSearch, Zap } from "lucide-react";
+import { ShoppingCart, RefreshCw, CheckCircle2, AlertTriangle, Loader2, PackageSearch, Zap, Ship, Eye } from "lucide-react";
+
+interface VesselSyncRow {
+  vesselId: string; name: string; imo: string | null; outcome: string;
+  shipskartVesselId?: string | null; detail?: string | null; mapped?: number; unmapped?: number;
+}
+interface VesselSyncResult {
+  preview: boolean; startedAt: string; finishedAt?: string;
+  totals: Record<string, number>; rows: VesselSyncRow[]; errors: string[];
+}
 
 interface VesselStatus {
   vesselId: string;
@@ -135,6 +144,8 @@ export default function ShipskartCatalogue() {
           </span>
         </CardContent>
       </Card>
+
+      <VesselSyncCard />
 
       <AlertDialog open={confirmEnable} onOpenChange={setConfirmEnable}>
         <AlertDialogContent>
@@ -285,6 +296,136 @@ export default function ShipskartCatalogue() {
       ) : null}
     </div>
   );
+}
+
+/**
+ * Vessels must exist on Shipskart before any user can be mapped to them, and before a
+ * catalogue can be pushed. This runs on demand — never on a timer — because the domain team
+ * needs to SEE what happened to each vessel. Check first shows what would change without
+ * touching anything; Sync then links the vessels and settles the crew mappings that were
+ * waiting on them.
+ */
+function VesselSyncCard() {
+  const { toast } = useToast();
+  const [preview, setPreview] = useState<VesselSyncResult | null>(null);
+
+  const statusQuery = useQuery<{ running: boolean; lastRun: VesselSyncResult | null }>({
+    queryKey: ["shipskart-vessel-sync-status"],
+    queryFn: async () => (await apiRequest("GET", "/technical/api/shipskart/vessels/sync/status")).json(),
+    refetchInterval: (q) => (q.state.data?.running ? 4_000 : false),
+  });
+
+  const checkMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/technical/api/shipskart/vessels/sync", { preview: true })).json(),
+    onSuccess: (d: VesselSyncResult) => { setPreview(d); toast({ title: "Check complete", description: `${d.rows.length} vessel(s) examined — nothing was changed.` }); },
+    onError: (e: any) => toast({ title: "Check failed", description: String(e?.message ?? e), variant: "destructive" }),
+  });
+
+  const runMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/technical/api/shipskart/vessels/sync", {})).json(),
+    onSuccess: (d: any) => {
+      setPreview(null);
+      toast({
+        title: d?.started ? "Vessel sync started" : "Not started",
+        description: d?.started ? "Running in the background — the table below updates as it goes." : String(d?.message ?? ""),
+        variant: d?.started ? undefined : "destructive",
+      });
+      queryClient.invalidateQueries({ queryKey: ["shipskart-vessel-sync-status"] });
+    },
+    onError: (e: any) => toast({ title: "Could not start", description: String(e?.message ?? e), variant: "destructive" }),
+  });
+
+  const running = statusQuery.data?.running ?? false;
+  const result = preview ?? statusQuery.data?.lastRun ?? null;
+
+  return (
+    <Card data-testid="vessel-sync-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><Ship className="h-4 w-4 text-blue-600" />Vessels on Shipskart</CardTitle>
+        <CardDescription>
+          A vessel must exist on Shipskart before crew can be linked to it or its catalogue pushed. This matches each of our
+          vessels to Shipskart by IMO number — using the existing one where there is one, creating it only when there is not —
+          and then completes any crew links that were waiting for it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" onClick={() => checkMutation.mutate()} disabled={checkMutation.isPending || running} data-testid="btn-vessel-check">
+            {checkMutation.isPending ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Checking…</>) : (<><Eye className="h-4 w-4 mr-2" />Check first (changes nothing)</>)}
+          </Button>
+          <Button onClick={() => runMutation.mutate()} disabled={running || runMutation.isPending} data-testid="btn-vessel-sync">
+            {running ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sync running…</>) : (<><RefreshCw className="h-4 w-4 mr-2" />Sync vessels now</>)}
+          </Button>
+          {running && <Badge variant="secondary" className="animate-pulse">Running in background</Badge>}
+          {result && !running && (
+            <span className="text-sm text-gray-500">
+              {result.preview ? "Check" : "Last run"} {result.finishedAt ? new Date(result.finishedAt).toLocaleString() : ""}
+            </span>
+          )}
+        </div>
+
+        {result && (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(result.totals).map(([k, n]) => (
+                <Badge key={k} variant="secondary" className="font-normal">{friendlyOutcome(k)}: {n}</Badge>
+              ))}
+            </div>
+            {result.errors.length > 0 && (
+              <p className="text-sm text-red-700 bg-red-50 rounded p-2">
+                <AlertTriangle className="h-4 w-4 inline mr-1" />{result.errors[0]}
+                {result.errors.length > 1 && ` (+${result.errors.length - 1} more)`}
+              </p>
+            )}
+            <ScrollArea className="h-72">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Vessel</TableHead>
+                    <TableHead>IMO</TableHead>
+                    <TableHead>Result</TableHead>
+                    <TableHead>Crew links</TableHead>
+                    <TableHead>Detail</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {result.rows.map((r) => (
+                    <TableRow key={r.vesselId}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{r.imo ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{friendlyOutcome(r.outcome)}</TableCell>
+                      <TableCell className="text-xs">
+                        {r.mapped || r.unmapped ? `${r.mapped ?? 0} linked${r.unmapped ? `, ${r.unmapped} removed` : ""}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs max-w-md truncate" title={r.detail ?? ""}>{r.detail ?? ""}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Outcome codes in the domain team's language. */
+function friendlyOutcome(code: string): string {
+  switch (code) {
+    case "adopted": return "Linked to the existing Shipskart vessel";
+    case "would_adopt": return "Would link to the existing Shipskart vessel";
+    case "repointed": return "Corrected — was pointing at the wrong Shipskart vessel";
+    case "would_repoint": return "Would correct a wrong link";
+    case "pushed": return "Created on Shipskart";
+    case "would_create": return "Would be created on Shipskart";
+    case "already_pushed": case "already_linked": return "Already correct";
+    case "invalid_imo": return "IMO number is not 7 digits — fix the vessel record";
+    case "lookup_failed": return "Could not reach Shipskart — safe to retry";
+    case "blocked_duplicate": return "Shipskart refused it as a duplicate";
+    case "error": return "Shipskart returned an error";
+    default: return code;
+  }
 }
 
 function StatBox({ label, value, tone }: { label: string; value: number | string; tone: "ok" | "warn" | "neutral" }) {

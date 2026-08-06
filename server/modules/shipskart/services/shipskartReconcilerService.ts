@@ -49,6 +49,13 @@ const B2B_PACE_MS = Math.max(0, Number(process.env.SHIPSKART_B2B_PACE_MS ?? 5000
 const paceB2b = () => new Promise((r) => setTimeout(r, B2B_PACE_MS));
 /** Statuses that mean a Shipskart API call was actually made (→ pace after them). */
 const API_HIT_STATUSES = new Set(['pushed', 'mapped', 'blocked_duplicate', 'error', 'role_updated', 'role_update_failed', 'unmapped', 'mapping_delete_failed']);
+/**
+ * Vessel statuses that cost at least one API call. Kept SEPARATE from API_HIT_STATUSES
+ * because 'already_pushed' means different things on the two paths: for a vessel it now
+ * implies an IMO lookup was made (pace it), while for a USER it is the free local
+ * no-drift comparison — pacing that would add 5s per untouched user to every sweep.
+ */
+const VESSEL_API_HIT_STATUSES = new Set(['pushed', 'adopted', 'repointed', 'already_pushed', 'blocked_duplicate', 'error', 'lookup_failed']);
 
 /**
  * CALLSIGN SEAM: Shipskart requires callSign and real call signs are not available yet —
@@ -81,16 +88,92 @@ export interface PushResult { status: string; shipskartId?: string; error?: stri
 
 // ── vessels ──
 
+/**
+ * LOOK UP A VESSEL ON THEIR SIDE BY IMO (their get-all-vessels filter, given 06-Aug).
+ * Returns their record, null when absent, or throws when the call itself fails — a failed
+ * LOOKUP must never be read as "not there", or we would create a duplicate of a vessel that
+ * exists (the same silent-empty mistake the catalogue listing made).
+ */
+export async function findRemoteVesselByImo(imo: string): Promise<{ id: string; name: string; imo: string } | null> {
+  const res = await authorizedB2bRequest('GET', `/integration/SAIL/get-all-vessels?filterQuery=${encodeURIComponent(`iMONumber_eq=${imo}`)}`);
+  if (!res.ok) {
+    throw new Error(`vessel lookup by IMO ${imo} failed: HTTP ${res.status} ${JSON.stringify(res.json ?? res.text)?.slice(0, 200)}`);
+  }
+  const hit = (res.json?.items ?? [])[0];
+  return hit?.id ? { id: hit.id, name: String(hit.name ?? ''), imo: String(hit.iMONumber ?? hit.imoNumber ?? '') } : null;
+}
+
+/**
+ * RESOLVE-AND-REPAIR, then create only if genuinely absent (06-Aug, Ghazi).
+ *
+ * Until their lookup existed we could only create blindly, so: a vessel that already
+ * existed on their side was unlinkable forever (their duplicate check answers without an
+ * id — worse, it SUFFIXES the IMO, leaving orphans like '9290294-1'), and a link whose
+ * remote row was deleted stayed 'pushed' with a dead id, breaking every downstream call
+ * silently. Both are now repaired here:
+ *
+ *   our link says      | their side by IMO | outcome
+ *   -------------------|-------------------|---------------------------------------
+ *   pushed, id X       | id X              | already_pushed (no write)
+ *   pushed, id X       | id Y              | 'repointed' — stale id healed
+ *   pushed, id X       | absent            | reset + create (remote row was deleted)
+ *   blocked_duplicate  | found             | 'adopted' — the dead-end state self-heals
+ *   anything           | found             | 'adopted'
+ *   anything           | absent            | create as before
+ *
+ * NAME CONFLICT: found by IMO but the name differs → we still adopt (IMO is the identity)
+ * and record a warning. The reverse case — same NAME, different IMO — cannot be detected
+ * here (the lookup is by IMO); that is the Gas Mia situation and it is the sync-vessels
+ * preview's job to surface it before anyone presses run.
+ */
 export async function pushVessel(v: {
   vuuid: string; name: string; imoNumber: string | null; vesselType?: string | null;
 }): Promise<PushResult> {
   const existing = await b2bRepo.getVesselLink(v.vuuid);
-  if (existing?.pushStatus === 'pushed' && existing.shipskartVesselId) {
-    return { status: 'already_pushed', shipskartId: existing.shipskartVesselId };
-  }
   if (!v.imoNumber || !/^\d{7}$/.test(v.imoNumber)) {
     await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber ?? null, pushStatus: 'invalid_imo', lastError: `IMO must be exactly 7 digits, got '${v.imoNumber ?? ''}'` });
     return { status: 'invalid_imo' };
+  }
+
+  // Ask their side FIRST — a lookup failure aborts (never mistaken for "absent").
+  let remote: { id: string; name: string; imo: string } | null;
+  try {
+    remote = await findRemoteVesselByImo(v.imoNumber);
+  } catch (err: any) {
+    // Keep whatever status the row already had — a lookup outage must not downgrade a
+    // healthy 'pushed' link; only the error text is refreshed so the console shows why.
+    await b2bRepo.upsertVesselLink(v.vuuid, {
+      imoNumber: v.imoNumber,
+      pushStatus: existing?.pushStatus ?? 'pending',
+      shipskartVesselId: existing?.shipskartVesselId ?? null,
+      lastError: String(err?.message || err).slice(0, 400),
+    });
+    return { status: 'lookup_failed', error: String(err?.message || err) };
+  }
+
+  if (remote) {
+    const nameDiffers = remote.name.trim().toLowerCase() !== v.name.trim().toLowerCase();
+    const warning = nameDiffers
+      ? `NAME-MISMATCH: IMO ${v.imoNumber} is '${remote.name}' on Shipskart, '${v.name}' here — linked on IMO, review the names`
+      : null;
+    if (warning) console.warn(`[Shipskart b2b] ${warning}`);
+    if (existing?.pushStatus === 'pushed' && existing.shipskartVesselId === remote.id) {
+      return { status: 'already_pushed', shipskartId: remote.id };
+    }
+    const status = existing?.shipskartVesselId && existing.shipskartVesselId !== remote.id ? 'repointed' : 'adopted';
+    if (status === 'repointed') {
+      console.warn(`[Shipskart b2b] vessel ${v.name}: stored id ${existing!.shipskartVesselId} is stale — repointing to ${remote.id}`);
+    }
+    await b2bRepo.upsertVesselLink(v.vuuid, {
+      imoNumber: v.imoNumber, shipskartVesselId: remote.id, pushStatus: 'pushed', lastError: warning,
+    });
+    return { status, shipskartId: remote.id };
+  }
+
+  // Genuinely absent on their side. A link that still claims 'pushed' means the remote row
+  // was deleted (exactly what happened to the users on 06-Aug) — fall through and re-create.
+  if (existing?.pushStatus === 'pushed' && existing.shipskartVesselId) {
+    console.warn(`[Shipskart b2b] vessel ${v.name}: link says pushed (${existing.shipskartVesselId}) but IMO ${v.imoNumber} is absent on Shipskart — recreating`);
   }
   const vesselEndpoint = process.env.SHIPSKART_B2B_VESSEL_ENDPOINT || '/integration/SAIL/create-vessel-new';
   const cfg = getB2bConfig();
@@ -327,6 +410,34 @@ const JIT_MAX_ATTEMPTS = 3;
 const jitAttempts = new Map<string, number>();
 
 /**
+ * Apply ONE user's outstanding assignment changes: map what capture-at-login added, unmap
+ * what it revoked. Used by the click (crew rotation, see ensureUserPushed) and by the
+ * Sync Vessels action (flush after linking vessels). Never throws — the caller's flow must
+ * not depend on Shipskart being reachable.
+ */
+export async function settleAssignmentChanges(
+  userUuid: string,
+  ctx?: { userFullName?: string | null },
+): Promise<{ mapped: number; unmapped: number; failed: number }> {
+  const out = { mapped: 0, unmapped: 0, failed: 0 };
+  try {
+    const work = await b2bRepo.getPendingAssignmentWork(userUuid);
+    for (const vesselId of work.toMap) {
+      const r = await mapUserToVessel(userUuid, vesselId, { userFullName: ctx?.userFullName ?? undefined });
+      if (r.status === 'mapped') out.mapped++;
+      else if (r.status !== 'awaiting_user' && r.status !== 'awaiting_vessel') out.failed++;
+    }
+    for (const a of work.toUnmap) {
+      const r = await deleteVesselUserMapping({ userUuid, vesselId: a.vesselId, shipskartMappingId: a.shipskartMappingId }, 'unmapped');
+      if (r.status === 'unmapped') out.unmapped++; else out.failed++;
+    }
+  } catch (err: any) {
+    console.warn(`[Shipskart] assignment settle failed for ${userUuid} (non-blocking): ${err?.message || err}`);
+  }
+  return out;
+}
+
+/**
  * Drop a user's click-attempt counter. The cap is checked BEFORE the push, so once it is
  * reached the click path stops even trying — and since the counter is in memory, a restart
  * was the only cure (proven on production 05-Aug). The sweep calls this after it pushes the
@@ -351,6 +462,16 @@ export async function ensureUserPushed(userUuid: string, sailRole: string | null
       if (drift.status === 'role_updated') reason = 'already_pushed_role_updated';
     } catch (err: any) {
       console.warn(`[Shipskart JIT] role-drift check failed for ${userUuid} (user is still in; sweep retries): ${err?.message || err}`);
+    }
+    // CREW ROTATION (06-Aug, Ghazi). Capture-at-login already recorded the change — the
+    // dropped vessel as 'revoked', the new one as 'pending' — but only the sweep ever acted
+    // on it, so with the sweep off a reassigned user kept seeing their OLD vessel and never
+    // the new one, however many times they clicked. Settle this user's own changes here.
+    // Best-effort by design: their Purchasing access does not depend on it, so a failure is
+    // recorded on the assignment row and left for the Sync Vessels action to retry.
+    const rotation = await settleAssignmentChanges(userUuid);
+    if (rotation.mapped || rotation.unmapped || rotation.failed) {
+      reason += ` (assignments: +${rotation.mapped} -${rotation.unmapped}${rotation.failed ? ` !${rotation.failed}` : ''})`;
     }
     return { pushed: true, reason };
   }
@@ -444,7 +565,7 @@ export async function runReconciliation(opts: { limit?: number } = {}): Promise<
   for (const v of vesselRows.filter((r) => !pushedVesselSet.has(r.vuuid)).slice(0, limit)) {
     const st = (await pushVessel(v)).status;
     tally(summary.vessels, st);
-    if (API_HIT_STATUSES.has(st)) await paceB2b();
+    if (VESSEL_API_HIT_STATUSES.has(st)) await paceB2b();
   }
 
   // 2. RETRY-ONLY, NEVER ENROL (06-Aug, Ghazi). This pass used to scan every

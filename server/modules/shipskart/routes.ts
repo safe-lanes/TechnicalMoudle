@@ -30,6 +30,11 @@ router.post('/shipskart/b2b/retry', asyncHandler(shipskartB2bController.retryHan
 // user calls it, not just admins.
 router.post('/shipskart/vessel-assignments', asyncHandler(shipskartB2bController.vesselAssignmentsHandler));
 
+// Vessel sync (06-Aug) — resolve-and-repair vessel links, then flush the mappings that
+// were waiting on them. Human-triggered, never on a timer.
+router.post('/shipskart/vessels/sync', asyncHandler(shipskartB2bController.vesselSyncHandler));
+router.get('/shipskart/vessels/sync/status', asyncHandler(shipskartB2bController.vesselSyncStatusHandler));
+
 // Stage 3D — catalogue push (shore-only inside the service; ledger-backed, resumable)
 router.post('/shipskart/catalogue/push', asyncHandler(shipskartB2bController.cataloguePushHandler));
 router.get('/shipskart/catalogue/status', asyncHandler(shipskartB2bController.catalogueStatusHandler));

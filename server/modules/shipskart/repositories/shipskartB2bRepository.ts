@@ -233,6 +233,30 @@ export async function getActiveVesselIdsForUser(userUuid: string): Promise<strin
 }
 
 /**
+ * ONE user's assignment work: vessels still to map, and mappings still to remove.
+ * Crew rotation writes both at login (capture-at-login marks the dropped vessel 'revoked'
+ * and adds the new one 'pending'), but until 06-Aug only the SWEEP acted on them — so with
+ * the sweep off a reassignment never reached Shipskart and the user kept seeing the OLD
+ * vessel. The click now settles its own user's changes with this.
+ */
+export async function getPendingAssignmentWork(userUuid: string): Promise<{
+  toMap: string[];
+  toUnmap: Array<{ vesselId: string; shipskartMappingId: string }>;
+}> {
+  const db = await getDb();
+  const rows = await db.select().from(masterUserVessels)
+    .where(eq(masterUserVessels.userUuid, userUuid));
+  return {
+    toMap: rows
+      .filter((r) => r.isActive && ['pending', 'awaiting_user', 'awaiting_vessel'].includes(r.mapStatus ?? ''))
+      .map((r) => r.vesselId),
+    toUnmap: rows
+      .filter((r) => !r.isActive && r.mapStatus === 'revoked' && !!r.shipskartMappingId)
+      .map((r) => ({ vesselId: r.vesselId, shipskartMappingId: r.shipskartMappingId as string })),
+  };
+}
+
+/**
  * Console detail: rows that are NOT successfully pushed/mapped, with their errors —
  * the "what needs a human" list. Bounded so a broken tenant cannot return everything.
  */

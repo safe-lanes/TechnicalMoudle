@@ -125,6 +125,32 @@ export async function cataloguePushHandler(req: AuthenticatedRequest, res: Respo
   res.status(202).json({ started: true, vesselId, note: 'running in background — follow GET /shipskart/catalogue/status' });
 }
 
+/**
+ * Admin → Sync Vessels (06-Aug).
+ *   POST /shipskart/vessels/sync { preview? } — preview answers synchronously (read-only,
+ *     one IMO lookup per vessel, no writes); a real run goes to the BACKGROUND because it
+ *     is paced at 5s per call, and the page polls GET /shipskart/vessels/sync/status.
+ *   GET  /shipskart/vessels/sync/status — running flag + the last result (rows + totals).
+ */
+export async function vesselSyncHandler(req: AuthenticatedRequest, res: Response) {
+  const svc = await import('../services/shipskartVesselSyncService');
+  if (req.body?.preview === true) {
+    return res.json(await svc.runVesselSync({ preview: true }));
+  }
+  if (svc.isVesselSyncRunning()) {
+    return res.status(409).json({ started: false, message: 'a vessel sync is already running' });
+  }
+  svc.runVesselSync({ preview: false })
+    .then(r => console.log(`[VesselSync] background run finished: ${JSON.stringify(r.totals)} errors=${r.errors.length}`))
+    .catch(err => console.error('[VesselSync] background run crashed:', err?.message || err));
+  res.status(202).json({ started: true, note: 'running in background — follow GET /shipskart/vessels/sync/status' });
+}
+
+export async function vesselSyncStatusHandler(_req: AuthenticatedRequest, res: Response) {
+  const svc = await import('../services/shipskartVesselSyncService');
+  res.json({ running: svc.isVesselSyncRunning(), lastRun: svc.getLastVesselSync() });
+}
+
 /** GET /shipskart/catalogue/status — per-vessel/per-entity ledger counts + recent failures. */
 export async function catalogueStatusHandler(_req: AuthenticatedRequest, res: Response) {
   const links = await import('../repositories/shipskartCatalogueLinkRepository');
