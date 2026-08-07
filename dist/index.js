@@ -38741,6 +38741,7 @@ __export(shipskartB2bRepository_exports, {
   failingRows: () => failingRows,
   getActiveVesselIdsForUser: () => getActiveVesselIdsForUser,
   getAssignment: () => getAssignment,
+  getPendingAssignmentWork: () => getPendingAssignmentWork,
   getTenantConfig: () => getTenantConfig,
   getUserLink: () => getUserLink,
   getVesselLink: () => getVesselLink,
@@ -38898,6 +38899,14 @@ async function getActiveVesselIdsForUser(userUuid) {
   const db2 = await getDb();
   const rows = await db2.select({ v: masterUserVessels.vesselId }).from(masterUserVessels).where(and27(eq31(masterUserVessels.userUuid, userUuid), eq31(masterUserVessels.isActive, true)));
   return rows.map((r) => r.v);
+}
+async function getPendingAssignmentWork(userUuid) {
+  const db2 = await getDb();
+  const rows = await db2.select().from(masterUserVessels).where(eq31(masterUserVessels.userUuid, userUuid));
+  return {
+    toMap: rows.filter((r) => r.isActive && ["pending", "awaiting_user", "awaiting_vessel"].includes(r.mapStatus ?? "")).map((r) => r.vesselId),
+    toUnmap: rows.filter((r) => !r.isActive && r.mapStatus === "revoked" && !!r.shipskartMappingId).map((r) => ({ vesselId: r.vesselId, shipskartMappingId: r.shipskartMappingId }))
+  };
 }
 async function failingRows(limit = 100) {
   const db2 = await getDb();
@@ -39283,13 +39292,16 @@ var init_shipskartRoleSource = __esm({
 // server/modules/shipskart/services/shipskartReconcilerService.ts
 var shipskartReconcilerService_exports = {};
 __export(shipskartReconcilerService_exports, {
+  clearJitAttempts: () => clearJitAttempts,
   deleteVesselUserMapping: () => deleteVesselUserMapping,
   ensureUserPushed: () => ensureUserPushed,
+  findRemoteVesselByImo: () => findRemoteVesselByImo,
   mapUserToVessel: () => mapUserToVessel,
   pushUser: () => pushUser,
   pushVessel: () => pushVessel,
   resolveCallSign: () => resolveCallSign,
-  runReconciliation: () => runReconciliation
+  runReconciliation: () => runReconciliation,
+  settleAssignmentChanges: () => settleAssignmentChanges
 });
 import crypto6 from "crypto";
 import { inArray as inArray8, eq as eq32, and as and28 } from "drizzle-orm";
@@ -39307,14 +39319,53 @@ function resolveVesselTypeCode(vesselType) {
   if (t.includes("lng") || t.includes("gas")) return "7";
   return "99";
 }
+async function findRemoteVesselByImo(imo) {
+  const res = await authorizedB2bRequest("GET", `/integration/SAIL/get-all-vessels?filterQuery=${encodeURIComponent(`iMONumber_eq=${imo}`)}`);
+  if (!res.ok) {
+    throw new Error(`vessel lookup by IMO ${imo} failed: HTTP ${res.status} ${JSON.stringify(res.json ?? res.text)?.slice(0, 200)}`);
+  }
+  const hit = (res.json?.items ?? [])[0];
+  return hit?.id ? { id: hit.id, name: String(hit.name ?? ""), imo: String(hit.iMONumber ?? hit.imoNumber ?? "") } : null;
+}
 async function pushVessel(v) {
   const existing = await getVesselLink(v.vuuid);
-  if (existing?.pushStatus === "pushed" && existing.shipskartVesselId) {
-    return { status: "already_pushed", shipskartId: existing.shipskartVesselId };
-  }
   if (!v.imoNumber || !/^\d{7}$/.test(v.imoNumber)) {
     await upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber ?? null, pushStatus: "invalid_imo", lastError: `IMO must be exactly 7 digits, got '${v.imoNumber ?? ""}'` });
     return { status: "invalid_imo" };
+  }
+  let remote;
+  try {
+    remote = await findRemoteVesselByImo(v.imoNumber);
+  } catch (err) {
+    await upsertVesselLink(v.vuuid, {
+      imoNumber: v.imoNumber,
+      pushStatus: existing?.pushStatus ?? "pending",
+      shipskartVesselId: existing?.shipskartVesselId ?? null,
+      lastError: String(err?.message || err).slice(0, 400)
+    });
+    return { status: "lookup_failed", error: String(err?.message || err) };
+  }
+  if (remote) {
+    const nameDiffers = remote.name.trim().toLowerCase() !== v.name.trim().toLowerCase();
+    const warning = nameDiffers ? `NAME-MISMATCH: IMO ${v.imoNumber} is '${remote.name}' on Shipskart, '${v.name}' here \u2014 linked on IMO, review the names` : null;
+    if (warning) console.warn(`[Shipskart b2b] ${warning}`);
+    if (existing?.pushStatus === "pushed" && existing.shipskartVesselId === remote.id) {
+      return { status: "already_pushed", shipskartId: remote.id };
+    }
+    const status2 = existing?.shipskartVesselId && existing.shipskartVesselId !== remote.id ? "repointed" : "adopted";
+    if (status2 === "repointed") {
+      console.warn(`[Shipskart b2b] vessel ${v.name}: stored id ${existing.shipskartVesselId} is stale \u2014 repointing to ${remote.id}`);
+    }
+    await upsertVesselLink(v.vuuid, {
+      imoNumber: v.imoNumber,
+      shipskartVesselId: remote.id,
+      pushStatus: "pushed",
+      lastError: warning
+    });
+    return { status: status2, shipskartId: remote.id };
+  }
+  if (existing?.pushStatus === "pushed" && existing.shipskartVesselId) {
+    console.warn(`[Shipskart b2b] vessel ${v.name}: link says pushed (${existing.shipskartVesselId}) but IMO ${v.imoNumber} is absent on Shipskart \u2014 recreating`);
   }
   const vesselEndpoint = process.env.SHIPSKART_B2B_VESSEL_ENDPOINT || "/integration/SAIL/create-vessel-new";
   const cfg = getB2bConfig();
@@ -39481,6 +39532,28 @@ async function deleteVesselUserMapping(a, after = "unmapped") {
   await upsertAssignment(a.userUuid, a.vesselId, { lastError: `mapping delete failed: ${error}` });
   return { status: "mapping_delete_failed", error };
 }
+async function settleAssignmentChanges(userUuid, ctx) {
+  const out = { mapped: 0, unmapped: 0, failed: 0 };
+  try {
+    const work = await getPendingAssignmentWork(userUuid);
+    for (const vesselId of work.toMap) {
+      const r = await mapUserToVessel(userUuid, vesselId, { userFullName: ctx?.userFullName ?? void 0 });
+      if (r.status === "mapped") out.mapped++;
+      else if (r.status !== "awaiting_user" && r.status !== "awaiting_vessel") out.failed++;
+    }
+    for (const a of work.toUnmap) {
+      const r = await deleteVesselUserMapping({ userUuid, vesselId: a.vesselId, shipskartMappingId: a.shipskartMappingId }, "unmapped");
+      if (r.status === "unmapped") out.unmapped++;
+      else out.failed++;
+    }
+  } catch (err) {
+    console.warn(`[Shipskart] assignment settle failed for ${userUuid} (non-blocking): ${err?.message || err}`);
+  }
+  return out;
+}
+function clearJitAttempts(userUuid) {
+  jitAttempts.delete(userUuid);
+}
 async function ensureUserPushed(userUuid, sailRole) {
   const existing = await getUserLink(userUuid);
   if (existing?.pushStatus === "pushed" && existing.shipskartUserId) {
@@ -39493,6 +39566,10 @@ async function ensureUserPushed(userUuid, sailRole) {
       if (drift.status === "role_updated") reason = "already_pushed_role_updated";
     } catch (err) {
       console.warn(`[Shipskart JIT] role-drift check failed for ${userUuid} (user is still in; sweep retries): ${err?.message || err}`);
+    }
+    const rotation = await settleAssignmentChanges(userUuid);
+    if (rotation.mapped || rotation.unmapped || rotation.failed) {
+      reason += ` (assignments: +${rotation.mapped} -${rotation.unmapped}${rotation.failed ? ` !${rotation.failed}` : ""})`;
     }
     return { pushed: true, reason };
   }
@@ -39563,10 +39640,11 @@ async function runReconciliation(opts = {}) {
   for (const v of vesselRows.filter((r) => !pushedVesselSet.has(r.vuuid)).slice(0, limit)) {
     const st = (await pushVessel(v)).status;
     tally(summary.vessels, st);
-    if (API_HIT_STATUSES.has(st)) await paceB2b();
+    if (VESSEL_API_HIT_STATUSES.has(st)) await paceB2b();
   }
-  const pushedUsers = await db2.select({ u: shipskartUserLinks.userUuid }).from(shipskartUserLinks).where(eq32(shipskartUserLinks.pushStatus, "pushed"));
-  const pushedUserSet = new Set(pushedUsers.map((r) => r.u));
+  const allUserLinks = await db2.select({ u: shipskartUserLinks.userUuid, s: shipskartUserLinks.pushStatus }).from(shipskartUserLinks);
+  const pushedUserSet = new Set(allUserLinks.filter((r) => r.s === "pushed").map((r) => r.u));
+  const retryUuids = new Set(allUserLinks.filter((r) => r.s !== "pushed").map((r) => r.u));
   const userRows = await db2.select({
     id: masterUsers.id,
     fullName: masterUsers.fullName,
@@ -39574,8 +39652,9 @@ async function runReconciliation(opts = {}) {
     role: masterUsers.role,
     designation: masterUsers.designation
   }).from(masterUsers).where(eq32(masterUsers.isDeleted, false));
-  for (const mu of userRows.filter((r) => !pushedUserSet.has(r.id)).slice(0, limit)) {
+  for (const mu of userRows.filter((r) => retryUuids.has(r.id)).slice(0, limit)) {
     const st = (await pushUser(mu)).status;
+    if (st === "pushed" || st === "already_pushed") clearJitAttempts(mu.id);
     tally(summary.users, st);
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
@@ -39584,7 +39663,8 @@ async function runReconciliation(opts = {}) {
     if (st !== "already_pushed") tally(summary.users, st);
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
-  const pendingAssignments = await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, ["pending", "awaiting_user", "awaiting_vessel"])));
+  const linkedUserUuids = new Set(allUserLinks.map((r) => r.u));
+  const pendingAssignments = (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, ["pending", "awaiting_user", "awaiting_vessel"])))).filter((a) => linkedUserUuids.has(a.userUuid));
   for (const a of pendingAssignments.slice(0, limit)) {
     const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
     tally(summary.mappings, st);
@@ -39607,7 +39687,7 @@ async function runReconciliation(opts = {}) {
   console.log(`[Shipskart b2b] reconciliation pass: vessels=${JSON.stringify(summary.vessels)} users=${JSON.stringify(summary.users)} mappings=${JSON.stringify(summary.mappings)}`);
   return summary;
 }
-var DEFAULT_BATCH_LIMIT, B2B_PACE_MS, paceB2b, API_HIT_STATUSES, tally, isDuplicate400, JIT_MAX_ATTEMPTS, jitAttempts;
+var DEFAULT_BATCH_LIMIT, B2B_PACE_MS, paceB2b, API_HIT_STATUSES, VESSEL_API_HIT_STATUSES, tally, isDuplicate400, JIT_MAX_ATTEMPTS, jitAttempts;
 var init_shipskartReconcilerService = __esm({
   "server/modules/shipskart/services/shipskartReconcilerService.ts"() {
     "use strict";
@@ -39623,6 +39703,7 @@ var init_shipskartReconcilerService = __esm({
     B2B_PACE_MS = Math.max(0, Number(process.env.SHIPSKART_B2B_PACE_MS ?? 5e3));
     paceB2b = () => new Promise((r) => setTimeout(r, B2B_PACE_MS));
     API_HIT_STATUSES = /* @__PURE__ */ new Set(["pushed", "mapped", "blocked_duplicate", "error", "role_updated", "role_update_failed", "unmapped", "mapping_delete_failed"]);
+    VESSEL_API_HIT_STATUSES = /* @__PURE__ */ new Set(["pushed", "adopted", "repointed", "already_pushed", "blocked_duplicate", "error", "lookup_failed"]);
     tally = (acc, s) => {
       acc[s] = (acc[s] || 0) + 1;
       return acc;
@@ -40374,6 +40455,143 @@ var init_shipskartCataloguePushService = __esm({
   }
 });
 
+// server/modules/shipskart/services/shipskartVesselSyncService.ts
+var shipskartVesselSyncService_exports = {};
+__export(shipskartVesselSyncService_exports, {
+  getLastVesselSync: () => getLastVesselSync,
+  isVesselSyncRunning: () => isVesselSyncRunning,
+  runVesselSync: () => runVesselSync
+});
+function isVesselSyncRunning() {
+  return inFlight2;
+}
+function getLastVesselSync() {
+  return lastRun2;
+}
+async function activeVessels() {
+  const pool4 = await getPool();
+  if (!pool4) throw Object.assign(new Error("Database not initialized"), { statusCode: 503 });
+  const { rows } = await pool4.query(
+    `SELECT vuuid, name, imo_number AS "imoNumber", vessel_type AS "vesselType"
+       FROM vessels WHERE is_active = true AND is_deleted = false ORDER BY name`
+  );
+  return rows;
+}
+async function usersAwaitingOn(vesselVuuid) {
+  const pool4 = await getPool();
+  if (!pool4) return [];
+  const { rows } = await pool4.query(
+    `SELECT DISTINCT user_uuid FROM master_user_vessels
+      WHERE vessel_id = $1
+        AND ( (is_active = true  AND map_status IN ('pending','awaiting_user','awaiting_vessel'))
+           OR (is_active = false AND map_status = 'revoked' AND shipskart_mapping_id IS NOT NULL) )`,
+    [vesselVuuid]
+  );
+  return rows.map((r) => r.user_uuid);
+}
+async function runVesselSync(opts = {}) {
+  const preview = opts.preview === true;
+  const res = { preview, startedAt: (/* @__PURE__ */ new Date()).toISOString(), totals: {}, rows: [], errors: [] };
+  if (!preview) {
+    if (inFlight2) {
+      res.errors.push("a vessel sync is already running");
+      return res;
+    }
+    inFlight2 = true;
+  }
+  if (await isShipInstance()) {
+    if (!preview) inFlight2 = false;
+    res.errors.push("refused: Shipskart sync is shore-only");
+    return res;
+  }
+  const tally2 = (k) => {
+    res.totals[k] = (res.totals[k] || 0) + 1;
+  };
+  try {
+    const vessels2 = await activeVessels();
+    for (const v of vessels2) {
+      const row = { vesselId: v.vuuid, name: v.name, imo: v.imoNumber, outcome: "pending" };
+      if (!v.imoNumber || !/^\d{7}$/.test(v.imoNumber)) {
+        row.outcome = "invalid_imo";
+        row.detail = `IMO must be exactly 7 digits, got '${v.imoNumber ?? ""}' \u2014 fix it in the vessel record, it cannot be looked up or created`;
+        res.rows.push(row);
+        tally2(row.outcome);
+        continue;
+      }
+      if (preview) {
+        try {
+          const remote = await findRemoteVesselByImo(v.imoNumber);
+          const link = await getVesselLink(v.vuuid);
+          if (!remote) {
+            row.outcome = "would_create";
+            row.detail = link?.shipskartVesselId ? `link holds ${link.shipskartVesselId} but that IMO is absent on Shipskart \u2014 it would be recreated` : null;
+          } else if (link?.pushStatus === "pushed" && link.shipskartVesselId === remote.id) {
+            row.outcome = "already_linked";
+            row.shipskartVesselId = remote.id;
+          } else if (link?.shipskartVesselId && link.shipskartVesselId !== remote.id) {
+            row.outcome = "would_repoint";
+            row.shipskartVesselId = remote.id;
+            row.detail = `stored ${link.shipskartVesselId} \u2192 ${remote.id}`;
+          } else {
+            row.outcome = "would_adopt";
+            row.shipskartVesselId = remote.id;
+          }
+          if (remote && remote.name.trim().toLowerCase() !== v.name.trim().toLowerCase()) {
+            row.detail = `${row.detail ? row.detail + " \xB7 " : ""}name differs on Shipskart: '${remote.name}'`;
+          }
+        } catch (err) {
+          row.outcome = "lookup_failed";
+          row.detail = String(err?.message || err).slice(0, 300);
+        }
+        res.rows.push(row);
+        tally2(row.outcome);
+        await sleep2(PACE_MS2);
+        continue;
+      }
+      const r = await pushVessel({ vuuid: v.vuuid, name: v.name, imoNumber: v.imoNumber, vesselType: v.vesselType });
+      row.outcome = r.status;
+      row.shipskartVesselId = r.shipskartId ?? null;
+      if (r.error) row.detail = String(r.error).slice(0, 300);
+      if (r.status === "lookup_failed" || r.status === "error") res.errors.push(`${v.name}: ${row.detail ?? r.status}`);
+      await sleep2(PACE_MS2);
+      if (r.shipskartId) {
+        row.mapped = 0;
+        row.unmapped = 0;
+        for (const userUuid of await usersAwaitingOn(v.vuuid)) {
+          const s = await settleAssignmentChanges(userUuid);
+          row.mapped += s.mapped;
+          row.unmapped += s.unmapped;
+          if (s.mapped || s.unmapped) await sleep2(PACE_MS2);
+        }
+      }
+      res.rows.push(row);
+      tally2(row.outcome);
+    }
+  } catch (err) {
+    res.errors.push(String(err?.message || err));
+  } finally {
+    if (!preview) inFlight2 = false;
+    res.finishedAt = (/* @__PURE__ */ new Date()).toISOString();
+    lastRun2 = res;
+    console.log(`[VesselSync] ${preview ? "PREVIEW" : "RUN"} finished: ${JSON.stringify(res.totals)} errors=${res.errors.length}`);
+  }
+  return res;
+}
+var PACE_MS2, sleep2, inFlight2, lastRun2;
+var init_shipskartVesselSyncService = __esm({
+  "server/modules/shipskart/services/shipskartVesselSyncService.ts"() {
+    "use strict";
+    init_db();
+    init_shipskartReconcilerService();
+    init_shipskartB2bRepository();
+    init_syncRole();
+    PACE_MS2 = Math.max(0, Number(process.env.SHIPSKART_B2B_PACE_MS ?? 5e3));
+    sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
+    inFlight2 = false;
+    lastRun2 = null;
+  }
+});
+
 // server/modules/noon-report/utils/fuelConversionFactors.ts
 function computeCiiRefLine(dwt) {
   if (!dwt || dwt <= 0) return null;
@@ -40758,7 +40976,7 @@ function envInt(name, def) {
   const n = parseInt(v, 10);
   return Number.isFinite(n) ? n : def;
 }
-var BOOT_DELAY_MS2, CONCURRENCY, JITTER_MS, TIMEOUT_ALERTS_MS, TIMEOUT_HEALTH_MS, TIMEOUT_PRUNING_MS, TIMEOUT_DRIFT_MS, sleep2, MaintenanceOrchestrator, maintenanceOrchestrator;
+var BOOT_DELAY_MS2, CONCURRENCY, JITTER_MS, TIMEOUT_ALERTS_MS, TIMEOUT_HEALTH_MS, TIMEOUT_PRUNING_MS, TIMEOUT_DRIFT_MS, sleep3, MaintenanceOrchestrator, maintenanceOrchestrator;
 var init_maintenanceOrchestrator = __esm({
   "server/services/maintenanceOrchestrator.ts"() {
     "use strict";
@@ -40774,7 +40992,7 @@ var init_maintenanceOrchestrator = __esm({
     TIMEOUT_HEALTH_MS = envInt("MAINT_HEALTH_TIMEOUT_MS", 5 * 6e4);
     TIMEOUT_PRUNING_MS = envInt("MAINT_PRUNING_TIMEOUT_MS", 30 * 6e4);
     TIMEOUT_DRIFT_MS = envInt("MAINT_DRIFT_TIMEOUT_MS", 15 * 6e4);
-    sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
+    sleep3 = (ms) => new Promise((r) => setTimeout(r, ms));
     MaintenanceOrchestrator = class {
       tasks = [
         { name: "alerts", intervalMs: 5 * 6e4, timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
@@ -40824,7 +41042,7 @@ var init_maintenanceOrchestrator = __esm({
           }
           const tenants2 = await tenantConnectionManager.getActiveTenants();
           await this.runWithConcurrency(tenants2, CONCURRENCY, async (t) => {
-            await sleep2(Math.floor(Math.random() * JITTER_MS));
+            await sleep3(Math.floor(Math.random() * JITTER_MS));
             await this.runOne(task, t.tuid, t.tuid);
           });
         } catch (err) {
@@ -40849,7 +41067,7 @@ var init_maintenanceOrchestrator = __esm({
         });
         await Promise.race([
           real,
-          sleep2(task.timeoutMs).then(() => {
+          sleep3(task.timeoutMs).then(() => {
             if (this.inProgress.get(guardKey)) {
               console.warn(`[Maint] ${guardKey} exceeded ${task.timeoutMs}ms \u2014 slot freed; guard held until completion`);
             }
@@ -78469,11 +78687,11 @@ async function executeTool(toolName, args, storage2) {
           flag: vessels.flag,
           isActive: vessels.isActive
         }).from(vessels);
-        const activeVessels = allVessels.filter((v) => v.isActive !== false);
+        const activeVessels2 = allVessels.filter((v) => v.isActive !== false);
         return {
           totalVessels: allVessels.length,
-          activeVessels: activeVessels.length,
-          inactiveVessels: allVessels.length - activeVessels.length,
+          activeVessels: activeVessels2.length,
+          inactiveVessels: allVessels.length - activeVessels2.length,
           vessels: allVessels.map((v) => ({
             id: v.id,
             name: v.name || "Unnamed Vessel",
@@ -81901,6 +82119,21 @@ async function cataloguePushHandler(req, res) {
   svc.pushVesselCatalogue(vesselId, opts).then((r) => console.log(`[CataloguePush] background run finished for ${vesselId}: errors=${r.errors.length} warnings=${r.warnings.length}`)).catch((err) => console.error(`[CataloguePush] background run crashed for ${vesselId}:`, err?.message || err));
   res.status(202).json({ started: true, vesselId, note: "running in background \u2014 follow GET /shipskart/catalogue/status" });
 }
+async function vesselSyncHandler(req, res) {
+  const svc = await Promise.resolve().then(() => (init_shipskartVesselSyncService(), shipskartVesselSyncService_exports));
+  if (req.body?.preview === true) {
+    return res.json(await svc.runVesselSync({ preview: true }));
+  }
+  if (svc.isVesselSyncRunning()) {
+    return res.status(409).json({ started: false, message: "a vessel sync is already running" });
+  }
+  svc.runVesselSync({ preview: false }).then((r) => console.log(`[VesselSync] background run finished: ${JSON.stringify(r.totals)} errors=${r.errors.length}`)).catch((err) => console.error("[VesselSync] background run crashed:", err?.message || err));
+  res.status(202).json({ started: true, note: "running in background \u2014 follow GET /shipskart/vessels/sync/status" });
+}
+async function vesselSyncStatusHandler(_req, res) {
+  const svc = await Promise.resolve().then(() => (init_shipskartVesselSyncService(), shipskartVesselSyncService_exports));
+  res.json({ running: svc.isVesselSyncRunning(), lastRun: svc.getLastVesselSync() });
+}
 async function catalogueStatusHandler(_req, res) {
   const links = await Promise.resolve().then(() => (init_shipskartCatalogueLinkRepository(), shipskartCatalogueLinkRepository_exports));
   res.json({
@@ -81953,6 +82186,8 @@ router24.get("/shipskart/b2b/reconciler-config", asyncHandler(getReconcilerConfi
 router24.put("/shipskart/b2b/reconciler-config", asyncHandler(putReconcilerConfigHandler));
 router24.post("/shipskart/b2b/retry", asyncHandler(retryHandler));
 router24.post("/shipskart/vessel-assignments", asyncHandler(vesselAssignmentsHandler));
+router24.post("/shipskart/vessels/sync", asyncHandler(vesselSyncHandler));
+router24.get("/shipskart/vessels/sync/status", asyncHandler(vesselSyncStatusHandler));
 router24.post("/shipskart/catalogue/push", asyncHandler(cataloguePushHandler));
 router24.get("/shipskart/catalogue/status", asyncHandler(catalogueStatusHandler));
 router24.get("/shipskart/catalogue/status/:vesselId", asyncHandler(catalogueVesselStatusHandler));
