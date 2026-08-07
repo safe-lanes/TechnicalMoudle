@@ -28,7 +28,26 @@ export async function jobDueScan(req: Request, res: Response) {
   const vesselId = req.body?.vesselId;
   console.log(`🔍 Manual job due scan triggered${vesselId ? ` for vessel: ${vesselId}` : ' for ALL vessels'}`);
 
-  const results = await jobDueScanner.runScan();
+  // SHORE gating (migration 161): this admin endpoint used to invoke runScan() for ALL
+  // vessels and ignored the supplied vesselId entirely. On shore it now requires a
+  // specific vessel AND that vessel's office-generation switch to be ON. Ship instances
+  // keep the original ungated behavior (their scanner is the normal writer).
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (!(await isShipInstance())) {
+    if (!vesselId || typeof vesselId !== 'string') {
+      return res.status(400).json({ success: false, message: 'A specific vesselId is required to run a job due scan from the office.' });
+    }
+    const { isOfficeWoGenerationEnabled } = await import('../../work-orders/services/workOrderGenerationGate');
+    if (!(await isOfficeWoGenerationEnabled(vesselId))) {
+      return res.status(403).json({
+        success: false,
+        error: 'OFFICE_GENERATION_DISABLED',
+        message: 'Office work-order generation is not enabled for this vessel. A Sail Admin can enable it per vessel on the Lead Time & Grace Period Settings screen.',
+      });
+    }
+  }
+
+  const results = await jobDueScanner.runScan(typeof vesselId === 'string' ? vesselId : undefined);
   console.log('✅ Manual job due scan completed:', results);
 
   res.json({

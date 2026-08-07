@@ -115,6 +115,31 @@ export async function deletePmsVesselSettings(req: Request, res: Response) {
   res.json({ success: true });
 }
 
+// PUT /pms-vessel-settings/:vesselId/office-wo-generation — per-vessel kill switch
+// (migration 161) for office-side WO generation. Shore-only (403 on ship — the setting
+// syncs ONE_WAY shore→ship), Sail Admin / Super Admin only. Mirrors the approval-policy
+// endpoint's enforcement pattern: server-side refusal, not UI-only hiding.
+const OFFICE_WO_SWITCH_EDITOR_ROLES = new Set(['Sail Admin', 'Super Admin']);
+
+export async function updateOfficeWoGenerationSwitch(req: Request, res: Response) {
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (await isShipInstance()) {
+    return res.status(403).json({ error: 'shore_only', message: 'Office work-order generation is configured on the shore server.' });
+  }
+  const userRole = ((req as any).user?.forwardedRole || (req as any).user?.role || '').trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: 'forbidden', message: 'Only Sail Admin / Super Admin may change office work-order generation.' });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled (boolean) is required' });
+  }
+  const username = (req as any).user?.username || 'unknown';
+  const settings = await service.setOfficeWoGenerationEnabled(req.params.vesselId, enabled, username);
+  console.log(`[OfficeWoSwitch] vessel=${req.params.vesselId} office_wo_generation_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, officeWoGenerationEnabled: settings.officeWoGenerationEnabled, updatedBy: settings.updatedBy });
+}
+
 // ── Company Standard Grace Settings controllers ──
 
 export async function getCompanyStandardGraceSettings(_req: Request, res: Response) {

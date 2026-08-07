@@ -474,6 +474,29 @@ export async function getJobMaintenanceHistory(jobId: string, user: UserInfo) {
 
 // ── Generate Work Order ──
 
+/**
+ * Rebaseline job tracking (migration 161 escape hatch): stamps tracking_rebaselined_at
+ * NOW() on the job and its component links so the next shore→ship sync is AUTHORIZED to
+ * overwrite the ship's tracking columns. Instance/role enforcement is in the controller.
+ */
+export async function rebaselineJobTracking(jobId: string, username: string) {
+  const job = await repo.findById(jobId);
+  if (!job) throw new NotFoundError('Job not found');
+
+  const { getPool } = await import('../../../db');
+  const pool = await getPool();
+  const jobRes = await pool.query(
+    `UPDATE jobs SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE juuid = $1`,
+    [jobId],
+  );
+  const linkRes = await pool.query(
+    `UPDATE job_component_links SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE job_id = $1`,
+    [jobId],
+  );
+  console.log(`[Rebaseline] job ${job.jobNo || jobId} tracking rebaselined by ${username} (links: ${linkRes.rowCount ?? 0})`);
+  return { success: true, jobId, jobStamped: (jobRes.rowCount ?? 0) > 0, linksStamped: linkRes.rowCount ?? 0 };
+}
+
 export async function generateWorkOrder(jobId: string, reason: string, activeComponentCode?: string) {
   if (!reason || !['Planning', 'Breakdown', 'Other'].includes(reason)) {
     throw new ValidationError("Invalid reason. Must be 'Planning', 'Breakdown', or 'Other'");
@@ -485,6 +508,19 @@ export async function generateWorkOrder(jobId: string, reason: string, activeCom
   }
   if (job.isActive === false) {
     throw new ValidationError('Cannot generate work orders for an inactive job');
+  }
+
+  // Per-vessel office kill switch (migration 161): this per-job path previously
+  // bypassed the generation gate entirely. Ship instances stay ungated (their own
+  // scanner/manual generation is the normal single-writer path).
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (!(await isShipInstance())) {
+    const { isOfficeWoGenerationEnabled } = await import('../../work-orders/services/workOrderGenerationGate');
+    if (!job.vesselId || !(await isOfficeWoGenerationEnabled(job.vesselId))) {
+      throw new ForbiddenError(
+        'Office work-order generation is not enabled for this vessel. A Sail Admin can enable it per vessel on the Lead Time & Grace Period Settings screen.',
+      );
+    }
   }
 
   const { jobDueScanner } = await import('../../../services/jobDueScanner');

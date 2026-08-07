@@ -14,6 +14,16 @@ import {
 } from "../utils/workOrderStatus";
 import type { InsertWorkOrder, Job, PmsVesselSettings, Component } from "@shared/schema";
 import { parseWorkOrderDate } from "@shared/workOrders/dateParse";
+import { getEffectiveInstanceId } from "../modules/sync/syncRole";
+
+/**
+ * Explicit origin marker (migration 161) stamped on every system-generated WO so
+ * office-created rows are identifiable without relying on sync_field_log history.
+ * Never throws — origin marking must not block generation.
+ */
+async function resolveOriginInstance(): Promise<string | null> {
+  try { return (await getEffectiveInstanceId()) || null; } catch { return null; }
+}
 
 /**
  * Determine if a job is "critical" based on its jobPriority
@@ -134,6 +144,38 @@ export class JobDueScannerService {
       };
     }
     this.runInProgress = true;
+
+    // ── CENTRAL SHORE GATE (migration 161) ────────────────────────────────
+    // Every caller funnels through runScan (schedulers, admin scan, generate-now,
+    // office RH updates via runningHoursService, WO completion re-scan). On a SHORE
+    // instance a scan must be scoped to ONE vessel AND that vessel's office
+    // generation switch must be ON — fail closed. Ship instances are ungated.
+    try {
+      const { isShipInstance } = await import('../modules/sync/syncRole');
+      if (!(await isShipInstance())) {
+        const { isOfficeWoGenerationEnabled } = await import('../modules/work-orders/services/workOrderGenerationGate');
+        if (!scopeVesselId || !(await isOfficeWoGenerationEnabled(scopeVesselId))) {
+          console.log(`[JobDueScanner] SHORE gate refused scan (${scopeVesselId ? `vessel ${scopeVesselId} switch OFF` : 'unscoped scan not allowed on shore'})`);
+          this.runInProgress = false;
+          return {
+            calendarJobsChecked: 0, calendarWOsGenerated: 0,
+            rhJobsChecked: 0, rhWOsGenerated: 0,
+            dualJobsChecked: 0, dualWOsGenerated: 0,
+            skipped: true,
+          };
+        }
+      }
+    } catch (gateErr: any) {
+      // Fail closed on shore-gate errors — never generate on an unverifiable state.
+      console.error(`[JobDueScanner] shore gate check failed (${gateErr?.message || gateErr}) — refusing scan`);
+      this.runInProgress = false;
+      return {
+        calendarJobsChecked: 0, calendarWOsGenerated: 0,
+        rhJobsChecked: 0, rhWOsGenerated: 0,
+        dualJobsChecked: 0, dualWOsGenerated: 0,
+        skipped: true,
+      };
+    }
 
     const scopeLabel = scopeVesselId ? `vessel ${scopeVesselId}` : 'all vessels';
     console.log(`[JobDueScanner] Starting job due scan (${scopeLabel})...`);
@@ -396,6 +438,7 @@ export class JobDueScannerService {
         const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
         
         const workOrderData: InsertWorkOrder = {
+          generatedByInstance: await resolveOriginInstance(),
           vesselId: job.vesselId,
           component: componentName,
           componentCode: componentCode, // Use linked component's code
@@ -644,6 +687,7 @@ export class JobDueScannerService {
 
         // D6: Record BOTH calendar and RH snapshots
         const workOrderData: InsertWorkOrder = {
+          generatedByInstance: await resolveOriginInstance(),
           vesselId: job.vesselId,
           component: componentName,
           componentCode: componentCode,
@@ -1092,6 +1136,7 @@ export class JobDueScannerService {
     const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, effectiveComponentCode, job.vesselId || undefined);
     
     const workOrderData: InsertWorkOrder = {
+      generatedByInstance: await resolveOriginInstance(),
       vesselId: job.vesselId,
       component: effectiveComponentName,
       componentCode: effectiveComponentCode,

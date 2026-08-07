@@ -181,14 +181,19 @@ export async function receivePushData(
   //     needsFullRows requests, BEFORE the field logs, so this same push's re-offered
   //     fragments find the rows present and apply as normal updates. Only-if-absent by
   //     construction (applyFullRowsIfAbsent) — cannot overwrite anything.
+  // Completion-learning candidates (shore learns ship WO completions → job tracking).
+  const completionWouuids = new Set<string>();
+
   let selfHealInserted = 0;
   if (payload.fullRows && payload.fullRows.length > 0) {
+    const { collectCompletionWouuidsFromFullRows } = await import('./shipCompletionLearner');
     for (const t of payload.fullRows) {
       const config = getTableSyncConfig(t.tableName);
       if (!config || config.category !== 'BOTH_EDITABLE') {
         console.warn(`[Sync Push] Self-heal fullRows rejected for non-BOTH_EDITABLE table: ${t.tableName}`);
         continue;
       }
+      collectCompletionWouuidsFromFullRows(t.tableName, t.rows).forEach(w => completionWouuids.add(w));
       const r = await applyFullRowsIfAbsent(t.tableName, t.rows);
       selfHealInserted += r.inserted;
       if (r.errors.length > 0) r.errors.slice(0, 3).forEach(e => syncDiag(`SELF-HEAL APPLY ERROR: ${e.substring(0, 150)}`));
@@ -263,6 +268,17 @@ export async function receivePushData(
         // Phase 1: Detect INSERT groups (all oldValue=null) and insert new rows
         const insertResult = await applyFieldLogInserts(acceptedLogs, client);
         fieldLogsApplied += insertResult.insertedRows;
+        // Completion learning candidates from APPLIED insert-groups only: exclude logs
+        // that were dropped (failedRowUuids) or deferred to the update path (updateLogs —
+        // those are collected at their own apply-success point below).
+        {
+          const { collectCompletionWouuidsFromLogs } = await import('./shipCompletionLearner');
+          const deferred = new Set(insertResult.updateLogs);
+          const dropped = new Set(insertResult.failedRowUuids || []);
+          const appliedInsertLogs = acceptedLogs.filter(l =>
+            (l.oldValue === null || l.oldValue === undefined) && !deferred.has(l as any) && !dropped.has(l.rowUuid));
+          collectCompletionWouuidsFromLogs(appliedInsertLogs).forEach(w => completionWouuids.add(w));
+        }
         fieldLogApplyErrors += insertResult.errors.length;
         (insertResult.failedRowUuids || []).forEach(r => droppedRowUuids.add(r));
         (insertResult.needsFullRows || []).forEach(n => needsFullRows.push(n));
@@ -547,6 +563,14 @@ export async function receivePushData(
             }
 
             fieldLogsApplied++;
+            // Completion learning candidate — ONLY on successful apply (stale/conflict/
+            // insert-origin skips above `continue` before reaching here). ANY applied
+            // work_orders field qualifies: completion fields can arrive in a later batch
+            // than the status change, and the learner filters by the row's PERSISTED
+            // status (advance-only per leg → re-runs are no-ops).
+            if (log.tableName === 'work_orders') {
+              completionWouuids.add(log.rowUuid);
+            }
             try { await client.query(`RELEASE SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
           } catch (err: any) {
             try { await client.query(`ROLLBACK TO SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
@@ -728,6 +752,22 @@ export async function receivePushData(
           }
         }
 
+        // 3b. COMPLETION LEARNING (same transaction, same client): work_orders status
+        //     changes that landed a completed value advance the linked shore job's
+        //     tracking columns using the received WO snapshot — closing the gap where
+        //     shore jobs go stale (jobs sync one-way shore→ship, ship completions never
+        //     updated shore jobs, and the shore sweep generated phantom overdue WOs).
+        {
+          const { learnFromShipCompletions } = await import('./shipCompletionLearner');
+          // completionWouuids was populated ONLY from changes that actually APPLIED
+          // (insert-groups that landed + update logs that passed the stale/conflict
+          // guards) plus self-heal fullRows — never from merely-accepted logs.
+          if (completionWouuids.size > 0) {
+            await learnFromShipCompletions(client, Array.from(completionWouuids));
+            completionWouuids.clear(); // consumed inside this transaction
+          }
+        }
+
         await client.query('COMMIT');
       } catch (txErr: any) {
         await client.query('ROLLBACK');
@@ -738,6 +778,31 @@ export async function receivePushData(
       }
     }
     totalReceived += fieldLogsStored;
+  }
+
+  // Completion learning for pushes that carried completed WOs ONLY as self-heal full
+  // rows (no accepted field logs → the shared transaction above never ran). Same
+  // learner, its own short transaction. No-op when the set was already consumed.
+  if (completionWouuids.size > 0) {
+    try {
+      const { learnFromShipCompletions } = await import('./shipCompletionLearner');
+      const pool = await getPool();
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+        await learnFromShipCompletions(client, Array.from(completionWouuids));
+        await client.query('COMMIT');
+      } catch (learnErr: any) {
+        try { await client.query('ROLLBACK'); } catch { /* non-fatal */ }
+        syncDiag(`COMPLETION-LEARN (fullRows-only) tx failed: ${String(learnErr?.message || learnErr).substring(0, 160)}`);
+      } finally {
+        client.release();
+      }
+      completionWouuids.clear();
+    } catch (learnOuterErr: any) {
+      syncDiag(`COMPLETION-LEARN (fullRows-only) setup failed: ${String(learnOuterErr?.message || learnOuterErr).substring(0, 160)}`);
+    }
   }
 
   // Update batch stats

@@ -116,6 +116,26 @@ export async function getJobMaintenanceHistory(req: Request, res: Response) {
 
 // ── Generate Work Order ──
 
+// ── Rebaseline job tracking (migration 161 escape hatch) ──
+// Shore Sail Admin / Super Admin only: stamps tracking_rebaselined_at on the job and its
+// component links so the NEXT shore→ship sync is authorized to overwrite the ship's
+// tracking columns. Use only when the office deliberately resets a job's cycle.
+const REBASELINE_ROLES = new Set(['Sail Admin', 'Super Admin']);
+
+export async function rebaselineJobTracking(req: Request, res: Response) {
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (await isShipInstance()) {
+    return res.status(403).json({ error: 'shore_only', message: 'Job tracking rebaseline is a shore (office) action.' });
+  }
+  const user = (req as AuthenticatedRequest).user;
+  const role = ((user as any)?.forwardedRole || user?.role || '').trim();
+  if (!REBASELINE_ROLES.has(role)) {
+    return res.status(403).json({ error: 'forbidden', message: 'Only Sail Admin / Super Admin may rebaseline job tracking.' });
+  }
+  const result = await jobService.rebaselineJobTracking(req.params.id, user?.username || 'unknown');
+  res.json(result);
+}
+
 export async function generateWorkOrder(req: Request, res: Response) {
   const { reason, activeComponentCode } = req.body;
   const result = await jobService.generateWorkOrder(req.params.id, reason, activeComponentCode);

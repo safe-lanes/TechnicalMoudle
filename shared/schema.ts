@@ -1194,6 +1194,9 @@ export const jobs = pgTable("jobs", {
   nextDueDate: text("next_due_date"), // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar-based jobs)
   lastDoneRH: text("last_done_rh"), // Last completion running hours (for RH-based jobs)
   nextDueRH: text("next_due_rh"), // Calculated: lastDoneRH + frequencyValue (for RH-based jobs)
+  // Authorized-rebaseline stamp (migration 161): shore tracking values only pass the
+  // one-way applier's job-tracking guard when this incoming stamp is newer than local.
+  trackingRebaselinedAt: timestamp("tracking_rebaselined_at"),
   jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
   classRelated: text("class_related"), // 'Yes' | 'No'
   briefWorkDescription: text("brief_work_description"),
@@ -1276,6 +1279,9 @@ export const workOrders = pgTable("work_orders", {
   nextDueDate: text("next_due_date"),
   nextDueReading: text("next_due_reading"),
   currentReading: text("current_reading"),
+  // Explicit origin marker (migration 161): SYNC instance id that generated this WO
+  // (system generation paths only). Identifies office-created rows without log history.
+  generatedByInstance: text("generated_by_instance"),
   classRelated: text("class_related"), // 'Yes' | 'No'
   jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
   briefWorkDescription: text("brief_work_description"),
@@ -2349,6 +2355,10 @@ export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   locationAName: text("location_a_name").notNull().default("Location A"),
   locationBName: text("location_b_name").notNull().default("Location B"),
 
+  // Office WO generation kill switch (migration 161): per-vessel opt-in for the shore
+  // daily sweep and all office generation entry points. Default OFF (fail closed).
+  officeWoGenerationEnabled: boolean("office_wo_generation_enabled").notNull().default(false),
+
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
@@ -3259,6 +3269,8 @@ export const jobComponentLinks = pgTable("job_component_links", {
   nextDueDate: text("next_due_date"), // Calculated next due date for THIS component
   lastDoneRH: text("last_done_rh"), // Last completion running hours for THIS component
   nextDueRH: text("next_due_rh"), // Calculated next due RH for THIS component
+  // Authorized-rebaseline stamp (migration 161) — see jobs.trackingRebaselinedAt.
+  trackingRebaselinedAt: timestamp("tracking_rebaselined_at"),
   updatedAt: updatedAtColumn(),
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
