@@ -127,23 +127,24 @@ export async function cataloguePushHandler(req: AuthenticatedRequest, res: Respo
 
 /**
  * Admin → Sync Vessels (06-Aug).
- *   POST /shipskart/vessels/sync { preview? } — preview answers synchronously (read-only,
- *     one IMO lookup per vessel, no writes); a real run goes to the BACKGROUND because it
- *     is paced at 5s per call, and the page polls GET /shipskart/vessels/sync/status.
+ *   POST /shipskart/vessels/sync { preview? } — BOTH the preview and the real run go to the
+ *     background and answer 202 at once; the page follows GET /shipskart/vessels/sync/status.
+ *     The preview used to answer synchronously, but it is paced at 5s per vessel just like a
+ *     run, so on a real fleet it outlived the gateway timeout and the browser got a 504 while
+ *     the work continued server-side (dev, 07-Aug). Nothing was lost — a preview writes
+ *     nothing — but the page never received its result.
  *   GET  /shipskart/vessels/sync/status — running flag + the last result (rows + totals).
  */
 export async function vesselSyncHandler(req: AuthenticatedRequest, res: Response) {
   const svc = await import('../services/shipskartVesselSyncService');
-  if (req.body?.preview === true) {
-    return res.json(await svc.runVesselSync({ preview: true }));
-  }
+  const preview = req.body?.preview === true;
   if (svc.isVesselSyncRunning()) {
     return res.status(409).json({ started: false, message: 'a vessel sync is already running' });
   }
-  svc.runVesselSync({ preview: false })
-    .then(r => console.log(`[VesselSync] background run finished: ${JSON.stringify(r.totals)} errors=${r.errors.length}`))
-    .catch(err => console.error('[VesselSync] background run crashed:', err?.message || err));
-  res.status(202).json({ started: true, note: 'running in background — follow GET /shipskart/vessels/sync/status' });
+  svc.runVesselSync({ preview })
+    .then(r => console.log(`[VesselSync] background ${preview ? 'preview' : 'run'} finished: ${JSON.stringify(r.totals)} errors=${r.errors.length}`))
+    .catch(err => console.error('[VesselSync] background job crashed:', err?.message || err));
+  res.status(202).json({ started: true, preview, note: 'running in background — follow GET /shipskart/vessels/sync/status' });
 }
 
 export async function vesselSyncStatusHandler(_req: AuthenticatedRequest, res: Response) {

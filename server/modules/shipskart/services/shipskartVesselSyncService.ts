@@ -85,12 +85,14 @@ export async function runVesselSync(opts: { preview?: boolean } = {}): Promise<V
   // refetches at once; if the flag were set after an await, that refetch would read
   // running:false, polling (which only starts while running) would never begin, and the page
   // would sit dead for the whole run — seen in browser testing 06-Aug.
-  if (!preview) {
-    if (inFlight) { res.errors.push('a vessel sync is already running'); return res; }
-    inFlight = true;
-  }
+  // PREVIEW COUNTS TOO (07-Aug): it is paced at 5s per vessel exactly like a real run, so on
+  // a real fleet it outlasts any gateway timeout — the browser got a 504 while the work
+  // carried on server-side. It is therefore a background job as well, and two of these must
+  // never overlap on the same rate-limited API.
+  if (inFlight) { res.errors.push('a vessel sync is already running'); return res; }
+  inFlight = true;
   if (await isShipInstance()) {
-    if (!preview) inFlight = false;
+    inFlight = false;
     res.errors.push('refused: Shipskart sync is shore-only');
     return res;
   }
@@ -156,7 +158,7 @@ export async function runVesselSync(opts: { preview?: boolean } = {}): Promise<V
   } catch (err: any) {
     res.errors.push(String(err?.message || err));
   } finally {
-    if (!preview) inFlight = false;
+    inFlight = false;
     res.finishedAt = new Date().toISOString();
     lastRun = res;
     console.log(`[VesselSync] ${preview ? 'PREVIEW' : 'RUN'} finished: ${JSON.stringify(res.totals)} errors=${res.errors.length}`);

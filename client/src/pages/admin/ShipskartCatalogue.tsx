@@ -307,36 +307,37 @@ export default function ShipskartCatalogue() {
  */
 function VesselSyncCard() {
   const { toast } = useToast();
-  const [preview, setPreview] = useState<VesselSyncResult | null>(null);
 
+  // BOTH buttons start a background job and return at once; the result arrives through this
+  // poll. The check used to be awaited inline, which meant a fleet-sized check outlived the
+  // gateway timeout and the browser saw a 504 (dev, 07-Aug) even though the server finished.
   const statusQuery = useQuery<{ running: boolean; lastRun: VesselSyncResult | null }>({
     queryKey: ["shipskart-vessel-sync-status"],
     queryFn: async () => (await apiRequest("GET", "/technical/api/shipskart/vessels/sync/status")).json(),
     refetchInterval: (q) => (q.state.data?.running ? 4_000 : false),
   });
 
-  const checkMutation = useMutation({
-    mutationFn: async () => (await apiRequest("POST", "/technical/api/shipskart/vessels/sync", { preview: true })).json(),
-    onSuccess: (d: VesselSyncResult) => { setPreview(d); toast({ title: "Check complete", description: `${d.rows.length} vessel(s) examined — nothing was changed.` }); },
-    onError: (e: any) => toast({ title: "Check failed", description: String(e?.message ?? e), variant: "destructive" }),
-  });
-
-  const runMutation = useMutation({
-    mutationFn: async () => (await apiRequest("POST", "/technical/api/shipskart/vessels/sync", {})).json(),
+  const start = (preview: boolean) => ({
+    mutationFn: async () =>
+      (await apiRequest("POST", "/technical/api/shipskart/vessels/sync", preview ? { preview: true } : {})).json(),
     onSuccess: (d: any) => {
-      setPreview(null);
       toast({
-        title: d?.started ? "Vessel sync started" : "Not started",
-        description: d?.started ? "Running in the background — the table below updates as it goes." : String(d?.message ?? ""),
-        variant: d?.started ? undefined : "destructive",
+        title: d?.started ? (preview ? "Check started" : "Vessel sync started") : "Not started",
+        description: d?.started
+          ? "Running in the background — the table below fills in as it goes. You can leave this page."
+          : String(d?.message ?? ""),
+        variant: d?.started ? undefined : ("destructive" as const),
       });
       queryClient.invalidateQueries({ queryKey: ["shipskart-vessel-sync-status"] });
     },
-    onError: (e: any) => toast({ title: "Could not start", description: String(e?.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not start", description: String(e?.message ?? e), variant: "destructive" as const }),
   });
 
+  const checkMutation = useMutation(start(true));
+  const runMutation = useMutation(start(false));
+
   const running = statusQuery.data?.running ?? false;
-  const result = preview ?? statusQuery.data?.lastRun ?? null;
+  const result = statusQuery.data?.lastRun ?? null;
 
   return (
     <Card data-testid="vessel-sync-card">
@@ -351,10 +352,10 @@ function VesselSyncCard() {
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="outline" onClick={() => checkMutation.mutate()} disabled={checkMutation.isPending || running} data-testid="btn-vessel-check">
-            {checkMutation.isPending ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Checking…</>) : (<><Eye className="h-4 w-4 mr-2" />Check first (changes nothing)</>)}
+            {running && result?.preview !== false ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Checking…</>) : (<><Eye className="h-4 w-4 mr-2" />Check first (changes nothing)</>)}
           </Button>
           <Button onClick={() => runMutation.mutate()} disabled={running || runMutation.isPending} data-testid="btn-vessel-sync">
-            {running ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sync running…</>) : (<><RefreshCw className="h-4 w-4 mr-2" />Sync vessels now</>)}
+            {running ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Running…</>) : (<><RefreshCw className="h-4 w-4 mr-2" />Sync vessels now</>)}
           </Button>
           {running && <Badge variant="secondary" className="animate-pulse">Running in background</Badge>}
           {result && !running && (
