@@ -421,7 +421,7 @@ function friendlyOutcome(code: string): string {
     case "pushed": return "Created on Shipskart";
     case "would_create": return "Would be created on Shipskart";
     case "already_pushed": case "already_linked": return "Already correct";
-    case "invalid_imo": return "IMO number is not 7 digits — fix the vessel record";
+    case "invalid_imo": return "IMO number is blank — fill it in the vessel record";
     case "lookup_failed": return "Could not reach Shipskart — safe to retry";
     case "blocked_duplicate": return "Shipskart refused it as a duplicate";
     case "error": return "Shipskart returned an error";

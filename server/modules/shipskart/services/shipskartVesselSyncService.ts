@@ -103,16 +103,20 @@ export async function runVesselSync(opts: { preview?: boolean } = {}): Promise<V
     for (const v of vessels) {
       const row: VesselSyncRow = { vesselId: v.vuuid, name: v.name, imo: v.imoNumber, outcome: 'pending' };
 
-      if (!v.imoNumber || !/^\d{7}$/.test(v.imoNumber)) {
+      // Blank is the only bar (07-Aug): the IMO is the key we match Shipskart on, so an
+      // empty one has nothing to match — any other value is accepted and used verbatim.
+      const imo = (v.imoNumber ?? '').trim();
+      if (!imo) {
         row.outcome = 'invalid_imo';
-        row.detail = `IMO must be exactly 7 digits, got '${v.imoNumber ?? ''}' — fix it in the vessel record, it cannot be looked up or created`;
+        row.detail = 'IMO number is blank — it is the key we match on, so fill it in the vessel record';
         res.rows.push(row); tally(row.outcome); continue;
       }
+      row.imo = imo;
 
       if (preview) {
         // Read-only: one lookup, no writes, no creates.
         try {
-          const remote = await findRemoteVesselByImo(v.imoNumber);
+          const remote = await findRemoteVesselByImo(imo);
           const link = await b2bRepo.getVesselLink(v.vuuid);
           if (!remote) {
             row.outcome = 'would_create';
@@ -137,7 +141,7 @@ export async function runVesselSync(opts: { preview?: boolean } = {}): Promise<V
       }
 
       // ── run ──
-      const r = await pushVessel({ vuuid: v.vuuid, name: v.name, imoNumber: v.imoNumber, vesselType: v.vesselType });
+      const r = await pushVessel({ vuuid: v.vuuid, name: v.name, imoNumber: imo, vesselType: v.vesselType });
       row.outcome = r.status;
       row.shipskartVesselId = r.shipskartId ?? null;
       if (r.error) row.detail = String(r.error).slice(0, 300);

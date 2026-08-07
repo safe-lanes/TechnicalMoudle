@@ -130,20 +130,25 @@ export async function pushVessel(v: {
   vuuid: string; name: string; imoNumber: string | null; vesselType?: string | null;
 }): Promise<PushResult> {
   const existing = await b2bRepo.getVesselLink(v.vuuid);
-  if (!v.imoNumber || !/^\d{7}$/.test(v.imoNumber)) {
-    await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber ?? null, pushStatus: 'invalid_imo', lastError: `IMO must be exactly 7 digits, got '${v.imoNumber ?? ''}'` });
+  // BLANK IS THE ONLY BAR (07-Aug, Ghazi). This used to demand exactly 7 digits, which
+  // blocked vessels whose recorded IMO is legitimately not in that shape. The IMO is still
+  // the matching key, so an empty one is refused — there would be nothing to match on — but
+  // any non-empty value is accepted as-is and looked up verbatim.
+  const imo = (v.imoNumber ?? '').trim();
+  if (!imo) {
+    await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: null, pushStatus: 'invalid_imo', lastError: 'IMO number is blank — it is the key we match on, so fill it in the vessel record' });
     return { status: 'invalid_imo' };
   }
 
   // Ask their side FIRST — a lookup failure aborts (never mistaken for "absent").
   let remote: { id: string; name: string; imo: string } | null;
   try {
-    remote = await findRemoteVesselByImo(v.imoNumber);
+    remote = await findRemoteVesselByImo(imo);
   } catch (err: any) {
     // Keep whatever status the row already had — a lookup outage must not downgrade a
     // healthy 'pushed' link; only the error text is refreshed so the console shows why.
     await b2bRepo.upsertVesselLink(v.vuuid, {
-      imoNumber: v.imoNumber,
+      imoNumber: imo,
       pushStatus: existing?.pushStatus ?? 'pending',
       shipskartVesselId: existing?.shipskartVesselId ?? null,
       lastError: String(err?.message || err).slice(0, 400),
@@ -154,7 +159,7 @@ export async function pushVessel(v: {
   if (remote) {
     const nameDiffers = remote.name.trim().toLowerCase() !== v.name.trim().toLowerCase();
     const warning = nameDiffers
-      ? `NAME-MISMATCH: IMO ${v.imoNumber} is '${remote.name}' on Shipskart, '${v.name}' here — linked on IMO, review the names`
+      ? `NAME-MISMATCH: IMO ${imo} is '${remote.name}' on Shipskart, '${v.name}' here — linked on IMO, review the names`
       : null;
     if (warning) console.warn(`[Shipskart b2b] ${warning}`);
     if (existing?.pushStatus === 'pushed' && existing.shipskartVesselId === remote.id) {
@@ -165,7 +170,7 @@ export async function pushVessel(v: {
       console.warn(`[Shipskart b2b] vessel ${v.name}: stored id ${existing!.shipskartVesselId} is stale — repointing to ${remote.id}`);
     }
     await b2bRepo.upsertVesselLink(v.vuuid, {
-      imoNumber: v.imoNumber, shipskartVesselId: remote.id, pushStatus: 'pushed', lastError: warning,
+      imoNumber: imo, shipskartVesselId: remote.id, pushStatus: 'pushed', lastError: warning,
     });
     return { status, shipskartId: remote.id };
   }
@@ -173,15 +178,15 @@ export async function pushVessel(v: {
   // Genuinely absent on their side. A link that still claims 'pushed' means the remote row
   // was deleted (exactly what happened to the users on 06-Aug) — fall through and re-create.
   if (existing?.pushStatus === 'pushed' && existing.shipskartVesselId) {
-    console.warn(`[Shipskart b2b] vessel ${v.name}: link says pushed (${existing.shipskartVesselId}) but IMO ${v.imoNumber} is absent on Shipskart — recreating`);
+    console.warn(`[Shipskart b2b] vessel ${v.name}: link says pushed (${existing.shipskartVesselId}) but IMO ${imo} is absent on Shipskart — recreating`);
   }
   const vesselEndpoint = process.env.SHIPSKART_B2B_VESSEL_ENDPOINT || '/integration/SAIL/create-vessel-new';
   const cfg = getB2bConfig();
   const res = await authorizedB2bRequest('POST', vesselEndpoint, {
     body: { data: {
       name: v.name,
-      imoNumber: v.imoNumber,
-      callSign: resolveCallSign(v),
+      imoNumber: imo,
+      callSign: resolveCallSign({ imoNumber: imo }),
       type: resolveVesselTypeCode(v.vesselType ?? null),
       operationalStatus: '1',
       // smcId IS required in practice: create accepts its omission, but map-user-to-vessel
@@ -195,12 +200,12 @@ export async function pushVessel(v: {
   });
   const shipskartId = res.json?.data?.id;
   if (res.ok && shipskartId) {
-    await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber, shipskartVesselId: shipskartId, pushStatus: 'pushed', lastError: null });
+    await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: imo, shipskartVesselId: shipskartId, pushStatus: 'pushed', lastError: null });
     return { status: 'pushed', shipskartId };
   }
   const status = isDuplicate400(res) ? 'blocked_duplicate' : 'error';
   const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
-  await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber, pushStatus: status, lastError: error });
+  await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: imo, pushStatus: status, lastError: error });
   return { status, error };
 }
 
