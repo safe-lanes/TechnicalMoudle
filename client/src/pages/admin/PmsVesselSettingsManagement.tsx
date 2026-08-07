@@ -153,6 +153,30 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
   const settingsMap = new Map(allSettings.map(s => [s.vesselId, s]));
 
+  // Office WO generation kill switch (migration 161): shore Sail Admin / Super Admin only.
+  const { hasRole } = useAuth();
+  const { isShore } = useSyncInstanceInfo();
+  const canToggleOfficeWoGeneration = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
+
+  const officeWoSwitchMutation = useMutation({
+    mutationFn: async (data: { vesselId: string; enabled: boolean }) => {
+      const res = await apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}/office-wo-generation`, { enabled: data.enabled });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
+      toast({
+        title: data.officeWoGenerationEnabled ? "Office generation ENABLED" : "Office generation DISABLED",
+        description: data.officeWoGenerationEnabled
+          ? "The office will now generate work orders for this vessel in the daily sweep and manual generation."
+          : "The office will not generate work orders for this vessel. The ship's own generation is unaffected.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not change office generation", description: error?.message, variant: "destructive" });
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (data: { vesselId: string; settings: typeof formData }) => {
       return apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}`, data.settings);
@@ -412,6 +436,28 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                     {summary}
                   </span>
                 </div>
+                {canToggleOfficeWoGeneration && (
+                  <div
+                    className="mt-3 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`row-office-wo-generation-${vessel.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">Office WO Generation</p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {settingsMap.get(vessel.id)?.officeWoGenerationEnabled
+                          ? "Office generates work orders for this vessel"
+                          : "Off — ship-only generation (default)"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settingsMap.get(vessel.id)?.officeWoGenerationEnabled === true}
+                      disabled={officeWoSwitchMutation.isPending}
+                      onCheckedChange={(checked) => officeWoSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
+                      data-testid={`switch-office-wo-generation-${vessel.id}`}
+                    />
+                  </div>
+                )}
                 <Button 
                   variant="ghost" 
                   size="sm" 

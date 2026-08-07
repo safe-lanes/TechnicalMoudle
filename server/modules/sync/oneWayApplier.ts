@@ -229,6 +229,42 @@ export async function applyRotationToComponent(conn: any, rowData: Record<string
  * @param rows - Array of row objects to upsert
  * @returns Counts of inserts, updates, soft-deletes, and any per-row errors
  */
+/** Ship-owned tracking columns on jobs / job_component_links (snake_case, DB names). */
+export const JOB_TRACKING_COLUMNS = ['last_done_date', 'next_due_date', 'last_done_rh', 'next_due_rh'] as const;
+
+function toTimeOrNull(v: any): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const d = v instanceof Date ? v : new Date(String(v));
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+
+/**
+ * Pure decision for the job tracking-column guard (migration 161).
+ * Returns the snake_case tracking columns to STRIP from the incoming shore row.
+ *  - Authorized rebaseline: incoming tracking_rebaselined_at strictly newer than local
+ *    → strip nothing (shore values pass through).
+ *  - Otherwise: strip each tracking column whose LOCAL value is non-NULL (ship data
+ *    is fresher by construction); NULL-local columns still accept the shore value
+ *    (fresh provisioning must keep working).
+ */
+export function evaluateJobTrackingGuard(localRow: Record<string, any>, incomingRow: Record<string, any>): string[] {
+  const incomingStamp = toTimeOrNull(incomingRow['tracking_rebaselined_at'] ?? incomingRow['trackingRebaselinedAt']);
+  const localStamp = toTimeOrNull(localRow['tracking_rebaselined_at'] ?? localRow['trackingRebaselinedAt']);
+  if (incomingStamp !== null && (localStamp === null || incomingStamp > localStamp)) {
+    return []; // authorized rebaseline — let shore tracking values through
+  }
+  const strip: string[] = [];
+  for (const col of JOB_TRACKING_COLUMNS) {
+    const localVal = localRow[col];
+    if (localVal !== null && localVal !== undefined && localVal !== '') {
+      strip.push(col);
+    }
+  }
+  // Without a newer authorized stamp, never let an incoming stamp overwrite the local one.
+  if (strip.length > 0) strip.push('tracking_rebaselined_at');
+  return strip;
+}
+
 export async function applyOneWayRows(
   tableName: string,
   rows: any[]
@@ -354,13 +390,44 @@ export async function applyOneWayRows(
           );
           result.softDeleted++;
         } else {
+          let rowToApply = row;
+          // ── Job tracking-column guard (migration 161) ─────────────────────
+          // jobs / job_component_links are ONE_WAY shore→ship full-row applies with no
+          // protected columns: any shore job edit would overwrite the SHIP's fresher
+          // last-done/next-due tracking (ship completions never sync into shore jobs, so
+          // shore tracking is chronically stale). Preserve local non-NULL tracking values
+          // unless the incoming row carries a NEWER tracking_rebaselined_at stamp (the
+          // authorized admin rebaseline escape hatch). Definition fields flow unchanged.
+          if (tableName === 'jobs' || tableName === 'job_component_links') {
+            try {
+              const localRes = await pool.query(
+                `SELECT last_done_date, next_due_date, last_done_rh, next_due_rh, tracking_rebaselined_at
+                   FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
+                whereValues
+              );
+              if (localRes.rows.length > 0) {
+                const strip = evaluateJobTrackingGuard(localRes.rows[0], row);
+                if (strip.length > 0) {
+                  rowToApply = { ...row };
+                  for (const col of strip) {
+                    delete rowToApply[col];
+                    delete rowToApply[toCamelCase(col)];
+                  }
+                  syncDiag(`JOB-TRACKING-GUARD: ${tableName} row preserved local tracking columns [${strip.join(',')}] — incoming shore values stripped (no newer rebaseline stamp)`);
+                }
+              }
+            } catch (guardErr: any) {
+              // Never let the guard break the apply; missing columns on a not-yet-migrated
+              // instance simply skip protection (pre-161 behavior).
+              syncDiag(`JOB-TRACKING-GUARD lookup failed for ${tableName}: ${String(guardErr?.message || guardErr).substring(0, 120)}`);
+            }
+          }
           // ── Rotational shore-revert guard ─────────────────────────────────
           // components full-row apply overwrites ALL columns (there is no protected-column
           // list). If a shore component edit was sent BEFORE shore received this side's
           // rotation event, its stale current_stamp/RH would revert the local swap with
           // nothing to re-correct it. When the local latest rotation for the component is
           // newer than the incoming row's updated_at, preserve the local stamp + RH columns.
-          let rowToApply = row;
           if (tableName === 'components') {
             const cuuid = row['cuuid'] || row['Cuuid'] || row[toCamelCase('cuuid')];
             if (cuuid) {

@@ -673,110 +673,34 @@ export async function completeWorkOrder(
     }
 
     if (job) {
-      const jobUpdates: any = {};
-      const linkUpdates: any = { updatedAt: new Date() };
+      // Cycle math extracted to the SHARED helper (jobCycleCalc) so the shore
+      // completion-learning hook computes identical values from synced ship
+      // completions. Semantics unchanged: Calendar/Dual/RH legs, D2 RH
+      // conditionality, R1 completion-RH source — see the helper's header.
+      const { computeJobCycleUpdates } = await import('@shared/workOrders/jobCycleCalc');
+      const { jobUpdates, linkUpdates: calcLinkUpdates } = computeJobCycleUpdates({
+        maintenanceBasis: workOrder.maintenanceBasis,
+        dateOfCompletion,
+        completionRH: cycleRH,
+        originalDueDate,
+        job,
+      });
+      const linkUpdates: any = { updatedAt: new Date(), ...calcLinkUpdates };
 
       const woComponentId = (workOrder as any).componentId || component.cuuid;
 
-      // Calendar-based job cycle update
-      if (workOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
-        const { calculateNextDueDate } = await import('@shared/dateUtils');
-        linkUpdates.lastDoneDate = dateOfCompletion;
-        jobUpdates.lastDoneDate = dateOfCompletion;
+      if (workOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletion && !cycleRH) {
+        console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
+      }
 
-        if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate(dateOfCompletion, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) {
-            linkUpdates.nextDueDate = nextDue;
-            jobUpdates.nextDueDate = nextDue;
-            console.log(`✅ Auto-calculated next due date for job ${job.jobNo}: ${nextDue} (last done: ${dateOfCompletion}, interval: ${job.frequencyValue} ${job.frequencyUnit})`);
-          }
-        }
-
+      if (Object.keys(jobUpdates).length > 0) {
         const updateVesselId = workOrder.vesselId || job.vesselId;
         if (woComponentId && updateVesselId) {
           await repo.updateJobComponentLinkTracking(updateVesselId, job.juuid, woComponentId, linkUpdates);
-          console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneDate: ${dateOfCompletion}`);
+          console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${woComponentId}`);
         }
-
         await repo.updateJob(job.juuid, jobUpdates);
-        console.log(`✅ Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
-      }
-
-      // Dual Frequency job cycle update — Calendar ALWAYS, RH only if RH entered (D2)
-      if (workOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletion) {
-        const { calculateNextDueDate } = await import('@shared/dateUtils');
-
-        // Calendar leg: ALWAYS update
-        linkUpdates.lastDoneDate = dateOfCompletion;
-        jobUpdates.lastDoneDate = dateOfCompletion;
-
-        if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate(dateOfCompletion, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) {
-            linkUpdates.nextDueDate = nextDue;
-            jobUpdates.nextDueDate = nextDue;
-            console.log(`✅ [Dual] Auto-calculated next due date for job ${job.jobNo}: ${nextDue}`);
-          }
-        }
-
-        // RH leg: ONLY if an RH value was entered (D2: if not entered, RH leg UNCHANGED).
-        // R1 (migration 139): the leg's SOURCE is the WO Completion RH (fallback:
-        // Current Reading = pre-feature behaviour) under the same conditionality.
-        if (cycleRH) {
-          const dualCurrentRH = parseInt(cycleRH);
-          if (!isNaN(dualCurrentRH)) {
-            linkUpdates.lastDoneRH = dualCurrentRH.toString();
-            jobUpdates.lastDoneRH = dualCurrentRH;
-
-            const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-            if (dualRhInterval && !isNaN(dualRhInterval)) {
-              const nextDueRH = dualCurrentRH + dualRhInterval;
-              linkUpdates.nextDueRH = nextDueRH.toString();
-              jobUpdates.nextDueRH = nextDueRH;
-              console.log(`✅ [Dual] Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done RH: ${dualCurrentRH}, interval: ${dualRhInterval})`);
-            }
-          }
-        } else {
-          console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
-        }
-
-        const dualUpdateVesselId = workOrder.vesselId || job.vesselId;
-        if (woComponentId && dualUpdateVesselId) {
-          await repo.updateJobComponentLinkTracking(dualUpdateVesselId, job.juuid, woComponentId, linkUpdates);
-          console.log(`✅ [Dual] Updated component tracking for vessel ${dualUpdateVesselId}, job ${job.jobNo} + component ${woComponentId}`);
-        }
-
-        await repo.updateJob(job.juuid, jobUpdates);
-        console.log(`✅ Updated Dual Frequency job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}${runningHours ? ', lastDoneRH: ' + runningHours : ' (RH unchanged)'}`);
-      }
-
-      // Running Hours-based job cycle update
-      // R1 (migration 139): next cycle derives from the WO Completion RH
-      // (fallback: Current Reading = pre-feature behaviour).
-      if (workOrder.maintenanceBasis === 'Running Hours' && cycleRH) {
-        const currentRH = parseInt(cycleRH);
-        if (!isNaN(currentRH)) {
-          linkUpdates.lastDoneRH = currentRH.toString();
-          jobUpdates.lastDoneRH = currentRH;
-
-          const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-          if (rhInterval && !isNaN(rhInterval)) {
-            const nextDueRH = currentRH + rhInterval;
-            linkUpdates.nextDueRH = nextDueRH.toString();
-            jobUpdates.nextDueRH = nextDueRH;
-            console.log(`✅ Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done: ${currentRH}, interval: ${rhInterval} hours)`);
-          }
-
-          const rhUpdateVesselId = workOrder.vesselId || job.vesselId;
-          if (woComponentId && rhUpdateVesselId) {
-            await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, woComponentId, linkUpdates);
-            console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneRH: ${currentRH}`);
-          }
-
-          await repo.updateJob(job.juuid, jobUpdates);
-          console.log(`✅ Updated RH job ${job.jobNo} with lastDoneRH: ${currentRH}`);
-        }
+        console.log(`✅ Updated ${workOrder.maintenanceBasis} job ${job.jobNo} cycle fields: ${JSON.stringify(jobUpdates)}`);
       }
     } else {
       console.warn(`⚠️ Could not find job to update for work order ${workOrder.workOrderNo}`);

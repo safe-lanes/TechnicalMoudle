@@ -29,6 +29,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useVessel } from "@/contexts/VesselContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 
@@ -139,6 +141,13 @@ const JobsFormPage: React.FC = () => {
   const { ranks: rankOptions } = useRanks();
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRebaselineConfirm, setShowRebaselineConfirm] = useState(false);
+  // Rebaseline is a SHORE-admin escape hatch: it authorizes this job's office-side
+  // cycle values (last done / next due) to overwrite the ship's protected tracking
+  // columns on the next sync. Shore instance + Sail Admin/Super Admin only.
+  const { hasRole } = useAuth();
+  const { isShore } = useSyncInstanceInfo();
+  const canRebaseline = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -181,6 +190,27 @@ const JobsFormPage: React.FC = () => {
     }
   });
   
+  const rebaselineMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/technical/api/jobs/${jobId}/rebaseline-tracking`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Rebaseline authorized",
+        description: "This job's office cycle values will overwrite the ship's tracking on the next sync.",
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/technical/api/jobs')
+      });
+      setShowRebaselineConfirm(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Rebaseline failed", description: error.message || "Could not rebaseline job tracking", variant: "destructive" });
+      setShowRebaselineConfirm(false);
+    }
+  });
+
   const [originalData, setOriginalData] = useState<Record<string, any>>({});
 
   const [templateData, setTemplateData] = useState({
@@ -915,6 +945,18 @@ const JobsFormPage: React.FC = () => {
                 >
                   <X className="h-4 w-4 mr-1" />
                   Cancel
+                </Button>
+              )}
+              {!isModifyMode && !isEditMode && canRebaseline && templateData.isActive !== 'No' && (templateData.isActive as any) !== false && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                  onClick={() => setShowRebaselineConfirm(true)}
+                  data-testid="button-rebaseline-job"
+                >
+                  <Clock className="h-4 w-4 mr-1" />
+                  Rebaseline &amp; Push to Ship
                 </Button>
               )}
               {!isModifyMode && !isEditMode && (isSailAdmin || isClientAdmin) && templateData.isActive !== 'No' && templateData.isActive !== false && (
@@ -1812,6 +1854,28 @@ const JobsFormPage: React.FC = () => {
         isOpen={isWorkInstructionsOpen}
         onClose={() => setIsWorkInstructionsOpen(false)}
       />
+
+      <Dialog open={showRebaselineConfirm} onOpenChange={setShowRebaselineConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rebaseline job cycle &amp; push to ship?</DialogTitle>
+            <DialogDescription>
+              This authorizes the office's current cycle values for this job (last done and next due dates/running hours)
+              to <strong>overwrite the ship's tracking</strong> on the next sync. Normally the ship's own completion history
+              is protected from office changes — only use this after correcting the cycle in the office (e.g. after a survey
+              or data fix). This action is recorded with your username.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRebaselineConfirm(false)} disabled={rebaselineMutation.isPending} data-testid="button-cancel-rebaseline">
+              Cancel
+            </Button>
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => rebaselineMutation.mutate()} disabled={rebaselineMutation.isPending} data-testid="button-confirm-rebaseline">
+              {rebaselineMutation.isPending ? 'Authorizing…' : 'Rebaseline & Push'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent>

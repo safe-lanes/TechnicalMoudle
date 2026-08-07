@@ -230,6 +230,21 @@ export async function createPmsVesselSettings(data: {
   });
 }
 
+/**
+ * Per-vessel office WO generation switch (migration 161). Upserts the settings row when
+ * one does not exist yet (keeping all Lead Time/Grace defaults) so the switch works even
+ * for "Not Set" vessels. Role/instance enforcement lives in the controller.
+ */
+export async function setOfficeWoGenerationEnabled(vesselId: string, enabled: boolean, username: string): Promise<PmsVesselSettings> {
+  const existing = await repo.getPmsVesselSettings(vesselId);
+  return repo.createOrUpdatePmsVesselSettings({
+    ...(existing ?? { vesselId }),
+    vesselId,
+    officeWoGenerationEnabled: enabled,
+    updatedBy: username || 'unknown',
+  } as any);
+}
+
 export async function updatePmsVesselSettings(vesselId: string, data: Record<string, any>, username: string): Promise<{ settings: PmsVesselSettings; recalcResult?: { statusesUpdated: number } }> {
   const updatedBy = data.updatedBy || username || 'test';
 

@@ -69,11 +69,26 @@ class ShoreWoDailyScheduler {
       const { jobDueScanner } = await import('./jobDueScanner');
 
       const vessels = await reconRepo.getProvisionedVesselIds();
+      const { isOfficeWoGenerationEnabled } = await import('../modules/work-orders/services/workOrderGenerationGate');
       syncDiag(`SHORE-WO-SWEEP START vessels=${vessels.length}`);
       let generated = 0;
+      let skippedDisabled = 0;
 
       for (const vesselId of vessels) {
         try {
+          // Role re-check PER VESSEL, not just per sweep — the RoleWatchdog can flip the
+          // instance role mid-run; a sweep already iterating must stop generating.
+          if (await isShipInstance()) {
+            console.warn('[ShoreWoSweep] instance role flipped to SHIP mid-sweep — aborting remaining vessels');
+            break;
+          }
+          // Per-vessel kill switch (migration 161): office generation is opt-in, default OFF.
+          // Checked immediately before each vessel's generation (not once per run).
+          if (!(await isOfficeWoGenerationEnabled(vesselId))) {
+            skippedDisabled++;
+            syncDiag(`SHORE-WO-SWEEP SKIP vessel=${vesselId} — office generation disabled (switch off)`);
+            continue;
+          }
           // Generate ONLY — the same sweep the ship runs, scoped to this vessel. runScan
           // carries its own in-progress guard (409 path) and duplicate checks.
           //
@@ -92,8 +107,8 @@ class ShoreWoDailyScheduler {
           console.error(`[ShoreWoSweep] vessel ${vesselId} failed: ${err?.message || err}`);
         }
       }
-      console.log(`[ShoreWoSweep] sweep complete: ${vessels.length} vessel(s), generated=${generated} (reconcile runs post-sync, not here)`);
-      syncDiag(`SHORE-WO-SWEEP END vessels=${vessels.length} generated=${generated}`);
+      console.log(`[ShoreWoSweep] sweep complete: ${vessels.length} vessel(s), skippedDisabled=${skippedDisabled}, generated=${generated} (reconcile runs post-sync, not here)`);
+      syncDiag(`SHORE-WO-SWEEP END vessels=${vessels.length} skippedDisabled=${skippedDisabled} generated=${generated}`);
     } finally {
       this.sweepInFlight = false;
     }

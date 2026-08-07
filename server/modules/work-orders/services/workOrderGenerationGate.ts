@@ -45,7 +45,8 @@ const PROVISIONING_ROLE = 'Sail Admin';
 
 export type GateRefusalCode =
   | 'ROLE_NOT_PERMITTED'
-  | 'VESSEL_STATE_UNKNOWN';
+  | 'VESSEL_STATE_UNKNOWN'
+  | 'OFFICE_GENERATION_DISABLED';
 
 export interface GateDecision {
   allowed: boolean;
@@ -58,6 +59,31 @@ export interface GateDecision {
 /** The real role if the client ever forwards it, else the mock. See the header warning. */
 export function resolveGateRole(user: any): string {
   return (user?.forwardedRole || user?.role || '').trim();
+}
+
+/**
+ * Per-vessel office generation kill switch (migration 161). Default OFF for every
+ * vessel — the office may generate WOs for a vessel ONLY after Sail Admin explicitly
+ * enables it. Fail closed: no settings row, NULL, or a query error all mean DISABLED.
+ * This is a DB fact (like the vessel-state half) — it cannot be spoofed by a caller.
+ * Ship instances never consult this (their own scanner is always the correct writer).
+ */
+export async function isOfficeWoGenerationEnabled(vesselId: string): Promise<boolean> {
+  try {
+    const { getPool } = await import('../../../db');
+    const pool = await getPool();
+    const r = await pool.query(
+      `SELECT office_wo_generation_enabled AS enabled
+         FROM pms_vessel_settings
+        WHERE vessel_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
+        LIMIT 1`,
+      [vesselId],
+    );
+    return r.rows[0]?.enabled === true;
+  } catch (err: any) {
+    console.error(`[WO-Gate] office-generation switch lookup failed for vessel ${vesselId}: ${err?.message || err} — treating as DISABLED`);
+    return false;
+  }
 }
 
 export async function evaluateDirectGeneration(opts: {
@@ -92,6 +118,20 @@ export async function evaluateDirectGeneration(opts: {
       allowed: false,
       code: 'ROLE_NOT_PERMITTED',
       message: `Only a ${PROVISIONING_ROLE} may generate work orders directly from the office.`,
+      state,
+    };
+  }
+
+  // Per-vessel kill switch (migration 161): office generation is opt-in per vessel,
+  // default OFF. This covers EVERY shore generation entry point that goes through the
+  // gate (Generate Now, the shore sweep, per-job manual generation, admin scan).
+  if (!(await isOfficeWoGenerationEnabled(opts.vesselId))) {
+    return {
+      allowed: false,
+      code: 'OFFICE_GENERATION_DISABLED',
+      message:
+        'Office work-order generation is not enabled for this vessel. A Sail Admin can ' +
+        'enable it per vessel on the Lead Time & Grace Period Settings screen.',
       state,
     };
   }

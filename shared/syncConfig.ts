@@ -83,7 +83,10 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isGlobal: false,
     isConfigurable: false,
     businessRules: 'Ship can request changes via Modify PMS (change_request) but cannot edit jobs directly',
-    notes: 'Job definitions managed by office. Ship uses change_request for modifications.',
+    notes: 'Job definitions managed by office. Ship uses change_request for modifications. ' +
+      'PROTECTED TRACKING COLUMNS (migration 161): last_done_date, next_due_date, last_done_rh, next_due_rh ' +
+      'are SHIP-owned once non-NULL — the one-way applier strips incoming shore values unless the row carries ' +
+      'a newer tracking_rebaselined_at stamp (authorized shore admin rebaseline). See oneWayApplier evaluateJobTrackingGuard.',
   },
   job_component_links: {
     tableName: 'job_component_links',
@@ -95,7 +98,9 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isGlobal: false,
     isConfigurable: false,
     businessRules: null,
-    notes: 'Job-component associations managed by office. Integer PK, no UUID identity.',
+    notes: 'Job-component associations managed by office. Integer PK, no UUID identity. ' +
+      'PROTECTED TRACKING COLUMNS (migration 161): same guard as jobs — last_done_date/next_due_date/' +
+      'last_done_rh/next_due_rh preserved on ship unless a newer tracking_rebaselined_at authorizes the overwrite.',
   },
 
   // ── Fleet Management ──

@@ -39,6 +39,12 @@ router.post('/jobs/:id/inactivate', requirePermission('pms-modify-pms', 'edit'),
 // POST /jobs/:id/generate-wo — generate work order on demand
 router.post('/jobs/:id/generate-wo', asyncHandler(jobCtrl.generateWorkOrder));
 
+// POST /jobs/:id/rebaseline-tracking — shore Sail Admin / Super Admin ONLY. Stamps
+// tracking_rebaselined_at (migration 161) on the job + its component links so the next
+// shore→ship sync is AUTHORIZED to overwrite the ship's tracking columns (escape hatch
+// for the one-way applier's job-tracking guard).
+router.post('/jobs/:id/rebaseline-tracking', requirePermission('pms-modify-pms', 'edit'), asyncHandler(jobCtrl.rebaselineJobTracking));
+
 // ── Maintenance Planner ──
 
 // GET /maintenance-planner — planner data with filters
