@@ -120,7 +120,7 @@ export class JobDueScannerService {
    *   a ship DB holds only its own vessel anyway).
    * @returns the counts, plus `skipped: true` if a run was already in progress.
    */
-  async runScan(scopeVesselId?: string): Promise<{
+  async runScan(scopeVesselId?: string, opts?: { triggerSource?: 'rh-update' | 'scheduler' | 'admin' | 'wo-completion' }): Promise<{
     calendarJobsChecked: number;
     calendarWOsGenerated: number;
     rhJobsChecked: number;
@@ -153,6 +153,20 @@ export class JobDueScannerService {
     try {
       const { isShipInstance } = await import('../modules/sync/syncRole');
       if (!(await isShipInstance())) {
+        // Task #394: office RH entries NEVER trigger WO generation on shore, even when
+        // the vessel's office-generation switch is ON. Generation from office readings
+        // would race the ship's own scanner off stale shore job-tracking state; the
+        // ship (or the office daily sweep/Generate Now, which see the switch) owns it.
+        if (opts?.triggerSource === 'rh-update') {
+          console.log(`[JobDueScanner] SHORE gate refused scan (RH-update trigger — office RH entries never generate WOs)`);
+          this.runInProgress = false;
+          return {
+            calendarJobsChecked: 0, calendarWOsGenerated: 0,
+            rhJobsChecked: 0, rhWOsGenerated: 0,
+            dualJobsChecked: 0, dualWOsGenerated: 0,
+            skipped: true,
+          };
+        }
         const { isOfficeWoGenerationEnabled } = await import('../modules/work-orders/services/workOrderGenerationGate');
         if (!scopeVesselId || !(await isOfficeWoGenerationEnabled(scopeVesselId))) {
           console.log(`[JobDueScanner] SHORE gate refused scan (${scopeVesselId ? `vessel ${scopeVesselId} switch OFF` : 'unscoped scan not allowed on shore'})`);

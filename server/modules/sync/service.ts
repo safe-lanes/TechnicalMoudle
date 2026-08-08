@@ -453,6 +453,18 @@ export async function receivePushData(
 
             // JSON coercion for json/jsonb columns
             const meta = await getColumnMeta(client, log.tableName);
+            // ── Unknown-column guard (Task #394 mixed-fleet safety) ──
+            // A newer sender may push field logs for columns this instance's schema does
+            // not have yet (e.g. running_hours_audit.origin_side / stamp_holder from
+            // migration 162). Interpolating them would raise 42703 and roll back the log.
+            // Skip-and-ack: the change is terminally handled here; the column's value
+            // arrives later via full-row sync once this instance is migrated.
+            // Fail-open when allCols is unknown (empty) — prior behaviour preserved.
+            if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+              syncDiag(`UPDATE SKIP (unknown column): ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} — column not in local schema (pre-migration instance); acked without apply`);
+              fieldLogsApplied++;
+              continue;
+            }
             let valueToApply: any = effectiveNewValue;
             if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
               try {
@@ -491,43 +503,19 @@ export async function receivePushData(
                 valueToApply !== null) {
               try {
                 const auditRow = await client.query(
-                  `SELECT component_id, entered_at_utc, date_updated_local FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+                  `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
                   [log.rowUuid]
                 );
                 if (auditRow.rows.length > 0) {
                   const compId = auditRow.rows[0].component_id;
-                  // Rotation ordering guard: a pre-swap RH reading applied AFTER the rotation
-                  // must not clobber the post-swap baseline with the old stamp's hours.
-                  const rotGuardReading = safeParseDate(auditRow.rows[0].date_updated_local)
-                    || (auditRow.rows[0].entered_at_utc instanceof Date ? auditRow.rows[0].entered_at_utc : safeParseDate(auditRow.rows[0].entered_at_utc));
-                  const latestRotation = await getLatestRotationDate(client, compId);
-                  if (latestRotation && isReadingPreRotation(rotGuardReading, latestRotation)) {
-                    syncDiag(`RH-APPLY UPDATE SKIP (pre-rotation): component=${compId} audit=${log.rowUuid} reading ${rotGuardReading.toISOString()} predates latest rotation ${latestRotation.toISOString()} — component baseline untouched`);
-                    continue;
-                  }
-                  const rhUpdatedAt = auditRow.rows[0].entered_at_utc || new Date();
-                  const oldRow = await client.query(
-                    `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-                    [compId]
-                  );
-                  const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || '(not found)';
-                  // Also propagate rh_master_updated_at + last_updated so "Last Updated Date" reflects on shore.
-                  // The API reads: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt
-                  // last_updated (TEXT) has highest priority, so it MUST be set here.
-                  // Components is ONE_WAY_SHORE_TO_SHIP — vessel's last_updated change never syncs back.
-                  // IMPORTANT: Vessel sets last_updated = date_updated_local (user-selected date, e.g. "13-May-2026 10:30").
-                  // We must use the same field here — NOT entered_at_utc which is a system timestamp.
-                  const lastUpdatedText = auditRow.rows[0].date_updated_local || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
-                  // rh_master_updated_at must be the USER's reading date (date_updated_local),
-                  // NOT entered_at_utc (the system write time). It feeds the "Last Updated"
-                  // MAX() and the WO-approval back-dated check; using the system time made
-                  // shore show the sync time (Issue 1) and made WO approval skip RH (Issue 2).
-                  const rhMasterUpdatedAtVal = safeParseDate(auditRow.rows[0].date_updated_local) || rhUpdatedAt;
-                  await client.query(
-                    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
-                    [String(valueToApply), compId, rhMasterUpdatedAtVal, lastUpdatedText]
-                  );
-                  syncDiag(`RH-APPLY UPDATE: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply}, last_updated=${lastUpdatedText} from audit row ${log.rowUuid}`);
+                  // Task #394: ORDER-INDEPENDENT DERIVE — recompute the component's RH from
+                  // the full local audit history via the canonical latest-reading-wins
+                  // comparator (ship wins exact-date ties; pre-rotation readings excluded)
+                  // instead of applying this single incoming field value. Stamps
+                  // rh_master_updated_at/last_updated with the WINNER's reading date.
+                  const { applyWinningRhToComponent } = await import('../running-hours/rhEventComparator');
+                  const updated = await applyWinningRhToComponent(client, compId, 'sync-push');
+                  syncDiag(`RH-APPLY UPDATE (derive): component=${compId} audit=${log.rowUuid} → ${updated ? 'component recomputed from winning event' : 'no usable winner (component untouched)'}`);
                 }
               } catch (rhErr: any) {
                 syncDiag(`RH-APPLY UPDATE ERROR: audit=${log.rowUuid}: ${rhErr.message}`);

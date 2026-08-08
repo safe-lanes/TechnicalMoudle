@@ -181,6 +181,11 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
   componentCode: text("component_code"),
   componentName: text("component_name"),
   updatedByUuid: text("updated_by_uuid"),
+  // Task #394 (migration 162): atomic RH event metadata for the canonical
+  // "latest reading wins" comparator. Nullable — legacy rows rank between
+  // ship and shore on ties (see rhEventComparator.originRank).
+  originSide: text("origin_side"), // 'ship' | 'shore'
+  stampHolder: text("stamp_holder"), // component's current_stamp at observation (rotational epoch)
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
   isDeleted: boolean("is_deleted").default(false),
@@ -2358,6 +2363,10 @@ export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   // Office WO generation kill switch (migration 161): per-vessel opt-in for the shore
   // daily sweep and all office generation entry points. Default OFF (fail closed).
   officeWoGenerationEnabled: boolean("office_wo_generation_enabled").notNull().default(false),
+
+  // Office RH entry kill switch (migration 162, Task #394): per-vessel opt-in for
+  // office-side running-hours entry via WO completion. Default OFF (fail closed).
+  officeRhEntryEnabled: boolean("office_rh_entry_enabled").notNull().default(false),
 
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),

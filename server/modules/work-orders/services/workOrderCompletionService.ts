@@ -178,12 +178,29 @@ export async function completeWorkOrder(
   // shore MASTER reading into INHERITED validation/audit. This outer block has no else (closes
   // cleanly), so a shore instance simply skips RH sync and continues. updateMasterRH still runs on
   // the ship, so the shore mirrors via running_hours_audit sync (propagation untouched).
-  if (runningHours && counterType !== 'NOT_RH_DRIVEN' && await isShipInstance()) {
+  // Task #394: the office may now advance the RH counter from WO completion, but ONLY for
+  // vessels whose per-vessel office-RH-entry switch is ON (default OFF, fail closed). Ship
+  // behaviour is unchanged; receiving-side latest-reading-wins guards are always on.
+  const isShipForRhSync = await isShipInstance();
+  let officeRhEntryAllowedCompletion = false;
+  if (!isShipForRhSync && (workOrder.vesselId || component.vesselId)) {
+    const { isOfficeRhEntryEnabled } = await import('./workOrderGenerationGate');
+    officeRhEntryAllowedCompletion = await isOfficeRhEntryEnabled(workOrder.vesselId || component.vesselId || '');
+  }
+  if (runningHours && counterType !== 'NOT_RH_DRIVEN' && (isShipForRhSync || officeRhEntryAllowedCompletion)) {
     const newRH = parseInt(runningHours);
     const completionDateForValidation = dateOfCompletion || new Date().toISOString().split('T')[0];
     // R2 (migration 139): the RH MODULE operates on the date the reading was TAKEN.
     // Falls back to the completion date = exact pre-feature behaviour.
     const readingDateForRH = currentReadingDate || completionDateForValidation;
+    // Task #394: an OFFICE RH entry must carry an explicit observed reading date — never
+    // default to "now" (a wrong reading date poisons the latest-reading-wins comparator).
+    if (!isShipForRhSync && !currentReadingDate && !dateOfCompletion) {
+      throw new ValidationError(
+        'Office RH entry requires the reading date (Current Reading Date or Date of Completion). Enter the date the counter was actually read.',
+        { code: 'RH_READING_DATE_REQUIRED', workOrderNo: workOrder.workOrderNo }
+      );
+    }
     const componentVesselId = workOrder.vesselId || component.vesselId || 'V001';
     const previousRH = parseInt(component.currentCumulativeRH || '0');
     // Double-sync guard: if this WO's reading was already applied once, do not re-apply it on
@@ -211,8 +228,16 @@ export async function completeWorkOrder(
         // normally; the reading is saved for scheduling / next-due calculation only.
         const masterCurrentRH = parseFloat((component.rhCurrentMaster ?? component.currentCumulativeRH) || '0');
         if (newRH <= masterCurrentRH) {
+          // Task #394: baseline from AUDIT HISTORY first (legacy component stamps may be
+          // poisoned with entry/sync time); component stamp only as fallback.
+          const { resolveRhBaselineDay } = await import('../../running-hours/rhEventComparator');
+          const { getPool } = await import('../../../db');
           const masterUpdRaw: any = component.rhMasterUpdatedAt ?? (component.lastUpdated ? new Date(component.lastUpdated) : null);
-          const masterUpdDate: Date | null = masterUpdRaw instanceof Date ? masterUpdRaw : (masterUpdRaw ? new Date(masterUpdRaw) : null);
+          const stampFallback: Date | null = masterUpdRaw instanceof Date ? masterUpdRaw : (masterUpdRaw ? new Date(masterUpdRaw) : null);
+          const masterUpdDate: Date | null = await resolveRhBaselineDay(
+            await getPool(), component.cuuid,
+            stampFallback && !isNaN(stampFallback.getTime()) ? stampFallback : null
+          );
           if (masterUpdDate && !isNaN(masterUpdDate.getTime())) {
             const woCompletionDate = new Date(readingDateForRH);
             const masterDay = Date.UTC(masterUpdDate.getUTCFullYear(), masterUpdDate.getUTCMonth(), masterUpdDate.getUTCDate());
@@ -227,6 +252,15 @@ export async function completeWorkOrder(
         }
 
         if (!rhBackdatedSkipped) {
+          // Task #394/#243: atomic compare-and-set claim on rh_synced_at — a concurrent or
+          // replayed completion of the SAME WO sees 0 rows and skips (no double-advance).
+          // Released on failure so a corrected retry can apply.
+          const { claimWoRhSync, releaseWoRhSync } = await import('../../running-hours/rhEventComparator');
+          const { getPool: getClaimPool } = await import('../../../db');
+          const claimPool = await getClaimPool();
+          if (!(await claimWoRhSync(claimPool, workOrder.wouuid))) {
+            console.warn(`⚠️ [RH Sync] WO ${workOrder.workOrderNo} RH already claimed/applied by a concurrent completion — skipping duplicate RH advance`);
+          } else {
           const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
           try {
             await updateMasterRH(component.cuuid, {
@@ -242,6 +276,8 @@ export async function completeWorkOrder(
             rhReadingApplied = true;
             console.log(`✅ [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
           } catch (masterErr: any) {
+            // Release the claim so a corrected retry can apply RH (Task #243 contract).
+            await releaseWoRhSync(claimPool, workOrder.wouuid);
             // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
             if (masterErr instanceof ValidationError) {
               const det: any = masterErr.details || {};
@@ -257,6 +293,7 @@ export async function completeWorkOrder(
             }
             throw masterErr;
           }
+          } // end claim else — MASTER branch
         }
       }
     } else {
@@ -284,8 +321,15 @@ export async function completeWorkOrder(
           // INHERITED pre-flight: detect back-dated lower entry against the master component.
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || '0');
           if (newRH <= inhMasterCurrentRH) {
+            // Task #394: audit-history baseline first; component stamp only as fallback.
+            const { resolveRhBaselineDay } = await import('../../running-hours/rhEventComparator');
+            const { getPool } = await import('../../../db');
             const inhMasterUpdRaw: any = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhMasterUpdDate: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
+            const inhStampFallback: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
+            const inhMasterUpdDate: Date | null = await resolveRhBaselineDay(
+              await getPool(), masterComp.cuuid,
+              inhStampFallback && !isNaN(inhStampFallback.getTime()) ? inhStampFallback : null
+            );
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
               const woCompletionDate = new Date(readingDateForRH);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
@@ -302,6 +346,13 @@ export async function completeWorkOrder(
           if (!rhBackdatedSkipped) {
           // Master resolved: advance its counter, which cascades the delta to every sibling
           // INHERITED component and stamps them all with the WO completion date.
+          // Task #394/#243: atomic claim — same double-advance protection as the MASTER branch.
+          const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await import('../../running-hours/rhEventComparator');
+          const { getPool: getPoolInh } = await import('../../../db');
+          const claimPoolInh = await getPoolInh();
+          if (!(await claimInh(claimPoolInh, workOrder.wouuid))) {
+            console.warn(`⚠️ [RH Sync] WO ${workOrder.workOrderNo} RH already claimed/applied by a concurrent completion — skipping duplicate RH advance (INHERITED)`);
+          } else {
           const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
           try {
             await updateMasterRH(masterComp.cuuid, {
@@ -316,6 +367,8 @@ export async function completeWorkOrder(
             });
             console.log(`✅ [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
           } catch (masterErr: any) {
+            // Release the claim so a corrected retry can apply RH (Task #243 contract).
+            await releaseInh(claimPoolInh, workOrder.wouuid);
             if (masterErr instanceof ValidationError) {
               const det: any = masterErr.details || {};
               throw new ValidationError(masterErr.message, {
@@ -330,6 +383,7 @@ export async function completeWorkOrder(
             }
             throw masterErr;
           }
+          } // end claim else — INHERITED branch
           } // end if (!rhBackdatedSkipped) — INHERITED branch
         } else {
           // No valid master link: timeline-validate and record on this child only.

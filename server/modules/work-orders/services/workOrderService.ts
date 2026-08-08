@@ -1447,12 +1447,22 @@ export async function updateWorkOrder(id: string, body: any) {
   //     updateMasterRH still runs on the ship, so the shore mirrors the value via the
   //     running_hours_audit sync + derived-RH-update (propagation untouched).
   const { isShipInstance: isShipInstanceForRH } = await import('../../sync/syncRole');
+  // Task #394: the office may now advance the RH counter from WO completion, but ONLY
+  // for vessels whose per-vessel office-RH-entry switch is ON (default OFF, fail closed).
+  // Ship behaviour is unchanged. The receiving-side latest-reading-wins guards are
+  // always on regardless of this switch.
+  const isShipForRhWrite = await isShipInstanceForRH();
+  let officeRhEntryAllowed = false;
+  if (!isShipForRhWrite && existingWO.vesselId) {
+    const { isOfficeRhEntryEnabled } = await import('./workOrderGenerationGate');
+    officeRhEntryAllowed = await isOfficeRhEntryEnabled(existingWO.vesselId);
+  }
   if (
     isApprovalTransition &&
     !interceptedForL2Review &&
     updateData.status === 'Completed' &&
     !(existingWO as any).rhSyncedAt &&
-    await isShipInstanceForRH()
+    (isShipForRhWrite || officeRhEntryAllowed)
   ) {
     const rhRaw = existingWO.runningHours || updateData.runningHours;
     if (rhRaw) {
@@ -1476,6 +1486,16 @@ export async function updateWorkOrder(id: string, body: any) {
       // exact pre-feature behaviour.
       const readingDateNorm = normRhDate((existingWO as any).currentReadingDate || (updateData as any).currentReadingDate) || completionDateNorm;
 
+      // Task #394: an OFFICE RH entry must carry an explicit observed reading date —
+      // never default to "now" (a wrong reading date poisons the latest-reading-wins
+      // comparator fleet-wide). Ship entries keep their existing fallback behaviour.
+      if (!isShipForRhWrite && !readingDateNorm) {
+        throw new ValidationError(
+          'Office RH entry requires the reading date (Current Reading Date or Completion Date). Enter the date the counter was actually read.',
+          { code: 'RH_READING_DATE_REQUIRED', workOrderNo: existingWO.workOrderNo }
+        );
+      }
+
       if (rhComp && rhCounterType === 'MASTER' && !isNaN(rhValue)) {
         // MASTER pre-flight: detect back-dated lower entry.
         // If the completion date predates the master's last RH update AND the entered RH is not
@@ -1483,8 +1503,17 @@ export async function updateWorkOrder(id: string, body: any) {
         let rhBackdatedSkippedApproval = false;
         const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || '0');
         if (rhValue <= masterCurrentRHApproval && readingDateNorm) {
-          const masterUpdRawApproval: any = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
-          const masterUpdDateApproval: Date | null = masterUpdRawApproval instanceof Date ? masterUpdRawApproval : (masterUpdRawApproval ? new Date(masterUpdRawApproval) : null);
+          // Task #394: baseline from AUDIT HISTORY first (legacy component stamps may
+          // be poisoned with entry/sync time from the old bug era) — component stamp
+          // is only the fallback when no usable audit history exists.
+          const { resolveRhBaselineDay } = await import('../../running-hours/rhEventComparator');
+          const { getPool } = await import('../../../db');
+          const stampFallbackApproval: any = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
+          const stampFallbackDateApproval: Date | null = stampFallbackApproval instanceof Date ? stampFallbackApproval : (stampFallbackApproval ? new Date(stampFallbackApproval) : null);
+          const masterUpdDateApproval: Date | null = await resolveRhBaselineDay(
+            await getPool(), rhComp.cuuid,
+            stampFallbackDateApproval && !isNaN(stampFallbackDateApproval.getTime()) ? stampFallbackDateApproval : null
+          );
           if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
             const approvalCompletionDate = new Date(readingDateNorm!);
             const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
@@ -1502,6 +1531,15 @@ export async function updateWorkOrder(id: string, body: any) {
 
         if (!rhBackdatedSkippedApproval) {
         // MASTER: completion reading is source of truth — advance master counter + cascade.
+        // Task #394/#243: atomic compare-and-set claim on rh_synced_at — a concurrent or
+        // replayed approval of the SAME WO sees 0 rows and skips (no double-advance).
+        // Released on failure so a corrected retry can apply.
+        const { claimWoRhSync, releaseWoRhSync } = await import('../../running-hours/rhEventComparator');
+        const { getPool: getPoolForClaim } = await import('../../../db');
+        const claimPool = await getPoolForClaim();
+        if (!(await claimWoRhSync(claimPool, existingWO.wouuid))) {
+          console.warn(`⚠️ [RH Sync] WO ${existingWO.workOrderNo} RH already claimed/applied by a concurrent completion — skipping duplicate RH advance`);
+        } else {
         const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
         try {
           await updateMasterRH(rhComp.cuuid, {
@@ -1517,6 +1555,8 @@ export async function updateWorkOrder(id: string, body: any) {
           updateData.rhSyncedAt = new Date();
           console.log(`✅ [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO.workOrderNo} (cascaded to INHERITED children)`);
         } catch (masterErr: any) {
+          // Release the claim so a corrected retry can apply RH (Task #243 contract).
+          await releaseWoRhSync(claimPool, existingWO.wouuid);
           // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
           if (masterErr instanceof ValidationError) {
             const det: any = masterErr.details || {};
@@ -1532,6 +1572,7 @@ export async function updateWorkOrder(id: string, body: any) {
           }
           throw masterErr;
         }
+        } // end claim else — MASTER branch
         } // end if (!rhBackdatedSkippedApproval) — MASTER branch
       } else if (rhComp && rhCounterType === 'INHERITED' && !isNaN(rhValue)) {
         // INHERITED: route through master propagation so the 25 hrs/day cap, cascade to all
@@ -1557,8 +1598,15 @@ export async function updateWorkOrder(id: string, body: any) {
           let rhBackdatedSkippedInherited = false;
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || '0');
           if (rhValue <= inhMasterCurrentRH && readingDateNorm) {
+            // Task #394: audit-history baseline first; component stamp only as fallback.
+            const { resolveRhBaselineDay } = await import('../../running-hours/rhEventComparator');
+            const { getPool } = await import('../../../db');
             const inhMasterUpdRaw: any = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhMasterUpdDate: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
+            const inhStampFallback: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
+            const inhMasterUpdDate: Date | null = await resolveRhBaselineDay(
+              await getPool(), masterComp.cuuid,
+              inhStampFallback && !isNaN(inhStampFallback.getTime()) ? inhStampFallback : null
+            );
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
               const inhCompletionDate = new Date(readingDateNorm!);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
@@ -1576,6 +1624,13 @@ export async function updateWorkOrder(id: string, body: any) {
 
           if (!rhBackdatedSkippedInherited) {
           // Master resolved: advance its counter, cascading delta + completion date to all siblings.
+          // Task #394/#243: atomic claim — same double-advance protection as the MASTER branch.
+          const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await import('../../running-hours/rhEventComparator');
+          const { getPool: getPoolInh } = await import('../../../db');
+          const claimPoolInh = await getPoolInh();
+          if (!(await claimInh(claimPoolInh, existingWO.wouuid))) {
+            console.warn(`⚠️ [RH Sync] WO ${existingWO.workOrderNo} RH already claimed/applied by a concurrent completion — skipping duplicate RH advance (INHERITED)`);
+          } else {
           const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
           try {
             await updateMasterRH(masterComp.cuuid, {
@@ -1591,6 +1646,8 @@ export async function updateWorkOrder(id: string, body: any) {
             updateData.rhSyncedAt = new Date();
             console.log(`✅ [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO.workOrderNo}`);
           } catch (masterErr: any) {
+            // Release the claim so a corrected retry can apply RH (Task #243 contract).
+            await releaseInh(claimPoolInh, existingWO.wouuid);
             if (masterErr instanceof ValidationError) {
               const det: any = masterErr.details || {};
               throw new ValidationError(masterErr.message, {
@@ -1605,6 +1662,7 @@ export async function updateWorkOrder(id: string, body: any) {
             }
             throw masterErr;
           }
+          } // end claim else — INHERITED branch
           } // end if (!rhBackdatedSkippedInherited) — INHERITED branch
         } else {
           // No valid master link: timeline-validate and record on this child only.
@@ -1631,7 +1689,9 @@ export async function updateWorkOrder(id: string, body: any) {
               previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
               newRH: rhValue.toString(),
               cumulativeRH: rhValue.toString(),
-              dateUpdatedLocal: completionDateNorm || new Date().toISOString().split('T')[0],
+              // Task #394 fix: stamp the READING date (not the completion date, and never
+              // "today") — a wrong date here poisons the latest-reading-wins comparator.
+              dateUpdatedLocal: readingDateNorm || completionDateNorm || new Date().toISOString().split('T')[0],
               dateUpdatedTZ: 'UTC',
               enteredAtUTC: new Date(),
               userId: body.userId || existingWO.performedBy || 'System',

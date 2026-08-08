@@ -177,6 +177,26 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
     },
   });
 
+  // Office RH entry kill switch (migration 162, Task #394): shore Sail Admin / Super Admin only.
+  const officeRhSwitchMutation = useMutation({
+    mutationFn: async (data: { vesselId: string; enabled: boolean }) => {
+      const res = await apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}/office-rh-entry`, { enabled: data.enabled });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
+      toast({
+        title: data.officeRhEntryEnabled ? "Office RH entry ENABLED" : "Office RH entry DISABLED",
+        description: data.officeRhEntryEnabled
+          ? "The office may now record running hours when completing work orders for this vessel. The latest reading date always wins; ship readings win same-day ties."
+          : "The office cannot record running hours for this vessel. Ship-side RH entry is unaffected.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not change office RH entry", description: error?.message, variant: "destructive" });
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (data: { vesselId: string; settings: typeof formData }) => {
       return apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}`, data.settings);
@@ -455,6 +475,28 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                       disabled={officeWoSwitchMutation.isPending}
                       onCheckedChange={(checked) => officeWoSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
                       data-testid={`switch-office-wo-generation-${vessel.id}`}
+                    />
+                  </div>
+                )}
+                {canToggleOfficeWoGeneration && (
+                  <div
+                    className="mt-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`row-office-rh-entry-${vessel.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">Office RH Entry</p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {(settingsMap.get(vessel.id) as any)?.officeRhEntryEnabled
+                          ? "Office records running hours via WO completion"
+                          : "Off — ship-only RH entry (default)"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={(settingsMap.get(vessel.id) as any)?.officeRhEntryEnabled === true}
+                      disabled={officeRhSwitchMutation.isPending}
+                      onCheckedChange={(checked) => officeRhSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
+                      data-testid={`switch-office-rh-entry-${vessel.id}`}
                     />
                   </div>
                 )}

@@ -222,6 +222,21 @@ import {
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
 
+// Task #394: which side observed/entered an RH reading — feeds running_hours_audit.origin_side
+// for the canonical latest-reading-wins comparator (ship wins exact-date ties). Cached after
+// first resolution; falls back to null (legacy rank) if the role cannot be resolved.
+let cachedRhOriginSide: string | null | undefined;
+async function getRhOriginSide(): Promise<string | null> {
+  if (cachedRhOriginSide !== undefined) return cachedRhOriginSide;
+  try {
+    const { getInstanceRole } = await import('./modules/sync/syncRole');
+    cachedRhOriginSide = await getInstanceRole(); // 'ship' | 'shore'
+  } catch {
+    cachedRhOriginSide = null;
+  }
+  return cachedRhOriginSide;
+}
+
 /**
  * PostgreSQL Storage Implementation
  * Module 1: Core Reference Data (users, fleets, vessels, pms_vessel_settings)
@@ -1664,6 +1679,9 @@ export class PostgresStorage {
         version: 1,
         componentCode: masterComponentCode,
         componentName: component.name || null,
+        // Task #394: comparator metadata — origin side + rotational epoch (stamp holder)
+        originSide: await getRhOriginSide(),
+        stampHolder: freshComponent.currentStamp || null,
       }).returning();
       // Sync field logging — INSERT (best-effort)
       try { await logFieldChanges('running_hours_audit', rhaResult[0].rhauuid, masterVesselId, null, rhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha tx create:', e); }
@@ -1719,6 +1737,9 @@ export class PostgresStorage {
           version: 1,
           componentCode: inherited.componentCode || null,
           componentName: inherited.name || null,
+          // Task #394: comparator metadata — origin side + rotational epoch (stamp holder)
+          originSide: await getRhOriginSide(),
+          stampHolder: inherited.currentStamp || null,
         }).returning();
         try { await logFieldChanges('running_hours_audit', childRhaResult[0].rhauuid, inherited.vesselId || masterVesselId, null, childRhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha cascade create:', e); }
 
@@ -2133,7 +2154,13 @@ export class PostgresStorage {
   async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
     const db = await getDb();
     // Audit Phase 0: freeze the human actor label unless the caller already supplied one.
-    const auditWithActor = { ...audit, actorLabel: audit.actorLabel ?? getAuditActor().actorLabel };
+    // Task #394: stamp origin_side (ship/shore) so the canonical latest-reading-wins
+    // comparator can break exact-date ties (ship wins).
+    const auditWithActor = {
+      ...audit,
+      actorLabel: audit.actorLabel ?? getAuditActor().actorLabel,
+      originSide: (audit as any).originSide ?? await getRhOriginSide(),
+    };
     const result = await db.insert(runningHoursAudit).values(auditWithActor).returning();
     // Sync field logging — INSERT
     try { await logFieldChanges('running_hours_audit', result[0].rhauuid, (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] rha create:', e); }

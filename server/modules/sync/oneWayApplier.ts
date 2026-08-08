@@ -446,6 +446,33 @@ export async function applyOneWayRows(
                   syncDiag(`ROTATION-GUARD: components.${cuuid} incoming row (updated_at=${incomingUpdatedRaw}) predates local rotation ${latestRotation.toISOString()} — stamp/RH columns preserved`);
                 }
               }
+              // ── RH latest-reading guard (Task #394) ─────────────────────────
+              // A shore full-row component edit must not regress the local RH state
+              // when the LOCAL audit history holds a reading with a LATER observed
+              // reading date than the incoming row claims. The local winner will be
+              // (re)derived from audit history by the RH hooks; here we only refuse
+              // the stale overwrite. Fail open on lookup errors (pre-162 behaviour).
+              try {
+                const { selectWinningRhEvent, parseReadingDay } = await import('../running-hours/rhEventComparator');
+                const localWinner = await selectWinningRhEvent(pool, cuuid);
+                if (localWinner) {
+                  const incomingRhStampRaw = row['rh_master_updated_at'] ?? row['rhMasterUpdatedAt'] ?? row['last_updated'] ?? row['lastUpdated'];
+                  const incomingRhDay = incomingRhStampRaw
+                    ? parseReadingDay(String(incomingRhStampRaw instanceof Date ? incomingRhStampRaw.toISOString() : incomingRhStampRaw))
+                    : null;
+                  if (!incomingRhDay || incomingRhDay.getTime() < localWinner.readingDay.getTime()) {
+                    if (rowToApply === row) rowToApply = { ...row };
+                    for (const col of ['current_cumulative_rh', 'currentCumulativeRH',
+                      'rh_current_master', 'rhCurrentMaster', 'rh_master_updated_at', 'rhMasterUpdatedAt',
+                      'rh_master_update_source', 'rhMasterUpdateSource', 'last_updated', 'lastUpdated']) {
+                      delete rowToApply[col];
+                    }
+                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? 'none'}) loses to local winning reading ${localWinner.readingDay.toISOString().split('T')[0]} — RH columns preserved`);
+                  }
+                }
+              } catch (rhGuardErr: any) {
+                syncDiag(`RH-LATEST-GUARD lookup failed for components.${cuuid}: ${String(rhGuardErr?.message || rhGuardErr).substring(0, 120)}`);
+              }
             }
           }
           // Update all columns (excluding PK and generated columns)
@@ -1026,40 +1053,16 @@ export async function applyFieldLogInserts(
       // from the inserted audit row and UPDATE the corresponding component.
       if (tableName === 'running_hours_audit' && rowData['component_id']) {
         try {
-          const compId = rowData['component_id'];
-          const newRH = rowData['cumulative_rh'] || rowData['new_rh'];
-          // Rotation ordering guard: a pre-swap RH reading delivered AFTER the rotation
-          // applied must not clobber the post-swap baseline with the old stamp's hours.
-          const readingDate = safeParseDate(rowData['date_updated_local'])
-            || (rowData['entered_at_utc'] instanceof Date ? rowData['entered_at_utc'] : safeParseDate(rowData['entered_at_utc']));
-          const latestRotation = await getLatestRotationDate(pool, compId);
-          if (latestRotation && readingDate && isReadingPreRotation(readingDate, latestRotation)) {
-            syncDiag(`RH-APPLY INSERT SKIP (pre-rotation): component=${compId} audit=${rowUuid} reading ${readingDate.toISOString()} predates latest rotation ${latestRotation.toISOString()} — audit stored, component baseline untouched`);
-          } else if (newRH !== undefined && newRH !== null) {
-            // Read old value for diag
-            const oldRow = await pool.query(
-              `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-              [compId]
-            );
-            const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || '(not found)';
-            // Also propagate rh_master_updated_at + last_updated so "Last Updated Date" reflects on shore.
-            // The API reads: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt
-            // last_updated (TEXT) has highest priority, so it MUST be set here.
-            // Components is ONE_WAY_SHORE_TO_SHIP — vessel's last_updated change never syncs back.
-            // IMPORTANT: Vessel sets last_updated = date_updated_local (user-selected date, e.g. "13-May-2026 10:30").
-            // We must use the same field here — NOT entered_at_utc which is a system timestamp.
-            const rhUpdatedAt = rowData['entered_at_utc'] || new Date();
-            const lastUpdatedText = rowData['date_updated_local'] || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
-            // rh_master_updated_at must be the USER's reading date (date_updated_local),
-            // NOT entered_at_utc (system write time) — feeds "Last Updated" MAX() and the
-            // WO-approval back-dated check (Issues 1 & 2).
-            const rhMasterUpdatedAtVal = safeParseDate(rowData['date_updated_local']) || rhUpdatedAt;
-            await pool.query(
-              `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
-              [String(newRH), compId, rhMasterUpdatedAtVal, lastUpdatedText]
-            );
-            syncDiag(`RH-APPLY INSERT: component=${compId} current_cumulative_rh updated from ${oldVal} to ${newRH}, last_updated=${lastUpdatedText} from audit row ${rowUuid}`);
-          }
+          // Task #394: ORDER-INDEPENDENT DERIVE — do NOT apply the incoming row's value.
+          // Recompute the component's current RH from the full local audit history via
+          // the canonical latest-reading-wins comparator (ship wins exact-date ties;
+          // pre-rotation readings excluded). A late-arriving backdated reading is stored
+          // in the audit but never regresses the component; a fresher reading wins even
+          // if it arrived first. Also stamps rh_master_updated_at/last_updated with the
+          // winner's READING date (not entry/sync time — backdate-guard protection).
+          const { applyWinningRhToComponent } = await import('../running-hours/rhEventComparator');
+          const updated = await applyWinningRhToComponent(pool, rowData['component_id'], 'sync-insert');
+          syncDiag(`RH-APPLY INSERT (derive): component=${rowData['component_id']} audit=${rowUuid} → ${updated ? 'component recomputed from winning event' : 'no usable winner (component untouched)'}`);
         } catch (rhErr: any) {
           syncDiag(`RH-APPLY INSERT ERROR: component=${rowData['component_id']} audit=${rowUuid}: ${rhErr.message}`);
         }

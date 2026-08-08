@@ -744,7 +744,9 @@ export async function updateMasterRH(componentId: string, body: unknown) {
       // Scope the event-driven generation to the affected vessel only (master RH
       // + its inherited cascades are all within this vessel). Avoids a fleet-wide
       // scan on every RH entry — far lower heap/CPU than the previous unscoped call.
-      const scanResult = await jobDueScanner.runScan(component.vesselId);
+      // Task #394: tag the trigger — on shore, RH-triggered scans are always refused
+      // (office RH entries must never generate WOs); on ship this changes nothing.
+      const scanResult = await jobDueScanner.runScan(component.vesselId, { triggerSource: 'rh-update' });
       woGenerationResult = {
         rhJobsChecked: scanResult.rhJobsChecked,
         rhWOsGenerated: scanResult.rhWOsGenerated

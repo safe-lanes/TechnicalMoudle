@@ -1266,30 +1266,20 @@ export class SyncEngine {
         valueToApply !== null) {
       try {
         const auditRow = await conn.query(
-          `SELECT component_id, date_updated_local, entered_at_utc FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+          `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
           [log.rowUuid]
         );
         if (auditRow.rows.length > 0) {
           const compId = auditRow.rows[0].component_id;
-          // Rotation ordering guard: a pre-swap RH reading applied AFTER the rotation
-          // must not clobber the post-swap baseline with the old stamp's hours.
-          const rotGuardReading = safeParseDate(auditRow.rows[0].date_updated_local)
-            || (auditRow.rows[0].entered_at_utc instanceof Date ? auditRow.rows[0].entered_at_utc : safeParseDate(auditRow.rows[0].entered_at_utc));
-          const latestRotation = await getLatestRotationDate(conn, compId);
-          if (latestRotation && isReadingPreRotation(rotGuardReading, latestRotation)) {
-            syncDiag(`RH-APPLY PULL SKIP (pre-rotation): component=${compId} audit=${log.rowUuid} reading ${rotGuardReading.toISOString()} predates latest rotation ${latestRotation.toISOString()} — component baseline untouched`);
-            return;
-          }
-          const oldRow = await conn.query(
-            `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-            [compId]
-          );
-          const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || '(not found)';
-          await conn.query(
-            `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, updated_at = NOW() WHERE cuuid = $2`,
-            [String(valueToApply), compId]
-          );
-          syncDiag(`RH-APPLY PULL: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply} from audit row ${log.rowUuid}`);
+          // Task #394: ORDER-INDEPENDENT DERIVE — recompute the component's RH from the
+          // full local audit history via the canonical latest-reading-wins comparator
+          // (ship wins exact-date ties; pre-rotation readings excluded) instead of
+          // applying this single incoming field value. Also stamps
+          // rh_master_updated_at/last_updated with the WINNER's reading date (parity
+          // with the push/insert hooks — this PULL hook previously left them stale).
+          const { applyWinningRhToComponent } = await import('../running-hours/rhEventComparator');
+          const updated = await applyWinningRhToComponent(conn, compId, 'sync-pull');
+          syncDiag(`RH-APPLY PULL (derive): component=${compId} audit=${log.rowUuid} → ${updated ? 'component recomputed from winning event' : 'no usable winner (component untouched)'}`);
         }
       } catch (rhErr: any) {
         syncDiag(`RH-APPLY PULL ERROR: audit=${log.rowUuid}: ${rhErr.message}`);
