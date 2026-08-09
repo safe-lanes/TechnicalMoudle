@@ -245,6 +245,20 @@ export async function setOfficeWoGenerationEnabled(vesselId: string, enabled: bo
   } as any);
 }
 
+/**
+ * Per-vessel office RH entry switch (migration 162, Task #394). Same upsert pattern as
+ * the office WO generation switch. Role/instance enforcement lives in the controller.
+ */
+export async function setOfficeRhEntryEnabled(vesselId: string, enabled: boolean, username: string): Promise<PmsVesselSettings> {
+  const existing = await repo.getPmsVesselSettings(vesselId);
+  return repo.createOrUpdatePmsVesselSettings({
+    ...(existing ?? { vesselId }),
+    vesselId,
+    officeRhEntryEnabled: enabled,
+    updatedBy: username || 'unknown',
+  } as any);
+}
+
 export async function updatePmsVesselSettings(vesselId: string, data: Record<string, any>, username: string): Promise<{ settings: PmsVesselSettings; recalcResult?: { statusesUpdated: number } }> {
   const updatedBy = data.updatedBy || username || 'test';
 

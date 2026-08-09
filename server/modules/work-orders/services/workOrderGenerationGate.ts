@@ -86,6 +86,31 @@ export async function isOfficeWoGenerationEnabled(vesselId: string): Promise<boo
   }
 }
 
+/**
+ * Per-vessel OFFICE RH ENTRY kill switch (migration 162, Task #394). Default OFF for
+ * every vessel — the office may enter running hours via WO completion for a vessel
+ * ONLY after Sail Admin explicitly enables it. Fail closed: no settings row, NULL, or
+ * a query error all mean DISABLED. Gates only office WRITES — the receiving-side
+ * guards (latest-reading-wins derive) are always on regardless of this switch.
+ */
+export async function isOfficeRhEntryEnabled(vesselId: string): Promise<boolean> {
+  try {
+    const { getPool } = await import('../../../db');
+    const pool = await getPool();
+    const r = await pool.query(
+      `SELECT office_rh_entry_enabled AS enabled
+         FROM pms_vessel_settings
+        WHERE vessel_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
+        LIMIT 1`,
+      [vesselId],
+    );
+    return r.rows[0]?.enabled === true;
+  } catch (err: any) {
+    console.error(`[RH-Gate] office-RH-entry switch lookup failed for vessel ${vesselId}: ${err?.message || err} — treating as DISABLED`);
+    return false;
+  }
+}
+
 export async function evaluateDirectGeneration(opts: {
   vesselId: string;
   role: string;

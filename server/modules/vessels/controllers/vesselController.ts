@@ -140,6 +140,30 @@ export async function updateOfficeWoGenerationSwitch(req: Request, res: Response
   res.json({ vesselId: req.params.vesselId, officeWoGenerationEnabled: settings.officeWoGenerationEnabled, updatedBy: settings.updatedBy });
 }
 
+// PUT /pms-vessel-settings/:vesselId/office-rh-entry — per-vessel kill switch
+// (migration 162, Task #394) for office-side RH entry via WO completion. Same
+// enforcement pattern as the office WO generation switch: shore-only, Sail Admin /
+// Super Admin only, server-side refusal. Gates only office WRITES — the
+// latest-reading-wins receive guards are always on regardless of this switch.
+export async function updateOfficeRhEntrySwitch(req: Request, res: Response) {
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (await isShipInstance()) {
+    return res.status(403).json({ error: 'shore_only', message: 'Office RH entry is configured on the shore server.' });
+  }
+  const userRole = ((req as any).user?.forwardedRole || (req as any).user?.role || '').trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: 'forbidden', message: 'Only Sail Admin / Super Admin may change office RH entry.' });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled (boolean) is required' });
+  }
+  const username = (req as any).user?.username || 'unknown';
+  const settings = await service.setOfficeRhEntryEnabled(req.params.vesselId, enabled, username);
+  console.log(`[OfficeRhSwitch] vessel=${req.params.vesselId} office_rh_entry_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, officeRhEntryEnabled: (settings as any).officeRhEntryEnabled, updatedBy: settings.updatedBy });
+}
+
 // ── Company Standard Grace Settings controllers ──
 
 export async function getCompanyStandardGraceSettings(_req: Request, res: Response) {
