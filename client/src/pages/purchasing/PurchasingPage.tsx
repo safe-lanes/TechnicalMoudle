@@ -18,14 +18,25 @@ export default function PurchasingPage() {
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [roleBlocked, setRoleBlocked] = useState(false);
-  // Role IS mapped, but this user's own Shipskart account is not provisioned yet. Distinct
-  // from roleBlocked: the admin has granted access, the account just is not ready. We show
-  // a plain message instead of falling back to a shared account (that fallback is retired).
-  const [notProvisioned, setNotProvisioned] = useState(false);
-  // Server-supplied reason text for the not-provisioned screen (identity not configured vs
-  // account not created yet) — falls back to a generic line if absent.
-  const [notProvisionedMessage, setNotProvisionedMessage] = useState<string | null>(null);
+  // WHY A USER IS BLOCKED, IN FULL (2026-08-10). Both refusals used to render one flat
+  // sentence — "not available yet, contact your administrator" — which told the person
+  // nothing and told support even less: a missing email and an unmapped role looked
+  // identical, and the only way to tell them apart was to open the database. The server now
+  // returns a plain-English explanation, what happens next, and a support reference; this
+  // screen renders all of it. Every field is optional so an older server still renders.
+  const [block, setBlock] = useState<{
+    kind: "role" | "account";
+    title?: string;
+    detail?: string;
+    whatHappensNext?: string;
+    retry?: "click" | "sync" | "support";
+    reasonCode?: string;
+    reason?: string;
+    userRole?: string | null;
+    userUuid?: string | null;
+    occurredAt?: string;
+    message?: string;
+  } | null>(null);
 
   // The logged-in role (already decrypted by AuthContext) drives which Shipskart
   // account Purchasing opens. The backend has no real auth, so we pass it here —
@@ -36,9 +47,7 @@ export default function PurchasingPage() {
   const initiate = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setRoleBlocked(false);
-    setNotProvisioned(false);
-    setNotProvisionedMessage(null);
+    setBlock(null);
     try {
       // Direct fetch (not apiRequest) so we can inspect the 403 ROLE_NOT_MAPPED
       // body and branch on it instead of treating it as a generic error.
@@ -51,15 +60,14 @@ export default function PurchasingPage() {
       const data = await res.json().catch(() => null);
 
       if (res.status === 403 && data?.errorCode === "ROLE_NOT_MAPPED") {
-        setRoleBlocked(true);
+        setBlock({ kind: "role", ...(data ?? {}) });
         return;
       }
       // 409 USER_NOT_PROVISIONED — the user's own Shipskart account could not be created
       // or resolved. Deliberately blocked (no shared-account fallback); the backend has
       // already logged the reason and recorded it for the reconciler to retry.
       if (res.status === 409 && data?.errorCode === "USER_NOT_PROVISIONED") {
-        setNotProvisioned(true);
-        setNotProvisionedMessage(typeof data?.message === "string" ? data.message : null);
+        setBlock({ kind: "account", ...(data ?? {}) });
         return;
       }
       if (!res.ok) {
@@ -101,48 +109,83 @@ export default function PurchasingPage() {
     );
   }
 
-  if (roleBlocked) {
+  if (block) {
+    const isRole = block.kind === "role";
     return (
       <div
-        className="flex h-full w-full items-center justify-center"
-        data-testid="purchasing-role-blocked"
+        className="flex h-full w-full items-start justify-center overflow-auto py-10 px-4"
+        data-testid={isRole ? "purchasing-role-blocked" : "purchasing-not-provisioned"}
       >
-        <div className="text-center max-w-md">
-          <Lock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">
-            Purchasing not available for your role
-          </h2>
-          <p className="text-gray-500">
-            Purchasing is not available for your role. Please contact your
-            administrator if you need access.
-          </p>
-        </div>
-      </div>
-    );
-  }
+        <div className="w-full max-w-xl">
+          <div className="flex flex-col items-center text-center mb-6">
+            {isRole ? (
+              <Lock className="h-12 w-12 text-gray-400 mb-4" />
+            ) : (
+              <Clock className="h-12 w-12 text-amber-500 mb-4" />
+            )}
+            <h2 className="text-xl font-semibold text-gray-800 mb-2" data-testid="purchasing-block-title">
+              {block.title ?? (isRole ? "Purchasing not available for your role" : "Purchasing is not available yet")}
+            </h2>
+            <p className="text-gray-600 leading-relaxed" data-testid="purchasing-block-detail">
+              {block.detail ?? block.message ?? "Your Purchasing account is still being set up."}
+            </p>
+          </div>
 
-  if (notProvisioned) {
-    return (
-      <div
-        className="flex h-full w-full items-center justify-center"
-        data-testid="purchasing-not-provisioned"
-      >
-        <div className="text-center max-w-md">
-          <Clock className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">
-            Purchasing is not available yet
-          </h2>
-          <p className="text-gray-500 mb-4">
-            {notProvisionedMessage ??
-              "Your Purchasing account is still being set up. Please contact your administrator if this does not resolve shortly."}
-          </p>
-          <button
-            onClick={initiate}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            data-testid="purchasing-not-provisioned-retry"
-          >
-            Try again
-          </button>
+          {block.whatHappensNext && (
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 mb-4 text-left">
+              <p className="text-sm font-semibold text-blue-900 mb-1">What happens next</p>
+              <p className="text-sm text-blue-900/90 leading-relaxed" data-testid="purchasing-block-next">
+                {block.whatHappensNext}
+              </p>
+            </div>
+          )}
+
+          {/* Support reference — everything a support engineer needs, without them asking
+              the user to describe the screen. Collapsed so it never shouts at the client. */}
+          {(block.reasonCode || block.reason) && (
+            <details className="rounded-lg border border-gray-200 bg-gray-50 p-4 mb-6 text-left">
+              <summary className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                Information for support
+              </summary>
+              <dl className="mt-3 space-y-1.5 text-xs text-gray-600">
+                {block.reasonCode && (
+                  <div className="flex gap-2"><dt className="w-28 shrink-0 text-gray-500">Reference</dt>
+                    <dd className="font-mono" data-testid="purchasing-block-code">{block.reasonCode}</dd></div>
+                )}
+                {block.reason && (
+                  <div className="flex gap-2"><dt className="w-28 shrink-0 text-gray-500">Detail</dt>
+                    <dd className="font-mono break-all">{block.reason}</dd></div>
+                )}
+                {block.userRole && (
+                  <div className="flex gap-2"><dt className="w-28 shrink-0 text-gray-500">Role</dt>
+                    <dd>{block.userRole}</dd></div>
+                )}
+                {block.userUuid && (
+                  <div className="flex gap-2"><dt className="w-28 shrink-0 text-gray-500">User ID</dt>
+                    <dd className="font-mono break-all">{block.userUuid}</dd></div>
+                )}
+                {block.occurredAt && (
+                  <div className="flex gap-2"><dt className="w-28 shrink-0 text-gray-500">Time</dt>
+                    <dd>{new Date(block.occurredAt).toLocaleString()}</dd></div>
+                )}
+              </dl>
+            </details>
+          )}
+
+          <div className="flex flex-col items-center gap-3">
+            {block.retry !== "support" && (
+              <button
+                onClick={initiate}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                data-testid="purchasing-not-provisioned-retry"
+              >
+                Try again
+              </button>
+            )}
+            <p className="text-sm text-gray-500 text-center">
+              If this continues, please contact support and quote the reference above.
+            </p>
+          </div>
         </div>
       </div>
     );

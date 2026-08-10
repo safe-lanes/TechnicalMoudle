@@ -249,6 +249,54 @@ async function syncRoleIfDrifted(
   return { status: 'role_update_failed', error };
 }
 
+/**
+ * WHY IS THIS USER BLOCKED — determined by INSPECTION, not by whatever status happened to be
+ * recorded (Ghazi, 2026-08-10).
+ *
+ * The refusal screen used to fall back to "your purchasing account could not be created" —
+ * true, and useless: it did not say whether an email was missing or a role was unmapped, so
+ * neither the user nor support could act. That happens whenever no push was attempted (JIT
+ * disabled, or the very first click), because then no specific status was ever written.
+ *
+ * This runs pushUser's OWN preconditions, in pushUser's order, WITHOUT calling Shipskart —
+ * two local queries plus one cached role lookup — so the screen can name the actual cause.
+ * Returns null when every precondition passes, i.e. the cause is genuinely something else
+ * (network, upstream rejection) and the recorded status is the better answer.
+ */
+export async function diagnoseUserBlock(
+  userUuid: string,
+  sailRole: string | null,
+): Promise<{ reasonCode: string; reason: string } | null> {
+  try {
+    const db = await getDb();
+    const rows = await db.select({ id: masterUsers.id, email: masterUsers.email, role: masterUsers.role })
+      .from(masterUsers).where(eq(masterUsers.id, userUuid)).limit(1);
+    const mu = rows[0];
+    if (!mu) {
+      return { reasonCode: 'no_master_row', reason: `no master_users row for ${userUuid}` };
+    }
+    if (!mu.email) {
+      return { reasonCode: 'missing_email', reason: 'master_users row has no email — Shipskart requires one' };
+    }
+    const effectiveRole = sailRole || mu.role || null;
+    const mapping = effectiveRole ? await roleMappingRepo.getMappingForSailRole(effectiveRole) : undefined;
+    if (!mapping) {
+      return { reasonCode: 'unmapped_role', reason: `SAIL role '${effectiveRole ?? ''}' has no shipskart_role_mappings row` };
+    }
+    const roleId = await resolveShipskartRoleId(mapping.shipskartRole);
+    if (!roleId) {
+      return {
+        reasonCode: 'unmapped_role',
+        reason: `mapped Shipskart role '${mapping.shipskartRole}' has no live roleId on this tenant`,
+      };
+    }
+    return null; // preconditions all fine — the recorded status is the better explanation
+  } catch (err: any) {
+    console.warn(`[Shipskart] block diagnosis failed for ${userUuid}: ${err?.message || err}`);
+    return null;
+  }
+}
+
 export async function pushUser(mu: {
   id: string; fullName: string; email: string | null; role: string | null; designation: string | null;
 }): Promise<PushResult> {

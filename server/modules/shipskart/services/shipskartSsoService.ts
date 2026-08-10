@@ -73,7 +73,18 @@ export class ShipskartRoleNotMappedError extends Error {
  * requisitions to another and make the audit trail meaningless.
  */
 export class ShipskartUserNotProvisionedError extends Error {
-  constructor(public readonly userUuid: string, public readonly reason: string) {
+  /**
+   * `reason` is the raw diagnostic (also written to shipskart_user_links.last_error).
+   * `reasonCode` is the MACHINE key the controller turns into a plain-English explanation
+   * and the exact remedy — so a blocked user, and the support person reading over their
+   * shoulder, are told what is wrong and who fixes it instead of "not available yet".
+   */
+  constructor(
+    public readonly userUuid: string,
+    public readonly reason: string,
+    public readonly reasonCode: string = 'unknown',
+    public readonly sailRole: string | null = null,
+  ) {
     super(`Shipskart account not provisioned for user ${userUuid}: ${reason}`);
     this.name = 'ShipskartUserNotProvisionedError';
   }
@@ -340,7 +351,25 @@ export async function resolveExternalUserId(userRole: string, userUuid?: string 
           console.warn(`[Shipskart] could not record the block reason for ${userUuid}: ${writeErr?.message || writeErr}`);
         }
       }
-      throw new ShipskartUserNotProvisionedError(userUuid, reason);
+      // The link row's own status IS the machine reason wherever a SPECIFIC one was recorded
+      // (unmapped_role / missing_email / blocked_duplicate / no_master_row).
+      let reasonCode = link?.pushStatus && link.pushStatus !== 'pending'
+        ? link.pushStatus
+        : (lookupError ? 'lookup_failed' : 'jit_failed');
+      let reasonText = reason;
+
+      // ...but jit_failed / error / pending say only "it did not work", which is useless on
+      // the screen: the user cannot tell a missing email from an unmapped role, and neither
+      // can support. It is also exactly what a first click or a JIT-disabled instance
+      // produces. So INSPECT the preconditions and name the real cause (no Shipskart call).
+      if (reasonCode === 'jit_failed' || reasonCode === 'error') {
+        try {
+          const { diagnoseUserBlock } = await import('./shipskartReconcilerService');
+          const dx = await diagnoseUserBlock(userUuid, userRole || null);
+          if (dx) { reasonCode = dx.reasonCode; reasonText = dx.reason; }
+        } catch { /* diagnosis is best-effort — keep the recorded status */ }
+      }
+      throw new ShipskartUserNotProvisionedError(userUuid, reasonText, reasonCode, userRole || null);
     }
     // No role mapping at all → the existing ROLE_NOT_MAPPED path below (null return).
   } else if (!LEGACY_SHARED_ACCOUNT_ENABLED) {
