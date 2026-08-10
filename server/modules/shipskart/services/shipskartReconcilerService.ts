@@ -547,13 +547,53 @@ export interface ReconcileSummary {
   vessels: Record<string, number>;
   users: Record<string, number>;
   mappings: Record<string, number>;
+  startedAt?: string;
+  finishedAt?: string;
 }
+
+/**
+ * SINGLE-FLIGHT + LAST-RUN STATE, so the admin "Run now" button can start a pass in the
+ * BACKGROUND and poll for the outcome.
+ *
+ * WHY BACKGROUND: a pass is paced at 5s per API hit across five categories with a batch
+ * limit of 25 each, so a busy pass runs for minutes. Answering it synchronously is exactly
+ * what gave the vessel-sync button a 504 on 07-Aug — the browser gave up while the server
+ * carried on. Same shape, same fix.
+ *
+ * The guard is INSIDE runReconciliation, not in the button, so the hourly scheduler and a
+ * manual press can never overlap on the same rate-limited API.
+ */
+let reconcileInFlight = false;
+let lastReconcile: ReconcileSummary | null = null;
+export function isReconcileRunning(): boolean { return reconcileInFlight; }
+export function getLastReconcile(): ReconcileSummary | null { return lastReconcile; }
 
 /**
  * One bounded reconciliation pass. Never throws mid-sweep — every per-record failure is
  * recorded on its link row and counted in the summary.
  */
 export async function runReconciliation(opts: { limit?: number } = {}): Promise<ReconcileSummary> {
+  // Claim the flag BEFORE the first await: the handler answers 202 immediately and the page
+  // refetches at once; setting it after an await would let that refetch read running:false,
+  // polling would never start, and the card would sit dead for the whole run (the exact bug
+  // found in browser testing on the vessel-sync card, 06-Aug).
+  if (reconcileInFlight) {
+    return { ran: false, reason: 'a reconciliation pass is already running', vessels: {}, users: {}, mappings: {} };
+  }
+  reconcileInFlight = true;
+  const startedAt = new Date().toISOString();
+  try {
+    const result = await runReconciliationInner(opts);
+    result.startedAt = startedAt;
+    result.finishedAt = new Date().toISOString();
+    lastReconcile = result;
+    return result;
+  } finally {
+    reconcileInFlight = false;
+  }
+}
+
+async function runReconciliationInner(opts: { limit?: number } = {}): Promise<ReconcileSummary> {
   const limit = Math.max(1, Math.min(200, opts.limit ?? DEFAULT_BATCH_LIMIT));
   const summary: ReconcileSummary = { ran: false, vessels: {}, users: {}, mappings: {} };
 

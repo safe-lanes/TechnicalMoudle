@@ -70,11 +70,29 @@ export async function putReconcilerConfigHandler(req: AuthenticatedRequest, res:
   res.json({ success: true, tenantId: cfg.tenantId, reconcilerEnabled: req.body.enabled });
 }
 
-/** POST /shipskart/b2b/reconcile { limit? } — one bounded manual pass. */
+/**
+ * POST /shipskart/b2b/reconcile { limit? } — one bounded manual pass, IN THE BACKGROUND.
+ *
+ * Answers 202 immediately and the page follows GET /shipskart/b2b/reconcile/status. A pass
+ * is paced at 5s per API hit across five categories, so answering synchronously is what gave
+ * the vessel-sync button a 504 on 07-Aug — the browser gave up while the server carried on.
+ * The single-flight guard lives in runReconciliation, so a manual press can never overlap
+ * the hourly scheduler on the same rate-limited API.
+ */
 export async function reconcileHandler(req: Request, res: Response) {
   const limit = Number.isInteger(req.body?.limit) ? req.body.limit : undefined;
-  const summary = await reconciler.runReconciliation({ limit });
-  res.status(summary.ran ? 200 : 409).json(summary);
+  if (reconciler.isReconcileRunning()) {
+    return res.status(409).json({ started: false, message: 'a reconciliation pass is already running' });
+  }
+  reconciler.runReconciliation({ limit })
+    .then(r => console.log(`[Shipskart b2b] background reconcile finished: ran=${r.ran}${r.reason ? ` (${r.reason})` : ''} users=${JSON.stringify(r.users)} mappings=${JSON.stringify(r.mappings)}`))
+    .catch(err => console.error('[Shipskart b2b] background reconcile crashed:', err?.message || err));
+  res.status(202).json({ started: true, note: 'running in background — follow GET /shipskart/b2b/reconcile/status' });
+}
+
+/** GET /shipskart/b2b/reconcile/status — is a pass running, and what did the last one do? */
+export async function reconcileStatusHandler(_req: Request, res: Response) {
+  res.json({ running: reconciler.isReconcileRunning(), lastRun: reconciler.getLastReconcile() });
 }
 
 /**

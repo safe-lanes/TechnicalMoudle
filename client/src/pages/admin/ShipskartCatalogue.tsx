@@ -129,19 +129,22 @@ export default function ShipskartCatalogue() {
             role changes and vessel assignments follow automatically. When OFF, nothing is ever pushed automatically.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center gap-3">
-          <Switch
-            checked={reconcilerQuery.data?.reconcilerEnabled ?? false}
-            disabled={reconcilerQuery.isLoading || reconcilerMutation.isPending}
-            onCheckedChange={(next) => (next ? setConfirmEnable(true) : reconcilerMutation.mutate(false))}
-            data-testid="switch-reconciler-enabled"
-          />
-          <span className="text-sm">
-            {reconcilerQuery.isLoading ? "Loading…"
-              : reconcilerQuery.data?.reconcilerEnabled
-                ? <Badge className="bg-green-600">ON — syncing automatically</Badge>
-                : <Badge variant="secondary">OFF — manual control</Badge>}
-          </span>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={reconcilerQuery.data?.reconcilerEnabled ?? false}
+              disabled={reconcilerQuery.isLoading || reconcilerMutation.isPending}
+              onCheckedChange={(next) => (next ? setConfirmEnable(true) : reconcilerMutation.mutate(false))}
+              data-testid="switch-reconciler-enabled"
+            />
+            <span className="text-sm">
+              {reconcilerQuery.isLoading ? "Loading…"
+                : reconcilerQuery.data?.reconcilerEnabled
+                  ? <Badge className="bg-green-600">ON — syncing automatically</Badge>
+                  : <Badge variant="secondary">OFF — manual control</Badge>}
+            </span>
+          </div>
+          <ReconcileNowRow enabled={reconcilerQuery.data?.reconcilerEnabled ?? false} />
         </CardContent>
       </Card>
 
@@ -305,6 +308,76 @@ export default function ShipskartCatalogue() {
  * touching anything; Sync then links the vessels and settles the crew mappings that were
  * waiting on them.
  */
+/**
+ * "Run now" for the hourly reconciler — the sweep that retries failed user enrolments,
+ * clears their click-attempt counters and applies outstanding vessel assignments.
+ *
+ * WHY IT EXISTS: the endpoint has always been there, but with no button the only way to
+ * force a pass was curl with signed headers. On 10-Aug that turned a one-click diagnosis
+ * into a long back-and-forth with the deployment team, so the button is the fix.
+ *
+ * BACKGROUND, like the vessel sync: a pass is paced at 5s per API call, so a synchronous
+ * request would 504 exactly as the vessel-sync button did on 07-Aug. The POST answers 202
+ * and this row polls the status endpoint while it runs.
+ */
+function ReconcileNowRow({ enabled }: { enabled: boolean }) {
+  const { toast } = useToast();
+  const statusQuery = useQuery<{ running: boolean; lastRun: any }>({
+    queryKey: ["shipskart-reconcile-status"],
+    queryFn: async () => (await apiRequest("GET", "/technical/api/shipskart/b2b/reconcile/status")).json(),
+    refetchInterval: (q) => (q.state.data?.running ? 3_000 : false),
+  });
+  const runMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/technical/api/shipskart/b2b/reconcile", {})).json(),
+    onSuccess: () => {
+      toast({ title: "Sync started", description: "Running in the background — the result appears here when it finishes." });
+      queryClient.invalidateQueries({ queryKey: ["shipskart-reconcile-status"] });
+    },
+    onError: (e: any) => toast({ title: "Could not start", description: String(e?.message ?? e), variant: "destructive" }),
+  });
+
+  const running = statusQuery.data?.running ?? false;
+  const last = statusQuery.data?.lastRun ?? null;
+  const total = (o: Record<string, number> | undefined) =>
+    Object.values(o ?? {}).reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="border-t pt-3 space-y-2">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!enabled || running || runMutation.isPending}
+          onClick={() => runMutation.mutate()}
+          data-testid="btn-reconcile-now"
+        >
+          {running ? "Sync running…" : "Sync users now"}
+        </Button>
+        <span className="text-xs text-gray-500">
+          {!enabled
+            ? "Turn automatic sync ON to use this — it runs the same job immediately instead of waiting for the next hour."
+            : "Retries users whose Purchasing access failed, and applies any vessel changes waiting to go across."}
+        </span>
+      </div>
+
+      {last && !running && (
+        <div className="text-xs text-gray-600" data-testid="text-reconcile-last-run">
+          {last.ran === false ? (
+            <span className="text-amber-700">Last run did nothing — {last.reason ?? "unknown reason"}</span>
+          ) : (
+            <>
+              Last run {last.finishedAt ? new Date(last.finishedAt).toLocaleString() : ""} —{" "}
+              <strong>{total(last.users)}</strong> user(s), <strong>{total(last.mappings)}</strong> vessel assignment(s),{" "}
+              <strong>{total(last.vessels)}</strong> vessel(s) processed.
+              {total(last.users) + total(last.mappings) + total(last.vessels) === 0 && " Nothing was outstanding."}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VesselSyncCard() {
   const { toast } = useToast();
 
