@@ -453,6 +453,16 @@ export function clearJitAttempts(userUuid: string): void { jitAttempts.delete(us
 export interface JitResult { pushed: boolean; reason: string; mappings?: Record<string, number> }
 
 export async function ensureUserPushed(userUuid: string, sailRole: string | null): Promise<JitResult> {
+  // SHORE-ONLY, like every other Shipskart write path (runReconciliation, runVesselSync and
+  // the catalogue push all carry the same guard). This one was missing, which mattered less
+  // while the caller only reached here on a user's FIRST click — from 2026-08-10 it runs on
+  // EVERY click, so a ship that somehow held b2b credentials would create users and rewrite
+  // vessel mappings on the live tenant continuously. SHIPSKART_B2B_JIT=false was the only
+  // protection; this makes it structural. An already-linked user is unaffected: the caller
+  // reads the link row itself and still lets them into Purchasing.
+  if (await isShipInstance()) {
+    return { pushed: false, reason: 'ship instance — Shipskart is shore-only' };
+  }
   const existing = await b2bRepo.getUserLink(userUuid);
   if (existing?.pushStatus === 'pushed' && existing.shipskartUserId) {
     // Role-drift self-heal at click time: free local comparison when nothing changed;
