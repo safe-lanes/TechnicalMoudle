@@ -40185,6 +40185,9 @@ function clearJitAttempts(userUuid) {
   jitAttempts.delete(userUuid);
 }
 async function ensureUserPushed(userUuid, sailRole) {
+  if (await isShipInstance()) {
+    return { pushed: false, reason: "ship instance \u2014 Shipskart is shore-only" };
+  }
   const existing = await getUserLink(userUuid);
   if (existing?.pushStatus === "pushed" && existing.shipskartUserId) {
     let reason = "already_pushed";
@@ -82516,12 +82519,13 @@ async function resolveExternalUserId(userRole, userUuid) {
       link = void 0;
     }
     let jitReason = null;
-    if (!lookupError && link?.pushStatus !== "pushed" && (process.env.SHIPSKART_B2B_JIT || "").toLowerCase() !== "false") {
+    const wasAlreadyPushed = link?.pushStatus === "pushed";
+    if (!lookupError && (process.env.SHIPSKART_B2B_JIT || "").toLowerCase() !== "false") {
       try {
         const { ensureUserPushed: ensureUserPushed2 } = await Promise.resolve().then(() => (init_shipskartReconcilerService(), shipskartReconcilerService_exports));
         const jit = await ensureUserPushed2(userUuid, userRole || null);
         jitReason = jit.reason;
-        if (jit.pushed) {
+        if (jit.pushed && !wasAlreadyPushed) {
           link = await getUserLink2(userUuid);
         }
       } catch (err) {
