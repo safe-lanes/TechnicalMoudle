@@ -859,6 +859,13 @@ var init_schema = __esm({
       componentCode: text2("component_code"),
       componentName: text2("component_name"),
       updatedByUuid: text2("updated_by_uuid"),
+      // Task #394 (migration 162): atomic RH event metadata for the canonical
+      // "latest reading wins" comparator. Nullable — legacy rows rank between
+      // ship and shore on ties (see rhEventComparator.originRank).
+      originSide: text2("origin_side"),
+      // 'ship' | 'shore'
+      stampHolder: text2("stamp_holder"),
+      // component's current_stamp at observation (rotational epoch)
       isSync: boolean2("is_sync").default(false),
       createdByUuid: text2("created_by_uuid"),
       isDeleted: boolean2("is_deleted").default(false),
@@ -3058,6 +3065,9 @@ var init_schema = __esm({
       // Office WO generation kill switch (migration 161): per-vessel opt-in for the shore
       // daily sweep and all office generation entry points. Default OFF (fail closed).
       officeWoGenerationEnabled: boolean2("office_wo_generation_enabled").notNull().default(false),
+      // Office RH entry kill switch (migration 162, Task #394): per-vessel opt-in for
+      // office-side running-hours entry via WO completion. Default OFF (fail closed).
+      officeRhEntryEnabled: boolean2("office_rh_entry_enabled").notNull().default(false),
       updatedBy: text2("updated_by").notNull(),
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
@@ -6925,148 +6935,158 @@ var init_requestContext = __esm({
   }
 });
 
-// server/modules/running-hours/utils/rhValidation.ts
-function getCalendarDate(dateStr) {
-  const date2 = new Date(dateStr);
-  return new Date(Date.UTC(date2.getUTCFullYear(), date2.getUTCMonth(), date2.getUTCDate()));
-}
-function getDaysBetweenCalendarDates(date1, date2) {
-  const msPerDay = 24 * 60 * 60 * 1e3;
-  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
-}
-function formatDMY(dateStr) {
-  if (!dateStr) return dateStr;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
-}
-function validateRunningHoursIncrease(input) {
-  const { currentRH, newRH, componentLastUpdated, newUpdateDate, userRole, adminOverride } = input;
-  const requestedIncrease = newRH - currentRH;
-  let daysSinceLastUpdate = 0;
-  let sameDayUpdate = false;
-  if (componentLastUpdated) {
-    const lastCalendarDate = getCalendarDate(componentLastUpdated);
-    const newCalendarDate = getCalendarDate(newUpdateDate);
-    daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
-    if (daysSinceLastUpdate < 0) {
-      const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
-      return {
-        allowed: canOverride2,
-        maxAllowedIncrease: 0,
-        requestedIncrease,
-        daysSinceLastUpdate,
-        lastUpdateDate: componentLastUpdated,
-        backdatedLower: requestedIncrease <= 0,
-        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated)}). Running hours can only be recorded on or after the latest reading.`,
-        requiresAdminOverride: !canOverride2
-      };
-    }
-    if (daysSinceLastUpdate === 0) {
-      sameDayUpdate = true;
-    }
-  } else {
-    daysSinceLastUpdate = 1;
+// server/modules/running-hours/rhEventComparator.ts
+var rhEventComparator_exports = {};
+__export(rhEventComparator_exports, {
+  applyWinningRhToComponent: () => applyWinningRhToComponent,
+  claimWoRhSync: () => claimWoRhSync,
+  compareRhEvents: () => compareRhEvents,
+  effectiveReadingDay: () => effectiveReadingDay,
+  originRank: () => originRank,
+  parseReadingDay: () => parseReadingDay,
+  releaseWoRhSync: () => releaseWoRhSync,
+  resolveRhBaselineDay: () => resolveRhBaselineDay,
+  selectWinningRhEvent: () => selectWinningRhEvent
+});
+function parseReadingDay(dateStr) {
+  if (!dateStr) return null;
+  const m = String(dateStr).match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})/);
+  if (m) {
+    const d = new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+    return isNaN(d.getTime()) ? null : d;
   }
-  if (requestedIncrease <= 0) {
-    return {
-      allowed: true,
-      maxAllowedIncrease: 0,
-      requestedIncrease,
-      daysSinceLastUpdate: 0,
-      lastUpdateDate: componentLastUpdated,
-      message: "No increase or decrease - no validation needed",
-      requiresAdminOverride: false
-    };
-  }
-  let maxAllowedIncrease;
-  if (sameDayUpdate) {
-    const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
-    return {
-      allowed: canOverride2,
-      maxAllowedIncrease: 0,
-      requestedIncrease,
-      daysSinceLastUpdate: 0,
-      lastUpdateDate: componentLastUpdated,
-      message: canOverride2 ? "Sail Admin override applied for same-day duplicate update" : "Same-day update already performed. Only one update of max 25 hours is allowed per day.",
-      requiresAdminOverride: !canOverride2
-    };
-  } else {
-    maxAllowedIncrease = daysSinceLastUpdate * MAX_HOURS_PER_DAY;
-  }
-  const isWithinLimit = requestedIncrease <= maxAllowedIncrease;
-  if (isWithinLimit) {
-    return {
-      allowed: true,
-      maxAllowedIncrease,
-      requestedIncrease,
-      daysSinceLastUpdate,
-      lastUpdateDate: componentLastUpdated,
-      message: `Increase of ${requestedIncrease} hours is within the allowed limit of ${maxAllowedIncrease} hours`,
-      requiresAdminOverride: false
-    };
-  }
-  const canOverride = userRole === "Sail Admin" && adminOverride === true;
-  return {
-    allowed: canOverride,
-    maxAllowedIncrease,
-    requestedIncrease,
-    daysSinceLastUpdate,
-    lastUpdateDate: componentLastUpdated,
-    message: canOverride ? `Sail Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days \xD7 25 hours/day).` : `Increase of ${requestedIncrease} hours exceeds maximum allowed of ${maxAllowedIncrease} hours. Maximum allowed is ${daysSinceLastUpdate} day(s) \xD7 25 hours/day = ${maxAllowedIncrease} hours.`,
-    requiresAdminOverride: !canOverride
-  };
+  const p = new Date(String(dateStr));
+  if (isNaN(p.getTime())) return null;
+  return new Date(Date.UTC(p.getUTCFullYear(), p.getUTCMonth(), p.getUTCDate()));
 }
-function canAdminOverride(userRole) {
-  return userRole === "Sail Admin";
+function originRank(originSide) {
+  const o = (originSide || "").toLowerCase();
+  if (o === "ship") return 0;
+  if (o === "shore") return 2;
+  return 1;
 }
-function safeParseDate(value) {
-  if (value == null) return null;
-  if (value instanceof Date) {
-    return isNaN(value.getTime()) ? null : value;
+function enteredAtMs(e) {
+  const v = e.enteredAtUTC instanceof Date ? e.enteredAtUTC : e.enteredAtUTC ? new Date(String(e.enteredAtUTC)) : null;
+  return v && !isNaN(v.getTime()) ? v.getTime() : 0;
+}
+function effectiveReadingDay(e) {
+  const d = parseReadingDay(e.dateUpdatedLocal);
+  if (d) return d;
+  const ms = enteredAtMs(e);
+  if (!ms) return null;
+  const t = new Date(ms);
+  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
+}
+function compareRhEvents(a, b) {
+  const da = effectiveReadingDay(a)?.getTime() ?? -Infinity;
+  const db2 = effectiveReadingDay(b)?.getTime() ?? -Infinity;
+  if (da !== db2) return da - db2 > 0 ? 1 : -1;
+  const ra = originRank(a.originSide);
+  const rb = originRank(b.originSide);
+  if (ra !== rb) return rb - ra > 0 ? 1 : -1;
+  const ea = enteredAtMs(a);
+  const eb = enteredAtMs(b);
+  if (ea !== eb) return ea - eb > 0 ? 1 : -1;
+  return a.rhauuid > b.rhauuid ? 1 : -1;
+}
+async function latestRotationDay(conn, componentId) {
+  try {
+    const r = await conn.query(
+      `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`,
+      [componentId]
+    );
+    const v = r.rows[0]?.latest;
+    if (!v) return null;
+    const d = v instanceof Date ? v : new Date(String(v));
+    if (isNaN(d.getTime())) return null;
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  } catch {
+    return null;
   }
-  const trimmed = String(value).trim();
-  if (!trimmed) return null;
-  const d = new Date(trimmed);
-  if (!isNaN(d.getTime())) return d;
-  const months = {
-    jan: 0,
-    feb: 1,
-    mar: 2,
-    apr: 3,
-    may: 4,
-    jun: 5,
-    jul: 6,
-    aug: 7,
-    sep: 8,
-    oct: 9,
-    nov: 10,
-    dec: 11
-  };
-  const match = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
-  if (match) {
-    const [, day, mon, year, hh = "0", mm = "0"] = match;
-    const month = months[mon.toLowerCase()];
-    if (month !== void 0) {
-      const parsed = new Date(
-        parseInt(year),
-        month,
-        parseInt(day),
-        parseInt(hh),
-        parseInt(mm)
-      );
-      return isNaN(parsed.getTime()) ? null : parsed;
-    }
+}
+async function selectWinningRhEvent(conn, componentId) {
+  const rotDay = await latestRotationDay(conn, componentId);
+  const params = [componentId];
+  let rotClause = "";
+  if (rotDay) {
+    rotClause = ` AND (CASE WHEN date_updated_local ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                        THEN substring(date_updated_local from 1 for 10)::date
+                        ELSE entered_at_utc::date END) >= $2::date`;
+    params.push(rotDay.toISOString().split("T")[0]);
+  }
+  const r = await conn.query(
+    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side
+       FROM running_hours_audit
+      WHERE component_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
+        AND (cumulative_rh IS NOT NULL OR new_rh IS NOT NULL)${rotClause}
+      ORDER BY (CASE WHEN date_updated_local ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                  THEN substring(date_updated_local from 1 for 10)::date
+                  ELSE entered_at_utc::date END) DESC,
+               (CASE WHEN lower(origin_side) = 'ship' THEN 0 WHEN origin_side IS NULL OR origin_side = '' THEN 1 ELSE 2 END) ASC,
+               entered_at_utc DESC,
+               rhauuid DESC
+      LIMIT 1`,
+    params
+  );
+  const row = r.rows[0];
+  if (!row) return null;
+  const rhRaw = row.cumulative_rh ?? row.new_rh;
+  const rh = parseFloat(String(rhRaw));
+  if (rhRaw === null || rhRaw === void 0 || isNaN(rh)) return null;
+  const day = effectiveReadingDay({
+    rhauuid: row.rhauuid,
+    dateUpdatedLocal: row.date_updated_local,
+    enteredAtUTC: row.entered_at_utc,
+    originSide: row.origin_side
+  });
+  if (!day) return null;
+  return { rhauuid: row.rhauuid, rh, readingDay: day, dateUpdatedLocal: row.date_updated_local, originSide: row.origin_side ?? null };
+}
+async function applyWinningRhToComponent(conn, componentId, context) {
+  const winner = await selectWinningRhEvent(conn, componentId);
+  if (!winner) return false;
+  const lastUpdatedText = winner.dateUpdatedLocal || winner.readingDay.toISOString();
+  await conn.query(
+    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1,
+        rh_master_updated_at = $2, last_updated = $3, updated_at = NOW()
+      WHERE cuuid = $4`,
+    [winner.rh.toFixed(2), winner.readingDay, lastUpdatedText, componentId]
+  );
+  console.log(`[RH-Derive:${context}] component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
+  return true;
+}
+async function resolveRhBaselineDay(conn, componentId, componentStampFallback) {
+  try {
+    const winner = await selectWinningRhEvent(conn, componentId);
+    if (winner) return winner.readingDay;
+  } catch {
+  }
+  if (componentStampFallback && !isNaN(componentStampFallback.getTime())) {
+    return new Date(Date.UTC(
+      componentStampFallback.getUTCFullYear(),
+      componentStampFallback.getUTCMonth(),
+      componentStampFallback.getUTCDate()
+    ));
   }
   return null;
 }
-var MAX_HOURS_PER_DAY;
-var init_rhValidation = __esm({
-  "server/modules/running-hours/utils/rhValidation.ts"() {
+async function claimWoRhSync(conn, wouuid) {
+  const r = await conn.query(
+    `UPDATE work_orders SET rh_synced_at = NOW() WHERE wouuid = $1 AND rh_synced_at IS NULL RETURNING wouuid`,
+    [wouuid]
+  );
+  return r.rows.length > 0;
+}
+async function releaseWoRhSync(conn, wouuid) {
+  try {
+    await conn.query(`UPDATE work_orders SET rh_synced_at = NULL WHERE wouuid = $1`, [wouuid]);
+  } catch (e) {
+    console.error(`[RH-Claim] release failed for WO ${wouuid}: ${e?.message || e}`);
+  }
+}
+var init_rhEventComparator = __esm({
+  "server/modules/running-hours/rhEventComparator.ts"() {
     "use strict";
-    MAX_HOURS_PER_DAY = 25;
   }
 });
 
@@ -7159,15 +7179,6 @@ async function getLatestRotationDate(conn, componentId, excludeRhruuid) {
   } catch {
     return null;
   }
-}
-function isReadingPreRotation(readingDate, latestRotation) {
-  if (!readingDate || !latestRotation) return false;
-  const rotationDayStart = Date.UTC(
-    latestRotation.getUTCFullYear(),
-    latestRotation.getUTCMonth(),
-    latestRotation.getUTCDate()
-  );
-  return readingDate.getTime() < rotationDayStart;
 }
 async function applyRotationToComponent(conn, rowData, rowUuid) {
   const compId = rowData["component_id"];
@@ -7368,6 +7379,34 @@ async function applyOneWayRows(tableName, rows) {
                   }
                   syncDiag(`ROTATION-GUARD: components.${cuuid} incoming row (updated_at=${incomingUpdatedRaw}) predates local rotation ${latestRotation.toISOString()} \u2014 stamp/RH columns preserved`);
                 }
+              }
+              try {
+                const { selectWinningRhEvent: selectWinningRhEvent2, parseReadingDay: parseReadingDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+                const localWinner = await selectWinningRhEvent2(pool4, cuuid);
+                if (localWinner) {
+                  const incomingRhStampRaw = row["rh_master_updated_at"] ?? row["rhMasterUpdatedAt"] ?? row["last_updated"] ?? row["lastUpdated"];
+                  const incomingRhDay = incomingRhStampRaw ? parseReadingDay2(String(incomingRhStampRaw instanceof Date ? incomingRhStampRaw.toISOString() : incomingRhStampRaw)) : null;
+                  if (!incomingRhDay || incomingRhDay.getTime() < localWinner.readingDay.getTime()) {
+                    if (rowToApply === row) rowToApply = { ...row };
+                    for (const col of [
+                      "current_cumulative_rh",
+                      "currentCumulativeRH",
+                      "rh_current_master",
+                      "rhCurrentMaster",
+                      "rh_master_updated_at",
+                      "rhMasterUpdatedAt",
+                      "rh_master_update_source",
+                      "rhMasterUpdateSource",
+                      "last_updated",
+                      "lastUpdated"
+                    ]) {
+                      delete rowToApply[col];
+                    }
+                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? "none"}) loses to local winning reading ${localWinner.readingDay.toISOString().split("T")[0]} \u2014 RH columns preserved`);
+                  }
+                }
+              } catch (rhGuardErr) {
+                syncDiag(`RH-LATEST-GUARD lookup failed for components.${cuuid}: ${String(rhGuardErr?.message || rhGuardErr).substring(0, 120)}`);
               }
             }
           }
@@ -7692,27 +7731,9 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
       if (tableName === "running_hours_audit" && rowData["component_id"]) {
         try {
-          const compId = rowData["component_id"];
-          const newRH = rowData["cumulative_rh"] || rowData["new_rh"];
-          const readingDate = safeParseDate(rowData["date_updated_local"]) || (rowData["entered_at_utc"] instanceof Date ? rowData["entered_at_utc"] : safeParseDate(rowData["entered_at_utc"]));
-          const latestRotation = await getLatestRotationDate(pool4, compId);
-          if (latestRotation && readingDate && isReadingPreRotation(readingDate, latestRotation)) {
-            syncDiag(`RH-APPLY INSERT SKIP (pre-rotation): component=${compId} audit=${rowUuid} reading ${readingDate.toISOString()} predates latest rotation ${latestRotation.toISOString()} \u2014 audit stored, component baseline untouched`);
-          } else if (newRH !== void 0 && newRH !== null) {
-            const oldRow = await pool4.query(
-              `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-              [compId]
-            );
-            const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || "(not found)";
-            const rhUpdatedAt = rowData["entered_at_utc"] || /* @__PURE__ */ new Date();
-            const lastUpdatedText = rowData["date_updated_local"] || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
-            const rhMasterUpdatedAtVal = safeParseDate(rowData["date_updated_local"]) || rhUpdatedAt;
-            await pool4.query(
-              `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
-              [String(newRH), compId, rhMasterUpdatedAtVal, lastUpdatedText]
-            );
-            syncDiag(`RH-APPLY INSERT: component=${compId} current_cumulative_rh updated from ${oldVal} to ${newRH}, last_updated=${lastUpdatedText} from audit row ${rowUuid}`);
-          }
+          const { applyWinningRhToComponent: applyWinningRhToComponent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const updated = await applyWinningRhToComponent2(pool4, rowData["component_id"], "sync-insert");
+          syncDiag(`RH-APPLY INSERT (derive): component=${rowData["component_id"]} audit=${rowUuid} \u2192 ${updated ? "component recomputed from winning event" : "no usable winner (component untouched)"}`);
         } catch (rhErr) {
           syncDiag(`RH-APPLY INSERT ERROR: component=${rowData["component_id"]} audit=${rowUuid}: ${rhErr.message}`);
         }
@@ -8149,7 +8170,6 @@ var init_oneWayApplier = __esm({
     init_db();
     init_syncConfig();
     init_syncDiagLogger();
-    init_rhValidation();
     columnMetaCache = /* @__PURE__ */ new Map();
     JOB_TRACKING_COLUMNS = ["last_done_date", "next_due_date", "last_done_rh", "next_due_rh"];
     SYNC_COLUMN_ALIASES = { location2: "location_2" };
@@ -11705,6 +11725,11 @@ async function receivePushData(batchUuid, vesselId, payload) {
               }
             }
             const meta = await getColumnMeta(client, log2.tableName);
+            if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+              syncDiag(`UPDATE SKIP (unknown column): ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} \u2014 column not in local schema (pre-migration instance); acked without apply`);
+              fieldLogsApplied++;
+              continue;
+            }
             let valueToApply = effectiveNewValue;
             if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
               try {
@@ -11726,30 +11751,14 @@ async function receivePushData(batchUuid, vesselId, payload) {
             if (log2.tableName === "running_hours_audit" && (fieldNameSnake === "new_rh" || fieldNameSnake === "cumulative_rh") && valueToApply !== null) {
               try {
                 const auditRow = await client.query(
-                  `SELECT component_id, entered_at_utc, date_updated_local FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+                  `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
                   [log2.rowUuid]
                 );
                 if (auditRow.rows.length > 0) {
                   const compId = auditRow.rows[0].component_id;
-                  const rotGuardReading = safeParseDate(auditRow.rows[0].date_updated_local) || (auditRow.rows[0].entered_at_utc instanceof Date ? auditRow.rows[0].entered_at_utc : safeParseDate(auditRow.rows[0].entered_at_utc));
-                  const latestRotation = await getLatestRotationDate(client, compId);
-                  if (latestRotation && isReadingPreRotation(rotGuardReading, latestRotation)) {
-                    syncDiag(`RH-APPLY UPDATE SKIP (pre-rotation): component=${compId} audit=${log2.rowUuid} reading ${rotGuardReading.toISOString()} predates latest rotation ${latestRotation.toISOString()} \u2014 component baseline untouched`);
-                    continue;
-                  }
-                  const rhUpdatedAt = auditRow.rows[0].entered_at_utc || /* @__PURE__ */ new Date();
-                  const oldRow = await client.query(
-                    `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-                    [compId]
-                  );
-                  const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || "(not found)";
-                  const lastUpdatedText = auditRow.rows[0].date_updated_local || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
-                  const rhMasterUpdatedAtVal = safeParseDate(auditRow.rows[0].date_updated_local) || rhUpdatedAt;
-                  await client.query(
-                    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
-                    [String(valueToApply), compId, rhMasterUpdatedAtVal, lastUpdatedText]
-                  );
-                  syncDiag(`RH-APPLY UPDATE: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply}, last_updated=${lastUpdatedText} from audit row ${log2.rowUuid}`);
+                  const { applyWinningRhToComponent: applyWinningRhToComponent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+                  const updated = await applyWinningRhToComponent2(client, compId, "sync-push");
+                  syncDiag(`RH-APPLY UPDATE (derive): component=${compId} audit=${log2.rowUuid} \u2192 ${updated ? "component recomputed from winning event" : "no usable winner (component untouched)"}`);
                 }
               } catch (rhErr) {
                 syncDiag(`RH-APPLY UPDATE ERROR: audit=${log2.rowUuid}: ${rhErr.message}`);
@@ -12468,7 +12477,6 @@ var init_service = __esm({
     init_syncDiagLogger();
     init_alertsRepository();
     init_conflictReviewRepository();
-    init_rhValidation();
     vesselCodeCache = /* @__PURE__ */ new Map();
   }
 });
@@ -17124,7 +17132,6 @@ var init_syncEngine = __esm({
     "use strict";
     init_repository();
     init_oneWayApplier();
-    init_rhValidation();
     init_fileSyncProcessor();
     init_syncConfig();
     init_db();
@@ -17993,27 +18000,14 @@ var init_syncEngine = __esm({
         if (log2.tableName === "running_hours_audit" && (fieldNameSnake === "new_rh" || fieldNameSnake === "cumulative_rh") && valueToApply !== null) {
           try {
             const auditRow = await conn.query(
-              `SELECT component_id, date_updated_local, entered_at_utc FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+              `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
               [log2.rowUuid]
             );
             if (auditRow.rows.length > 0) {
               const compId = auditRow.rows[0].component_id;
-              const rotGuardReading = safeParseDate(auditRow.rows[0].date_updated_local) || (auditRow.rows[0].entered_at_utc instanceof Date ? auditRow.rows[0].entered_at_utc : safeParseDate(auditRow.rows[0].entered_at_utc));
-              const latestRotation = await getLatestRotationDate(conn, compId);
-              if (latestRotation && isReadingPreRotation(rotGuardReading, latestRotation)) {
-                syncDiag(`RH-APPLY PULL SKIP (pre-rotation): component=${compId} audit=${log2.rowUuid} reading ${rotGuardReading.toISOString()} predates latest rotation ${latestRotation.toISOString()} \u2014 component baseline untouched`);
-                return;
-              }
-              const oldRow = await conn.query(
-                `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-                [compId]
-              );
-              const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || "(not found)";
-              await conn.query(
-                `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, updated_at = NOW() WHERE cuuid = $2`,
-                [String(valueToApply), compId]
-              );
-              syncDiag(`RH-APPLY PULL: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply} from audit row ${log2.rowUuid}`);
+              const { applyWinningRhToComponent: applyWinningRhToComponent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+              const updated = await applyWinningRhToComponent2(conn, compId, "sync-pull");
+              syncDiag(`RH-APPLY PULL (derive): component=${compId} audit=${log2.rowUuid} \u2192 ${updated ? "component recomputed from winning event" : "no usable winner (component untouched)"}`);
             }
           } catch (rhErr) {
             syncDiag(`RH-APPLY PULL ERROR: audit=${log2.rowUuid}: ${rhErr.message}`);
@@ -22301,6 +22295,16 @@ var init_componentService = __esm({
 // server/postgresStorage.ts
 import { randomUUID as randomUUID2 } from "crypto";
 import { eq as eq7, and as and6, desc as desc2, sql as sql8, inArray as inArray2, or, ilike as ilike2, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
+async function getRhOriginSide() {
+  if (cachedRhOriginSide !== void 0) return cachedRhOriginSide;
+  try {
+    const { getInstanceRole: getInstanceRole2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+    cachedRhOriginSide = await getInstanceRole2();
+  } catch {
+    cachedRhOriginSide = null;
+  }
+  return cachedRhOriginSide;
+}
 function getWorkOrderNumericFields() {
   if (_woNumericFields) return _woNumericFields;
   try {
@@ -22311,7 +22315,7 @@ function getWorkOrderNumericFields() {
   }
   return _woNumericFields;
 }
-var _woNumericFields, PostgresStorage, postgresStorage;
+var cachedRhOriginSide, _woNumericFields, PostgresStorage, postgresStorage;
 var init_postgresStorage = __esm({
   "server/postgresStorage.ts"() {
     "use strict";
@@ -23362,7 +23366,10 @@ var init_postgresStorage = __esm({
             meterReplaced: false,
             version: 1,
             componentCode: masterComponentCode,
-            componentName: component.name || null
+            componentName: component.name || null,
+            // Task #394: comparator metadata — origin side + rotational epoch (stamp holder)
+            originSide: await getRhOriginSide(),
+            stampHolder: freshComponent.currentStamp || null
           }).returning();
           try {
             await logFieldChanges("running_hours_audit", rhaResult[0].rhauuid, masterVesselId, null, rhaResult[0], params.userId);
@@ -23405,7 +23412,10 @@ var init_postgresStorage = __esm({
               meterReplaced: false,
               version: 1,
               componentCode: inherited.componentCode || null,
-              componentName: inherited.name || null
+              componentName: inherited.name || null,
+              // Task #394: comparator metadata — origin side + rotational epoch (stamp holder)
+              originSide: await getRhOriginSide(),
+              stampHolder: inherited.currentStamp || null
             }).returning();
             try {
               await logFieldChanges("running_hours_audit", childRhaResult[0].rhauuid, inherited.vesselId || masterVesselId, null, childRhaResult[0], params.userId);
@@ -23696,7 +23706,11 @@ var init_postgresStorage = __esm({
       // ============= MODULE 3: RUNNING HOURS AUDIT =============
       async createRunningHoursAudit(audit) {
         const db2 = await getDb();
-        const auditWithActor = { ...audit, actorLabel: audit.actorLabel ?? getAuditActor().actorLabel };
+        const auditWithActor = {
+          ...audit,
+          actorLabel: audit.actorLabel ?? getAuditActor().actorLabel,
+          originSide: audit.originSide ?? await getRhOriginSide()
+        };
         const result = await db2.insert(runningHoursAudit).values(auditWithActor).returning();
         try {
           await logFieldChanges("running_hours_audit", result[0].rhauuid, result[0].vesselId || null, null, result[0], "system");
@@ -30517,6 +30531,7 @@ var init_workOrderNumbering = __esm({
 var workOrderGenerationGate_exports = {};
 __export(workOrderGenerationGate_exports, {
   evaluateDirectGeneration: () => evaluateDirectGeneration,
+  isOfficeRhEntryEnabled: () => isOfficeRhEntryEnabled,
   isOfficeWoGenerationEnabled: () => isOfficeWoGenerationEnabled,
   resolveGateRole: () => resolveGateRole
 });
@@ -30537,6 +30552,23 @@ async function isOfficeWoGenerationEnabled(vesselId) {
     return r.rows[0]?.enabled === true;
   } catch (err) {
     console.error(`[WO-Gate] office-generation switch lookup failed for vessel ${vesselId}: ${err?.message || err} \u2014 treating as DISABLED`);
+    return false;
+  }
+}
+async function isOfficeRhEntryEnabled(vesselId) {
+  try {
+    const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const pool4 = await getPool2();
+    const r = await pool4.query(
+      `SELECT office_rh_entry_enabled AS enabled
+         FROM pms_vessel_settings
+        WHERE vessel_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
+        LIMIT 1`,
+      [vesselId]
+    );
+    return r.rows[0]?.enabled === true;
+  } catch (err) {
+    console.error(`[RH-Gate] office-RH-entry switch lookup failed for vessel ${vesselId}: ${err?.message || err} \u2014 treating as DISABLED`);
     return false;
   }
 }
@@ -31091,7 +31123,7 @@ function getDaysBetween(date1, date2) {
   const msPerDay = 24 * 60 * 60 * 1e3;
   return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
 }
-function formatDMY2(isoDate) {
+function formatDMY(isoDate) {
   if (!isoDate) return isoDate;
   const m = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return isoDate;
@@ -31223,10 +31255,10 @@ async function getValidRange(machineryId, completionDate) {
   }
   const daysToPrev = getDaysBetween(parseDate2(previousEntry.date), targetDate);
   let minRH = previousEntry.runningHours;
-  let maxRH = previousEntry.runningHours + daysToPrev * MAX_HOURS_PER_DAY2;
+  let maxRH = previousEntry.runningHours + daysToPrev * MAX_HOURS_PER_DAY;
   if (nextEntry) {
     const daysToNext = getDaysBetween(targetDate, parseDate2(nextEntry.date));
-    const minFromForward = nextEntry.runningHours - daysToNext * MAX_HOURS_PER_DAY2;
+    const minFromForward = nextEntry.runningHours - daysToNext * MAX_HOURS_PER_DAY;
     minRH = Math.max(minRH, minFromForward);
     maxRH = Math.min(maxRH, nextEntry.runningHours);
   }
@@ -31253,7 +31285,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
     return {
       isValid: false,
       validationStatus: "INVALID_BACKDATED",
-      errorMessage: `Completion Date ${formatDMY2(completionDate)} is earlier than the component's last running-hours update (${formatDMY2(range.baselineDate || "")}). There is no running-hours entry on or before this date, so running hours cannot be recorded here. Running hours can only be recorded on or after the latest reading.`,
+      errorMessage: `Completion Date ${formatDMY(completionDate)} is earlier than the component's last running-hours update (${formatDMY(range.baselineDate || "")}). There is no running-hours entry on or before this date, so running hours cannot be recorded here. Running hours can only be recorded on or after the latest reading.`,
       validRange: { min: range.minRH, max: range.maxRH },
       utilizationRate: 0,
       requiresJustification: false,
@@ -31275,7 +31307,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
   if (range.previousEntry) {
     daysBetweenPrevious = getDaysBetween(parseDate2(range.previousEntry.date), targetDate);
     actualIncrease = enteredRH - range.previousEntry.runningHours;
-    maxPossibleIncrease = daysBetweenPrevious * MAX_HOURS_PER_DAY2;
+    maxPossibleIncrease = daysBetweenPrevious * MAX_HOURS_PER_DAY;
   }
   if (range.nextEntry) {
     daysBetweenNext = getDaysBetween(targetDate, parseDate2(range.nextEntry.date));
@@ -31301,7 +31333,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
     return {
       isValid: false,
       validationStatus: "INVALID_BACKWARD",
-      errorMessage: `This is physically impossible because: Previous RH entry: ${range.previousEntry.runningHours} hours on ${range.previousEntry.date}. Days between: ${daysBetweenPrevious} days. Maximum possible increase: ${maxPossibleIncrease} hours (${daysBetweenPrevious} days \xD7 ${MAX_HOURS_PER_DAY2} hrs/day). Your entered increase: ${actualIncrease} hours. Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours.`,
+      errorMessage: `This is physically impossible because: Previous RH entry: ${range.previousEntry.runningHours} hours on ${range.previousEntry.date}. Days between: ${daysBetweenPrevious} days. Maximum possible increase: ${maxPossibleIncrease} hours (${daysBetweenPrevious} days \xD7 ${MAX_HOURS_PER_DAY} hrs/day). Your entered increase: ${actualIncrease} hours. Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours.`,
       validRange: { min: range.minRH, max: range.maxRH },
       utilizationRate: 0,
       requiresJustification: false,
@@ -31333,12 +31365,12 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
   }
   if (range.nextEntry) {
     const requiredIncrease = range.nextEntry.runningHours - enteredRH;
-    const maxForwardIncrease = daysBetweenNext * MAX_HOURS_PER_DAY2;
+    const maxForwardIncrease = daysBetweenNext * MAX_HOURS_PER_DAY;
     if (requiredIncrease > maxForwardIncrease && daysBetweenNext > 0) {
       return {
         isValid: false,
         validationStatus: "INVALID_FORWARD",
-        errorMessage: `This conflicts with future RH data: Next RH entry: ${range.nextEntry.runningHours} hours on ${range.nextEntry.date}. Days between: ${daysBetweenNext} days. Required increase from your entry: ${requiredIncrease.toFixed(0)} hours. Maximum possible in ${daysBetweenNext} days: ${maxForwardIncrease} hours (${daysBetweenNext} \xD7 ${MAX_HOURS_PER_DAY2} hrs/day). Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours. Your entry would require the machinery to run more than ${MAX_HOURS_PER_DAY2} hours per day to reach the next recorded value.`,
+        errorMessage: `This conflicts with future RH data: Next RH entry: ${range.nextEntry.runningHours} hours on ${range.nextEntry.date}. Days between: ${daysBetweenNext} days. Required increase from your entry: ${requiredIncrease.toFixed(0)} hours. Maximum possible in ${daysBetweenNext} days: ${maxForwardIncrease} hours (${daysBetweenNext} \xD7 ${MAX_HOURS_PER_DAY} hrs/day). Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours. Your entry would require the machinery to run more than ${MAX_HOURS_PER_DAY} hours per day to reach the next recorded value.`,
         validRange: { min: range.minRH, max: range.maxRH },
         utilizationRate: 0,
         requiresJustification: false,
@@ -31488,12 +31520,12 @@ async function getCurrentRH(machineryId) {
     rhCounterType: (component.rhCounterType || "MASTER").toUpperCase()
   };
 }
-var MAX_HOURS_PER_DAY2, HIGH_UTILIZATION_THRESHOLD;
+var MAX_HOURS_PER_DAY, HIGH_UTILIZATION_THRESHOLD;
 var init_rhTimelineValidationService = __esm({
   "server/modules/running-hours/services/rhTimelineValidationService.ts"() {
     "use strict";
     init_runningHoursRepository();
-    MAX_HOURS_PER_DAY2 = 25;
+    MAX_HOURS_PER_DAY = 25;
     HIGH_UTILIZATION_THRESHOLD = 20;
   }
 });
@@ -31989,7 +32021,7 @@ var init_jobDueScanner = __esm({
        *   a ship DB holds only its own vessel anyway).
        * @returns the counts, plus `skipped: true` if a run was already in progress.
        */
-      async runScan(scopeVesselId) {
+      async runScan(scopeVesselId, opts) {
         if (this.runInProgress) {
           console.log("[JobDueScanner] Previous scan still running \u2014 skipping this run");
           return {
@@ -32006,6 +32038,19 @@ var init_jobDueScanner = __esm({
         try {
           const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
           if (!await isShipInstance2()) {
+            if (opts?.triggerSource === "rh-update") {
+              console.log(`[JobDueScanner] SHORE gate refused scan (RH-update trigger \u2014 office RH entries never generate WOs)`);
+              this.runInProgress = false;
+              return {
+                calendarJobsChecked: 0,
+                calendarWOsGenerated: 0,
+                rhJobsChecked: 0,
+                rhWOsGenerated: 0,
+                dualJobsChecked: 0,
+                dualWOsGenerated: 0,
+                skipped: true
+              };
+            }
             const { isOfficeWoGenerationEnabled: isOfficeWoGenerationEnabled2 } = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
             if (!scopeVesselId || !await isOfficeWoGenerationEnabled2(scopeVesselId)) {
               console.log(`[JobDueScanner] SHORE gate refused scan (${scopeVesselId ? `vessel ${scopeVesselId} switch OFF` : "unscoped scan not allowed on shore"})`);
@@ -34197,6 +34242,151 @@ var init_hodResolutionService = __esm({
   }
 });
 
+// server/modules/running-hours/utils/rhValidation.ts
+function getCalendarDate(dateStr) {
+  const date2 = new Date(dateStr);
+  return new Date(Date.UTC(date2.getUTCFullYear(), date2.getUTCMonth(), date2.getUTCDate()));
+}
+function getDaysBetweenCalendarDates(date1, date2) {
+  const msPerDay = 24 * 60 * 60 * 1e3;
+  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
+}
+function formatDMY2(dateStr) {
+  if (!dateStr) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+}
+function validateRunningHoursIncrease(input) {
+  const { currentRH, newRH, componentLastUpdated, newUpdateDate, userRole, adminOverride } = input;
+  const requestedIncrease = newRH - currentRH;
+  let daysSinceLastUpdate = 0;
+  let sameDayUpdate = false;
+  if (componentLastUpdated) {
+    const lastCalendarDate = getCalendarDate(componentLastUpdated);
+    const newCalendarDate = getCalendarDate(newUpdateDate);
+    daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
+    if (daysSinceLastUpdate < 0) {
+      const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
+      return {
+        allowed: canOverride2,
+        maxAllowedIncrease: 0,
+        requestedIncrease,
+        daysSinceLastUpdate,
+        lastUpdateDate: componentLastUpdated,
+        backdatedLower: requestedIncrease <= 0,
+        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY2(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY2(componentLastUpdated)}). Running hours can only be recorded on or after the latest reading.`,
+        requiresAdminOverride: !canOverride2
+      };
+    }
+    if (daysSinceLastUpdate === 0) {
+      sameDayUpdate = true;
+    }
+  } else {
+    daysSinceLastUpdate = 1;
+  }
+  if (requestedIncrease <= 0) {
+    return {
+      allowed: true,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: "No increase or decrease - no validation needed",
+      requiresAdminOverride: false
+    };
+  }
+  let maxAllowedIncrease;
+  if (sameDayUpdate) {
+    const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
+    return {
+      allowed: canOverride2,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: canOverride2 ? "Sail Admin override applied for same-day duplicate update" : "Same-day update already performed. Only one update of max 25 hours is allowed per day.",
+      requiresAdminOverride: !canOverride2
+    };
+  } else {
+    maxAllowedIncrease = daysSinceLastUpdate * MAX_HOURS_PER_DAY2;
+  }
+  const isWithinLimit = requestedIncrease <= maxAllowedIncrease;
+  if (isWithinLimit) {
+    return {
+      allowed: true,
+      maxAllowedIncrease,
+      requestedIncrease,
+      daysSinceLastUpdate,
+      lastUpdateDate: componentLastUpdated,
+      message: `Increase of ${requestedIncrease} hours is within the allowed limit of ${maxAllowedIncrease} hours`,
+      requiresAdminOverride: false
+    };
+  }
+  const canOverride = userRole === "Sail Admin" && adminOverride === true;
+  return {
+    allowed: canOverride,
+    maxAllowedIncrease,
+    requestedIncrease,
+    daysSinceLastUpdate,
+    lastUpdateDate: componentLastUpdated,
+    message: canOverride ? `Sail Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days \xD7 25 hours/day).` : `Increase of ${requestedIncrease} hours exceeds maximum allowed of ${maxAllowedIncrease} hours. Maximum allowed is ${daysSinceLastUpdate} day(s) \xD7 25 hours/day = ${maxAllowedIncrease} hours.`,
+    requiresAdminOverride: !canOverride
+  };
+}
+function canAdminOverride(userRole) {
+  return userRole === "Sail Admin";
+}
+function safeParseDate(value) {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) return d;
+  const months = {
+    jan: 0,
+    feb: 1,
+    mar: 2,
+    apr: 3,
+    may: 4,
+    jun: 5,
+    jul: 6,
+    aug: 7,
+    sep: 8,
+    oct: 9,
+    nov: 10,
+    dec: 11
+  };
+  const match = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if (match) {
+    const [, day, mon, year, hh = "0", mm = "0"] = match;
+    const month = months[mon.toLowerCase()];
+    if (month !== void 0) {
+      const parsed = new Date(
+        parseInt(year),
+        month,
+        parseInt(day),
+        parseInt(hh),
+        parseInt(mm)
+      );
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+  return null;
+}
+var MAX_HOURS_PER_DAY2;
+var init_rhValidation = __esm({
+  "server/modules/running-hours/utils/rhValidation.ts"() {
+    "use strict";
+    MAX_HOURS_PER_DAY2 = 25;
+  }
+});
+
 // server/modules/running-hours/services/runningHoursService.ts
 var runningHoursService_exports = {};
 __export(runningHoursService_exports, {
@@ -34713,7 +34903,7 @@ async function updateMasterRH(componentId, body) {
   try {
     if (component.vesselId) {
       const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
-      const scanResult = await jobDueScanner2.runScan(component.vesselId);
+      const scanResult = await jobDueScanner2.runScan(component.vesselId, { triggerSource: "rh-update" });
       woGenerationResult = {
         rhJobsChecked: scanResult.rhJobsChecked,
         rhWOsGenerated: scanResult.rhWOsGenerated
@@ -36026,7 +36216,13 @@ async function updateWorkOrder(id, body) {
     );
   }
   const { isShipInstance: isShipInstanceForRH } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
-  if (isApprovalTransition && !interceptedForL2Review && updateData.status === "Completed" && !existingWO2.rhSyncedAt && await isShipInstanceForRH()) {
+  const isShipForRhWrite = await isShipInstanceForRH();
+  let officeRhEntryAllowed = false;
+  if (!isShipForRhWrite && existingWO2.vesselId) {
+    const { isOfficeRhEntryEnabled: isOfficeRhEntryEnabled2 } = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
+    officeRhEntryAllowed = await isOfficeRhEntryEnabled2(existingWO2.vesselId);
+  }
+  if (isApprovalTransition && !interceptedForL2Review && updateData.status === "Completed" && !existingWO2.rhSyncedAt && (isShipForRhWrite || officeRhEntryAllowed)) {
     const rhRaw = existingWO2.runningHours || updateData.runningHours;
     if (rhRaw) {
       let rhComp = await findComponent2(existingWO2.component);
@@ -36045,12 +36241,25 @@ async function updateWorkOrder(id, body) {
       };
       const completionDateNorm = normRhDate(existingWO2.completionDateTime || existingWO2.dateCompleted || updateData.completionDateTime);
       const readingDateNorm = normRhDate(existingWO2.currentReadingDate || updateData.currentReadingDate) || completionDateNorm;
+      if (!isShipForRhWrite && !readingDateNorm) {
+        throw new ValidationError(
+          "Office RH entry requires the reading date (Current Reading Date or Completion Date). Enter the date the counter was actually read.",
+          { code: "RH_READING_DATE_REQUIRED", workOrderNo: existingWO2.workOrderNo }
+        );
+      }
       if (rhComp && rhCounterType === "MASTER" && !isNaN(rhValue)) {
         let rhBackdatedSkippedApproval = false;
         const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || "0");
         if (rhValue <= masterCurrentRHApproval && readingDateNorm) {
-          const masterUpdRawApproval = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
-          const masterUpdDateApproval = masterUpdRawApproval instanceof Date ? masterUpdRawApproval : masterUpdRawApproval ? new Date(masterUpdRawApproval) : null;
+          const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const stampFallbackApproval = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
+          const stampFallbackDateApproval = stampFallbackApproval instanceof Date ? stampFallbackApproval : stampFallbackApproval ? new Date(stampFallbackApproval) : null;
+          const masterUpdDateApproval = await resolveRhBaselineDay2(
+            await getPool2(),
+            rhComp.cuuid,
+            stampFallbackDateApproval && !isNaN(stampFallbackDateApproval.getTime()) ? stampFallbackDateApproval : null
+          );
           if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
             const approvalCompletionDate = new Date(readingDateNorm);
             const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
@@ -36066,34 +36275,42 @@ async function updateWorkOrder(id, body) {
           }
         }
         if (!rhBackdatedSkippedApproval) {
-          const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-          try {
-            await updateMasterRH3(rhComp.cuuid, {
-              newRHValue: rhValue,
-              updateSource: "MANUAL",
-              userId: body.userId || existingWO2.performedBy || "system",
-              userUuid: body.userUuid,
-              userRole: body.userRole || "Ship",
-              adminOverride: body.adminOverride || false,
-              comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
-              dateUpdated: readingDateNorm
-            });
-            updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-            console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children)`);
-          } catch (masterErr) {
-            if (masterErr instanceof ValidationError) {
-              const det = masterErr.details || {};
-              throw new ValidationError(masterErr.message, {
-                code: "RH_OVERRIDE_REQUIRED",
-                ...det,
-                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                canOverride: det.validation?.canOverride ?? false,
-                componentId: rhComp.cuuid,
-                componentCode: rhComp.componentCode || existingWO2.componentCode,
-                rhCounterType: "MASTER"
+          const { claimWoRhSync: claimWoRhSync2, releaseWoRhSync: releaseWoRhSync2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getPoolForClaim } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const claimPool = await getPoolForClaim();
+          if (!await claimWoRhSync2(claimPool, existingWO2.wouuid)) {
+            console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
+          } else {
+            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+            try {
+              await updateMasterRH3(rhComp.cuuid, {
+                newRHValue: rhValue,
+                updateSource: "MANUAL",
+                userId: body.userId || existingWO2.performedBy || "system",
+                userUuid: body.userUuid,
+                userRole: body.userRole || "Ship",
+                adminOverride: body.adminOverride || false,
+                comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
+                dateUpdated: readingDateNorm
               });
+              updateData.rhSyncedAt = /* @__PURE__ */ new Date();
+              console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children)`);
+            } catch (masterErr) {
+              await releaseWoRhSync2(claimPool, existingWO2.wouuid);
+              if (masterErr instanceof ValidationError) {
+                const det = masterErr.details || {};
+                throw new ValidationError(masterErr.message, {
+                  code: "RH_OVERRIDE_REQUIRED",
+                  ...det,
+                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                  canOverride: det.validation?.canOverride ?? false,
+                  componentId: rhComp.cuuid,
+                  componentCode: rhComp.componentCode || existingWO2.componentCode,
+                  rhCounterType: "MASTER"
+                });
+              }
+              throw masterErr;
             }
-            throw masterErr;
           }
         }
       } else if (rhComp && rhCounterType === "INHERITED" && !isNaN(rhValue)) {
@@ -36109,8 +36326,15 @@ async function updateWorkOrder(id, body) {
           let rhBackdatedSkippedInherited = false;
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || "0");
           if (rhValue <= inhMasterCurrentRH && readingDateNorm) {
+            const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+            const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
             const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhMasterUpdDate = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
+            const inhStampFallback = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
+            const inhMasterUpdDate = await resolveRhBaselineDay2(
+              await getPool2(),
+              masterComp.cuuid,
+              inhStampFallback && !isNaN(inhStampFallback.getTime()) ? inhStampFallback : null
+            );
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
               const inhCompletionDate = new Date(readingDateNorm);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
@@ -36126,34 +36350,42 @@ async function updateWorkOrder(id, body) {
             }
           }
           if (!rhBackdatedSkippedInherited) {
-            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-            try {
-              await updateMasterRH3(masterComp.cuuid, {
-                newRHValue: rhValue,
-                updateSource: "WORKORDER",
-                userId: body.userId || existingWO2.performedBy || "system",
-                userUuid: body.userUuid,
-                userRole: body.userRole || "Ship",
-                adminOverride: body.adminOverride || false,
-                comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                dateUpdated: readingDateNorm
-              });
-              updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-              console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO2.workOrderNo}`);
-            } catch (masterErr) {
-              if (masterErr instanceof ValidationError) {
-                const det = masterErr.details || {};
-                throw new ValidationError(masterErr.message, {
-                  code: "RH_OVERRIDE_REQUIRED",
-                  ...det,
-                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                  canOverride: det.validation?.canOverride ?? false,
-                  componentId: masterComp.cuuid,
-                  componentCode: masterComp.componentCode || existingWO2.componentCode,
-                  rhCounterType: "INHERITED"
+            const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+            const { getPool: getPoolInh } = await Promise.resolve().then(() => (init_db(), db_exports));
+            const claimPoolInh = await getPoolInh();
+            if (!await claimInh(claimPoolInh, existingWO2.wouuid)) {
+              console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
+            } else {
+              const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+              try {
+                await updateMasterRH3(masterComp.cuuid, {
+                  newRHValue: rhValue,
+                  updateSource: "WORKORDER",
+                  userId: body.userId || existingWO2.performedBy || "system",
+                  userUuid: body.userUuid,
+                  userRole: body.userRole || "Ship",
+                  adminOverride: body.adminOverride || false,
+                  comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+                  dateUpdated: readingDateNorm
                 });
+                updateData.rhSyncedAt = /* @__PURE__ */ new Date();
+                console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO2.workOrderNo}`);
+              } catch (masterErr) {
+                await releaseInh(claimPoolInh, existingWO2.wouuid);
+                if (masterErr instanceof ValidationError) {
+                  const det = masterErr.details || {};
+                  throw new ValidationError(masterErr.message, {
+                    code: "RH_OVERRIDE_REQUIRED",
+                    ...det,
+                    requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                    canOverride: det.validation?.canOverride ?? false,
+                    componentId: masterComp.cuuid,
+                    componentCode: masterComp.componentCode || existingWO2.componentCode,
+                    rhCounterType: "INHERITED"
+                  });
+                }
+                throw masterErr;
               }
-              throw masterErr;
             }
           }
         } else {
@@ -36180,7 +36412,9 @@ async function updateWorkOrder(id, body) {
               previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
               newRH: rhValue.toString(),
               cumulativeRH: rhValue.toString(),
-              dateUpdatedLocal: completionDateNorm || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+              // Task #394 fix: stamp the READING date (not the completion date, and never
+              // "today") — a wrong date here poisons the latest-reading-wins comparator.
+              dateUpdatedLocal: readingDateNorm || completionDateNorm || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
               dateUpdatedTZ: "UTC",
               enteredAtUTC: /* @__PURE__ */ new Date(),
               userId: body.userId || existingWO2.performedBy || "System",
@@ -41949,6 +42183,15 @@ async function setOfficeWoGenerationEnabled(vesselId, enabled, username) {
     updatedBy: username || "unknown"
   });
 }
+async function setOfficeRhEntryEnabled(vesselId, enabled, username) {
+  const existing = await getPmsVesselSettings(vesselId);
+  return createOrUpdatePmsVesselSettings({
+    ...existing ?? { vesselId },
+    vesselId,
+    officeRhEntryEnabled: enabled,
+    updatedBy: username || "unknown"
+  });
+}
 async function updatePmsVesselSettings(vesselId, data, username) {
   const updatedBy = data.updatedBy || username || "test";
   const settingsMode = data.settingsMode || "COMPANY_STANDARD";
@@ -42336,6 +42579,24 @@ async function updateOfficeWoGenerationSwitch(req, res) {
   console.log(`[OfficeWoSwitch] vessel=${req.params.vesselId} office_wo_generation_enabled=${enabled} by ${username}`);
   res.json({ vesselId: req.params.vesselId, officeWoGenerationEnabled: settings.officeWoGenerationEnabled, updatedBy: settings.updatedBy });
 }
+async function updateOfficeRhEntrySwitch(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "Office RH entry is configured on the shore server." });
+  }
+  const userRole = (req.user?.forwardedRole || req.user?.role || "").trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may change office RH entry." });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled (boolean) is required" });
+  }
+  const username = req.user?.username || "unknown";
+  const settings = await setOfficeRhEntryEnabled(req.params.vesselId, enabled, username);
+  console.log(`[OfficeRhSwitch] vessel=${req.params.vesselId} office_rh_entry_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, officeRhEntryEnabled: settings.officeRhEntryEnabled, updatedBy: settings.updatedBy });
+}
 async function getCompanyStandardGraceSettings3(_req, res) {
   const settings = await getCompanyStandardGraceSettings2();
   res.json(settings);
@@ -42380,6 +42641,7 @@ router2.get("/pms-vessel-settings", asyncHandler(getAllPmsVesselSettings3));
 router2.post("/pms-vessel-settings", requirePermission("pms-admin", ["create", "edit"]), asyncHandler(createPmsVesselSettings2));
 router2.get("/pms-vessel-settings/:vesselId", asyncHandler(getPmsVesselSettings3));
 router2.put("/pms-vessel-settings/:vesselId/office-wo-generation", requirePermission("pms-admin", "edit"), asyncHandler(updateOfficeWoGenerationSwitch));
+router2.put("/pms-vessel-settings/:vesselId/office-rh-entry", requirePermission("pms-admin", "edit"), asyncHandler(updateOfficeRhEntrySwitch));
 router2.put("/pms-vessel-settings/:vesselId", requirePermission("pms-admin", "edit"), asyncHandler(updatePmsVesselSettings2));
 router2.delete("/pms-vessel-settings/:vesselId", requirePermission("pms-admin", "delete"), asyncHandler(deletePmsVesselSettings3));
 router2.get("/company-standard-grace-settings", asyncHandler(getCompanyStandardGraceSettings3));
@@ -45650,10 +45912,22 @@ async function completeWorkOrder(workOrderId, body) {
   let rhBackdatedSkipped = false;
   let rhBackdatedLatestRH = null;
   let rhBackdatedLatestRHDate = null;
-  if (runningHours && counterType !== "NOT_RH_DRIVEN" && await isShipInstance()) {
+  const isShipForRhSync = await isShipInstance();
+  let officeRhEntryAllowedCompletion = false;
+  if (!isShipForRhSync && (workOrder.vesselId || component.vesselId)) {
+    const { isOfficeRhEntryEnabled: isOfficeRhEntryEnabled2 } = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
+    officeRhEntryAllowedCompletion = await isOfficeRhEntryEnabled2(workOrder.vesselId || component.vesselId || "");
+  }
+  if (runningHours && counterType !== "NOT_RH_DRIVEN" && (isShipForRhSync || officeRhEntryAllowedCompletion)) {
     const newRH = parseInt(runningHours);
     const completionDateForValidation = dateOfCompletion || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const readingDateForRH = currentReadingDate || completionDateForValidation;
+    if (!isShipForRhSync && !currentReadingDate && !dateOfCompletion) {
+      throw new ValidationError(
+        "Office RH entry requires the reading date (Current Reading Date or Date of Completion). Enter the date the counter was actually read.",
+        { code: "RH_READING_DATE_REQUIRED", workOrderNo: workOrder.workOrderNo }
+      );
+    }
     const componentVesselId = workOrder.vesselId || component.vesselId || "V001";
     const previousRH = parseInt(component.currentCumulativeRH || "0");
     const alreadySynced = !!workOrder.rhSyncedAt;
@@ -45666,8 +45940,15 @@ async function completeWorkOrder(workOrderId, body) {
       } else {
         const masterCurrentRH = parseFloat((component.rhCurrentMaster ?? component.currentCumulativeRH) || "0");
         if (newRH <= masterCurrentRH) {
+          const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const masterUpdRaw = component.rhMasterUpdatedAt ?? (component.lastUpdated ? new Date(component.lastUpdated) : null);
-          const masterUpdDate = masterUpdRaw instanceof Date ? masterUpdRaw : masterUpdRaw ? new Date(masterUpdRaw) : null;
+          const stampFallback = masterUpdRaw instanceof Date ? masterUpdRaw : masterUpdRaw ? new Date(masterUpdRaw) : null;
+          const masterUpdDate = await resolveRhBaselineDay2(
+            await getPool2(),
+            component.cuuid,
+            stampFallback && !isNaN(stampFallback.getTime()) ? stampFallback : null
+          );
           if (masterUpdDate && !isNaN(masterUpdDate.getTime())) {
             const woCompletionDate = new Date(readingDateForRH);
             const masterDay = Date.UTC(masterUpdDate.getUTCFullYear(), masterUpdDate.getUTCMonth(), masterUpdDate.getUTCDate());
@@ -45681,34 +45962,42 @@ async function completeWorkOrder(workOrderId, body) {
           }
         }
         if (!rhBackdatedSkipped) {
-          const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-          try {
-            await updateMasterRH3(component.cuuid, {
-              newRHValue: newRH,
-              updateSource: "MANUAL",
-              userId: bodyUserId || executionData.performedBy || "system",
-              userUuid: bodyUserUuid,
-              userRole: userRole || "Ship",
-              adminOverride: adminOverride || false,
-              comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ""})`,
-              dateUpdated: readingDateForRH
-            });
-            rhReadingApplied = true;
-            console.log(`\u2705 [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
-          } catch (masterErr) {
-            if (masterErr instanceof ValidationError) {
-              const det = masterErr.details || {};
-              throw new ValidationError(masterErr.message, {
-                code: "RH_OVERRIDE_REQUIRED",
-                ...det,
-                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                canOverride: det.validation?.canOverride ?? false,
-                componentId: component.cuuid,
-                componentCode: component.componentCode || workOrder.componentCode,
-                rhCounterType: "MASTER"
+          const { claimWoRhSync: claimWoRhSync2, releaseWoRhSync: releaseWoRhSync2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getClaimPool } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const claimPool = await getClaimPool();
+          if (!await claimWoRhSync2(claimPool, workOrder.wouuid)) {
+            console.warn(`\u26A0\uFE0F [RH Sync] WO ${workOrder.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
+          } else {
+            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+            try {
+              await updateMasterRH3(component.cuuid, {
+                newRHValue: newRH,
+                updateSource: "MANUAL",
+                userId: bodyUserId || executionData.performedBy || "system",
+                userUuid: bodyUserUuid,
+                userRole: userRole || "Ship",
+                adminOverride: adminOverride || false,
+                comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ""})`,
+                dateUpdated: readingDateForRH
               });
+              rhReadingApplied = true;
+              console.log(`\u2705 [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
+            } catch (masterErr) {
+              await releaseWoRhSync2(claimPool, workOrder.wouuid);
+              if (masterErr instanceof ValidationError) {
+                const det = masterErr.details || {};
+                throw new ValidationError(masterErr.message, {
+                  code: "RH_OVERRIDE_REQUIRED",
+                  ...det,
+                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                  canOverride: det.validation?.canOverride ?? false,
+                  componentId: component.cuuid,
+                  componentCode: component.componentCode || workOrder.componentCode,
+                  rhCounterType: "MASTER"
+                });
+              }
+              throw masterErr;
             }
-            throw masterErr;
           }
         }
       }
@@ -45725,8 +46014,15 @@ async function completeWorkOrder(workOrderId, body) {
         if (masterComp) {
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || "0");
           if (newRH <= inhMasterCurrentRH) {
+            const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+            const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
             const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhMasterUpdDate = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
+            const inhStampFallback = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
+            const inhMasterUpdDate = await resolveRhBaselineDay2(
+              await getPool2(),
+              masterComp.cuuid,
+              inhStampFallback && !isNaN(inhStampFallback.getTime()) ? inhStampFallback : null
+            );
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
               const woCompletionDate = new Date(readingDateForRH);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
@@ -45740,33 +46036,41 @@ async function completeWorkOrder(workOrderId, body) {
             }
           }
           if (!rhBackdatedSkipped) {
-            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-            try {
-              await updateMasterRH3(masterComp.cuuid, {
-                newRHValue: newRH,
-                updateSource: "WORKORDER",
-                userId: bodyUserId || executionData.performedBy || "system",
-                userUuid: bodyUserUuid,
-                userRole: userRole || "Ship",
-                adminOverride: adminOverride || false,
-                comments: `WO ${workOrder.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                dateUpdated: readingDateForRH
-              });
-              console.log(`\u2705 [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
-            } catch (masterErr) {
-              if (masterErr instanceof ValidationError) {
-                const det = masterErr.details || {};
-                throw new ValidationError(masterErr.message, {
-                  code: "RH_OVERRIDE_REQUIRED",
-                  ...det,
-                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                  canOverride: det.validation?.canOverride ?? false,
-                  componentId: masterComp.cuuid,
-                  componentCode: masterComp.componentCode || workOrder.componentCode,
-                  rhCounterType: "INHERITED"
+            const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+            const { getPool: getPoolInh } = await Promise.resolve().then(() => (init_db(), db_exports));
+            const claimPoolInh = await getPoolInh();
+            if (!await claimInh(claimPoolInh, workOrder.wouuid)) {
+              console.warn(`\u26A0\uFE0F [RH Sync] WO ${workOrder.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
+            } else {
+              const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+              try {
+                await updateMasterRH3(masterComp.cuuid, {
+                  newRHValue: newRH,
+                  updateSource: "WORKORDER",
+                  userId: bodyUserId || executionData.performedBy || "system",
+                  userUuid: bodyUserUuid,
+                  userRole: userRole || "Ship",
+                  adminOverride: adminOverride || false,
+                  comments: `WO ${workOrder.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+                  dateUpdated: readingDateForRH
                 });
+                console.log(`\u2705 [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
+              } catch (masterErr) {
+                await releaseInh(claimPoolInh, workOrder.wouuid);
+                if (masterErr instanceof ValidationError) {
+                  const det = masterErr.details || {};
+                  throw new ValidationError(masterErr.message, {
+                    code: "RH_OVERRIDE_REQUIRED",
+                    ...det,
+                    requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                    canOverride: det.validation?.canOverride ?? false,
+                    componentId: masterComp.cuuid,
+                    componentCode: masterComp.componentCode || workOrder.componentCode,
+                    rhCounterType: "INHERITED"
+                  });
+                }
+                throw masterErr;
               }
-              throw masterErr;
             }
           }
         } else {
