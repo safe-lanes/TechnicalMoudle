@@ -30,10 +30,22 @@ import { ShipskartRoleNotMappedError, ShipskartUserNotProvisionedError } from '.
 interface BlockExplanation { title: string; detail: string; whatHappensNext: string; retry: 'click' | 'sync' | 'support' }
 
 /** Test seam — the copy is the deliverable here, so it is asserted directly. */
-export const __testExplainBlock = (code: string, role: string | null, raw: string) => explainBlock(code, role, raw);
+export const __testExplainBlock = (code: string, role: string | null, raw: string, facts: any = {}) => explainBlock(code, role, raw, facts);
 
-function explainBlock(reasonCode: string, sailRole: string | null, rawReason: string): BlockExplanation {
+function explainBlock(
+  reasonCode: string,
+  sailRole: string | null,
+  rawReason: string,
+  facts: { fullName?: string | null; sailRole?: string | null; shipskartRole?: string | null } = {},
+): BlockExplanation {
+  // NAME THE ACTUAL VALUES (Ghazi, 2026-08-10). "linked to a purchasing role that no longer
+  // exists" sends support to the database to find out WHICH one; saying
+  // “WAH-KWONG-PUCHASER” lets them fix it from the screen. Every value here already sits in
+  // our own tables, so there is no reason to describe a category instead of naming the thing.
   const role = sailRole ? `“${sailRole}”` : 'your role';
+  const who = facts.fullName ? ` (${facts.fullName})` : '';
+  const skRole = facts.shipskartRole ? `“${facts.shipskartRole}”` : null;
+
   switch (reasonCode) {
     case 'unmapped_role':
       // Two shapes behind one status: no mapping row at all, or the mapped name no longer
@@ -42,12 +54,12 @@ function explainBlock(reasonCode: string, sailRole: string | null, rawReason: st
         ? {
             title: 'Purchasing access is being set up for your role',
             detail:
-              `Your role ${role} is linked to a purchasing role that is no longer available on the ` +
-              `supplier's system, so we cannot open Purchasing for you yet. This usually happens after ` +
-              `the supplier renames a role.`,
+              `Your role ${role} is linked to the purchasing role ${skRole ?? '(not recorded)'}, which no ` +
+              `longer exists on the supplier's system — so we cannot open Purchasing for you yet. This ` +
+              `usually happens after the supplier renames a role.`,
             whatHappensNext:
-              'An administrator needs to re-select the purchasing role for your role in Access Control. ' +
-              'Once that is done, simply open Purchasing again — there is no need to log out.',
+              `An administrator needs to open Access Control and re-select the purchasing role for ${role}, ` +
+              `then save. Once that is done, simply open Purchasing again — there is no need to log out.`,
             retry: 'click',
           }
         : {
@@ -56,8 +68,8 @@ function explainBlock(reasonCode: string, sailRole: string | null, rawReason: st
               `Your role ${role} has not yet been linked to a purchasing role. This is a one-time setup ` +
               `step and it has not been done for this role.`,
             whatHappensNext:
-              'An administrator can link it in Access Control. Once linked, simply open Purchasing again — ' +
-              'there is no need to log out.',
+              `An administrator can link ${role} to a purchasing role in Access Control. Once linked, ` +
+              `simply open Purchasing again — there is no need to log out.`,
             retry: 'click',
           };
 
@@ -65,8 +77,8 @@ function explainBlock(reasonCode: string, sailRole: string | null, rawReason: st
       return {
         title: 'An email address is needed for your account',
         detail:
-          'The purchasing system requires an email address to create your account, and there is no email ' +
-          'recorded against your user profile.',
+          `The purchasing system requires an email address to create your account, and there is no email ` +
+          `recorded against your user profile${who}.`,
         whatHappensNext:
           'Once your email address is added to your user profile and the user details are refreshed, ' +
           'open Purchasing again and your account will be created automatically.',
@@ -159,7 +171,7 @@ export async function initiateHandler(req: AuthenticatedRequest, res: Response) 
     });
   } catch (err: any) {
     if (err instanceof ShipskartRoleNotMappedError) {
-      const x = explainBlock('unmapped_role', err.userRole || userRole || null, 'no shipskart_role_mappings row');
+      const x = explainBlock('unmapped_role', err.userRole || userRole || null, 'no shipskart_role_mappings row', { sailRole: err.userRole || userRole || null });
       return res.status(403).json({
         success: false,
         errorCode: 'ROLE_NOT_MAPPED',
@@ -185,7 +197,7 @@ export async function initiateHandler(req: AuthenticatedRequest, res: Response) 
       // identity not wired on this deployment vs this user's account not created yet.
       const identityMissing = err.reason === 'identity_not_configured';
       const code = identityMissing ? 'identity_not_configured' : (err.reasonCode || 'unknown');
-      const x = explainBlock(code, err.sailRole ?? userRole ?? null, err.reason);
+      const x = explainBlock(code, err.sailRole ?? userRole ?? null, err.reason, err.facts ?? {});
       return res.status(409).json({
         success: false,
         errorCode: 'USER_NOT_PROVISIONED',

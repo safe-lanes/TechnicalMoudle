@@ -263,31 +263,52 @@ async function syncRoleIfDrifted(
  * Returns null when every precondition passes, i.e. the cause is genuinely something else
  * (network, upstream rejection) and the recorded status is the better answer.
  */
+export interface BlockFacts {
+  /** The person's name as we hold it, so the screen can say WHOSE profile is short. */
+  fullName?: string | null;
+  /** Their SAIL role — the thing an admin maps. */
+  sailRole?: string | null;
+  /** The purchasing role their SAIL role points at (named when that link is the problem). */
+  shipskartRole?: string | null;
+}
+
 export async function diagnoseUserBlock(
   userUuid: string,
   sailRole: string | null,
-): Promise<{ reasonCode: string; reason: string } | null> {
+): Promise<{ reasonCode: string; reason: string; facts: BlockFacts } | null> {
   try {
     const db = await getDb();
-    const rows = await db.select({ id: masterUsers.id, email: masterUsers.email, role: masterUsers.role })
-      .from(masterUsers).where(eq(masterUsers.id, userUuid)).limit(1);
+    const rows = await db.select({
+      id: masterUsers.id, email: masterUsers.email, role: masterUsers.role, fullName: masterUsers.fullName,
+    }).from(masterUsers).where(eq(masterUsers.id, userUuid)).limit(1);
     const mu = rows[0];
     if (!mu) {
-      return { reasonCode: 'no_master_row', reason: `no master_users row for ${userUuid}` };
+      return {
+        reasonCode: 'no_master_row',
+        reason: `no master_users row for ${userUuid}`,
+        facts: { sailRole },
+      };
     }
+    const facts: BlockFacts = { fullName: mu.fullName ?? null, sailRole: sailRole || mu.role || null };
     if (!mu.email) {
-      return { reasonCode: 'missing_email', reason: 'master_users row has no email — Shipskart requires one' };
+      return { reasonCode: 'missing_email', reason: 'master_users row has no email — Shipskart requires one', facts };
     }
-    const effectiveRole = sailRole || mu.role || null;
+    const effectiveRole = facts.sailRole;
     const mapping = effectiveRole ? await roleMappingRepo.getMappingForSailRole(effectiveRole) : undefined;
     if (!mapping) {
-      return { reasonCode: 'unmapped_role', reason: `SAIL role '${effectiveRole ?? ''}' has no shipskart_role_mappings row` };
+      return {
+        reasonCode: 'unmapped_role',
+        reason: `SAIL role '${effectiveRole ?? ''}' has no shipskart_role_mappings row`,
+        facts,
+      };
     }
+    facts.shipskartRole = mapping.shipskartRole;
     const roleId = await resolveShipskartRoleId(mapping.shipskartRole);
     if (!roleId) {
       return {
         reasonCode: 'unmapped_role',
         reason: `mapped Shipskart role '${mapping.shipskartRole}' has no live roleId on this tenant`,
+        facts,
       };
     }
     return null; // preconditions all fine — the recorded status is the better explanation

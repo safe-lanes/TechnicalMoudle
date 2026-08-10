@@ -84,6 +84,9 @@ export class ShipskartUserNotProvisionedError extends Error {
     public readonly reason: string,
     public readonly reasonCode: string = 'unknown',
     public readonly sailRole: string | null = null,
+    /** Concrete values behind the block (whose profile, which role, which purchasing role)
+     *  so the screen can NAME them instead of describing a category. */
+    public readonly facts: { fullName?: string | null; sailRole?: string | null; shipskartRole?: string | null } = {},
   ) {
     super(`Shipskart account not provisioned for user ${userUuid}: ${reason}`);
     this.name = 'ShipskartUserNotProvisionedError';
@@ -357,6 +360,7 @@ export async function resolveExternalUserId(userRole: string, userUuid?: string 
         ? link.pushStatus
         : (lookupError ? 'lookup_failed' : 'jit_failed');
       let reasonText = reason;
+      let facts: { fullName?: string | null; sailRole?: string | null; shipskartRole?: string | null } = { sailRole: userRole || null };
 
       // ...but jit_failed / error / pending say only "it did not work", which is useless on
       // the screen: the user cannot tell a missing email from an unmapped role, and neither
@@ -366,10 +370,18 @@ export async function resolveExternalUserId(userRole: string, userUuid?: string 
         try {
           const { diagnoseUserBlock } = await import('./shipskartReconcilerService');
           const dx = await diagnoseUserBlock(userUuid, userRole || null);
-          if (dx) { reasonCode = dx.reasonCode; reasonText = dx.reason; }
+          if (dx) { reasonCode = dx.reasonCode; reasonText = dx.reason; facts = dx.facts; }
         } catch { /* diagnosis is best-effort — keep the recorded status */ }
       }
-      throw new ShipskartUserNotProvisionedError(userUuid, reasonText, reasonCode, userRole || null);
+      // Even when the recorded status was already specific, fetch the names behind it so the
+      // screen can say WHICH purchasing role is dead rather than "a purchasing role".
+      if (!facts.shipskartRole && reasonCode === 'unmapped_role') {
+        try {
+          const m = userRole ? await roleMappingRepo.getMappingForSailRole(userRole) : undefined;
+          if (m) facts.shipskartRole = m.shipskartRole;
+        } catch { /* best-effort */ }
+      }
+      throw new ShipskartUserNotProvisionedError(userUuid, reasonText, reasonCode, userRole || null, facts);
     }
     // No role mapping at all → the existing ROLE_NOT_MAPPED path below (null return).
   } else if (!LEGACY_SHARED_ACCOUNT_ENABLED) {
