@@ -1400,7 +1400,7 @@ export const workOrders = pgTable("work_orders", {
   // WO only for job scheduling / next-due calculation.
   rhBackdatedEntry: boolean("rh_backdated_entry"),
 
-  // === Save as Draft (migration 164, Task #402) ===
+  // === Save as Draft (migration 165, Task #402) ===
   // In-progress Part-B edits stashed as a JSON document. Draft saves write ONLY
   // this column (no status/completion/RH/due writes) so the computed tab never
   // moves; Submit promotes values through the normal workflow and clears it.

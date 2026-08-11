@@ -1024,7 +1024,7 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   });
 
-  // ── Save as Draft (migration 164, Task #402) ──────────────────────────────
+  // ── Save as Draft (migration 165, Task #402) ──────────────────────────────
   // A draft save sends ONLY draftExecutionData (a non-null JSON document) and
   // no status/completion fields. It writes exclusively to the draft column so
   // the stored status and every derivation input (completionDateTime, due
