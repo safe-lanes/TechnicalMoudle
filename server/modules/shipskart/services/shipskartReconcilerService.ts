@@ -32,7 +32,7 @@ import { getDb } from '../../../db';
 import { masterUsers, vessels, masterUserVessels, shipskartUserLinks, shipskartVesselLinks } from '@shared/schema';
 import { isShipInstance } from '../../sync/syncRole';
 import { authorizedB2bRequest } from './shipskartTokenService';
-import { resolveShipskartRoleId } from './shipskartRoleSource';
+import { resolveRoleIdForMapping } from './shipskartRoleSource';
 import * as roleMappingRepo from '../repositories/shipskartRoleMappingRepository';
 import * as b2bRepo from '../repositories/shipskartB2bRepository';
 import { getB2bConfig } from './shipskartB2bClient';
@@ -129,6 +129,14 @@ export async function findRemoteVesselByImo(imo: string): Promise<{ id: string; 
 export async function pushVessel(v: {
   vuuid: string; name: string; imoNumber: string | null; vesselType?: string | null;
 }): Promise<PushResult> {
+  // SHIP GATE (migration-164 batch): Shipskart is shore-only. The click entry point
+  // (ensureUserPushed) and the sweep are already gated, but this function is exported and
+  // callable directly (Sync Vessels, scripts) — a ship holding leaked b2b credentials
+  // could otherwise RE-CREATE remote vessels (pushVessel treats "no IMO match" as deleted-
+  // remotely and recreates). Structural, like the a49beba80 gate on ensureUserPushed.
+  if (await isShipInstance()) {
+    return { status: 'skipped_ship_instance', error: 'ship instance — Shipskart is shore-only' };
+  }
   const existing = await b2bRepo.getVesselLink(v.vuuid);
   // BLANK IS THE ONLY BAR (07-Aug, Ghazi). This used to demand exactly 7 digits, which
   // blocked vessels whose recorded IMO is legitimately not in that shape. The IMO is still
@@ -227,7 +235,7 @@ async function syncRoleIfDrifted(
   sailRole: string | null,
 ): Promise<PushResult> {
   const mapping = sailRole ? await roleMappingRepo.getMappingForSailRole(sailRole) : undefined;
-  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  const roleId = mapping ? await resolveRoleIdForMapping(mapping) : null;
   if (!mapping || !roleId || link.pushedRoleId === roleId) {
     return { status: 'already_pushed', shipskartId: link.shipskartUserId };
   }
@@ -303,7 +311,7 @@ export async function diagnoseUserBlock(
       };
     }
     facts.shipskartRole = mapping.shipskartRole;
-    const roleId = await resolveShipskartRoleId(mapping.shipskartRole);
+    const roleId = await resolveRoleIdForMapping(mapping);
     if (!roleId) {
       return {
         reasonCode: 'unmapped_role',
@@ -321,6 +329,13 @@ export async function diagnoseUserBlock(
 export async function pushUser(mu: {
   id: string; fullName: string; email: string | null; role: string | null; designation: string | null;
 }): Promise<PushResult> {
+  // SHIP GATE (migration-164 batch): same reasoning as pushVessel — the click and sweep
+  // entry points are gated, but this export was the last user-side write path a direct
+  // caller could reach from a ship. Creating users / rewriting roles on the live tenant
+  // is shore's job only.
+  if (await isShipInstance()) {
+    return { status: 'skipped_ship_instance', error: 'ship instance — Shipskart is shore-only' };
+  }
   const existing = await b2bRepo.getUserLink(mu.id);
   if (existing?.pushStatus === 'pushed' && existing.shipskartUserId) {
     return syncRoleIfDrifted(
@@ -333,7 +348,7 @@ export async function pushUser(mu: {
     return { status: 'missing_email' };
   }
   const mapping = mu.role ? await roleMappingRepo.getMappingForSailRole(mu.role) : undefined;
-  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  const roleId = mapping ? await resolveRoleIdForMapping(mapping) : null;
   if (!mapping || !roleId) {
     await b2bRepo.upsertUserLink(mu.id, {
       pushStatus: 'unmapped_role',
@@ -387,6 +402,11 @@ export async function mapUserToVessel(userUuid: string, vesselVuuid: string, ctx
   if (assignment?.mapStatus === 'mapped' && assignment.shipskartMappingId) {
     return { status: 'already_mapped', shipskartId: assignment.shipskartMappingId };
   }
+  // Retry bookkeeping (migration 164). EVERY attempt — even one that stops at a local
+  // precondition (awaiting_*) — stamps last_attempt_at, because the hourly sweep orders
+  // oldest-attempt-first: a row this pass just touched must go to the BACK of the queue.
+  // That ordering is the queue-starvation fix; the stamp is what makes it work.
+  const attempt = { mapAttempts: (assignment?.mapAttempts ?? 0) + 1, lastAttemptAt: new Date() };
   // RE-ACTIVATION: a mapping that already has a Shipskart id (user was removed from the
   // vessel and came back) follows Sachin's delete-then-recreate flow — the old mapping is
   // deleted first, then the normal POST below creates a fresh one. A failed delete is
@@ -400,11 +420,11 @@ export async function mapUserToVessel(userUuid: string, vesselVuuid: string, ctx
   const userLink = await b2bRepo.getUserLink(userUuid);
   const vesselLink = await b2bRepo.getVesselLink(vesselVuuid);
   if (userLink?.pushStatus !== 'pushed' || !userLink.shipskartUserId) {
-    await b2bRepo.upsertAssignment(userUuid, vesselVuuid, { mapStatus: 'awaiting_user', lastError: `user link status: ${userLink?.pushStatus ?? 'absent'}` });
+    await b2bRepo.upsertAssignment(userUuid, vesselVuuid, { mapStatus: 'awaiting_user', lastError: `user link status: ${userLink?.pushStatus ?? 'absent'}`, ...attempt });
     return { status: 'awaiting_user' };
   }
   if (vesselLink?.pushStatus !== 'pushed' || !vesselLink.shipskartVesselId) {
-    await b2bRepo.upsertAssignment(userUuid, vesselVuuid, { mapStatus: 'awaiting_vessel', lastError: `vessel link status: ${vesselLink?.pushStatus ?? 'absent'}` });
+    await b2bRepo.upsertAssignment(userUuid, vesselVuuid, { mapStatus: 'awaiting_vessel', lastError: `vessel link status: ${vesselLink?.pushStatus ?? 'absent'}`, ...attempt });
     return { status: 'awaiting_vessel' };
   }
   const res = await authorizedB2bRequest('POST', '/integration/SAIL/map-user-to-vessel', {
@@ -418,13 +438,54 @@ export async function mapUserToVessel(userUuid: string, vesselVuuid: string, ctx
   });
   const mappingId = res.json?.data?.id;
   if (res.ok && mappingId) {
-    await b2bRepo.upsertAssignment(userUuid, vesselVuuid, { shipskartMappingId: mappingId, mapStatus: 'mapped', lastError: null });
+    await b2bRepo.upsertAssignment(userUuid, vesselVuuid, { shipskartMappingId: mappingId, mapStatus: 'mapped', lastError: null, mapAttempts: 0, lastAttemptAt: attempt.lastAttemptAt });
     return { status: 'mapped', shipskartId: mappingId };
   }
   const status = isDuplicate400(res) ? 'blocked_duplicate' : 'error';
   const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
-  await b2bRepo.upsertAssignment(userUuid, vesselVuuid, { mapStatus: status, lastError: error });
+  await b2bRepo.upsertAssignment(userUuid, vesselVuuid, { mapStatus: status, lastError: error, ...attempt });
   return { status, error };
+}
+
+// ── assignment retry ladder (migration 164) ──
+//
+// WHY: two production findings on 11-Aug. (1) The hourly sweep settled at most `limit`
+// assignment rows per pass, selected with NO ordering — rows that keep failing as
+// awaiting_* stayed in the selection set and could occupy the head of the queue forever
+// while fresh rows were never reached (interim mitigation for Nilesh was raising
+// SHIPSKART_RECONCILE_BATCH; this is the real fix). (2) A transient API failure —
+// gurpreet's RATE_LIMITED row — landed in map_status='error', which NO retry path
+// selected: stranded until a manual SQL reset.
+//
+// The ladder mirrors the sync_field_log pattern (migration 147): NEVER give up, only
+// slow down. The reconciler runs hourly, so the effective floor is one attempt/hour.
+//   attempts 1–3  → due every pass        (fresh rows; most failures clear here)
+//   attempts 4–6  → due after 6 hours     (something is stuck — stop hammering)
+//   attempts 7+   → due after 24 hours    (needs a human, but keep trying daily forever)
+// Human-triggered paths (Purchasing click, Sync Vessels) IGNORE the ladder on purpose —
+// a person acting is the retry decision — which is also what resets a stuck row fast.
+
+export const RETRYABLE_MAP_STATUSES = ['pending', 'awaiting_user', 'awaiting_vessel', 'error'];
+
+export function isAssignmentRetryDue(
+  row: { mapAttempts?: number | null; lastAttemptAt?: Date | null },
+  now: Date = new Date(),
+): boolean {
+  const attempts = row.mapAttempts ?? 0;
+  const last = row.lastAttemptAt;
+  if (!last) return true; // never attempted — always due
+  const waitMs = attempts <= 3 ? 0 : attempts <= 6 ? 6 * 3600_000 : 24 * 3600_000;
+  return now.getTime() - new Date(last).getTime() >= waitMs;
+}
+
+/** Oldest-attempt-first: never-attempted rows lead, then stalest last_attempt_at. */
+export function orderAssignmentsForRetry<T extends { mapAttempts?: number | null; lastAttemptAt?: Date | null }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const ta = a.lastAttemptAt ? new Date(a.lastAttemptAt).getTime() : -1;
+    const tb = b.lastAttemptAt ? new Date(b.lastAttemptAt).getTime() : -1;
+    if (ta !== tb) return ta - tb;
+    return (a.mapAttempts ?? 0) - (b.mapAttempts ?? 0);
+  });
 }
 
 // ── vessel-user mapping REMOVAL ──
@@ -456,7 +517,13 @@ export async function deleteVesselUserMapping(
     return { status: 'unmapped', shipskartId: a.shipskartMappingId };
   }
   const error = `HTTP ${res.status} ${JSON.stringify(res.json ?? res.text)?.slice(0, 380)}`;
-  await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { lastError: `mapping delete failed: ${error}` });
+  // Stamp the attempt (migration 164) so the sweep's oldest-first ordering rotates past
+  // a delete that keeps failing instead of retrying it at the head of every pass.
+  const prior = await b2bRepo.getAssignment(a.userUuid, a.vesselId);
+  await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, {
+    lastError: `mapping delete failed: ${error}`,
+    mapAttempts: (prior?.mapAttempts ?? 0) + 1, lastAttemptAt: new Date(),
+  });
   return { status: 'mapping_delete_failed', error };
 }
 
@@ -737,10 +804,17 @@ async function runReconciliationInner(opts: { limit?: number } = {}): Promise<Re
   //    (mapUserToVessel returns before any API call when the user link is absent) but
   //    pointless DB churn and a summary full of noise. A user with no link row has not
   //    opened Purchasing, so their vessels are not Shipskart's business yet.
+  //    RETRY LADDER + ORDERING (migration 164): 'error' rows are retryable now (a rate
+  //    limit or 5xx used to strand them forever — gurpreet, 11-Aug), backoff slows down
+  //    persistent failures, and oldest-attempt-first ordering guarantees the `limit`
+  //    slots rotate — a batch of stuck rows can no longer starve the queue head, because
+  //    every touched row is stamped and sent to the back.
   const linkedUserUuids = new Set(allUserLinks.map((r) => r.u));
-  const pendingAssignments = (await db.select().from(masterUserVessels)
-    .where(and(eq(masterUserVessels.isActive, true), inArray(masterUserVessels.mapStatus, ['pending', 'awaiting_user', 'awaiting_vessel']))))
-    .filter((a) => linkedUserUuids.has(a.userUuid));
+  const now = new Date();
+  const pendingAssignments = orderAssignmentsForRetry(
+    (await db.select().from(masterUserVessels)
+      .where(and(eq(masterUserVessels.isActive, true), inArray(masterUserVessels.mapStatus, RETRYABLE_MAP_STATUSES))))
+      .filter((a) => linkedUserUuids.has(a.userUuid) && isAssignmentRetryDue(a, now)));
   for (const a of pendingAssignments.slice(0, limit)) {
     const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
     tally(summary.mappings, st);
@@ -750,8 +824,12 @@ async function runReconciliationInner(opts: { limit?: number } = {}): Promise<Re
   // 3b. REVOKED assignments (capture-at-login removed the vessel) — remove the Shipskart
   // mapping via delete-vessel-user (Sachin's 05-Aug flow). A revoked row that never
   // reached Shipskart has nothing to undo remotely → closed out locally as 'unmapped'.
-  const revokedAssignments = await db.select().from(masterUserVessels)
-    .where(and(eq(masterUserVessels.isActive, false), eq(masterUserVessels.mapStatus, 'revoked')));
+  // Same ordering + backoff as step 3: a delete that keeps failing must not hold its
+  // queue slot every pass (deleteVesselUserMapping stamps the attempt on failure).
+  const revokedAssignments = orderAssignmentsForRetry(
+    (await db.select().from(masterUserVessels)
+      .where(and(eq(masterUserVessels.isActive, false), eq(masterUserVessels.mapStatus, 'revoked'))))
+      .filter((a) => isAssignmentRetryDue(a, now)));
   for (const a of revokedAssignments.slice(0, limit)) {
     if (!a.shipskartMappingId) {
       await b2bRepo.upsertAssignment(a.userUuid, a.vesselId, { mapStatus: 'unmapped', lastError: null });

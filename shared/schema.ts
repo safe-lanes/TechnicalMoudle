@@ -4646,6 +4646,11 @@ export const shipskartRoleMappings = pgTable("shipskart_role_mappings", {
   id: serial("id").primaryKey(),
   sailRole: text("sail_role").notNull().unique(), // one SAIL role → exactly one Shipskart role
   shipskartRole: text("shipskart_role").notNull(), // many rows may share this (many-to-one)
+  // Migration 164: Shipskart's role GUID — the value that actually travels on create-user.
+  // Preferred over the name at resolve time so a Shipskart-side RENAME (the 07-Aug
+  // WAH-KWONG-PUCHASER outage) no longer breaks enrolment. Nullable: legacy rows keep
+  // resolving by name until re-saved in Access Control.
+  shipskartRoleId: text("shipskart_role_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
   updatedByUuid: text("updated_by_uuid"),
@@ -4710,6 +4715,10 @@ export const masterUserVessels = pgTable("master_user_vessels", {
   shipskartMappingId: text("shipskart_mapping_id"),
   mapStatus: text("map_status").notNull().default("pending"),
   lastError: text("last_error"),
+  // Retry ladder (migration 164) — LOCAL bookkeeping, mirrors sync_field_log's
+  // sync_attempts/last_attempt_at. Never on any wire; the table is NO_SYNC.
+  mapAttempts: integer("map_attempts").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
   mappedAt: timestamp("mapped_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),

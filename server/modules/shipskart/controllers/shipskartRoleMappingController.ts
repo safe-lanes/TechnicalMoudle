@@ -18,25 +18,29 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../../../middleware/auth';
 import * as repo from '../repositories/shipskartRoleMappingRepository';
-import { getAvailableShipskartRoles } from '../services/shipskartRoleSource';
+import { getAvailableShipskartRoles, getAvailableShipskartRoleObjects } from '../services/shipskartRoleSource';
 
 const EDITOR_ROLES = new Set(['Sail Admin', 'Super Admin']);
 
 export async function getRoleMappingsHandler(req: AuthenticatedRequest, res: Response) {
-  const [availableRoles, rows] = await Promise.all([
-    getAvailableShipskartRoles(),
+  const [liveRoles, rows] = await Promise.all([
+    getAvailableShipskartRoleObjects(),
     repo.getAllMappings(),
   ]);
+  const availableRoles = Array.from(new Set(liveRoles.map(r => r.name)));
   // A saved mapping can point at a role the tenant does NOT have — e.g. rows written
   // before the dropdown became live-only, which named the retired shared-account roles
   // ('captain'/'purchaser'/'manager'). Such a mapping silently BLOCKS its users
   // ('unmapped_role' at create-user), so flag it here instead of letting an admin find out
   // when someone cannot open Purchasing. `stale: true` = this row needs remapping.
-  const live = new Set(availableRoles);
+  // ID-AWARE (migration 164): a row whose stored GUID still exists is NOT stale even if
+  // Shipskart renamed the role — resolution goes by id, so its users are not blocked.
+  const live = new Set(liveRoles.map(r => r.name));
+  const liveIds = new Set(liveRoles.map(r => r.id));
   const mappings = rows.map(r => ({
     sailRole: r.sailRole,
     shipskartRole: r.shipskartRole,
-    stale: !live.has(r.shipskartRole),
+    stale: !live.has(r.shipskartRole) && !(r.shipskartRoleId && liveIds.has(r.shipskartRoleId)),
   }));
   const staleCount = mappings.filter(m => m.stale).length;
   if (staleCount > 0) {
@@ -59,7 +63,8 @@ export async function putRoleMappingsHandler(req: AuthenticatedRequest, res: Res
     return res.status(400).json({ error: 'mappings[] is required' });
   }
 
-  const validRoles = new Set(await getAvailableShipskartRoles());
+  const liveRoles = await getAvailableShipskartRoleObjects();
+  const validRoles = new Set(liveRoles.map(r => r.name));
   // Validate everything BEFORE writing anything (no partial saves).
   for (const m of mappings) {
     if (!m || typeof m.sailRole !== 'string' || !m.sailRole.trim()) {
@@ -74,11 +79,16 @@ export async function putRoleMappingsHandler(req: AuthenticatedRequest, res: Res
   }
 
   const updatedBy = req.user?.userUuid || null;
+  // Capture the role's GUID at save time (migration 164) — the id is what create-user
+  // actually sends, and it survives a Shipskart-side rename that would break name lookup
+  // (the 07-Aug outage). Resolved server-side from the same live list used for validation;
+  // the client never supplies it.
+  const idByName = new Map(liveRoles.map(r => [r.name, r.id]));
   for (const m of mappings) {
     if (m.shipskartRole == null) {
       await repo.deleteMapping(m.sailRole.trim());
     } else {
-      await repo.upsertMapping(m.sailRole.trim(), m.shipskartRole, updatedBy);
+      await repo.upsertMapping(m.sailRole.trim(), m.shipskartRole, updatedBy, idByName.get(m.shipskartRole) ?? null);
     }
   }
 

@@ -9,8 +9,8 @@
  * we removed the shared-account fallback to prevent, just arriving through the new path.
  *
  * So: per-user decisions must read the FORWARDED HEADER, not the resolved mock user.
- * No header → no identity → the caller takes the legacy shared-account path (which logs
- * loudly, see the tag below) instead of pretending the default uuid is a person.
+ * No header → no identity → the caller REFUSES the request with a clear reason (the
+ * shared-account fallback is retired) instead of pretending the default uuid is a person.
  *
  * The header is set client-side by `activeRank.ts`'s interceptor from `setActiveIdentity`
  * (AuthContext, after the encrypted userProfile is decrypted). It is therefore MISSING
@@ -53,10 +53,10 @@ export function forwardedUserUuid(req: Request, context: string): string | null 
       warnedThisProcess = true;
       console.warn(
         `${IDENTITY_MISSING_TAG} ${context}: request arrived with NO x-user-id header. This shore is ` +
-        `NOT identity-integrated, so per-user Purchasing accounts cannot be used and callers fall back ` +
-        `to the LEGACY SHARED account. If this is the WK trial or any production shore, FIX THE ` +
-        `INTEGRATION — every user would otherwise share one Shipskart identity and requisitions would ` +
-        `be attributed to the wrong person. (This warning prints once per process.)`,
+        `NOT identity-integrated, so per-user Purchasing accounts cannot be used and the request is ` +
+        `REFUSED (the legacy shared-account fallback is retired). If this is any production shore, ` +
+        `FIX THE INTEGRATION — until then every affected user is blocked from Purchasing with an ` +
+        `identity-missing reason. (This warning prints once per process.)`,
       );
     } else {
       console.warn(`${IDENTITY_MISSING_TAG} ${context}: no x-user-id header (see the first occurrence for detail).`);
@@ -84,7 +84,7 @@ export function forwardedUserUuid(req: Request, context: string): string | null 
 export function logIdentityIntegrationExpectation(): void {
   console.log(
     `[Shipskart][IDENTITY] Per-user Purchasing SSO requires the x-user-id header forwarded by the ` +
-    `frontend (SAILERP profile). Any request without it falls back to the legacy shared account and ` +
+    `frontend (SAILERP profile). Any request without it is REFUSED with an identity-missing reason and ` +
     `logs "${IDENTITY_MISSING_TAG}" — grep that tag to confirm this deployment is identity-integrated.`,
   );
 }

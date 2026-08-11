@@ -64,6 +64,11 @@ export async function getAvailableShipskartRoles(): Promise<string[]> {
   return Array.from(new Set((await getRoles()).map((r) => r.name)));
 }
 
+/** Live {id, name} pairs — for id-aware staleness checks and id capture at save time. */
+export async function getAvailableShipskartRoleObjects(): Promise<Array<{ id: string; name: string }>> {
+  return (await getRoles()).map((r) => ({ id: r.id, name: r.name }));
+}
+
 /**
  * Live roleId for a role name (exact match). Returns null for any name the tenant does not
  * have — including legacy names left in old mapping rows, which the reconciler then records
@@ -72,6 +77,23 @@ export async function getAvailableShipskartRoles(): Promise<string[]> {
 export async function resolveShipskartRoleId(roleName: string): Promise<string | null> {
   const roles = await getRoles();
   return roles.find((r) => r.name === roleName)?.id ?? null;
+}
+
+/**
+ * RoleId for a MAPPING ROW — the stored GUID wins, the name is the fallback (migration 164).
+ *
+ * WHY: the id is what actually travels on create-user; the name was only ever our storage
+ * key. The 07-Aug outage was exactly a Shipskart-side RENAME (WAH-KWONG-PUCHASER →
+ * PURCHASER): every mapping row still named the old spelling, name lookup returned null,
+ * and every enrolment recorded 'unmapped_role' until Ghazi re-saved the mappings. A row
+ * saved since mig 164 carries the GUID, which survives any rename. Rows saved earlier have
+ * a NULL id and keep the exact pre-164 behaviour — nothing changes for them until re-saved.
+ */
+export async function resolveRoleIdForMapping(
+  mapping: { shipskartRole: string; shipskartRoleId?: string | null },
+): Promise<string | null> {
+  if (mapping.shipskartRoleId) return mapping.shipskartRoleId;
+  return resolveShipskartRoleId(mapping.shipskartRole);
 }
 
 /** Test hook: drop the cache (harness only). */
