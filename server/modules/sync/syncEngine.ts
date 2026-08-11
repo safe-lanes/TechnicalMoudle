@@ -1011,6 +1011,15 @@ export class SyncEngine {
         const failedRowUuids = new Set<string>(insertResult.failedRowUuids || []);
 
         // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
+        // Task #399: dual-completion collision context (same WO completed on BOTH sides) —
+        // one interim decision per WO from this batch's incoming completion dates.
+        const { evaluateDualCompletion: evalDualPull, collectIncomingWoCompletionDates: collectDualDates } =
+          await import('./dualCompletionResolver');
+        const dualCtxPull = {
+          receiverInstanceId: this.instanceId,
+          batchUuid,
+          incomingCompletionDateByRow: collectDualDates(insertResult.updateLogs as any),
+        };
         let updateApplied = 0;
         let updateErrors = 0;
         let updSpIdx = 0;
@@ -1026,6 +1035,28 @@ export class SyncEngine {
             // Frontier Venture "39" had status/approval_tier/days_late reverted by a
             // re-delivered creation-time log. Skip is TERMINAL (acked, not re-offered): the
             // row exists and its column is populated, so retrying can never change the outcome.
+            // ── Task #399: dual-completion collision (same WO completed on BOTH sides) ──
+            // Evaluated BEFORE the insert-origin/stale guards: completion fields that were
+            // previously NULL arrive with oldValue=null and would otherwise be routed through
+            // the insert-origin guard, silently interleaving the two completions. Detector
+            // only fires when the row exists, is completed, and this receiver holds the
+            // CURRENT local completion episode. Resolution logs force-apply and close the
+            // local mirror conflict. Same shared helper as the shore receive path.
+            const logChangedAtPull = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
+            const dual = await evalDualPull(client, { ...log, changedAt: logChangedAtPull } as any, dualCtxPull);
+            let dualBypassGuardsPull = false;
+            if (dual.remoteResolution) {
+              dualBypassGuardsPull = true; // force-apply — skip both guards
+            } else if (dual.dualConflict) {
+              if (!dual.applyIncoming) {
+                // Local side is the interim winner — keep it; conflict already recorded.
+                try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
+                continue;
+              }
+              dualBypassGuardsPull = true; // incoming side is the interim winner — apply it
+            }
+
+            if (!dualBypassGuardsPull) {
             const guard = await evaluateInsertOriginGuard(client, log as any);
             if (guard.skip) {
               try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
@@ -1041,7 +1072,7 @@ export class SyncEngine {
             if (log.oldValue !== null && log.oldValue !== undefined) {
               const stale = await evaluateStaleSkipGuard(
                 client,
-                { ...log, changedAt: log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt)) } as any,
+                { ...log, changedAt: logChangedAtPull } as any,
                 this.instanceId,
                 { batchUuid },
               );
@@ -1050,6 +1081,7 @@ export class SyncEngine {
                 continue;
               }
             }
+            } // end !dualBypassGuardsPull
             await this.applyFieldLog(log, client);
             try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
             totalPulled++;

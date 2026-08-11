@@ -329,6 +329,18 @@ export async function receivePushData(
           console.error('[Sync Push] CRITICAL: SYNC_INSTANCE_ID env var not configured — stale-skip guard cannot distinguish receiver-local edits');
         }
 
+        // Task #399: dual-completion collision context — incoming completion dates per WO,
+        // gathered from THIS batch so every field of the same WO gets one interim decision.
+        const { evaluateDualCompletion, collectIncomingWoCompletionDates } = await import('./dualCompletionResolver');
+        const dualCtxPush = {
+          receiverInstanceId,
+          batchUuid,
+          incomingCompletionDateByRow: collectIncomingWoCompletionDates(insertResult.updateLogs as any),
+        };
+        // WOs with an open dual-completion conflict in this batch are HELD OUT of completion
+        // learning until resolution (the resolution log re-triggers learning when it applies).
+        const dualConflictWouuids = new Set<string>();
+
         let pushUpdIdx = 0;
         for (const log of insertResult.updateLogs) {
           const config = getTableSyncConfig(log.tableName);
@@ -345,11 +357,34 @@ export async function receivePushData(
             const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
             const isInsertLog = log.oldValue === null || log.oldValue === undefined;
 
+            // ── Task #399: dual-completion collision (same WO completed on BOTH sides) ──
+            // Evaluated BEFORE the insert-origin/stale split: completion fields that were
+            // previously NULL (date_completed, readings, remarks…) arrive with oldValue=null
+            // and would otherwise be routed through the insert-origin guard, silently
+            // interleaving the two completions. The detector itself only fires when the row
+            // EXISTS, is completed, and this receiver holds the CURRENT local completion
+            // episode — true row creation still flows through the insert-origin guard below.
+            const dual = await evaluateDualCompletion(client, { ...log, changedAt: logChangedAt } as any, dualCtxPush);
+            let dualBypassGuards = false;
+            if (dual.remoteResolution) {
+              dualBypassGuards = true; // resolution log: force-apply, skip both guards
+            } else if (dual.dualConflict) {
+              dualConflictWouuids.add(log.rowUuid);
+              if (!dual.applyIncoming) {
+                // Local side is the interim winner — keep it; conflict already recorded.
+                try { await client.query(`RELEASE SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
+                continue;
+              }
+              dualBypassGuards = true; // incoming side is the interim winner — apply it
+            }
+
             // INSERT-origin logs apply UNCONDITIONALLY only while the row is being created.
             // Once the row EXISTS, a creation-time log is by definition the oldest state of that
             // row and must not overwrite a populated column — that is how the Frontier Venture
             // "39" were reverted. See evaluateInsertOriginGuard (SYNC-HARDENING-PLAN §13).
-            if (isInsertLog) {
+            if (dualBypassGuards) {
+              // dual-completion interim winner or resolution log — apply below, no guards
+            } else if (isInsertLog) {
               const guard = await evaluateInsertOriginGuard(client, log);
               if (guard.skip) {
                 // TERMINAL: acked, not re-offered. The condition can never change, so retrying
@@ -747,6 +782,17 @@ export async function receivePushData(
         //     updated shore jobs, and the shore sweep generated phantom overdue WOs).
         {
           const { learnFromShipCompletions } = await import('./shipCompletionLearner');
+          // Task #399: WOs with an OPEN dual-completion conflict are held out of learning —
+          // job tracking must not advance from an interim value; the user's resolution log
+          // re-enters this path and triggers learning with the final chosen values.
+          // DB-checked (not just this batch's detections): a resolution log for ONE field
+          // must not trigger learning while sibling field conflicts are still open.
+          dualConflictWouuids.forEach((w) => completionWouuids.delete(w));
+          if (completionWouuids.size > 0) {
+            const { findWouuidsWithOpenDualConflicts } = await import('./dualCompletionResolver');
+            const stillOpen = await findWouuidsWithOpenDualConflicts(client, Array.from(completionWouuids));
+            stillOpen.forEach((w) => completionWouuids.delete(w));
+          }
           // completionWouuids was populated ONLY from changes that actually APPLIED
           // (insert-groups that landed + update logs that passed the stale/conflict
           // guards) plus self-heal fullRows — never from merely-accepted logs.
@@ -779,7 +825,13 @@ export async function receivePushData(
       try {
         await client.query('BEGIN');
         await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
-        await learnFromShipCompletions(client, Array.from(completionWouuids));
+        // Task #399: hold WOs with an open dual-completion conflict out of learning here too.
+        const { findWouuidsWithOpenDualConflicts } = await import('./dualCompletionResolver');
+        const stillOpen = await findWouuidsWithOpenDualConflicts(client, Array.from(completionWouuids));
+        stillOpen.forEach((w) => completionWouuids.delete(w));
+        if (completionWouuids.size > 0) {
+          await learnFromShipCompletions(client, Array.from(completionWouuids));
+        }
         await client.query('COMMIT');
       } catch (learnErr: any) {
         try { await client.query('ROLLBACK'); } catch { /* non-fatal */ }
