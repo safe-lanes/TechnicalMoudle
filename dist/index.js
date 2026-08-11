@@ -2119,6 +2119,11 @@ var init_schema = __esm({
       // master RH. In this case the RH module is NOT updated; the reading is saved to the
       // WO only for job scheduling / next-due calculation.
       rhBackdatedEntry: boolean2("rh_backdated_entry"),
+      // === Save as Draft (migration 165, Task #402) ===
+      // In-progress Part-B edits stashed as a JSON document. Draft saves write ONLY
+      // this column (no status/completion/RH/due writes) so the computed tab never
+      // moves; Submit promotes values through the normal workflow and clears it.
+      draftExecutionData: jsonb("draft_execution_data"),
       // === Postponement Approval Fields (Plan B) ===
       postponeRequestedDate: text2("postpone_requested_date"),
       // Ship's requested new due date (populated on postpone-request submit)
@@ -5053,6 +5058,11 @@ var init_schema = __esm({
       // one SAIL role → exactly one Shipskart role
       shipskartRole: text2("shipskart_role").notNull(),
       // many rows may share this (many-to-one)
+      // Migration 164: Shipskart's role GUID — the value that actually travels on create-user.
+      // Preferred over the name at resolve time so a Shipskart-side RENAME (the 07-Aug
+      // WAH-KWONG-PUCHASER outage) no longer breaks enrolment. Nullable: legacy rows keep
+      // resolving by name until re-saved in Access Control.
+      shipskartRoleId: text2("shipskart_role_id"),
       createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
       updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date()),
       updatedByUuid: text2("updated_by_uuid")
@@ -5101,6 +5111,10 @@ var init_schema = __esm({
       shipskartMappingId: text2("shipskart_mapping_id"),
       mapStatus: text2("map_status").notNull().default("pending"),
       lastError: text2("last_error"),
+      // Retry ladder (migration 164) — LOCAL bookkeeping, mirrors sync_field_log's
+      // sync_attempts/last_attempt_at. Never on any wire; the table is NO_SYNC.
+      mapAttempts: integer2("map_attempts").notNull().default(0),
+      lastAttemptAt: timestamp3("last_attempt_at", { withTimezone: true }),
       mappedAt: timestamp3("mapped_at", { withTimezone: true }),
       createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
       updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
@@ -36242,6 +36256,26 @@ async function updateWorkOrder(id, body) {
       delete updateData[key];
     }
   });
+  const draftDoc = updateData.draftExecutionData;
+  const isDraftOnlySave = draftDoc != null && typeof draftDoc === "object" && !Array.isArray(draftDoc) && updateData.status === void 0 && updateData.completionDateTime === void 0 && updateData.dateOfCompletion === void 0;
+  if (isDraftOnlySave) {
+    const DRAFT_SAVE_ALLOWED_KEYS = /* @__PURE__ */ new Set(["draftExecutionData", "userId", "performedBy", "userRole", "userUuid"]);
+    const strayKeys = Object.keys(updateData).filter((k) => !DRAFT_SAVE_ALLOWED_KEYS.has(k));
+    if (strayKeys.length > 0) {
+      throw new ValidationError(
+        "Draft save must contain only draftExecutionData",
+        { message: `Unexpected fields in draft save: ${strayKeys.join(", ")}. Send them via a normal update or include them inside draftExecutionData.`, strayKeys }
+      );
+    }
+    const workOrder2 = await update6(id, { draftExecutionData: draftDoc });
+    try {
+      await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, workOrder2, body.userId || body.performedBy || "system");
+    } catch (err) {
+      console.error("[FieldLogger] WO draft save:", err);
+    }
+    console.log(`\u{1F4DD} Draft saved for WO ${existingWO2.workOrderNo || id} (draft-only update, status/tab unchanged)`);
+    return workOrder2;
+  }
   const validateNumericField = (value, fieldName, opts = {}) => {
     if (value == null || value === "") return;
     const str = String(value).trim();
@@ -36429,6 +36463,10 @@ async function updateWorkOrder(id, body) {
   if (isSubmissionAction && !existingWO2.submittedDate) {
     updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
     console.log("\u{1F4DD} Capturing submittedDate for audit trail on submission/Pending Approval");
+  }
+  if ((isSubmissionAction || hasCompletionData || updateData.status === "Completed") && updateData.draftExecutionData === void 0 && existingWO2.draftExecutionData != null) {
+    updateData.draftExecutionData = null;
+    console.log("\u{1F4DD} Clearing draftExecutionData on submission");
   }
   if (isSubmissionAction || updateData.status === "Pending Approval") {
     const completionDateForCalc = updateData.completionDateTime || updateData.dateCompleted || existingWO2.completionDateTime || existingWO2.dateCompleted;
@@ -39666,7 +39704,7 @@ function forwardedUserUuid(req, context) {
     if (!warnedThisProcess) {
       warnedThisProcess = true;
       console.warn(
-        `${IDENTITY_MISSING_TAG} ${context}: request arrived with NO x-user-id header. This shore is NOT identity-integrated, so per-user Purchasing accounts cannot be used and callers fall back to the LEGACY SHARED account. If this is the WK trial or any production shore, FIX THE INTEGRATION \u2014 every user would otherwise share one Shipskart identity and requisitions would be attributed to the wrong person. (This warning prints once per process.)`
+        `${IDENTITY_MISSING_TAG} ${context}: request arrived with NO x-user-id header. This shore is NOT identity-integrated, so per-user Purchasing accounts cannot be used and the request is REFUSED (the legacy shared-account fallback is retired). If this is any production shore, FIX THE INTEGRATION \u2014 until then every affected user is blocked from Purchasing with an identity-missing reason. (This warning prints once per process.)`
       );
     } else {
       console.warn(`${IDENTITY_MISSING_TAG} ${context}: no x-user-id header (see the first occurrence for detail).`);
@@ -39683,7 +39721,7 @@ function forwardedUserUuid(req, context) {
 }
 function logIdentityIntegrationExpectation() {
   console.log(
-    `[Shipskart][IDENTITY] Per-user Purchasing SSO requires the x-user-id header forwarded by the frontend (SAILERP profile). Any request without it falls back to the legacy shared account and logs "${IDENTITY_MISSING_TAG}" \u2014 grep that tag to confirm this deployment is identity-integrated.`
+    `[Shipskart][IDENTITY] Per-user Purchasing SSO requires the x-user-id header forwarded by the frontend (SAILERP profile). Any request without it is REFUSED with an identity-missing reason and logs "${IDENTITY_MISSING_TAG}" \u2014 grep that tag to confirm this deployment is identity-integrated.`
   );
 }
 var MOCK_DEFAULT_USER_UUID, IDENTITY_MISSING_TAG, warnedThisProcess;
@@ -39707,11 +39745,11 @@ async function getMappingForSailRole(sailRole) {
   const rows = await db2.select().from(shipskartRoleMappings).where(eq30(shipskartRoleMappings.sailRole, sailRole)).limit(1);
   return rows[0];
 }
-async function upsertMapping2(sailRole, shipskartRole, updatedByUuid) {
+async function upsertMapping2(sailRole, shipskartRole, updatedByUuid, shipskartRoleId) {
   const db2 = await getDb();
-  await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
+  await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, shipskartRoleId: shipskartRoleId ?? null, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
     target: shipskartRoleMappings.sailRole,
-    set: { shipskartRole, updatedByUuid: updatedByUuid ?? null, updatedAt: /* @__PURE__ */ new Date() }
+    set: { shipskartRole, shipskartRoleId: shipskartRoleId ?? null, updatedByUuid: updatedByUuid ?? null, updatedAt: /* @__PURE__ */ new Date() }
   });
 }
 async function deleteMapping(sailRole) {
@@ -39855,6 +39893,8 @@ async function upsertAssignment(userUuid, vesselId, patch) {
     shipskartMappingId: patch.shipskartMappingId ?? null,
     mapStatus: patch.mapStatus ?? "pending",
     lastError: patch.lastError ?? null,
+    mapAttempts: patch.mapAttempts ?? 0,
+    lastAttemptAt: patch.lastAttemptAt ?? null,
     mappedAt: mappedAt ?? null
   }).onConflictDoUpdate({
     target: [masterUserVessels.userUuid, masterUserVessels.vesselId],
@@ -39862,6 +39902,8 @@ async function upsertAssignment(userUuid, vesselId, patch) {
       ...patch.isActive !== void 0 ? { isActive: patch.isActive } : {},
       ...patch.shipskartMappingId !== void 0 ? { shipskartMappingId: patch.shipskartMappingId } : {},
       ...patch.mapStatus !== void 0 ? { mapStatus: patch.mapStatus } : {},
+      ...patch.mapAttempts !== void 0 ? { mapAttempts: patch.mapAttempts } : {},
+      ...patch.lastAttemptAt !== void 0 ? { lastAttemptAt: patch.lastAttemptAt } : {},
       lastError: patch.lastError ?? null,
       ...mappedAt ? { mappedAt } : {},
       updatedAt: now
@@ -39875,11 +39917,14 @@ async function replaceAssignmentsForUser(userUuid, vesselVuuids) {
   for (const vesselId of vesselVuuids) {
     const existing = await getAssignment(userUuid, vesselId);
     const mapStatus = existing?.shipskartMappingId && existing.isActive ? void 0 : "pending";
-    await upsertAssignment(userUuid, vesselId, { isActive: true, ...mapStatus ? { mapStatus } : {} });
+    await upsertAssignment(userUuid, vesselId, {
+      isActive: true,
+      ...mapStatus ? { mapStatus, mapAttempts: 0, lastAttemptAt: null } : {}
+    });
     activated++;
   }
   const keep = vesselVuuids.length > 0 ? vesselVuuids : ["__none__"];
-  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", updatedAt: now }).where(and27(
+  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", mapAttempts: 0, lastAttemptAt: null, updatedAt: now }).where(and27(
     eq31(masterUserVessels.userUuid, userUuid),
     eq31(masterUserVessels.isActive, true),
     notInArray3(masterUserVessels.vesselId, keep)
@@ -39895,7 +39940,13 @@ async function getPendingAssignmentWork(userUuid) {
   const db2 = await getDb();
   const rows = await db2.select().from(masterUserVessels).where(eq31(masterUserVessels.userUuid, userUuid));
   return {
-    toMap: rows.filter((r) => r.isActive && ["pending", "awaiting_user", "awaiting_vessel"].includes(r.mapStatus ?? "")).map((r) => r.vesselId),
+    // 'error' is IN this list on purpose (migration 164): a transient failure — rate
+    // limit, 5xx, network — used to strand the row forever, because NO retry path
+    // selected 'error' (gurpreet's Gas Mia row, 11-Aug, needed a manual SQL reset).
+    // Human-triggered paths (Purchasing click, Sync Vessels) retry immediately, no
+    // backoff — a person acting IS the retry decision. 'blocked_duplicate' stays out:
+    // retrying a duplicate reproduces the same 400 until someone fixes the data.
+    toMap: rows.filter((r) => r.isActive && ["pending", "awaiting_user", "awaiting_vessel", "error"].includes(r.mapStatus ?? "")).map((r) => r.vesselId),
     toUnmap: rows.filter((r) => !r.isActive && r.mapStatus === "revoked" && !!r.shipskartMappingId).map((r) => ({ vesselId: r.vesselId, shipskartMappingId: r.shipskartMappingId }))
   };
 }
@@ -40263,12 +40314,16 @@ async function getRoles() {
     return [];
   }
 }
-async function getAvailableShipskartRoles() {
-  return Array.from(new Set((await getRoles()).map((r) => r.name)));
+async function getAvailableShipskartRoleObjects() {
+  return (await getRoles()).map((r) => ({ id: r.id, name: r.name }));
 }
 async function resolveShipskartRoleId(roleName) {
   const roles = await getRoles();
   return roles.find((r) => r.name === roleName)?.id ?? null;
+}
+async function resolveRoleIdForMapping(mapping) {
+  if (mapping.shipskartRoleId) return mapping.shipskartRoleId;
+  return resolveShipskartRoleId(mapping.shipskartRole);
 }
 var ROLE_CACHE_TTL_MS, cache2;
 var init_shipskartRoleSource = __esm({
@@ -40283,14 +40338,17 @@ var init_shipskartRoleSource = __esm({
 // server/modules/shipskart/services/shipskartReconcilerService.ts
 var shipskartReconcilerService_exports = {};
 __export(shipskartReconcilerService_exports, {
+  RETRYABLE_MAP_STATUSES: () => RETRYABLE_MAP_STATUSES,
   clearJitAttempts: () => clearJitAttempts,
   deleteVesselUserMapping: () => deleteVesselUserMapping,
   diagnoseUserBlock: () => diagnoseUserBlock,
   ensureUserPushed: () => ensureUserPushed,
   findRemoteVesselByImo: () => findRemoteVesselByImo,
   getLastReconcile: () => getLastReconcile,
+  isAssignmentRetryDue: () => isAssignmentRetryDue,
   isReconcileRunning: () => isReconcileRunning,
   mapUserToVessel: () => mapUserToVessel,
+  orderAssignmentsForRetry: () => orderAssignmentsForRetry,
   pushUser: () => pushUser,
   pushVessel: () => pushVessel,
   resolveCallSign: () => resolveCallSign,
@@ -40322,6 +40380,9 @@ async function findRemoteVesselByImo(imo) {
   return hit?.id ? { id: hit.id, name: String(hit.name ?? ""), imo: String(hit.iMONumber ?? hit.imoNumber ?? "") } : null;
 }
 async function pushVessel(v) {
+  if (await isShipInstance()) {
+    return { status: "skipped_ship_instance", error: "ship instance \u2014 Shipskart is shore-only" };
+  }
   const existing = await getVesselLink(v.vuuid);
   const imo = (v.imoNumber ?? "").trim();
   if (!imo) {
@@ -40392,7 +40453,7 @@ async function pushVessel(v) {
 }
 async function syncRoleIfDrifted(link, sailRole) {
   const mapping = sailRole ? await getMappingForSailRole(sailRole) : void 0;
-  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  const roleId = mapping ? await resolveRoleIdForMapping(mapping) : null;
   if (!mapping || !roleId || link.pushedRoleId === roleId) {
     return { status: "already_pushed", shipskartId: link.shipskartUserId };
   }
@@ -40444,7 +40505,7 @@ async function diagnoseUserBlock(userUuid, sailRole) {
       };
     }
     facts.shipskartRole = mapping.shipskartRole;
-    const roleId = await resolveShipskartRoleId(mapping.shipskartRole);
+    const roleId = await resolveRoleIdForMapping(mapping);
     if (!roleId) {
       return {
         reasonCode: "unmapped_role",
@@ -40459,6 +40520,9 @@ async function diagnoseUserBlock(userUuid, sailRole) {
   }
 }
 async function pushUser(mu) {
+  if (await isShipInstance()) {
+    return { status: "skipped_ship_instance", error: "ship instance \u2014 Shipskart is shore-only" };
+  }
   const existing = await getUserLink(mu.id);
   if (existing?.pushStatus === "pushed" && existing.shipskartUserId) {
     return syncRoleIfDrifted(
@@ -40471,7 +40535,7 @@ async function pushUser(mu) {
     return { status: "missing_email" };
   }
   const mapping = mu.role ? await getMappingForSailRole(mu.role) : void 0;
-  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  const roleId = mapping ? await resolveRoleIdForMapping(mapping) : null;
   if (!mapping || !roleId) {
     await upsertUserLink(mu.id, {
       pushStatus: "unmapped_role",
@@ -40523,6 +40587,7 @@ async function mapUserToVessel(userUuid, vesselVuuid, ctx) {
   if (assignment?.mapStatus === "mapped" && assignment.shipskartMappingId) {
     return { status: "already_mapped", shipskartId: assignment.shipskartMappingId };
   }
+  const attempt = { mapAttempts: (assignment?.mapAttempts ?? 0) + 1, lastAttemptAt: /* @__PURE__ */ new Date() };
   if (assignment?.shipskartMappingId) {
     const del = await deleteVesselUserMapping(
       { userUuid, vesselId: vesselVuuid, shipskartMappingId: assignment.shipskartMappingId },
@@ -40534,11 +40599,11 @@ async function mapUserToVessel(userUuid, vesselVuuid, ctx) {
   const userLink = await getUserLink(userUuid);
   const vesselLink = await getVesselLink(vesselVuuid);
   if (userLink?.pushStatus !== "pushed" || !userLink.shipskartUserId) {
-    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_user", lastError: `user link status: ${userLink?.pushStatus ?? "absent"}` });
+    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_user", lastError: `user link status: ${userLink?.pushStatus ?? "absent"}`, ...attempt });
     return { status: "awaiting_user" };
   }
   if (vesselLink?.pushStatus !== "pushed" || !vesselLink.shipskartVesselId) {
-    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_vessel", lastError: `vessel link status: ${vesselLink?.pushStatus ?? "absent"}` });
+    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_vessel", lastError: `vessel link status: ${vesselLink?.pushStatus ?? "absent"}`, ...attempt });
     return { status: "awaiting_vessel" };
   }
   const res = await authorizedB2bRequest("POST", "/integration/SAIL/map-user-to-vessel", {
@@ -40552,13 +40617,28 @@ async function mapUserToVessel(userUuid, vesselVuuid, ctx) {
   });
   const mappingId = res.json?.data?.id;
   if (res.ok && mappingId) {
-    await upsertAssignment(userUuid, vesselVuuid, { shipskartMappingId: mappingId, mapStatus: "mapped", lastError: null });
+    await upsertAssignment(userUuid, vesselVuuid, { shipskartMappingId: mappingId, mapStatus: "mapped", lastError: null, mapAttempts: 0, lastAttemptAt: attempt.lastAttemptAt });
     return { status: "mapped", shipskartId: mappingId };
   }
   const status = isDuplicate400(res) ? "blocked_duplicate" : "error";
   const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
-  await upsertAssignment(userUuid, vesselVuuid, { mapStatus: status, lastError: error });
+  await upsertAssignment(userUuid, vesselVuuid, { mapStatus: status, lastError: error, ...attempt });
   return { status, error };
+}
+function isAssignmentRetryDue(row, now = /* @__PURE__ */ new Date()) {
+  const attempts = row.mapAttempts ?? 0;
+  const last = row.lastAttemptAt;
+  if (!last) return true;
+  const waitMs = attempts <= 3 ? 0 : attempts <= 6 ? 6 * 36e5 : 24 * 36e5;
+  return now.getTime() - new Date(last).getTime() >= waitMs;
+}
+function orderAssignmentsForRetry(rows) {
+  return [...rows].sort((a, b) => {
+    const ta = a.lastAttemptAt ? new Date(a.lastAttemptAt).getTime() : -1;
+    const tb = b.lastAttemptAt ? new Date(b.lastAttemptAt).getTime() : -1;
+    if (ta !== tb) return ta - tb;
+    return (a.mapAttempts ?? 0) - (b.mapAttempts ?? 0);
+  });
 }
 async function deleteVesselUserMapping(a, after = "unmapped") {
   const res = await authorizedB2bRequest("DELETE", `/integration/SAIL/delete-vessel-user/${a.shipskartMappingId}`, { body: {} });
@@ -40569,7 +40649,12 @@ async function deleteVesselUserMapping(a, after = "unmapped") {
     return { status: "unmapped", shipskartId: a.shipskartMappingId };
   }
   const error = `HTTP ${res.status} ${JSON.stringify(res.json ?? res.text)?.slice(0, 380)}`;
-  await upsertAssignment(a.userUuid, a.vesselId, { lastError: `mapping delete failed: ${error}` });
+  const prior = await getAssignment(a.userUuid, a.vesselId);
+  await upsertAssignment(a.userUuid, a.vesselId, {
+    lastError: `mapping delete failed: ${error}`,
+    mapAttempts: (prior?.mapAttempts ?? 0) + 1,
+    lastAttemptAt: /* @__PURE__ */ new Date()
+  });
   return { status: "mapping_delete_failed", error };
 }
 async function settleAssignmentChanges(userUuid, ctx) {
@@ -40729,13 +40814,18 @@ async function runReconciliationInner(opts = {}) {
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
   const linkedUserUuids = new Set(allUserLinks.map((r) => r.u));
-  const pendingAssignments = (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, ["pending", "awaiting_user", "awaiting_vessel"])))).filter((a) => linkedUserUuids.has(a.userUuid));
+  const now = /* @__PURE__ */ new Date();
+  const pendingAssignments = orderAssignmentsForRetry(
+    (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, RETRYABLE_MAP_STATUSES)))).filter((a) => linkedUserUuids.has(a.userUuid) && isAssignmentRetryDue(a, now))
+  );
   for (const a of pendingAssignments.slice(0, limit)) {
     const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
     tally(summary.mappings, st);
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
-  const revokedAssignments = await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, false), eq32(masterUserVessels.mapStatus, "revoked")));
+  const revokedAssignments = orderAssignmentsForRetry(
+    (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, false), eq32(masterUserVessels.mapStatus, "revoked")))).filter((a) => isAssignmentRetryDue(a, now))
+  );
   for (const a of revokedAssignments.slice(0, limit)) {
     if (!a.shipskartMappingId) {
       await upsertAssignment(a.userUuid, a.vesselId, { mapStatus: "unmapped", lastError: null });
@@ -40752,7 +40842,7 @@ async function runReconciliationInner(opts = {}) {
   console.log(`[Shipskart b2b] reconciliation pass: vessels=${JSON.stringify(summary.vessels)} users=${JSON.stringify(summary.users)} mappings=${JSON.stringify(summary.mappings)}`);
   return summary;
 }
-var DEFAULT_BATCH_LIMIT, B2B_PACE_MS, paceB2b, API_HIT_STATUSES, VESSEL_API_HIT_STATUSES, tally, isDuplicate400, JIT_MAX_ATTEMPTS, jitAttempts, reconcileInFlight, lastReconcile;
+var DEFAULT_BATCH_LIMIT, B2B_PACE_MS, paceB2b, API_HIT_STATUSES, VESSEL_API_HIT_STATUSES, tally, isDuplicate400, RETRYABLE_MAP_STATUSES, JIT_MAX_ATTEMPTS, jitAttempts, reconcileInFlight, lastReconcile;
 var init_shipskartReconcilerService = __esm({
   "server/modules/shipskart/services/shipskartReconcilerService.ts"() {
     "use strict";
@@ -40774,6 +40864,7 @@ var init_shipskartReconcilerService = __esm({
       return acc;
     };
     isDuplicate400 = (res) => res.status === 400 && /already in use|already exists|duplicate/i.test(JSON.stringify(res.json ?? ""));
+    RETRYABLE_MAP_STATUSES = ["pending", "awaiting_user", "awaiting_vessel", "error"];
     JIT_MAX_ATTEMPTS = 3;
     jitAttempts = /* @__PURE__ */ new Map();
     reconcileInFlight = false;
@@ -46006,7 +46097,7 @@ async function getWorkOrderContext(workOrderId) {
       approvalBlockReason: null
     }).catch((err) => console.error("\u26A0\uFE0F Failed to auto-correct stuck rejected WO status:", err));
   }
-  const executionData = {
+  let executionData = {
     // B1 - Risk Assessment, Checklists & Records
     riskAssessmentStatus: correctedWorkOrder.riskAssessmentStatus || "",
     safetyChecklistsStatus: correctedWorkOrder.safetyChecklistsStatus || "",
@@ -46040,11 +46131,17 @@ async function getWorkOrderContext(workOrderId) {
     dateCompleted: correctedWorkOrder.dateCompleted || "",
     completionRemarks: correctedWorkOrder.completionRemarks || ""
   };
+  const draftDoc = correctedWorkOrder.draftExecutionData;
+  const hasDraft = draftDoc != null && typeof draftDoc === "object" && !Array.isArray(draftDoc);
+  if (hasDraft) {
+    executionData = { ...executionData, ...draftDoc };
+  }
   const finalTemplateData = { ...templateData };
   return {
     workOrder: correctedWorkOrder,
     templateData: finalTemplateData,
     executionData,
+    hasDraftExecutionData: hasDraft,
     job,
     component: {
       id: component.cuuid,
@@ -46653,7 +46750,9 @@ async function completeWorkOrder(workOrderId, body) {
     // Double-sync guard: stamp when a completion reading was applied this run (MASTER cascade or
     // INHERITED cycle). Leaves an existing stamp intact on replay.
     rhSyncedAt: rhReadingApplied ? /* @__PURE__ */ new Date() : void 0,
-    rhBackdatedEntry: rhBackdatedSkipped ? true : void 0
+    rhBackdatedEntry: rhBackdatedSkipped ? true : void 0,
+    // Save as Draft (Task #402): completion supersedes any stashed draft.
+    draftExecutionData: null
   });
   try {
     await logFieldChanges("work_orders", workOrder.wouuid, workOrder.vesselId || null, workOrder, updatedWorkOrder, executionData.performedBy || "system");
@@ -47236,7 +47335,9 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         ceApprovalRemarks: tierMinRemarks > 0 ? remarks : null,
         skippedCyclesJustification: missedCycles >= 1 && skippedCyclesJustification ? skippedCyclesJustification : null,
         approvalDate: (/* @__PURE__ */ new Date()).toISOString(),
-        wasRejected: false
+        wasRejected: false,
+        // Save as Draft (Task #402): approval supersedes any stashed draft.
+        draftExecutionData: null
       };
       if (!requiresLevel2Review) {
         updateData.nextDueDate = nextDueDate;
@@ -47320,7 +47421,9 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
     nextDueDate,
     nextDueReading,
     missedCycles,
-    originalDueDate
+    originalDueDate,
+    // Save as Draft (Task #402): Level-2 approval supersedes any stashed draft.
+    draftExecutionData: null
   };
   if (actualCompletionDate) {
     updateData.dateCompleted = actualCompletionDate;
@@ -83217,15 +83320,17 @@ init_shipskartRoleMappingRepository();
 init_shipskartRoleSource();
 var EDITOR_ROLES2 = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
 async function getRoleMappingsHandler(req, res) {
-  const [availableRoles, rows] = await Promise.all([
-    getAvailableShipskartRoles(),
+  const [liveRoles, rows] = await Promise.all([
+    getAvailableShipskartRoleObjects(),
     getAllMappings()
   ]);
-  const live = new Set(availableRoles);
+  const availableRoles = Array.from(new Set(liveRoles.map((r) => r.name)));
+  const live = new Set(liveRoles.map((r) => r.name));
+  const liveIds = new Set(liveRoles.map((r) => r.id));
   const mappings = rows.map((r) => ({
     sailRole: r.sailRole,
     shipskartRole: r.shipskartRole,
-    stale: !live.has(r.shipskartRole)
+    stale: !live.has(r.shipskartRole) && !(r.shipskartRoleId && liveIds.has(r.shipskartRoleId))
   }));
   const staleCount = mappings.filter((m) => m.stale).length;
   if (staleCount > 0) {
@@ -83244,7 +83349,8 @@ async function putRoleMappingsHandler(req, res) {
   if (!Array.isArray(mappings)) {
     return res.status(400).json({ error: "mappings[] is required" });
   }
-  const validRoles = new Set(await getAvailableShipskartRoles());
+  const liveRoles = await getAvailableShipskartRoleObjects();
+  const validRoles = new Set(liveRoles.map((r) => r.name));
   for (const m of mappings) {
     if (!m || typeof m.sailRole !== "string" || !m.sailRole.trim()) {
       return res.status(400).json({ error: `every entry needs a sailRole` });
@@ -83257,11 +83363,12 @@ async function putRoleMappingsHandler(req, res) {
     }
   }
   const updatedBy = req.user?.userUuid || null;
+  const idByName = new Map(liveRoles.map((r) => [r.name, r.id]));
   for (const m of mappings) {
     if (m.shipskartRole == null) {
       await deleteMapping(m.sailRole.trim());
     } else {
-      await upsertMapping2(m.sailRole.trim(), m.shipskartRole, updatedBy);
+      await upsertMapping2(m.sailRole.trim(), m.shipskartRole, updatedBy, idByName.get(m.shipskartRole) ?? null);
     }
   }
   const rows = await getAllMappings();
