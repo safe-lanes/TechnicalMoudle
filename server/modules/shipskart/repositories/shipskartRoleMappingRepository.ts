@@ -25,14 +25,19 @@ export async function getMappingForSailRole(sailRole: string): Promise<Shipskart
   return rows[0];
 }
 
-/** Upsert one mapping (UNIQUE sail_role → many-to-one is natural). */
-export async function upsertMapping(sailRole: string, shipskartRole: string, updatedByUuid?: string | null): Promise<void> {
+/**
+ * Upsert one mapping (UNIQUE sail_role → many-to-one is natural).
+ * shipskartRoleId (migration 164): the role's GUID, captured at save time so a
+ * Shipskart-side rename cannot break resolution. Every save overwrites it — including
+ * to NULL when the id could not be resolved — so a stale id never outlives a re-save.
+ */
+export async function upsertMapping(sailRole: string, shipskartRole: string, updatedByUuid?: string | null, shipskartRoleId?: string | null): Promise<void> {
   const db = await getDb();
   await db.insert(shipskartRoleMappings)
-    .values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null })
+    .values({ sailRole, shipskartRole, shipskartRoleId: shipskartRoleId ?? null, updatedByUuid: updatedByUuid ?? null })
     .onConflictDoUpdate({
       target: shipskartRoleMappings.sailRole,
-      set: { shipskartRole, updatedByUuid: updatedByUuid ?? null, updatedAt: new Date() },
+      set: { shipskartRole, shipskartRoleId: shipskartRoleId ?? null, updatedByUuid: updatedByUuid ?? null, updatedAt: new Date() },
     });
 }
 

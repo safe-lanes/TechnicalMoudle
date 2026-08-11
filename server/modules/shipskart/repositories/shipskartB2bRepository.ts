@@ -156,6 +156,7 @@ export async function getAssignment(userUuid: string, vesselId: string): Promise
 
 export async function upsertAssignment(userUuid: string, vesselId: string, patch: {
   isActive?: boolean; shipskartMappingId?: string | null; mapStatus?: string; lastError?: string | null;
+  mapAttempts?: number; lastAttemptAt?: Date | null;
 }): Promise<void> {
   const db = await getDb();
   const now = new Date();
@@ -167,6 +168,8 @@ export async function upsertAssignment(userUuid: string, vesselId: string, patch
       shipskartMappingId: patch.shipskartMappingId ?? null,
       mapStatus: patch.mapStatus ?? 'pending',
       lastError: patch.lastError ?? null,
+      mapAttempts: patch.mapAttempts ?? 0,
+      lastAttemptAt: patch.lastAttemptAt ?? null,
       mappedAt: mappedAt ?? null,
     })
     .onConflictDoUpdate({
@@ -175,6 +178,8 @@ export async function upsertAssignment(userUuid: string, vesselId: string, patch
         ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
         ...(patch.shipskartMappingId !== undefined ? { shipskartMappingId: patch.shipskartMappingId } : {}),
         ...(patch.mapStatus !== undefined ? { mapStatus: patch.mapStatus } : {}),
+        ...(patch.mapAttempts !== undefined ? { mapAttempts: patch.mapAttempts } : {}),
+        ...(patch.lastAttemptAt !== undefined ? { lastAttemptAt: patch.lastAttemptAt } : {}),
         lastError: patch.lastError ?? null,
         ...(mappedAt ? { mappedAt } : {}),
         updatedAt: now,
@@ -207,13 +212,20 @@ export async function replaceAssignmentsForUser(
     // Re-activating a previously deactivated row must re-open the mapping question, so a
     // row that was mapped-then-deactivated goes back to 'pending' for the reconciler.
     const mapStatus = existing?.shipskartMappingId && existing.isActive ? undefined : 'pending';
-    await upsertAssignment(userUuid, vesselId, { isActive: true, ...(mapStatus ? { mapStatus } : {}) });
+    // Going (back) to 'pending' is FRESH work — reset the retry ladder (migration 164)
+    // so a row that previously climbed to a 24h backoff is retried immediately.
+    await upsertAssignment(userUuid, vesselId, {
+      isActive: true,
+      ...(mapStatus ? { mapStatus, mapAttempts: 0, lastAttemptAt: null } : {}),
+    });
     activated++;
   }
 
   const keep = vesselVuuids.length > 0 ? vesselVuuids : ['__none__'];
+  // Revocation is fresh work too — reset the ladder so the unmap is tried straight away
+  // even if the row had accumulated backoff from its mapping days.
   const deactivatedRows = await db.update(masterUserVessels)
-    .set({ isActive: false, mapStatus: 'revoked', updatedAt: now })
+    .set({ isActive: false, mapStatus: 'revoked', mapAttempts: 0, lastAttemptAt: null, updatedAt: now })
     .where(and(
       eq(masterUserVessels.userUuid, userUuid),
       eq(masterUserVessels.isActive, true),
@@ -247,8 +259,14 @@ export async function getPendingAssignmentWork(userUuid: string): Promise<{
   const rows = await db.select().from(masterUserVessels)
     .where(eq(masterUserVessels.userUuid, userUuid));
   return {
+    // 'error' is IN this list on purpose (migration 164): a transient failure — rate
+    // limit, 5xx, network — used to strand the row forever, because NO retry path
+    // selected 'error' (gurpreet's Gas Mia row, 11-Aug, needed a manual SQL reset).
+    // Human-triggered paths (Purchasing click, Sync Vessels) retry immediately, no
+    // backoff — a person acting IS the retry decision. 'blocked_duplicate' stays out:
+    // retrying a duplicate reproduces the same 400 until someone fixes the data.
     toMap: rows
-      .filter((r) => r.isActive && ['pending', 'awaiting_user', 'awaiting_vessel'].includes(r.mapStatus ?? ''))
+      .filter((r) => r.isActive && ['pending', 'awaiting_user', 'awaiting_vessel', 'error'].includes(r.mapStatus ?? ''))
       .map((r) => r.vesselId),
     toUnmap: rows
       .filter((r) => !r.isActive && r.mapStatus === 'revoked' && !!r.shipskartMappingId)
