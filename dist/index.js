@@ -10152,635 +10152,352 @@ var init_alertsRepository = __esm({
   }
 });
 
-// server/modules/sync/conflictReviewRepository.ts
-function getTableDisplayName(tableName) {
-  const map = {
-    work_orders: "Work Orders",
-    work_order_executions: "WO Executions",
-    work_order_documents: "WO Documents",
-    work_order_postponements: "WO Postponements",
-    defects: "Defects",
-    defect_actions: "Defect Actions",
-    defect_attachments: "Defect Attachments",
-    defect_sequences: "Defect Sequences",
-    spares: "Spares",
-    spares_history: "Spares History",
-    spare_location_stock: "Spare Location Stock",
-    stores_items: "Stores Items",
-    stores_ledger: "Stores Ledger",
-    inventory_transactions: "Inventory Transactions",
-    change_request: "Change Requests",
-    change_request_approval: "CR Approvals",
-    change_request_comment: "CR Comments",
-    running_hours_audit: "Running Hours Audit",
-    component_running_hours_log: "Running Hours Log",
-    component_maintenance_history: "Maintenance History",
-    vessel_certificate_data: "Vessel Certificates",
-    vessel_survey_data: "Vessel Surveys",
-    planner_dates: "Planner Dates",
-    components: "Components",
-    jobs: "Jobs"
-  };
-  return map[tableName] || tableName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+// server/utils/workOrderStatus.ts
+var workOrderStatus_exports = {};
+__export(workOrderStatus_exports, {
+  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
+  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
+  buildRhCycleWOMap: () => buildRhCycleWOMap,
+  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
+  findBlockingWOForJob: () => findBlockingWOForJob,
+  isBlockingStatus: () => isBlockingStatus,
+  isCompletedStatus: () => isCompletedStatus
+});
+function isBlockingStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
 }
-function getFieldDisplayName(fieldName) {
-  const acronymMap = {
-    rh: "RH",
-    rob: "ROB",
-    utc: "UTC",
-    tz: "TZ",
-    uuid: "UUID",
-    wo: "WO",
-    cr: "CR",
-    coc: "CoC",
-    id: "ID",
-    url: "URL",
-    html: "HTML",
-    sfi: "SFI",
-    viq: "VIQ",
-    pms: "PMS"
-  };
-  let words;
-  if (fieldName.includes("_")) {
-    words = fieldName;
-  } else {
-    words = fieldName.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
-  }
-  return words.replace(/_/g, " ").split(" ").map((w) => {
-    const lower = w.toLowerCase();
-    if (acronymMap[lower]) return acronymMap[lower];
-    return lower.charAt(0).toUpperCase() + lower.slice(1);
-  }).join(" ");
+function isCompletedStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
 }
-function getInstanceLabel(instanceId, vesselName) {
-  if (!instanceId) return "Unknown";
-  if (isShipInstanceId(instanceId)) {
-    return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId})`;
+function extractJobNoFromWorkOrderNo(workOrderNo) {
+  if (!workOrderNo) return null;
+  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+  if (newFormatMatch) {
+    return newFormatMatch[1];
   }
-  if (instanceId.toUpperCase().startsWith("SHORE")) {
-    return "Shore \u2014 Office";
+  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
+  if (woSuffixMatch) {
+    return woSuffixMatch[1];
   }
-  return instanceId;
+  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
+  if (oldFormatMatch) {
+    return oldFormatMatch[1];
+  }
+  return null;
 }
-async function getRecordLabel(pool4, tableName, rowUuid) {
-  const labelConfigs = {
-    work_orders: {
-      cols: ["job_title", "component_code"],
-      format: (a, b) => b ? `WO: ${a} (${b})` : `WO: ${a}`
-    },
-    defects: {
-      cols: ["id", "description"],
-      format: (a, b) => `Defect ${a}: ${(b || "").substring(0, 60)}`
-    },
-    spares: {
-      cols: ["part_name", "part_code"],
-      format: (a, b) => b ? `Spare: ${a} (${b})` : `Spare: ${a}`
-    },
-    stores_items: {
-      cols: ["item_name", "item_code"],
-      format: (a, b) => b ? `Store: ${a} (${b})` : `Store: ${a}`
-    },
-    change_request: {
-      cols: ["title"],
-      format: (a) => `CR: ${a}`
-    },
-    running_hours_audit: {
-      cols: ["component_name", "component_code"],
-      format: (a, b) => b ? `RH: ${a} (${b})` : `RH: ${a}`
-    },
-    work_order_executions: {
-      cols: ["id"],
-      format: (a) => `WO Exec: ${a}`
-    },
-    work_order_documents: {
-      cols: ["document_name"],
-      format: (a) => `WO Doc: ${a}`
-    },
-    defect_actions: {
-      cols: ["action_description"],
-      format: (a) => `Action: ${(a || "").substring(0, 60)}`
-    },
-    vessel_certificate_data: {
-      cols: ["certificate_name"],
-      format: (a) => `Cert: ${a}`
-    },
-    vessel_survey_data: {
-      cols: ["survey_name"],
-      format: (a) => `Survey: ${a}`
-    },
-    components: {
-      cols: ["component_name", "component_code"],
-      format: (a, b) => b ? `${a} (${b})` : `${a}`
-    },
-    jobs: {
-      cols: ["job_title", "job_code"],
-      format: (a, b) => b ? `${a} (${b})` : `${a}`
+function buildJobsWithActiveWOSet(workOrders2, vesselId) {
+  const byJobId = /* @__PURE__ */ new Set();
+  const byJobNo = /* @__PURE__ */ new Set();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
     }
-  };
-  const config = labelConfigs[tableName];
-  if (!config) return `${tableName} ${rowUuid.substring(0, 8)}`;
-  const identityCol = getIdentityColumn(tableName) || "id";
-  const selectCols = config.cols.map((c) => `"${c}"`).join(", ");
-  try {
-    const result = await pool4.query(
-      `SELECT ${selectCols} FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-      [rowUuid]
-    );
-    if (result.rows.length === 0) return `${tableName} ${rowUuid.substring(0, 8)}`;
-    const vals = config.cols.map((c) => result.rows[0][c] ?? "");
-    return config.format(...vals) || `${tableName} ${rowUuid.substring(0, 8)}`;
-  } catch {
-    return `${tableName} ${rowUuid.substring(0, 8)}`;
-  }
-}
-async function resolveUserName(pool4, userId) {
-  if (!userId || userId === "system" || userId === "System" || userId === "admin") return "System";
-  const parsed = parseInt(userId, 10);
-  if (isNaN(parsed)) return userId;
-  try {
-    const result = await pool4.query(
-      `SELECT full_name FROM users WHERE id = $1 LIMIT 1`,
-      [parsed]
-    );
-    return result.rows[0]?.full_name || `User ${userId}`;
-  } catch {
-    return `User ${userId}`;
-  }
-}
-async function listConflicts(filters) {
-  const pool4 = await getPool();
-  const limit = Math.min(filters.limit || 50, 200);
-  const offset = filters.offset || 0;
-  const source = filters.source || "all";
-  const resolved = filters.resolved ?? false;
-  const logRows = [];
-  const oldRows = [];
-  let totalLog = 0;
-  let totalOld = 0;
-  if (source === "all" || source === "log") {
-    const conditions = [`cl.is_resolved = $1`];
-    const params = [resolved];
-    let paramIdx = 2;
-    if (filters.tableName) {
-      conditions.push(`cl.table_name = $${paramIdx++}`);
-      params.push(filters.tableName);
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
     }
-    if (filters.vesselId) {
-      conditions.push(`EXISTS (SELECT 1 FROM sync_field_log sfl WHERE sfl.table_name = cl.table_name AND sfl.row_uuid = cl.row_uuid AND sfl.vessel_id = $${paramIdx++} LIMIT 1)`);
-      params.push(filters.vesselId);
-    }
-    if (filters.dateFrom) {
-      conditions.push(`cl.detected_at >= $${paramIdx++}`);
-      params.push(filters.dateFrom);
-    }
-    if (filters.dateTo) {
-      conditions.push(`cl.detected_at <= $${paramIdx++}`);
-      params.push(filters.dateTo);
-    }
-    const whereClause = conditions.join(" AND ");
-    const countResult = await pool4.query(
-      `SELECT COUNT(*) as cnt FROM sync_conflict_log cl WHERE ${whereClause}`,
-      params
-    );
-    totalLog = parseInt(countResult.rows[0].cnt, 10);
-    const dataResult = await pool4.query(
-      `SELECT cl.*
-       FROM sync_conflict_log cl
-       WHERE ${whereClause}
-       ORDER BY cl.detected_at DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-      params
-    );
-    for (const row of dataResult.rows) {
-      let incomingUserId = null;
-      let winnerUserId = null;
-      try {
-        const incomingUser = await pool4.query(
-          `SELECT changed_by_user_id FROM sync_field_log
-           WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
-             AND instance_id = $4
-           ORDER BY changed_at DESC LIMIT 1`,
-          [row.table_name, row.row_uuid, row.field_name, row.incoming_sender_instance]
-        );
-        incomingUserId = incomingUser.rows[0]?.changed_by_user_id || null;
-      } catch {
+    if (isBlockingStatus(wo.status)) {
+      if (wo.jobId) {
+        byJobId.add(wo.jobId);
       }
-      try {
-        const winnerUser = await pool4.query(
-          `SELECT changed_by_user_id FROM sync_field_log
-           WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
-             AND instance_id = $4
-           ORDER BY changed_at DESC LIMIT 1`,
-          [row.table_name, row.row_uuid, row.field_name, row.receiver_winner_instance]
-        );
-        winnerUserId = winnerUser.rows[0]?.changed_by_user_id || null;
-      } catch {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        byJobNo.add(`${woVesselId}|${jobNo}`);
       }
-      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
-      const incomingUserName = await resolveUserName(pool4, incomingUserId);
-      const winnerUserName = await resolveUserName(pool4, winnerUserId);
-      logRows.push({
-        id: row.id,
-        source: "log",
-        detectedAt: row.detected_at?.toISOString?.() || String(row.detected_at),
-        batchUuid: row.batch_uuid,
-        tableName: row.table_name,
-        tableDisplayName: getTableDisplayName(row.table_name),
-        rowUuid: row.row_uuid,
-        recordDisplay,
-        fieldName: row.field_name,
-        fieldDisplayName: getFieldDisplayName(row.field_name),
-        winner: {
-          value: row.receiver_current_value,
-          changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
-          instanceId: row.receiver_winner_instance || "",
-          userId: winnerUserId,
-          userName: winnerUserName,
-          locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
-        },
-        rejected: {
-          value: row.incoming_new_value,
-          changedAt: row.incoming_changed_at?.toISOString?.() || null,
-          instanceId: row.incoming_sender_instance || "",
-          userId: incomingUserId,
-          userName: incomingUserName,
-          locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
-        },
-        isResolved: row.is_resolved,
-        resolvedAt: row.resolved_at?.toISOString?.() || null,
-        resolvedBy: row.resolved_by,
-        resolvedAction: row.resolved_action
-      });
     }
-  }
-  if (source === "all" || source === "old") {
-    const conditions = [];
-    const params = [];
-    let paramIdx = 1;
-    if (resolved) {
-      conditions.push(`sc.resolution IS NOT NULL`);
-    } else {
-      conditions.push(`sc.resolution IS NULL`);
-    }
-    if (filters.tableName) {
-      conditions.push(`sc.table_name = $${paramIdx++}`);
-      params.push(filters.tableName);
-    }
-    if (filters.vesselId) {
-      conditions.push(`sc.vessel_id = $${paramIdx++}`);
-      params.push(filters.vesselId);
-    }
-    if (filters.dateFrom) {
-      conditions.push(`sc.created_at >= $${paramIdx++}`);
-      params.push(filters.dateFrom);
-    }
-    if (filters.dateTo) {
-      conditions.push(`sc.created_at <= $${paramIdx++}`);
-      params.push(filters.dateTo);
-    }
-    conditions.push(`(sc.is_deleted = false OR sc.is_deleted IS NULL)`);
-    const whereClause = conditions.join(" AND ");
-    const countResult = await pool4.query(
-      `SELECT COUNT(*) as cnt FROM sync_conflicts sc WHERE ${whereClause}`,
-      params
-    );
-    totalOld = parseInt(countResult.rows[0].cnt, 10);
-    const dataResult = await pool4.query(
-      `SELECT sc.*
-       FROM sync_conflicts sc
-       WHERE ${whereClause}
-       ORDER BY sc.created_at DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-      params
-    );
-    for (const row of dataResult.rows) {
-      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
-      const shipUserName = await resolveUserName(pool4, row.ship_changed_by);
-      const shoreUserName = await resolveUserName(pool4, row.shore_changed_by);
-      oldRows.push({
-        id: row.id,
-        source: "old",
-        detectedAt: row.created_at?.toISOString?.() || String(row.created_at),
-        batchUuid: row.sync_batch_id,
-        tableName: row.table_name,
-        tableDisplayName: getTableDisplayName(row.table_name),
-        rowUuid: row.row_uuid,
-        recordDisplay,
-        fieldName: row.field_name,
-        fieldDisplayName: getFieldDisplayName(row.field_name),
-        winner: {
-          value: row.shore_value,
-          changedAt: row.shore_changed_at?.toISOString?.() || null,
-          instanceId: "SHORE",
-          userId: row.shore_changed_by,
-          userName: shoreUserName,
-          locationLabel: "Shore \u2014 Office"
-        },
-        rejected: {
-          value: row.ship_value,
-          changedAt: row.ship_changed_at?.toISOString?.() || null,
-          instanceId: "SHIP",
-          userId: row.ship_changed_by,
-          userName: shipUserName,
-          locationLabel: "Ship"
-        },
-        isResolved: row.resolution !== null,
-        resolvedAt: row.resolved_at?.toISOString?.() || null,
-        resolvedBy: row.resolved_by,
-        resolvedAction: row.resolution
-      });
-    }
-  }
-  const allRows = [...logRows, ...oldRows].sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime()).slice(0, limit);
-  return { rows: allRows, total: totalLog + totalOld };
+  });
+  return { byJobId, byJobNo };
 }
-async function countUnresolvedConflicts(vesselId) {
-  const pool4 = await getPool();
-  let logQuery = `SELECT COUNT(*) as cnt FROM sync_conflict_log WHERE is_resolved = false`;
-  let oldQuery = `SELECT COUNT(*) as cnt FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)`;
-  const logParams = [];
-  const oldParams = [];
-  if (vesselId) {
-    logQuery += ` AND EXISTS (SELECT 1 FROM sync_field_log sfl WHERE sfl.table_name = sync_conflict_log.table_name AND sfl.row_uuid = sync_conflict_log.row_uuid AND sfl.vessel_id = $1 LIMIT 1)`;
-    logParams.push(vesselId);
-    oldQuery += ` AND vessel_id = $1`;
-    oldParams.push(vesselId);
-  }
-  const [logResult, oldResult] = await Promise.all([
-    pool4.query(logQuery, logParams),
-    pool4.query(oldQuery, oldParams)
-  ]);
-  const fromLog = parseInt(logResult.rows[0].cnt, 10);
-  const fromOld = parseInt(oldResult.rows[0].cnt, 10);
-  return { total: fromLog + fromOld, fromLog, fromOld };
-}
-async function getConflict2(id, source) {
-  const pool4 = await getPool();
-  if (source === "log") {
-    const result = await pool4.query(
-      `SELECT * FROM sync_conflict_log WHERE id = $1`,
-      [id]
-    );
-    if (result.rows.length === 0) return null;
-    const row = result.rows[0];
-    let incomingUserId = null;
-    let winnerUserId = null;
-    try {
-      const r = await pool4.query(
-        `SELECT changed_by_user_id FROM sync_field_log
-         WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
-         ORDER BY changed_at DESC LIMIT 1`,
-        [row.table_name, row.row_uuid, row.field_name, row.incoming_sender_instance]
-      );
-      incomingUserId = r.rows[0]?.changed_by_user_id || null;
-    } catch {
+function buildRhCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
     }
-    try {
-      const r = await pool4.query(
-        `SELECT changed_by_user_id FROM sync_field_log
-         WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
-         ORDER BY changed_at DESC LIMIT 1`,
-        [row.table_name, row.row_uuid, row.field_name, row.receiver_winner_instance]
-      );
-      winnerUserId = r.rows[0]?.changed_by_user_id || null;
-    } catch {
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
     }
-    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
-    return {
-      id: row.id,
-      source: "log",
-      detectedAt: row.detected_at?.toISOString?.() || String(row.detected_at),
-      batchUuid: row.batch_uuid,
-      tableName: row.table_name,
-      tableDisplayName: getTableDisplayName(row.table_name),
-      rowUuid: row.row_uuid,
-      recordDisplay,
-      fieldName: row.field_name,
-      fieldDisplayName: getFieldDisplayName(row.field_name),
-      winner: {
-        value: row.receiver_current_value,
-        changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
-        instanceId: row.receiver_winner_instance || "",
-        userId: winnerUserId,
-        userName: await resolveUserName(pool4, winnerUserId),
-        locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
-      },
-      rejected: {
-        value: row.incoming_new_value,
-        changedAt: row.incoming_changed_at?.toISOString?.() || null,
-        instanceId: row.incoming_sender_instance || "",
-        userId: incomingUserId,
-        userName: await resolveUserName(pool4, incomingUserId),
-        locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
-      },
-      isResolved: row.is_resolved,
-      resolvedAt: row.resolved_at?.toISOString?.() || null,
-      resolvedBy: row.resolved_by,
-      resolvedAction: row.resolved_action
-    };
-  } else {
-    const result = await pool4.query(
-      `SELECT * FROM sync_conflicts WHERE id = $1`,
-      [id]
-    );
-    if (result.rows.length === 0) return null;
-    const row = result.rows[0];
-    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
-    return {
-      id: row.id,
-      source: "old",
-      detectedAt: row.created_at?.toISOString?.() || String(row.created_at),
-      batchUuid: row.sync_batch_id,
-      tableName: row.table_name,
-      tableDisplayName: getTableDisplayName(row.table_name),
-      rowUuid: row.row_uuid,
-      recordDisplay,
-      fieldName: row.field_name,
-      fieldDisplayName: getFieldDisplayName(row.field_name),
-      winner: {
-        value: row.shore_value,
-        changedAt: row.shore_changed_at?.toISOString?.() || null,
-        instanceId: "SHORE",
-        userId: row.shore_changed_by,
-        userName: await resolveUserName(pool4, row.shore_changed_by),
-        locationLabel: "Shore \u2014 Office"
-      },
-      rejected: {
-        value: row.ship_value,
-        changedAt: row.ship_changed_at?.toISOString?.() || null,
-        instanceId: "SHIP",
-        userId: row.ship_changed_by,
-        userName: await resolveUserName(pool4, row.ship_changed_by),
-        locationLabel: "Ship"
-      },
-      isResolved: row.resolution !== null,
-      resolvedAt: row.resolved_at?.toISOString?.() || null,
-      resolvedBy: row.resolved_by,
-      resolvedAction: row.resolution
-    };
-  }
-}
-async function applyIncomingConflict(id, source, userId) {
-  const pool4 = await getPool();
-  if (source === "log") {
-    const conflictResult = await pool4.query(
-      `SELECT * FROM sync_conflict_log WHERE id = $1`,
-      [id]
-    );
-    if (conflictResult.rows.length === 0) return null;
-    const conflict = conflictResult.rows[0];
-    if (conflict.is_resolved) {
-      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
     }
-    const identityCol = getIdentityColumn(conflict.table_name) || "id";
-    const fieldNameSnake = toSnakeCase2(conflict.field_name);
-    const currentRow = await pool4.query(
-      `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
-      [conflict.row_uuid]
-    );
-    const oldValue = currentRow.rows[0]?.[fieldNameSnake] ?? null;
-    const vesselId = currentRow.rows[0]?.vessel_id ?? null;
-    await pool4.query(
-      `UPDATE "${conflict.table_name}"
-       SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
-       WHERE "${identityCol}" = $2`,
-      [conflict.incoming_new_value, conflict.row_uuid]
-    );
-    const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-    await pool4.query(
-      `INSERT INTO sync_field_log
-        (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
-         changed_by_user_id, instance_id, is_synced, is_sync)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
-      [
-        conflict.table_name,
-        conflict.row_uuid,
-        conflict.field_name,
-        oldValue !== null ? String(oldValue) : null,
-        conflict.incoming_new_value,
-        vesselId,
-        userId,
-        instanceId
-      ]
-    );
-    await pool4.query(
-      `UPDATE sync_conflict_log
-       SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'APPLY_INCOMING'
-       WHERE id = $2`,
-      [userId, id]
-    );
-    syncDiag(`CONFLICT RESOLVED: id=${id} source=log action=APPLY_INCOMING by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
-    return getConflict2(id, source);
-  } else {
-    const conflictResult = await pool4.query(
-      `SELECT * FROM sync_conflicts WHERE id = $1`,
-      [id]
-    );
-    if (conflictResult.rows.length === 0) return null;
-    const conflict = conflictResult.rows[0];
-    if (conflict.resolution !== null) {
-      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    if (wo.cycleDueRhSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
+      }
     }
-    const identityCol = getIdentityColumn(conflict.table_name) || "id";
-    const fieldNameSnake = toSnakeCase2(conflict.field_name);
-    const currentOldRow = await pool4.query(
-      `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
-      [conflict.row_uuid]
-    );
-    const oldValOld = currentOldRow.rows[0]?.[fieldNameSnake] ?? null;
-    const vesselIdOld = currentOldRow.rows[0]?.vessel_id ?? null;
-    await pool4.query(
-      `UPDATE "${conflict.table_name}"
-       SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
-       WHERE "${identityCol}" = $2`,
-      [conflict.ship_value, conflict.row_uuid]
-    );
-    const instanceIdOld = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-    await pool4.query(
-      `INSERT INTO sync_field_log
-        (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
-         changed_by_user_id, instance_id, is_synced, is_sync)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
-      [
-        conflict.table_name,
-        conflict.row_uuid,
-        conflict.field_name,
-        oldValOld !== null ? String(oldValOld) : null,
-        conflict.ship_value,
-        vesselIdOld,
-        userId,
-        instanceIdOld
-      ]
-    );
-    await pool4.query(
-      `UPDATE sync_conflicts
-       SET resolution = 'ship_wins', resolved_value = $1, resolved_at = NOW(), resolved_by = $2
-       WHERE id = $3`,
-      [conflict.ship_value, userId, id]
-    );
-    syncDiag(`CONFLICT RESOLVED: id=${id} source=old action=APPLY_INCOMING(ship_wins) by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
-    return getConflict2(id, source);
-  }
+  });
+  return cycleMap;
 }
-async function dismissConflict(id, source, userId) {
-  const pool4 = await getPool();
-  if (source === "log") {
-    const conflictResult = await pool4.query(
-      `SELECT * FROM sync_conflict_log WHERE id = $1`,
-      [id]
-    );
-    if (conflictResult.rows.length === 0) return null;
-    if (conflictResult.rows[0].is_resolved) {
-      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+function buildCalendarCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
     }
-    await pool4.query(
-      `UPDATE sync_conflict_log
-       SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'DISMISS'
-       WHERE id = $2`,
-      [userId, id]
-    );
-    syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId}`);
-    return getConflict2(id, source);
-  } else {
-    const conflictResult = await pool4.query(
-      `SELECT * FROM sync_conflicts WHERE id = $1`,
-      [id]
-    );
-    if (conflictResult.rows.length === 0) return null;
-    if (conflictResult.rows[0].resolution !== null) {
-      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
     }
-    await pool4.query(
-      `UPDATE sync_conflicts
-       SET resolution = 'dismissed', resolved_value = shore_value, resolved_at = NOW(), resolved_by = $1
-       WHERE id = $2`,
-      [userId, id]
-    );
-    syncDiag(`CONFLICT DISMISSED: id=${id} source=old by=${userId}`);
-    return getConflict2(id, source);
-  }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (wo.cycleDueDateSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
+      }
+    }
+  });
+  return cycleMap;
 }
-async function getConflictTableNames() {
-  const pool4 = await getPool();
-  const result = await pool4.query(`
-    SELECT DISTINCT table_name FROM (
-      SELECT table_name FROM sync_conflict_log WHERE is_resolved = false
-      UNION
-      SELECT table_name FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)
-    ) combined ORDER BY table_name
-  `);
-  return result.rows.map((r) => r.table_name);
+function findBlockingWOForJob(workOrders2, jobId, jobNo) {
+  return workOrders2.find((wo) => {
+    if (wo.isDeleted === true) return false;
+    if (!isBlockingStatus(wo.status)) return false;
+    if (wo.jobId === jobId) return true;
+    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+    return woJobNo === jobNo;
+  });
 }
-function toSnakeCase2(str) {
-  return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
-}
-var init_conflictReviewRepository = __esm({
-  "server/modules/sync/conflictReviewRepository.ts"() {
+var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
+var init_workOrderStatus = __esm({
+  "server/utils/workOrderStatus.ts"() {
     "use strict";
-    init_db();
-    init_syncConfig();
-    init_syncDiagLogger();
+    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "active",
+      "due",
+      "due (grace p)",
+      "due (grace)",
+      "overdue",
+      "pending approval",
+      "pending_approval",
+      "pendingapproval",
+      "postponed",
+      "in progress",
+      "in_progress",
+      "inprogress",
+      "open",
+      "rejected",
+      // Rejected WOs block new generation - work needs rework before cycle can advance
+      "awaiting office approval",
+      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
+      "postponement approved"
+      // Postponement approved — WO is still active, scanner must not re-generate
+    ]);
+    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "completed",
+      "closed",
+      "approved",
+      "cancelled",
+      "canceled"
+    ]);
+  }
+});
+
+// server/modules/sync/dualCompletionResolver.ts
+var dualCompletionResolver_exports = {};
+__export(dualCompletionResolver_exports, {
+  DUAL_COMPLETION_KIND: () => DUAL_COMPLETION_KIND,
+  RESOLUTION_ACTOR: () => RESOLUTION_ACTOR,
+  WO_COMPLETION_FIELDS_SNAKE: () => WO_COMPLETION_FIELDS_SNAKE,
+  chooseInterimSide: () => chooseInterimSide,
+  collectIncomingWoCompletionDates: () => collectIncomingWoCompletionDates,
+  evaluateDualCompletion: () => evaluateDualCompletion,
+  findWouuidsWithOpenDualConflicts: () => findWouuidsWithOpenDualConflicts,
+  isWoCompletionField: () => isWoCompletionField
+});
+function isWoCompletionField(fieldNameSnake) {
+  return WO_COMPLETION_FIELDS_SNAKE.has(fieldNameSnake);
+}
+function chooseInterimSide(local, incoming) {
+  const ld = parseReadingDay(local.completionDate)?.getTime() ?? null;
+  const id = parseReadingDay(incoming.completionDate)?.getTime() ?? null;
+  if (ld !== null && id !== null && ld !== id) return ld > id ? "local" : "incoming";
+  if (ld !== null && id === null) return "local";
+  if (ld === null && id !== null) return "incoming";
+  if (local.isShip !== incoming.isShip) return local.isShip ? "local" : "incoming";
+  return "local";
+}
+function collectIncomingWoCompletionDates(logs) {
+  const primary = /* @__PURE__ */ new Map();
+  const fallback = /* @__PURE__ */ new Map();
+  for (const log2 of logs) {
+    if (log2.tableName !== "work_orders" || !log2.newValue) continue;
+    const f = log2.fieldName.includes("_") ? log2.fieldName : log2.fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+    if (f === "date_completed") primary.set(log2.rowUuid, log2.newValue);
+    else if (f === "completion_date_time") fallback.set(log2.rowUuid, log2.newValue);
+  }
+  const out = /* @__PURE__ */ new Map();
+  fallback.forEach((v, k) => out.set(k, v));
+  primary.forEach((v, k) => out.set(k, v));
+  return out;
+}
+async function findWouuidsWithOpenDualConflicts(client, wouuids) {
+  if (wouuids.length === 0) return /* @__PURE__ */ new Set();
+  try {
+    const res = await client.query(
+      `SELECT DISTINCT row_uuid FROM sync_conflict_log
+        WHERE conflict_kind = $1 AND table_name = 'work_orders'
+          AND is_resolved = false AND row_uuid = ANY($2)`,
+      [DUAL_COMPLETION_KIND, wouuids]
+    );
+    return new Set(res.rows.map((r) => String(r.row_uuid)));
+  } catch (err) {
+    syncDiag(`DUAL-COMPLETION OPEN-CONFLICT CHECK FAILED (treating none as open): ${String(err?.message || err).substring(0, 120)}`);
+    return /* @__PURE__ */ new Set();
+  }
+}
+async function evaluateDualCompletion(client, log2, ctx) {
+  if (log2.tableName !== "work_orders") return NOT_DUAL;
+  const fieldSnake = log2.fieldName.includes("_") ? log2.fieldName : log2.fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+  if (!isWoCompletionField(fieldSnake)) return NOT_DUAL;
+  try {
+    if (log2.changedByUserId === RESOLUTION_ACTOR) {
+      await client.query(
+        `UPDATE sync_conflict_log
+            SET is_resolved = true, resolved_at = NOW(),
+                resolved_by = $1, resolved_action = 'REMOTE_RESOLUTION'
+          WHERE conflict_kind = $2 AND table_name = 'work_orders'
+            AND row_uuid = $3 AND field_name IN ($4, $5) AND is_resolved = false`,
+        [RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, log2.rowUuid, log2.fieldName, fieldSnake]
+      );
+      syncDiag(`DUAL-COMPLETION REMOTE-RESOLUTION: work_orders.${fieldSnake} row=${log2.rowUuid} \u2014 force-applying resolved value, local mirror conflict closed`);
+      return { dualConflict: false, applyIncoming: true, remoteResolution: true };
+    }
+    const rowRes = await client.query(
+      `SELECT status, date_completed, completion_date_time, "${fieldSnake}" AS current_value
+         FROM work_orders WHERE wouuid = $1 LIMIT 1`,
+      [log2.rowUuid]
+    );
+    if (rowRes.rows.length === 0) return NOT_DUAL;
+    const row = rowRes.rows[0];
+    if (!isCompletedStatus(row.status)) return NOT_DUAL;
+    if (fieldSnake === "status" && !isCompletedStatus(log2.newValue ?? null)) return NOT_DUAL;
+    const currentValue = row.current_value === null || row.current_value === void 0 ? null : String(row.current_value);
+    const incomingValue = log2.newValue === null || log2.newValue === void 0 ? null : String(log2.newValue);
+    if (currentValue === incomingValue) return NOT_DUAL;
+    if (currentValue !== null && incomingValue !== null) {
+      const cn = Number(currentValue), inn = Number(incomingValue);
+      if (currentValue.trim() !== "" && incomingValue.trim() !== "" && Number.isFinite(cn) && Number.isFinite(inn) && cn === inn) return NOT_DUAL;
+    }
+    const receiverId = ctx.receiverInstanceId;
+    if (!receiverId || receiverId === "UNKNOWN") return NOT_DUAL;
+    if (log2.instanceId && log2.instanceId === receiverId) return NOT_DUAL;
+    const localStatus = await client.query(
+      `SELECT new_value, changed_at FROM sync_field_log
+        WHERE table_name = 'work_orders' AND row_uuid = $1
+          AND instance_id = $2 AND field_name IN ('status')
+        ORDER BY changed_at DESC LIMIT 1`,
+      [log2.rowUuid, receiverId]
+    );
+    if (localStatus.rows.length === 0 || !isCompletedStatus(localStatus.rows[0].new_value)) {
+      return NOT_DUAL;
+    }
+    const localCompletion = await client.query(
+      `SELECT changed_at FROM sync_field_log
+        WHERE table_name = 'work_orders' AND row_uuid = $1
+          AND instance_id = $2 AND field_name = ANY($3)
+        ORDER BY changed_at DESC LIMIT 1`,
+      [log2.rowUuid, receiverId, COMPLETION_FIELD_NAME_VARIANTS]
+    );
+    if (localCompletion.rows.length === 0) return NOT_DUAL;
+    const existing = await client.query(
+      `SELECT id FROM sync_conflict_log
+        WHERE conflict_kind = $1 AND table_name = 'work_orders'
+          AND row_uuid = $2 AND field_name = $3 AND is_resolved = false LIMIT 1`,
+      [DUAL_COMPLETION_KIND, log2.rowUuid, log2.fieldName]
+    );
+    if (existing.rows.length === 0) {
+      await client.query(
+        `INSERT INTO sync_conflict_log
+           (batch_uuid, table_name, row_uuid, field_name, conflict_kind,
+            incoming_sender_instance, incoming_changed_at, incoming_old_value, incoming_new_value,
+            receiver_winner_instance, receiver_winner_changed_at, receiver_current_value)
+         VALUES ($1,'work_orders',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          ctx.batchUuid ?? null,
+          log2.rowUuid,
+          log2.fieldName,
+          DUAL_COMPLETION_KIND,
+          log2.instanceId ?? null,
+          log2.changedAt,
+          log2.oldValue ?? null,
+          incomingValue,
+          receiverId,
+          new Date(localCompletion.rows[0].changed_at),
+          currentValue
+        ]
+      );
+    }
+    const localDate = row.date_completed || row.completion_date_time || null;
+    const incomingDate = ctx.incomingCompletionDateByRow?.get(log2.rowUuid) ?? (fieldSnake === "date_completed" || fieldSnake === "completion_date_time" ? incomingValue : null);
+    const winner = chooseInterimSide(
+      { completionDate: localDate, isShip: isShipInstanceId(receiverId) },
+      { completionDate: incomingDate ?? null, isShip: log2.instanceId ? isShipInstanceId(log2.instanceId) : false }
+    );
+    const applyIncoming = winner === "incoming";
+    syncDiag(
+      `DUAL-COMPLETION CONFLICT: work_orders.${fieldSnake} row=${log2.rowUuid} \u2014 completed on BOTH sides (local ${localDate ?? "no-date"} vs incoming ${incomingDate ?? "no-date"}); interim=${winner}, ${applyIncoming ? "incoming value applied" : "local value kept"}; recorded for review`
+    );
+    return { dualConflict: true, applyIncoming, remoteResolution: false };
+  } catch (err) {
+    syncDiag(`DUAL-COMPLETION DETECT ERROR (fail-open to legacy guards): work_orders.${fieldSnake} row=${log2.rowUuid}: ${String(err?.message || err).substring(0, 150)}`);
+    return NOT_DUAL;
+  }
+}
+var RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, WO_COMPLETION_FIELDS_SNAKE, snakeToCamel, COMPLETION_FIELD_NAME_VARIANTS, NOT_DUAL;
+var init_dualCompletionResolver = __esm({
+  "server/modules/sync/dualCompletionResolver.ts"() {
+    "use strict";
+    init_workOrderStatus();
     init_syncRole();
+    init_rhEventComparator();
+    init_syncDiagLogger();
+    RESOLUTION_ACTOR = "sync-conflict-resolution";
+    DUAL_COMPLETION_KIND = "dual_completion";
+    WO_COMPLETION_FIELDS_SNAKE = /* @__PURE__ */ new Set([
+      "status",
+      "date_completed",
+      "completion_date_time",
+      "performed_by",
+      "completion_remarks",
+      "completion_rh",
+      "wo_completion_rh",
+      "completion_rh_source",
+      "completion_rh_validated",
+      "completion_rh_validation_details",
+      "rh_justification",
+      "rh_justification_provided_by",
+      "rh_justification_date",
+      "rh_backdated_entry",
+      "current_reading",
+      "current_reading_date",
+      "previous_reading",
+      "reading_date"
+    ]);
+    snakeToCamel = (s) => s.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+    COMPLETION_FIELD_NAME_VARIANTS = Array.from(WO_COMPLETION_FIELDS_SNAKE).flatMap((f) => [f, snakeToCamel(f)]);
+    NOT_DUAL = { dualConflict: false, applyIncoming: true, remoteResolution: false };
   }
 });
 
@@ -11099,168 +10816,6 @@ var init_jobCycleCalc = __esm({
   }
 });
 
-// server/utils/workOrderStatus.ts
-var workOrderStatus_exports = {};
-__export(workOrderStatus_exports, {
-  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
-  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
-  buildRhCycleWOMap: () => buildRhCycleWOMap,
-  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
-  findBlockingWOForJob: () => findBlockingWOForJob,
-  isBlockingStatus: () => isBlockingStatus,
-  isCompletedStatus: () => isCompletedStatus
-});
-function isBlockingStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
-}
-function isCompletedStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
-}
-function extractJobNoFromWorkOrderNo(workOrderNo) {
-  if (!workOrderNo) return null;
-  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-  if (newFormatMatch) {
-    return newFormatMatch[1];
-  }
-  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
-  if (woSuffixMatch) {
-    return woSuffixMatch[1];
-  }
-  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-  if (oldFormatMatch) {
-    return oldFormatMatch[1];
-  }
-  return null;
-}
-function buildJobsWithActiveWOSet(workOrders2, vesselId) {
-  const byJobId = /* @__PURE__ */ new Set();
-  const byJobNo = /* @__PURE__ */ new Set();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (isBlockingStatus(wo.status)) {
-      if (wo.jobId) {
-        byJobId.add(wo.jobId);
-      }
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        byJobNo.add(`${woVesselId}|${jobNo}`);
-      }
-    }
-  });
-  return { byJobId, byJobNo };
-}
-function buildRhCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueRhSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function buildCalendarCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueDateSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function findBlockingWOForJob(workOrders2, jobId, jobNo) {
-  return workOrders2.find((wo) => {
-    if (wo.isDeleted === true) return false;
-    if (!isBlockingStatus(wo.status)) return false;
-    if (wo.jobId === jobId) return true;
-    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-    return woJobNo === jobNo;
-  });
-}
-var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
-var init_workOrderStatus = __esm({
-  "server/utils/workOrderStatus.ts"() {
-    "use strict";
-    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "active",
-      "due",
-      "due (grace p)",
-      "due (grace)",
-      "overdue",
-      "pending approval",
-      "pending_approval",
-      "pendingapproval",
-      "postponed",
-      "in progress",
-      "in_progress",
-      "inprogress",
-      "open",
-      "rejected",
-      // Rejected WOs block new generation - work needs rework before cycle can advance
-      "awaiting office approval",
-      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
-      "postponement approved"
-      // Postponement approved — WO is still active, scanner must not re-generate
-    ]);
-    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "completed",
-      "closed",
-      "approved",
-      "cancelled",
-      "canceled"
-    ]);
-  }
-});
-
 // server/modules/sync/shipCompletionLearner.ts
 var shipCompletionLearner_exports = {};
 __export(shipCompletionLearner_exports, {
@@ -11428,6 +10983,756 @@ var init_shipCompletionLearner = __esm({
       lastDoneRH: "last_done_rh",
       nextDueRH: "next_due_rh"
     };
+  }
+});
+
+// server/modules/sync/conflictReviewRepository.ts
+async function runPostResolutionLearning(pool4, wouuid) {
+  const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+  if (isShipInstanceId(instanceId)) return;
+  const stillOpen = await findWouuidsWithOpenDualConflicts(pool4, [wouuid]);
+  if (stillOpen.has(wouuid)) {
+    syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING DEFERRED: wouuid=${wouuid} \u2014 sibling field conflicts still open`);
+    return;
+  }
+  const client = await pool4.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+    const { learnFromShipCompletions: learnFromShipCompletions2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+    await learnFromShipCompletions2(client, [wouuid]);
+    await client.query("COMMIT");
+    syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING: wouuid=${wouuid}`);
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+    }
+    syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING FAILED (non-fatal): wouuid=${wouuid}: ${String(err?.message || err).substring(0, 150)}`);
+  } finally {
+    client.release();
+  }
+}
+function getTableDisplayName(tableName) {
+  const map = {
+    work_orders: "Work Orders",
+    work_order_executions: "WO Executions",
+    work_order_documents: "WO Documents",
+    work_order_postponements: "WO Postponements",
+    defects: "Defects",
+    defect_actions: "Defect Actions",
+    defect_attachments: "Defect Attachments",
+    defect_sequences: "Defect Sequences",
+    spares: "Spares",
+    spares_history: "Spares History",
+    spare_location_stock: "Spare Location Stock",
+    stores_items: "Stores Items",
+    stores_ledger: "Stores Ledger",
+    inventory_transactions: "Inventory Transactions",
+    change_request: "Change Requests",
+    change_request_approval: "CR Approvals",
+    change_request_comment: "CR Comments",
+    running_hours_audit: "Running Hours Audit",
+    component_running_hours_log: "Running Hours Log",
+    component_maintenance_history: "Maintenance History",
+    vessel_certificate_data: "Vessel Certificates",
+    vessel_survey_data: "Vessel Surveys",
+    planner_dates: "Planner Dates",
+    components: "Components",
+    jobs: "Jobs"
+  };
+  return map[tableName] || tableName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function getFieldDisplayName(fieldName) {
+  const acronymMap = {
+    rh: "RH",
+    rob: "ROB",
+    utc: "UTC",
+    tz: "TZ",
+    uuid: "UUID",
+    wo: "WO",
+    cr: "CR",
+    coc: "CoC",
+    id: "ID",
+    url: "URL",
+    html: "HTML",
+    sfi: "SFI",
+    viq: "VIQ",
+    pms: "PMS"
+  };
+  let words;
+  if (fieldName.includes("_")) {
+    words = fieldName;
+  } else {
+    words = fieldName.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+  }
+  return words.replace(/_/g, " ").split(" ").map((w) => {
+    const lower = w.toLowerCase();
+    if (acronymMap[lower]) return acronymMap[lower];
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(" ");
+}
+function getInstanceLabel(instanceId, vesselName) {
+  if (!instanceId) return "Unknown";
+  if (isShipInstanceId(instanceId)) {
+    return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId})`;
+  }
+  if (instanceId.toUpperCase().startsWith("SHORE")) {
+    return "Shore \u2014 Office";
+  }
+  return instanceId;
+}
+async function getRecordLabel(pool4, tableName, rowUuid) {
+  const labelConfigs = {
+    work_orders: {
+      cols: ["job_title", "component_code"],
+      format: (a, b) => b ? `WO: ${a} (${b})` : `WO: ${a}`
+    },
+    defects: {
+      cols: ["id", "description"],
+      format: (a, b) => `Defect ${a}: ${(b || "").substring(0, 60)}`
+    },
+    spares: {
+      cols: ["part_name", "part_code"],
+      format: (a, b) => b ? `Spare: ${a} (${b})` : `Spare: ${a}`
+    },
+    stores_items: {
+      cols: ["item_name", "item_code"],
+      format: (a, b) => b ? `Store: ${a} (${b})` : `Store: ${a}`
+    },
+    change_request: {
+      cols: ["title"],
+      format: (a) => `CR: ${a}`
+    },
+    running_hours_audit: {
+      cols: ["component_name", "component_code"],
+      format: (a, b) => b ? `RH: ${a} (${b})` : `RH: ${a}`
+    },
+    work_order_executions: {
+      cols: ["id"],
+      format: (a) => `WO Exec: ${a}`
+    },
+    work_order_documents: {
+      cols: ["document_name"],
+      format: (a) => `WO Doc: ${a}`
+    },
+    defect_actions: {
+      cols: ["action_description"],
+      format: (a) => `Action: ${(a || "").substring(0, 60)}`
+    },
+    vessel_certificate_data: {
+      cols: ["certificate_name"],
+      format: (a) => `Cert: ${a}`
+    },
+    vessel_survey_data: {
+      cols: ["survey_name"],
+      format: (a) => `Survey: ${a}`
+    },
+    components: {
+      cols: ["component_name", "component_code"],
+      format: (a, b) => b ? `${a} (${b})` : `${a}`
+    },
+    jobs: {
+      cols: ["job_title", "job_code"],
+      format: (a, b) => b ? `${a} (${b})` : `${a}`
+    }
+  };
+  const config = labelConfigs[tableName];
+  if (!config) return `${tableName} ${rowUuid.substring(0, 8)}`;
+  const identityCol = getIdentityColumn(tableName) || "id";
+  const selectCols = config.cols.map((c) => `"${c}"`).join(", ");
+  try {
+    const result = await pool4.query(
+      `SELECT ${selectCols} FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+      [rowUuid]
+    );
+    if (result.rows.length === 0) return `${tableName} ${rowUuid.substring(0, 8)}`;
+    const vals = config.cols.map((c) => result.rows[0][c] ?? "");
+    return config.format(...vals) || `${tableName} ${rowUuid.substring(0, 8)}`;
+  } catch {
+    return `${tableName} ${rowUuid.substring(0, 8)}`;
+  }
+}
+async function resolveUserName(pool4, userId) {
+  if (!userId || userId === "system" || userId === "System" || userId === "admin") return "System";
+  const parsed = parseInt(userId, 10);
+  if (isNaN(parsed)) return userId;
+  try {
+    const result = await pool4.query(
+      `SELECT full_name FROM users WHERE id = $1 LIMIT 1`,
+      [parsed]
+    );
+    return result.rows[0]?.full_name || `User ${userId}`;
+  } catch {
+    return `User ${userId}`;
+  }
+}
+async function listConflicts(filters) {
+  const pool4 = await getPool();
+  const limit = Math.min(filters.limit || 50, 200);
+  const offset = filters.offset || 0;
+  const source = filters.source || "all";
+  const resolved = filters.resolved ?? false;
+  const logRows = [];
+  const oldRows = [];
+  let totalLog = 0;
+  let totalOld = 0;
+  if (source === "all" || source === "log") {
+    const conditions = [`cl.is_resolved = $1`];
+    const params = [resolved];
+    let paramIdx = 2;
+    if (filters.tableName) {
+      conditions.push(`cl.table_name = $${paramIdx++}`);
+      params.push(filters.tableName);
+    }
+    if (filters.vesselId) {
+      conditions.push(`EXISTS (SELECT 1 FROM sync_field_log sfl WHERE sfl.table_name = cl.table_name AND sfl.row_uuid = cl.row_uuid AND sfl.vessel_id = $${paramIdx++} LIMIT 1)`);
+      params.push(filters.vesselId);
+    }
+    if (filters.dateFrom) {
+      conditions.push(`cl.detected_at >= $${paramIdx++}`);
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      conditions.push(`cl.detected_at <= $${paramIdx++}`);
+      params.push(filters.dateTo);
+    }
+    const whereClause = conditions.join(" AND ");
+    const countResult = await pool4.query(
+      `SELECT COUNT(*) as cnt FROM sync_conflict_log cl WHERE ${whereClause}`,
+      params
+    );
+    totalLog = parseInt(countResult.rows[0].cnt, 10);
+    const dataResult = await pool4.query(
+      `SELECT cl.*
+       FROM sync_conflict_log cl
+       WHERE ${whereClause}
+       ORDER BY cl.detected_at DESC
+       LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+    for (const row of dataResult.rows) {
+      let incomingUserId = null;
+      let winnerUserId = null;
+      try {
+        const incomingUser = await pool4.query(
+          `SELECT changed_by_user_id FROM sync_field_log
+           WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
+             AND instance_id = $4
+           ORDER BY changed_at DESC LIMIT 1`,
+          [row.table_name, row.row_uuid, row.field_name, row.incoming_sender_instance]
+        );
+        incomingUserId = incomingUser.rows[0]?.changed_by_user_id || null;
+      } catch {
+      }
+      try {
+        const winnerUser = await pool4.query(
+          `SELECT changed_by_user_id FROM sync_field_log
+           WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
+             AND instance_id = $4
+           ORDER BY changed_at DESC LIMIT 1`,
+          [row.table_name, row.row_uuid, row.field_name, row.receiver_winner_instance]
+        );
+        winnerUserId = winnerUser.rows[0]?.changed_by_user_id || null;
+      } catch {
+      }
+      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+      const incomingUserName = await resolveUserName(pool4, incomingUserId);
+      const winnerUserName = await resolveUserName(pool4, winnerUserId);
+      logRows.push({
+        id: row.id,
+        source: "log",
+        detectedAt: row.detected_at?.toISOString?.() || String(row.detected_at),
+        batchUuid: row.batch_uuid,
+        tableName: row.table_name,
+        tableDisplayName: getTableDisplayName(row.table_name),
+        rowUuid: row.row_uuid,
+        recordDisplay,
+        fieldName: row.field_name,
+        fieldDisplayName: getFieldDisplayName(row.field_name),
+        winner: {
+          value: row.receiver_current_value,
+          changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
+          instanceId: row.receiver_winner_instance || "",
+          userId: winnerUserId,
+          userName: winnerUserName,
+          locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
+        },
+        rejected: {
+          value: row.incoming_new_value,
+          changedAt: row.incoming_changed_at?.toISOString?.() || null,
+          instanceId: row.incoming_sender_instance || "",
+          userId: incomingUserId,
+          userName: incomingUserName,
+          locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
+        },
+        isResolved: row.is_resolved,
+        resolvedAt: row.resolved_at?.toISOString?.() || null,
+        resolvedBy: row.resolved_by,
+        resolvedAction: row.resolved_action,
+        conflictKind: row.conflict_kind ?? null
+      });
+    }
+  }
+  if (source === "all" || source === "old") {
+    const conditions = [];
+    const params = [];
+    let paramIdx = 1;
+    if (resolved) {
+      conditions.push(`sc.resolution IS NOT NULL`);
+    } else {
+      conditions.push(`sc.resolution IS NULL`);
+    }
+    if (filters.tableName) {
+      conditions.push(`sc.table_name = $${paramIdx++}`);
+      params.push(filters.tableName);
+    }
+    if (filters.vesselId) {
+      conditions.push(`sc.vessel_id = $${paramIdx++}`);
+      params.push(filters.vesselId);
+    }
+    if (filters.dateFrom) {
+      conditions.push(`sc.created_at >= $${paramIdx++}`);
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      conditions.push(`sc.created_at <= $${paramIdx++}`);
+      params.push(filters.dateTo);
+    }
+    conditions.push(`(sc.is_deleted = false OR sc.is_deleted IS NULL)`);
+    const whereClause = conditions.join(" AND ");
+    const countResult = await pool4.query(
+      `SELECT COUNT(*) as cnt FROM sync_conflicts sc WHERE ${whereClause}`,
+      params
+    );
+    totalOld = parseInt(countResult.rows[0].cnt, 10);
+    const dataResult = await pool4.query(
+      `SELECT sc.*
+       FROM sync_conflicts sc
+       WHERE ${whereClause}
+       ORDER BY sc.created_at DESC
+       LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+    for (const row of dataResult.rows) {
+      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+      const shipUserName = await resolveUserName(pool4, row.ship_changed_by);
+      const shoreUserName = await resolveUserName(pool4, row.shore_changed_by);
+      oldRows.push({
+        id: row.id,
+        source: "old",
+        detectedAt: row.created_at?.toISOString?.() || String(row.created_at),
+        batchUuid: row.sync_batch_id,
+        tableName: row.table_name,
+        tableDisplayName: getTableDisplayName(row.table_name),
+        rowUuid: row.row_uuid,
+        recordDisplay,
+        fieldName: row.field_name,
+        fieldDisplayName: getFieldDisplayName(row.field_name),
+        winner: {
+          value: row.shore_value,
+          changedAt: row.shore_changed_at?.toISOString?.() || null,
+          instanceId: "SHORE",
+          userId: row.shore_changed_by,
+          userName: shoreUserName,
+          locationLabel: "Shore \u2014 Office"
+        },
+        rejected: {
+          value: row.ship_value,
+          changedAt: row.ship_changed_at?.toISOString?.() || null,
+          instanceId: "SHIP",
+          userId: row.ship_changed_by,
+          userName: shipUserName,
+          locationLabel: "Ship"
+        },
+        isResolved: row.resolution !== null,
+        resolvedAt: row.resolved_at?.toISOString?.() || null,
+        resolvedBy: row.resolved_by,
+        resolvedAction: row.resolution
+      });
+    }
+  }
+  const allRows = [...logRows, ...oldRows].sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime()).slice(0, limit);
+  return { rows: allRows, total: totalLog + totalOld };
+}
+async function countUnresolvedConflicts(vesselId) {
+  const pool4 = await getPool();
+  let logQuery = `SELECT COUNT(*) as cnt FROM sync_conflict_log WHERE is_resolved = false`;
+  let oldQuery = `SELECT COUNT(*) as cnt FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)`;
+  const logParams = [];
+  const oldParams = [];
+  if (vesselId) {
+    logQuery += ` AND EXISTS (SELECT 1 FROM sync_field_log sfl WHERE sfl.table_name = sync_conflict_log.table_name AND sfl.row_uuid = sync_conflict_log.row_uuid AND sfl.vessel_id = $1 LIMIT 1)`;
+    logParams.push(vesselId);
+    oldQuery += ` AND vessel_id = $1`;
+    oldParams.push(vesselId);
+  }
+  const [logResult, oldResult] = await Promise.all([
+    pool4.query(logQuery, logParams),
+    pool4.query(oldQuery, oldParams)
+  ]);
+  const fromLog = parseInt(logResult.rows[0].cnt, 10);
+  const fromOld = parseInt(oldResult.rows[0].cnt, 10);
+  return { total: fromLog + fromOld, fromLog, fromOld };
+}
+async function getConflict2(id, source) {
+  const pool4 = await getPool();
+  if (source === "log") {
+    const result = await pool4.query(
+      `SELECT * FROM sync_conflict_log WHERE id = $1`,
+      [id]
+    );
+    if (result.rows.length === 0) return null;
+    const row = result.rows[0];
+    let incomingUserId = null;
+    let winnerUserId = null;
+    try {
+      const r = await pool4.query(
+        `SELECT changed_by_user_id FROM sync_field_log
+         WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
+         ORDER BY changed_at DESC LIMIT 1`,
+        [row.table_name, row.row_uuid, row.field_name, row.incoming_sender_instance]
+      );
+      incomingUserId = r.rows[0]?.changed_by_user_id || null;
+    } catch {
+    }
+    try {
+      const r = await pool4.query(
+        `SELECT changed_by_user_id FROM sync_field_log
+         WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
+         ORDER BY changed_at DESC LIMIT 1`,
+        [row.table_name, row.row_uuid, row.field_name, row.receiver_winner_instance]
+      );
+      winnerUserId = r.rows[0]?.changed_by_user_id || null;
+    } catch {
+    }
+    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+    return {
+      id: row.id,
+      source: "log",
+      detectedAt: row.detected_at?.toISOString?.() || String(row.detected_at),
+      batchUuid: row.batch_uuid,
+      tableName: row.table_name,
+      tableDisplayName: getTableDisplayName(row.table_name),
+      rowUuid: row.row_uuid,
+      recordDisplay,
+      fieldName: row.field_name,
+      fieldDisplayName: getFieldDisplayName(row.field_name),
+      winner: {
+        value: row.receiver_current_value,
+        changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
+        instanceId: row.receiver_winner_instance || "",
+        userId: winnerUserId,
+        userName: await resolveUserName(pool4, winnerUserId),
+        locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
+      },
+      rejected: {
+        value: row.incoming_new_value,
+        changedAt: row.incoming_changed_at?.toISOString?.() || null,
+        instanceId: row.incoming_sender_instance || "",
+        userId: incomingUserId,
+        userName: await resolveUserName(pool4, incomingUserId),
+        locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
+      },
+      isResolved: row.is_resolved,
+      resolvedAt: row.resolved_at?.toISOString?.() || null,
+      resolvedBy: row.resolved_by,
+      resolvedAction: row.resolved_action,
+      conflictKind: row.conflict_kind ?? null
+    };
+  } else {
+    const result = await pool4.query(
+      `SELECT * FROM sync_conflicts WHERE id = $1`,
+      [id]
+    );
+    if (result.rows.length === 0) return null;
+    const row = result.rows[0];
+    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+    return {
+      id: row.id,
+      source: "old",
+      detectedAt: row.created_at?.toISOString?.() || String(row.created_at),
+      batchUuid: row.sync_batch_id,
+      tableName: row.table_name,
+      tableDisplayName: getTableDisplayName(row.table_name),
+      rowUuid: row.row_uuid,
+      recordDisplay,
+      fieldName: row.field_name,
+      fieldDisplayName: getFieldDisplayName(row.field_name),
+      winner: {
+        value: row.shore_value,
+        changedAt: row.shore_changed_at?.toISOString?.() || null,
+        instanceId: "SHORE",
+        userId: row.shore_changed_by,
+        userName: await resolveUserName(pool4, row.shore_changed_by),
+        locationLabel: "Shore \u2014 Office"
+      },
+      rejected: {
+        value: row.ship_value,
+        changedAt: row.ship_changed_at?.toISOString?.() || null,
+        instanceId: "SHIP",
+        userId: row.ship_changed_by,
+        userName: await resolveUserName(pool4, row.ship_changed_by),
+        locationLabel: "Ship"
+      },
+      isResolved: row.resolution !== null,
+      resolvedAt: row.resolved_at?.toISOString?.() || null,
+      resolvedBy: row.resolved_by,
+      resolvedAction: row.resolution
+    };
+  }
+}
+async function resolveDualCompletionGroup(pool4, conflict, choice, userId) {
+  const identityCol = getIdentityColumn(conflict.table_name) || "id";
+  const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+  const resolvedAction = choice === "incoming" ? "APPLY_INCOMING" : "DISMISS";
+  const client = await pool4.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+    const siblings = (await client.query(
+      `SELECT * FROM sync_conflict_log
+        WHERE conflict_kind = $1 AND table_name = $2 AND row_uuid = $3 AND is_resolved = false
+        FOR UPDATE`,
+      [DUAL_COMPLETION_KIND, conflict.table_name, conflict.row_uuid]
+    )).rows;
+    const vesselRow = await client.query(
+      `SELECT vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+      [conflict.row_uuid]
+    );
+    const vesselId = vesselRow.rows[0]?.vessel_id ?? null;
+    for (const sib of siblings) {
+      const fieldSnake = toSnakeCase2(sib.field_name);
+      const cur = await client.query(
+        `SELECT "${fieldSnake}" AS v FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+        [conflict.row_uuid]
+      );
+      const currentValue = cur.rows[0]?.v ?? null;
+      const chosenValue = choice === "incoming" ? sib.incoming_new_value : currentValue !== null ? String(currentValue) : null;
+      const rejectedValue = choice === "incoming" ? currentValue !== null ? String(currentValue) : null : sib.incoming_new_value;
+      if (choice === "incoming") {
+        await client.query(
+          `UPDATE "${conflict.table_name}" SET "${fieldSnake}" = $1, "updated_at" = NOW()
+            WHERE "${identityCol}" = $2`,
+          [chosenValue, conflict.row_uuid]
+        );
+      }
+      await client.query(
+        `INSERT INTO sync_field_log
+          (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
+           changed_by_user_id, instance_id, is_synced, is_sync)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
+        [
+          conflict.table_name,
+          conflict.row_uuid,
+          sib.field_name,
+          rejectedValue,
+          chosenValue,
+          vesselId,
+          RESOLUTION_ACTOR,
+          instanceId
+        ]
+      );
+      await client.query(
+        `UPDATE sync_conflict_log
+            SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = $2
+          WHERE id = $3`,
+        [userId, resolvedAction, sib.id]
+      );
+    }
+    await client.query("COMMIT");
+    syncDiag(`DUAL-COMPLETION GROUP RESOLVED: row=${conflict.row_uuid} choice=${choice} fields=${siblings.length} by=${userId} \u2014 resolution logs queued for propagation`);
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+async function applyIncomingConflict(id, source, userId) {
+  const pool4 = await getPool();
+  if (source === "log") {
+    const conflictResult = await pool4.query(
+      `SELECT * FROM sync_conflict_log WHERE id = $1`,
+      [id]
+    );
+    if (conflictResult.rows.length === 0) return null;
+    const conflict = conflictResult.rows[0];
+    if (conflict.is_resolved) {
+      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    }
+    const isDualCompletion = conflict.conflict_kind === DUAL_COMPLETION_KIND;
+    if (isDualCompletion) {
+      await resolveDualCompletionGroup(pool4, conflict, "incoming", userId);
+      syncDiag(`CONFLICT RESOLVED: id=${id} source=log action=APPLY_INCOMING by=${userId} table=${conflict.table_name}.${conflict.field_name} kind=dual_completion (whole completion group)`);
+      if (conflict.table_name === "work_orders") {
+        await runPostResolutionLearning(pool4, conflict.row_uuid);
+      }
+      return getConflict2(id, source);
+    }
+    const identityCol = getIdentityColumn(conflict.table_name) || "id";
+    const fieldNameSnake = toSnakeCase2(conflict.field_name);
+    const currentRow = await pool4.query(
+      `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+      [conflict.row_uuid]
+    );
+    const oldValue = currentRow.rows[0]?.[fieldNameSnake] ?? null;
+    const vesselId = currentRow.rows[0]?.vessel_id ?? null;
+    await pool4.query(
+      `UPDATE "${conflict.table_name}"
+       SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
+       WHERE "${identityCol}" = $2`,
+      [conflict.incoming_new_value, conflict.row_uuid]
+    );
+    const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+    await pool4.query(
+      `INSERT INTO sync_field_log
+        (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
+         changed_by_user_id, instance_id, is_synced, is_sync)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
+      [
+        conflict.table_name,
+        conflict.row_uuid,
+        conflict.field_name,
+        oldValue !== null ? String(oldValue) : null,
+        conflict.incoming_new_value,
+        vesselId,
+        userId,
+        instanceId
+      ]
+    );
+    await pool4.query(
+      `UPDATE sync_conflict_log
+       SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'APPLY_INCOMING'
+       WHERE id = $2`,
+      [userId, id]
+    );
+    syncDiag(`CONFLICT RESOLVED: id=${id} source=log action=APPLY_INCOMING by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
+    return getConflict2(id, source);
+  } else {
+    const conflictResult = await pool4.query(
+      `SELECT * FROM sync_conflicts WHERE id = $1`,
+      [id]
+    );
+    if (conflictResult.rows.length === 0) return null;
+    const conflict = conflictResult.rows[0];
+    if (conflict.resolution !== null) {
+      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    }
+    const identityCol = getIdentityColumn(conflict.table_name) || "id";
+    const fieldNameSnake = toSnakeCase2(conflict.field_name);
+    const currentOldRow = await pool4.query(
+      `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+      [conflict.row_uuid]
+    );
+    const oldValOld = currentOldRow.rows[0]?.[fieldNameSnake] ?? null;
+    const vesselIdOld = currentOldRow.rows[0]?.vessel_id ?? null;
+    await pool4.query(
+      `UPDATE "${conflict.table_name}"
+       SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
+       WHERE "${identityCol}" = $2`,
+      [conflict.ship_value, conflict.row_uuid]
+    );
+    const instanceIdOld = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+    await pool4.query(
+      `INSERT INTO sync_field_log
+        (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
+         changed_by_user_id, instance_id, is_synced, is_sync)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
+      [
+        conflict.table_name,
+        conflict.row_uuid,
+        conflict.field_name,
+        oldValOld !== null ? String(oldValOld) : null,
+        conflict.ship_value,
+        vesselIdOld,
+        userId,
+        instanceIdOld
+      ]
+    );
+    await pool4.query(
+      `UPDATE sync_conflicts
+       SET resolution = 'ship_wins', resolved_value = $1, resolved_at = NOW(), resolved_by = $2
+       WHERE id = $3`,
+      [conflict.ship_value, userId, id]
+    );
+    syncDiag(`CONFLICT RESOLVED: id=${id} source=old action=APPLY_INCOMING(ship_wins) by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
+    return getConflict2(id, source);
+  }
+}
+async function dismissConflict(id, source, userId) {
+  const pool4 = await getPool();
+  if (source === "log") {
+    const conflictResult = await pool4.query(
+      `SELECT * FROM sync_conflict_log WHERE id = $1`,
+      [id]
+    );
+    if (conflictResult.rows.length === 0) return null;
+    const conflict = conflictResult.rows[0];
+    if (conflict.is_resolved) {
+      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    }
+    const isDualDismiss = conflict.conflict_kind === DUAL_COMPLETION_KIND;
+    if (isDualDismiss) {
+      await resolveDualCompletionGroup(pool4, conflict, "current", userId);
+      syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId} kind=dual_completion (whole completion group kept + re-asserted for propagation)`);
+      if (conflict.table_name === "work_orders") {
+        await runPostResolutionLearning(pool4, conflict.row_uuid);
+      }
+      return getConflict2(id, source);
+    }
+    await pool4.query(
+      `UPDATE sync_conflict_log
+       SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'DISMISS'
+       WHERE id = $2`,
+      [userId, id]
+    );
+    syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId}`);
+    return getConflict2(id, source);
+  } else {
+    const conflictResult = await pool4.query(
+      `SELECT * FROM sync_conflicts WHERE id = $1`,
+      [id]
+    );
+    if (conflictResult.rows.length === 0) return null;
+    if (conflictResult.rows[0].resolution !== null) {
+      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    }
+    await pool4.query(
+      `UPDATE sync_conflicts
+       SET resolution = 'dismissed', resolved_value = shore_value, resolved_at = NOW(), resolved_by = $1
+       WHERE id = $2`,
+      [userId, id]
+    );
+    syncDiag(`CONFLICT DISMISSED: id=${id} source=old by=${userId}`);
+    return getConflict2(id, source);
+  }
+}
+async function getConflictTableNames() {
+  const pool4 = await getPool();
+  const result = await pool4.query(`
+    SELECT DISTINCT table_name FROM (
+      SELECT table_name FROM sync_conflict_log WHERE is_resolved = false
+      UNION
+      SELECT table_name FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)
+    ) combined ORDER BY table_name
+  `);
+  return result.rows.map((r) => r.table_name);
+}
+function toSnakeCase2(str) {
+  return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+}
+var init_conflictReviewRepository = __esm({
+  "server/modules/sync/conflictReviewRepository.ts"() {
+    "use strict";
+    init_db();
+    init_syncConfig();
+    init_syncDiagLogger();
+    init_syncRole();
+    init_dualCompletionResolver();
   }
 });
 
@@ -11626,6 +11931,13 @@ async function receivePushData(batchUuid, vesselId, payload) {
           syncDiag("WARNING: SYNC_INSTANCE_ID not set \u2014 per-field stale-skip protection degraded");
           console.error("[Sync Push] CRITICAL: SYNC_INSTANCE_ID env var not configured \u2014 stale-skip guard cannot distinguish receiver-local edits");
         }
+        const { evaluateDualCompletion: evaluateDualCompletion2, collectIncomingWoCompletionDates: collectIncomingWoCompletionDates2 } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
+        const dualCtxPush = {
+          receiverInstanceId,
+          batchUuid,
+          incomingCompletionDateByRow: collectIncomingWoCompletionDates2(insertResult.updateLogs)
+        };
+        const dualConflictWouuids = /* @__PURE__ */ new Set();
         let pushUpdIdx = 0;
         for (const log2 of insertResult.updateLogs) {
           const config = getTableSyncConfig(log2.tableName);
@@ -11640,7 +11952,23 @@ async function receivePushData(batchUuid, vesselId, payload) {
           try {
             const logChangedAt = log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt));
             const isInsertLog = log2.oldValue === null || log2.oldValue === void 0;
-            if (isInsertLog) {
+            const dual = await evaluateDualCompletion2(client, { ...log2, changedAt: logChangedAt }, dualCtxPush);
+            let dualBypassGuards = false;
+            if (dual.remoteResolution) {
+              dualBypassGuards = true;
+            } else if (dual.dualConflict) {
+              dualConflictWouuids.add(log2.rowUuid);
+              if (!dual.applyIncoming) {
+                try {
+                  await client.query(`RELEASE SAVEPOINT ${pushSp}`);
+                } catch {
+                }
+                continue;
+              }
+              dualBypassGuards = true;
+            }
+            if (dualBypassGuards) {
+            } else if (isInsertLog) {
               const guard = await evaluateInsertOriginGuard(client, log2);
               if (guard.skip) {
                 try {
@@ -11936,6 +12264,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
         }
         {
           const { learnFromShipCompletions: learnFromShipCompletions2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+          dualConflictWouuids.forEach((w) => completionWouuids.delete(w));
+          if (completionWouuids.size > 0) {
+            const { findWouuidsWithOpenDualConflicts: findWouuidsWithOpenDualConflicts2 } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
+            const stillOpen = await findWouuidsWithOpenDualConflicts2(client, Array.from(completionWouuids));
+            stillOpen.forEach((w) => completionWouuids.delete(w));
+          }
           if (completionWouuids.size > 0) {
             await learnFromShipCompletions2(client, Array.from(completionWouuids));
             completionWouuids.clear();
@@ -11960,7 +12294,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
       try {
         await client.query("BEGIN");
         await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
-        await learnFromShipCompletions2(client, Array.from(completionWouuids));
+        const { findWouuidsWithOpenDualConflicts: findWouuidsWithOpenDualConflicts2 } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
+        const stillOpen = await findWouuidsWithOpenDualConflicts2(client, Array.from(completionWouuids));
+        stillOpen.forEach((w) => completionWouuids.delete(w));
+        if (completionWouuids.size > 0) {
+          await learnFromShipCompletions2(client, Array.from(completionWouuids));
+        }
         await client.query("COMMIT");
       } catch (learnErr) {
         try {
@@ -17809,6 +18148,12 @@ var init_syncEngine = __esm({
               allErrors.push(...insertResult.errors);
             }
             const failedRowUuids = new Set(insertResult.failedRowUuids || []);
+            const { evaluateDualCompletion: evalDualPull, collectIncomingWoCompletionDates: collectDualDates } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
+            const dualCtxPull = {
+              receiverInstanceId: this.instanceId,
+              batchUuid,
+              incomingCompletionDateByRow: collectDualDates(insertResult.updateLogs)
+            };
             let updateApplied = 0;
             let updateErrors = 0;
             let updSpIdx = 0;
@@ -17819,27 +18164,44 @@ var init_syncEngine = __esm({
               } catch {
               }
               try {
-                const guard = await evaluateInsertOriginGuard(client, log2);
-                if (guard.skip) {
-                  try {
-                    await client.query(`RELEASE SAVEPOINT ${updSp}`);
-                  } catch {
-                  }
-                  continue;
-                }
-                if (log2.oldValue !== null && log2.oldValue !== void 0) {
-                  const stale = await evaluateStaleSkipGuard(
-                    client,
-                    { ...log2, changedAt: log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt)) },
-                    this.instanceId,
-                    { batchUuid }
-                  );
-                  if (stale.skip) {
+                const logChangedAtPull = log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt));
+                const dual = await evalDualPull(client, { ...log2, changedAt: logChangedAtPull }, dualCtxPull);
+                let dualBypassGuardsPull = false;
+                if (dual.remoteResolution) {
+                  dualBypassGuardsPull = true;
+                } else if (dual.dualConflict) {
+                  if (!dual.applyIncoming) {
                     try {
                       await client.query(`RELEASE SAVEPOINT ${updSp}`);
                     } catch {
                     }
                     continue;
+                  }
+                  dualBypassGuardsPull = true;
+                }
+                if (!dualBypassGuardsPull) {
+                  const guard = await evaluateInsertOriginGuard(client, log2);
+                  if (guard.skip) {
+                    try {
+                      await client.query(`RELEASE SAVEPOINT ${updSp}`);
+                    } catch {
+                    }
+                    continue;
+                  }
+                  if (log2.oldValue !== null && log2.oldValue !== void 0) {
+                    const stale = await evaluateStaleSkipGuard(
+                      client,
+                      { ...log2, changedAt: logChangedAtPull },
+                      this.instanceId,
+                      { batchUuid }
+                    );
+                    if (stale.skip) {
+                      try {
+                        await client.query(`RELEASE SAVEPOINT ${updSp}`);
+                      } catch {
+                      }
+                      continue;
+                    }
                   }
                 }
                 await this.applyFieldLog(log2, client);
@@ -39923,8 +40285,11 @@ var shipskartReconcilerService_exports = {};
 __export(shipskartReconcilerService_exports, {
   clearJitAttempts: () => clearJitAttempts,
   deleteVesselUserMapping: () => deleteVesselUserMapping,
+  diagnoseUserBlock: () => diagnoseUserBlock,
   ensureUserPushed: () => ensureUserPushed,
   findRemoteVesselByImo: () => findRemoteVesselByImo,
+  getLastReconcile: () => getLastReconcile,
+  isReconcileRunning: () => isReconcileRunning,
   mapUserToVessel: () => mapUserToVessel,
   pushUser: () => pushUser,
   pushVessel: () => pushVessel,
@@ -40047,6 +40412,51 @@ async function syncRoleIfDrifted(link, sailRole) {
   const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
   await upsertUserLink(link.userUuid, { pushStatus: "pushed", lastError: `role update failed: ${error}` });
   return { status: "role_update_failed", error };
+}
+async function diagnoseUserBlock(userUuid, sailRole) {
+  try {
+    const db2 = await getDb();
+    const rows = await db2.select({
+      id: masterUsers.id,
+      email: masterUsers.email,
+      role: masterUsers.role,
+      fullName: masterUsers.fullName
+    }).from(masterUsers).where(eq32(masterUsers.id, userUuid)).limit(1);
+    const mu = rows[0];
+    if (!mu) {
+      return {
+        reasonCode: "no_master_row",
+        reason: `no master_users row for ${userUuid}`,
+        facts: { sailRole }
+      };
+    }
+    const facts = { fullName: mu.fullName ?? null, sailRole: sailRole || mu.role || null };
+    if (!mu.email) {
+      return { reasonCode: "missing_email", reason: "master_users row has no email \u2014 Shipskart requires one", facts };
+    }
+    const effectiveRole = facts.sailRole;
+    const mapping = effectiveRole ? await getMappingForSailRole(effectiveRole) : void 0;
+    if (!mapping) {
+      return {
+        reasonCode: "unmapped_role",
+        reason: `SAIL role '${effectiveRole ?? ""}' has no shipskart_role_mappings row`,
+        facts
+      };
+    }
+    facts.shipskartRole = mapping.shipskartRole;
+    const roleId = await resolveShipskartRoleId(mapping.shipskartRole);
+    if (!roleId) {
+      return {
+        reasonCode: "unmapped_role",
+        reason: `mapped Shipskart role '${mapping.shipskartRole}' has no live roleId on this tenant`,
+        facts
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[Shipskart] block diagnosis failed for ${userUuid}: ${err?.message || err}`);
+    return null;
+  }
 }
 async function pushUser(mu) {
   const existing = await getUserLink(mu.id);
@@ -40247,7 +40657,29 @@ async function ensureUserPushed(userUuid, sailRole) {
   }
   return { pushed: true, reason: "pushed_jit", mappings };
 }
+function isReconcileRunning() {
+  return reconcileInFlight;
+}
+function getLastReconcile() {
+  return lastReconcile;
+}
 async function runReconciliation(opts = {}) {
+  if (reconcileInFlight) {
+    return { ran: false, reason: "a reconciliation pass is already running", vessels: {}, users: {}, mappings: {} };
+  }
+  reconcileInFlight = true;
+  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  try {
+    const result = await runReconciliationInner(opts);
+    result.startedAt = startedAt;
+    result.finishedAt = (/* @__PURE__ */ new Date()).toISOString();
+    lastReconcile = result;
+    return result;
+  } finally {
+    reconcileInFlight = false;
+  }
+}
+async function runReconciliationInner(opts = {}) {
   const limit = Math.max(1, Math.min(200, opts.limit ?? DEFAULT_BATCH_LIMIT));
   const summary = { ran: false, vessels: {}, users: {}, mappings: {} };
   if (await isShipInstance()) {
@@ -40320,7 +40752,7 @@ async function runReconciliation(opts = {}) {
   console.log(`[Shipskart b2b] reconciliation pass: vessels=${JSON.stringify(summary.vessels)} users=${JSON.stringify(summary.users)} mappings=${JSON.stringify(summary.mappings)}`);
   return summary;
 }
-var DEFAULT_BATCH_LIMIT, B2B_PACE_MS, paceB2b, API_HIT_STATUSES, VESSEL_API_HIT_STATUSES, tally, isDuplicate400, JIT_MAX_ATTEMPTS, jitAttempts;
+var DEFAULT_BATCH_LIMIT, B2B_PACE_MS, paceB2b, API_HIT_STATUSES, VESSEL_API_HIT_STATUSES, tally, isDuplicate400, JIT_MAX_ATTEMPTS, jitAttempts, reconcileInFlight, lastReconcile;
 var init_shipskartReconcilerService = __esm({
   "server/modules/shipskart/services/shipskartReconcilerService.ts"() {
     "use strict";
@@ -40344,6 +40776,8 @@ var init_shipskartReconcilerService = __esm({
     isDuplicate400 = (res) => res.status === 400 && /already in use|already exists|duplicate/i.test(JSON.stringify(res.json ?? ""));
     JIT_MAX_ATTEMPTS = 3;
     jitAttempts = /* @__PURE__ */ new Map();
+    reconcileInFlight = false;
+    lastReconcile = null;
   }
 });
 
@@ -82400,10 +82834,19 @@ var ShipskartRoleNotMappedError = class extends Error {
   }
 };
 var ShipskartUserNotProvisionedError = class extends Error {
-  constructor(userUuid, reason) {
+  /**
+   * `reason` is the raw diagnostic (also written to shipskart_user_links.last_error).
+   * `reasonCode` is the MACHINE key the controller turns into a plain-English explanation
+   * and the exact remedy — so a blocked user, and the support person reading over their
+   * shoulder, are told what is wrong and who fixes it instead of "not available yet".
+   */
+  constructor(userUuid, reason, reasonCode = "unknown", sailRole = null, facts = {}) {
     super(`Shipskart account not provisioned for user ${userUuid}: ${reason}`);
     this.userUuid = userUuid;
     this.reason = reason;
+    this.reasonCode = reasonCode;
+    this.sailRole = sailRole;
+    this.facts = facts;
     this.name = "ShipskartUserNotProvisionedError";
   }
 };
@@ -82547,7 +82990,29 @@ async function resolveExternalUserId(userRole, userUuid) {
           console.warn(`[Shipskart] could not record the block reason for ${userUuid}: ${writeErr?.message || writeErr}`);
         }
       }
-      throw new ShipskartUserNotProvisionedError(userUuid, reason);
+      let reasonCode = link?.pushStatus && link.pushStatus !== "pending" ? link.pushStatus : lookupError ? "lookup_failed" : "jit_failed";
+      let reasonText = reason;
+      let facts = { sailRole: userRole || null };
+      if (reasonCode === "jit_failed" || reasonCode === "error") {
+        try {
+          const { diagnoseUserBlock: diagnoseUserBlock2 } = await Promise.resolve().then(() => (init_shipskartReconcilerService(), shipskartReconcilerService_exports));
+          const dx = await diagnoseUserBlock2(userUuid, userRole || null);
+          if (dx) {
+            reasonCode = dx.reasonCode;
+            reasonText = dx.reason;
+            facts = dx.facts;
+          }
+        } catch {
+        }
+      }
+      if (!facts.shipskartRole && reasonCode === "unmapped_role") {
+        try {
+          const m = userRole ? await getMappingForSailRole(userRole) : void 0;
+          if (m) facts.shipskartRole = m.shipskartRole;
+        } catch {
+        }
+      }
+      throw new ShipskartUserNotProvisionedError(userUuid, reasonText, reasonCode, userRole || null, facts);
     }
   } else if (!LEGACY_SHARED_ACCOUNT_ENABLED) {
     console.warn(
@@ -82619,6 +83084,67 @@ async function logoutSso(userRole, userUuid) {
 }
 
 // server/modules/shipskart/controllers/shipskartSsoController.ts
+function explainBlock(reasonCode, sailRole, rawReason, facts = {}) {
+  const role = sailRole ? `\u201C${sailRole}\u201D` : "your role";
+  const who = facts.fullName ? ` (${facts.fullName})` : "";
+  const skRole = facts.shipskartRole ? `\u201C${facts.shipskartRole}\u201D` : null;
+  switch (reasonCode) {
+    case "unmapped_role":
+      return /has no live roleId/i.test(rawReason) ? {
+        title: "Purchasing access is being set up for your role",
+        detail: `Your role ${role} is linked to the purchasing role ${skRole ?? "(not recorded)"}, which no longer exists on the supplier's system \u2014 so we cannot open Purchasing for you yet. This usually happens after the supplier renames a role.`,
+        whatHappensNext: `An administrator needs to open Access Control and re-select the purchasing role for ${role}, then save. Once that is done, simply open Purchasing again \u2014 there is no need to log out.`,
+        retry: "click"
+      } : {
+        title: "Purchasing access is not set up for your role yet",
+        detail: `Your role ${role} has not yet been linked to a purchasing role. This is a one-time setup step and it has not been done for this role.`,
+        whatHappensNext: `An administrator can link ${role} to a purchasing role in Access Control. Once linked, simply open Purchasing again \u2014 there is no need to log out.`,
+        retry: "click"
+      };
+    case "missing_email":
+      return {
+        title: "An email address is needed for your account",
+        detail: `The purchasing system requires an email address to create your account, and there is no email recorded against your user profile${who}.`,
+        whatHappensNext: "Once your email address is added to your user profile and the user details are refreshed, open Purchasing again and your account will be created automatically.",
+        retry: "sync"
+      };
+    case "no_master_row":
+      return {
+        title: "Your user profile has not reached this system yet",
+        detail: "Your account exists, but its details have not yet been received by this system, so a purchasing account cannot be created for you.",
+        whatHappensNext: "An administrator needs to refresh the user details. After that, open Purchasing again.",
+        retry: "sync"
+      };
+    case "blocked_duplicate":
+      return {
+        title: "An account already exists with your email address",
+        detail: "The purchasing system already has an account registered against your email address, so a second one cannot be created. This has to be resolved with the supplier.",
+        whatHappensNext: "This one cannot be fixed from within the application \u2014 please contact support and they will raise it with the supplier.",
+        retry: "support"
+      };
+    case "identity_not_configured":
+      return {
+        title: "Purchasing is not fully configured on this installation",
+        detail: "Purchasing needs to know which user is signed in, and this installation is not providing that information. This is a configuration matter, not a problem with your account.",
+        whatHappensNext: "Please contact support \u2014 this needs to be enabled by the technical team.",
+        retry: "support"
+      };
+    case "lookup_failed":
+      return {
+        title: "We could not reach the purchasing system just now",
+        detail: "Your account looks fine \u2014 we simply could not contact the supplier\u2019s system to check it. This is usually temporary.",
+        whatHappensNext: "Please wait a few minutes and open Purchasing again.",
+        retry: "click"
+      };
+    default:
+      return {
+        title: "Your purchasing account could not be created",
+        detail: "We tried to create your account on the purchasing system and it did not complete. The technical detail is shown below for support.",
+        whatHappensNext: "Please try again in a few minutes. If it keeps happening, contact support and quote the details below.",
+        retry: "click"
+      };
+  }
+}
 async function initiateHandler(req, res) {
   const bodyRole = typeof req.body?.role === "string" ? req.body.role.trim() : "";
   const userRole = bodyRole || req.user?.role || "";
@@ -82633,18 +83159,42 @@ async function initiateHandler(req, res) {
     });
   } catch (err) {
     if (err instanceof ShipskartRoleNotMappedError) {
+      const x = explainBlock("unmapped_role", err.userRole || userRole || null, "no shipskart_role_mappings row", { sailRole: err.userRole || userRole || null });
       return res.status(403).json({
         success: false,
         errorCode: "ROLE_NOT_MAPPED",
-        message: "Purchasing is not available for your role."
+        message: "Purchasing is not available for your role.",
+        // Plain-English explanation + the support reference (see explainBlock).
+        title: x.title,
+        detail: x.detail,
+        whatHappensNext: x.whatHappensNext,
+        retry: x.retry,
+        reasonCode: "unmapped_role",
+        reason: `SAIL role '${err.userRole || userRole || "(none)"}' has no shipskart_role_mappings row`,
+        userRole: err.userRole || userRole || null,
+        userUuid: forwardedUserUuid(req, "sso/initiate") ?? null,
+        occurredAt: (/* @__PURE__ */ new Date()).toISOString()
       });
     }
     if (err instanceof ShipskartUserNotProvisionedError) {
       const identityMissing = err.reason === "identity_not_configured";
+      const code = identityMissing ? "identity_not_configured" : err.reasonCode || "unknown";
+      const x = explainBlock(code, err.sailRole ?? userRole ?? null, err.reason, err.facts ?? {});
       return res.status(409).json({
         success: false,
         errorCode: "USER_NOT_PROVISIONED",
-        message: identityMissing ? "Purchasing is unavailable: user identity is not configured for this deployment. Please contact your administrator." : "Purchasing is not available yet. Please contact your administrator."
+        message: identityMissing ? "Purchasing is unavailable: user identity is not configured for this deployment. Please contact your administrator." : "Purchasing is not available yet. Please contact your administrator.",
+        // Plain-English explanation + the support reference (see explainBlock).
+        title: x.title,
+        detail: x.detail,
+        whatHappensNext: x.whatHappensNext,
+        retry: x.retry,
+        reasonCode: code,
+        reason: err.reason,
+        // the raw diagnostic, also on shipskart_user_links.last_error
+        userRole: err.sailRole ?? userRole ?? null,
+        userUuid: identityMissing ? null : err.userUuid,
+        occurredAt: (/* @__PURE__ */ new Date()).toISOString()
       });
     }
     throw err;
@@ -82830,8 +83380,14 @@ async function putReconcilerConfigHandler(req, res) {
 }
 async function reconcileHandler(req, res) {
   const limit = Number.isInteger(req.body?.limit) ? req.body.limit : void 0;
-  const summary = await runReconciliation({ limit });
-  res.status(summary.ran ? 200 : 409).json(summary);
+  if (isReconcileRunning()) {
+    return res.status(409).json({ started: false, message: "a reconciliation pass is already running" });
+  }
+  runReconciliation({ limit }).then((r) => console.log(`[Shipskart b2b] background reconcile finished: ran=${r.ran}${r.reason ? ` (${r.reason})` : ""} users=${JSON.stringify(r.users)} mappings=${JSON.stringify(r.mappings)}`)).catch((err) => console.error("[Shipskart b2b] background reconcile crashed:", err?.message || err));
+  res.status(202).json({ started: true, note: "running in background \u2014 follow GET /shipskart/b2b/reconcile/status" });
+}
+async function reconcileStatusHandler(_req, res) {
+  res.json({ running: isReconcileRunning(), lastRun: getLastReconcile() });
 }
 async function vesselAssignmentsHandler(req, res) {
   const userUuid = forwardedUserUuid(req, "vessel-assignments");
@@ -82920,6 +83476,7 @@ router24.put("/shipskart/role-mappings", asyncHandler(putRoleMappingsHandler));
 router24.post("/shipskart/b2b/bootstrap", asyncHandler(bootstrapHandler));
 router24.get("/shipskart/b2b/status", asyncHandler(statusHandler2));
 router24.post("/shipskart/b2b/reconcile", asyncHandler(reconcileHandler));
+router24.get("/shipskart/b2b/reconcile/status", asyncHandler(reconcileStatusHandler));
 router24.get("/shipskart/b2b/reconciler-config", asyncHandler(getReconcilerConfigHandler));
 router24.put("/shipskart/b2b/reconciler-config", asyncHandler(putReconcilerConfigHandler));
 router24.post("/shipskart/b2b/retry", asyncHandler(retryHandler));
