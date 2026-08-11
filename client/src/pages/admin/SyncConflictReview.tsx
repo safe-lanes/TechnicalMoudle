@@ -70,6 +70,7 @@ interface EnrichedConflict {
   resolvedAt: string | null;
   resolvedBy: string | null;
   resolvedAction: string | null;
+  conflictKind?: string | null;
 }
 
 interface ConflictListResponse {
@@ -343,6 +344,16 @@ export default function SyncConflictReview() {
                   <Badge variant="secondary" className="text-xs">
                     {conflict.tableDisplayName}
                   </Badge>
+                  {conflict.conflictKind === "dual_completion" && (
+                    <Badge
+                      variant="destructive"
+                      className="text-xs"
+                      title="This work order was completed independently on BOTH the vessel and the office. An interim value is shown on both sides until you choose which completion to keep — your choice will sync to the other side."
+                      data-testid={`badge-dual-completion-${conflict.id}`}
+                    >
+                      Completed on both sides
+                    </Badge>
+                  )}
                   <span
                     className="text-sm font-medium text-gray-800 truncate max-w-[400px]"
                     title={conflict.recordDisplay}
