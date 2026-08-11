@@ -19,7 +19,10 @@ router.put('/shipskart/role-mappings', asyncHandler(shipskartRoleMappingControll
 // bootstrap = the ~90-day manual token step (OTP by email; UAT static OTP via env).
 router.post('/shipskart/b2b/bootstrap', asyncHandler(shipskartB2bController.bootstrapHandler));
 router.get('/shipskart/b2b/status', asyncHandler(shipskartB2bController.statusHandler));
+// Manual reconcile. Static '/reconcile/status' is registered BEFORE nothing else here, but
+// keep them adjacent so a future ':id' route cannot be slipped in between and shadow it.
 router.post('/shipskart/b2b/reconcile', asyncHandler(shipskartB2bController.reconcileHandler));
+router.get('/shipskart/b2b/reconcile/status', asyncHandler(shipskartB2bController.reconcileStatusHandler));
 router.get('/shipskart/b2b/reconciler-config', asyncHandler(shipskartB2bController.getReconcilerConfigHandler));
 router.put('/shipskart/b2b/reconciler-config', asyncHandler(shipskartB2bController.putReconcilerConfigHandler));
 router.post('/shipskart/b2b/retry', asyncHandler(shipskartB2bController.retryHandler));

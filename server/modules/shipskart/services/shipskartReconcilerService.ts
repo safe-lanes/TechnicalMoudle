@@ -130,20 +130,25 @@ export async function pushVessel(v: {
   vuuid: string; name: string; imoNumber: string | null; vesselType?: string | null;
 }): Promise<PushResult> {
   const existing = await b2bRepo.getVesselLink(v.vuuid);
-  if (!v.imoNumber || !/^\d{7}$/.test(v.imoNumber)) {
-    await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber ?? null, pushStatus: 'invalid_imo', lastError: `IMO must be exactly 7 digits, got '${v.imoNumber ?? ''}'` });
+  // BLANK IS THE ONLY BAR (07-Aug, Ghazi). This used to demand exactly 7 digits, which
+  // blocked vessels whose recorded IMO is legitimately not in that shape. The IMO is still
+  // the matching key, so an empty one is refused — there would be nothing to match on — but
+  // any non-empty value is accepted as-is and looked up verbatim.
+  const imo = (v.imoNumber ?? '').trim();
+  if (!imo) {
+    await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: null, pushStatus: 'invalid_imo', lastError: 'IMO number is blank — it is the key we match on, so fill it in the vessel record' });
     return { status: 'invalid_imo' };
   }
 
   // Ask their side FIRST — a lookup failure aborts (never mistaken for "absent").
   let remote: { id: string; name: string; imo: string } | null;
   try {
-    remote = await findRemoteVesselByImo(v.imoNumber);
+    remote = await findRemoteVesselByImo(imo);
   } catch (err: any) {
     // Keep whatever status the row already had — a lookup outage must not downgrade a
     // healthy 'pushed' link; only the error text is refreshed so the console shows why.
     await b2bRepo.upsertVesselLink(v.vuuid, {
-      imoNumber: v.imoNumber,
+      imoNumber: imo,
       pushStatus: existing?.pushStatus ?? 'pending',
       shipskartVesselId: existing?.shipskartVesselId ?? null,
       lastError: String(err?.message || err).slice(0, 400),
@@ -154,7 +159,7 @@ export async function pushVessel(v: {
   if (remote) {
     const nameDiffers = remote.name.trim().toLowerCase() !== v.name.trim().toLowerCase();
     const warning = nameDiffers
-      ? `NAME-MISMATCH: IMO ${v.imoNumber} is '${remote.name}' on Shipskart, '${v.name}' here — linked on IMO, review the names`
+      ? `NAME-MISMATCH: IMO ${imo} is '${remote.name}' on Shipskart, '${v.name}' here — linked on IMO, review the names`
       : null;
     if (warning) console.warn(`[Shipskart b2b] ${warning}`);
     if (existing?.pushStatus === 'pushed' && existing.shipskartVesselId === remote.id) {
@@ -165,7 +170,7 @@ export async function pushVessel(v: {
       console.warn(`[Shipskart b2b] vessel ${v.name}: stored id ${existing!.shipskartVesselId} is stale — repointing to ${remote.id}`);
     }
     await b2bRepo.upsertVesselLink(v.vuuid, {
-      imoNumber: v.imoNumber, shipskartVesselId: remote.id, pushStatus: 'pushed', lastError: warning,
+      imoNumber: imo, shipskartVesselId: remote.id, pushStatus: 'pushed', lastError: warning,
     });
     return { status, shipskartId: remote.id };
   }
@@ -173,15 +178,15 @@ export async function pushVessel(v: {
   // Genuinely absent on their side. A link that still claims 'pushed' means the remote row
   // was deleted (exactly what happened to the users on 06-Aug) — fall through and re-create.
   if (existing?.pushStatus === 'pushed' && existing.shipskartVesselId) {
-    console.warn(`[Shipskart b2b] vessel ${v.name}: link says pushed (${existing.shipskartVesselId}) but IMO ${v.imoNumber} is absent on Shipskart — recreating`);
+    console.warn(`[Shipskart b2b] vessel ${v.name}: link says pushed (${existing.shipskartVesselId}) but IMO ${imo} is absent on Shipskart — recreating`);
   }
   const vesselEndpoint = process.env.SHIPSKART_B2B_VESSEL_ENDPOINT || '/integration/SAIL/create-vessel-new';
   const cfg = getB2bConfig();
   const res = await authorizedB2bRequest('POST', vesselEndpoint, {
     body: { data: {
       name: v.name,
-      imoNumber: v.imoNumber,
-      callSign: resolveCallSign(v),
+      imoNumber: imo,
+      callSign: resolveCallSign({ imoNumber: imo }),
       type: resolveVesselTypeCode(v.vesselType ?? null),
       operationalStatus: '1',
       // smcId IS required in practice: create accepts its omission, but map-user-to-vessel
@@ -195,12 +200,12 @@ export async function pushVessel(v: {
   });
   const shipskartId = res.json?.data?.id;
   if (res.ok && shipskartId) {
-    await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber, shipskartVesselId: shipskartId, pushStatus: 'pushed', lastError: null });
+    await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: imo, shipskartVesselId: shipskartId, pushStatus: 'pushed', lastError: null });
     return { status: 'pushed', shipskartId };
   }
   const status = isDuplicate400(res) ? 'blocked_duplicate' : 'error';
   const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
-  await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: v.imoNumber, pushStatus: status, lastError: error });
+  await b2bRepo.upsertVesselLink(v.vuuid, { imoNumber: imo, pushStatus: status, lastError: error });
   return { status, error };
 }
 
@@ -242,6 +247,75 @@ async function syncRoleIfDrifted(
   // error is recorded and the next sweep retries because the stamp was not written.
   await b2bRepo.upsertUserLink(link.userUuid, { pushStatus: 'pushed', lastError: `role update failed: ${error}` });
   return { status: 'role_update_failed', error };
+}
+
+/**
+ * WHY IS THIS USER BLOCKED — determined by INSPECTION, not by whatever status happened to be
+ * recorded (Ghazi, 2026-08-10).
+ *
+ * The refusal screen used to fall back to "your purchasing account could not be created" —
+ * true, and useless: it did not say whether an email was missing or a role was unmapped, so
+ * neither the user nor support could act. That happens whenever no push was attempted (JIT
+ * disabled, or the very first click), because then no specific status was ever written.
+ *
+ * This runs pushUser's OWN preconditions, in pushUser's order, WITHOUT calling Shipskart —
+ * two local queries plus one cached role lookup — so the screen can name the actual cause.
+ * Returns null when every precondition passes, i.e. the cause is genuinely something else
+ * (network, upstream rejection) and the recorded status is the better answer.
+ */
+export interface BlockFacts {
+  /** The person's name as we hold it, so the screen can say WHOSE profile is short. */
+  fullName?: string | null;
+  /** Their SAIL role — the thing an admin maps. */
+  sailRole?: string | null;
+  /** The purchasing role their SAIL role points at (named when that link is the problem). */
+  shipskartRole?: string | null;
+}
+
+export async function diagnoseUserBlock(
+  userUuid: string,
+  sailRole: string | null,
+): Promise<{ reasonCode: string; reason: string; facts: BlockFacts } | null> {
+  try {
+    const db = await getDb();
+    const rows = await db.select({
+      id: masterUsers.id, email: masterUsers.email, role: masterUsers.role, fullName: masterUsers.fullName,
+    }).from(masterUsers).where(eq(masterUsers.id, userUuid)).limit(1);
+    const mu = rows[0];
+    if (!mu) {
+      return {
+        reasonCode: 'no_master_row',
+        reason: `no master_users row for ${userUuid}`,
+        facts: { sailRole },
+      };
+    }
+    const facts: BlockFacts = { fullName: mu.fullName ?? null, sailRole: sailRole || mu.role || null };
+    if (!mu.email) {
+      return { reasonCode: 'missing_email', reason: 'master_users row has no email — Shipskart requires one', facts };
+    }
+    const effectiveRole = facts.sailRole;
+    const mapping = effectiveRole ? await roleMappingRepo.getMappingForSailRole(effectiveRole) : undefined;
+    if (!mapping) {
+      return {
+        reasonCode: 'unmapped_role',
+        reason: `SAIL role '${effectiveRole ?? ''}' has no shipskart_role_mappings row`,
+        facts,
+      };
+    }
+    facts.shipskartRole = mapping.shipskartRole;
+    const roleId = await resolveShipskartRoleId(mapping.shipskartRole);
+    if (!roleId) {
+      return {
+        reasonCode: 'unmapped_role',
+        reason: `mapped Shipskart role '${mapping.shipskartRole}' has no live roleId on this tenant`,
+        facts,
+      };
+    }
+    return null; // preconditions all fine — the recorded status is the better explanation
+  } catch (err: any) {
+    console.warn(`[Shipskart] block diagnosis failed for ${userUuid}: ${err?.message || err}`);
+    return null;
+  }
 }
 
 export async function pushUser(mu: {
@@ -448,6 +522,16 @@ export function clearJitAttempts(userUuid: string): void { jitAttempts.delete(us
 export interface JitResult { pushed: boolean; reason: string; mappings?: Record<string, number> }
 
 export async function ensureUserPushed(userUuid: string, sailRole: string | null): Promise<JitResult> {
+  // SHORE-ONLY, like every other Shipskart write path (runReconciliation, runVesselSync and
+  // the catalogue push all carry the same guard). This one was missing, which mattered less
+  // while the caller only reached here on a user's FIRST click — from 2026-08-10 it runs on
+  // EVERY click, so a ship that somehow held b2b credentials would create users and rewrite
+  // vessel mappings on the live tenant continuously. SHIPSKART_B2B_JIT=false was the only
+  // protection; this makes it structural. An already-linked user is unaffected: the caller
+  // reads the link row itself and still lets them into Purchasing.
+  if (await isShipInstance()) {
+    return { pushed: false, reason: 'ship instance — Shipskart is shore-only' };
+  }
   const existing = await b2bRepo.getUserLink(userUuid);
   if (existing?.pushStatus === 'pushed' && existing.shipskartUserId) {
     // Role-drift self-heal at click time: free local comparison when nothing changed;
@@ -532,13 +616,53 @@ export interface ReconcileSummary {
   vessels: Record<string, number>;
   users: Record<string, number>;
   mappings: Record<string, number>;
+  startedAt?: string;
+  finishedAt?: string;
 }
+
+/**
+ * SINGLE-FLIGHT + LAST-RUN STATE, so the admin "Run now" button can start a pass in the
+ * BACKGROUND and poll for the outcome.
+ *
+ * WHY BACKGROUND: a pass is paced at 5s per API hit across five categories with a batch
+ * limit of 25 each, so a busy pass runs for minutes. Answering it synchronously is exactly
+ * what gave the vessel-sync button a 504 on 07-Aug — the browser gave up while the server
+ * carried on. Same shape, same fix.
+ *
+ * The guard is INSIDE runReconciliation, not in the button, so the hourly scheduler and a
+ * manual press can never overlap on the same rate-limited API.
+ */
+let reconcileInFlight = false;
+let lastReconcile: ReconcileSummary | null = null;
+export function isReconcileRunning(): boolean { return reconcileInFlight; }
+export function getLastReconcile(): ReconcileSummary | null { return lastReconcile; }
 
 /**
  * One bounded reconciliation pass. Never throws mid-sweep — every per-record failure is
  * recorded on its link row and counted in the summary.
  */
 export async function runReconciliation(opts: { limit?: number } = {}): Promise<ReconcileSummary> {
+  // Claim the flag BEFORE the first await: the handler answers 202 immediately and the page
+  // refetches at once; setting it after an await would let that refetch read running:false,
+  // polling would never start, and the card would sit dead for the whole run (the exact bug
+  // found in browser testing on the vessel-sync card, 06-Aug).
+  if (reconcileInFlight) {
+    return { ran: false, reason: 'a reconciliation pass is already running', vessels: {}, users: {}, mappings: {} };
+  }
+  reconcileInFlight = true;
+  const startedAt = new Date().toISOString();
+  try {
+    const result = await runReconciliationInner(opts);
+    result.startedAt = startedAt;
+    result.finishedAt = new Date().toISOString();
+    lastReconcile = result;
+    return result;
+  } finally {
+    reconcileInFlight = false;
+  }
+}
+
+async function runReconciliationInner(opts: { limit?: number } = {}): Promise<ReconcileSummary> {
   const limit = Math.max(1, Math.min(200, opts.limit ?? DEFAULT_BATCH_LIMIT));
   const summary: ReconcileSummary = { ran: false, vessels: {}, users: {}, mappings: {} };
 

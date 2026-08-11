@@ -217,8 +217,35 @@ function toActiveIdentity(
  * The sessionStorage guard keeps it to one call per load (both the mount-hydration and
  * the explicit login path call it). The user uuid is taken server-side from the
  * x-user-id header — deliberately not sent in the body.
+ *
+ * ⚠️ THE GUARD MUST BE CLEARED ON LOGOUT — see clearVesselCaptureGuard below.
  */
 const VESSEL_CAPTURE_GUARD = "pms.vesselAssignmentsPosted";
+
+/**
+ * Drop the once-per-session capture guard so the NEXT login re-posts the vessel list.
+ *
+ * WHY (bug found 2026-08-10): the guard lives in sessionStorage, which is scoped to the
+ * browser TAB and survives BOTH a logout and a hard refresh — only closing the tab ends
+ * it. `logout()` calls secureClear(), which touches localStorage only, and nothing else
+ * in the client cleared sessionStorage. So a same-tab logout→login skipped the POST
+ * entirely: a vessel reassignment made between the two logins never reached
+ * `master_user_vessels`, and therefore never reached Shipskart. The only cure was to
+ * close the browser, which no operator would ever guess.
+ *
+ * Clears EVERY user's guard, not just the current one: at logout the uuid may already be
+ * gone, and a shared machine can carry stale keys for whoever used the tab before.
+ */
+function clearVesselCaptureGuard(): void {
+  try {
+    // Object.keys returns a snapshot, so removing while iterating is safe.
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith(`${VESSEL_CAPTURE_GUARD}:`)) sessionStorage.removeItem(key);
+    }
+  } catch {
+    // private-mode / storage-disabled: there was no guard to clear either.
+  }
+}
 
 function captureVesselAssignments(assignments: MyVesselAssignment[], userUuid: string | null | undefined): void {
   if (!userUuid) return; // no forwarded identity → the server would reject it anyway
@@ -445,6 +472,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Wipe all auth-related localStorage so a reload cannot re-hydrate the
     // previous user (otherwise AuthContext's mount effect re-authenticates).
     secureClear();
+    // secureClear() is localStorage-only, and the capture guard lives in sessionStorage —
+    // which survives logout. Without this the next login in the SAME TAB skips the vessel
+    // capture, so an assignment changed between the two logins never reaches the server.
+    clearVesselCaptureGuard();
 
     setCurrentUser(null);
     setMyVessels([]);

@@ -73,7 +73,21 @@ export class ShipskartRoleNotMappedError extends Error {
  * requisitions to another and make the audit trail meaningless.
  */
 export class ShipskartUserNotProvisionedError extends Error {
-  constructor(public readonly userUuid: string, public readonly reason: string) {
+  /**
+   * `reason` is the raw diagnostic (also written to shipskart_user_links.last_error).
+   * `reasonCode` is the MACHINE key the controller turns into a plain-English explanation
+   * and the exact remedy — so a blocked user, and the support person reading over their
+   * shoulder, are told what is wrong and who fixes it instead of "not available yet".
+   */
+  constructor(
+    public readonly userUuid: string,
+    public readonly reason: string,
+    public readonly reasonCode: string = 'unknown',
+    public readonly sailRole: string | null = null,
+    /** Concrete values behind the block (whose profile, which role, which purchasing role)
+     *  so the screen can NAME them instead of describing a category. */
+    public readonly facts: { fullName?: string | null; sailRole?: string | null; shipskartRole?: string | null } = {},
+  ) {
     super(`Shipskart account not provisioned for user ${userUuid}: ${reason}`);
     this.name = 'ShipskartUserNotProvisionedError';
   }
@@ -274,19 +288,38 @@ export async function resolveExternalUserId(userRole: string, userUuid?: string 
       link = undefined;
     }
 
-    // JIT: not pushed yet → try once, here and now, so new joiners / role changes / users
-    // the reconciler has not reached resolve on their FIRST click (no cutover day).
+    // Settle this user's Shipskart state on EVERY click, not only their first one.
+    //   • not enrolled yet → enrol now, so new joiners / role changes / users the
+    //     reconciler has not reached resolve on their FIRST click (no cutover day);
+    //   • already enrolled → repair role drift and settle the vessel assignments that
+    //     capture-at-login recorded (crew rotation).
     // Opt-out via SHIPSKART_B2B_JIT=false.
+    //
+    // 🔴 BUG FIXED 2026-08-10 — this block was gated on `link?.pushStatus !== 'pushed'`.
+    // ensureUserPushed is the ONLY caller of settleAssignmentChanges on the click path, so
+    // that condition meant it ran solely for users who were NOT yet enrolled, and the
+    // crew-rotation settle added inside it on 06-Aug was unreachable for exactly the users
+    // it was written for. An already-enrolled user's reassignment sat in master_user_vessels
+    // untouched — map_status 'pending' / 'revoked' with NO last_error, because nothing ever
+    // tried. PROVEN on production with nilesh.kumar3 (Gas Mia → Testvessel): repeated clicks
+    // changed nothing; only Admin → Sync Vessels settled it.
+    //
+    // ensureUserPushed branches internally, and BOTH branches are cheap when there is
+    // nothing to do — one DB read plus a local role comparison, no Shipskart calls.
     let jitReason: string | null = null;
-    if (!lookupError && link?.pushStatus !== 'pushed' && (process.env.SHIPSKART_B2B_JIT || '').toLowerCase() !== 'false') {
+    const wasAlreadyPushed = link?.pushStatus === 'pushed';
+    if (!lookupError && (process.env.SHIPSKART_B2B_JIT || '').toLowerCase() !== 'false') {
       try {
         const { ensureUserPushed } = await import('./shipskartReconcilerService');
         const jit = await ensureUserPushed(userUuid, userRole || null);
         jitReason = jit.reason;
-        if (jit.pushed) {
+        // Only re-read when the link may have CHANGED — i.e. this call enrolled them.
+        if (jit.pushed && !wasAlreadyPushed) {
           link = await getUserLink(userUuid);
         }
       } catch (err: any) {
+        // A settle/enrol failure must NEVER block an already-enrolled user from Purchasing:
+        // `link` is untouched here, so the pushed check below still lets them straight in.
         jitReason = `jit threw: ${err?.message || err}`;
       }
     }
@@ -321,7 +354,34 @@ export async function resolveExternalUserId(userRole: string, userUuid?: string 
           console.warn(`[Shipskart] could not record the block reason for ${userUuid}: ${writeErr?.message || writeErr}`);
         }
       }
-      throw new ShipskartUserNotProvisionedError(userUuid, reason);
+      // The link row's own status IS the machine reason wherever a SPECIFIC one was recorded
+      // (unmapped_role / missing_email / blocked_duplicate / no_master_row).
+      let reasonCode = link?.pushStatus && link.pushStatus !== 'pending'
+        ? link.pushStatus
+        : (lookupError ? 'lookup_failed' : 'jit_failed');
+      let reasonText = reason;
+      let facts: { fullName?: string | null; sailRole?: string | null; shipskartRole?: string | null } = { sailRole: userRole || null };
+
+      // ...but jit_failed / error / pending say only "it did not work", which is useless on
+      // the screen: the user cannot tell a missing email from an unmapped role, and neither
+      // can support. It is also exactly what a first click or a JIT-disabled instance
+      // produces. So INSPECT the preconditions and name the real cause (no Shipskart call).
+      if (reasonCode === 'jit_failed' || reasonCode === 'error') {
+        try {
+          const { diagnoseUserBlock } = await import('./shipskartReconcilerService');
+          const dx = await diagnoseUserBlock(userUuid, userRole || null);
+          if (dx) { reasonCode = dx.reasonCode; reasonText = dx.reason; facts = dx.facts; }
+        } catch { /* diagnosis is best-effort — keep the recorded status */ }
+      }
+      // Even when the recorded status was already specific, fetch the names behind it so the
+      // screen can say WHICH purchasing role is dead rather than "a purchasing role".
+      if (!facts.shipskartRole && reasonCode === 'unmapped_role') {
+        try {
+          const m = userRole ? await roleMappingRepo.getMappingForSailRole(userRole) : undefined;
+          if (m) facts.shipskartRole = m.shipskartRole;
+        } catch { /* best-effort */ }
+      }
+      throw new ShipskartUserNotProvisionedError(userUuid, reasonText, reasonCode, userRole || null, facts);
     }
     // No role mapping at all → the existing ROLE_NOT_MAPPED path below (null return).
   } else if (!LEGACY_SHARED_ACCOUNT_ENABLED) {

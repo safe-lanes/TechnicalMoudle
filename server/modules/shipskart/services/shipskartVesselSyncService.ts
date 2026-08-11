@@ -85,12 +85,14 @@ export async function runVesselSync(opts: { preview?: boolean } = {}): Promise<V
   // refetches at once; if the flag were set after an await, that refetch would read
   // running:false, polling (which only starts while running) would never begin, and the page
   // would sit dead for the whole run — seen in browser testing 06-Aug.
-  if (!preview) {
-    if (inFlight) { res.errors.push('a vessel sync is already running'); return res; }
-    inFlight = true;
-  }
+  // PREVIEW COUNTS TOO (07-Aug): it is paced at 5s per vessel exactly like a real run, so on
+  // a real fleet it outlasts any gateway timeout — the browser got a 504 while the work
+  // carried on server-side. It is therefore a background job as well, and two of these must
+  // never overlap on the same rate-limited API.
+  if (inFlight) { res.errors.push('a vessel sync is already running'); return res; }
+  inFlight = true;
   if (await isShipInstance()) {
-    if (!preview) inFlight = false;
+    inFlight = false;
     res.errors.push('refused: Shipskart sync is shore-only');
     return res;
   }
@@ -101,16 +103,20 @@ export async function runVesselSync(opts: { preview?: boolean } = {}): Promise<V
     for (const v of vessels) {
       const row: VesselSyncRow = { vesselId: v.vuuid, name: v.name, imo: v.imoNumber, outcome: 'pending' };
 
-      if (!v.imoNumber || !/^\d{7}$/.test(v.imoNumber)) {
+      // Blank is the only bar (07-Aug): the IMO is the key we match Shipskart on, so an
+      // empty one has nothing to match — any other value is accepted and used verbatim.
+      const imo = (v.imoNumber ?? '').trim();
+      if (!imo) {
         row.outcome = 'invalid_imo';
-        row.detail = `IMO must be exactly 7 digits, got '${v.imoNumber ?? ''}' — fix it in the vessel record, it cannot be looked up or created`;
+        row.detail = 'IMO number is blank — it is the key we match on, so fill it in the vessel record';
         res.rows.push(row); tally(row.outcome); continue;
       }
+      row.imo = imo;
 
       if (preview) {
         // Read-only: one lookup, no writes, no creates.
         try {
-          const remote = await findRemoteVesselByImo(v.imoNumber);
+          const remote = await findRemoteVesselByImo(imo);
           const link = await b2bRepo.getVesselLink(v.vuuid);
           if (!remote) {
             row.outcome = 'would_create';
@@ -135,7 +141,7 @@ export async function runVesselSync(opts: { preview?: boolean } = {}): Promise<V
       }
 
       // ── run ──
-      const r = await pushVessel({ vuuid: v.vuuid, name: v.name, imoNumber: v.imoNumber, vesselType: v.vesselType });
+      const r = await pushVessel({ vuuid: v.vuuid, name: v.name, imoNumber: imo, vesselType: v.vesselType });
       row.outcome = r.status;
       row.shipskartVesselId = r.shipskartId ?? null;
       if (r.error) row.detail = String(r.error).slice(0, 300);
@@ -156,7 +162,7 @@ export async function runVesselSync(opts: { preview?: boolean } = {}): Promise<V
   } catch (err: any) {
     res.errors.push(String(err?.message || err));
   } finally {
-    if (!preview) inFlight = false;
+    inFlight = false;
     res.finishedAt = new Date().toISOString();
     lastRun = res;
     console.log(`[VesselSync] ${preview ? 'PREVIEW' : 'RUN'} finished: ${JSON.stringify(res.totals)} errors=${res.errors.length}`);

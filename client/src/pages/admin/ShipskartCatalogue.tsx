@@ -129,19 +129,22 @@ export default function ShipskartCatalogue() {
             role changes and vessel assignments follow automatically. When OFF, nothing is ever pushed automatically.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center gap-3">
-          <Switch
-            checked={reconcilerQuery.data?.reconcilerEnabled ?? false}
-            disabled={reconcilerQuery.isLoading || reconcilerMutation.isPending}
-            onCheckedChange={(next) => (next ? setConfirmEnable(true) : reconcilerMutation.mutate(false))}
-            data-testid="switch-reconciler-enabled"
-          />
-          <span className="text-sm">
-            {reconcilerQuery.isLoading ? "Loading…"
-              : reconcilerQuery.data?.reconcilerEnabled
-                ? <Badge className="bg-green-600">ON — syncing automatically</Badge>
-                : <Badge variant="secondary">OFF — manual control</Badge>}
-          </span>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={reconcilerQuery.data?.reconcilerEnabled ?? false}
+              disabled={reconcilerQuery.isLoading || reconcilerMutation.isPending}
+              onCheckedChange={(next) => (next ? setConfirmEnable(true) : reconcilerMutation.mutate(false))}
+              data-testid="switch-reconciler-enabled"
+            />
+            <span className="text-sm">
+              {reconcilerQuery.isLoading ? "Loading…"
+                : reconcilerQuery.data?.reconcilerEnabled
+                  ? <Badge className="bg-green-600">ON — syncing automatically</Badge>
+                  : <Badge variant="secondary">OFF — manual control</Badge>}
+            </span>
+          </div>
+          <ReconcileNowRow enabled={reconcilerQuery.data?.reconcilerEnabled ?? false} />
         </CardContent>
       </Card>
 
@@ -305,38 +308,109 @@ export default function ShipskartCatalogue() {
  * touching anything; Sync then links the vessels and settles the crew mappings that were
  * waiting on them.
  */
+/**
+ * "Run now" for the hourly reconciler — the sweep that retries failed user enrolments,
+ * clears their click-attempt counters and applies outstanding vessel assignments.
+ *
+ * WHY IT EXISTS: the endpoint has always been there, but with no button the only way to
+ * force a pass was curl with signed headers. On 10-Aug that turned a one-click diagnosis
+ * into a long back-and-forth with the deployment team, so the button is the fix.
+ *
+ * BACKGROUND, like the vessel sync: a pass is paced at 5s per API call, so a synchronous
+ * request would 504 exactly as the vessel-sync button did on 07-Aug. The POST answers 202
+ * and this row polls the status endpoint while it runs.
+ */
+function ReconcileNowRow({ enabled }: { enabled: boolean }) {
+  const { toast } = useToast();
+  const statusQuery = useQuery<{ running: boolean; lastRun: any }>({
+    queryKey: ["shipskart-reconcile-status"],
+    queryFn: async () => (await apiRequest("GET", "/technical/api/shipskart/b2b/reconcile/status")).json(),
+    refetchInterval: (q) => (q.state.data?.running ? 3_000 : false),
+  });
+  const runMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/technical/api/shipskart/b2b/reconcile", {})).json(),
+    onSuccess: () => {
+      toast({ title: "Sync started", description: "Running in the background — the result appears here when it finishes." });
+      queryClient.invalidateQueries({ queryKey: ["shipskart-reconcile-status"] });
+    },
+    onError: (e: any) => toast({ title: "Could not start", description: String(e?.message ?? e), variant: "destructive" }),
+  });
+
+  const running = statusQuery.data?.running ?? false;
+  const last = statusQuery.data?.lastRun ?? null;
+  const total = (o: Record<string, number> | undefined) =>
+    Object.values(o ?? {}).reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="border-t pt-3 space-y-2">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!enabled || running || runMutation.isPending}
+          onClick={() => runMutation.mutate()}
+          data-testid="btn-reconcile-now"
+        >
+          {running ? "Sync running…" : "Sync users now"}
+        </Button>
+        <span className="text-xs text-gray-500">
+          {!enabled
+            ? "Turn automatic sync ON to use this — it runs the same job immediately instead of waiting for the next hour."
+            : "Retries users whose Purchasing access failed, and applies any vessel changes waiting to go across."}
+        </span>
+      </div>
+
+      {last && !running && (
+        <div className="text-xs text-gray-600" data-testid="text-reconcile-last-run">
+          {last.ran === false ? (
+            <span className="text-amber-700">Last run did nothing — {last.reason ?? "unknown reason"}</span>
+          ) : (
+            <>
+              Last run {last.finishedAt ? new Date(last.finishedAt).toLocaleString() : ""} —{" "}
+              <strong>{total(last.users)}</strong> user(s), <strong>{total(last.mappings)}</strong> vessel assignment(s),{" "}
+              <strong>{total(last.vessels)}</strong> vessel(s) processed.
+              {total(last.users) + total(last.mappings) + total(last.vessels) === 0 && " Nothing was outstanding."}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VesselSyncCard() {
   const { toast } = useToast();
-  const [preview, setPreview] = useState<VesselSyncResult | null>(null);
 
+  // BOTH buttons start a background job and return at once; the result arrives through this
+  // poll. The check used to be awaited inline, which meant a fleet-sized check outlived the
+  // gateway timeout and the browser saw a 504 (dev, 07-Aug) even though the server finished.
   const statusQuery = useQuery<{ running: boolean; lastRun: VesselSyncResult | null }>({
     queryKey: ["shipskart-vessel-sync-status"],
     queryFn: async () => (await apiRequest("GET", "/technical/api/shipskart/vessels/sync/status")).json(),
     refetchInterval: (q) => (q.state.data?.running ? 4_000 : false),
   });
 
-  const checkMutation = useMutation({
-    mutationFn: async () => (await apiRequest("POST", "/technical/api/shipskart/vessels/sync", { preview: true })).json(),
-    onSuccess: (d: VesselSyncResult) => { setPreview(d); toast({ title: "Check complete", description: `${d.rows.length} vessel(s) examined — nothing was changed.` }); },
-    onError: (e: any) => toast({ title: "Check failed", description: String(e?.message ?? e), variant: "destructive" }),
-  });
-
-  const runMutation = useMutation({
-    mutationFn: async () => (await apiRequest("POST", "/technical/api/shipskart/vessels/sync", {})).json(),
+  const start = (preview: boolean) => ({
+    mutationFn: async () =>
+      (await apiRequest("POST", "/technical/api/shipskart/vessels/sync", preview ? { preview: true } : {})).json(),
     onSuccess: (d: any) => {
-      setPreview(null);
       toast({
-        title: d?.started ? "Vessel sync started" : "Not started",
-        description: d?.started ? "Running in the background — the table below updates as it goes." : String(d?.message ?? ""),
-        variant: d?.started ? undefined : "destructive",
+        title: d?.started ? (preview ? "Check started" : "Vessel sync started") : "Not started",
+        description: d?.started
+          ? "Running in the background — the table below fills in as it goes. You can leave this page."
+          : String(d?.message ?? ""),
+        variant: d?.started ? undefined : ("destructive" as const),
       });
       queryClient.invalidateQueries({ queryKey: ["shipskart-vessel-sync-status"] });
     },
-    onError: (e: any) => toast({ title: "Could not start", description: String(e?.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not start", description: String(e?.message ?? e), variant: "destructive" as const }),
   });
 
+  const checkMutation = useMutation(start(true));
+  const runMutation = useMutation(start(false));
+
   const running = statusQuery.data?.running ?? false;
-  const result = preview ?? statusQuery.data?.lastRun ?? null;
+  const result = statusQuery.data?.lastRun ?? null;
 
   return (
     <Card data-testid="vessel-sync-card">
@@ -351,10 +425,10 @@ function VesselSyncCard() {
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="outline" onClick={() => checkMutation.mutate()} disabled={checkMutation.isPending || running} data-testid="btn-vessel-check">
-            {checkMutation.isPending ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Checking…</>) : (<><Eye className="h-4 w-4 mr-2" />Check first (changes nothing)</>)}
+            {running && result?.preview !== false ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Checking…</>) : (<><Eye className="h-4 w-4 mr-2" />Check first (changes nothing)</>)}
           </Button>
           <Button onClick={() => runMutation.mutate()} disabled={running || runMutation.isPending} data-testid="btn-vessel-sync">
-            {running ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sync running…</>) : (<><RefreshCw className="h-4 w-4 mr-2" />Sync vessels now</>)}
+            {running ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Running…</>) : (<><RefreshCw className="h-4 w-4 mr-2" />Sync vessels now</>)}
           </Button>
           {running && <Badge variant="secondary" className="animate-pulse">Running in background</Badge>}
           {result && !running && (
@@ -420,7 +494,7 @@ function friendlyOutcome(code: string): string {
     case "pushed": return "Created on Shipskart";
     case "would_create": return "Would be created on Shipskart";
     case "already_pushed": case "already_linked": return "Already correct";
-    case "invalid_imo": return "IMO number is not 7 digits — fix the vessel record";
+    case "invalid_imo": return "IMO number is blank — fill it in the vessel record";
     case "lookup_failed": return "Could not reach Shipskart — safe to retry";
     case "blocked_duplicate": return "Shipskart refused it as a duplicate";
     case "error": return "Shipskart returned an error";

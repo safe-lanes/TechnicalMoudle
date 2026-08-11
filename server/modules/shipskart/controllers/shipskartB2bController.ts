@@ -70,11 +70,29 @@ export async function putReconcilerConfigHandler(req: AuthenticatedRequest, res:
   res.json({ success: true, tenantId: cfg.tenantId, reconcilerEnabled: req.body.enabled });
 }
 
-/** POST /shipskart/b2b/reconcile { limit? } — one bounded manual pass. */
+/**
+ * POST /shipskart/b2b/reconcile { limit? } — one bounded manual pass, IN THE BACKGROUND.
+ *
+ * Answers 202 immediately and the page follows GET /shipskart/b2b/reconcile/status. A pass
+ * is paced at 5s per API hit across five categories, so answering synchronously is what gave
+ * the vessel-sync button a 504 on 07-Aug — the browser gave up while the server carried on.
+ * The single-flight guard lives in runReconciliation, so a manual press can never overlap
+ * the hourly scheduler on the same rate-limited API.
+ */
 export async function reconcileHandler(req: Request, res: Response) {
   const limit = Number.isInteger(req.body?.limit) ? req.body.limit : undefined;
-  const summary = await reconciler.runReconciliation({ limit });
-  res.status(summary.ran ? 200 : 409).json(summary);
+  if (reconciler.isReconcileRunning()) {
+    return res.status(409).json({ started: false, message: 'a reconciliation pass is already running' });
+  }
+  reconciler.runReconciliation({ limit })
+    .then(r => console.log(`[Shipskart b2b] background reconcile finished: ran=${r.ran}${r.reason ? ` (${r.reason})` : ''} users=${JSON.stringify(r.users)} mappings=${JSON.stringify(r.mappings)}`))
+    .catch(err => console.error('[Shipskart b2b] background reconcile crashed:', err?.message || err));
+  res.status(202).json({ started: true, note: 'running in background — follow GET /shipskart/b2b/reconcile/status' });
+}
+
+/** GET /shipskart/b2b/reconcile/status — is a pass running, and what did the last one do? */
+export async function reconcileStatusHandler(_req: Request, res: Response) {
+  res.json({ running: reconciler.isReconcileRunning(), lastRun: reconciler.getLastReconcile() });
 }
 
 /**
@@ -127,23 +145,24 @@ export async function cataloguePushHandler(req: AuthenticatedRequest, res: Respo
 
 /**
  * Admin → Sync Vessels (06-Aug).
- *   POST /shipskart/vessels/sync { preview? } — preview answers synchronously (read-only,
- *     one IMO lookup per vessel, no writes); a real run goes to the BACKGROUND because it
- *     is paced at 5s per call, and the page polls GET /shipskart/vessels/sync/status.
+ *   POST /shipskart/vessels/sync { preview? } — BOTH the preview and the real run go to the
+ *     background and answer 202 at once; the page follows GET /shipskart/vessels/sync/status.
+ *     The preview used to answer synchronously, but it is paced at 5s per vessel just like a
+ *     run, so on a real fleet it outlived the gateway timeout and the browser got a 504 while
+ *     the work continued server-side (dev, 07-Aug). Nothing was lost — a preview writes
+ *     nothing — but the page never received its result.
  *   GET  /shipskart/vessels/sync/status — running flag + the last result (rows + totals).
  */
 export async function vesselSyncHandler(req: AuthenticatedRequest, res: Response) {
   const svc = await import('../services/shipskartVesselSyncService');
-  if (req.body?.preview === true) {
-    return res.json(await svc.runVesselSync({ preview: true }));
-  }
+  const preview = req.body?.preview === true;
   if (svc.isVesselSyncRunning()) {
     return res.status(409).json({ started: false, message: 'a vessel sync is already running' });
   }
-  svc.runVesselSync({ preview: false })
-    .then(r => console.log(`[VesselSync] background run finished: ${JSON.stringify(r.totals)} errors=${r.errors.length}`))
-    .catch(err => console.error('[VesselSync] background run crashed:', err?.message || err));
-  res.status(202).json({ started: true, note: 'running in background — follow GET /shipskart/vessels/sync/status' });
+  svc.runVesselSync({ preview })
+    .then(r => console.log(`[VesselSync] background ${preview ? 'preview' : 'run'} finished: ${JSON.stringify(r.totals)} errors=${r.errors.length}`))
+    .catch(err => console.error('[VesselSync] background job crashed:', err?.message || err));
+  res.status(202).json({ started: true, preview, note: 'running in background — follow GET /shipskart/vessels/sync/status' });
 }
 
 export async function vesselSyncStatusHandler(_req: AuthenticatedRequest, res: Response) {
