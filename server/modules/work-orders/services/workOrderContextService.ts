@@ -389,7 +389,7 @@ export async function getWorkOrderContext(workOrderId: string) {
   }
 
   // Build executionData from work order (Part B - editable execution record)
-  const executionData = {
+  let executionData = {
     // B1 - Risk Assessment, Checklists & Records
     riskAssessmentStatus: correctedWorkOrder.riskAssessmentStatus || '',
     safetyChecklistsStatus: correctedWorkOrder.safetyChecklistsStatus || '',
@@ -424,6 +424,16 @@ export async function getWorkOrderContext(workOrderId: string) {
     completionRemarks: correctedWorkOrder.completionRemarks || ''
   };
 
+  // Save as Draft (migration 164, Task #402): if an unsubmitted draft exists,
+  // it holds the user's latest Part-B form state — overlay it so reopening the
+  // form restores drafted values. The draft is cleared at every submission
+  // entry point, so a present draft always means "in progress".
+  const draftDoc: any = (correctedWorkOrder as any).draftExecutionData;
+  const hasDraft = draftDoc != null && typeof draftDoc === 'object' && !Array.isArray(draftDoc);
+  if (hasDraft) {
+    executionData = { ...executionData, ...draftDoc };
+  }
+
   // Use actual database data - no dummy data overrides
   const finalTemplateData: any = { ...templateData };
 
@@ -431,6 +441,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     workOrder: correctedWorkOrder,
     templateData: finalTemplateData,
     executionData,
+    hasDraftExecutionData: hasDraft,
     job,
     component: {
       id: component.cuuid,

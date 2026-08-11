@@ -1400,6 +1400,12 @@ export const workOrders = pgTable("work_orders", {
   // WO only for job scheduling / next-due calculation.
   rhBackdatedEntry: boolean("rh_backdated_entry"),
 
+  // === Save as Draft (migration 164, Task #402) ===
+  // In-progress Part-B edits stashed as a JSON document. Draft saves write ONLY
+  // this column (no status/completion/RH/due writes) so the computed tab never
+  // moves; Submit promotes values through the normal workflow and clears it.
+  draftExecutionData: jsonb("draft_execution_data"),
+
   // === Postponement Approval Fields (Plan B) ===
   postponeRequestedDate: text("postpone_requested_date"), // Ship's requested new due date (populated on postpone-request submit)
   postponeApprover: text("postpone_approver"), // Static "Office" value stored at request time
