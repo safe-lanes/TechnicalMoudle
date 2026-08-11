@@ -541,7 +541,9 @@ export async function completeWorkOrder(
     // Double-sync guard: stamp when a completion reading was applied this run (MASTER cascade or
     // INHERITED cycle). Leaves an existing stamp intact on replay.
     rhSyncedAt: rhReadingApplied ? new Date() : undefined,
-    rhBackdatedEntry: rhBackdatedSkipped ? true : undefined
+    rhBackdatedEntry: rhBackdatedSkipped ? true : undefined,
+    // Save as Draft (Task #402): completion supersedes any stashed draft.
+    draftExecutionData: null
   });
 
   // Sync field logging — log completion UPDATE

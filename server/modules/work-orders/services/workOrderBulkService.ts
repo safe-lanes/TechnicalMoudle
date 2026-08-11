@@ -162,7 +162,9 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         ceApprovalRemarks: tierMinRemarks > 0 ? remarks : null,
         skippedCyclesJustification: (missedCycles >= 1 && skippedCyclesJustification) ? skippedCyclesJustification : null,
         approvalDate: new Date().toISOString(),
-        wasRejected: false
+        wasRejected: false,
+        // Save as Draft (Task #402): approval supersedes any stashed draft.
+        draftExecutionData: null
       };
 
       if (!requiresLevel2Review) {
@@ -265,6 +267,8 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     nextDueReading,
     missedCycles,
     originalDueDate,
+    // Save as Draft (Task #402): Level-2 approval supersedes any stashed draft.
+    draftExecutionData: null,
   };
   if (actualCompletionDate) {
     updateData.dateCompleted = actualCompletionDate;

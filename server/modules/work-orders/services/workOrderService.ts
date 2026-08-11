@@ -1024,6 +1024,42 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   });
 
+  // ── Save as Draft (migration 165, Task #402) ──────────────────────────────
+  // A draft save sends ONLY draftExecutionData (a non-null JSON document) and
+  // no status/completion fields. It writes exclusively to the draft column so
+  // the stored status and every derivation input (completionDateTime, due
+  // dates, RH readings) stay untouched — the WO keeps its current tab. All
+  // completion mapping, auto-promotion, RH validation and job side effects
+  // below are deliberately skipped. draftExecutionData:null (clearing) and
+  // payloads that also carry status/completion fields fall through to the
+  // normal path.
+  const draftDoc = updateData.draftExecutionData;
+  const isDraftOnlySave =
+    draftDoc != null && typeof draftDoc === 'object' && !Array.isArray(draftDoc) &&
+    updateData.status === undefined &&
+    updateData.completionDateTime === undefined &&
+    updateData.dateOfCompletion === undefined;
+  if (isDraftOnlySave) {
+    // Strict payload check: a draft save must not smuggle in live-column
+    // writes. Anything beyond the draft doc + actor metadata is rejected
+    // loudly rather than silently dropped.
+    // userRole/userUuid are injected into the body by route middleware.
+    const DRAFT_SAVE_ALLOWED_KEYS = new Set(['draftExecutionData', 'userId', 'performedBy', 'userRole', 'userUuid']);
+    const strayKeys = Object.keys(updateData).filter((k: string) => !DRAFT_SAVE_ALLOWED_KEYS.has(k));
+    if (strayKeys.length > 0) {
+      throw new ValidationError(
+        'Draft save must contain only draftExecutionData',
+        { message: `Unexpected fields in draft save: ${strayKeys.join(', ')}. Send them via a normal update or include them inside draftExecutionData.`, strayKeys }
+      );
+    }
+    const workOrder = await repo.update(id, { draftExecutionData: draftDoc });
+    try {
+      await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, workOrder, body.userId || body.performedBy || 'system');
+    } catch (err) { console.error('[FieldLogger] WO draft save:', err); }
+    console.log(`📝 Draft saved for WO ${existingWO.workOrderNo || id} (draft-only update, status/tab unchanged)`);
+    return workOrder;
+  }
+
   // VALIDATION: Numeric field precision
   const validateNumericField = (
     value: any,
@@ -1246,6 +1282,15 @@ export async function updateWorkOrder(id: string, body: any) {
   if (isSubmissionAction && !existingWO.submittedDate) {
     updateData.submittedDate = new Date().toISOString();
     console.log('📝 Capturing submittedDate for audit trail on submission/Pending Approval');
+  }
+
+  // Save as Draft (Task #402): a real submission supersedes any stashed draft —
+  // clear it so the form no longer prefers stale drafted values after approval.
+  if ((isSubmissionAction || hasCompletionData || updateData.status === 'Completed') &&
+      updateData.draftExecutionData === undefined &&
+      (existingWO as any).draftExecutionData != null) {
+    updateData.draftExecutionData = null;
+    console.log('📝 Clearing draftExecutionData on submission');
   }
 
   if (isSubmissionAction || updateData.status === 'Pending Approval') {

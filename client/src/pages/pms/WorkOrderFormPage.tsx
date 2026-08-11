@@ -2799,20 +2799,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           operationalFormsStatus: executionData.operationalForms,
         };
 
+        // Save as Draft (Task #402): stash the form state in the dedicated draft
+        // column ONLY — no live status/completion/RH/due columns are written, so
+        // the work order keeps its current tab (Due stays Due, Overdue stays
+        // Overdue) until the user actually Submits.
         const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...templateData,
-            ...saveExecutionData,
+            draftExecutionData: saveExecutionData,
           })
         });
 
         const result = await response.json();
         if (!response.ok) {
-          if (result.code === 'INVALID_RUNNING_HOURS') {
-            throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
-          }
           throw new Error(result.error || 'Failed to save draft');
         }
 
@@ -2852,20 +2852,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             operationalFormsStatus: executionData.operationalForms,
           };
 
+          // Save as Draft (Task #402): implicit draft saves (incomplete Part B)
+          // also go through the draft-only column so live status/completion/RH/
+          // due columns — and therefore the computed tab — are never touched.
           const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              ...templateData,
-              ...saveExecutionData,
+              draftExecutionData: saveExecutionData,
             })
           });
 
           const result = await response.json();
           if (!response.ok) {
-            if (result.code === 'INVALID_RUNNING_HOURS') {
-              throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
-            }
             throw new Error(result.error || 'Failed to save work order');
           }
 
@@ -7234,12 +7233,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {showSplitButtons && (
                   <Button
                     onClick={handleBottomSaveDraft}
-                    disabled={!!isRHSaveBlocked}
-                    className={`font-bold px-8 py-2.5 h-auto text-sm shadow-md ${
-                      isRHSaveBlocked
-                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed hover:bg-gray-400'
-                        : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
-                    }`}
+                    className="font-bold px-8 py-2.5 h-auto text-sm shadow-md bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white"
                     data-testid="button-save-draft-bottom"
                   >
                     Save Draft
