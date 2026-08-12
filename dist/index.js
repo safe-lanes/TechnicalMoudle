@@ -859,6 +859,13 @@ var init_schema = __esm({
       componentCode: text2("component_code"),
       componentName: text2("component_name"),
       updatedByUuid: text2("updated_by_uuid"),
+      // Task #394 (migration 162): atomic RH event metadata for the canonical
+      // "latest reading wins" comparator. Nullable — legacy rows rank between
+      // ship and shore on ties (see rhEventComparator.originRank).
+      originSide: text2("origin_side"),
+      // 'ship' | 'shore'
+      stampHolder: text2("stamp_holder"),
+      // component's current_stamp at observation (rotational epoch)
       isSync: boolean2("is_sync").default(false),
       createdByUuid: text2("created_by_uuid"),
       isDeleted: boolean2("is_deleted").default(false),
@@ -2112,6 +2119,11 @@ var init_schema = __esm({
       // master RH. In this case the RH module is NOT updated; the reading is saved to the
       // WO only for job scheduling / next-due calculation.
       rhBackdatedEntry: boolean2("rh_backdated_entry"),
+      // === Save as Draft (migration 165, Task #402) ===
+      // In-progress Part-B edits stashed as a JSON document. Draft saves write ONLY
+      // this column (no status/completion/RH/due writes) so the computed tab never
+      // moves; Submit promotes values through the normal workflow and clears it.
+      draftExecutionData: jsonb("draft_execution_data"),
       // === Postponement Approval Fields (Plan B) ===
       postponeRequestedDate: text2("postpone_requested_date"),
       // Ship's requested new due date (populated on postpone-request submit)
@@ -3058,6 +3070,9 @@ var init_schema = __esm({
       // Office WO generation kill switch (migration 161): per-vessel opt-in for the shore
       // daily sweep and all office generation entry points. Default OFF (fail closed).
       officeWoGenerationEnabled: boolean2("office_wo_generation_enabled").notNull().default(false),
+      // Office RH entry kill switch (migration 162, Task #394): per-vessel opt-in for
+      // office-side running-hours entry via WO completion. Default OFF (fail closed).
+      officeRhEntryEnabled: boolean2("office_rh_entry_enabled").notNull().default(false),
       updatedBy: text2("updated_by").notNull(),
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
@@ -5043,6 +5058,11 @@ var init_schema = __esm({
       // one SAIL role → exactly one Shipskart role
       shipskartRole: text2("shipskart_role").notNull(),
       // many rows may share this (many-to-one)
+      // Migration 164: Shipskart's role GUID — the value that actually travels on create-user.
+      // Preferred over the name at resolve time so a Shipskart-side RENAME (the 07-Aug
+      // WAH-KWONG-PUCHASER outage) no longer breaks enrolment. Nullable: legacy rows keep
+      // resolving by name until re-saved in Access Control.
+      shipskartRoleId: text2("shipskart_role_id"),
       createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
       updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date()),
       updatedByUuid: text2("updated_by_uuid")
@@ -5091,6 +5111,10 @@ var init_schema = __esm({
       shipskartMappingId: text2("shipskart_mapping_id"),
       mapStatus: text2("map_status").notNull().default("pending"),
       lastError: text2("last_error"),
+      // Retry ladder (migration 164) — LOCAL bookkeeping, mirrors sync_field_log's
+      // sync_attempts/last_attempt_at. Never on any wire; the table is NO_SYNC.
+      mapAttempts: integer2("map_attempts").notNull().default(0),
+      lastAttemptAt: timestamp3("last_attempt_at", { withTimezone: true }),
       mappedAt: timestamp3("mapped_at", { withTimezone: true }),
       createdAt: timestamp3("created_at", { withTimezone: true }).notNull().defaultNow(),
       updatedAt: timestamp3("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => /* @__PURE__ */ new Date())
@@ -6925,148 +6949,158 @@ var init_requestContext = __esm({
   }
 });
 
-// server/modules/running-hours/utils/rhValidation.ts
-function getCalendarDate(dateStr) {
-  const date2 = new Date(dateStr);
-  return new Date(Date.UTC(date2.getUTCFullYear(), date2.getUTCMonth(), date2.getUTCDate()));
-}
-function getDaysBetweenCalendarDates(date1, date2) {
-  const msPerDay = 24 * 60 * 60 * 1e3;
-  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
-}
-function formatDMY(dateStr) {
-  if (!dateStr) return dateStr;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
-}
-function validateRunningHoursIncrease(input) {
-  const { currentRH, newRH, componentLastUpdated, newUpdateDate, userRole, adminOverride } = input;
-  const requestedIncrease = newRH - currentRH;
-  let daysSinceLastUpdate = 0;
-  let sameDayUpdate = false;
-  if (componentLastUpdated) {
-    const lastCalendarDate = getCalendarDate(componentLastUpdated);
-    const newCalendarDate = getCalendarDate(newUpdateDate);
-    daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
-    if (daysSinceLastUpdate < 0) {
-      const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
-      return {
-        allowed: canOverride2,
-        maxAllowedIncrease: 0,
-        requestedIncrease,
-        daysSinceLastUpdate,
-        lastUpdateDate: componentLastUpdated,
-        backdatedLower: requestedIncrease <= 0,
-        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated)}). Running hours can only be recorded on or after the latest reading.`,
-        requiresAdminOverride: !canOverride2
-      };
-    }
-    if (daysSinceLastUpdate === 0) {
-      sameDayUpdate = true;
-    }
-  } else {
-    daysSinceLastUpdate = 1;
+// server/modules/running-hours/rhEventComparator.ts
+var rhEventComparator_exports = {};
+__export(rhEventComparator_exports, {
+  applyWinningRhToComponent: () => applyWinningRhToComponent,
+  claimWoRhSync: () => claimWoRhSync,
+  compareRhEvents: () => compareRhEvents,
+  effectiveReadingDay: () => effectiveReadingDay,
+  originRank: () => originRank,
+  parseReadingDay: () => parseReadingDay,
+  releaseWoRhSync: () => releaseWoRhSync,
+  resolveRhBaselineDay: () => resolveRhBaselineDay,
+  selectWinningRhEvent: () => selectWinningRhEvent
+});
+function parseReadingDay(dateStr) {
+  if (!dateStr) return null;
+  const m = String(dateStr).match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})/);
+  if (m) {
+    const d = new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+    return isNaN(d.getTime()) ? null : d;
   }
-  if (requestedIncrease <= 0) {
-    return {
-      allowed: true,
-      maxAllowedIncrease: 0,
-      requestedIncrease,
-      daysSinceLastUpdate: 0,
-      lastUpdateDate: componentLastUpdated,
-      message: "No increase or decrease - no validation needed",
-      requiresAdminOverride: false
-    };
-  }
-  let maxAllowedIncrease;
-  if (sameDayUpdate) {
-    const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
-    return {
-      allowed: canOverride2,
-      maxAllowedIncrease: 0,
-      requestedIncrease,
-      daysSinceLastUpdate: 0,
-      lastUpdateDate: componentLastUpdated,
-      message: canOverride2 ? "Sail Admin override applied for same-day duplicate update" : "Same-day update already performed. Only one update of max 25 hours is allowed per day.",
-      requiresAdminOverride: !canOverride2
-    };
-  } else {
-    maxAllowedIncrease = daysSinceLastUpdate * MAX_HOURS_PER_DAY;
-  }
-  const isWithinLimit = requestedIncrease <= maxAllowedIncrease;
-  if (isWithinLimit) {
-    return {
-      allowed: true,
-      maxAllowedIncrease,
-      requestedIncrease,
-      daysSinceLastUpdate,
-      lastUpdateDate: componentLastUpdated,
-      message: `Increase of ${requestedIncrease} hours is within the allowed limit of ${maxAllowedIncrease} hours`,
-      requiresAdminOverride: false
-    };
-  }
-  const canOverride = userRole === "Sail Admin" && adminOverride === true;
-  return {
-    allowed: canOverride,
-    maxAllowedIncrease,
-    requestedIncrease,
-    daysSinceLastUpdate,
-    lastUpdateDate: componentLastUpdated,
-    message: canOverride ? `Sail Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days \xD7 25 hours/day).` : `Increase of ${requestedIncrease} hours exceeds maximum allowed of ${maxAllowedIncrease} hours. Maximum allowed is ${daysSinceLastUpdate} day(s) \xD7 25 hours/day = ${maxAllowedIncrease} hours.`,
-    requiresAdminOverride: !canOverride
-  };
+  const p = new Date(String(dateStr));
+  if (isNaN(p.getTime())) return null;
+  return new Date(Date.UTC(p.getUTCFullYear(), p.getUTCMonth(), p.getUTCDate()));
 }
-function canAdminOverride(userRole) {
-  return userRole === "Sail Admin";
+function originRank(originSide) {
+  const o = (originSide || "").toLowerCase();
+  if (o === "ship") return 0;
+  if (o === "shore") return 2;
+  return 1;
 }
-function safeParseDate(value) {
-  if (value == null) return null;
-  if (value instanceof Date) {
-    return isNaN(value.getTime()) ? null : value;
+function enteredAtMs(e) {
+  const v = e.enteredAtUTC instanceof Date ? e.enteredAtUTC : e.enteredAtUTC ? new Date(String(e.enteredAtUTC)) : null;
+  return v && !isNaN(v.getTime()) ? v.getTime() : 0;
+}
+function effectiveReadingDay(e) {
+  const d = parseReadingDay(e.dateUpdatedLocal);
+  if (d) return d;
+  const ms = enteredAtMs(e);
+  if (!ms) return null;
+  const t = new Date(ms);
+  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
+}
+function compareRhEvents(a, b) {
+  const da = effectiveReadingDay(a)?.getTime() ?? -Infinity;
+  const db2 = effectiveReadingDay(b)?.getTime() ?? -Infinity;
+  if (da !== db2) return da - db2 > 0 ? 1 : -1;
+  const ra = originRank(a.originSide);
+  const rb = originRank(b.originSide);
+  if (ra !== rb) return rb - ra > 0 ? 1 : -1;
+  const ea = enteredAtMs(a);
+  const eb = enteredAtMs(b);
+  if (ea !== eb) return ea - eb > 0 ? 1 : -1;
+  return a.rhauuid > b.rhauuid ? 1 : -1;
+}
+async function latestRotationDay(conn, componentId) {
+  try {
+    const r = await conn.query(
+      `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`,
+      [componentId]
+    );
+    const v = r.rows[0]?.latest;
+    if (!v) return null;
+    const d = v instanceof Date ? v : new Date(String(v));
+    if (isNaN(d.getTime())) return null;
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  } catch {
+    return null;
   }
-  const trimmed = String(value).trim();
-  if (!trimmed) return null;
-  const d = new Date(trimmed);
-  if (!isNaN(d.getTime())) return d;
-  const months = {
-    jan: 0,
-    feb: 1,
-    mar: 2,
-    apr: 3,
-    may: 4,
-    jun: 5,
-    jul: 6,
-    aug: 7,
-    sep: 8,
-    oct: 9,
-    nov: 10,
-    dec: 11
-  };
-  const match = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
-  if (match) {
-    const [, day, mon, year, hh = "0", mm = "0"] = match;
-    const month = months[mon.toLowerCase()];
-    if (month !== void 0) {
-      const parsed = new Date(
-        parseInt(year),
-        month,
-        parseInt(day),
-        parseInt(hh),
-        parseInt(mm)
-      );
-      return isNaN(parsed.getTime()) ? null : parsed;
-    }
+}
+async function selectWinningRhEvent(conn, componentId) {
+  const rotDay = await latestRotationDay(conn, componentId);
+  const params = [componentId];
+  let rotClause = "";
+  if (rotDay) {
+    rotClause = ` AND (CASE WHEN date_updated_local ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                        THEN substring(date_updated_local from 1 for 10)::date
+                        ELSE entered_at_utc::date END) >= $2::date`;
+    params.push(rotDay.toISOString().split("T")[0]);
+  }
+  const r = await conn.query(
+    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side
+       FROM running_hours_audit
+      WHERE component_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
+        AND (cumulative_rh IS NOT NULL OR new_rh IS NOT NULL)${rotClause}
+      ORDER BY (CASE WHEN date_updated_local ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                  THEN substring(date_updated_local from 1 for 10)::date
+                  ELSE entered_at_utc::date END) DESC,
+               (CASE WHEN lower(origin_side) = 'ship' THEN 0 WHEN origin_side IS NULL OR origin_side = '' THEN 1 ELSE 2 END) ASC,
+               entered_at_utc DESC,
+               rhauuid DESC
+      LIMIT 1`,
+    params
+  );
+  const row = r.rows[0];
+  if (!row) return null;
+  const rhRaw = row.cumulative_rh ?? row.new_rh;
+  const rh = parseFloat(String(rhRaw));
+  if (rhRaw === null || rhRaw === void 0 || isNaN(rh)) return null;
+  const day = effectiveReadingDay({
+    rhauuid: row.rhauuid,
+    dateUpdatedLocal: row.date_updated_local,
+    enteredAtUTC: row.entered_at_utc,
+    originSide: row.origin_side
+  });
+  if (!day) return null;
+  return { rhauuid: row.rhauuid, rh, readingDay: day, dateUpdatedLocal: row.date_updated_local, originSide: row.origin_side ?? null };
+}
+async function applyWinningRhToComponent(conn, componentId, context) {
+  const winner = await selectWinningRhEvent(conn, componentId);
+  if (!winner) return false;
+  const lastUpdatedText = winner.dateUpdatedLocal || winner.readingDay.toISOString();
+  await conn.query(
+    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1,
+        rh_master_updated_at = $2, last_updated = $3, updated_at = NOW()
+      WHERE cuuid = $4`,
+    [winner.rh.toFixed(2), winner.readingDay, lastUpdatedText, componentId]
+  );
+  console.log(`[RH-Derive:${context}] component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
+  return true;
+}
+async function resolveRhBaselineDay(conn, componentId, componentStampFallback) {
+  try {
+    const winner = await selectWinningRhEvent(conn, componentId);
+    if (winner) return winner.readingDay;
+  } catch {
+  }
+  if (componentStampFallback && !isNaN(componentStampFallback.getTime())) {
+    return new Date(Date.UTC(
+      componentStampFallback.getUTCFullYear(),
+      componentStampFallback.getUTCMonth(),
+      componentStampFallback.getUTCDate()
+    ));
   }
   return null;
 }
-var MAX_HOURS_PER_DAY;
-var init_rhValidation = __esm({
-  "server/modules/running-hours/utils/rhValidation.ts"() {
+async function claimWoRhSync(conn, wouuid) {
+  const r = await conn.query(
+    `UPDATE work_orders SET rh_synced_at = NOW() WHERE wouuid = $1 AND rh_synced_at IS NULL RETURNING wouuid`,
+    [wouuid]
+  );
+  return r.rows.length > 0;
+}
+async function releaseWoRhSync(conn, wouuid) {
+  try {
+    await conn.query(`UPDATE work_orders SET rh_synced_at = NULL WHERE wouuid = $1`, [wouuid]);
+  } catch (e) {
+    console.error(`[RH-Claim] release failed for WO ${wouuid}: ${e?.message || e}`);
+  }
+}
+var init_rhEventComparator = __esm({
+  "server/modules/running-hours/rhEventComparator.ts"() {
     "use strict";
-    MAX_HOURS_PER_DAY = 25;
   }
 });
 
@@ -7159,15 +7193,6 @@ async function getLatestRotationDate(conn, componentId, excludeRhruuid) {
   } catch {
     return null;
   }
-}
-function isReadingPreRotation(readingDate, latestRotation) {
-  if (!readingDate || !latestRotation) return false;
-  const rotationDayStart = Date.UTC(
-    latestRotation.getUTCFullYear(),
-    latestRotation.getUTCMonth(),
-    latestRotation.getUTCDate()
-  );
-  return readingDate.getTime() < rotationDayStart;
 }
 async function applyRotationToComponent(conn, rowData, rowUuid) {
   const compId = rowData["component_id"];
@@ -7368,6 +7393,34 @@ async function applyOneWayRows(tableName, rows) {
                   }
                   syncDiag(`ROTATION-GUARD: components.${cuuid} incoming row (updated_at=${incomingUpdatedRaw}) predates local rotation ${latestRotation.toISOString()} \u2014 stamp/RH columns preserved`);
                 }
+              }
+              try {
+                const { selectWinningRhEvent: selectWinningRhEvent2, parseReadingDay: parseReadingDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+                const localWinner = await selectWinningRhEvent2(pool4, cuuid);
+                if (localWinner) {
+                  const incomingRhStampRaw = row["rh_master_updated_at"] ?? row["rhMasterUpdatedAt"] ?? row["last_updated"] ?? row["lastUpdated"];
+                  const incomingRhDay = incomingRhStampRaw ? parseReadingDay2(String(incomingRhStampRaw instanceof Date ? incomingRhStampRaw.toISOString() : incomingRhStampRaw)) : null;
+                  if (!incomingRhDay || incomingRhDay.getTime() < localWinner.readingDay.getTime()) {
+                    if (rowToApply === row) rowToApply = { ...row };
+                    for (const col of [
+                      "current_cumulative_rh",
+                      "currentCumulativeRH",
+                      "rh_current_master",
+                      "rhCurrentMaster",
+                      "rh_master_updated_at",
+                      "rhMasterUpdatedAt",
+                      "rh_master_update_source",
+                      "rhMasterUpdateSource",
+                      "last_updated",
+                      "lastUpdated"
+                    ]) {
+                      delete rowToApply[col];
+                    }
+                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? "none"}) loses to local winning reading ${localWinner.readingDay.toISOString().split("T")[0]} \u2014 RH columns preserved`);
+                  }
+                }
+              } catch (rhGuardErr) {
+                syncDiag(`RH-LATEST-GUARD lookup failed for components.${cuuid}: ${String(rhGuardErr?.message || rhGuardErr).substring(0, 120)}`);
               }
             }
           }
@@ -7692,27 +7745,9 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
       if (tableName === "running_hours_audit" && rowData["component_id"]) {
         try {
-          const compId = rowData["component_id"];
-          const newRH = rowData["cumulative_rh"] || rowData["new_rh"];
-          const readingDate = safeParseDate(rowData["date_updated_local"]) || (rowData["entered_at_utc"] instanceof Date ? rowData["entered_at_utc"] : safeParseDate(rowData["entered_at_utc"]));
-          const latestRotation = await getLatestRotationDate(pool4, compId);
-          if (latestRotation && readingDate && isReadingPreRotation(readingDate, latestRotation)) {
-            syncDiag(`RH-APPLY INSERT SKIP (pre-rotation): component=${compId} audit=${rowUuid} reading ${readingDate.toISOString()} predates latest rotation ${latestRotation.toISOString()} \u2014 audit stored, component baseline untouched`);
-          } else if (newRH !== void 0 && newRH !== null) {
-            const oldRow = await pool4.query(
-              `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-              [compId]
-            );
-            const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || "(not found)";
-            const rhUpdatedAt = rowData["entered_at_utc"] || /* @__PURE__ */ new Date();
-            const lastUpdatedText = rowData["date_updated_local"] || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
-            const rhMasterUpdatedAtVal = safeParseDate(rowData["date_updated_local"]) || rhUpdatedAt;
-            await pool4.query(
-              `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
-              [String(newRH), compId, rhMasterUpdatedAtVal, lastUpdatedText]
-            );
-            syncDiag(`RH-APPLY INSERT: component=${compId} current_cumulative_rh updated from ${oldVal} to ${newRH}, last_updated=${lastUpdatedText} from audit row ${rowUuid}`);
-          }
+          const { applyWinningRhToComponent: applyWinningRhToComponent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const updated = await applyWinningRhToComponent2(pool4, rowData["component_id"], "sync-insert");
+          syncDiag(`RH-APPLY INSERT (derive): component=${rowData["component_id"]} audit=${rowUuid} \u2192 ${updated ? "component recomputed from winning event" : "no usable winner (component untouched)"}`);
         } catch (rhErr) {
           syncDiag(`RH-APPLY INSERT ERROR: component=${rowData["component_id"]} audit=${rowUuid}: ${rhErr.message}`);
         }
@@ -8149,7 +8184,6 @@ var init_oneWayApplier = __esm({
     init_db();
     init_syncConfig();
     init_syncDiagLogger();
-    init_rhValidation();
     columnMetaCache = /* @__PURE__ */ new Map();
     JOB_TRACKING_COLUMNS = ["last_done_date", "next_due_date", "last_done_rh", "next_due_rh"];
     SYNC_COLUMN_ALIASES = { location2: "location_2" };
@@ -10132,635 +10166,352 @@ var init_alertsRepository = __esm({
   }
 });
 
-// server/modules/sync/conflictReviewRepository.ts
-function getTableDisplayName(tableName) {
-  const map = {
-    work_orders: "Work Orders",
-    work_order_executions: "WO Executions",
-    work_order_documents: "WO Documents",
-    work_order_postponements: "WO Postponements",
-    defects: "Defects",
-    defect_actions: "Defect Actions",
-    defect_attachments: "Defect Attachments",
-    defect_sequences: "Defect Sequences",
-    spares: "Spares",
-    spares_history: "Spares History",
-    spare_location_stock: "Spare Location Stock",
-    stores_items: "Stores Items",
-    stores_ledger: "Stores Ledger",
-    inventory_transactions: "Inventory Transactions",
-    change_request: "Change Requests",
-    change_request_approval: "CR Approvals",
-    change_request_comment: "CR Comments",
-    running_hours_audit: "Running Hours Audit",
-    component_running_hours_log: "Running Hours Log",
-    component_maintenance_history: "Maintenance History",
-    vessel_certificate_data: "Vessel Certificates",
-    vessel_survey_data: "Vessel Surveys",
-    planner_dates: "Planner Dates",
-    components: "Components",
-    jobs: "Jobs"
-  };
-  return map[tableName] || tableName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+// server/utils/workOrderStatus.ts
+var workOrderStatus_exports = {};
+__export(workOrderStatus_exports, {
+  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
+  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
+  buildRhCycleWOMap: () => buildRhCycleWOMap,
+  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
+  findBlockingWOForJob: () => findBlockingWOForJob,
+  isBlockingStatus: () => isBlockingStatus,
+  isCompletedStatus: () => isCompletedStatus
+});
+function isBlockingStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
 }
-function getFieldDisplayName(fieldName) {
-  const acronymMap = {
-    rh: "RH",
-    rob: "ROB",
-    utc: "UTC",
-    tz: "TZ",
-    uuid: "UUID",
-    wo: "WO",
-    cr: "CR",
-    coc: "CoC",
-    id: "ID",
-    url: "URL",
-    html: "HTML",
-    sfi: "SFI",
-    viq: "VIQ",
-    pms: "PMS"
-  };
-  let words;
-  if (fieldName.includes("_")) {
-    words = fieldName;
-  } else {
-    words = fieldName.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
-  }
-  return words.replace(/_/g, " ").split(" ").map((w) => {
-    const lower = w.toLowerCase();
-    if (acronymMap[lower]) return acronymMap[lower];
-    return lower.charAt(0).toUpperCase() + lower.slice(1);
-  }).join(" ");
+function isCompletedStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
 }
-function getInstanceLabel(instanceId, vesselName) {
-  if (!instanceId) return "Unknown";
-  if (isShipInstanceId(instanceId)) {
-    return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId})`;
+function extractJobNoFromWorkOrderNo(workOrderNo) {
+  if (!workOrderNo) return null;
+  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+  if (newFormatMatch) {
+    return newFormatMatch[1];
   }
-  if (instanceId.toUpperCase().startsWith("SHORE")) {
-    return "Shore \u2014 Office";
+  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
+  if (woSuffixMatch) {
+    return woSuffixMatch[1];
   }
-  return instanceId;
+  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
+  if (oldFormatMatch) {
+    return oldFormatMatch[1];
+  }
+  return null;
 }
-async function getRecordLabel(pool4, tableName, rowUuid) {
-  const labelConfigs = {
-    work_orders: {
-      cols: ["job_title", "component_code"],
-      format: (a, b) => b ? `WO: ${a} (${b})` : `WO: ${a}`
-    },
-    defects: {
-      cols: ["id", "description"],
-      format: (a, b) => `Defect ${a}: ${(b || "").substring(0, 60)}`
-    },
-    spares: {
-      cols: ["part_name", "part_code"],
-      format: (a, b) => b ? `Spare: ${a} (${b})` : `Spare: ${a}`
-    },
-    stores_items: {
-      cols: ["item_name", "item_code"],
-      format: (a, b) => b ? `Store: ${a} (${b})` : `Store: ${a}`
-    },
-    change_request: {
-      cols: ["title"],
-      format: (a) => `CR: ${a}`
-    },
-    running_hours_audit: {
-      cols: ["component_name", "component_code"],
-      format: (a, b) => b ? `RH: ${a} (${b})` : `RH: ${a}`
-    },
-    work_order_executions: {
-      cols: ["id"],
-      format: (a) => `WO Exec: ${a}`
-    },
-    work_order_documents: {
-      cols: ["document_name"],
-      format: (a) => `WO Doc: ${a}`
-    },
-    defect_actions: {
-      cols: ["action_description"],
-      format: (a) => `Action: ${(a || "").substring(0, 60)}`
-    },
-    vessel_certificate_data: {
-      cols: ["certificate_name"],
-      format: (a) => `Cert: ${a}`
-    },
-    vessel_survey_data: {
-      cols: ["survey_name"],
-      format: (a) => `Survey: ${a}`
-    },
-    components: {
-      cols: ["component_name", "component_code"],
-      format: (a, b) => b ? `${a} (${b})` : `${a}`
-    },
-    jobs: {
-      cols: ["job_title", "job_code"],
-      format: (a, b) => b ? `${a} (${b})` : `${a}`
+function buildJobsWithActiveWOSet(workOrders2, vesselId) {
+  const byJobId = /* @__PURE__ */ new Set();
+  const byJobNo = /* @__PURE__ */ new Set();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
     }
-  };
-  const config = labelConfigs[tableName];
-  if (!config) return `${tableName} ${rowUuid.substring(0, 8)}`;
-  const identityCol = getIdentityColumn(tableName) || "id";
-  const selectCols = config.cols.map((c) => `"${c}"`).join(", ");
-  try {
-    const result = await pool4.query(
-      `SELECT ${selectCols} FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-      [rowUuid]
-    );
-    if (result.rows.length === 0) return `${tableName} ${rowUuid.substring(0, 8)}`;
-    const vals = config.cols.map((c) => result.rows[0][c] ?? "");
-    return config.format(...vals) || `${tableName} ${rowUuid.substring(0, 8)}`;
-  } catch {
-    return `${tableName} ${rowUuid.substring(0, 8)}`;
-  }
-}
-async function resolveUserName(pool4, userId) {
-  if (!userId || userId === "system" || userId === "System" || userId === "admin") return "System";
-  const parsed = parseInt(userId, 10);
-  if (isNaN(parsed)) return userId;
-  try {
-    const result = await pool4.query(
-      `SELECT full_name FROM users WHERE id = $1 LIMIT 1`,
-      [parsed]
-    );
-    return result.rows[0]?.full_name || `User ${userId}`;
-  } catch {
-    return `User ${userId}`;
-  }
-}
-async function listConflicts(filters) {
-  const pool4 = await getPool();
-  const limit = Math.min(filters.limit || 50, 200);
-  const offset = filters.offset || 0;
-  const source = filters.source || "all";
-  const resolved = filters.resolved ?? false;
-  const logRows = [];
-  const oldRows = [];
-  let totalLog = 0;
-  let totalOld = 0;
-  if (source === "all" || source === "log") {
-    const conditions = [`cl.is_resolved = $1`];
-    const params = [resolved];
-    let paramIdx = 2;
-    if (filters.tableName) {
-      conditions.push(`cl.table_name = $${paramIdx++}`);
-      params.push(filters.tableName);
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
     }
-    if (filters.vesselId) {
-      conditions.push(`EXISTS (SELECT 1 FROM sync_field_log sfl WHERE sfl.table_name = cl.table_name AND sfl.row_uuid = cl.row_uuid AND sfl.vessel_id = $${paramIdx++} LIMIT 1)`);
-      params.push(filters.vesselId);
-    }
-    if (filters.dateFrom) {
-      conditions.push(`cl.detected_at >= $${paramIdx++}`);
-      params.push(filters.dateFrom);
-    }
-    if (filters.dateTo) {
-      conditions.push(`cl.detected_at <= $${paramIdx++}`);
-      params.push(filters.dateTo);
-    }
-    const whereClause = conditions.join(" AND ");
-    const countResult = await pool4.query(
-      `SELECT COUNT(*) as cnt FROM sync_conflict_log cl WHERE ${whereClause}`,
-      params
-    );
-    totalLog = parseInt(countResult.rows[0].cnt, 10);
-    const dataResult = await pool4.query(
-      `SELECT cl.*
-       FROM sync_conflict_log cl
-       WHERE ${whereClause}
-       ORDER BY cl.detected_at DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-      params
-    );
-    for (const row of dataResult.rows) {
-      let incomingUserId = null;
-      let winnerUserId = null;
-      try {
-        const incomingUser = await pool4.query(
-          `SELECT changed_by_user_id FROM sync_field_log
-           WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
-             AND instance_id = $4
-           ORDER BY changed_at DESC LIMIT 1`,
-          [row.table_name, row.row_uuid, row.field_name, row.incoming_sender_instance]
-        );
-        incomingUserId = incomingUser.rows[0]?.changed_by_user_id || null;
-      } catch {
+    if (isBlockingStatus(wo.status)) {
+      if (wo.jobId) {
+        byJobId.add(wo.jobId);
       }
-      try {
-        const winnerUser = await pool4.query(
-          `SELECT changed_by_user_id FROM sync_field_log
-           WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
-             AND instance_id = $4
-           ORDER BY changed_at DESC LIMIT 1`,
-          [row.table_name, row.row_uuid, row.field_name, row.receiver_winner_instance]
-        );
-        winnerUserId = winnerUser.rows[0]?.changed_by_user_id || null;
-      } catch {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        byJobNo.add(`${woVesselId}|${jobNo}`);
       }
-      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
-      const incomingUserName = await resolveUserName(pool4, incomingUserId);
-      const winnerUserName = await resolveUserName(pool4, winnerUserId);
-      logRows.push({
-        id: row.id,
-        source: "log",
-        detectedAt: row.detected_at?.toISOString?.() || String(row.detected_at),
-        batchUuid: row.batch_uuid,
-        tableName: row.table_name,
-        tableDisplayName: getTableDisplayName(row.table_name),
-        rowUuid: row.row_uuid,
-        recordDisplay,
-        fieldName: row.field_name,
-        fieldDisplayName: getFieldDisplayName(row.field_name),
-        winner: {
-          value: row.receiver_current_value,
-          changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
-          instanceId: row.receiver_winner_instance || "",
-          userId: winnerUserId,
-          userName: winnerUserName,
-          locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
-        },
-        rejected: {
-          value: row.incoming_new_value,
-          changedAt: row.incoming_changed_at?.toISOString?.() || null,
-          instanceId: row.incoming_sender_instance || "",
-          userId: incomingUserId,
-          userName: incomingUserName,
-          locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
-        },
-        isResolved: row.is_resolved,
-        resolvedAt: row.resolved_at?.toISOString?.() || null,
-        resolvedBy: row.resolved_by,
-        resolvedAction: row.resolved_action
-      });
     }
-  }
-  if (source === "all" || source === "old") {
-    const conditions = [];
-    const params = [];
-    let paramIdx = 1;
-    if (resolved) {
-      conditions.push(`sc.resolution IS NOT NULL`);
-    } else {
-      conditions.push(`sc.resolution IS NULL`);
-    }
-    if (filters.tableName) {
-      conditions.push(`sc.table_name = $${paramIdx++}`);
-      params.push(filters.tableName);
-    }
-    if (filters.vesselId) {
-      conditions.push(`sc.vessel_id = $${paramIdx++}`);
-      params.push(filters.vesselId);
-    }
-    if (filters.dateFrom) {
-      conditions.push(`sc.created_at >= $${paramIdx++}`);
-      params.push(filters.dateFrom);
-    }
-    if (filters.dateTo) {
-      conditions.push(`sc.created_at <= $${paramIdx++}`);
-      params.push(filters.dateTo);
-    }
-    conditions.push(`(sc.is_deleted = false OR sc.is_deleted IS NULL)`);
-    const whereClause = conditions.join(" AND ");
-    const countResult = await pool4.query(
-      `SELECT COUNT(*) as cnt FROM sync_conflicts sc WHERE ${whereClause}`,
-      params
-    );
-    totalOld = parseInt(countResult.rows[0].cnt, 10);
-    const dataResult = await pool4.query(
-      `SELECT sc.*
-       FROM sync_conflicts sc
-       WHERE ${whereClause}
-       ORDER BY sc.created_at DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-      params
-    );
-    for (const row of dataResult.rows) {
-      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
-      const shipUserName = await resolveUserName(pool4, row.ship_changed_by);
-      const shoreUserName = await resolveUserName(pool4, row.shore_changed_by);
-      oldRows.push({
-        id: row.id,
-        source: "old",
-        detectedAt: row.created_at?.toISOString?.() || String(row.created_at),
-        batchUuid: row.sync_batch_id,
-        tableName: row.table_name,
-        tableDisplayName: getTableDisplayName(row.table_name),
-        rowUuid: row.row_uuid,
-        recordDisplay,
-        fieldName: row.field_name,
-        fieldDisplayName: getFieldDisplayName(row.field_name),
-        winner: {
-          value: row.shore_value,
-          changedAt: row.shore_changed_at?.toISOString?.() || null,
-          instanceId: "SHORE",
-          userId: row.shore_changed_by,
-          userName: shoreUserName,
-          locationLabel: "Shore \u2014 Office"
-        },
-        rejected: {
-          value: row.ship_value,
-          changedAt: row.ship_changed_at?.toISOString?.() || null,
-          instanceId: "SHIP",
-          userId: row.ship_changed_by,
-          userName: shipUserName,
-          locationLabel: "Ship"
-        },
-        isResolved: row.resolution !== null,
-        resolvedAt: row.resolved_at?.toISOString?.() || null,
-        resolvedBy: row.resolved_by,
-        resolvedAction: row.resolution
-      });
-    }
-  }
-  const allRows = [...logRows, ...oldRows].sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime()).slice(0, limit);
-  return { rows: allRows, total: totalLog + totalOld };
+  });
+  return { byJobId, byJobNo };
 }
-async function countUnresolvedConflicts(vesselId) {
-  const pool4 = await getPool();
-  let logQuery = `SELECT COUNT(*) as cnt FROM sync_conflict_log WHERE is_resolved = false`;
-  let oldQuery = `SELECT COUNT(*) as cnt FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)`;
-  const logParams = [];
-  const oldParams = [];
-  if (vesselId) {
-    logQuery += ` AND EXISTS (SELECT 1 FROM sync_field_log sfl WHERE sfl.table_name = sync_conflict_log.table_name AND sfl.row_uuid = sync_conflict_log.row_uuid AND sfl.vessel_id = $1 LIMIT 1)`;
-    logParams.push(vesselId);
-    oldQuery += ` AND vessel_id = $1`;
-    oldParams.push(vesselId);
-  }
-  const [logResult, oldResult] = await Promise.all([
-    pool4.query(logQuery, logParams),
-    pool4.query(oldQuery, oldParams)
-  ]);
-  const fromLog = parseInt(logResult.rows[0].cnt, 10);
-  const fromOld = parseInt(oldResult.rows[0].cnt, 10);
-  return { total: fromLog + fromOld, fromLog, fromOld };
-}
-async function getConflict2(id, source) {
-  const pool4 = await getPool();
-  if (source === "log") {
-    const result = await pool4.query(
-      `SELECT * FROM sync_conflict_log WHERE id = $1`,
-      [id]
-    );
-    if (result.rows.length === 0) return null;
-    const row = result.rows[0];
-    let incomingUserId = null;
-    let winnerUserId = null;
-    try {
-      const r = await pool4.query(
-        `SELECT changed_by_user_id FROM sync_field_log
-         WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
-         ORDER BY changed_at DESC LIMIT 1`,
-        [row.table_name, row.row_uuid, row.field_name, row.incoming_sender_instance]
-      );
-      incomingUserId = r.rows[0]?.changed_by_user_id || null;
-    } catch {
+function buildRhCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
     }
-    try {
-      const r = await pool4.query(
-        `SELECT changed_by_user_id FROM sync_field_log
-         WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
-         ORDER BY changed_at DESC LIMIT 1`,
-        [row.table_name, row.row_uuid, row.field_name, row.receiver_winner_instance]
-      );
-      winnerUserId = r.rows[0]?.changed_by_user_id || null;
-    } catch {
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
     }
-    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
-    return {
-      id: row.id,
-      source: "log",
-      detectedAt: row.detected_at?.toISOString?.() || String(row.detected_at),
-      batchUuid: row.batch_uuid,
-      tableName: row.table_name,
-      tableDisplayName: getTableDisplayName(row.table_name),
-      rowUuid: row.row_uuid,
-      recordDisplay,
-      fieldName: row.field_name,
-      fieldDisplayName: getFieldDisplayName(row.field_name),
-      winner: {
-        value: row.receiver_current_value,
-        changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
-        instanceId: row.receiver_winner_instance || "",
-        userId: winnerUserId,
-        userName: await resolveUserName(pool4, winnerUserId),
-        locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
-      },
-      rejected: {
-        value: row.incoming_new_value,
-        changedAt: row.incoming_changed_at?.toISOString?.() || null,
-        instanceId: row.incoming_sender_instance || "",
-        userId: incomingUserId,
-        userName: await resolveUserName(pool4, incomingUserId),
-        locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
-      },
-      isResolved: row.is_resolved,
-      resolvedAt: row.resolved_at?.toISOString?.() || null,
-      resolvedBy: row.resolved_by,
-      resolvedAction: row.resolved_action
-    };
-  } else {
-    const result = await pool4.query(
-      `SELECT * FROM sync_conflicts WHERE id = $1`,
-      [id]
-    );
-    if (result.rows.length === 0) return null;
-    const row = result.rows[0];
-    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
-    return {
-      id: row.id,
-      source: "old",
-      detectedAt: row.created_at?.toISOString?.() || String(row.created_at),
-      batchUuid: row.sync_batch_id,
-      tableName: row.table_name,
-      tableDisplayName: getTableDisplayName(row.table_name),
-      rowUuid: row.row_uuid,
-      recordDisplay,
-      fieldName: row.field_name,
-      fieldDisplayName: getFieldDisplayName(row.field_name),
-      winner: {
-        value: row.shore_value,
-        changedAt: row.shore_changed_at?.toISOString?.() || null,
-        instanceId: "SHORE",
-        userId: row.shore_changed_by,
-        userName: await resolveUserName(pool4, row.shore_changed_by),
-        locationLabel: "Shore \u2014 Office"
-      },
-      rejected: {
-        value: row.ship_value,
-        changedAt: row.ship_changed_at?.toISOString?.() || null,
-        instanceId: "SHIP",
-        userId: row.ship_changed_by,
-        userName: await resolveUserName(pool4, row.ship_changed_by),
-        locationLabel: "Ship"
-      },
-      isResolved: row.resolution !== null,
-      resolvedAt: row.resolved_at?.toISOString?.() || null,
-      resolvedBy: row.resolved_by,
-      resolvedAction: row.resolution
-    };
-  }
-}
-async function applyIncomingConflict(id, source, userId) {
-  const pool4 = await getPool();
-  if (source === "log") {
-    const conflictResult = await pool4.query(
-      `SELECT * FROM sync_conflict_log WHERE id = $1`,
-      [id]
-    );
-    if (conflictResult.rows.length === 0) return null;
-    const conflict = conflictResult.rows[0];
-    if (conflict.is_resolved) {
-      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
     }
-    const identityCol = getIdentityColumn(conflict.table_name) || "id";
-    const fieldNameSnake = toSnakeCase2(conflict.field_name);
-    const currentRow = await pool4.query(
-      `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
-      [conflict.row_uuid]
-    );
-    const oldValue = currentRow.rows[0]?.[fieldNameSnake] ?? null;
-    const vesselId = currentRow.rows[0]?.vessel_id ?? null;
-    await pool4.query(
-      `UPDATE "${conflict.table_name}"
-       SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
-       WHERE "${identityCol}" = $2`,
-      [conflict.incoming_new_value, conflict.row_uuid]
-    );
-    const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-    await pool4.query(
-      `INSERT INTO sync_field_log
-        (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
-         changed_by_user_id, instance_id, is_synced, is_sync)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
-      [
-        conflict.table_name,
-        conflict.row_uuid,
-        conflict.field_name,
-        oldValue !== null ? String(oldValue) : null,
-        conflict.incoming_new_value,
-        vesselId,
-        userId,
-        instanceId
-      ]
-    );
-    await pool4.query(
-      `UPDATE sync_conflict_log
-       SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'APPLY_INCOMING'
-       WHERE id = $2`,
-      [userId, id]
-    );
-    syncDiag(`CONFLICT RESOLVED: id=${id} source=log action=APPLY_INCOMING by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
-    return getConflict2(id, source);
-  } else {
-    const conflictResult = await pool4.query(
-      `SELECT * FROM sync_conflicts WHERE id = $1`,
-      [id]
-    );
-    if (conflictResult.rows.length === 0) return null;
-    const conflict = conflictResult.rows[0];
-    if (conflict.resolution !== null) {
-      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    if (wo.cycleDueRhSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
+      }
     }
-    const identityCol = getIdentityColumn(conflict.table_name) || "id";
-    const fieldNameSnake = toSnakeCase2(conflict.field_name);
-    const currentOldRow = await pool4.query(
-      `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
-      [conflict.row_uuid]
-    );
-    const oldValOld = currentOldRow.rows[0]?.[fieldNameSnake] ?? null;
-    const vesselIdOld = currentOldRow.rows[0]?.vessel_id ?? null;
-    await pool4.query(
-      `UPDATE "${conflict.table_name}"
-       SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
-       WHERE "${identityCol}" = $2`,
-      [conflict.ship_value, conflict.row_uuid]
-    );
-    const instanceIdOld = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-    await pool4.query(
-      `INSERT INTO sync_field_log
-        (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
-         changed_by_user_id, instance_id, is_synced, is_sync)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
-      [
-        conflict.table_name,
-        conflict.row_uuid,
-        conflict.field_name,
-        oldValOld !== null ? String(oldValOld) : null,
-        conflict.ship_value,
-        vesselIdOld,
-        userId,
-        instanceIdOld
-      ]
-    );
-    await pool4.query(
-      `UPDATE sync_conflicts
-       SET resolution = 'ship_wins', resolved_value = $1, resolved_at = NOW(), resolved_by = $2
-       WHERE id = $3`,
-      [conflict.ship_value, userId, id]
-    );
-    syncDiag(`CONFLICT RESOLVED: id=${id} source=old action=APPLY_INCOMING(ship_wins) by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
-    return getConflict2(id, source);
-  }
+  });
+  return cycleMap;
 }
-async function dismissConflict(id, source, userId) {
-  const pool4 = await getPool();
-  if (source === "log") {
-    const conflictResult = await pool4.query(
-      `SELECT * FROM sync_conflict_log WHERE id = $1`,
-      [id]
-    );
-    if (conflictResult.rows.length === 0) return null;
-    if (conflictResult.rows[0].is_resolved) {
-      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+function buildCalendarCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
     }
-    await pool4.query(
-      `UPDATE sync_conflict_log
-       SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'DISMISS'
-       WHERE id = $2`,
-      [userId, id]
-    );
-    syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId}`);
-    return getConflict2(id, source);
-  } else {
-    const conflictResult = await pool4.query(
-      `SELECT * FROM sync_conflicts WHERE id = $1`,
-      [id]
-    );
-    if (conflictResult.rows.length === 0) return null;
-    if (conflictResult.rows[0].resolution !== null) {
-      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
     }
-    await pool4.query(
-      `UPDATE sync_conflicts
-       SET resolution = 'dismissed', resolved_value = shore_value, resolved_at = NOW(), resolved_by = $1
-       WHERE id = $2`,
-      [userId, id]
-    );
-    syncDiag(`CONFLICT DISMISSED: id=${id} source=old by=${userId}`);
-    return getConflict2(id, source);
-  }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (wo.cycleDueDateSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
+      }
+    }
+  });
+  return cycleMap;
 }
-async function getConflictTableNames() {
-  const pool4 = await getPool();
-  const result = await pool4.query(`
-    SELECT DISTINCT table_name FROM (
-      SELECT table_name FROM sync_conflict_log WHERE is_resolved = false
-      UNION
-      SELECT table_name FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)
-    ) combined ORDER BY table_name
-  `);
-  return result.rows.map((r) => r.table_name);
+function findBlockingWOForJob(workOrders2, jobId, jobNo) {
+  return workOrders2.find((wo) => {
+    if (wo.isDeleted === true) return false;
+    if (!isBlockingStatus(wo.status)) return false;
+    if (wo.jobId === jobId) return true;
+    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+    return woJobNo === jobNo;
+  });
 }
-function toSnakeCase2(str) {
-  return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
-}
-var init_conflictReviewRepository = __esm({
-  "server/modules/sync/conflictReviewRepository.ts"() {
+var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
+var init_workOrderStatus = __esm({
+  "server/utils/workOrderStatus.ts"() {
     "use strict";
-    init_db();
-    init_syncConfig();
-    init_syncDiagLogger();
+    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "active",
+      "due",
+      "due (grace p)",
+      "due (grace)",
+      "overdue",
+      "pending approval",
+      "pending_approval",
+      "pendingapproval",
+      "postponed",
+      "in progress",
+      "in_progress",
+      "inprogress",
+      "open",
+      "rejected",
+      // Rejected WOs block new generation - work needs rework before cycle can advance
+      "awaiting office approval",
+      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
+      "postponement approved"
+      // Postponement approved — WO is still active, scanner must not re-generate
+    ]);
+    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "completed",
+      "closed",
+      "approved",
+      "cancelled",
+      "canceled"
+    ]);
+  }
+});
+
+// server/modules/sync/dualCompletionResolver.ts
+var dualCompletionResolver_exports = {};
+__export(dualCompletionResolver_exports, {
+  DUAL_COMPLETION_KIND: () => DUAL_COMPLETION_KIND,
+  RESOLUTION_ACTOR: () => RESOLUTION_ACTOR,
+  WO_COMPLETION_FIELDS_SNAKE: () => WO_COMPLETION_FIELDS_SNAKE,
+  chooseInterimSide: () => chooseInterimSide,
+  collectIncomingWoCompletionDates: () => collectIncomingWoCompletionDates,
+  evaluateDualCompletion: () => evaluateDualCompletion,
+  findWouuidsWithOpenDualConflicts: () => findWouuidsWithOpenDualConflicts,
+  isWoCompletionField: () => isWoCompletionField
+});
+function isWoCompletionField(fieldNameSnake) {
+  return WO_COMPLETION_FIELDS_SNAKE.has(fieldNameSnake);
+}
+function chooseInterimSide(local, incoming) {
+  const ld = parseReadingDay(local.completionDate)?.getTime() ?? null;
+  const id = parseReadingDay(incoming.completionDate)?.getTime() ?? null;
+  if (ld !== null && id !== null && ld !== id) return ld > id ? "local" : "incoming";
+  if (ld !== null && id === null) return "local";
+  if (ld === null && id !== null) return "incoming";
+  if (local.isShip !== incoming.isShip) return local.isShip ? "local" : "incoming";
+  return "local";
+}
+function collectIncomingWoCompletionDates(logs) {
+  const primary = /* @__PURE__ */ new Map();
+  const fallback = /* @__PURE__ */ new Map();
+  for (const log2 of logs) {
+    if (log2.tableName !== "work_orders" || !log2.newValue) continue;
+    const f = log2.fieldName.includes("_") ? log2.fieldName : log2.fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+    if (f === "date_completed") primary.set(log2.rowUuid, log2.newValue);
+    else if (f === "completion_date_time") fallback.set(log2.rowUuid, log2.newValue);
+  }
+  const out = /* @__PURE__ */ new Map();
+  fallback.forEach((v, k) => out.set(k, v));
+  primary.forEach((v, k) => out.set(k, v));
+  return out;
+}
+async function findWouuidsWithOpenDualConflicts(client, wouuids) {
+  if (wouuids.length === 0) return /* @__PURE__ */ new Set();
+  try {
+    const res = await client.query(
+      `SELECT DISTINCT row_uuid FROM sync_conflict_log
+        WHERE conflict_kind = $1 AND table_name = 'work_orders'
+          AND is_resolved = false AND row_uuid = ANY($2)`,
+      [DUAL_COMPLETION_KIND, wouuids]
+    );
+    return new Set(res.rows.map((r) => String(r.row_uuid)));
+  } catch (err) {
+    syncDiag(`DUAL-COMPLETION OPEN-CONFLICT CHECK FAILED (treating none as open): ${String(err?.message || err).substring(0, 120)}`);
+    return /* @__PURE__ */ new Set();
+  }
+}
+async function evaluateDualCompletion(client, log2, ctx) {
+  if (log2.tableName !== "work_orders") return NOT_DUAL;
+  const fieldSnake = log2.fieldName.includes("_") ? log2.fieldName : log2.fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+  if (!isWoCompletionField(fieldSnake)) return NOT_DUAL;
+  try {
+    if (log2.changedByUserId === RESOLUTION_ACTOR) {
+      await client.query(
+        `UPDATE sync_conflict_log
+            SET is_resolved = true, resolved_at = NOW(),
+                resolved_by = $1, resolved_action = 'REMOTE_RESOLUTION'
+          WHERE conflict_kind = $2 AND table_name = 'work_orders'
+            AND row_uuid = $3 AND field_name IN ($4, $5) AND is_resolved = false`,
+        [RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, log2.rowUuid, log2.fieldName, fieldSnake]
+      );
+      syncDiag(`DUAL-COMPLETION REMOTE-RESOLUTION: work_orders.${fieldSnake} row=${log2.rowUuid} \u2014 force-applying resolved value, local mirror conflict closed`);
+      return { dualConflict: false, applyIncoming: true, remoteResolution: true };
+    }
+    const rowRes = await client.query(
+      `SELECT status, date_completed, completion_date_time, "${fieldSnake}" AS current_value
+         FROM work_orders WHERE wouuid = $1 LIMIT 1`,
+      [log2.rowUuid]
+    );
+    if (rowRes.rows.length === 0) return NOT_DUAL;
+    const row = rowRes.rows[0];
+    if (!isCompletedStatus(row.status)) return NOT_DUAL;
+    if (fieldSnake === "status" && !isCompletedStatus(log2.newValue ?? null)) return NOT_DUAL;
+    const currentValue = row.current_value === null || row.current_value === void 0 ? null : String(row.current_value);
+    const incomingValue = log2.newValue === null || log2.newValue === void 0 ? null : String(log2.newValue);
+    if (currentValue === incomingValue) return NOT_DUAL;
+    if (currentValue !== null && incomingValue !== null) {
+      const cn = Number(currentValue), inn = Number(incomingValue);
+      if (currentValue.trim() !== "" && incomingValue.trim() !== "" && Number.isFinite(cn) && Number.isFinite(inn) && cn === inn) return NOT_DUAL;
+    }
+    const receiverId = ctx.receiverInstanceId;
+    if (!receiverId || receiverId === "UNKNOWN") return NOT_DUAL;
+    if (log2.instanceId && log2.instanceId === receiverId) return NOT_DUAL;
+    const localStatus = await client.query(
+      `SELECT new_value, changed_at FROM sync_field_log
+        WHERE table_name = 'work_orders' AND row_uuid = $1
+          AND instance_id = $2 AND field_name IN ('status')
+        ORDER BY changed_at DESC LIMIT 1`,
+      [log2.rowUuid, receiverId]
+    );
+    if (localStatus.rows.length === 0 || !isCompletedStatus(localStatus.rows[0].new_value)) {
+      return NOT_DUAL;
+    }
+    const localCompletion = await client.query(
+      `SELECT changed_at FROM sync_field_log
+        WHERE table_name = 'work_orders' AND row_uuid = $1
+          AND instance_id = $2 AND field_name = ANY($3)
+        ORDER BY changed_at DESC LIMIT 1`,
+      [log2.rowUuid, receiverId, COMPLETION_FIELD_NAME_VARIANTS]
+    );
+    if (localCompletion.rows.length === 0) return NOT_DUAL;
+    const existing = await client.query(
+      `SELECT id FROM sync_conflict_log
+        WHERE conflict_kind = $1 AND table_name = 'work_orders'
+          AND row_uuid = $2 AND field_name = $3 AND is_resolved = false LIMIT 1`,
+      [DUAL_COMPLETION_KIND, log2.rowUuid, log2.fieldName]
+    );
+    if (existing.rows.length === 0) {
+      await client.query(
+        `INSERT INTO sync_conflict_log
+           (batch_uuid, table_name, row_uuid, field_name, conflict_kind,
+            incoming_sender_instance, incoming_changed_at, incoming_old_value, incoming_new_value,
+            receiver_winner_instance, receiver_winner_changed_at, receiver_current_value)
+         VALUES ($1,'work_orders',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          ctx.batchUuid ?? null,
+          log2.rowUuid,
+          log2.fieldName,
+          DUAL_COMPLETION_KIND,
+          log2.instanceId ?? null,
+          log2.changedAt,
+          log2.oldValue ?? null,
+          incomingValue,
+          receiverId,
+          new Date(localCompletion.rows[0].changed_at),
+          currentValue
+        ]
+      );
+    }
+    const localDate = row.date_completed || row.completion_date_time || null;
+    const incomingDate = ctx.incomingCompletionDateByRow?.get(log2.rowUuid) ?? (fieldSnake === "date_completed" || fieldSnake === "completion_date_time" ? incomingValue : null);
+    const winner = chooseInterimSide(
+      { completionDate: localDate, isShip: isShipInstanceId(receiverId) },
+      { completionDate: incomingDate ?? null, isShip: log2.instanceId ? isShipInstanceId(log2.instanceId) : false }
+    );
+    const applyIncoming = winner === "incoming";
+    syncDiag(
+      `DUAL-COMPLETION CONFLICT: work_orders.${fieldSnake} row=${log2.rowUuid} \u2014 completed on BOTH sides (local ${localDate ?? "no-date"} vs incoming ${incomingDate ?? "no-date"}); interim=${winner}, ${applyIncoming ? "incoming value applied" : "local value kept"}; recorded for review`
+    );
+    return { dualConflict: true, applyIncoming, remoteResolution: false };
+  } catch (err) {
+    syncDiag(`DUAL-COMPLETION DETECT ERROR (fail-open to legacy guards): work_orders.${fieldSnake} row=${log2.rowUuid}: ${String(err?.message || err).substring(0, 150)}`);
+    return NOT_DUAL;
+  }
+}
+var RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, WO_COMPLETION_FIELDS_SNAKE, snakeToCamel, COMPLETION_FIELD_NAME_VARIANTS, NOT_DUAL;
+var init_dualCompletionResolver = __esm({
+  "server/modules/sync/dualCompletionResolver.ts"() {
+    "use strict";
+    init_workOrderStatus();
     init_syncRole();
+    init_rhEventComparator();
+    init_syncDiagLogger();
+    RESOLUTION_ACTOR = "sync-conflict-resolution";
+    DUAL_COMPLETION_KIND = "dual_completion";
+    WO_COMPLETION_FIELDS_SNAKE = /* @__PURE__ */ new Set([
+      "status",
+      "date_completed",
+      "completion_date_time",
+      "performed_by",
+      "completion_remarks",
+      "completion_rh",
+      "wo_completion_rh",
+      "completion_rh_source",
+      "completion_rh_validated",
+      "completion_rh_validation_details",
+      "rh_justification",
+      "rh_justification_provided_by",
+      "rh_justification_date",
+      "rh_backdated_entry",
+      "current_reading",
+      "current_reading_date",
+      "previous_reading",
+      "reading_date"
+    ]);
+    snakeToCamel = (s) => s.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+    COMPLETION_FIELD_NAME_VARIANTS = Array.from(WO_COMPLETION_FIELDS_SNAKE).flatMap((f) => [f, snakeToCamel(f)]);
+    NOT_DUAL = { dualConflict: false, applyIncoming: true, remoteResolution: false };
   }
 });
 
@@ -11079,168 +10830,6 @@ var init_jobCycleCalc = __esm({
   }
 });
 
-// server/utils/workOrderStatus.ts
-var workOrderStatus_exports = {};
-__export(workOrderStatus_exports, {
-  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
-  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
-  buildRhCycleWOMap: () => buildRhCycleWOMap,
-  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
-  findBlockingWOForJob: () => findBlockingWOForJob,
-  isBlockingStatus: () => isBlockingStatus,
-  isCompletedStatus: () => isCompletedStatus
-});
-function isBlockingStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
-}
-function isCompletedStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
-}
-function extractJobNoFromWorkOrderNo(workOrderNo) {
-  if (!workOrderNo) return null;
-  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-  if (newFormatMatch) {
-    return newFormatMatch[1];
-  }
-  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
-  if (woSuffixMatch) {
-    return woSuffixMatch[1];
-  }
-  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-  if (oldFormatMatch) {
-    return oldFormatMatch[1];
-  }
-  return null;
-}
-function buildJobsWithActiveWOSet(workOrders2, vesselId) {
-  const byJobId = /* @__PURE__ */ new Set();
-  const byJobNo = /* @__PURE__ */ new Set();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (isBlockingStatus(wo.status)) {
-      if (wo.jobId) {
-        byJobId.add(wo.jobId);
-      }
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        byJobNo.add(`${woVesselId}|${jobNo}`);
-      }
-    }
-  });
-  return { byJobId, byJobNo };
-}
-function buildRhCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueRhSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function buildCalendarCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueDateSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function findBlockingWOForJob(workOrders2, jobId, jobNo) {
-  return workOrders2.find((wo) => {
-    if (wo.isDeleted === true) return false;
-    if (!isBlockingStatus(wo.status)) return false;
-    if (wo.jobId === jobId) return true;
-    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-    return woJobNo === jobNo;
-  });
-}
-var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
-var init_workOrderStatus = __esm({
-  "server/utils/workOrderStatus.ts"() {
-    "use strict";
-    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "active",
-      "due",
-      "due (grace p)",
-      "due (grace)",
-      "overdue",
-      "pending approval",
-      "pending_approval",
-      "pendingapproval",
-      "postponed",
-      "in progress",
-      "in_progress",
-      "inprogress",
-      "open",
-      "rejected",
-      // Rejected WOs block new generation - work needs rework before cycle can advance
-      "awaiting office approval",
-      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
-      "postponement approved"
-      // Postponement approved — WO is still active, scanner must not re-generate
-    ]);
-    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "completed",
-      "closed",
-      "approved",
-      "cancelled",
-      "canceled"
-    ]);
-  }
-});
-
 // server/modules/sync/shipCompletionLearner.ts
 var shipCompletionLearner_exports = {};
 __export(shipCompletionLearner_exports, {
@@ -11408,6 +10997,756 @@ var init_shipCompletionLearner = __esm({
       lastDoneRH: "last_done_rh",
       nextDueRH: "next_due_rh"
     };
+  }
+});
+
+// server/modules/sync/conflictReviewRepository.ts
+async function runPostResolutionLearning(pool4, wouuid) {
+  const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+  if (isShipInstanceId(instanceId)) return;
+  const stillOpen = await findWouuidsWithOpenDualConflicts(pool4, [wouuid]);
+  if (stillOpen.has(wouuid)) {
+    syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING DEFERRED: wouuid=${wouuid} \u2014 sibling field conflicts still open`);
+    return;
+  }
+  const client = await pool4.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+    const { learnFromShipCompletions: learnFromShipCompletions2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+    await learnFromShipCompletions2(client, [wouuid]);
+    await client.query("COMMIT");
+    syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING: wouuid=${wouuid}`);
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+    }
+    syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING FAILED (non-fatal): wouuid=${wouuid}: ${String(err?.message || err).substring(0, 150)}`);
+  } finally {
+    client.release();
+  }
+}
+function getTableDisplayName(tableName) {
+  const map = {
+    work_orders: "Work Orders",
+    work_order_executions: "WO Executions",
+    work_order_documents: "WO Documents",
+    work_order_postponements: "WO Postponements",
+    defects: "Defects",
+    defect_actions: "Defect Actions",
+    defect_attachments: "Defect Attachments",
+    defect_sequences: "Defect Sequences",
+    spares: "Spares",
+    spares_history: "Spares History",
+    spare_location_stock: "Spare Location Stock",
+    stores_items: "Stores Items",
+    stores_ledger: "Stores Ledger",
+    inventory_transactions: "Inventory Transactions",
+    change_request: "Change Requests",
+    change_request_approval: "CR Approvals",
+    change_request_comment: "CR Comments",
+    running_hours_audit: "Running Hours Audit",
+    component_running_hours_log: "Running Hours Log",
+    component_maintenance_history: "Maintenance History",
+    vessel_certificate_data: "Vessel Certificates",
+    vessel_survey_data: "Vessel Surveys",
+    planner_dates: "Planner Dates",
+    components: "Components",
+    jobs: "Jobs"
+  };
+  return map[tableName] || tableName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function getFieldDisplayName(fieldName) {
+  const acronymMap = {
+    rh: "RH",
+    rob: "ROB",
+    utc: "UTC",
+    tz: "TZ",
+    uuid: "UUID",
+    wo: "WO",
+    cr: "CR",
+    coc: "CoC",
+    id: "ID",
+    url: "URL",
+    html: "HTML",
+    sfi: "SFI",
+    viq: "VIQ",
+    pms: "PMS"
+  };
+  let words;
+  if (fieldName.includes("_")) {
+    words = fieldName;
+  } else {
+    words = fieldName.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+  }
+  return words.replace(/_/g, " ").split(" ").map((w) => {
+    const lower = w.toLowerCase();
+    if (acronymMap[lower]) return acronymMap[lower];
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(" ");
+}
+function getInstanceLabel(instanceId, vesselName) {
+  if (!instanceId) return "Unknown";
+  if (isShipInstanceId(instanceId)) {
+    return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId})`;
+  }
+  if (instanceId.toUpperCase().startsWith("SHORE")) {
+    return "Shore \u2014 Office";
+  }
+  return instanceId;
+}
+async function getRecordLabel(pool4, tableName, rowUuid) {
+  const labelConfigs = {
+    work_orders: {
+      cols: ["job_title", "component_code"],
+      format: (a, b) => b ? `WO: ${a} (${b})` : `WO: ${a}`
+    },
+    defects: {
+      cols: ["id", "description"],
+      format: (a, b) => `Defect ${a}: ${(b || "").substring(0, 60)}`
+    },
+    spares: {
+      cols: ["part_name", "part_code"],
+      format: (a, b) => b ? `Spare: ${a} (${b})` : `Spare: ${a}`
+    },
+    stores_items: {
+      cols: ["item_name", "item_code"],
+      format: (a, b) => b ? `Store: ${a} (${b})` : `Store: ${a}`
+    },
+    change_request: {
+      cols: ["title"],
+      format: (a) => `CR: ${a}`
+    },
+    running_hours_audit: {
+      cols: ["component_name", "component_code"],
+      format: (a, b) => b ? `RH: ${a} (${b})` : `RH: ${a}`
+    },
+    work_order_executions: {
+      cols: ["id"],
+      format: (a) => `WO Exec: ${a}`
+    },
+    work_order_documents: {
+      cols: ["document_name"],
+      format: (a) => `WO Doc: ${a}`
+    },
+    defect_actions: {
+      cols: ["action_description"],
+      format: (a) => `Action: ${(a || "").substring(0, 60)}`
+    },
+    vessel_certificate_data: {
+      cols: ["certificate_name"],
+      format: (a) => `Cert: ${a}`
+    },
+    vessel_survey_data: {
+      cols: ["survey_name"],
+      format: (a) => `Survey: ${a}`
+    },
+    components: {
+      cols: ["component_name", "component_code"],
+      format: (a, b) => b ? `${a} (${b})` : `${a}`
+    },
+    jobs: {
+      cols: ["job_title", "job_code"],
+      format: (a, b) => b ? `${a} (${b})` : `${a}`
+    }
+  };
+  const config = labelConfigs[tableName];
+  if (!config) return `${tableName} ${rowUuid.substring(0, 8)}`;
+  const identityCol = getIdentityColumn(tableName) || "id";
+  const selectCols = config.cols.map((c) => `"${c}"`).join(", ");
+  try {
+    const result = await pool4.query(
+      `SELECT ${selectCols} FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+      [rowUuid]
+    );
+    if (result.rows.length === 0) return `${tableName} ${rowUuid.substring(0, 8)}`;
+    const vals = config.cols.map((c) => result.rows[0][c] ?? "");
+    return config.format(...vals) || `${tableName} ${rowUuid.substring(0, 8)}`;
+  } catch {
+    return `${tableName} ${rowUuid.substring(0, 8)}`;
+  }
+}
+async function resolveUserName(pool4, userId) {
+  if (!userId || userId === "system" || userId === "System" || userId === "admin") return "System";
+  const parsed = parseInt(userId, 10);
+  if (isNaN(parsed)) return userId;
+  try {
+    const result = await pool4.query(
+      `SELECT full_name FROM users WHERE id = $1 LIMIT 1`,
+      [parsed]
+    );
+    return result.rows[0]?.full_name || `User ${userId}`;
+  } catch {
+    return `User ${userId}`;
+  }
+}
+async function listConflicts(filters) {
+  const pool4 = await getPool();
+  const limit = Math.min(filters.limit || 50, 200);
+  const offset = filters.offset || 0;
+  const source = filters.source || "all";
+  const resolved = filters.resolved ?? false;
+  const logRows = [];
+  const oldRows = [];
+  let totalLog = 0;
+  let totalOld = 0;
+  if (source === "all" || source === "log") {
+    const conditions = [`cl.is_resolved = $1`];
+    const params = [resolved];
+    let paramIdx = 2;
+    if (filters.tableName) {
+      conditions.push(`cl.table_name = $${paramIdx++}`);
+      params.push(filters.tableName);
+    }
+    if (filters.vesselId) {
+      conditions.push(`EXISTS (SELECT 1 FROM sync_field_log sfl WHERE sfl.table_name = cl.table_name AND sfl.row_uuid = cl.row_uuid AND sfl.vessel_id = $${paramIdx++} LIMIT 1)`);
+      params.push(filters.vesselId);
+    }
+    if (filters.dateFrom) {
+      conditions.push(`cl.detected_at >= $${paramIdx++}`);
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      conditions.push(`cl.detected_at <= $${paramIdx++}`);
+      params.push(filters.dateTo);
+    }
+    const whereClause = conditions.join(" AND ");
+    const countResult = await pool4.query(
+      `SELECT COUNT(*) as cnt FROM sync_conflict_log cl WHERE ${whereClause}`,
+      params
+    );
+    totalLog = parseInt(countResult.rows[0].cnt, 10);
+    const dataResult = await pool4.query(
+      `SELECT cl.*
+       FROM sync_conflict_log cl
+       WHERE ${whereClause}
+       ORDER BY cl.detected_at DESC
+       LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+    for (const row of dataResult.rows) {
+      let incomingUserId = null;
+      let winnerUserId = null;
+      try {
+        const incomingUser = await pool4.query(
+          `SELECT changed_by_user_id FROM sync_field_log
+           WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
+             AND instance_id = $4
+           ORDER BY changed_at DESC LIMIT 1`,
+          [row.table_name, row.row_uuid, row.field_name, row.incoming_sender_instance]
+        );
+        incomingUserId = incomingUser.rows[0]?.changed_by_user_id || null;
+      } catch {
+      }
+      try {
+        const winnerUser = await pool4.query(
+          `SELECT changed_by_user_id FROM sync_field_log
+           WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
+             AND instance_id = $4
+           ORDER BY changed_at DESC LIMIT 1`,
+          [row.table_name, row.row_uuid, row.field_name, row.receiver_winner_instance]
+        );
+        winnerUserId = winnerUser.rows[0]?.changed_by_user_id || null;
+      } catch {
+      }
+      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+      const incomingUserName = await resolveUserName(pool4, incomingUserId);
+      const winnerUserName = await resolveUserName(pool4, winnerUserId);
+      logRows.push({
+        id: row.id,
+        source: "log",
+        detectedAt: row.detected_at?.toISOString?.() || String(row.detected_at),
+        batchUuid: row.batch_uuid,
+        tableName: row.table_name,
+        tableDisplayName: getTableDisplayName(row.table_name),
+        rowUuid: row.row_uuid,
+        recordDisplay,
+        fieldName: row.field_name,
+        fieldDisplayName: getFieldDisplayName(row.field_name),
+        winner: {
+          value: row.receiver_current_value,
+          changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
+          instanceId: row.receiver_winner_instance || "",
+          userId: winnerUserId,
+          userName: winnerUserName,
+          locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
+        },
+        rejected: {
+          value: row.incoming_new_value,
+          changedAt: row.incoming_changed_at?.toISOString?.() || null,
+          instanceId: row.incoming_sender_instance || "",
+          userId: incomingUserId,
+          userName: incomingUserName,
+          locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
+        },
+        isResolved: row.is_resolved,
+        resolvedAt: row.resolved_at?.toISOString?.() || null,
+        resolvedBy: row.resolved_by,
+        resolvedAction: row.resolved_action,
+        conflictKind: row.conflict_kind ?? null
+      });
+    }
+  }
+  if (source === "all" || source === "old") {
+    const conditions = [];
+    const params = [];
+    let paramIdx = 1;
+    if (resolved) {
+      conditions.push(`sc.resolution IS NOT NULL`);
+    } else {
+      conditions.push(`sc.resolution IS NULL`);
+    }
+    if (filters.tableName) {
+      conditions.push(`sc.table_name = $${paramIdx++}`);
+      params.push(filters.tableName);
+    }
+    if (filters.vesselId) {
+      conditions.push(`sc.vessel_id = $${paramIdx++}`);
+      params.push(filters.vesselId);
+    }
+    if (filters.dateFrom) {
+      conditions.push(`sc.created_at >= $${paramIdx++}`);
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      conditions.push(`sc.created_at <= $${paramIdx++}`);
+      params.push(filters.dateTo);
+    }
+    conditions.push(`(sc.is_deleted = false OR sc.is_deleted IS NULL)`);
+    const whereClause = conditions.join(" AND ");
+    const countResult = await pool4.query(
+      `SELECT COUNT(*) as cnt FROM sync_conflicts sc WHERE ${whereClause}`,
+      params
+    );
+    totalOld = parseInt(countResult.rows[0].cnt, 10);
+    const dataResult = await pool4.query(
+      `SELECT sc.*
+       FROM sync_conflicts sc
+       WHERE ${whereClause}
+       ORDER BY sc.created_at DESC
+       LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+    for (const row of dataResult.rows) {
+      const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+      const shipUserName = await resolveUserName(pool4, row.ship_changed_by);
+      const shoreUserName = await resolveUserName(pool4, row.shore_changed_by);
+      oldRows.push({
+        id: row.id,
+        source: "old",
+        detectedAt: row.created_at?.toISOString?.() || String(row.created_at),
+        batchUuid: row.sync_batch_id,
+        tableName: row.table_name,
+        tableDisplayName: getTableDisplayName(row.table_name),
+        rowUuid: row.row_uuid,
+        recordDisplay,
+        fieldName: row.field_name,
+        fieldDisplayName: getFieldDisplayName(row.field_name),
+        winner: {
+          value: row.shore_value,
+          changedAt: row.shore_changed_at?.toISOString?.() || null,
+          instanceId: "SHORE",
+          userId: row.shore_changed_by,
+          userName: shoreUserName,
+          locationLabel: "Shore \u2014 Office"
+        },
+        rejected: {
+          value: row.ship_value,
+          changedAt: row.ship_changed_at?.toISOString?.() || null,
+          instanceId: "SHIP",
+          userId: row.ship_changed_by,
+          userName: shipUserName,
+          locationLabel: "Ship"
+        },
+        isResolved: row.resolution !== null,
+        resolvedAt: row.resolved_at?.toISOString?.() || null,
+        resolvedBy: row.resolved_by,
+        resolvedAction: row.resolution
+      });
+    }
+  }
+  const allRows = [...logRows, ...oldRows].sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime()).slice(0, limit);
+  return { rows: allRows, total: totalLog + totalOld };
+}
+async function countUnresolvedConflicts(vesselId) {
+  const pool4 = await getPool();
+  let logQuery = `SELECT COUNT(*) as cnt FROM sync_conflict_log WHERE is_resolved = false`;
+  let oldQuery = `SELECT COUNT(*) as cnt FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)`;
+  const logParams = [];
+  const oldParams = [];
+  if (vesselId) {
+    logQuery += ` AND EXISTS (SELECT 1 FROM sync_field_log sfl WHERE sfl.table_name = sync_conflict_log.table_name AND sfl.row_uuid = sync_conflict_log.row_uuid AND sfl.vessel_id = $1 LIMIT 1)`;
+    logParams.push(vesselId);
+    oldQuery += ` AND vessel_id = $1`;
+    oldParams.push(vesselId);
+  }
+  const [logResult, oldResult] = await Promise.all([
+    pool4.query(logQuery, logParams),
+    pool4.query(oldQuery, oldParams)
+  ]);
+  const fromLog = parseInt(logResult.rows[0].cnt, 10);
+  const fromOld = parseInt(oldResult.rows[0].cnt, 10);
+  return { total: fromLog + fromOld, fromLog, fromOld };
+}
+async function getConflict2(id, source) {
+  const pool4 = await getPool();
+  if (source === "log") {
+    const result = await pool4.query(
+      `SELECT * FROM sync_conflict_log WHERE id = $1`,
+      [id]
+    );
+    if (result.rows.length === 0) return null;
+    const row = result.rows[0];
+    let incomingUserId = null;
+    let winnerUserId = null;
+    try {
+      const r = await pool4.query(
+        `SELECT changed_by_user_id FROM sync_field_log
+         WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
+         ORDER BY changed_at DESC LIMIT 1`,
+        [row.table_name, row.row_uuid, row.field_name, row.incoming_sender_instance]
+      );
+      incomingUserId = r.rows[0]?.changed_by_user_id || null;
+    } catch {
+    }
+    try {
+      const r = await pool4.query(
+        `SELECT changed_by_user_id FROM sync_field_log
+         WHERE table_name=$1 AND row_uuid=$2 AND field_name=$3 AND instance_id=$4
+         ORDER BY changed_at DESC LIMIT 1`,
+        [row.table_name, row.row_uuid, row.field_name, row.receiver_winner_instance]
+      );
+      winnerUserId = r.rows[0]?.changed_by_user_id || null;
+    } catch {
+    }
+    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+    return {
+      id: row.id,
+      source: "log",
+      detectedAt: row.detected_at?.toISOString?.() || String(row.detected_at),
+      batchUuid: row.batch_uuid,
+      tableName: row.table_name,
+      tableDisplayName: getTableDisplayName(row.table_name),
+      rowUuid: row.row_uuid,
+      recordDisplay,
+      fieldName: row.field_name,
+      fieldDisplayName: getFieldDisplayName(row.field_name),
+      winner: {
+        value: row.receiver_current_value,
+        changedAt: row.receiver_winner_changed_at?.toISOString?.() || null,
+        instanceId: row.receiver_winner_instance || "",
+        userId: winnerUserId,
+        userName: await resolveUserName(pool4, winnerUserId),
+        locationLabel: getInstanceLabel(row.receiver_winner_instance || "")
+      },
+      rejected: {
+        value: row.incoming_new_value,
+        changedAt: row.incoming_changed_at?.toISOString?.() || null,
+        instanceId: row.incoming_sender_instance || "",
+        userId: incomingUserId,
+        userName: await resolveUserName(pool4, incomingUserId),
+        locationLabel: getInstanceLabel(row.incoming_sender_instance || "")
+      },
+      isResolved: row.is_resolved,
+      resolvedAt: row.resolved_at?.toISOString?.() || null,
+      resolvedBy: row.resolved_by,
+      resolvedAction: row.resolved_action,
+      conflictKind: row.conflict_kind ?? null
+    };
+  } else {
+    const result = await pool4.query(
+      `SELECT * FROM sync_conflicts WHERE id = $1`,
+      [id]
+    );
+    if (result.rows.length === 0) return null;
+    const row = result.rows[0];
+    const recordDisplay = await getRecordLabel(pool4, row.table_name, row.row_uuid);
+    return {
+      id: row.id,
+      source: "old",
+      detectedAt: row.created_at?.toISOString?.() || String(row.created_at),
+      batchUuid: row.sync_batch_id,
+      tableName: row.table_name,
+      tableDisplayName: getTableDisplayName(row.table_name),
+      rowUuid: row.row_uuid,
+      recordDisplay,
+      fieldName: row.field_name,
+      fieldDisplayName: getFieldDisplayName(row.field_name),
+      winner: {
+        value: row.shore_value,
+        changedAt: row.shore_changed_at?.toISOString?.() || null,
+        instanceId: "SHORE",
+        userId: row.shore_changed_by,
+        userName: await resolveUserName(pool4, row.shore_changed_by),
+        locationLabel: "Shore \u2014 Office"
+      },
+      rejected: {
+        value: row.ship_value,
+        changedAt: row.ship_changed_at?.toISOString?.() || null,
+        instanceId: "SHIP",
+        userId: row.ship_changed_by,
+        userName: await resolveUserName(pool4, row.ship_changed_by),
+        locationLabel: "Ship"
+      },
+      isResolved: row.resolution !== null,
+      resolvedAt: row.resolved_at?.toISOString?.() || null,
+      resolvedBy: row.resolved_by,
+      resolvedAction: row.resolution
+    };
+  }
+}
+async function resolveDualCompletionGroup(pool4, conflict, choice, userId) {
+  const identityCol = getIdentityColumn(conflict.table_name) || "id";
+  const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+  const resolvedAction = choice === "incoming" ? "APPLY_INCOMING" : "DISMISS";
+  const client = await pool4.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+    const siblings = (await client.query(
+      `SELECT * FROM sync_conflict_log
+        WHERE conflict_kind = $1 AND table_name = $2 AND row_uuid = $3 AND is_resolved = false
+        FOR UPDATE`,
+      [DUAL_COMPLETION_KIND, conflict.table_name, conflict.row_uuid]
+    )).rows;
+    const vesselRow = await client.query(
+      `SELECT vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+      [conflict.row_uuid]
+    );
+    const vesselId = vesselRow.rows[0]?.vessel_id ?? null;
+    for (const sib of siblings) {
+      const fieldSnake = toSnakeCase2(sib.field_name);
+      const cur = await client.query(
+        `SELECT "${fieldSnake}" AS v FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+        [conflict.row_uuid]
+      );
+      const currentValue = cur.rows[0]?.v ?? null;
+      const chosenValue = choice === "incoming" ? sib.incoming_new_value : currentValue !== null ? String(currentValue) : null;
+      const rejectedValue = choice === "incoming" ? currentValue !== null ? String(currentValue) : null : sib.incoming_new_value;
+      if (choice === "incoming") {
+        await client.query(
+          `UPDATE "${conflict.table_name}" SET "${fieldSnake}" = $1, "updated_at" = NOW()
+            WHERE "${identityCol}" = $2`,
+          [chosenValue, conflict.row_uuid]
+        );
+      }
+      await client.query(
+        `INSERT INTO sync_field_log
+          (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
+           changed_by_user_id, instance_id, is_synced, is_sync)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
+        [
+          conflict.table_name,
+          conflict.row_uuid,
+          sib.field_name,
+          rejectedValue,
+          chosenValue,
+          vesselId,
+          RESOLUTION_ACTOR,
+          instanceId
+        ]
+      );
+      await client.query(
+        `UPDATE sync_conflict_log
+            SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = $2
+          WHERE id = $3`,
+        [userId, resolvedAction, sib.id]
+      );
+    }
+    await client.query("COMMIT");
+    syncDiag(`DUAL-COMPLETION GROUP RESOLVED: row=${conflict.row_uuid} choice=${choice} fields=${siblings.length} by=${userId} \u2014 resolution logs queued for propagation`);
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+async function applyIncomingConflict(id, source, userId) {
+  const pool4 = await getPool();
+  if (source === "log") {
+    const conflictResult = await pool4.query(
+      `SELECT * FROM sync_conflict_log WHERE id = $1`,
+      [id]
+    );
+    if (conflictResult.rows.length === 0) return null;
+    const conflict = conflictResult.rows[0];
+    if (conflict.is_resolved) {
+      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    }
+    const isDualCompletion = conflict.conflict_kind === DUAL_COMPLETION_KIND;
+    if (isDualCompletion) {
+      await resolveDualCompletionGroup(pool4, conflict, "incoming", userId);
+      syncDiag(`CONFLICT RESOLVED: id=${id} source=log action=APPLY_INCOMING by=${userId} table=${conflict.table_name}.${conflict.field_name} kind=dual_completion (whole completion group)`);
+      if (conflict.table_name === "work_orders") {
+        await runPostResolutionLearning(pool4, conflict.row_uuid);
+      }
+      return getConflict2(id, source);
+    }
+    const identityCol = getIdentityColumn(conflict.table_name) || "id";
+    const fieldNameSnake = toSnakeCase2(conflict.field_name);
+    const currentRow = await pool4.query(
+      `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+      [conflict.row_uuid]
+    );
+    const oldValue = currentRow.rows[0]?.[fieldNameSnake] ?? null;
+    const vesselId = currentRow.rows[0]?.vessel_id ?? null;
+    await pool4.query(
+      `UPDATE "${conflict.table_name}"
+       SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
+       WHERE "${identityCol}" = $2`,
+      [conflict.incoming_new_value, conflict.row_uuid]
+    );
+    const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+    await pool4.query(
+      `INSERT INTO sync_field_log
+        (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
+         changed_by_user_id, instance_id, is_synced, is_sync)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
+      [
+        conflict.table_name,
+        conflict.row_uuid,
+        conflict.field_name,
+        oldValue !== null ? String(oldValue) : null,
+        conflict.incoming_new_value,
+        vesselId,
+        userId,
+        instanceId
+      ]
+    );
+    await pool4.query(
+      `UPDATE sync_conflict_log
+       SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'APPLY_INCOMING'
+       WHERE id = $2`,
+      [userId, id]
+    );
+    syncDiag(`CONFLICT RESOLVED: id=${id} source=log action=APPLY_INCOMING by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
+    return getConflict2(id, source);
+  } else {
+    const conflictResult = await pool4.query(
+      `SELECT * FROM sync_conflicts WHERE id = $1`,
+      [id]
+    );
+    if (conflictResult.rows.length === 0) return null;
+    const conflict = conflictResult.rows[0];
+    if (conflict.resolution !== null) {
+      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    }
+    const identityCol = getIdentityColumn(conflict.table_name) || "id";
+    const fieldNameSnake = toSnakeCase2(conflict.field_name);
+    const currentOldRow = await pool4.query(
+      `SELECT "${fieldNameSnake}", vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+      [conflict.row_uuid]
+    );
+    const oldValOld = currentOldRow.rows[0]?.[fieldNameSnake] ?? null;
+    const vesselIdOld = currentOldRow.rows[0]?.vessel_id ?? null;
+    await pool4.query(
+      `UPDATE "${conflict.table_name}"
+       SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
+       WHERE "${identityCol}" = $2`,
+      [conflict.ship_value, conflict.row_uuid]
+    );
+    const instanceIdOld = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+    await pool4.query(
+      `INSERT INTO sync_field_log
+        (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
+         changed_by_user_id, instance_id, is_synced, is_sync)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
+      [
+        conflict.table_name,
+        conflict.row_uuid,
+        conflict.field_name,
+        oldValOld !== null ? String(oldValOld) : null,
+        conflict.ship_value,
+        vesselIdOld,
+        userId,
+        instanceIdOld
+      ]
+    );
+    await pool4.query(
+      `UPDATE sync_conflicts
+       SET resolution = 'ship_wins', resolved_value = $1, resolved_at = NOW(), resolved_by = $2
+       WHERE id = $3`,
+      [conflict.ship_value, userId, id]
+    );
+    syncDiag(`CONFLICT RESOLVED: id=${id} source=old action=APPLY_INCOMING(ship_wins) by=${userId} table=${conflict.table_name}.${conflict.field_name}`);
+    return getConflict2(id, source);
+  }
+}
+async function dismissConflict(id, source, userId) {
+  const pool4 = await getPool();
+  if (source === "log") {
+    const conflictResult = await pool4.query(
+      `SELECT * FROM sync_conflict_log WHERE id = $1`,
+      [id]
+    );
+    if (conflictResult.rows.length === 0) return null;
+    const conflict = conflictResult.rows[0];
+    if (conflict.is_resolved) {
+      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    }
+    const isDualDismiss = conflict.conflict_kind === DUAL_COMPLETION_KIND;
+    if (isDualDismiss) {
+      await resolveDualCompletionGroup(pool4, conflict, "current", userId);
+      syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId} kind=dual_completion (whole completion group kept + re-asserted for propagation)`);
+      if (conflict.table_name === "work_orders") {
+        await runPostResolutionLearning(pool4, conflict.row_uuid);
+      }
+      return getConflict2(id, source);
+    }
+    await pool4.query(
+      `UPDATE sync_conflict_log
+       SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = 'DISMISS'
+       WHERE id = $2`,
+      [userId, id]
+    );
+    syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId}`);
+    return getConflict2(id, source);
+  } else {
+    const conflictResult = await pool4.query(
+      `SELECT * FROM sync_conflicts WHERE id = $1`,
+      [id]
+    );
+    if (conflictResult.rows.length === 0) return null;
+    if (conflictResult.rows[0].resolution !== null) {
+      throw Object.assign(new Error("Conflict is already resolved"), { statusCode: 409 });
+    }
+    await pool4.query(
+      `UPDATE sync_conflicts
+       SET resolution = 'dismissed', resolved_value = shore_value, resolved_at = NOW(), resolved_by = $1
+       WHERE id = $2`,
+      [userId, id]
+    );
+    syncDiag(`CONFLICT DISMISSED: id=${id} source=old by=${userId}`);
+    return getConflict2(id, source);
+  }
+}
+async function getConflictTableNames() {
+  const pool4 = await getPool();
+  const result = await pool4.query(`
+    SELECT DISTINCT table_name FROM (
+      SELECT table_name FROM sync_conflict_log WHERE is_resolved = false
+      UNION
+      SELECT table_name FROM sync_conflicts WHERE resolution IS NULL AND (is_deleted = false OR is_deleted IS NULL)
+    ) combined ORDER BY table_name
+  `);
+  return result.rows.map((r) => r.table_name);
+}
+function toSnakeCase2(str) {
+  return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+}
+var init_conflictReviewRepository = __esm({
+  "server/modules/sync/conflictReviewRepository.ts"() {
+    "use strict";
+    init_db();
+    init_syncConfig();
+    init_syncDiagLogger();
+    init_syncRole();
+    init_dualCompletionResolver();
   }
 });
 
@@ -11606,6 +11945,13 @@ async function receivePushData(batchUuid, vesselId, payload) {
           syncDiag("WARNING: SYNC_INSTANCE_ID not set \u2014 per-field stale-skip protection degraded");
           console.error("[Sync Push] CRITICAL: SYNC_INSTANCE_ID env var not configured \u2014 stale-skip guard cannot distinguish receiver-local edits");
         }
+        const { evaluateDualCompletion: evaluateDualCompletion2, collectIncomingWoCompletionDates: collectIncomingWoCompletionDates2 } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
+        const dualCtxPush = {
+          receiverInstanceId,
+          batchUuid,
+          incomingCompletionDateByRow: collectIncomingWoCompletionDates2(insertResult.updateLogs)
+        };
+        const dualConflictWouuids = /* @__PURE__ */ new Set();
         let pushUpdIdx = 0;
         for (const log2 of insertResult.updateLogs) {
           const config = getTableSyncConfig(log2.tableName);
@@ -11620,7 +11966,23 @@ async function receivePushData(batchUuid, vesselId, payload) {
           try {
             const logChangedAt = log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt));
             const isInsertLog = log2.oldValue === null || log2.oldValue === void 0;
-            if (isInsertLog) {
+            const dual = await evaluateDualCompletion2(client, { ...log2, changedAt: logChangedAt }, dualCtxPush);
+            let dualBypassGuards = false;
+            if (dual.remoteResolution) {
+              dualBypassGuards = true;
+            } else if (dual.dualConflict) {
+              dualConflictWouuids.add(log2.rowUuid);
+              if (!dual.applyIncoming) {
+                try {
+                  await client.query(`RELEASE SAVEPOINT ${pushSp}`);
+                } catch {
+                }
+                continue;
+              }
+              dualBypassGuards = true;
+            }
+            if (dualBypassGuards) {
+            } else if (isInsertLog) {
               const guard = await evaluateInsertOriginGuard(client, log2);
               if (guard.skip) {
                 try {
@@ -11705,6 +12067,11 @@ async function receivePushData(batchUuid, vesselId, payload) {
               }
             }
             const meta = await getColumnMeta(client, log2.tableName);
+            if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+              syncDiag(`UPDATE SKIP (unknown column): ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} \u2014 column not in local schema (pre-migration instance); acked without apply`);
+              fieldLogsApplied++;
+              continue;
+            }
             let valueToApply = effectiveNewValue;
             if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
               try {
@@ -11726,30 +12093,14 @@ async function receivePushData(batchUuid, vesselId, payload) {
             if (log2.tableName === "running_hours_audit" && (fieldNameSnake === "new_rh" || fieldNameSnake === "cumulative_rh") && valueToApply !== null) {
               try {
                 const auditRow = await client.query(
-                  `SELECT component_id, entered_at_utc, date_updated_local FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+                  `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
                   [log2.rowUuid]
                 );
                 if (auditRow.rows.length > 0) {
                   const compId = auditRow.rows[0].component_id;
-                  const rotGuardReading = safeParseDate(auditRow.rows[0].date_updated_local) || (auditRow.rows[0].entered_at_utc instanceof Date ? auditRow.rows[0].entered_at_utc : safeParseDate(auditRow.rows[0].entered_at_utc));
-                  const latestRotation = await getLatestRotationDate(client, compId);
-                  if (latestRotation && isReadingPreRotation(rotGuardReading, latestRotation)) {
-                    syncDiag(`RH-APPLY UPDATE SKIP (pre-rotation): component=${compId} audit=${log2.rowUuid} reading ${rotGuardReading.toISOString()} predates latest rotation ${latestRotation.toISOString()} \u2014 component baseline untouched`);
-                    continue;
-                  }
-                  const rhUpdatedAt = auditRow.rows[0].entered_at_utc || /* @__PURE__ */ new Date();
-                  const oldRow = await client.query(
-                    `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-                    [compId]
-                  );
-                  const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || "(not found)";
-                  const lastUpdatedText = auditRow.rows[0].date_updated_local || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
-                  const rhMasterUpdatedAtVal = safeParseDate(auditRow.rows[0].date_updated_local) || rhUpdatedAt;
-                  await client.query(
-                    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
-                    [String(valueToApply), compId, rhMasterUpdatedAtVal, lastUpdatedText]
-                  );
-                  syncDiag(`RH-APPLY UPDATE: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply}, last_updated=${lastUpdatedText} from audit row ${log2.rowUuid}`);
+                  const { applyWinningRhToComponent: applyWinningRhToComponent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+                  const updated = await applyWinningRhToComponent2(client, compId, "sync-push");
+                  syncDiag(`RH-APPLY UPDATE (derive): component=${compId} audit=${log2.rowUuid} \u2192 ${updated ? "component recomputed from winning event" : "no usable winner (component untouched)"}`);
                 }
               } catch (rhErr) {
                 syncDiag(`RH-APPLY UPDATE ERROR: audit=${log2.rowUuid}: ${rhErr.message}`);
@@ -11927,6 +12278,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
         }
         {
           const { learnFromShipCompletions: learnFromShipCompletions2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+          dualConflictWouuids.forEach((w) => completionWouuids.delete(w));
+          if (completionWouuids.size > 0) {
+            const { findWouuidsWithOpenDualConflicts: findWouuidsWithOpenDualConflicts2 } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
+            const stillOpen = await findWouuidsWithOpenDualConflicts2(client, Array.from(completionWouuids));
+            stillOpen.forEach((w) => completionWouuids.delete(w));
+          }
           if (completionWouuids.size > 0) {
             await learnFromShipCompletions2(client, Array.from(completionWouuids));
             completionWouuids.clear();
@@ -11951,7 +12308,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
       try {
         await client.query("BEGIN");
         await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
-        await learnFromShipCompletions2(client, Array.from(completionWouuids));
+        const { findWouuidsWithOpenDualConflicts: findWouuidsWithOpenDualConflicts2 } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
+        const stillOpen = await findWouuidsWithOpenDualConflicts2(client, Array.from(completionWouuids));
+        stillOpen.forEach((w) => completionWouuids.delete(w));
+        if (completionWouuids.size > 0) {
+          await learnFromShipCompletions2(client, Array.from(completionWouuids));
+        }
         await client.query("COMMIT");
       } catch (learnErr) {
         try {
@@ -12468,7 +12830,6 @@ var init_service = __esm({
     init_syncDiagLogger();
     init_alertsRepository();
     init_conflictReviewRepository();
-    init_rhValidation();
     vesselCodeCache = /* @__PURE__ */ new Map();
   }
 });
@@ -17124,7 +17485,6 @@ var init_syncEngine = __esm({
     "use strict";
     init_repository();
     init_oneWayApplier();
-    init_rhValidation();
     init_fileSyncProcessor();
     init_syncConfig();
     init_db();
@@ -17802,6 +18162,12 @@ var init_syncEngine = __esm({
               allErrors.push(...insertResult.errors);
             }
             const failedRowUuids = new Set(insertResult.failedRowUuids || []);
+            const { evaluateDualCompletion: evalDualPull, collectIncomingWoCompletionDates: collectDualDates } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
+            const dualCtxPull = {
+              receiverInstanceId: this.instanceId,
+              batchUuid,
+              incomingCompletionDateByRow: collectDualDates(insertResult.updateLogs)
+            };
             let updateApplied = 0;
             let updateErrors = 0;
             let updSpIdx = 0;
@@ -17812,27 +18178,44 @@ var init_syncEngine = __esm({
               } catch {
               }
               try {
-                const guard = await evaluateInsertOriginGuard(client, log2);
-                if (guard.skip) {
-                  try {
-                    await client.query(`RELEASE SAVEPOINT ${updSp}`);
-                  } catch {
-                  }
-                  continue;
-                }
-                if (log2.oldValue !== null && log2.oldValue !== void 0) {
-                  const stale = await evaluateStaleSkipGuard(
-                    client,
-                    { ...log2, changedAt: log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt)) },
-                    this.instanceId,
-                    { batchUuid }
-                  );
-                  if (stale.skip) {
+                const logChangedAtPull = log2.changedAt instanceof Date ? log2.changedAt : new Date(String(log2.changedAt));
+                const dual = await evalDualPull(client, { ...log2, changedAt: logChangedAtPull }, dualCtxPull);
+                let dualBypassGuardsPull = false;
+                if (dual.remoteResolution) {
+                  dualBypassGuardsPull = true;
+                } else if (dual.dualConflict) {
+                  if (!dual.applyIncoming) {
                     try {
                       await client.query(`RELEASE SAVEPOINT ${updSp}`);
                     } catch {
                     }
                     continue;
+                  }
+                  dualBypassGuardsPull = true;
+                }
+                if (!dualBypassGuardsPull) {
+                  const guard = await evaluateInsertOriginGuard(client, log2);
+                  if (guard.skip) {
+                    try {
+                      await client.query(`RELEASE SAVEPOINT ${updSp}`);
+                    } catch {
+                    }
+                    continue;
+                  }
+                  if (log2.oldValue !== null && log2.oldValue !== void 0) {
+                    const stale = await evaluateStaleSkipGuard(
+                      client,
+                      { ...log2, changedAt: logChangedAtPull },
+                      this.instanceId,
+                      { batchUuid }
+                    );
+                    if (stale.skip) {
+                      try {
+                        await client.query(`RELEASE SAVEPOINT ${updSp}`);
+                      } catch {
+                      }
+                      continue;
+                    }
                   }
                 }
                 await this.applyFieldLog(log2, client);
@@ -17993,27 +18376,14 @@ var init_syncEngine = __esm({
         if (log2.tableName === "running_hours_audit" && (fieldNameSnake === "new_rh" || fieldNameSnake === "cumulative_rh") && valueToApply !== null) {
           try {
             const auditRow = await conn.query(
-              `SELECT component_id, date_updated_local, entered_at_utc FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+              `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
               [log2.rowUuid]
             );
             if (auditRow.rows.length > 0) {
               const compId = auditRow.rows[0].component_id;
-              const rotGuardReading = safeParseDate(auditRow.rows[0].date_updated_local) || (auditRow.rows[0].entered_at_utc instanceof Date ? auditRow.rows[0].entered_at_utc : safeParseDate(auditRow.rows[0].entered_at_utc));
-              const latestRotation = await getLatestRotationDate(conn, compId);
-              if (latestRotation && isReadingPreRotation(rotGuardReading, latestRotation)) {
-                syncDiag(`RH-APPLY PULL SKIP (pre-rotation): component=${compId} audit=${log2.rowUuid} reading ${rotGuardReading.toISOString()} predates latest rotation ${latestRotation.toISOString()} \u2014 component baseline untouched`);
-                return;
-              }
-              const oldRow = await conn.query(
-                `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
-                [compId]
-              );
-              const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || "(not found)";
-              await conn.query(
-                `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, updated_at = NOW() WHERE cuuid = $2`,
-                [String(valueToApply), compId]
-              );
-              syncDiag(`RH-APPLY PULL: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply} from audit row ${log2.rowUuid}`);
+              const { applyWinningRhToComponent: applyWinningRhToComponent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+              const updated = await applyWinningRhToComponent2(conn, compId, "sync-pull");
+              syncDiag(`RH-APPLY PULL (derive): component=${compId} audit=${log2.rowUuid} \u2192 ${updated ? "component recomputed from winning event" : "no usable winner (component untouched)"}`);
             }
           } catch (rhErr) {
             syncDiag(`RH-APPLY PULL ERROR: audit=${log2.rowUuid}: ${rhErr.message}`);
@@ -22301,6 +22671,16 @@ var init_componentService = __esm({
 // server/postgresStorage.ts
 import { randomUUID as randomUUID2 } from "crypto";
 import { eq as eq7, and as and6, desc as desc2, sql as sql8, inArray as inArray2, or, ilike as ilike2, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
+async function getRhOriginSide() {
+  if (cachedRhOriginSide !== void 0) return cachedRhOriginSide;
+  try {
+    const { getInstanceRole: getInstanceRole2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+    cachedRhOriginSide = await getInstanceRole2();
+  } catch {
+    cachedRhOriginSide = null;
+  }
+  return cachedRhOriginSide;
+}
 function getWorkOrderNumericFields() {
   if (_woNumericFields) return _woNumericFields;
   try {
@@ -22311,7 +22691,7 @@ function getWorkOrderNumericFields() {
   }
   return _woNumericFields;
 }
-var _woNumericFields, PostgresStorage, postgresStorage;
+var cachedRhOriginSide, _woNumericFields, PostgresStorage, postgresStorage;
 var init_postgresStorage = __esm({
   "server/postgresStorage.ts"() {
     "use strict";
@@ -23362,7 +23742,10 @@ var init_postgresStorage = __esm({
             meterReplaced: false,
             version: 1,
             componentCode: masterComponentCode,
-            componentName: component.name || null
+            componentName: component.name || null,
+            // Task #394: comparator metadata — origin side + rotational epoch (stamp holder)
+            originSide: await getRhOriginSide(),
+            stampHolder: freshComponent.currentStamp || null
           }).returning();
           try {
             await logFieldChanges("running_hours_audit", rhaResult[0].rhauuid, masterVesselId, null, rhaResult[0], params.userId);
@@ -23405,7 +23788,10 @@ var init_postgresStorage = __esm({
               meterReplaced: false,
               version: 1,
               componentCode: inherited.componentCode || null,
-              componentName: inherited.name || null
+              componentName: inherited.name || null,
+              // Task #394: comparator metadata — origin side + rotational epoch (stamp holder)
+              originSide: await getRhOriginSide(),
+              stampHolder: inherited.currentStamp || null
             }).returning();
             try {
               await logFieldChanges("running_hours_audit", childRhaResult[0].rhauuid, inherited.vesselId || masterVesselId, null, childRhaResult[0], params.userId);
@@ -23696,7 +24082,11 @@ var init_postgresStorage = __esm({
       // ============= MODULE 3: RUNNING HOURS AUDIT =============
       async createRunningHoursAudit(audit) {
         const db2 = await getDb();
-        const auditWithActor = { ...audit, actorLabel: audit.actorLabel ?? getAuditActor().actorLabel };
+        const auditWithActor = {
+          ...audit,
+          actorLabel: audit.actorLabel ?? getAuditActor().actorLabel,
+          originSide: audit.originSide ?? await getRhOriginSide()
+        };
         const result = await db2.insert(runningHoursAudit).values(auditWithActor).returning();
         try {
           await logFieldChanges("running_hours_audit", result[0].rhauuid, result[0].vesselId || null, null, result[0], "system");
@@ -30517,6 +30907,7 @@ var init_workOrderNumbering = __esm({
 var workOrderGenerationGate_exports = {};
 __export(workOrderGenerationGate_exports, {
   evaluateDirectGeneration: () => evaluateDirectGeneration,
+  isOfficeRhEntryEnabled: () => isOfficeRhEntryEnabled,
   isOfficeWoGenerationEnabled: () => isOfficeWoGenerationEnabled,
   resolveGateRole: () => resolveGateRole
 });
@@ -30537,6 +30928,23 @@ async function isOfficeWoGenerationEnabled(vesselId) {
     return r.rows[0]?.enabled === true;
   } catch (err) {
     console.error(`[WO-Gate] office-generation switch lookup failed for vessel ${vesselId}: ${err?.message || err} \u2014 treating as DISABLED`);
+    return false;
+  }
+}
+async function isOfficeRhEntryEnabled(vesselId) {
+  try {
+    const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const pool4 = await getPool2();
+    const r = await pool4.query(
+      `SELECT office_rh_entry_enabled AS enabled
+         FROM pms_vessel_settings
+        WHERE vessel_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
+        LIMIT 1`,
+      [vesselId]
+    );
+    return r.rows[0]?.enabled === true;
+  } catch (err) {
+    console.error(`[RH-Gate] office-RH-entry switch lookup failed for vessel ${vesselId}: ${err?.message || err} \u2014 treating as DISABLED`);
     return false;
   }
 }
@@ -31091,7 +31499,7 @@ function getDaysBetween(date1, date2) {
   const msPerDay = 24 * 60 * 60 * 1e3;
   return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
 }
-function formatDMY2(isoDate) {
+function formatDMY(isoDate) {
   if (!isoDate) return isoDate;
   const m = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return isoDate;
@@ -31223,10 +31631,10 @@ async function getValidRange(machineryId, completionDate) {
   }
   const daysToPrev = getDaysBetween(parseDate2(previousEntry.date), targetDate);
   let minRH = previousEntry.runningHours;
-  let maxRH = previousEntry.runningHours + daysToPrev * MAX_HOURS_PER_DAY2;
+  let maxRH = previousEntry.runningHours + daysToPrev * MAX_HOURS_PER_DAY;
   if (nextEntry) {
     const daysToNext = getDaysBetween(targetDate, parseDate2(nextEntry.date));
-    const minFromForward = nextEntry.runningHours - daysToNext * MAX_HOURS_PER_DAY2;
+    const minFromForward = nextEntry.runningHours - daysToNext * MAX_HOURS_PER_DAY;
     minRH = Math.max(minRH, minFromForward);
     maxRH = Math.min(maxRH, nextEntry.runningHours);
   }
@@ -31253,7 +31661,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
     return {
       isValid: false,
       validationStatus: "INVALID_BACKDATED",
-      errorMessage: `Completion Date ${formatDMY2(completionDate)} is earlier than the component's last running-hours update (${formatDMY2(range.baselineDate || "")}). There is no running-hours entry on or before this date, so running hours cannot be recorded here. Running hours can only be recorded on or after the latest reading.`,
+      errorMessage: `Completion Date ${formatDMY(completionDate)} is earlier than the component's last running-hours update (${formatDMY(range.baselineDate || "")}). There is no running-hours entry on or before this date, so running hours cannot be recorded here. Running hours can only be recorded on or after the latest reading.`,
       validRange: { min: range.minRH, max: range.maxRH },
       utilizationRate: 0,
       requiresJustification: false,
@@ -31275,7 +31683,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
   if (range.previousEntry) {
     daysBetweenPrevious = getDaysBetween(parseDate2(range.previousEntry.date), targetDate);
     actualIncrease = enteredRH - range.previousEntry.runningHours;
-    maxPossibleIncrease = daysBetweenPrevious * MAX_HOURS_PER_DAY2;
+    maxPossibleIncrease = daysBetweenPrevious * MAX_HOURS_PER_DAY;
   }
   if (range.nextEntry) {
     daysBetweenNext = getDaysBetween(targetDate, parseDate2(range.nextEntry.date));
@@ -31301,7 +31709,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
     return {
       isValid: false,
       validationStatus: "INVALID_BACKWARD",
-      errorMessage: `This is physically impossible because: Previous RH entry: ${range.previousEntry.runningHours} hours on ${range.previousEntry.date}. Days between: ${daysBetweenPrevious} days. Maximum possible increase: ${maxPossibleIncrease} hours (${daysBetweenPrevious} days \xD7 ${MAX_HOURS_PER_DAY2} hrs/day). Your entered increase: ${actualIncrease} hours. Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours.`,
+      errorMessage: `This is physically impossible because: Previous RH entry: ${range.previousEntry.runningHours} hours on ${range.previousEntry.date}. Days between: ${daysBetweenPrevious} days. Maximum possible increase: ${maxPossibleIncrease} hours (${daysBetweenPrevious} days \xD7 ${MAX_HOURS_PER_DAY} hrs/day). Your entered increase: ${actualIncrease} hours. Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours.`,
       validRange: { min: range.minRH, max: range.maxRH },
       utilizationRate: 0,
       requiresJustification: false,
@@ -31333,12 +31741,12 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
   }
   if (range.nextEntry) {
     const requiredIncrease = range.nextEntry.runningHours - enteredRH;
-    const maxForwardIncrease = daysBetweenNext * MAX_HOURS_PER_DAY2;
+    const maxForwardIncrease = daysBetweenNext * MAX_HOURS_PER_DAY;
     if (requiredIncrease > maxForwardIncrease && daysBetweenNext > 0) {
       return {
         isValid: false,
         validationStatus: "INVALID_FORWARD",
-        errorMessage: `This conflicts with future RH data: Next RH entry: ${range.nextEntry.runningHours} hours on ${range.nextEntry.date}. Days between: ${daysBetweenNext} days. Required increase from your entry: ${requiredIncrease.toFixed(0)} hours. Maximum possible in ${daysBetweenNext} days: ${maxForwardIncrease} hours (${daysBetweenNext} \xD7 ${MAX_HOURS_PER_DAY2} hrs/day). Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours. Your entry would require the machinery to run more than ${MAX_HOURS_PER_DAY2} hours per day to reach the next recorded value.`,
+        errorMessage: `This conflicts with future RH data: Next RH entry: ${range.nextEntry.runningHours} hours on ${range.nextEntry.date}. Days between: ${daysBetweenNext} days. Required increase from your entry: ${requiredIncrease.toFixed(0)} hours. Maximum possible in ${daysBetweenNext} days: ${maxForwardIncrease} hours (${daysBetweenNext} \xD7 ${MAX_HOURS_PER_DAY} hrs/day). Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours. Your entry would require the machinery to run more than ${MAX_HOURS_PER_DAY} hours per day to reach the next recorded value.`,
         validRange: { min: range.minRH, max: range.maxRH },
         utilizationRate: 0,
         requiresJustification: false,
@@ -31488,12 +31896,12 @@ async function getCurrentRH(machineryId) {
     rhCounterType: (component.rhCounterType || "MASTER").toUpperCase()
   };
 }
-var MAX_HOURS_PER_DAY2, HIGH_UTILIZATION_THRESHOLD;
+var MAX_HOURS_PER_DAY, HIGH_UTILIZATION_THRESHOLD;
 var init_rhTimelineValidationService = __esm({
   "server/modules/running-hours/services/rhTimelineValidationService.ts"() {
     "use strict";
     init_runningHoursRepository();
-    MAX_HOURS_PER_DAY2 = 25;
+    MAX_HOURS_PER_DAY = 25;
     HIGH_UTILIZATION_THRESHOLD = 20;
   }
 });
@@ -31989,7 +32397,7 @@ var init_jobDueScanner = __esm({
        *   a ship DB holds only its own vessel anyway).
        * @returns the counts, plus `skipped: true` if a run was already in progress.
        */
-      async runScan(scopeVesselId) {
+      async runScan(scopeVesselId, opts) {
         if (this.runInProgress) {
           console.log("[JobDueScanner] Previous scan still running \u2014 skipping this run");
           return {
@@ -32006,6 +32414,19 @@ var init_jobDueScanner = __esm({
         try {
           const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
           if (!await isShipInstance2()) {
+            if (opts?.triggerSource === "rh-update") {
+              console.log(`[JobDueScanner] SHORE gate refused scan (RH-update trigger \u2014 office RH entries never generate WOs)`);
+              this.runInProgress = false;
+              return {
+                calendarJobsChecked: 0,
+                calendarWOsGenerated: 0,
+                rhJobsChecked: 0,
+                rhWOsGenerated: 0,
+                dualJobsChecked: 0,
+                dualWOsGenerated: 0,
+                skipped: true
+              };
+            }
             const { isOfficeWoGenerationEnabled: isOfficeWoGenerationEnabled2 } = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
             if (!scopeVesselId || !await isOfficeWoGenerationEnabled2(scopeVesselId)) {
               console.log(`[JobDueScanner] SHORE gate refused scan (${scopeVesselId ? `vessel ${scopeVesselId} switch OFF` : "unscoped scan not allowed on shore"})`);
@@ -34197,6 +34618,151 @@ var init_hodResolutionService = __esm({
   }
 });
 
+// server/modules/running-hours/utils/rhValidation.ts
+function getCalendarDate(dateStr) {
+  const date2 = new Date(dateStr);
+  return new Date(Date.UTC(date2.getUTCFullYear(), date2.getUTCMonth(), date2.getUTCDate()));
+}
+function getDaysBetweenCalendarDates(date1, date2) {
+  const msPerDay = 24 * 60 * 60 * 1e3;
+  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
+}
+function formatDMY2(dateStr) {
+  if (!dateStr) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+}
+function validateRunningHoursIncrease(input) {
+  const { currentRH, newRH, componentLastUpdated, newUpdateDate, userRole, adminOverride } = input;
+  const requestedIncrease = newRH - currentRH;
+  let daysSinceLastUpdate = 0;
+  let sameDayUpdate = false;
+  if (componentLastUpdated) {
+    const lastCalendarDate = getCalendarDate(componentLastUpdated);
+    const newCalendarDate = getCalendarDate(newUpdateDate);
+    daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
+    if (daysSinceLastUpdate < 0) {
+      const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
+      return {
+        allowed: canOverride2,
+        maxAllowedIncrease: 0,
+        requestedIncrease,
+        daysSinceLastUpdate,
+        lastUpdateDate: componentLastUpdated,
+        backdatedLower: requestedIncrease <= 0,
+        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY2(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY2(componentLastUpdated)}). Running hours can only be recorded on or after the latest reading.`,
+        requiresAdminOverride: !canOverride2
+      };
+    }
+    if (daysSinceLastUpdate === 0) {
+      sameDayUpdate = true;
+    }
+  } else {
+    daysSinceLastUpdate = 1;
+  }
+  if (requestedIncrease <= 0) {
+    return {
+      allowed: true,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: "No increase or decrease - no validation needed",
+      requiresAdminOverride: false
+    };
+  }
+  let maxAllowedIncrease;
+  if (sameDayUpdate) {
+    const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
+    return {
+      allowed: canOverride2,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: canOverride2 ? "Sail Admin override applied for same-day duplicate update" : "Same-day update already performed. Only one update of max 25 hours is allowed per day.",
+      requiresAdminOverride: !canOverride2
+    };
+  } else {
+    maxAllowedIncrease = daysSinceLastUpdate * MAX_HOURS_PER_DAY2;
+  }
+  const isWithinLimit = requestedIncrease <= maxAllowedIncrease;
+  if (isWithinLimit) {
+    return {
+      allowed: true,
+      maxAllowedIncrease,
+      requestedIncrease,
+      daysSinceLastUpdate,
+      lastUpdateDate: componentLastUpdated,
+      message: `Increase of ${requestedIncrease} hours is within the allowed limit of ${maxAllowedIncrease} hours`,
+      requiresAdminOverride: false
+    };
+  }
+  const canOverride = userRole === "Sail Admin" && adminOverride === true;
+  return {
+    allowed: canOverride,
+    maxAllowedIncrease,
+    requestedIncrease,
+    daysSinceLastUpdate,
+    lastUpdateDate: componentLastUpdated,
+    message: canOverride ? `Sail Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days \xD7 25 hours/day).` : `Increase of ${requestedIncrease} hours exceeds maximum allowed of ${maxAllowedIncrease} hours. Maximum allowed is ${daysSinceLastUpdate} day(s) \xD7 25 hours/day = ${maxAllowedIncrease} hours.`,
+    requiresAdminOverride: !canOverride
+  };
+}
+function canAdminOverride(userRole) {
+  return userRole === "Sail Admin";
+}
+function safeParseDate(value) {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) return d;
+  const months = {
+    jan: 0,
+    feb: 1,
+    mar: 2,
+    apr: 3,
+    may: 4,
+    jun: 5,
+    jul: 6,
+    aug: 7,
+    sep: 8,
+    oct: 9,
+    nov: 10,
+    dec: 11
+  };
+  const match = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if (match) {
+    const [, day, mon, year, hh = "0", mm = "0"] = match;
+    const month = months[mon.toLowerCase()];
+    if (month !== void 0) {
+      const parsed = new Date(
+        parseInt(year),
+        month,
+        parseInt(day),
+        parseInt(hh),
+        parseInt(mm)
+      );
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+  return null;
+}
+var MAX_HOURS_PER_DAY2;
+var init_rhValidation = __esm({
+  "server/modules/running-hours/utils/rhValidation.ts"() {
+    "use strict";
+    MAX_HOURS_PER_DAY2 = 25;
+  }
+});
+
 // server/modules/running-hours/services/runningHoursService.ts
 var runningHoursService_exports = {};
 __export(runningHoursService_exports, {
@@ -34713,7 +35279,7 @@ async function updateMasterRH(componentId, body) {
   try {
     if (component.vesselId) {
       const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
-      const scanResult = await jobDueScanner2.runScan(component.vesselId);
+      const scanResult = await jobDueScanner2.runScan(component.vesselId, { triggerSource: "rh-update" });
       woGenerationResult = {
         rhJobsChecked: scanResult.rhJobsChecked,
         rhWOsGenerated: scanResult.rhWOsGenerated
@@ -35690,6 +36256,26 @@ async function updateWorkOrder(id, body) {
       delete updateData[key];
     }
   });
+  const draftDoc = updateData.draftExecutionData;
+  const isDraftOnlySave = draftDoc != null && typeof draftDoc === "object" && !Array.isArray(draftDoc) && updateData.status === void 0 && updateData.completionDateTime === void 0 && updateData.dateOfCompletion === void 0;
+  if (isDraftOnlySave) {
+    const DRAFT_SAVE_ALLOWED_KEYS = /* @__PURE__ */ new Set(["draftExecutionData", "userId", "performedBy", "userRole", "userUuid"]);
+    const strayKeys = Object.keys(updateData).filter((k) => !DRAFT_SAVE_ALLOWED_KEYS.has(k));
+    if (strayKeys.length > 0) {
+      throw new ValidationError(
+        "Draft save must contain only draftExecutionData",
+        { message: `Unexpected fields in draft save: ${strayKeys.join(", ")}. Send them via a normal update or include them inside draftExecutionData.`, strayKeys }
+      );
+    }
+    const workOrder2 = await update6(id, { draftExecutionData: draftDoc });
+    try {
+      await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, workOrder2, body.userId || body.performedBy || "system");
+    } catch (err) {
+      console.error("[FieldLogger] WO draft save:", err);
+    }
+    console.log(`\u{1F4DD} Draft saved for WO ${existingWO2.workOrderNo || id} (draft-only update, status/tab unchanged)`);
+    return workOrder2;
+  }
   const validateNumericField = (value, fieldName, opts = {}) => {
     if (value == null || value === "") return;
     const str = String(value).trim();
@@ -35878,6 +36464,10 @@ async function updateWorkOrder(id, body) {
     updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
     console.log("\u{1F4DD} Capturing submittedDate for audit trail on submission/Pending Approval");
   }
+  if ((isSubmissionAction || hasCompletionData || updateData.status === "Completed") && updateData.draftExecutionData === void 0 && existingWO2.draftExecutionData != null) {
+    updateData.draftExecutionData = null;
+    console.log("\u{1F4DD} Clearing draftExecutionData on submission");
+  }
   if (isSubmissionAction || updateData.status === "Pending Approval") {
     const completionDateForCalc = updateData.completionDateTime || updateData.dateCompleted || existingWO2.completionDateTime || existingWO2.dateCompleted;
     const dueDateForCalc = existingWO2.nextDueDate || existingWO2.dueDate;
@@ -36026,7 +36616,13 @@ async function updateWorkOrder(id, body) {
     );
   }
   const { isShipInstance: isShipInstanceForRH } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
-  if (isApprovalTransition && !interceptedForL2Review && updateData.status === "Completed" && !existingWO2.rhSyncedAt && await isShipInstanceForRH()) {
+  const isShipForRhWrite = await isShipInstanceForRH();
+  let officeRhEntryAllowed = false;
+  if (!isShipForRhWrite && existingWO2.vesselId) {
+    const { isOfficeRhEntryEnabled: isOfficeRhEntryEnabled2 } = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
+    officeRhEntryAllowed = await isOfficeRhEntryEnabled2(existingWO2.vesselId);
+  }
+  if (isApprovalTransition && !interceptedForL2Review && updateData.status === "Completed" && !existingWO2.rhSyncedAt && (isShipForRhWrite || officeRhEntryAllowed)) {
     const rhRaw = existingWO2.runningHours || updateData.runningHours;
     if (rhRaw) {
       let rhComp = await findComponent2(existingWO2.component);
@@ -36045,12 +36641,25 @@ async function updateWorkOrder(id, body) {
       };
       const completionDateNorm = normRhDate(existingWO2.completionDateTime || existingWO2.dateCompleted || updateData.completionDateTime);
       const readingDateNorm = normRhDate(existingWO2.currentReadingDate || updateData.currentReadingDate) || completionDateNorm;
+      if (!isShipForRhWrite && !readingDateNorm) {
+        throw new ValidationError(
+          "Office RH entry requires the reading date (Current Reading Date or Completion Date). Enter the date the counter was actually read.",
+          { code: "RH_READING_DATE_REQUIRED", workOrderNo: existingWO2.workOrderNo }
+        );
+      }
       if (rhComp && rhCounterType === "MASTER" && !isNaN(rhValue)) {
         let rhBackdatedSkippedApproval = false;
         const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || "0");
         if (rhValue <= masterCurrentRHApproval && readingDateNorm) {
-          const masterUpdRawApproval = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
-          const masterUpdDateApproval = masterUpdRawApproval instanceof Date ? masterUpdRawApproval : masterUpdRawApproval ? new Date(masterUpdRawApproval) : null;
+          const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const stampFallbackApproval = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
+          const stampFallbackDateApproval = stampFallbackApproval instanceof Date ? stampFallbackApproval : stampFallbackApproval ? new Date(stampFallbackApproval) : null;
+          const masterUpdDateApproval = await resolveRhBaselineDay2(
+            await getPool2(),
+            rhComp.cuuid,
+            stampFallbackDateApproval && !isNaN(stampFallbackDateApproval.getTime()) ? stampFallbackDateApproval : null
+          );
           if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
             const approvalCompletionDate = new Date(readingDateNorm);
             const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
@@ -36066,34 +36675,42 @@ async function updateWorkOrder(id, body) {
           }
         }
         if (!rhBackdatedSkippedApproval) {
-          const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-          try {
-            await updateMasterRH3(rhComp.cuuid, {
-              newRHValue: rhValue,
-              updateSource: "MANUAL",
-              userId: body.userId || existingWO2.performedBy || "system",
-              userUuid: body.userUuid,
-              userRole: body.userRole || "Ship",
-              adminOverride: body.adminOverride || false,
-              comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
-              dateUpdated: readingDateNorm
-            });
-            updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-            console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children)`);
-          } catch (masterErr) {
-            if (masterErr instanceof ValidationError) {
-              const det = masterErr.details || {};
-              throw new ValidationError(masterErr.message, {
-                code: "RH_OVERRIDE_REQUIRED",
-                ...det,
-                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                canOverride: det.validation?.canOverride ?? false,
-                componentId: rhComp.cuuid,
-                componentCode: rhComp.componentCode || existingWO2.componentCode,
-                rhCounterType: "MASTER"
+          const { claimWoRhSync: claimWoRhSync2, releaseWoRhSync: releaseWoRhSync2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getPoolForClaim } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const claimPool = await getPoolForClaim();
+          if (!await claimWoRhSync2(claimPool, existingWO2.wouuid)) {
+            console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
+          } else {
+            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+            try {
+              await updateMasterRH3(rhComp.cuuid, {
+                newRHValue: rhValue,
+                updateSource: "MANUAL",
+                userId: body.userId || existingWO2.performedBy || "system",
+                userUuid: body.userUuid,
+                userRole: body.userRole || "Ship",
+                adminOverride: body.adminOverride || false,
+                comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
+                dateUpdated: readingDateNorm
               });
+              updateData.rhSyncedAt = /* @__PURE__ */ new Date();
+              console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children)`);
+            } catch (masterErr) {
+              await releaseWoRhSync2(claimPool, existingWO2.wouuid);
+              if (masterErr instanceof ValidationError) {
+                const det = masterErr.details || {};
+                throw new ValidationError(masterErr.message, {
+                  code: "RH_OVERRIDE_REQUIRED",
+                  ...det,
+                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                  canOverride: det.validation?.canOverride ?? false,
+                  componentId: rhComp.cuuid,
+                  componentCode: rhComp.componentCode || existingWO2.componentCode,
+                  rhCounterType: "MASTER"
+                });
+              }
+              throw masterErr;
             }
-            throw masterErr;
           }
         }
       } else if (rhComp && rhCounterType === "INHERITED" && !isNaN(rhValue)) {
@@ -36109,8 +36726,15 @@ async function updateWorkOrder(id, body) {
           let rhBackdatedSkippedInherited = false;
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || "0");
           if (rhValue <= inhMasterCurrentRH && readingDateNorm) {
+            const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+            const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
             const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhMasterUpdDate = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
+            const inhStampFallback = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
+            const inhMasterUpdDate = await resolveRhBaselineDay2(
+              await getPool2(),
+              masterComp.cuuid,
+              inhStampFallback && !isNaN(inhStampFallback.getTime()) ? inhStampFallback : null
+            );
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
               const inhCompletionDate = new Date(readingDateNorm);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
@@ -36126,34 +36750,42 @@ async function updateWorkOrder(id, body) {
             }
           }
           if (!rhBackdatedSkippedInherited) {
-            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-            try {
-              await updateMasterRH3(masterComp.cuuid, {
-                newRHValue: rhValue,
-                updateSource: "WORKORDER",
-                userId: body.userId || existingWO2.performedBy || "system",
-                userUuid: body.userUuid,
-                userRole: body.userRole || "Ship",
-                adminOverride: body.adminOverride || false,
-                comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                dateUpdated: readingDateNorm
-              });
-              updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-              console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO2.workOrderNo}`);
-            } catch (masterErr) {
-              if (masterErr instanceof ValidationError) {
-                const det = masterErr.details || {};
-                throw new ValidationError(masterErr.message, {
-                  code: "RH_OVERRIDE_REQUIRED",
-                  ...det,
-                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                  canOverride: det.validation?.canOverride ?? false,
-                  componentId: masterComp.cuuid,
-                  componentCode: masterComp.componentCode || existingWO2.componentCode,
-                  rhCounterType: "INHERITED"
+            const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+            const { getPool: getPoolInh } = await Promise.resolve().then(() => (init_db(), db_exports));
+            const claimPoolInh = await getPoolInh();
+            if (!await claimInh(claimPoolInh, existingWO2.wouuid)) {
+              console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
+            } else {
+              const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+              try {
+                await updateMasterRH3(masterComp.cuuid, {
+                  newRHValue: rhValue,
+                  updateSource: "WORKORDER",
+                  userId: body.userId || existingWO2.performedBy || "system",
+                  userUuid: body.userUuid,
+                  userRole: body.userRole || "Ship",
+                  adminOverride: body.adminOverride || false,
+                  comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+                  dateUpdated: readingDateNorm
                 });
+                updateData.rhSyncedAt = /* @__PURE__ */ new Date();
+                console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO2.workOrderNo}`);
+              } catch (masterErr) {
+                await releaseInh(claimPoolInh, existingWO2.wouuid);
+                if (masterErr instanceof ValidationError) {
+                  const det = masterErr.details || {};
+                  throw new ValidationError(masterErr.message, {
+                    code: "RH_OVERRIDE_REQUIRED",
+                    ...det,
+                    requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                    canOverride: det.validation?.canOverride ?? false,
+                    componentId: masterComp.cuuid,
+                    componentCode: masterComp.componentCode || existingWO2.componentCode,
+                    rhCounterType: "INHERITED"
+                  });
+                }
+                throw masterErr;
               }
-              throw masterErr;
             }
           }
         } else {
@@ -36180,7 +36812,9 @@ async function updateWorkOrder(id, body) {
               previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
               newRH: rhValue.toString(),
               cumulativeRH: rhValue.toString(),
-              dateUpdatedLocal: completionDateNorm || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+              // Task #394 fix: stamp the READING date (not the completion date, and never
+              // "today") — a wrong date here poisons the latest-reading-wins comparator.
+              dateUpdatedLocal: readingDateNorm || completionDateNorm || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
               dateUpdatedTZ: "UTC",
               enteredAtUTC: /* @__PURE__ */ new Date(),
               userId: body.userId || existingWO2.performedBy || "System",
@@ -39070,7 +39704,7 @@ function forwardedUserUuid(req, context) {
     if (!warnedThisProcess) {
       warnedThisProcess = true;
       console.warn(
-        `${IDENTITY_MISSING_TAG} ${context}: request arrived with NO x-user-id header. This shore is NOT identity-integrated, so per-user Purchasing accounts cannot be used and callers fall back to the LEGACY SHARED account. If this is the WK trial or any production shore, FIX THE INTEGRATION \u2014 every user would otherwise share one Shipskart identity and requisitions would be attributed to the wrong person. (This warning prints once per process.)`
+        `${IDENTITY_MISSING_TAG} ${context}: request arrived with NO x-user-id header. This shore is NOT identity-integrated, so per-user Purchasing accounts cannot be used and the request is REFUSED (the legacy shared-account fallback is retired). If this is any production shore, FIX THE INTEGRATION \u2014 until then every affected user is blocked from Purchasing with an identity-missing reason. (This warning prints once per process.)`
       );
     } else {
       console.warn(`${IDENTITY_MISSING_TAG} ${context}: no x-user-id header (see the first occurrence for detail).`);
@@ -39087,7 +39721,7 @@ function forwardedUserUuid(req, context) {
 }
 function logIdentityIntegrationExpectation() {
   console.log(
-    `[Shipskart][IDENTITY] Per-user Purchasing SSO requires the x-user-id header forwarded by the frontend (SAILERP profile). Any request without it falls back to the legacy shared account and logs "${IDENTITY_MISSING_TAG}" \u2014 grep that tag to confirm this deployment is identity-integrated.`
+    `[Shipskart][IDENTITY] Per-user Purchasing SSO requires the x-user-id header forwarded by the frontend (SAILERP profile). Any request without it is REFUSED with an identity-missing reason and logs "${IDENTITY_MISSING_TAG}" \u2014 grep that tag to confirm this deployment is identity-integrated.`
   );
 }
 var MOCK_DEFAULT_USER_UUID, IDENTITY_MISSING_TAG, warnedThisProcess;
@@ -39111,11 +39745,11 @@ async function getMappingForSailRole(sailRole) {
   const rows = await db2.select().from(shipskartRoleMappings).where(eq30(shipskartRoleMappings.sailRole, sailRole)).limit(1);
   return rows[0];
 }
-async function upsertMapping2(sailRole, shipskartRole, updatedByUuid) {
+async function upsertMapping2(sailRole, shipskartRole, updatedByUuid, shipskartRoleId) {
   const db2 = await getDb();
-  await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
+  await db2.insert(shipskartRoleMappings).values({ sailRole, shipskartRole, shipskartRoleId: shipskartRoleId ?? null, updatedByUuid: updatedByUuid ?? null }).onConflictDoUpdate({
     target: shipskartRoleMappings.sailRole,
-    set: { shipskartRole, updatedByUuid: updatedByUuid ?? null, updatedAt: /* @__PURE__ */ new Date() }
+    set: { shipskartRole, shipskartRoleId: shipskartRoleId ?? null, updatedByUuid: updatedByUuid ?? null, updatedAt: /* @__PURE__ */ new Date() }
   });
 }
 async function deleteMapping(sailRole) {
@@ -39259,6 +39893,8 @@ async function upsertAssignment(userUuid, vesselId, patch) {
     shipskartMappingId: patch.shipskartMappingId ?? null,
     mapStatus: patch.mapStatus ?? "pending",
     lastError: patch.lastError ?? null,
+    mapAttempts: patch.mapAttempts ?? 0,
+    lastAttemptAt: patch.lastAttemptAt ?? null,
     mappedAt: mappedAt ?? null
   }).onConflictDoUpdate({
     target: [masterUserVessels.userUuid, masterUserVessels.vesselId],
@@ -39266,6 +39902,8 @@ async function upsertAssignment(userUuid, vesselId, patch) {
       ...patch.isActive !== void 0 ? { isActive: patch.isActive } : {},
       ...patch.shipskartMappingId !== void 0 ? { shipskartMappingId: patch.shipskartMappingId } : {},
       ...patch.mapStatus !== void 0 ? { mapStatus: patch.mapStatus } : {},
+      ...patch.mapAttempts !== void 0 ? { mapAttempts: patch.mapAttempts } : {},
+      ...patch.lastAttemptAt !== void 0 ? { lastAttemptAt: patch.lastAttemptAt } : {},
       lastError: patch.lastError ?? null,
       ...mappedAt ? { mappedAt } : {},
       updatedAt: now
@@ -39279,11 +39917,14 @@ async function replaceAssignmentsForUser(userUuid, vesselVuuids) {
   for (const vesselId of vesselVuuids) {
     const existing = await getAssignment(userUuid, vesselId);
     const mapStatus = existing?.shipskartMappingId && existing.isActive ? void 0 : "pending";
-    await upsertAssignment(userUuid, vesselId, { isActive: true, ...mapStatus ? { mapStatus } : {} });
+    await upsertAssignment(userUuid, vesselId, {
+      isActive: true,
+      ...mapStatus ? { mapStatus, mapAttempts: 0, lastAttemptAt: null } : {}
+    });
     activated++;
   }
   const keep = vesselVuuids.length > 0 ? vesselVuuids : ["__none__"];
-  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", updatedAt: now }).where(and27(
+  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", mapAttempts: 0, lastAttemptAt: null, updatedAt: now }).where(and27(
     eq31(masterUserVessels.userUuid, userUuid),
     eq31(masterUserVessels.isActive, true),
     notInArray3(masterUserVessels.vesselId, keep)
@@ -39299,7 +39940,13 @@ async function getPendingAssignmentWork(userUuid) {
   const db2 = await getDb();
   const rows = await db2.select().from(masterUserVessels).where(eq31(masterUserVessels.userUuid, userUuid));
   return {
-    toMap: rows.filter((r) => r.isActive && ["pending", "awaiting_user", "awaiting_vessel"].includes(r.mapStatus ?? "")).map((r) => r.vesselId),
+    // 'error' is IN this list on purpose (migration 164): a transient failure — rate
+    // limit, 5xx, network — used to strand the row forever, because NO retry path
+    // selected 'error' (gurpreet's Gas Mia row, 11-Aug, needed a manual SQL reset).
+    // Human-triggered paths (Purchasing click, Sync Vessels) retry immediately, no
+    // backoff — a person acting IS the retry decision. 'blocked_duplicate' stays out:
+    // retrying a duplicate reproduces the same 400 until someone fixes the data.
+    toMap: rows.filter((r) => r.isActive && ["pending", "awaiting_user", "awaiting_vessel", "error"].includes(r.mapStatus ?? "")).map((r) => r.vesselId),
     toUnmap: rows.filter((r) => !r.isActive && r.mapStatus === "revoked" && !!r.shipskartMappingId).map((r) => ({ vesselId: r.vesselId, shipskartMappingId: r.shipskartMappingId }))
   };
 }
@@ -39667,12 +40314,16 @@ async function getRoles() {
     return [];
   }
 }
-async function getAvailableShipskartRoles() {
-  return Array.from(new Set((await getRoles()).map((r) => r.name)));
+async function getAvailableShipskartRoleObjects() {
+  return (await getRoles()).map((r) => ({ id: r.id, name: r.name }));
 }
 async function resolveShipskartRoleId(roleName) {
   const roles = await getRoles();
   return roles.find((r) => r.name === roleName)?.id ?? null;
+}
+async function resolveRoleIdForMapping(mapping) {
+  if (mapping.shipskartRoleId) return mapping.shipskartRoleId;
+  return resolveShipskartRoleId(mapping.shipskartRole);
 }
 var ROLE_CACHE_TTL_MS, cache2;
 var init_shipskartRoleSource = __esm({
@@ -39687,11 +40338,17 @@ var init_shipskartRoleSource = __esm({
 // server/modules/shipskart/services/shipskartReconcilerService.ts
 var shipskartReconcilerService_exports = {};
 __export(shipskartReconcilerService_exports, {
+  RETRYABLE_MAP_STATUSES: () => RETRYABLE_MAP_STATUSES,
   clearJitAttempts: () => clearJitAttempts,
   deleteVesselUserMapping: () => deleteVesselUserMapping,
+  diagnoseUserBlock: () => diagnoseUserBlock,
   ensureUserPushed: () => ensureUserPushed,
   findRemoteVesselByImo: () => findRemoteVesselByImo,
+  getLastReconcile: () => getLastReconcile,
+  isAssignmentRetryDue: () => isAssignmentRetryDue,
+  isReconcileRunning: () => isReconcileRunning,
   mapUserToVessel: () => mapUserToVessel,
+  orderAssignmentsForRetry: () => orderAssignmentsForRetry,
   pushUser: () => pushUser,
   pushVessel: () => pushVessel,
   resolveCallSign: () => resolveCallSign,
@@ -39723,6 +40380,9 @@ async function findRemoteVesselByImo(imo) {
   return hit?.id ? { id: hit.id, name: String(hit.name ?? ""), imo: String(hit.iMONumber ?? hit.imoNumber ?? "") } : null;
 }
 async function pushVessel(v) {
+  if (await isShipInstance()) {
+    return { status: "skipped_ship_instance", error: "ship instance \u2014 Shipskart is shore-only" };
+  }
   const existing = await getVesselLink(v.vuuid);
   const imo = (v.imoNumber ?? "").trim();
   if (!imo) {
@@ -39793,7 +40453,7 @@ async function pushVessel(v) {
 }
 async function syncRoleIfDrifted(link, sailRole) {
   const mapping = sailRole ? await getMappingForSailRole(sailRole) : void 0;
-  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  const roleId = mapping ? await resolveRoleIdForMapping(mapping) : null;
   if (!mapping || !roleId || link.pushedRoleId === roleId) {
     return { status: "already_pushed", shipskartId: link.shipskartUserId };
   }
@@ -39814,7 +40474,55 @@ async function syncRoleIfDrifted(link, sailRole) {
   await upsertUserLink(link.userUuid, { pushStatus: "pushed", lastError: `role update failed: ${error}` });
   return { status: "role_update_failed", error };
 }
+async function diagnoseUserBlock(userUuid, sailRole) {
+  try {
+    const db2 = await getDb();
+    const rows = await db2.select({
+      id: masterUsers.id,
+      email: masterUsers.email,
+      role: masterUsers.role,
+      fullName: masterUsers.fullName
+    }).from(masterUsers).where(eq32(masterUsers.id, userUuid)).limit(1);
+    const mu = rows[0];
+    if (!mu) {
+      return {
+        reasonCode: "no_master_row",
+        reason: `no master_users row for ${userUuid}`,
+        facts: { sailRole }
+      };
+    }
+    const facts = { fullName: mu.fullName ?? null, sailRole: sailRole || mu.role || null };
+    if (!mu.email) {
+      return { reasonCode: "missing_email", reason: "master_users row has no email \u2014 Shipskart requires one", facts };
+    }
+    const effectiveRole = facts.sailRole;
+    const mapping = effectiveRole ? await getMappingForSailRole(effectiveRole) : void 0;
+    if (!mapping) {
+      return {
+        reasonCode: "unmapped_role",
+        reason: `SAIL role '${effectiveRole ?? ""}' has no shipskart_role_mappings row`,
+        facts
+      };
+    }
+    facts.shipskartRole = mapping.shipskartRole;
+    const roleId = await resolveRoleIdForMapping(mapping);
+    if (!roleId) {
+      return {
+        reasonCode: "unmapped_role",
+        reason: `mapped Shipskart role '${mapping.shipskartRole}' has no live roleId on this tenant`,
+        facts
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[Shipskart] block diagnosis failed for ${userUuid}: ${err?.message || err}`);
+    return null;
+  }
+}
 async function pushUser(mu) {
+  if (await isShipInstance()) {
+    return { status: "skipped_ship_instance", error: "ship instance \u2014 Shipskart is shore-only" };
+  }
   const existing = await getUserLink(mu.id);
   if (existing?.pushStatus === "pushed" && existing.shipskartUserId) {
     return syncRoleIfDrifted(
@@ -39827,7 +40535,7 @@ async function pushUser(mu) {
     return { status: "missing_email" };
   }
   const mapping = mu.role ? await getMappingForSailRole(mu.role) : void 0;
-  const roleId = mapping ? await resolveShipskartRoleId(mapping.shipskartRole) : null;
+  const roleId = mapping ? await resolveRoleIdForMapping(mapping) : null;
   if (!mapping || !roleId) {
     await upsertUserLink(mu.id, {
       pushStatus: "unmapped_role",
@@ -39879,6 +40587,7 @@ async function mapUserToVessel(userUuid, vesselVuuid, ctx) {
   if (assignment?.mapStatus === "mapped" && assignment.shipskartMappingId) {
     return { status: "already_mapped", shipskartId: assignment.shipskartMappingId };
   }
+  const attempt = { mapAttempts: (assignment?.mapAttempts ?? 0) + 1, lastAttemptAt: /* @__PURE__ */ new Date() };
   if (assignment?.shipskartMappingId) {
     const del = await deleteVesselUserMapping(
       { userUuid, vesselId: vesselVuuid, shipskartMappingId: assignment.shipskartMappingId },
@@ -39890,11 +40599,11 @@ async function mapUserToVessel(userUuid, vesselVuuid, ctx) {
   const userLink = await getUserLink(userUuid);
   const vesselLink = await getVesselLink(vesselVuuid);
   if (userLink?.pushStatus !== "pushed" || !userLink.shipskartUserId) {
-    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_user", lastError: `user link status: ${userLink?.pushStatus ?? "absent"}` });
+    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_user", lastError: `user link status: ${userLink?.pushStatus ?? "absent"}`, ...attempt });
     return { status: "awaiting_user" };
   }
   if (vesselLink?.pushStatus !== "pushed" || !vesselLink.shipskartVesselId) {
-    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_vessel", lastError: `vessel link status: ${vesselLink?.pushStatus ?? "absent"}` });
+    await upsertAssignment(userUuid, vesselVuuid, { mapStatus: "awaiting_vessel", lastError: `vessel link status: ${vesselLink?.pushStatus ?? "absent"}`, ...attempt });
     return { status: "awaiting_vessel" };
   }
   const res = await authorizedB2bRequest("POST", "/integration/SAIL/map-user-to-vessel", {
@@ -39908,13 +40617,28 @@ async function mapUserToVessel(userUuid, vesselVuuid, ctx) {
   });
   const mappingId = res.json?.data?.id;
   if (res.ok && mappingId) {
-    await upsertAssignment(userUuid, vesselVuuid, { shipskartMappingId: mappingId, mapStatus: "mapped", lastError: null });
+    await upsertAssignment(userUuid, vesselVuuid, { shipskartMappingId: mappingId, mapStatus: "mapped", lastError: null, mapAttempts: 0, lastAttemptAt: attempt.lastAttemptAt });
     return { status: "mapped", shipskartId: mappingId };
   }
   const status = isDuplicate400(res) ? "blocked_duplicate" : "error";
   const error = JSON.stringify(res.json ?? res.text)?.slice(0, 400);
-  await upsertAssignment(userUuid, vesselVuuid, { mapStatus: status, lastError: error });
+  await upsertAssignment(userUuid, vesselVuuid, { mapStatus: status, lastError: error, ...attempt });
   return { status, error };
+}
+function isAssignmentRetryDue(row, now = /* @__PURE__ */ new Date()) {
+  const attempts = row.mapAttempts ?? 0;
+  const last = row.lastAttemptAt;
+  if (!last) return true;
+  const waitMs = attempts <= 3 ? 0 : attempts <= 6 ? 6 * 36e5 : 24 * 36e5;
+  return now.getTime() - new Date(last).getTime() >= waitMs;
+}
+function orderAssignmentsForRetry(rows) {
+  return [...rows].sort((a, b) => {
+    const ta = a.lastAttemptAt ? new Date(a.lastAttemptAt).getTime() : -1;
+    const tb = b.lastAttemptAt ? new Date(b.lastAttemptAt).getTime() : -1;
+    if (ta !== tb) return ta - tb;
+    return (a.mapAttempts ?? 0) - (b.mapAttempts ?? 0);
+  });
 }
 async function deleteVesselUserMapping(a, after = "unmapped") {
   const res = await authorizedB2bRequest("DELETE", `/integration/SAIL/delete-vessel-user/${a.shipskartMappingId}`, { body: {} });
@@ -39925,7 +40649,12 @@ async function deleteVesselUserMapping(a, after = "unmapped") {
     return { status: "unmapped", shipskartId: a.shipskartMappingId };
   }
   const error = `HTTP ${res.status} ${JSON.stringify(res.json ?? res.text)?.slice(0, 380)}`;
-  await upsertAssignment(a.userUuid, a.vesselId, { lastError: `mapping delete failed: ${error}` });
+  const prior = await getAssignment(a.userUuid, a.vesselId);
+  await upsertAssignment(a.userUuid, a.vesselId, {
+    lastError: `mapping delete failed: ${error}`,
+    mapAttempts: (prior?.mapAttempts ?? 0) + 1,
+    lastAttemptAt: /* @__PURE__ */ new Date()
+  });
   return { status: "mapping_delete_failed", error };
 }
 async function settleAssignmentChanges(userUuid, ctx) {
@@ -39951,6 +40680,9 @@ function clearJitAttempts(userUuid) {
   jitAttempts.delete(userUuid);
 }
 async function ensureUserPushed(userUuid, sailRole) {
+  if (await isShipInstance()) {
+    return { pushed: false, reason: "ship instance \u2014 Shipskart is shore-only" };
+  }
   const existing = await getUserLink(userUuid);
   if (existing?.pushStatus === "pushed" && existing.shipskartUserId) {
     let reason = "already_pushed";
@@ -40010,7 +40742,29 @@ async function ensureUserPushed(userUuid, sailRole) {
   }
   return { pushed: true, reason: "pushed_jit", mappings };
 }
+function isReconcileRunning() {
+  return reconcileInFlight;
+}
+function getLastReconcile() {
+  return lastReconcile;
+}
 async function runReconciliation(opts = {}) {
+  if (reconcileInFlight) {
+    return { ran: false, reason: "a reconciliation pass is already running", vessels: {}, users: {}, mappings: {} };
+  }
+  reconcileInFlight = true;
+  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  try {
+    const result = await runReconciliationInner(opts);
+    result.startedAt = startedAt;
+    result.finishedAt = (/* @__PURE__ */ new Date()).toISOString();
+    lastReconcile = result;
+    return result;
+  } finally {
+    reconcileInFlight = false;
+  }
+}
+async function runReconciliationInner(opts = {}) {
   const limit = Math.max(1, Math.min(200, opts.limit ?? DEFAULT_BATCH_LIMIT));
   const summary = { ran: false, vessels: {}, users: {}, mappings: {} };
   if (await isShipInstance()) {
@@ -40060,13 +40814,18 @@ async function runReconciliation(opts = {}) {
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
   const linkedUserUuids = new Set(allUserLinks.map((r) => r.u));
-  const pendingAssignments = (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, ["pending", "awaiting_user", "awaiting_vessel"])))).filter((a) => linkedUserUuids.has(a.userUuid));
+  const now = /* @__PURE__ */ new Date();
+  const pendingAssignments = orderAssignmentsForRetry(
+    (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, RETRYABLE_MAP_STATUSES)))).filter((a) => linkedUserUuids.has(a.userUuid) && isAssignmentRetryDue(a, now))
+  );
   for (const a of pendingAssignments.slice(0, limit)) {
     const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
     tally(summary.mappings, st);
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
-  const revokedAssignments = await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, false), eq32(masterUserVessels.mapStatus, "revoked")));
+  const revokedAssignments = orderAssignmentsForRetry(
+    (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, false), eq32(masterUserVessels.mapStatus, "revoked")))).filter((a) => isAssignmentRetryDue(a, now))
+  );
   for (const a of revokedAssignments.slice(0, limit)) {
     if (!a.shipskartMappingId) {
       await upsertAssignment(a.userUuid, a.vesselId, { mapStatus: "unmapped", lastError: null });
@@ -40083,7 +40842,7 @@ async function runReconciliation(opts = {}) {
   console.log(`[Shipskart b2b] reconciliation pass: vessels=${JSON.stringify(summary.vessels)} users=${JSON.stringify(summary.users)} mappings=${JSON.stringify(summary.mappings)}`);
   return summary;
 }
-var DEFAULT_BATCH_LIMIT, B2B_PACE_MS, paceB2b, API_HIT_STATUSES, VESSEL_API_HIT_STATUSES, tally, isDuplicate400, JIT_MAX_ATTEMPTS, jitAttempts;
+var DEFAULT_BATCH_LIMIT, B2B_PACE_MS, paceB2b, API_HIT_STATUSES, VESSEL_API_HIT_STATUSES, tally, isDuplicate400, RETRYABLE_MAP_STATUSES, JIT_MAX_ATTEMPTS, jitAttempts, reconcileInFlight, lastReconcile;
 var init_shipskartReconcilerService = __esm({
   "server/modules/shipskart/services/shipskartReconcilerService.ts"() {
     "use strict";
@@ -40105,8 +40864,11 @@ var init_shipskartReconcilerService = __esm({
       return acc;
     };
     isDuplicate400 = (res) => res.status === 400 && /already in use|already exists|duplicate/i.test(JSON.stringify(res.json ?? ""));
+    RETRYABLE_MAP_STATUSES = ["pending", "awaiting_user", "awaiting_vessel", "error"];
     JIT_MAX_ATTEMPTS = 3;
     jitAttempts = /* @__PURE__ */ new Map();
+    reconcileInFlight = false;
+    lastReconcile = null;
   }
 });
 
@@ -41949,6 +42711,15 @@ async function setOfficeWoGenerationEnabled(vesselId, enabled, username) {
     updatedBy: username || "unknown"
   });
 }
+async function setOfficeRhEntryEnabled(vesselId, enabled, username) {
+  const existing = await getPmsVesselSettings(vesselId);
+  return createOrUpdatePmsVesselSettings({
+    ...existing ?? { vesselId },
+    vesselId,
+    officeRhEntryEnabled: enabled,
+    updatedBy: username || "unknown"
+  });
+}
 async function updatePmsVesselSettings(vesselId, data, username) {
   const updatedBy = data.updatedBy || username || "test";
   const settingsMode = data.settingsMode || "COMPANY_STANDARD";
@@ -42336,6 +43107,24 @@ async function updateOfficeWoGenerationSwitch(req, res) {
   console.log(`[OfficeWoSwitch] vessel=${req.params.vesselId} office_wo_generation_enabled=${enabled} by ${username}`);
   res.json({ vesselId: req.params.vesselId, officeWoGenerationEnabled: settings.officeWoGenerationEnabled, updatedBy: settings.updatedBy });
 }
+async function updateOfficeRhEntrySwitch(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "Office RH entry is configured on the shore server." });
+  }
+  const userRole = (req.user?.forwardedRole || req.user?.role || "").trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may change office RH entry." });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled (boolean) is required" });
+  }
+  const username = req.user?.username || "unknown";
+  const settings = await setOfficeRhEntryEnabled(req.params.vesselId, enabled, username);
+  console.log(`[OfficeRhSwitch] vessel=${req.params.vesselId} office_rh_entry_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, officeRhEntryEnabled: settings.officeRhEntryEnabled, updatedBy: settings.updatedBy });
+}
 async function getCompanyStandardGraceSettings3(_req, res) {
   const settings = await getCompanyStandardGraceSettings2();
   res.json(settings);
@@ -42380,6 +43169,7 @@ router2.get("/pms-vessel-settings", asyncHandler(getAllPmsVesselSettings3));
 router2.post("/pms-vessel-settings", requirePermission("pms-admin", ["create", "edit"]), asyncHandler(createPmsVesselSettings2));
 router2.get("/pms-vessel-settings/:vesselId", asyncHandler(getPmsVesselSettings3));
 router2.put("/pms-vessel-settings/:vesselId/office-wo-generation", requirePermission("pms-admin", "edit"), asyncHandler(updateOfficeWoGenerationSwitch));
+router2.put("/pms-vessel-settings/:vesselId/office-rh-entry", requirePermission("pms-admin", "edit"), asyncHandler(updateOfficeRhEntrySwitch));
 router2.put("/pms-vessel-settings/:vesselId", requirePermission("pms-admin", "edit"), asyncHandler(updatePmsVesselSettings2));
 router2.delete("/pms-vessel-settings/:vesselId", requirePermission("pms-admin", "delete"), asyncHandler(deletePmsVesselSettings3));
 router2.get("/company-standard-grace-settings", asyncHandler(getCompanyStandardGraceSettings3));
@@ -45307,7 +46097,7 @@ async function getWorkOrderContext(workOrderId) {
       approvalBlockReason: null
     }).catch((err) => console.error("\u26A0\uFE0F Failed to auto-correct stuck rejected WO status:", err));
   }
-  const executionData = {
+  let executionData = {
     // B1 - Risk Assessment, Checklists & Records
     riskAssessmentStatus: correctedWorkOrder.riskAssessmentStatus || "",
     safetyChecklistsStatus: correctedWorkOrder.safetyChecklistsStatus || "",
@@ -45341,11 +46131,17 @@ async function getWorkOrderContext(workOrderId) {
     dateCompleted: correctedWorkOrder.dateCompleted || "",
     completionRemarks: correctedWorkOrder.completionRemarks || ""
   };
+  const draftDoc = correctedWorkOrder.draftExecutionData;
+  const hasDraft = draftDoc != null && typeof draftDoc === "object" && !Array.isArray(draftDoc);
+  if (hasDraft) {
+    executionData = { ...executionData, ...draftDoc };
+  }
   const finalTemplateData = { ...templateData };
   return {
     workOrder: correctedWorkOrder,
     templateData: finalTemplateData,
     executionData,
+    hasDraftExecutionData: hasDraft,
     job,
     component: {
       id: component.cuuid,
@@ -45650,10 +46446,22 @@ async function completeWorkOrder(workOrderId, body) {
   let rhBackdatedSkipped = false;
   let rhBackdatedLatestRH = null;
   let rhBackdatedLatestRHDate = null;
-  if (runningHours && counterType !== "NOT_RH_DRIVEN" && await isShipInstance()) {
+  const isShipForRhSync = await isShipInstance();
+  let officeRhEntryAllowedCompletion = false;
+  if (!isShipForRhSync && (workOrder.vesselId || component.vesselId)) {
+    const { isOfficeRhEntryEnabled: isOfficeRhEntryEnabled2 } = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
+    officeRhEntryAllowedCompletion = await isOfficeRhEntryEnabled2(workOrder.vesselId || component.vesselId || "");
+  }
+  if (runningHours && counterType !== "NOT_RH_DRIVEN" && (isShipForRhSync || officeRhEntryAllowedCompletion)) {
     const newRH = parseInt(runningHours);
     const completionDateForValidation = dateOfCompletion || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const readingDateForRH = currentReadingDate || completionDateForValidation;
+    if (!isShipForRhSync && !currentReadingDate && !dateOfCompletion) {
+      throw new ValidationError(
+        "Office RH entry requires the reading date (Current Reading Date or Date of Completion). Enter the date the counter was actually read.",
+        { code: "RH_READING_DATE_REQUIRED", workOrderNo: workOrder.workOrderNo }
+      );
+    }
     const componentVesselId = workOrder.vesselId || component.vesselId || "V001";
     const previousRH = parseInt(component.currentCumulativeRH || "0");
     const alreadySynced = !!workOrder.rhSyncedAt;
@@ -45666,8 +46474,15 @@ async function completeWorkOrder(workOrderId, body) {
       } else {
         const masterCurrentRH = parseFloat((component.rhCurrentMaster ?? component.currentCumulativeRH) || "0");
         if (newRH <= masterCurrentRH) {
+          const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const masterUpdRaw = component.rhMasterUpdatedAt ?? (component.lastUpdated ? new Date(component.lastUpdated) : null);
-          const masterUpdDate = masterUpdRaw instanceof Date ? masterUpdRaw : masterUpdRaw ? new Date(masterUpdRaw) : null;
+          const stampFallback = masterUpdRaw instanceof Date ? masterUpdRaw : masterUpdRaw ? new Date(masterUpdRaw) : null;
+          const masterUpdDate = await resolveRhBaselineDay2(
+            await getPool2(),
+            component.cuuid,
+            stampFallback && !isNaN(stampFallback.getTime()) ? stampFallback : null
+          );
           if (masterUpdDate && !isNaN(masterUpdDate.getTime())) {
             const woCompletionDate = new Date(readingDateForRH);
             const masterDay = Date.UTC(masterUpdDate.getUTCFullYear(), masterUpdDate.getUTCMonth(), masterUpdDate.getUTCDate());
@@ -45681,34 +46496,42 @@ async function completeWorkOrder(workOrderId, body) {
           }
         }
         if (!rhBackdatedSkipped) {
-          const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-          try {
-            await updateMasterRH3(component.cuuid, {
-              newRHValue: newRH,
-              updateSource: "MANUAL",
-              userId: bodyUserId || executionData.performedBy || "system",
-              userUuid: bodyUserUuid,
-              userRole: userRole || "Ship",
-              adminOverride: adminOverride || false,
-              comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ""})`,
-              dateUpdated: readingDateForRH
-            });
-            rhReadingApplied = true;
-            console.log(`\u2705 [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
-          } catch (masterErr) {
-            if (masterErr instanceof ValidationError) {
-              const det = masterErr.details || {};
-              throw new ValidationError(masterErr.message, {
-                code: "RH_OVERRIDE_REQUIRED",
-                ...det,
-                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                canOverride: det.validation?.canOverride ?? false,
-                componentId: component.cuuid,
-                componentCode: component.componentCode || workOrder.componentCode,
-                rhCounterType: "MASTER"
+          const { claimWoRhSync: claimWoRhSync2, releaseWoRhSync: releaseWoRhSync2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getClaimPool } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const claimPool = await getClaimPool();
+          if (!await claimWoRhSync2(claimPool, workOrder.wouuid)) {
+            console.warn(`\u26A0\uFE0F [RH Sync] WO ${workOrder.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
+          } else {
+            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+            try {
+              await updateMasterRH3(component.cuuid, {
+                newRHValue: newRH,
+                updateSource: "MANUAL",
+                userId: bodyUserId || executionData.performedBy || "system",
+                userUuid: bodyUserUuid,
+                userRole: userRole || "Ship",
+                adminOverride: adminOverride || false,
+                comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ""})`,
+                dateUpdated: readingDateForRH
               });
+              rhReadingApplied = true;
+              console.log(`\u2705 [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
+            } catch (masterErr) {
+              await releaseWoRhSync2(claimPool, workOrder.wouuid);
+              if (masterErr instanceof ValidationError) {
+                const det = masterErr.details || {};
+                throw new ValidationError(masterErr.message, {
+                  code: "RH_OVERRIDE_REQUIRED",
+                  ...det,
+                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                  canOverride: det.validation?.canOverride ?? false,
+                  componentId: component.cuuid,
+                  componentCode: component.componentCode || workOrder.componentCode,
+                  rhCounterType: "MASTER"
+                });
+              }
+              throw masterErr;
             }
-            throw masterErr;
           }
         }
       }
@@ -45725,8 +46548,15 @@ async function completeWorkOrder(workOrderId, body) {
         if (masterComp) {
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || "0");
           if (newRH <= inhMasterCurrentRH) {
+            const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+            const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
             const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhMasterUpdDate = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
+            const inhStampFallback = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
+            const inhMasterUpdDate = await resolveRhBaselineDay2(
+              await getPool2(),
+              masterComp.cuuid,
+              inhStampFallback && !isNaN(inhStampFallback.getTime()) ? inhStampFallback : null
+            );
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
               const woCompletionDate = new Date(readingDateForRH);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
@@ -45740,33 +46570,41 @@ async function completeWorkOrder(workOrderId, body) {
             }
           }
           if (!rhBackdatedSkipped) {
-            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-            try {
-              await updateMasterRH3(masterComp.cuuid, {
-                newRHValue: newRH,
-                updateSource: "WORKORDER",
-                userId: bodyUserId || executionData.performedBy || "system",
-                userUuid: bodyUserUuid,
-                userRole: userRole || "Ship",
-                adminOverride: adminOverride || false,
-                comments: `WO ${workOrder.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                dateUpdated: readingDateForRH
-              });
-              console.log(`\u2705 [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
-            } catch (masterErr) {
-              if (masterErr instanceof ValidationError) {
-                const det = masterErr.details || {};
-                throw new ValidationError(masterErr.message, {
-                  code: "RH_OVERRIDE_REQUIRED",
-                  ...det,
-                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                  canOverride: det.validation?.canOverride ?? false,
-                  componentId: masterComp.cuuid,
-                  componentCode: masterComp.componentCode || workOrder.componentCode,
-                  rhCounterType: "INHERITED"
+            const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+            const { getPool: getPoolInh } = await Promise.resolve().then(() => (init_db(), db_exports));
+            const claimPoolInh = await getPoolInh();
+            if (!await claimInh(claimPoolInh, workOrder.wouuid)) {
+              console.warn(`\u26A0\uFE0F [RH Sync] WO ${workOrder.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
+            } else {
+              const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+              try {
+                await updateMasterRH3(masterComp.cuuid, {
+                  newRHValue: newRH,
+                  updateSource: "WORKORDER",
+                  userId: bodyUserId || executionData.performedBy || "system",
+                  userUuid: bodyUserUuid,
+                  userRole: userRole || "Ship",
+                  adminOverride: adminOverride || false,
+                  comments: `WO ${workOrder.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+                  dateUpdated: readingDateForRH
                 });
+                console.log(`\u2705 [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
+              } catch (masterErr) {
+                await releaseInh(claimPoolInh, workOrder.wouuid);
+                if (masterErr instanceof ValidationError) {
+                  const det = masterErr.details || {};
+                  throw new ValidationError(masterErr.message, {
+                    code: "RH_OVERRIDE_REQUIRED",
+                    ...det,
+                    requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                    canOverride: det.validation?.canOverride ?? false,
+                    componentId: masterComp.cuuid,
+                    componentCode: masterComp.componentCode || workOrder.componentCode,
+                    rhCounterType: "INHERITED"
+                  });
+                }
+                throw masterErr;
               }
-              throw masterErr;
             }
           }
         } else {
@@ -45912,7 +46750,9 @@ async function completeWorkOrder(workOrderId, body) {
     // Double-sync guard: stamp when a completion reading was applied this run (MASTER cascade or
     // INHERITED cycle). Leaves an existing stamp intact on replay.
     rhSyncedAt: rhReadingApplied ? /* @__PURE__ */ new Date() : void 0,
-    rhBackdatedEntry: rhBackdatedSkipped ? true : void 0
+    rhBackdatedEntry: rhBackdatedSkipped ? true : void 0,
+    // Save as Draft (Task #402): completion supersedes any stashed draft.
+    draftExecutionData: null
   });
   try {
     await logFieldChanges("work_orders", workOrder.wouuid, workOrder.vesselId || null, workOrder, updatedWorkOrder, executionData.performedBy || "system");
@@ -46495,7 +47335,9 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         ceApprovalRemarks: tierMinRemarks > 0 ? remarks : null,
         skippedCyclesJustification: missedCycles >= 1 && skippedCyclesJustification ? skippedCyclesJustification : null,
         approvalDate: (/* @__PURE__ */ new Date()).toISOString(),
-        wasRejected: false
+        wasRejected: false,
+        // Save as Draft (Task #402): approval supersedes any stashed draft.
+        draftExecutionData: null
       };
       if (!requiresLevel2Review) {
         updateData.nextDueDate = nextDueDate;
@@ -46579,7 +47421,9 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
     nextDueDate,
     nextDueReading,
     missedCycles,
-    originalDueDate
+    originalDueDate,
+    // Save as Draft (Task #402): Level-2 approval supersedes any stashed draft.
+    draftExecutionData: null
   };
   if (actualCompletionDate) {
     updateData.dateCompleted = actualCompletionDate;
@@ -82093,10 +82937,19 @@ var ShipskartRoleNotMappedError = class extends Error {
   }
 };
 var ShipskartUserNotProvisionedError = class extends Error {
-  constructor(userUuid, reason) {
+  /**
+   * `reason` is the raw diagnostic (also written to shipskart_user_links.last_error).
+   * `reasonCode` is the MACHINE key the controller turns into a plain-English explanation
+   * and the exact remedy — so a blocked user, and the support person reading over their
+   * shoulder, are told what is wrong and who fixes it instead of "not available yet".
+   */
+  constructor(userUuid, reason, reasonCode = "unknown", sailRole = null, facts = {}) {
     super(`Shipskart account not provisioned for user ${userUuid}: ${reason}`);
     this.userUuid = userUuid;
     this.reason = reason;
+    this.reasonCode = reasonCode;
+    this.sailRole = sailRole;
+    this.facts = facts;
     this.name = "ShipskartUserNotProvisionedError";
   }
 };
@@ -82212,12 +83065,13 @@ async function resolveExternalUserId(userRole, userUuid) {
       link = void 0;
     }
     let jitReason = null;
-    if (!lookupError && link?.pushStatus !== "pushed" && (process.env.SHIPSKART_B2B_JIT || "").toLowerCase() !== "false") {
+    const wasAlreadyPushed = link?.pushStatus === "pushed";
+    if (!lookupError && (process.env.SHIPSKART_B2B_JIT || "").toLowerCase() !== "false") {
       try {
         const { ensureUserPushed: ensureUserPushed2 } = await Promise.resolve().then(() => (init_shipskartReconcilerService(), shipskartReconcilerService_exports));
         const jit = await ensureUserPushed2(userUuid, userRole || null);
         jitReason = jit.reason;
-        if (jit.pushed) {
+        if (jit.pushed && !wasAlreadyPushed) {
           link = await getUserLink2(userUuid);
         }
       } catch (err) {
@@ -82239,7 +83093,29 @@ async function resolveExternalUserId(userRole, userUuid) {
           console.warn(`[Shipskart] could not record the block reason for ${userUuid}: ${writeErr?.message || writeErr}`);
         }
       }
-      throw new ShipskartUserNotProvisionedError(userUuid, reason);
+      let reasonCode = link?.pushStatus && link.pushStatus !== "pending" ? link.pushStatus : lookupError ? "lookup_failed" : "jit_failed";
+      let reasonText = reason;
+      let facts = { sailRole: userRole || null };
+      if (reasonCode === "jit_failed" || reasonCode === "error") {
+        try {
+          const { diagnoseUserBlock: diagnoseUserBlock2 } = await Promise.resolve().then(() => (init_shipskartReconcilerService(), shipskartReconcilerService_exports));
+          const dx = await diagnoseUserBlock2(userUuid, userRole || null);
+          if (dx) {
+            reasonCode = dx.reasonCode;
+            reasonText = dx.reason;
+            facts = dx.facts;
+          }
+        } catch {
+        }
+      }
+      if (!facts.shipskartRole && reasonCode === "unmapped_role") {
+        try {
+          const m = userRole ? await getMappingForSailRole(userRole) : void 0;
+          if (m) facts.shipskartRole = m.shipskartRole;
+        } catch {
+        }
+      }
+      throw new ShipskartUserNotProvisionedError(userUuid, reasonText, reasonCode, userRole || null, facts);
     }
   } else if (!LEGACY_SHARED_ACCOUNT_ENABLED) {
     console.warn(
@@ -82311,6 +83187,67 @@ async function logoutSso(userRole, userUuid) {
 }
 
 // server/modules/shipskart/controllers/shipskartSsoController.ts
+function explainBlock(reasonCode, sailRole, rawReason, facts = {}) {
+  const role = sailRole ? `\u201C${sailRole}\u201D` : "your role";
+  const who = facts.fullName ? ` (${facts.fullName})` : "";
+  const skRole = facts.shipskartRole ? `\u201C${facts.shipskartRole}\u201D` : null;
+  switch (reasonCode) {
+    case "unmapped_role":
+      return /has no live roleId/i.test(rawReason) ? {
+        title: "Purchasing access is being set up for your role",
+        detail: `Your role ${role} is linked to the purchasing role ${skRole ?? "(not recorded)"}, which no longer exists on the supplier's system \u2014 so we cannot open Purchasing for you yet. This usually happens after the supplier renames a role.`,
+        whatHappensNext: `An administrator needs to open Access Control and re-select the purchasing role for ${role}, then save. Once that is done, simply open Purchasing again \u2014 there is no need to log out.`,
+        retry: "click"
+      } : {
+        title: "Purchasing access is not set up for your role yet",
+        detail: `Your role ${role} has not yet been linked to a purchasing role. This is a one-time setup step and it has not been done for this role.`,
+        whatHappensNext: `An administrator can link ${role} to a purchasing role in Access Control. Once linked, simply open Purchasing again \u2014 there is no need to log out.`,
+        retry: "click"
+      };
+    case "missing_email":
+      return {
+        title: "An email address is needed for your account",
+        detail: `The purchasing system requires an email address to create your account, and there is no email recorded against your user profile${who}.`,
+        whatHappensNext: "Once your email address is added to your user profile and the user details are refreshed, open Purchasing again and your account will be created automatically.",
+        retry: "sync"
+      };
+    case "no_master_row":
+      return {
+        title: "Your user profile has not reached this system yet",
+        detail: "Your account exists, but its details have not yet been received by this system, so a purchasing account cannot be created for you.",
+        whatHappensNext: "An administrator needs to refresh the user details. After that, open Purchasing again.",
+        retry: "sync"
+      };
+    case "blocked_duplicate":
+      return {
+        title: "An account already exists with your email address",
+        detail: "The purchasing system already has an account registered against your email address, so a second one cannot be created. This has to be resolved with the supplier.",
+        whatHappensNext: "This one cannot be fixed from within the application \u2014 please contact support and they will raise it with the supplier.",
+        retry: "support"
+      };
+    case "identity_not_configured":
+      return {
+        title: "Purchasing is not fully configured on this installation",
+        detail: "Purchasing needs to know which user is signed in, and this installation is not providing that information. This is a configuration matter, not a problem with your account.",
+        whatHappensNext: "Please contact support \u2014 this needs to be enabled by the technical team.",
+        retry: "support"
+      };
+    case "lookup_failed":
+      return {
+        title: "We could not reach the purchasing system just now",
+        detail: "Your account looks fine \u2014 we simply could not contact the supplier\u2019s system to check it. This is usually temporary.",
+        whatHappensNext: "Please wait a few minutes and open Purchasing again.",
+        retry: "click"
+      };
+    default:
+      return {
+        title: "Your purchasing account could not be created",
+        detail: "We tried to create your account on the purchasing system and it did not complete. The technical detail is shown below for support.",
+        whatHappensNext: "Please try again in a few minutes. If it keeps happening, contact support and quote the details below.",
+        retry: "click"
+      };
+  }
+}
 async function initiateHandler(req, res) {
   const bodyRole = typeof req.body?.role === "string" ? req.body.role.trim() : "";
   const userRole = bodyRole || req.user?.role || "";
@@ -82325,18 +83262,42 @@ async function initiateHandler(req, res) {
     });
   } catch (err) {
     if (err instanceof ShipskartRoleNotMappedError) {
+      const x = explainBlock("unmapped_role", err.userRole || userRole || null, "no shipskart_role_mappings row", { sailRole: err.userRole || userRole || null });
       return res.status(403).json({
         success: false,
         errorCode: "ROLE_NOT_MAPPED",
-        message: "Purchasing is not available for your role."
+        message: "Purchasing is not available for your role.",
+        // Plain-English explanation + the support reference (see explainBlock).
+        title: x.title,
+        detail: x.detail,
+        whatHappensNext: x.whatHappensNext,
+        retry: x.retry,
+        reasonCode: "unmapped_role",
+        reason: `SAIL role '${err.userRole || userRole || "(none)"}' has no shipskart_role_mappings row`,
+        userRole: err.userRole || userRole || null,
+        userUuid: forwardedUserUuid(req, "sso/initiate") ?? null,
+        occurredAt: (/* @__PURE__ */ new Date()).toISOString()
       });
     }
     if (err instanceof ShipskartUserNotProvisionedError) {
       const identityMissing = err.reason === "identity_not_configured";
+      const code = identityMissing ? "identity_not_configured" : err.reasonCode || "unknown";
+      const x = explainBlock(code, err.sailRole ?? userRole ?? null, err.reason, err.facts ?? {});
       return res.status(409).json({
         success: false,
         errorCode: "USER_NOT_PROVISIONED",
-        message: identityMissing ? "Purchasing is unavailable: user identity is not configured for this deployment. Please contact your administrator." : "Purchasing is not available yet. Please contact your administrator."
+        message: identityMissing ? "Purchasing is unavailable: user identity is not configured for this deployment. Please contact your administrator." : "Purchasing is not available yet. Please contact your administrator.",
+        // Plain-English explanation + the support reference (see explainBlock).
+        title: x.title,
+        detail: x.detail,
+        whatHappensNext: x.whatHappensNext,
+        retry: x.retry,
+        reasonCode: code,
+        reason: err.reason,
+        // the raw diagnostic, also on shipskart_user_links.last_error
+        userRole: err.sailRole ?? userRole ?? null,
+        userUuid: identityMissing ? null : err.userUuid,
+        occurredAt: (/* @__PURE__ */ new Date()).toISOString()
       });
     }
     throw err;
@@ -82359,15 +83320,17 @@ init_shipskartRoleMappingRepository();
 init_shipskartRoleSource();
 var EDITOR_ROLES2 = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
 async function getRoleMappingsHandler(req, res) {
-  const [availableRoles, rows] = await Promise.all([
-    getAvailableShipskartRoles(),
+  const [liveRoles, rows] = await Promise.all([
+    getAvailableShipskartRoleObjects(),
     getAllMappings()
   ]);
-  const live = new Set(availableRoles);
+  const availableRoles = Array.from(new Set(liveRoles.map((r) => r.name)));
+  const live = new Set(liveRoles.map((r) => r.name));
+  const liveIds = new Set(liveRoles.map((r) => r.id));
   const mappings = rows.map((r) => ({
     sailRole: r.sailRole,
     shipskartRole: r.shipskartRole,
-    stale: !live.has(r.shipskartRole)
+    stale: !live.has(r.shipskartRole) && !(r.shipskartRoleId && liveIds.has(r.shipskartRoleId))
   }));
   const staleCount = mappings.filter((m) => m.stale).length;
   if (staleCount > 0) {
@@ -82386,7 +83349,8 @@ async function putRoleMappingsHandler(req, res) {
   if (!Array.isArray(mappings)) {
     return res.status(400).json({ error: "mappings[] is required" });
   }
-  const validRoles = new Set(await getAvailableShipskartRoles());
+  const liveRoles = await getAvailableShipskartRoleObjects();
+  const validRoles = new Set(liveRoles.map((r) => r.name));
   for (const m of mappings) {
     if (!m || typeof m.sailRole !== "string" || !m.sailRole.trim()) {
       return res.status(400).json({ error: `every entry needs a sailRole` });
@@ -82399,11 +83363,12 @@ async function putRoleMappingsHandler(req, res) {
     }
   }
   const updatedBy = req.user?.userUuid || null;
+  const idByName = new Map(liveRoles.map((r) => [r.name, r.id]));
   for (const m of mappings) {
     if (m.shipskartRole == null) {
       await deleteMapping(m.sailRole.trim());
     } else {
-      await upsertMapping2(m.sailRole.trim(), m.shipskartRole, updatedBy);
+      await upsertMapping2(m.sailRole.trim(), m.shipskartRole, updatedBy, idByName.get(m.shipskartRole) ?? null);
     }
   }
   const rows = await getAllMappings();
@@ -82522,8 +83487,14 @@ async function putReconcilerConfigHandler(req, res) {
 }
 async function reconcileHandler(req, res) {
   const limit = Number.isInteger(req.body?.limit) ? req.body.limit : void 0;
-  const summary = await runReconciliation({ limit });
-  res.status(summary.ran ? 200 : 409).json(summary);
+  if (isReconcileRunning()) {
+    return res.status(409).json({ started: false, message: "a reconciliation pass is already running" });
+  }
+  runReconciliation({ limit }).then((r) => console.log(`[Shipskart b2b] background reconcile finished: ran=${r.ran}${r.reason ? ` (${r.reason})` : ""} users=${JSON.stringify(r.users)} mappings=${JSON.stringify(r.mappings)}`)).catch((err) => console.error("[Shipskart b2b] background reconcile crashed:", err?.message || err));
+  res.status(202).json({ started: true, note: "running in background \u2014 follow GET /shipskart/b2b/reconcile/status" });
+}
+async function reconcileStatusHandler(_req, res) {
+  res.json({ running: isReconcileRunning(), lastRun: getLastReconcile() });
 }
 async function vesselAssignmentsHandler(req, res) {
   const userUuid = forwardedUserUuid(req, "vessel-assignments");
@@ -82612,6 +83583,7 @@ router24.put("/shipskart/role-mappings", asyncHandler(putRoleMappingsHandler));
 router24.post("/shipskart/b2b/bootstrap", asyncHandler(bootstrapHandler));
 router24.get("/shipskart/b2b/status", asyncHandler(statusHandler2));
 router24.post("/shipskart/b2b/reconcile", asyncHandler(reconcileHandler));
+router24.get("/shipskart/b2b/reconcile/status", asyncHandler(reconcileStatusHandler));
 router24.get("/shipskart/b2b/reconciler-config", asyncHandler(getReconcilerConfigHandler));
 router24.put("/shipskart/b2b/reconciler-config", asyncHandler(putReconcilerConfigHandler));
 router24.post("/shipskart/b2b/retry", asyncHandler(retryHandler));
