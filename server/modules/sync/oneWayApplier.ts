@@ -440,7 +440,8 @@ export async function applyOneWayRows(
                   rowToApply = { ...row };
                   for (const col of ['current_stamp', 'currentStamp', 'current_cumulative_rh', 'currentCumulativeRH',
                     'rh_current_master', 'rhCurrentMaster', 'rh_master_updated_at', 'rhMasterUpdatedAt',
-                    'rh_master_update_source', 'rhMasterUpdateSource', 'last_updated', 'lastUpdated']) {
+                    'rh_master_update_source', 'rhMasterUpdateSource', 'last_updated', 'lastUpdated',
+                    'rh_current_inherited_cached', 'rhCurrentInheritedCached', 'rh_inherited_updated_at', 'rhInheritedUpdatedAt']) {
                     delete rowToApply[col];
                   }
                   syncDiag(`ROTATION-GUARD: components.${cuuid} incoming row (updated_at=${incomingUpdatedRaw}) predates local rotation ${latestRotation.toISOString()} — stamp/RH columns preserved`);
@@ -453,21 +454,33 @@ export async function applyOneWayRows(
               // (re)derived from audit history by the RH hooks; here we only refuse
               // the stale overwrite. Fail open on lookup errors (pre-162 behaviour).
               try {
-                const { selectWinningRhEvent, parseReadingDay } = await import('../running-hours/rhEventComparator');
+                const { selectWinningRhEvent, incomingRhStamp, shouldStripIncomingRh, localRhClaimDay, RH_GUARD_STRIP_COLUMNS } = await import('../running-hours/rhEventComparator');
                 const localWinner = await selectWinningRhEvent(pool, cuuid);
-                if (localWinner) {
-                  const incomingRhStampRaw = row['rh_master_updated_at'] ?? row['rhMasterUpdatedAt'] ?? row['last_updated'] ?? row['lastUpdated'];
-                  const incomingRhDay = incomingRhStampRaw
-                    ? parseReadingDay(String(incomingRhStampRaw instanceof Date ? incomingRhStampRaw.toISOString() : incomingRhStampRaw))
-                    : null;
-                  if (!incomingRhDay || incomingRhDay.getTime() < localWinner.readingDay.getTime()) {
+                // Task #417: the local claim is the NEWER of the child's own winning
+                // reading and the inherited-cache provenance stamp — a master-arrival
+                // refresh can make the cache fresher than the child's own audit
+                // history (e.g. no child cascade audit exists at all).
+                let localCacheStamp: any = null;
+                try {
+                  const cs = await pool.query(
+                    `SELECT rh_inherited_updated_at FROM components WHERE cuuid = $1 LIMIT 1`, [cuuid]);
+                  localCacheStamp = cs.rows[0]?.rh_inherited_updated_at ?? null;
+                } catch { /* pre-migration schema — winner-only comparison */ }
+                const claimDay = localRhClaimDay(localWinner?.readingDay ?? null, localCacheStamp);
+                if (claimDay) {
+                  // Strip unless the incoming stamp is STRICTLY newer (was `<`, which let
+                  // an equal-day shore stamp overwrite the ship — violating the
+                  // ship-wins-ties rule and causing the stale-revert regression). The
+                  // strip list also protects the inherited cache/date columns, and the
+                  // incoming claim also considers rh_inherited_updated_at. Decision logic
+                  // and column list are pure helpers in rhEventComparator (unit-tested).
+                  const incomingRhStampRaw = incomingRhStamp(row);
+                  if (shouldStripIncomingRh(incomingRhStampRaw, claimDay)) {
                     if (rowToApply === row) rowToApply = { ...row };
-                    for (const col of ['current_cumulative_rh', 'currentCumulativeRH',
-                      'rh_current_master', 'rhCurrentMaster', 'rh_master_updated_at', 'rhMasterUpdatedAt',
-                      'rh_master_update_source', 'rhMasterUpdateSource', 'last_updated', 'lastUpdated']) {
+                    for (const col of RH_GUARD_STRIP_COLUMNS) {
                       delete rowToApply[col];
                     }
-                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? 'none'}) loses to local winning reading ${localWinner.readingDay.toISOString().split('T')[0]} — RH columns preserved`);
+                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? 'none'}) does not beat local RH claim ${claimDay.toISOString().split('T')[0]} — RH columns preserved`);
                   }
                 }
               } catch (rhGuardErr: any) {
