@@ -326,6 +326,43 @@ export async function updateJob(id: string, body: any) {
     throw new NotFoundError('Job not found');
   }
 
+  // Validate jobNo if it is being changed: blank values are not allowed
+  if ('jobNo' in updateData) {
+    const trimmed = (updateData.jobNo || '').trim();
+    if (!trimmed) {
+      throw new ValidationError('Job code cannot be blank. Please provide a valid job code.');
+    }
+    updateData.jobNo = trimmed;
+  }
+
+  // Component-scoped duplicate check: if jobNo is changing, ensure no other job
+  // on the same component (and vessel) already uses the new code.
+  // Checks both the legacy direct componentId and all many-to-many job-component links.
+  if ('jobNo' in updateData && updateData.jobNo !== existingJob.jobNo) {
+    const effectiveVesselId = existingJob.vesselId || '';
+    const { storage: store } = await import('../../../storage');
+    // Collect all component IDs this job is assigned to
+    const links = await store.getJobComponentLinksByJob(existingJob.juuid);
+    const componentIds = Array.from(
+      new Set<string>([
+        ...links.map((l: any) => l.componentId),
+        ...(existingJob.componentId ? [existingJob.componentId] : [])
+      ])
+    );
+
+    for (const compId of componentIds) {
+      const componentJobs = await repo.findJobs(effectiveVesselId, compId);
+      const duplicate = componentJobs.find(
+        (j: any) => j.jobNo === updateData.jobNo && j.juuid !== existingJob.juuid && j.id !== id
+      );
+      if (duplicate) {
+        throw new ValidationError(
+          `Job code "${updateData.jobNo}" is already used by another job on this component (${duplicate.jobTitle || duplicate.juuid}). Please choose a different code.`
+        );
+      }
+    }
+  }
+
   // D3: Block Dual Frequency if component RH Counter Type is not MASTER/INHERITED
   const effectiveBasis = updateData.maintenanceBasis ?? existingJob.maintenanceBasis;
   const effectiveComponentId = updateData.componentId ?? existingJob.componentId;
