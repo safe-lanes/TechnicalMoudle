@@ -220,6 +220,7 @@ import {
   type InsertWoPostponementApproval,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
+import { parsedDateUpdatedLocalExpr } from './modules/running-hours/repositories/dateUpdatedLocalSql';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
 
 // Task #394: which side observed/entered an RH reading — feeds running_hours_audit.origin_side
@@ -2235,14 +2236,10 @@ export class PostgresStorage {
     const comp = await this.getComponent(componentId);
     const resolvedId = comp ? comp.cuuid : componentId;
 
-    // NOTE: use [0-9] not \d — inside a JS sql`` template literal, "\d" is cooked to
-    // "d", producing a regex that never matches ISO dates and crashes TO_TIMESTAMP on
-    // the DD-Mon-YYYY branch ("invalid value ... for Mon"). [0-9] survives intact.
-    const parsedDateExpr = sql`CASE 
-      WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' 
-        THEN TO_TIMESTAMP(${runningHoursAudit.dateUpdatedLocal}, 'YYYY-MM-DD')
-      ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
-    END`;
+    // Crash-proof parse of the free-text date_updated_local column: normalizes
+    // long month names ("Sept"/"June"/…) and yields NULL (row excluded) for
+    // unparseable strings instead of raising 22007 (Task: Sept crash).
+    const parsedDateExpr = parsedDateUpdatedLocalExpr();
 
     const idCondition = or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId));
 

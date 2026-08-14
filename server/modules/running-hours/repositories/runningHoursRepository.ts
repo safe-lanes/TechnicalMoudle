@@ -3,6 +3,7 @@ import { getDb } from '../../../db';
 import { runningHoursAudit, componentMaintenanceHistory, rotationalItems } from '@shared/schema';
 import { desc, asc, eq, and, gte, lte, or, ilike, sql, inArray } from 'drizzle-orm';
 import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
+import { parsedDateUpdatedLocalExpr } from './dateUpdatedLocalSql';
 
 // ── Component Queries ──
 
@@ -150,14 +151,10 @@ export async function getRunningHoursAtDateBatch(
   const { identifiers, idToCuuid } = buildIdentifierIndex(masters);
   if (identifiers.length === 0) return result;
 
-  // NOTE: use [0-9] not \d — inside a JS sql`` template literal, "\d" is cooked to
-  // "d", producing a regex that never matches ISO dates and crashes TO_TIMESTAMP on
-  // the DD-Mon-YYYY branch ("invalid value ... for Mon"). [0-9] survives intact.
-  const parsedDateExpr = sql`CASE 
-    WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' 
-      THEN TO_TIMESTAMP(${runningHoursAudit.dateUpdatedLocal}, 'YYYY-MM-DD')
-    ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
-  END`;
+  // Crash-proof parse of the free-text date_updated_local column: normalizes
+  // long month names ("Sept"/"June"/…) and yields NULL (row excluded) for
+  // unparseable strings instead of aborting the whole batch (Task: Sept crash).
+  const parsedDateExpr = parsedDateUpdatedLocalExpr();
 
   // Per-cuuid reducer: keep the row with the latest (primary) / earliest (fallback)
   // parsed date, so audits split across legacy id + cuuid still collapse correctly.

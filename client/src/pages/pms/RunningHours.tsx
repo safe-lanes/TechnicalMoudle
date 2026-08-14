@@ -29,6 +29,7 @@ import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import ZeroRHConfirmationDialog from "@/components/ZeroRHConfirmationDialog";
 import MeterReplacedConfirmationDialog from "@/components/MeterReplacedConfirmationDialog";
 import { RENEWAL_ACTION_TYPES } from "@shared/schema";
+import { formatLocalDateTimeDDMMMYYYY } from "@shared/dateUtils";
 
 interface ChildRHData {
   id: string;
@@ -1039,16 +1040,10 @@ const RunningHours = () => {
       // Date is already validated above, but it's also mandatory for meter replacement
     }
     
-    // Format date in vessel local time
-    const dateLocal = selectedDate.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    }) + ' ' + selectedDate.toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
+    // Format date in vessel local time. Locale-independent formatter: en-GB
+    // toLocaleDateString abbreviates September as "Sept" (4 letters), which
+    // crashes the server-side TO_TIMESTAMP parse of date_updated_local.
+    const dateLocal = formatLocalDateTimeDDMMMYYYY(selectedDate);
     
     const effectiveNewValue = meterReplaced && (!updateForm.newValue || updateForm.newValue.trim() === "")
       ? updateForm.newMeterStart || "0"
@@ -1338,15 +1333,8 @@ const RunningHours = () => {
     const selectedDate = new Date(bulkUpdateGlobal.dateUpdated);
     selectedDate.setHours(23, 59, 59, 999);
     
-    const dateLocal = selectedDate.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    }) + ' ' + selectedDate.toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
+    // Locale-independent formatter (see individual-update handler note re "Sept").
+    const dateLocal = formatLocalDateTimeDDMMMYYYY(selectedDate);
     
     // Process each component with updates
     for (const component of runningHoursData) {
