@@ -65,6 +65,21 @@ const slugify = (s: string) => String(s || '').toLowerCase().trim()
   .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 
 /**
+ * Display name convention (Rev01 mapping, Jeevan 14-Aug): categories and product
+ * masters show "{component_code} - {component_name}" so the crew sees the code they
+ * know from PMS. Descriptions stay the PLAIN name (also Rev01).
+ */
+export const codedName = (code: string, name: string | null | undefined) =>
+  name ? `${code} - ${name}` : code;
+
+/** Year for the product master — extracted from installation_date text (Rev01: last
+ *  4 chars in practice; a 4-digit-year regex is tolerant of date format drift). */
+export const yearFromInstallationDate = (v: any): string | null => {
+  const m = /(\d{4})(?!.*\d{4})/.exec(String(v ?? ''));
+  return m ? m[1] : null;
+};
+
+/**
  * Ancestor chain for a component code, derived from the codes present in OUR components
  * table (the tree ships inside the table — 35 roots on the pilot, parents verified
  * present). Two numbering schemes handled:
@@ -91,14 +106,15 @@ export function deriveCodeChain(componentCode: string): string[] {
 
 // ── payload builders ─────────────────────────────────────────────────────────
 
-export function buildCategoryPayload(opts: { name: string; categoryCode: string; level: number; hasChildren: boolean }) {
+export function buildCategoryPayload(opts: { name: string; categoryCode: string; level: number; hasChildren: boolean; description?: string }) {
   return {
     data: {
       name: opts.name,
       categoryCode: opts.categoryCode,
       allowChildren: opts.hasChildren,
       status: 1,
-      description: opts.name,
+      // Rev01: description is the PLAIN name (no code prefix) even when `name` is coded.
+      description: opts.description ?? opts.name,
       impaChapterId: null, impaChapterName: null,
       impaGroupId: null, impaGroupName: null,
       impaSubGroupId: null, impaSubGroupName: null,
@@ -123,26 +139,29 @@ export function buildCategoryMappingPayload(opts: {
 
 export function buildProductMasterPayload(opts: {
   vesselCode: string;
-  component: { componentCode: string; name: string; maker?: string | null; model?: string | null; serialNo?: string | null };
+  component: { componentCode: string; name: string; maker?: string | null; model?: string | null; serialNo?: string | null; installationDate?: any };
   categoryId: string; categoryName: string;
+  /** 'coded' (default, Rev01: "{code} - {name}") | 'plain' (stores synthetic masters keep their readable name). */
+  nameStyle?: 'coded' | 'plain';
 }) {
   const c = opts.component;
+  const displayName = (opts.nameStyle ?? 'coded') === 'coded' ? codedName(c.componentCode, c.name) : c.name;
   return {
     data: {
       productCode: sanitizeCode(`${opts.vesselCode}-${c.componentCode}`), // COLLISION SAFETY: see header; charset per their validation
-      name: c.name,
+      name: displayName,
       categoryId: opts.categoryId,
       categoryName: opts.categoryName,
-      description: c.name,
+      description: c.name,                  // Rev01: plain name only, no code prefix
       status: 'Active',
       impaCode: null, issaCode: null, hsnCode: null, featuredImage: null,
       slug: slugify(`${opts.vesselCode}-${c.name}`),
       isActive: true,
       searchKeywords: slugify(c.name),
-      make: c.maker ?? null,
+      make: c.maker ?? null,                // Rev01 (Jeevan's correction): the COMPONENT's maker
       model: c.model ?? null,
       serialNumber: c.serialNo ?? null,
-      year: null,
+      year: yearFromInstallationDate(c.installationDate),  // Rev01: from installation_date
       partNumber: null,
     },
   };
@@ -152,6 +171,8 @@ interface SkuSource {
   skuCode: string; skuName: string; description?: string | null;
   partNumber?: string | null; make?: string | null; model?: string | null;
   manufacturerName?: string | null; uomName?: string | null; unitCost?: number | null;
+  /** Rev01: name/value pairs for their productSpecifications object (blank values omitted by the caller). */
+  specs?: Record<string, string> | null;
 }
 
 function buildSkuPayload(src: SkuSource, product: { productId: string; productName: string },
@@ -176,7 +197,9 @@ function buildSkuPayload(src: SkuSource, product: { productId: string; productNa
       unitOfMeasurementId: ref.unitOfMeasurementId,
       unitOfMeasurementName: src.uomName || ref.unitOfMeasurementName,
       countryId: null, countryOfOrigin: null,
-      productSpecifications: {},            // Sachin §3: {} on create; free text lives in skuDescription
+      // Rev01: real spec pairs when the caller has them (their Postman sample shows an
+      // object of name/value strings); {} otherwise. Free text still lives in skuDescription.
+      productSpecifications: src.specs && Object.keys(src.specs).length ? src.specs : {},
     },
   };
 }
@@ -186,9 +209,15 @@ export function buildSkuFromSpare(spare: any, product: { productId: string; prod
   return buildSkuPayload({
     skuCode: spare.partCode, skuName: spare.partName,
     description: [spare.specification, spare.note].filter(Boolean).join(' | ') || null,
-    partNumber: spare.partNumber, make: spare.maker, model: spare.model,
+    partNumber: spare.partNumber,
+    make: spare.maker,                       // Rev01 (Jeevan's correction): the SPARE's maker
+    model: spare.partNumber ?? null,         // Rev01: part number doubles as the model field
     manufacturerName: spare.maker, uomName: spare.uom,
-    unitCost: spare.unitCost != null ? Number(spare.unitCost) : null,
+    unitCost: 0,                             // Rev01: baseMrp always 0 for spares (stores keep unit_cost)
+    specs: {
+      ...(spare.drawingNumber ? { drawingNumber: String(spare.drawingNumber) } : {}),
+      ...(spare.positionNumber ? { positionNumber: String(spare.positionNumber) } : {}),
+    },
   }, product, category, ref);
 }
 
