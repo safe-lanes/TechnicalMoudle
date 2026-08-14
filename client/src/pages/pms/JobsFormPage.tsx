@@ -309,7 +309,7 @@ const JobsFormPage: React.FC = () => {
 
   const getChangedFields = (): string[] => {
     const changedFields: string[] = [];
-    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
+    const fieldsToCheck = ['woTitle', 'woTemplateCode', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
     
     for (const field of fieldsToCheck) {
       if (templateData[field as keyof typeof templateData] !== originalData[field]) {
@@ -473,6 +473,9 @@ const JobsFormPage: React.FC = () => {
       if (templateData.criticality !== originalData.criticality) {
         updatePayload.criticality = templateData.criticality || null;
       }
+      if (templateData.woTemplateCode !== originalData.woTemplateCode) {
+        updatePayload.jobNo = templateData.woTemplateCode;
+      }
       
       if (Object.keys(updatePayload).length === 0) {
         toast({
@@ -482,6 +485,28 @@ const JobsFormPage: React.FC = () => {
         setIsEditMode(false);
         setIsSaving(false);
         return;
+      }
+
+      // Component-scoped duplicate check: if job code changed, ensure no other job
+      // on the same component already uses the new code.
+      if (updatePayload.jobNo) {
+        const componentCuuid = (jobContext as any)?.component?.id;
+        if (componentCuuid) {
+          const dupCheckRes = await apiRequest('GET', `/technical/api/jobs?vesselId=${encodeURIComponent(vesselId || '')}&componentId=${encodeURIComponent(componentCuuid)}`);
+          const componentJobs: any[] = await dupCheckRes.json();
+          const duplicate = componentJobs.find(
+            (j: any) => j.jobNo === updatePayload.jobNo && j.juuid !== jobId && j.id !== jobId
+          );
+          if (duplicate) {
+            toast({
+              title: "Job Code already in use",
+              description: `Job code "${updatePayload.jobNo}" is already used by another job on this component (${duplicate.jobTitle || duplicate.juuid}). Please choose a different code.`,
+              variant: "destructive",
+            });
+            setIsSaving(false);
+            return;
+          }
+        }
       }
       
       await apiRequest('PATCH', `/technical/api/jobs/${jobId}`, updatePayload);
@@ -1093,7 +1118,17 @@ const JobsFormPage: React.FC = () => {
                   />
                   <ReadOnlyField label="Component Name" value={templateData.componentName || templateData.component} labelMarker="JF.A1.5" valueMarker="JF.A1.6" />
                   <ReadOnlyField label="Component Code" value={templateData.componentCode} labelMarker="JF.A1.7" valueMarker="JF.A1.8" />
-                  <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} labelMarker="JF.A1.9" valueMarker="JF.A1.10" />
+                  <EditableField
+                    label="Job Code"
+                    field="woTemplateCode"
+                    value={templateData.woTemplateCode}
+                    originalValue={originalData.woTemplateCode}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
+                    labelMarker="JF.A1.9"
+                    valueMarker="JF.A1.10"
+                  />
                   {/* Maintenance Basis — editable in edit mode, read-only otherwise */}
                   {(() => {
                     const basisChanged = isModifyMode && templateData.maintenanceBasis !== originalData.maintenanceBasis;

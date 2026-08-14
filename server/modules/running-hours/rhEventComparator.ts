@@ -87,6 +87,53 @@ export function compareRhEvents(a: RhEventLike, b: RhEventLike): number {
   return a.rhauuid > b.rhauuid ? 1 : -1;
 }
 
+/* ────────────────── RH-LATEST-GUARD pure helpers (Task #417) ──────────────────
+ * Used by the components ONE_WAY_SHORE_TO_SHIP applier; kept here (pure) so the
+ * strip decision matrix is unit-testable. Both naming styles are listed because
+ * incoming rows may be snake_case or camelCase.
+ */
+export const RH_GUARD_STRIP_COLUMNS = [
+  'current_cumulative_rh', 'currentCumulativeRH',
+  'rh_current_master', 'rhCurrentMaster', 'rh_master_updated_at', 'rhMasterUpdatedAt',
+  'rh_master_update_source', 'rhMasterUpdateSource', 'last_updated', 'lastUpdated',
+  'rh_current_inherited_cached', 'rhCurrentInheritedCached', 'rh_inherited_updated_at', 'rhInheritedUpdatedAt',
+] as const;
+
+/** Incoming RH stamp claim from a components row (master stamp, then inherited stamp, then last_updated). */
+export function incomingRhStamp(row: Record<string, any>): any {
+  return row['rh_master_updated_at'] ?? row['rhMasterUpdatedAt']
+    ?? row['rh_inherited_updated_at'] ?? row['rhInheritedUpdatedAt']
+    ?? row['last_updated'] ?? row['lastUpdated'];
+}
+
+/**
+ * Strip decision: TRUE (preserve local RH columns) unless the incoming stamp's
+ * day is STRICTLY newer than the local winning reading day. Equal-day → strip
+ * (ship wins ties — Domain Team confirmed; the pre-#417 `<` let same-day shore
+ * stamps overwrite the ship, causing the stale-revert regression).
+ */
+/**
+ * The LOCAL RH claim day a sync guard should defend: the newer of the child's
+ * own winning reading day and the local inherited-cache provenance stamp
+ * (rh_inherited_updated_at). A master-arrival refresh can make the cache
+ * NEWER than the child's own latest audit event — comparing only against the
+ * child winner would let a stale shore row overwrite the fresher cache.
+ */
+export function localRhClaimDay(winnerDay: Date | null, localCacheStampRaw: any): Date | null {
+  const cacheDay = localCacheStampRaw
+    ? parseReadingDay(String(localCacheStampRaw instanceof Date ? localCacheStampRaw.toISOString() : localCacheStampRaw))
+    : null;
+  if (winnerDay && cacheDay) return winnerDay.getTime() >= cacheDay.getTime() ? winnerDay : cacheDay;
+  return winnerDay ?? cacheDay ?? null;
+}
+
+export function shouldStripIncomingRh(incomingStampRaw: any, localWinnerDay: Date): boolean {
+  const incomingDay = incomingStampRaw
+    ? parseReadingDay(String(incomingStampRaw instanceof Date ? incomingStampRaw.toISOString() : incomingStampRaw))
+    : null;
+  return !incomingDay || incomingDay.getTime() <= localWinnerDay.getTime();
+}
+
 /* ────────────────────────── DB-backed helpers ──────────────────────────
  * `conn` is anything with .query(text, params) — a pool, client, or tx conn.
  */
@@ -166,13 +213,96 @@ export async function selectWinningRhEvent(conn: any, componentId: string): Prom
  * which fragment of an event arrived, or in what order.
  * Returns true when the component was updated.
  */
-export async function applyWinningRhToComponent(conn: any, componentId: string, context: string): Promise<boolean> {
+export async function applyWinningRhToComponent(conn: any, componentId: string, context: string): Promise<boolean | 'unchanged'> {
   const winner = await selectWinningRhEvent(conn, componentId);
   if (!winner) return false;
   // last_updated (TEXT, highest read priority) carries the user's reading date text;
   // rh_master_updated_at carries the reading DAY — never entry/sync time (backdate-guard
   // poisoning protection, see rh-reading-date-vs-entry-time).
   const lastUpdatedText = winner.dateUpdatedLocal || winner.readingDay.toISOString();
+
+  // Task #417: counter-type-aware derive. INHERITED components display
+  // rh_current_inherited_cached (the MASTER's TOTAL = meter baseline + master
+  // reading — cascade convention, see updateMasterRunningHours). The pre-#394
+  // direct-apply sync kept that column in step; the derive rework only wrote
+  // master columns, leaving inherited displays stale on the receiving side.
+  let comp: any = null;
+  try {
+    const c = await conn.query(
+      `SELECT id, rh_counter_type, rh_master_component_id, rh_counter_source,
+              meter_replaced_last_rh, component_code, vessel_id,
+              current_cumulative_rh, rh_current_inherited_cached, rh_inherited_updated_at, last_updated
+         FROM components WHERE cuuid = $1 LIMIT 1`,
+      [componentId]
+    );
+    comp = c.rows[0] || null;
+  } catch { /* pre-migration schema — fall through to legacy master-shaped update */ }
+
+  const counterType = String(comp?.rh_counter_type || '').toUpperCase();
+  // Legacy data may express the master relationship via rh_counter_source
+  // instead of rh_master_component_id (same rule as getInheritedComponents).
+  const masterRef = comp?.rh_master_component_id || comp?.rh_counter_source || null;
+
+  if (counterType === 'INHERITED' && masterRef) {
+    // Child's own winning event drives its individual hours (current_cumulative_rh).
+    // The cache is derived from the MASTER's winning event + the master's meter
+    // baseline — order-independent (audit history, not the master's component row).
+    // No master winner → keep the existing cache AND its stamp (never blank it).
+    let cache: string | null = null;
+    let cacheDay: Date | null = null; // provenance: the MASTER winner's reading day
+    try {
+      // The master reference may hold the master's cuuid, its full id, or its
+      // component CODE (legacy data — same resolution rule as the cascades /
+      // runningHoursService). Non-cuuid matches are vessel-scoped: the same
+      // code exists on every vessel.
+      const m = await conn.query(
+        `SELECT cuuid, meter_replaced_last_rh FROM components
+          WHERE (cuuid = $1 OR ((component_code = $1 OR id = $1) AND vessel_id = $2))
+            AND (is_deleted = false OR is_deleted IS NULL)
+          ORDER BY (cuuid = $1) DESC LIMIT 1`,
+        [masterRef, comp.vessel_id]
+      );
+      const master = m.rows[0];
+      if (master) {
+        const baseline = parseFloat(master.meter_replaced_last_rh || '0') || 0;
+        const masterWinner = await selectWinningRhEvent(conn, master.cuuid);
+        if (masterWinner) {
+          cache = (baseline + masterWinner.rh).toFixed(2);
+          cacheDay = masterWinner.readingDay;
+        }
+      }
+    } catch (e: any) {
+      console.log(`[RH-Derive:${context}] INHERITED cache lookup failed for master=${masterRef}: ${String(e?.message || e).substring(0, 120)} — cache preserved`);
+    }
+    // No-op skip: don't rewrite (and churn updated_at) when the derived state
+    // already matches — keeps repeated derives and every startup self-heal cheap.
+    const num = (v: any) => (v === null || v === undefined ? null : parseFloat(String(v)));
+    const day = (v: any) => (v ? parseReadingDay(String(v instanceof Date ? v.toISOString() : v))?.getTime() ?? null : null);
+    // rh_inherited_updated_at is the CACHE's provenance stamp — the MASTER
+    // winner's reading day that produced the cache — NOT the child's own
+    // reading day. When no master winner exists, both cache and stamp are
+    // preserved so the stamp always describes the value it accompanies (the
+    // sync guard compares incoming claims against this stamp).
+    const unchanged =
+      num(comp.current_cumulative_rh) === num(winner.rh.toFixed(2)) &&
+      (cache === null || num(comp.rh_current_inherited_cached) === num(cache)) &&
+      (cacheDay === null || day(comp.rh_inherited_updated_at) === cacheDay.getTime()) &&
+      String(comp.last_updated ?? '') === lastUpdatedText;
+    if (unchanged) {
+      return 'unchanged';
+    }
+    await conn.query(
+      `UPDATE components SET current_cumulative_rh = $1,
+          rh_current_inherited_cached = COALESCE($2, rh_current_inherited_cached),
+          rh_inherited_updated_at = COALESCE($3, rh_inherited_updated_at),
+          last_updated = $4, updated_at = NOW()
+        WHERE cuuid = $5`,
+      [winner.rh.toFixed(2), cache, cacheDay, lastUpdatedText, componentId]
+    );
+    console.log(`[RH-Derive:${context}] INHERITED component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} cache=${cache ?? 'preserved'} cacheDay=${cacheDay ? cacheDay.toISOString().split('T')[0] : 'preserved'} reading=${winner.readingDay.toISOString().split('T')[0]} origin=${winner.originSide || 'legacy'}`);
+    return true;
+  }
+
   await conn.query(
     `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1,
         rh_master_updated_at = $2, last_updated = $3, updated_at = NOW()
@@ -180,7 +310,64 @@ export async function applyWinningRhToComponent(conn: any, componentId: string, 
     [winner.rh.toFixed(2), winner.readingDay, lastUpdatedText, componentId]
   );
   console.log(`[RH-Derive:${context}] component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} reading=${winner.readingDay.toISOString().split('T')[0]} origin=${winner.originSide || 'legacy'}`);
+
+  // Task #417: a MASTER's winning event also refreshes its inherited children's
+  // caches — covers arrival orders where the master's audit lands without (or
+  // before) the child cascade rows. Same TOTAL convention as the cascades.
+  if (counterType === 'MASTER') {
+    try {
+      const baseline = parseFloat(comp?.meter_replaced_last_rh || '0') || 0;
+      const total = (baseline + winner.rh).toFixed(2);
+      // Children may reference this master by cuuid, full id, or component CODE
+      // via rh_master_component_id — or by CODE via legacy rh_counter_source
+      // (same rule as getInheritedComponents). Non-cuuid matches vessel-scoped.
+      const r = await conn.query(
+        `UPDATE components SET rh_current_inherited_cached = $1,
+            rh_inherited_updated_at = $2, last_updated = $3, updated_at = NOW()
+          WHERE (rh_master_component_id = $4
+                 OR (vessel_id = $6 AND (
+                      ($5::text IS NOT NULL AND (rh_master_component_id = $5 OR rh_counter_source = $5))
+                      OR ($7::text IS NOT NULL AND rh_master_component_id = $7))))
+            AND upper(rh_counter_type) = 'INHERITED'
+            AND (is_deleted = false OR is_deleted IS NULL)
+            AND (rh_current_inherited_cached IS DISTINCT FROM $1::decimal
+                 OR rh_inherited_updated_at IS DISTINCT FROM $2
+                 OR last_updated IS DISTINCT FROM $3)`,
+        [total, winner.readingDay, lastUpdatedText, componentId, comp?.component_code ?? null, comp?.vessel_id ?? null, comp?.id ?? null]
+      );
+      if (r.rowCount) {
+        console.log(`[RH-Derive:${context}] master=${componentId} refreshed inherited cache on ${r.rowCount} child component(s) total=${total}`);
+      }
+    } catch (e: any) {
+      console.log(`[RH-Derive:${context}] inherited-children cache refresh failed for master=${componentId}: ${String(e?.message || e).substring(0, 120)}`);
+    }
+  }
   return true;
+}
+
+/**
+ * Task #417 SELF-HEAL: one-shot recompute of every INHERITED component's display
+ * state from local audit history. Idempotent; components without a usable
+ * winning event are never touched. Safe to run on every startup (cheap once
+ * values converge), covers displays left stale by the pre-fix derive.
+ */
+export async function selfHealInheritedRhCaches(conn: any): Promise<{ scanned: number; healed: number }> {
+  const r = await conn.query(
+    `SELECT cuuid FROM components
+      WHERE upper(rh_counter_type) = 'INHERITED'
+        AND (rh_master_component_id IS NOT NULL OR rh_counter_source IS NOT NULL)
+        AND (is_deleted = false OR is_deleted IS NULL)`
+  );
+  let healed = 0;
+  for (const row of r.rows) {
+    try {
+      const res = await applyWinningRhToComponent(conn, row.cuuid, 'self-heal');
+      if (res === true) healed++; // 'unchanged' = verified in sync, no write
+    } catch (e: any) {
+      console.log(`[RH-SelfHeal] component=${row.cuuid} failed: ${String(e?.message || e).substring(0, 120)}`);
+    }
+  }
+  return { scanned: r.rows.length, healed };
 }
 
 /**

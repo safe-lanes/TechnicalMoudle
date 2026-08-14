@@ -6128,8 +6128,66 @@ export class PostgresStorage {
       delete safeUpdateData.taskType;
     }
 
+    // woTemplateCode -> jobNo (UI uses woTemplateCode, schema column is jobNo)
+    if ('woTemplateCode' in safeUpdateData) {
+      console.log(`[CR_APPLY] Job field translation: woTemplateCode -> jobNo`);
+      safeUpdateData.jobNo = safeUpdateData.woTemplateCode;
+      delete safeUpdateData.woTemplateCode;
+    }
+
+    // Reject blank jobNo values if jobNo is being changed via CR approval
+    if ('jobNo' in safeUpdateData) {
+      const trimmed = (safeUpdateData.jobNo || '').trim();
+      if (!trimmed) {
+        throw new Error('Job code cannot be blank. Please provide a valid job code.');
+      }
+      safeUpdateData.jobNo = trimmed;
+    }
+
+    // Component-scoped duplicate check for jobNo changes via CR approval
+    // Covers both legacy direct assignment and many-to-many job-component links
+    if ('jobNo' in safeUpdateData && safeUpdateData.jobNo !== beforeState.jobNo) {
+      const vesselId = beforeState.vesselId;
+      // Collect all component IDs this job is linked to
+      const links = await tx.select({ componentId: jobComponentLinks.componentId })
+        .from(jobComponentLinks)
+        .where(eq(jobComponentLinks.jobId, resolvedJuuid));
+      const componentIds = Array.from(
+        new Set<string>([
+          ...links.map((l: any) => l.componentId as string),
+          ...(beforeState.componentId ? [beforeState.componentId as string] : [])
+        ])
+      );
+
+      for (const compId of componentIds) {
+        // Check direct-assignment siblings
+        const direct = await tx.select({ juuid: jobs.juuid }).from(jobs)
+          .where(and(
+            eq(jobs.vesselId, vesselId),
+            eq(jobs.componentId, compId),
+            eq(jobs.jobNo, safeUpdateData.jobNo)
+          ));
+        if (direct.find((j: any) => j.juuid !== resolvedJuuid)) {
+          throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
+        }
+        // Check many-to-many linked siblings
+        const siblingLinks = await tx.select({ jobId: jobComponentLinks.jobId })
+          .from(jobComponentLinks)
+          .where(eq(jobComponentLinks.componentId, compId));
+        for (const sl of siblingLinks) {
+          if (sl.jobId === resolvedJuuid) continue;
+          const linked = await tx.select({ jobNo: jobs.jobNo }).from(jobs)
+            .where(eq(jobs.juuid, sl.jobId));
+          if (linked[0]?.jobNo === safeUpdateData.jobNo) {
+            throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
+          }
+        }
+      }
+      console.log(`[CR_APPLY] Job ${resolvedJuuid}: jobNo duplicate check passed for "${safeUpdateData.jobNo}"`);
+    }
+
     // Remove any fields that don't exist in the jobs table schema
-    const invalidFields = ['woTemplateCode', 'componentName', 'componentCode', 'nextDueReading'];
+    const invalidFields = ['componentName', 'componentCode', 'nextDueReading'];
     for (const field of invalidFields) {
       if (field in safeUpdateData) {
         console.log(`[CR_APPLY] Removing invalid job field: ${field}`);

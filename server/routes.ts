@@ -368,6 +368,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
+  // STARTUP SELF-HEAL (Task #417): recompute every INHERITED component's display
+  // state (current_cumulative_rh + rh_current_inherited_cached) from local audit
+  // history. Idempotent, no-winner components untouched; corrects displays left
+  // stale by the pre-fix derive on both office and ship deployments.
+  (async () => {
+    try {
+      const { pool } = await import('./db');
+      const { selfHealInheritedRhCaches } = await import('./modules/running-hours/rhEventComparator');
+      const { scanned, healed } = await selfHealInheritedRhCaches(pool);
+      console.log(`✅ Inherited RH self-heal complete: ${healed}/${scanned} inherited component(s) recomputed from audit history`);
+    } catch (err) {
+      console.error('⚠️ Error during inherited RH self-heal:', err);
+    }
+  })();
+
   // Recalculate recurring defects on startup (don't await - let it run in background)
   storage.recalculateAllRecurringDefects().then(() => {
     console.log('✅ Recurring defects recalculated successfully');
