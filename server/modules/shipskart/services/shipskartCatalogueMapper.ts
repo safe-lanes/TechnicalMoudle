@@ -80,6 +80,14 @@ export const yearFromInstallationDate = (v: any): string | null => {
 };
 
 /**
+ * LIVE-DISCOVERED RULE (14-Aug, WK Frontier Pilot run): their validator refuses
+ * "Category code must be at least 3 characters long". Root components with short codes
+ * ('2', '60' — 19/271 on the pilot) pad deterministically to 'C-2' / 'C-60' for the
+ * INTERNAL categoryCode only; the display name keeps the real code ("60 - …").
+ */
+export const padCategoryCode = (code: string) => (String(code).length >= 3 ? String(code) : `C-${code}`);
+
+/**
  * Ancestor chain for a component code, derived from the codes present in OUR components
  * table (the tree ships inside the table — 35 roots on the pilot, parents verified
  * present). Two numbering schemes handled:
@@ -233,7 +241,11 @@ export function buildSkuFromStoreItem(item: any, product: { productId: string; p
 
 export function buildCatalogueAddPayload(opts: {
   skuCode: string; skuName: string;
-  productId: string; productMasterCode: string;
+  /** The SPARE PART / SKU id returned by create-spare-part — Sachin's written answer
+   *  14-Aug (Option B). His own PDF example showed the product-master id; the email
+   *  overrides the example. Their field is still NAMED productId on the wire. */
+  skuId: string;
+  productMasterCode: string;
   categoryId: string;
   smc: { smcId: string; smcName: string; smcTenantId: string };
   vessel: { vesselId: string; vesselName: string };
@@ -245,7 +257,7 @@ export function buildCatalogueAddPayload(opts: {
       productName: opts.skuName,
       smcId: opts.smc.smcId, smcName: opts.smc.smcName, smcTenantId: opts.smc.smcTenantId,
       vesselId: opts.vessel.vesselId, vesselName: opts.vessel.vesselName,
-      productId: opts.productId,
+      productId: opts.skuId,
       status: 1, isLocked: false,
       type: 'ProductMaster',
       productMasterSKU: opts.productMasterCode,
