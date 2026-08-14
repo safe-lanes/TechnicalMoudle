@@ -6952,15 +6952,20 @@ var init_requestContext = __esm({
 // server/modules/running-hours/rhEventComparator.ts
 var rhEventComparator_exports = {};
 __export(rhEventComparator_exports, {
+  RH_GUARD_STRIP_COLUMNS: () => RH_GUARD_STRIP_COLUMNS,
   applyWinningRhToComponent: () => applyWinningRhToComponent,
   claimWoRhSync: () => claimWoRhSync,
   compareRhEvents: () => compareRhEvents,
   effectiveReadingDay: () => effectiveReadingDay,
+  incomingRhStamp: () => incomingRhStamp,
+  localRhClaimDay: () => localRhClaimDay,
   originRank: () => originRank,
   parseReadingDay: () => parseReadingDay,
   releaseWoRhSync: () => releaseWoRhSync,
   resolveRhBaselineDay: () => resolveRhBaselineDay,
-  selectWinningRhEvent: () => selectWinningRhEvent
+  selectWinningRhEvent: () => selectWinningRhEvent,
+  selfHealInheritedRhCaches: () => selfHealInheritedRhCaches,
+  shouldStripIncomingRh: () => shouldStripIncomingRh
 });
 function parseReadingDay(dateStr) {
   if (!dateStr) return null;
@@ -7002,6 +7007,18 @@ function compareRhEvents(a, b) {
   const eb = enteredAtMs(b);
   if (ea !== eb) return ea - eb > 0 ? 1 : -1;
   return a.rhauuid > b.rhauuid ? 1 : -1;
+}
+function incomingRhStamp(row) {
+  return row["rh_master_updated_at"] ?? row["rhMasterUpdatedAt"] ?? row["rh_inherited_updated_at"] ?? row["rhInheritedUpdatedAt"] ?? row["last_updated"] ?? row["lastUpdated"];
+}
+function localRhClaimDay(winnerDay, localCacheStampRaw) {
+  const cacheDay = localCacheStampRaw ? parseReadingDay(String(localCacheStampRaw instanceof Date ? localCacheStampRaw.toISOString() : localCacheStampRaw)) : null;
+  if (winnerDay && cacheDay) return winnerDay.getTime() >= cacheDay.getTime() ? winnerDay : cacheDay;
+  return winnerDay ?? cacheDay ?? null;
+}
+function shouldStripIncomingRh(incomingStampRaw, localWinnerDay) {
+  const incomingDay = incomingStampRaw ? parseReadingDay(String(incomingStampRaw instanceof Date ? incomingStampRaw.toISOString() : incomingStampRaw)) : null;
+  return !incomingDay || incomingDay.getTime() <= localWinnerDay.getTime();
 }
 async function latestRotationDay(conn, componentId) {
   try {
@@ -7060,6 +7077,60 @@ async function applyWinningRhToComponent(conn, componentId, context) {
   const winner = await selectWinningRhEvent(conn, componentId);
   if (!winner) return false;
   const lastUpdatedText = winner.dateUpdatedLocal || winner.readingDay.toISOString();
+  let comp = null;
+  try {
+    const c = await conn.query(
+      `SELECT id, rh_counter_type, rh_master_component_id, rh_counter_source,
+              meter_replaced_last_rh, component_code, vessel_id,
+              current_cumulative_rh, rh_current_inherited_cached, rh_inherited_updated_at, last_updated
+         FROM components WHERE cuuid = $1 LIMIT 1`,
+      [componentId]
+    );
+    comp = c.rows[0] || null;
+  } catch {
+  }
+  const counterType = String(comp?.rh_counter_type || "").toUpperCase();
+  const masterRef = comp?.rh_master_component_id || comp?.rh_counter_source || null;
+  if (counterType === "INHERITED" && masterRef) {
+    let cache3 = null;
+    let cacheDay = null;
+    try {
+      const m = await conn.query(
+        `SELECT cuuid, meter_replaced_last_rh FROM components
+          WHERE (cuuid = $1 OR ((component_code = $1 OR id = $1) AND vessel_id = $2))
+            AND (is_deleted = false OR is_deleted IS NULL)
+          ORDER BY (cuuid = $1) DESC LIMIT 1`,
+        [masterRef, comp.vessel_id]
+      );
+      const master = m.rows[0];
+      if (master) {
+        const baseline = parseFloat(master.meter_replaced_last_rh || "0") || 0;
+        const masterWinner = await selectWinningRhEvent(conn, master.cuuid);
+        if (masterWinner) {
+          cache3 = (baseline + masterWinner.rh).toFixed(2);
+          cacheDay = masterWinner.readingDay;
+        }
+      }
+    } catch (e) {
+      console.log(`[RH-Derive:${context}] INHERITED cache lookup failed for master=${masterRef}: ${String(e?.message || e).substring(0, 120)} \u2014 cache preserved`);
+    }
+    const num = (v) => v === null || v === void 0 ? null : parseFloat(String(v));
+    const day = (v) => v ? parseReadingDay(String(v instanceof Date ? v.toISOString() : v))?.getTime() ?? null : null;
+    const unchanged = num(comp.current_cumulative_rh) === num(winner.rh.toFixed(2)) && (cache3 === null || num(comp.rh_current_inherited_cached) === num(cache3)) && (cacheDay === null || day(comp.rh_inherited_updated_at) === cacheDay.getTime()) && String(comp.last_updated ?? "") === lastUpdatedText;
+    if (unchanged) {
+      return "unchanged";
+    }
+    await conn.query(
+      `UPDATE components SET current_cumulative_rh = $1,
+          rh_current_inherited_cached = COALESCE($2, rh_current_inherited_cached),
+          rh_inherited_updated_at = COALESCE($3, rh_inherited_updated_at),
+          last_updated = $4, updated_at = NOW()
+        WHERE cuuid = $5`,
+      [winner.rh.toFixed(2), cache3, cacheDay, lastUpdatedText, componentId]
+    );
+    console.log(`[RH-Derive:${context}] INHERITED component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} cache=${cache3 ?? "preserved"} cacheDay=${cacheDay ? cacheDay.toISOString().split("T")[0] : "preserved"} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
+    return true;
+  }
   await conn.query(
     `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1,
         rh_master_updated_at = $2, last_updated = $3, updated_at = NOW()
@@ -7067,7 +7138,50 @@ async function applyWinningRhToComponent(conn, componentId, context) {
     [winner.rh.toFixed(2), winner.readingDay, lastUpdatedText, componentId]
   );
   console.log(`[RH-Derive:${context}] component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
+  if (counterType === "MASTER") {
+    try {
+      const baseline = parseFloat(comp?.meter_replaced_last_rh || "0") || 0;
+      const total = (baseline + winner.rh).toFixed(2);
+      const r = await conn.query(
+        `UPDATE components SET rh_current_inherited_cached = $1,
+            rh_inherited_updated_at = $2, last_updated = $3, updated_at = NOW()
+          WHERE (rh_master_component_id = $4
+                 OR (vessel_id = $6 AND (
+                      ($5::text IS NOT NULL AND (rh_master_component_id = $5 OR rh_counter_source = $5))
+                      OR ($7::text IS NOT NULL AND rh_master_component_id = $7))))
+            AND upper(rh_counter_type) = 'INHERITED'
+            AND (is_deleted = false OR is_deleted IS NULL)
+            AND (rh_current_inherited_cached IS DISTINCT FROM $1::decimal
+                 OR rh_inherited_updated_at IS DISTINCT FROM $2
+                 OR last_updated IS DISTINCT FROM $3)`,
+        [total, winner.readingDay, lastUpdatedText, componentId, comp?.component_code ?? null, comp?.vessel_id ?? null, comp?.id ?? null]
+      );
+      if (r.rowCount) {
+        console.log(`[RH-Derive:${context}] master=${componentId} refreshed inherited cache on ${r.rowCount} child component(s) total=${total}`);
+      }
+    } catch (e) {
+      console.log(`[RH-Derive:${context}] inherited-children cache refresh failed for master=${componentId}: ${String(e?.message || e).substring(0, 120)}`);
+    }
+  }
   return true;
+}
+async function selfHealInheritedRhCaches(conn) {
+  const r = await conn.query(
+    `SELECT cuuid FROM components
+      WHERE upper(rh_counter_type) = 'INHERITED'
+        AND (rh_master_component_id IS NOT NULL OR rh_counter_source IS NOT NULL)
+        AND (is_deleted = false OR is_deleted IS NULL)`
+  );
+  let healed = 0;
+  for (const row of r.rows) {
+    try {
+      const res = await applyWinningRhToComponent(conn, row.cuuid, "self-heal");
+      if (res === true) healed++;
+    } catch (e) {
+      console.log(`[RH-SelfHeal] component=${row.cuuid} failed: ${String(e?.message || e).substring(0, 120)}`);
+    }
+  }
+  return { scanned: r.rows.length, healed };
 }
 async function resolveRhBaselineDay(conn, componentId, componentStampFallback) {
   try {
@@ -7098,9 +7212,26 @@ async function releaseWoRhSync(conn, wouuid) {
     console.error(`[RH-Claim] release failed for WO ${wouuid}: ${e?.message || e}`);
   }
 }
+var RH_GUARD_STRIP_COLUMNS;
 var init_rhEventComparator = __esm({
   "server/modules/running-hours/rhEventComparator.ts"() {
     "use strict";
+    RH_GUARD_STRIP_COLUMNS = [
+      "current_cumulative_rh",
+      "currentCumulativeRH",
+      "rh_current_master",
+      "rhCurrentMaster",
+      "rh_master_updated_at",
+      "rhMasterUpdatedAt",
+      "rh_master_update_source",
+      "rhMasterUpdateSource",
+      "last_updated",
+      "lastUpdated",
+      "rh_current_inherited_cached",
+      "rhCurrentInheritedCached",
+      "rh_inherited_updated_at",
+      "rhInheritedUpdatedAt"
+    ];
   }
 });
 
@@ -7387,7 +7518,11 @@ async function applyOneWayRows(tableName, rows) {
                     "rh_master_update_source",
                     "rhMasterUpdateSource",
                     "last_updated",
-                    "lastUpdated"
+                    "lastUpdated",
+                    "rh_current_inherited_cached",
+                    "rhCurrentInheritedCached",
+                    "rh_inherited_updated_at",
+                    "rhInheritedUpdatedAt"
                   ]) {
                     delete rowToApply[col];
                   }
@@ -7395,28 +7530,26 @@ async function applyOneWayRows(tableName, rows) {
                 }
               }
               try {
-                const { selectWinningRhEvent: selectWinningRhEvent2, parseReadingDay: parseReadingDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+                const { selectWinningRhEvent: selectWinningRhEvent2, incomingRhStamp: incomingRhStamp2, shouldStripIncomingRh: shouldStripIncomingRh2, localRhClaimDay: localRhClaimDay2, RH_GUARD_STRIP_COLUMNS: RH_GUARD_STRIP_COLUMNS2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
                 const localWinner = await selectWinningRhEvent2(pool4, cuuid);
-                if (localWinner) {
-                  const incomingRhStampRaw = row["rh_master_updated_at"] ?? row["rhMasterUpdatedAt"] ?? row["last_updated"] ?? row["lastUpdated"];
-                  const incomingRhDay = incomingRhStampRaw ? parseReadingDay2(String(incomingRhStampRaw instanceof Date ? incomingRhStampRaw.toISOString() : incomingRhStampRaw)) : null;
-                  if (!incomingRhDay || incomingRhDay.getTime() < localWinner.readingDay.getTime()) {
+                let localCacheStamp = null;
+                try {
+                  const cs = await pool4.query(
+                    `SELECT rh_inherited_updated_at FROM components WHERE cuuid = $1 LIMIT 1`,
+                    [cuuid]
+                  );
+                  localCacheStamp = cs.rows[0]?.rh_inherited_updated_at ?? null;
+                } catch {
+                }
+                const claimDay = localRhClaimDay2(localWinner?.readingDay ?? null, localCacheStamp);
+                if (claimDay) {
+                  const incomingRhStampRaw = incomingRhStamp2(row);
+                  if (shouldStripIncomingRh2(incomingRhStampRaw, claimDay)) {
                     if (rowToApply === row) rowToApply = { ...row };
-                    for (const col of [
-                      "current_cumulative_rh",
-                      "currentCumulativeRH",
-                      "rh_current_master",
-                      "rhCurrentMaster",
-                      "rh_master_updated_at",
-                      "rhMasterUpdatedAt",
-                      "rh_master_update_source",
-                      "rhMasterUpdateSource",
-                      "last_updated",
-                      "lastUpdated"
-                    ]) {
+                    for (const col of RH_GUARD_STRIP_COLUMNS2) {
                       delete rowToApply[col];
                     }
-                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? "none"}) loses to local winning reading ${localWinner.readingDay.toISOString().split("T")[0]} \u2014 RH columns preserved`);
+                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? "none"}) does not beat local RH claim ${claimDay.toISOString().split("T")[0]} \u2014 RH columns preserved`);
                   }
                 }
               } catch (rhGuardErr) {
@@ -27070,7 +27203,48 @@ var init_postgresStorage = __esm({
           safeUpdateData.maintenanceType = safeUpdateData.taskType;
           delete safeUpdateData.taskType;
         }
-        const invalidFields = ["woTemplateCode", "componentName", "componentCode", "nextDueReading"];
+        if ("woTemplateCode" in safeUpdateData) {
+          console.log(`[CR_APPLY] Job field translation: woTemplateCode -> jobNo`);
+          safeUpdateData.jobNo = safeUpdateData.woTemplateCode;
+          delete safeUpdateData.woTemplateCode;
+        }
+        if ("jobNo" in safeUpdateData) {
+          const trimmed = (safeUpdateData.jobNo || "").trim();
+          if (!trimmed) {
+            throw new Error("Job code cannot be blank. Please provide a valid job code.");
+          }
+          safeUpdateData.jobNo = trimmed;
+        }
+        if ("jobNo" in safeUpdateData && safeUpdateData.jobNo !== beforeState.jobNo) {
+          const vesselId = beforeState.vesselId;
+          const links = await tx.select({ componentId: jobComponentLinks.componentId }).from(jobComponentLinks).where(eq7(jobComponentLinks.jobId, resolvedJuuid));
+          const componentIds = Array.from(
+            /* @__PURE__ */ new Set([
+              ...links.map((l) => l.componentId),
+              ...beforeState.componentId ? [beforeState.componentId] : []
+            ])
+          );
+          for (const compId of componentIds) {
+            const direct = await tx.select({ juuid: jobs.juuid }).from(jobs).where(and6(
+              eq7(jobs.vesselId, vesselId),
+              eq7(jobs.componentId, compId),
+              eq7(jobs.jobNo, safeUpdateData.jobNo)
+            ));
+            if (direct.find((j) => j.juuid !== resolvedJuuid)) {
+              throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
+            }
+            const siblingLinks = await tx.select({ jobId: jobComponentLinks.jobId }).from(jobComponentLinks).where(eq7(jobComponentLinks.componentId, compId));
+            for (const sl of siblingLinks) {
+              if (sl.jobId === resolvedJuuid) continue;
+              const linked = await tx.select({ jobNo: jobs.jobNo }).from(jobs).where(eq7(jobs.juuid, sl.jobId));
+              if (linked[0]?.jobNo === safeUpdateData.jobNo) {
+                throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
+              }
+            }
+          }
+          console.log(`[CR_APPLY] Job ${resolvedJuuid}: jobNo duplicate check passed for "${safeUpdateData.jobNo}"`);
+        }
+        const invalidFields = ["componentName", "componentCode", "nextDueReading"];
         for (const field of invalidFields) {
           if (field in safeUpdateData) {
             console.log(`[CR_APPLY] Removing invalid job field: ${field}`);
@@ -44928,6 +45102,35 @@ async function updateJob(id, body) {
   const existingJob = await findById2(id);
   if (!existingJob) {
     throw new NotFoundError("Job not found");
+  }
+  if ("jobNo" in updateData) {
+    const trimmed = (updateData.jobNo || "").trim();
+    if (!trimmed) {
+      throw new ValidationError("Job code cannot be blank. Please provide a valid job code.");
+    }
+    updateData.jobNo = trimmed;
+  }
+  if ("jobNo" in updateData && updateData.jobNo !== existingJob.jobNo) {
+    const effectiveVesselId = existingJob.vesselId || "";
+    const { storage: store } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+    const links = await store.getJobComponentLinksByJob(existingJob.juuid);
+    const componentIds = Array.from(
+      /* @__PURE__ */ new Set([
+        ...links.map((l) => l.componentId),
+        ...existingJob.componentId ? [existingJob.componentId] : []
+      ])
+    );
+    for (const compId of componentIds) {
+      const componentJobs = await findJobs(effectiveVesselId, compId);
+      const duplicate = componentJobs.find(
+        (j) => j.jobNo === updateData.jobNo && j.juuid !== existingJob.juuid && j.id !== id
+      );
+      if (duplicate) {
+        throw new ValidationError(
+          `Job code "${updateData.jobNo}" is already used by another job on this component (${duplicate.jobTitle || duplicate.juuid}). Please choose a different code.`
+        );
+      }
+    }
   }
   const effectiveBasis = updateData.maintenanceBasis ?? existingJob.maintenanceBasis;
   const effectiveComponentId = updateData.componentId ?? existingJob.componentId;
@@ -85547,6 +85750,16 @@ async function registerRoutes(app2) {
     }
   });
   const httpServer = createServer(app2);
+  (async () => {
+    try {
+      const { pool: pool4 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { selfHealInheritedRhCaches: selfHealInheritedRhCaches2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+      const { scanned, healed } = await selfHealInheritedRhCaches2(pool4);
+      console.log(`\u2705 Inherited RH self-heal complete: ${healed}/${scanned} inherited component(s) recomputed from audit history`);
+    } catch (err) {
+      console.error("\u26A0\uFE0F Error during inherited RH self-heal:", err);
+    }
+  })();
   storage.recalculateAllRecurringDefects().then(() => {
     console.log("\u2705 Recurring defects recalculated successfully");
   }).catch((err) => {
