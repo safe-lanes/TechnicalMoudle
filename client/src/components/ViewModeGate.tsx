@@ -14,7 +14,12 @@ import { Loader2, ShieldAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { isReplit } from "@/lib/env";
-import { secureClear } from "@/utils/secureStorage";
+import {
+  secureClear,
+  hasLoggedOutMarker,
+  clearLoggedOutMarker,
+} from "@/utils/secureStorage";
+import { LogOut } from "lucide-react";
 
 // One-shot guard (module scope) so a re-render can never double-redirect.
 let redirectedToLogin = false;
@@ -40,11 +45,13 @@ function GateScreen({
   title,
   message,
   onRetry,
+  retryLabel = "Retry",
 }: {
   icon: ReactNode;
   title: string;
   message: string;
   onRetry?: () => void;
+  retryLabel?: string;
 }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
@@ -59,7 +66,7 @@ function GateScreen({
         {onRetry && (
           <Button onClick={onRetry} variant="outline" data-testid="button-gate-retry">
             <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
+            {retryLabel}
           </Button>
         )}
       </div>
@@ -82,8 +89,29 @@ export function ViewModeGate({ children }: { children: ReactNode }) {
     }
   }, [authExpired]);
 
-  // No user yet (pre-hydration / logged out) — don't block the login surface.
-  if (!currentUser) return <>{children}</>;
+  // No user (pre-hydration / logged out). In the Replit dev preview there is
+  // no parent /login page, so an intentional logout (marker set) must render
+  // an explicit signed-out screen instead of leaving the app mounted — data
+  // components would otherwise keep firing unauthenticated requests
+  // (Task #422). Outside Replit (and pre-hydration) pass through: the token
+  // layer / logout redirect owns navigation to the parent app's login page.
+  if (!currentUser) {
+    if (isReplit() && hasLoggedOutMarker()) {
+      return (
+        <GateScreen
+          icon={<LogOut className="h-10 w-10 text-gray-400" />}
+          title="You are signed out"
+          message="You have been logged out. In this development preview there is no login page — use the button below to start a new dev session as the default user."
+          retryLabel="Start new dev session"
+          onRetry={() => {
+            clearLoggedOutMarker();
+            window.location.reload();
+          }}
+        />
+      );
+    }
+    return <>{children}</>;
+  }
 
   if (uiRoleResolution.status === "unauthenticated") {
     if (isReplit()) {
