@@ -119,7 +119,7 @@ server/
   storage.ts       — IStorage interface
   postgresStorage.ts — PostgreSQL implementation of IStorage
   migrations.ts    — Legacy migration runner (entries 001-081, FROZEN)
-  middleware/auth.ts — requireAuth, requirePMSAdmin middleware
+  middleware/       — auth.ts (requireRole, requirePMSAdmin, mockAuth), permissions.ts (requirePermission), syncTenantGuard.ts (ship→shore machine auth)
   modules/         — Feature modules (access-control, stores, spares, etc.)
     modules/sync/        — Ship↔shore sync engine (HIGHEST RISK — see Sync Layer rules; do not modify unless the task names it)
     modules/shipskart/   — Purchasing / Shipskart integration (LIVE, shore-only — do not modify unless the task names it)
