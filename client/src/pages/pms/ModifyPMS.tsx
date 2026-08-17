@@ -60,6 +60,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useLocalApprovers } from "@/hooks/useExternalMasterData";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 
 interface RevisionHistoryEntry {
   revisionNumber: number;
@@ -133,6 +134,7 @@ export default function ModifyPMS() {
   const { vesselId, setVesselId } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { currentUser, isOfficeUser } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   const { canCreate, canEdit } = usePermissions();
   const canCreateModifyPms = canCreate("pms-modify-pms");
   const canEditModifyPms = canEdit("pms-modify-pms");
@@ -251,7 +253,7 @@ export default function ModifyPMS() {
       const res = await apiRequest('POST', '/technical/api/change-requests', {
         ...data,
         vesselId: vesselId,
-        requestedByUserId: 'current_user'
+        requestedByUserId: resolvedUserName
       });
       return res.json();
     },
@@ -268,7 +270,7 @@ export default function ModifyPMS() {
       const res = await apiRequest('PUT', `/technical/api/change-requests/${id}`, {
         ...data,
         vesselId: vesselId,
-        requestedByUserId: 'current_user'
+        requestedByUserId: resolvedUserName
       });
       return res.json();
     },
@@ -284,7 +286,7 @@ export default function ModifyPMS() {
     mutationFn: async (id: number) => {
       const res = await apiRequest('PATCH', `/technical/api/change-requests/${id}/status`, {
         status: 'submitted',
-        reviewedByUserId: 'current_user'
+        reviewedByUserId: resolvedUserName
       });
       return res.json();
     },
@@ -624,10 +626,7 @@ export default function ModifyPMS() {
                           <div className="font-medium text-gray-900">{request.title}</div>
                         </TableCell>
                         <TableCell className="py-3 px-4 text-gray-700">
-                          {request.requestedByUserId === 'current_user' ? 'Chief Engineer' : 
-                           request.requestedByUserId === '2nd_engineer' ? '2nd Engineer' : 
-                           request.requestedByUserId === '3rd_engineer' ? '3rd Engineer' : 
-                           request.requestedByUserId}
+                          {request.requestedByUserId || '-'}
                         </TableCell>
                         <TableCell className="py-3 px-4 text-gray-700">
                           {request.submittedAt 
@@ -858,7 +857,7 @@ export default function ModifyPMS() {
                           proposedChangesJson: changes,
                           movePreviewJson: movePreview,
                           vesselId: vesselId,
-                          requestedByUserId: 'current_user'
+                          requestedByUserId: resolvedUserName
                         })
                       }).catch(console.error);
                     }
@@ -1356,7 +1355,7 @@ export default function ModifyPMS() {
                   const response = await fetch(`/technical/api/change-requests/${reviewDialog.requestId}/${endpoint}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ comment, reviewerId: currentUser?.username || currentUser?.userUuid || 'current_user' }),
+                    body: JSON.stringify({ comment, reviewerId: resolvedUserName }),
                   });
                   if (!response.ok) throw new Error(`Failed to ${endpoint}`);
                   queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });

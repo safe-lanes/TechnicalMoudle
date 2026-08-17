@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import {
@@ -578,6 +579,7 @@ const Dashboard = () => {
   }
 
   const { currentUser, myVessels } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   const userRankName = currentUser?.rank_name ?? '';
   const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
 
@@ -2408,9 +2410,6 @@ const Dashboard = () => {
   const modifyPmsColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
     const formatRequestedBy = (uid: string | undefined | null) => {
-      if (uid === 'current_user') return 'Chief Engineer';
-      if (uid === '2nd_engineer') return '2nd Engineer';
-      if (uid === '3rd_engineer') return '3rd Engineer';
       return uid || '—';
     };
     const formatDate = (cr: any) => {
@@ -3326,10 +3325,7 @@ const Dashboard = () => {
                               const rows = operationKPIs.openChangeRequestsList.map(cr => ({
                                 title: cr.title || '-',
                                 category: cr.category ? cr.category.charAt(0).toUpperCase() + cr.category.slice(1) : '-',
-                                requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                                  cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                                  cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                                  cr.requestedByUserId || '-',
+                                requestedBy: cr.requestedByUserId || '-',
                                 date: cr.submittedAt
                                   ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
                                   : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' '),
@@ -4470,10 +4466,7 @@ const Dashboard = () => {
                 const data = crListModal.changeRequests.map(cr => ({
                   vessel: (cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name || cr.vesselId : '-'),
                   title: cr.title || '-',
-                  requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                    cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                    cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                    cr.requestedByUserId || '-',
+                  requestedBy: cr.requestedByUserId || '-',
                   date: cr.submittedAt
                     ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
                     : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' '),
@@ -4523,10 +4516,7 @@ const Dashboard = () => {
                       <TableCell>{cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name || cr.vesselId : '-'}</TableCell>
                       <TableCell className="font-medium text-gray-900">{cr.title}</TableCell>
                       <TableCell>
-                        {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                         cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                         cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                         cr.requestedByUserId}
+                        {cr.requestedByUserId || '-'}
                       </TableCell>
                       <TableCell>
                         {cr.submittedAt
@@ -4604,10 +4594,7 @@ const Dashboard = () => {
                 <div>
                   <span className="text-sm font-medium text-gray-500">Requested By</span>
                   <p className="text-gray-900" data-testid="text-op-cr-requested-by">
-                    {opDetailChangeRequest.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                     opDetailChangeRequest.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                     opDetailChangeRequest.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                     opDetailChangeRequest.requestedByUserId}
+                    {opDetailChangeRequest.requestedByUserId || '-'}
                   </p>
                 </div>
                 <div>
@@ -4810,7 +4797,7 @@ const Dashboard = () => {
                     const response = await fetch(`/technical/api/change-requests/${rejectDialog.id}/reject`, {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ comment: reason, reviewerId: 'current_user' }),
+                      body: JSON.stringify({ comment: reason, reviewerId: resolvedUserName }),
                     });
                     if (!response.ok) throw new Error('Failed to reject');
                     queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });

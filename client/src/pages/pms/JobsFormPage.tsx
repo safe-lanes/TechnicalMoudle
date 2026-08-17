@@ -30,6 +30,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
@@ -146,6 +147,7 @@ const JobsFormPage: React.FC = () => {
   // cycle values (last done / next due) to overwrite the ship's protected tracking
   // columns on the next sync. Shore instance + Sail Admin/Super Admin only.
   const { hasRole } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   const { isShore } = useSyncInstanceInfo();
   const canRebaseline = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -350,7 +352,7 @@ const JobsFormPage: React.FC = () => {
         snapshotBeforeJson: originalData,
         proposedChangesJson: proposedChanges,
         status: 'submitted',
-        requestedByUserId: 'Current User'
+        requestedByUserId: resolvedUserName
       });
       
       // Invalidate change requests cache so ModifyPMS shows the new request

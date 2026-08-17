@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { AdminOnly } from "@/components/RoleGuard";
@@ -2428,6 +2429,7 @@ const Components: React.FC = () => {
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept, isExternal } = useUIRole();
   const { isOfficeUser } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
   const canCreateComponent = canCreatePerm("pms-components");
   const canEditComponent = canEditPerm("pms-components");
@@ -3484,7 +3486,7 @@ const Components: React.FC = () => {
       category: 'components',  // Required field
       title: `Modify Component: ${selectedComponent.code} ${selectedComponent.name}`,  // Required field
       reason: 'Component modification request',  // Required field
-      requestedByUserId: 'current_user',  // Required field
+      requestedByUserId: resolvedUserName,  // Real logged-in user
       targetType: 'component',
       targetId: selectedComponent.actualId || selectedComponent.id,  // Use actual database ID
       snapshotBeforeJson: {

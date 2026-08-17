@@ -3,6 +3,7 @@ import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Marker } from "@/components/Marker";
@@ -179,6 +180,7 @@ const Stores: React.FC = () => {
   const storesScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { isOfficeUser } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   const { canCreate, canEdit, canDelete } = usePermissions();
   const canCreateStore = canCreate("pms-stores");
   const canEditStore = canEdit("pms-stores");
@@ -1201,7 +1203,7 @@ const Stores: React.FC = () => {
         snapshotBeforeJson: originalStoreData,
         proposedChangesJson: changes,
         status: 'submitted',
-        requestedByUserId: 'Current User'
+        requestedByUserId: resolvedUserName
       });
       
       queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });

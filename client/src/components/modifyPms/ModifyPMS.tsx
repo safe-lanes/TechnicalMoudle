@@ -27,6 +27,7 @@ import { useUIRole } from '@/contexts/UIRoleContext';
 import { useVessels } from '@/hooks/useVessels';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalApprovers } from '@/hooks/useExternalMasterData';
+import { useResolvedUserName } from '@/hooks/useResolvedUserName';
 import {
   Select,
   SelectContent,
@@ -105,6 +106,7 @@ export function ModifyPMS() {
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
   const { currentUser } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
 
   const periodDateRange = useMemo(() => periodFilter ? periodFilterToDateRange(periodFilter) : null, [periodFilter]);
@@ -185,7 +187,7 @@ export function ModifyPMS() {
       const response = await fetch(`/technical/api/change-requests/${id}/reject`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment, reviewerId: 'current_user' })
+        body: JSON.stringify({ comment, reviewerId: resolvedUserName })
       });
       if (!response.ok) throw new Error('Failed to reject request');
       return response.json();
@@ -219,9 +221,6 @@ export function ModifyPMS() {
   };
 
   const formatRequestedBy = (uid: string | null | undefined): string => {
-    if (uid === 'current_user') return 'Chief Engineer';
-    if (uid === '2nd_engineer') return '2nd Engineer';
-    if (uid === '3rd_engineer') return '3rd Engineer';
     return uid || '—';
   };
 
@@ -458,7 +457,7 @@ export function ModifyPMS() {
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-500">Requested By</Label>
-                <p className="text-gray-900">{viewingRequest.requestedByUserId === 'current_user' ? 'Chief Engineer' : viewingRequest.requestedByUserId}</p>
+                <p className="text-gray-900">{viewingRequest.requestedByUserId || '—'}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-500">Status</Label>
