@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle, X, RotateCcw, GitPullRequest, AlertTriangle, Info, Pencil } from "lucide-react";
 import type { ChangeRequest } from "@shared/schema";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 
 interface ApproveRejectModalProps {
   open: boolean;
@@ -29,6 +30,7 @@ export default function ApproveRejectModal({
   onProcessed 
 }: ApproveRejectModalProps) {
   const { toast } = useToast();
+  const { resolvedUserName } = useResolvedUserName();
   const [comment, setComment] = useState("");
   // Per-field override state: key = field name, value = approver-edited text
   const [overrides, setOverrides] = useState<Record<string, string>>({});
@@ -58,6 +60,7 @@ export default function ApproveRejectModal({
     mutationFn: async (overriddenChanges: Array<{ field: string; approverNewValue: string }>) => {
       return apiRequest('PUT', `/technical/api/change-requests/${requestId}/approve`, {
         comment,
+        reviewerId: resolvedUserName,
         ...(overriddenChanges.length > 0 ? { overriddenChanges } : {}),
       });
     },
@@ -84,6 +87,7 @@ export default function ApproveRejectModal({
     mutationFn: async () => {
       return apiRequest('PUT', `/technical/api/change-requests/${requestId}/reject`, {
         comment,
+        reviewerId: resolvedUserName,
       });
     },
     onSuccess: () => {
@@ -109,6 +113,7 @@ export default function ApproveRejectModal({
     mutationFn: async () => {
       return apiRequest('PUT', `/technical/api/change-requests/${requestId}/return`, {
         comment,
+        reviewerId: resolvedUserName,
       });
     },
     onSuccess: () => {

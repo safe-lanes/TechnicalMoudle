@@ -41,6 +41,7 @@ import { generateSuggestions, extractContextFromWorkOrder, type WorkOrderContext
 import { FEATURES, IHM_ACTIONS } from '@/config/features';
 import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
 import { useRanks, ensureRankInOptions } from '@/hooks/useRanks';
+import { useResolvedUserName } from '@/hooks/useResolvedUserName';
 
 // Type for history mode payload
 export interface HistoryWorkOrderPayload {
@@ -327,6 +328,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
 
   // Vessel context for inventory transactions
   const { vesselId } = useVessel();
+  const { resolvedUserName } = useResolvedUserName();
 
   const woDepartment = workOrder?.department || '';
   const hodQuery = useQuery<{ resolved: boolean; rankName: string; source: string }>({
@@ -2487,7 +2489,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                               category: 'workOrders',
                               title: `Modify Work Order: ${workOrder?.jobTitle || workOrder?.woTitle || 'Unknown'}`,
                               reason: 'Work order modification request',
-                              requestedByUserId: 'current_user',
+                              requestedByUserId: resolvedUserName,
                               targetType: 'workOrder',
                               targetId: workOrder?.id,
                               snapshotBeforeJson: {
@@ -3367,7 +3369,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                               category: 'workOrders',
                               title: `Modify Work Order: ${workOrder?.jobTitle || workOrder?.woTitle || 'Unknown'}`,
                               reason: 'Work order modification request',
-                              requestedByUserId: 'current_user',
+                              requestedByUserId: resolvedUserName,
                               targetType: 'workOrder',
                               targetId: workOrder?.id,
                               snapshotBeforeJson: {

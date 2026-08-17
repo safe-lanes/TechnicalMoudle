@@ -3,6 +3,7 @@ import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useLocation } from "wouter";
@@ -168,6 +169,7 @@ const Spares: React.FC = () => {
   // UI Role context for role-based visibility
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const { isOfficeUser } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
   const canCreateSpare = canCreatePerm("pms-spares");
   const canEditSpare = canEditPerm("pms-spares");
@@ -1015,7 +1017,7 @@ const Spares: React.FC = () => {
         },
         proposedChangesJson: changes,
         status: 'submitted',
-        requestedByUserId: 'Current User'
+        requestedByUserId: resolvedUserName
       });
       
       queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });

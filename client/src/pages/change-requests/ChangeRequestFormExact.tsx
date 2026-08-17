@@ -20,7 +20,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useVessels } from "@/hooks/useVessels";
 import { type FieldDefinition } from "@shared/changeRequestFields";
 import { useAuth } from "@/contexts/AuthContext";
-import { secureGetItem } from "@/utils/secureStorage";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 
 interface TargetEntityData {
   entity: any;
@@ -66,16 +66,8 @@ interface ChangeRequestFormExactProps {
 export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 'new' }: ChangeRequestFormExactProps) {
   const { toast } = useToast();
   const { currentUser } = useAuth();
-  // Match AuthContext's own session-validity check: a real SAILERP session requires
-  // BOTH an encrypted userType AND a role on the profile. Checking userProfile alone
-  // is not sufficient — missing userType causes AuthContext to fall back to DEFAULT_USER
-  // even when a profile key is present.
-  const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
-  const encryptedUserType = secureGetItem<string>("userType");
-  const hasRealSession = !!(encryptedProfile && encryptedUserType && encryptedProfile?.role);
-  const resolvedUserName = hasRealSession
-    ? (currentUser?.fullName || currentUser?.username || 'Unknown')
-    : 'Unknown';
+  // Shared identity resolution (see useResolvedUserName for the session-validity rationale)
+  const { resolvedUserName } = useResolvedUserName();
   const { vesselId: selectedVessel } = useVessel();
   const [activeSection, setActiveSection] = useState<string>('basic');
   const [proposedChanges, setProposedChanges] = useState<ProposedChange[]>([]);
@@ -113,11 +105,11 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
   // user (or DEFAULT_USER). react-hook-form does not re-evaluate defaultValues after mount,
   // so re-set the requester field once the real identity is known (new CRs only).
   useEffect(() => {
-    if (!changeRequest && hasRealSession && currentUser) {
+    if (!changeRequest && currentUser) {
       const name = currentUser.fullName || currentUser.username || 'Unknown';
       form.setValue('requestedByUserId', name, { shouldDirty: false });
     }
-  }, [currentUser, changeRequest, hasRealSession]);
+  }, [currentUser, changeRequest]);
 
   const isViewMode = mode === 'view';
   const isEditMode = mode === 'edit';

@@ -43,6 +43,7 @@ import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useApprovalPolicy, effectiveApprovalTier } from "@/hooks/useApprovalPolicy";
 import { startApprovalQueue } from "@/lib/approvalQueue";
@@ -246,6 +247,7 @@ const WorkOrders: React.FC = () => {
   const vesselScopeKey = isMyVessels ? `my:${assignedVesselIds.join(',')}` : vesselId;
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
   const { isOfficeUser } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   // Office (shore) replacement for the removed every-minute auto-scan: on shore,
   // WO generation is on-demand. The ship generates on its daily schedule.
   const { isShore } = useSyncInstanceInfo();
@@ -1078,7 +1080,7 @@ const WorkOrders: React.FC = () => {
     
     const updateData: Record<string, any> = {
       status: "Approved",
-      approver: "Current User", // Replace with actual user
+      approver: resolvedUserName,
       approverRemarks,
       approvalDate: new Date().toISOString(),
       nextDueDate,
@@ -1099,7 +1101,7 @@ const WorkOrders: React.FC = () => {
     
     const updateData = {
       status: "Rejected",
-      approver: "Current User", // Replace with actual user
+      approver: resolvedUserName,
       approverRemarks: rejectionComments,
       rejectionDate: new Date().toISOString()
     };
