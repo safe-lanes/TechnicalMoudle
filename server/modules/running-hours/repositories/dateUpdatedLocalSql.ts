@@ -27,3 +27,21 @@ import { runningHoursAudit } from '@shared/schema';
 export function parsedDateUpdatedLocalExpr(): SQL {
   return sql`safe_parse_rh_date_local(${runningHoursAudit.dateUpdatedLocal})`;
 }
+
+/**
+ * Task #427: session-timezone-safe CALENDAR DAY of date_updated_local.
+ * safe_rh_reading_day() (migrations/167) applies ::date inside the SAME
+ * session that TO_TIMESTAMP built the timestamptz in, so the literal day
+ * round-trips regardless of the DB session timezone. All at-date readers
+ * must compare this DATE against a target calendar day (YYYY-MM-DD), never
+ * a timestamptz against an instant — otherwise a non-UTC session shifts a
+ * vessel-local day across midnight.
+ */
+export function readingDayLocalExpr(): SQL {
+  return sql`safe_rh_reading_day(${runningHoursAudit.dateUpdatedLocal})`;
+}
+
+/** Deliberate instant→calendar-day conversion for at-date targets (UTC day). */
+export function targetReadingDay(targetDate: Date): string {
+  return targetDate.toISOString().split('T')[0];
+}

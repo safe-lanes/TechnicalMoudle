@@ -368,18 +368,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
-  // STARTUP SELF-HEAL (Task #417): recompute every INHERITED component's display
-  // state (current_cumulative_rh + rh_current_inherited_cached) from local audit
-  // history. Idempotent, no-winner components untouched; corrects displays left
-  // stale by the pre-fix derive on both office and ship deployments.
+  // STARTUP SELF-HEAL (Task #417 + #427): recompute MASTER and INHERITED
+  // component display state from local audit history via the hardened winner
+  // selection. Idempotent (no-op on converged data → zero churn on restart).
+  // Gated on migration 167 readiness (safe_rh_reading_day + backup table): the
+  // heal's SQL depends on the parser function, and running it before the
+  // normalization migration would rank legacy rows by entry day again.
+  // Advisory lock guards multi-instance deployments (one healer at a time).
   (async () => {
+    const RH_SELF_HEAL_LOCK_KEY = 427167001;
+    let lockClient: any = null;
     try {
-      const { pool } = await import('./db');
-      const { selfHealInheritedRhCaches } = await import('./modules/running-hours/rhEventComparator');
-      const { scanned, healed } = await selfHealInheritedRhCaches(pool);
-      console.log(`✅ Inherited RH self-heal complete: ${healed}/${scanned} inherited component(s) recomputed from audit history`);
+      const { getPool } = await import('./db');
+      const pool = await getPool();
+      // READINESS GATE (Task #427): migration presence cannot be assumed on
+      // external builds (live 22007 crash proved a deployment missing 166).
+      const ready = await pool.query(`
+        SELECT
+          EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'safe_rh_reading_day') AS fn_ready,
+          EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'rh_date_normalization_backup') AS norm_ready
+      `);
+      if (!ready.rows[0]?.fn_ready || !ready.rows[0]?.norm_ready) {
+        console.error('❌ [RH-SelfHeal] SKIPPED — migration 167 not applied (safe_rh_reading_day/backup table missing). This build must include migrations 166 + 167; RH winner selection stays on legacy ranking until it runs.');
+        return;
+      }
+      lockClient = await pool.connect();
+      const lock = await lockClient.query('SELECT pg_try_advisory_lock($1) AS locked', [RH_SELF_HEAL_LOCK_KEY]);
+      if (!lock.rows[0]?.locked) {
+        console.log('ℹ️ [RH-SelfHeal] another instance holds the self-heal lock — skipping on this instance');
+        return;
+      }
+      try {
+        const { selfHealRhComponents } = await import('./modules/running-hours/rhEventComparator');
+        const m = await selfHealRhComponents(pool);
+        console.log(`✅ RH self-heal complete: masters ${m.mastersHealed}/${m.mastersScanned} healed, inherited ${m.childrenHealed}/${m.childrenScanned} healed, rhDecreases=${m.rhDecreases}, errors=${m.errors}, ${m.durationMs}ms${m.mastersHealed + m.childrenHealed === 0 ? ' (no-op — converged)' : ''}`);
+      } finally {
+        await lockClient.query('SELECT pg_advisory_unlock($1)', [RH_SELF_HEAL_LOCK_KEY]);
+      }
     } catch (err) {
-      console.error('⚠️ Error during inherited RH self-heal:', err);
+      console.error('⚠️ Error during RH self-heal:', err);
+    } finally {
+      lockClient?.release?.();
     }
   })();
 

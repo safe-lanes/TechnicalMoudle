@@ -3,7 +3,7 @@ import { getDb } from '../../../db';
 import { runningHoursAudit, componentMaintenanceHistory, rotationalItems } from '@shared/schema';
 import { desc, asc, eq, and, gte, lte, or, ilike, sql, inArray } from 'drizzle-orm';
 import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
-import { parsedDateUpdatedLocalExpr } from './dateUpdatedLocalSql';
+import { readingDayLocalExpr, targetReadingDay } from './dateUpdatedLocalSql';
 
 // ── Component Queries ──
 
@@ -151,10 +151,14 @@ export async function getRunningHoursAtDateBatch(
   const { identifiers, idToCuuid } = buildIdentifierIndex(masters);
   if (identifiers.length === 0) return result;
 
-  // Crash-proof parse of the free-text date_updated_local column: normalizes
-  // long month names ("Sept"/"June"/…) and yields NULL (row excluded) for
-  // unparseable strings instead of aborting the whole batch (Task: Sept crash).
-  const parsedDateExpr = parsedDateUpdatedLocalExpr();
+  // Crash-proof CALENDAR-DAY parse of the free-text date_updated_local column
+  // (Task #427): normalizes long month names ("Sept"/"June"/…), yields NULL
+  // (row excluded) for unparseable strings instead of aborting the batch, and
+  // — unlike the old timestamptz comparison — is session-timezone-safe: DATE
+  // vs target calendar day, so a vessel-local day never shifts across
+  // midnight in a non-UTC DB session.
+  const parsedDateExpr = readingDayLocalExpr();
+  const targetDay = targetReadingDay(targetDate);
 
   // Per-cuuid reducer: keep the row with the latest (primary) / earliest (fallback)
   // parsed date, so audits split across legacy id + cuuid still collapse correctly.
@@ -185,7 +189,7 @@ export async function getRunningHoursAtDateBatch(
     .from(runningHoursAudit)
     .where(and(
       inArray(runningHoursAudit.componentId, identifiers),
-      sql`${parsedDateExpr} <= ${targetDate}`
+      sql`${parsedDateExpr} <= ${targetDay}::date`
     ))
     .orderBy(runningHoursAudit.componentId, sql`${parsedDateExpr} DESC`);
 
@@ -210,7 +214,7 @@ export async function getRunningHoursAtDateBatch(
       .from(runningHoursAudit)
       .where(and(
         inArray(runningHoursAudit.componentId, missingIds),
-        sql`${parsedDateExpr} > ${targetDate}`
+        sql`${parsedDateExpr} > ${targetDay}::date`
       ))
       .orderBy(runningHoursAudit.componentId, sql`${parsedDateExpr} ASC`);
 
@@ -415,7 +419,7 @@ export async function updateRHConfig(params: {
 export async function updateMasterRunningHours(params: {
   componentId: string;
   newRHValue: number;
-  updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
+  updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'WORKORDER';
   userId: string;
   userUuid?: string;
   comments?: string;

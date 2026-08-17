@@ -220,7 +220,8 @@ import {
   type InsertWoPostponementApproval,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
-import { parsedDateUpdatedLocalExpr } from './modules/running-hours/repositories/dateUpdatedLocalSql';
+import { readingDayLocalExpr, targetReadingDay } from './modules/running-hours/repositories/dateUpdatedLocalSql';
+import { canonicalizeReadingDateInput, requireReadingDayInput, parseReadingDayStrict, formatReadingDay } from './modules/running-hours/utils/readingDate';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
 
 // Task #394: which side observed/entered an RH reading — feeds running_hours_audit.origin_side
@@ -1594,9 +1595,10 @@ export class PostgresStorage {
     // last-updated stamps so the RH timeline reflects when hours were read — NOT when the row was
     // written. Falls back to "now" when omitted or unparseable. enteredAtUTC stays "now" (it is
     // the audit trail of when the row was entered, not the reading date).
-    const parsedReadingDate = params.dateUpdated ? new Date(params.dateUpdated) : null;
-    const readingDate = parsedReadingDate && !isNaN(parsedReadingDate.getTime()) ? parsedReadingDate : now;
-    const readingDateLocal = readingDate.toISOString().split('T')[0];
+    // Task #427: canonical calendar-day contract — the persisted reading date is
+    // ALWAYS YYYY-MM-DD (shared parser; no naive new Date(text) day shifts).
+    const readingDateLocal = requireReadingDayInput(params.dateUpdated ?? null) ?? formatReadingDay(now);
+    const readingDate = parseReadingDayStrict(readingDateLocal)!;
     
     // Verify component exists and is a MASTER
     const component = await this.getComponent(params.componentId);
@@ -1647,7 +1649,7 @@ export class PostgresStorage {
           rhMasterUpdatedAt: readingDate,
           rhMasterUpdatedBy: params.userId,
           rhMasterUpdateSource: params.updateSource,
-          lastUpdated: readingDate.toISOString(),
+          lastUpdated: readingDateLocal,
           updatedAt: now,
         })
         .where(eq(components.cuuid, component.cuuid))
@@ -1689,7 +1691,7 @@ export class PostgresStorage {
 
       // RH follows the Stamp: accrue the DELTA onto the master's Installed rotational item
       // (delta-based — Task #369). Inside the tx: stamp RH and component RH stay atomic.
-      await this.accrueStampRhDelta(tx, masterVesselId, freshComponent.currentStamp, delta, readingDate.toISOString(), params.userId);
+      await this.accrueStampRhDelta(tx, masterVesselId, freshComponent.currentStamp, delta, readingDateLocal, params.userId);
 
       // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
       // rhCurrentInheritedCached stores the master's absolute value (for display/config)
@@ -1710,7 +1712,7 @@ export class PostgresStorage {
             // Stamp the reading date (WO completion date / RH section date), not the server
             // clock, so the family's Last Updated reflects when the hours were observed.
             rhInheritedUpdatedAt: readingDate,
-            lastUpdated: readingDate.toISOString(),
+            lastUpdated: readingDateLocal,
             updatedAt: now,
           })
           .where(eq(components.cuuid, inherited.cuuid));
@@ -1746,7 +1748,7 @@ export class PostgresStorage {
 
         // RH follows the Stamp: accrue the DELTA onto the child's Installed rotational item
         // too (delta-based — Task #369; the child's cumulative is NOT the stamp's hours).
-        await this.accrueStampRhDelta(tx, inherited.vesselId || masterVesselId, inherited.currentStamp, delta, readingDate.toISOString(), params.userId);
+        await this.accrueStampRhDelta(tx, inherited.vesselId || masterVesselId, inherited.currentStamp, delta, readingDateLocal, params.userId);
 
         inheritedUpdated++;
       }
@@ -1769,7 +1771,8 @@ export class PostgresStorage {
   }): Promise<{ component: Component; inheritedUpdated: number }> {
     const db = await getDb();
     const now = new Date();
-    const lastUpdatedValue = params.lastUpdatedDate || now.toISOString();
+    // Task #427: canonical calendar-day contract for component stamps.
+    const lastUpdatedValue = requireReadingDayInput(params.lastUpdatedDate ?? null, 'last updated date') ?? formatReadingDay(now);
     
     // Get the component to determine its counter type
     const component = await this.getComponent(params.componentId);
@@ -1779,9 +1782,9 @@ export class PostgresStorage {
 
     const rhValueStr = params.newRHValue.toString();
     let inheritedUpdated = 0;
-    // Reading date for the stamp accrual (WO completion date / provided date, else now)
-    const parsedReading = params.lastUpdatedDate ? new Date(params.lastUpdatedDate) : null;
-    const readingIso = parsedReading && !isNaN(parsedReading.getTime()) ? parsedReading.toISOString() : now.toISOString();
+    // Reading date for the stamp accrual: canonical calendar day (Task #427 —
+    // rotational-item rh_last_updated holds YYYY-MM-DD, never an instant).
+    const readingIso = lastUpdatedValue;
 
     // Fetch inherited components list before the tx (read-only)
     let inheritedComponentsPre = component.rhCounterType === 'MASTER' && component.vesselId
@@ -2157,8 +2160,17 @@ export class PostgresStorage {
     // Audit Phase 0: freeze the human actor label unless the caller already supplied one.
     // Task #394: stamp origin_side (ship/shore) so the canonical latest-reading-wins
     // comparator can break exact-date ties (ship wins).
+    // Task #427: the storage insert is the LAST boundary — no writer may
+    // persist non-canonical date_updated_local text. Absent → today (UTC day);
+    // PRESENT-but-unparseable → reject (never silently default). Sync appliers
+    // bypass this method (raw apply paths), so verbatim legacy rows arriving
+    // via sync are unaffected.
+    const canonicalDateUpdatedLocal =
+      requireReadingDayInput((audit as any).dateUpdatedLocal ?? null, 'reading date (dateUpdatedLocal)')
+      ?? formatReadingDay(new Date());
     const auditWithActor = {
       ...audit,
+      dateUpdatedLocal: canonicalDateUpdatedLocal,
       actorLabel: audit.actorLabel ?? getAuditActor().actorLabel,
       originSide: (audit as any).originSide ?? await getRhOriginSide(),
     };
@@ -2236,10 +2248,11 @@ export class PostgresStorage {
     const comp = await this.getComponent(componentId);
     const resolvedId = comp ? comp.cuuid : componentId;
 
-    // Crash-proof parse of the free-text date_updated_local column: normalizes
-    // long month names ("Sept"/"June"/…) and yields NULL (row excluded) for
-    // unparseable strings instead of raising 22007 (Task: Sept crash).
-    const parsedDateExpr = parsedDateUpdatedLocalExpr();
+    // Crash-proof CALENDAR-DAY parse of the free-text date_updated_local
+    // column (Task #427): NULL for unparseable strings (no 22007), and DATE
+    // vs target calendar day so a non-UTC DB session can't shift the day.
+    const parsedDateExpr = readingDayLocalExpr();
+    const targetDay = targetReadingDay(targetDate);
 
     const idCondition = or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId));
 
@@ -2250,7 +2263,7 @@ export class PostgresStorage {
       .from(runningHoursAudit)
       .where(and(
         idCondition,
-        sql`${parsedDateExpr} <= ${targetDate}`
+        sql`${parsedDateExpr} <= ${targetDay}::date`
       ))
       .orderBy(sql`${parsedDateExpr} DESC`)
       .limit(1);
@@ -2270,7 +2283,7 @@ export class PostgresStorage {
       .from(runningHoursAudit)
       .where(and(
         idCondition,
-        sql`${parsedDateExpr} > ${targetDate}`
+        sql`${parsedDateExpr} > ${targetDay}::date`
       ))
       .orderBy(sql`${parsedDateExpr} ASC`)
       .limit(1);
@@ -7757,13 +7770,16 @@ export class PostgresStorage {
     renewalEvidenceUrls?: string[];
   }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
-    const { parentComponentId, mode, value, dateUpdated, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+    const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
     const now = new Date();
     // Reading date: when the hours were actually observed (user-entered date), not when
     // the row is written. Falls back to "now" only when omitted or unparseable.
     // enteredAtUTC and updatedAt stay "now" — they are the server-write audit trail.
-    const parsedReadingDate = dateUpdated ? new Date(dateUpdated) : null;
-    const readingDate = parsedReadingDate && !isNaN(parsedReadingDate.getTime()) ? parsedReadingDate : now;
+    // Task #427: canonical calendar-day contract — every persisted date text
+    // (date_updated_local, components.last_updated, rotational stamp dates) is
+    // YYYY-MM-DD via the shared parser; no locale text ever reaches storage.
+    const dateUpdated = requireReadingDayInput(params.dateUpdated ?? null) ?? formatReadingDay(now);
+    const readingDate = parseReadingDayStrict(dateUpdated)!;
 
     // ── Phase 1: Reads + Validation (outside transaction) ──
 
@@ -7873,24 +7889,23 @@ export class PostgresStorage {
         .orderBy(desc(runningHoursAudit.enteredAtUTC))
         .limit(1);
 
-      if (latestAudit.length > 0) {
-        const latestDate = latestAudit[0].dateUpdatedLocal;
-        // Parse dates for comparison (format: DD-MMM-YYYY HH:mm)
-        const parseDate = (dateStr: string): Date => {
-          const months: Record<string, number> = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
-          const parts = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{4})\s*(\d{2})?:?(\d{2})?/);
-          if (parts) {
-            const [, day, month, year, hours = '00', minutes = '00'] = parts;
-            return new Date(parseInt(year), months[month], parseInt(day), parseInt(hours), parseInt(minutes));
+      // Task #427: the date guard uses the SAME winner selection as every other
+      // RH consumer (shared calendar-day parser + latest-reading-wins ranking) —
+      // no more ad-hoc DD-MMM-YYYY parsing that disagreed with the comparator.
+      {
+        const { selectWinningRhEvent } = await import('./modules/running-hours/rhEventComparator');
+        // Tenant-aware pool seam (server/db.ts contract) — NOT the deprecated
+        // eager `pool` export: winner selection must run against the SAME
+        // tenant database as the rest of this writer. Guard failures propagate:
+        // silently skipping the date guard would let a backdated entry through.
+        const { getPool } = await import('./db');
+        const rhPool = await getPool();
+        const winner = await selectWinningRhEvent(rhPool, resolvedParentId);
+        if (winner) {
+          const newDay = parseReadingDayStrict(dateUpdated);
+          if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
+            throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
           }
-          return new Date(dateStr);
-        };
-
-        const latestParsedDate = parseDate(latestDate);
-        const newParsedDate = parseDate(dateUpdated);
-
-        if (newParsedDate < latestParsedDate) {
-          throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${latestDate}).`);
         }
       }
 
@@ -7975,7 +7990,7 @@ export class PostgresStorage {
         // (Task #369). Skipped on meter replacement / renewal reset — those are baseline
         // resets, not hours actually run by the stamp.
         if (!meterReplaced && !isRenewalReset) {
-          await this.accrueStampRhDelta(tx, freshParent.vesselId, freshParent.currentStamp, newRH - currentRH, readingDate.toISOString(), userId || null);
+          await this.accrueStampRhDelta(tx, freshParent.vesselId, freshParent.currentStamp, newRH - currentRH, dateUpdated, userId || null);
         }
 
         updatedComponents++;
@@ -8021,7 +8036,7 @@ export class PostgresStorage {
 
           // RH follows the Stamp: accrue the DELTA onto the inherited child's Installed item (Task #369)
           if (!meterReplaced && !isRenewalReset) {
-            await this.accrueStampRhDelta(tx, inherited.vesselId || parentResult[0]?.vesselId || null, inherited.currentStamp, inheritedDelta, readingDate.toISOString(), userId || null);
+            await this.accrueStampRhDelta(tx, inherited.vesselId || parentResult[0]?.vesselId || null, inherited.currentStamp, inheritedDelta, dateUpdated, userId || null);
           }
 
           updatedComponents++;
@@ -8094,7 +8109,7 @@ export class PostgresStorage {
 
         // RH follows the Stamp: accrue the DELTA onto the structural child's Installed item (Task #369)
         if (!meterReplaced && !isRenewalReset) {
-          await this.accrueStampRhDelta(tx, child.vesselId, child.currentStamp, structuralDelta, readingDate.toISOString(), userId || null);
+          await this.accrueStampRhDelta(tx, child.vesselId, child.currentStamp, structuralDelta, dateUpdated, userId || null);
         }
 
         updatedComponents++;

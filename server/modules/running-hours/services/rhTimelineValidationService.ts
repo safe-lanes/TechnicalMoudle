@@ -1,5 +1,6 @@
 import * as repo from '../repositories/runningHoursRepository';
 import { storage } from '../../../storage';
+import { canonicalReadingDay, parseReadingDayStrict, todayReadingDay } from '../utils/readingDate';
 
 const MAX_HOURS_PER_DAY = 25;
 const HIGH_UTILIZATION_THRESHOLD = 20;
@@ -74,8 +75,13 @@ export interface RHTimelineViewEntry {
 }
 
 function parseDate(dateStr: string): Date {
-  const d = new Date(dateStr);
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  // Task #427: shared strict calendar-day parser; a caller-supplied
+  // unparseable date degrades to today (prior behaviour for garbage input)
+  // instead of Invalid Date propagating NaN through range math.
+  const d = parseReadingDayStrict(dateStr);
+  if (d) return d;
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
 function getDaysBetween(date1: Date, date2: Date): number {
@@ -97,29 +103,19 @@ function formatDMY(isoDate: string): string {
 }
 
 function normalizeAuditDate(audit: any): string {
+  // Task #427: SHARED strict calendar-day parser — same policy as winner
+  // selection: the row's reading-date text ranks by its true day; a row the
+  // parser classifies as unparseable falls back to its entry day (never raw
+  // text, never NaN ordering).
   if (audit.dateUpdatedLocal) {
-    const dateStr = audit.dateUpdatedLocal;
-    const parsed = new Date(dateStr);
-    if (!isNaN(parsed.getTime())) {
-      return parsed.toISOString().split('T')[0];
-    }
-    const formats = dateStr.match(/(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
-    if (formats) {
-      const months: Record<string, string> = {
-        Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
-        Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
-      };
-      const month = months[formats[2]];
-      if (month) {
-        return `${formats[3]}-${month}-${formats[1].padStart(2, '0')}`;
-      }
-    }
-    return dateStr;
+    const day = canonicalReadingDay(String(audit.dateUpdatedLocal));
+    if (day) return day;
   }
   if (audit.enteredAtUTC) {
-    return new Date(audit.enteredAtUTC).toISOString().split('T')[0];
+    const entered = audit.enteredAtUTC instanceof Date ? audit.enteredAtUTC : new Date(String(audit.enteredAtUTC));
+    if (!isNaN(entered.getTime())) return entered.toISOString().split('T')[0];
   }
-  return new Date().toISOString().split('T')[0];
+  return todayReadingDay();
 }
 
 async function getTimelineForComponent(componentId: string): Promise<RHTimelineEntry[]> {
@@ -133,7 +129,9 @@ async function getTimelineForComponent(componentId: string): Promise<RHTimelineE
     id: a.id
   }));
 
-  entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // Dates are canonical YYYY-MM-DD (normalizeAuditDate) — lexicographic order
+  // IS chronological order; no Date parsing (NaN-safe).
+  entries.sort((a, b) => a.date.localeCompare(b.date));
   return entries;
 }
 
@@ -432,9 +430,8 @@ export async function getRHTimeline(
   }
 
   filtered.sort((a, b) => {
-    const dateA = normalizeAuditDate(a);
-    const dateB = normalizeAuditDate(b);
-    return new Date(dateA).getTime() - new Date(dateB).getTime();
+    // Canonical YYYY-MM-DD → lexicographic order is chronological (NaN-safe).
+    return normalizeAuditDate(a).localeCompare(normalizeAuditDate(b));
   });
 
   const entries: RHTimelineViewEntry[] = [];

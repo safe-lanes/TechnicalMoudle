@@ -1,6 +1,7 @@
 import * as repo from '../repositories/runningHoursRepository';
 import type { RHHistoryQuery, RHHistoryResult } from '../repositories/runningHoursRepository';
 import { validateRunningHoursIncrease, canAdminOverride, safeParseDate } from '../utils/rhValidation';
+import { canonicalizeReadingDateInput, requireReadingDayInput, todayReadingDay } from '../utils/readingDate';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { z } from 'zod';
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema } from '@shared/schema';
@@ -26,11 +27,19 @@ const updateMasterRHSchema = z.object({
 });
 
 // ── Helper: resolve last-updated date with fallback chain ──
+// Task #427: canonicalize legacy stamp text via the shared calendar-day
+// parser — no naive `new Date(text)`, no machine-timezone day shifts. When
+// the component's own text stamp is unparseable, fall through to the typed
+// timestamp columns.
 
 function resolveLastUpdated(component: Component): string | null {
-  return component.lastUpdated
-    || (component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt).toISOString() : null)
-    || (component.updatedAt ? new Date(component.updatedAt).toISOString() : null);
+  const own = canonicalizeReadingDateInput(component.lastUpdated ?? null);
+  if (own) return own;
+  const master = canonicalizeReadingDateInput(
+    component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt) : null
+  );
+  if (master) return master;
+  return canonicalizeReadingDateInput(component.updatedAt ? new Date(component.updatedAt) : null);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -46,7 +55,22 @@ export async function createAudit(body: unknown): Promise<RunningHoursAudit> {
   if (!parseResult.success) {
     throw new ValidationError("Invalid audit data", { details: parseResult.error.errors });
   }
-  return repo.createRunningHoursAudit(parseResult.data);
+  const data = parseResult.data;
+  // Task #427 calendar-day contract: date_updated_local is ALWAYS persisted as
+  // canonical YYYY-MM-DD. A supplied-but-unparseable date is rejected loudly —
+  // silently persisting raw text would re-open the poisoning path the
+  // normalization migration just closed.
+  if (data.dateUpdatedLocal !== undefined && data.dateUpdatedLocal !== null && String(data.dateUpdatedLocal).trim() !== '') {
+    const canonical = canonicalizeReadingDateInput(String(data.dateUpdatedLocal));
+    if (!canonical) {
+      throw new ValidationError(
+        `Invalid reading date "${data.dateUpdatedLocal}". Use a real calendar date (e.g. 2026-08-17).`,
+        { code: 'RH_INVALID_READING_DATE' }
+      );
+    }
+    data.dateUpdatedLocal = canonical;
+  }
+  return repo.createRunningHoursAudit(data);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -59,6 +83,12 @@ export async function cascadeUpdate(body: unknown) {
     throw new ValidationError("Invalid cascade data", { details: parseResult.error.errors });
   }
   const validatedData = parseResult.data;
+
+  // Task #427: canonicalize the user's reading date ONCE at the service
+  // boundary — validation and the cascade's persistence (date_updated_local,
+  // component stamps, rotational stamp accrual) all see the same YYYY-MM-DD.
+  // Absent → today; PRESENT-but-unparseable → reject (never silently 'today').
+  validatedData.dateUpdated = requireReadingDayInput(validatedData.dateUpdated ?? null) ?? todayReadingDay();
 
   // Get the parent component to determine current RH
   const parentComponent = await repo.getComponent(validatedData.parentComponentId);
@@ -400,12 +430,19 @@ export async function updateChildRH(componentId: string, body: {
   // Use same fallback logic as the Running Hours display
   const componentLastUpdated = resolveLastUpdated(component);
 
+  // Task #427: canonicalize the user's reading date ONCE at the service
+  // boundary — validation, component write, audit insert, and stamp accrual
+  // all use this SAME calendar day (offset/locale inputs can no longer make
+  // them disagree).
+  // Absent → today; PRESENT-but-unparseable → reject (never silently 'today').
+  const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
+
   // Validate running hours increase against daily limits
   const validation = validateRunningHoursIncrease({
     currentRH: currentRHValue,
     newRH: newRHValue,
     componentLastUpdated: componentLastUpdated,
-    newUpdateDate: dateUpdated || new Date().toISOString(),
+    newUpdateDate: canonicalDay,
     userRole: userRole || 'Ship',
     adminOverride: adminOverride || false
   });
@@ -432,15 +469,14 @@ export async function updateChildRH(componentId: string, body: {
   // Component write + stamp DELTA accrual happen in ONE locked transaction (Task #374):
   // the delta is computed from a fresh in-tx read, so a duplicate/overlapping
   // submission sees the committed value and accrues 0 instead of double-counting.
-  const stampReadingIso = (() => {
-    const d = dateUpdated ? new Date(dateUpdated) : new Date();
-    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-  })();
+  // Task #427: rotational-stamp date contract is the CANONICAL calendar day
+  // (YYYY-MM-DD), never an instant — offset/local-midnight inputs must not
+  // shift the stored day.
   const atomicResult = await repo.updateChildRhWithStampAccrual({
     componentId,
     newRHValue,
-    lastUpdated: dateUpdated || new Date().toISOString(),
-    readingDateIso: stampReadingIso,
+    lastUpdated: canonicalDay,
+    readingDateIso: canonicalDay,
     userId: userId || null,
   });
   // Audit the value that was actually committed as previous (fresh in-tx read),
@@ -449,9 +485,7 @@ export async function updateChildRH(componentId: string, body: {
 
   // dateUpdatedLocal must also use the user's entered date so the audit-based
   // MAX in listParents reads the correct reading date, not the server save time.
-  const auditDateLocal = dateUpdated
-    ? dateUpdated.split('T')[0]
-    : new Date().toISOString().split('T')[0];
+  const auditDateLocal = canonicalDay;
 
   await repo.createRunningHoursAudit({
     vesselId: component.vesselId || '',
@@ -686,6 +720,12 @@ export async function updateMasterRH(componentId: string, body: unknown) {
 
   const { newRHValue, updateSource, userId, userUuid, userRole, adminOverride, comments, dateUpdated } = parseResult.data;
 
+  // Task #427: canonicalize the user's reading date ONCE at the service
+  // boundary — validation and persistence (cascade writes date_updated_local
+  // + component stamps) use the SAME calendar day.
+  // Absent → today; PRESENT-but-unparseable → reject (never silently 'today').
+  const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
+
   // Verify component exists and is a MASTER type
   const component = await repo.getComponent(componentId);
   if (!component) {
@@ -705,7 +745,7 @@ export async function updateMasterRH(componentId: string, body: unknown) {
       currentRH: currentRHValue,
       newRH: newRHValue,
       componentLastUpdated: lastUpdate,
-      newUpdateDate: dateUpdated || new Date().toISOString(),
+      newUpdateDate: canonicalDay,
       userRole: userRole || 'Ship',
       adminOverride: adminOverride || false
     });
@@ -733,7 +773,8 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     comments,
     // Persist the reading date (WO completion date / RH Section "Date Updated") so the stored
     // reading and the component's last-updated reflect when the hours were observed, not "now".
-    dateUpdated
+    // Task #427: canonical YYYY-MM-DD only.
+    dateUpdated: canonicalDay
   });
 
   // TRIGGER 1 HOOK: After MASTER RH is updated, scan for RH-based WO generation

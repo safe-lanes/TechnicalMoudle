@@ -189,10 +189,14 @@ export async function completeWorkOrder(
   }
   if (runningHours && counterType !== 'NOT_RH_DRIVEN' && (isShipForRhSync || officeRhEntryAllowedCompletion)) {
     const newRH = parseInt(runningHours);
-    const completionDateForValidation = dateOfCompletion || new Date().toISOString().split('T')[0];
+    // Task #427: canonicalize ONCE at the boundary via the shared calendar-day
+    // parser — the same YYYY-MM-DD flows to validation, updateMasterRH, audit
+    // insert and stamp accrual (locale/offset inputs can no longer shift days).
+    const { requireReadingDayInput, todayReadingDay } = await import('../../running-hours/utils/readingDate');
+    const completionDateForValidation = requireReadingDayInput(dateOfCompletion ?? null, 'completion date') || todayReadingDay();
     // R2 (migration 139): the RH MODULE operates on the date the reading was TAKEN.
     // Falls back to the completion date = exact pre-feature behaviour.
-    const readingDateForRH = currentReadingDate || completionDateForValidation;
+    const readingDateForRH = requireReadingDayInput(currentReadingDate ?? null, 'current reading date') || completionDateForValidation;
     // Task #394: an OFFICE RH entry must carry an explicit observed reading date — never
     // default to "now" (a wrong reading date poisons the latest-reading-wins comparator).
     if (!isShipForRhSync && !currentReadingDate && !dateOfCompletion) {

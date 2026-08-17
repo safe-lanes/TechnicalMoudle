@@ -1517,14 +1517,13 @@ export async function updateWorkOrder(id: string, body: any) {
       }
       const rhCounterType = (rhComp?.rhCounterType || 'MASTER').toUpperCase();
       const rhValue = parseInt(rhRaw);
-      const normRhDate = (d?: string | null): string | undefined => {
-        if (!d) return undefined;
-        if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split('T')[0];
-        const m = d.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
-        if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-        const p = new Date(d);
-        return !isNaN(p.getTime()) ? p.toISOString().split('T')[0] : undefined;
-      };
+      // Task #427: SHARED canonicalizer — same calendar-day contract as every
+      // other RH writer (ISO prefix literal day, legacy DD Mon YYYY, numeric
+      // day-first D-M-YYYY); no unrestricted `new Date(d)` fallback.
+      const { requireReadingDayInput } = await import('../../running-hours/utils/readingDate');
+      // Absent → undefined (documented fallback chain); PRESENT-but-unparseable → reject.
+      const normRhDate = (d?: string | null): string | undefined =>
+        requireReadingDayInput(d ?? null, 'reading/completion date') ?? undefined;
       const completionDateNorm = normRhDate(existingWO.completionDateTime || existingWO.dateCompleted || updateData.completionDateTime);
       // R2 (migration 139): the RH module operates on the date the reading was
       // TAKEN (stored Current Reading Date); fallback to the completion date =
