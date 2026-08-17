@@ -140,25 +140,10 @@ migrations/        — SQL migration files (auto-generated + hand-written)
 
 - Dev environment uses mock auth (always injects Sail Admin user)
 - Mock auth middleware defined in `server/middleware/auth.ts`
+- Per-user identity for Purchasing comes from the x-user-id header via server/modules/shipskart/services/identityGuard.ts — never from req.user.
 
-## Purchasing
-
-The **Purchasing** entry in the top navigation bar (`client/src/components/TopMenuBar.tsx`) is currently a **placeholder icon only**. It is reserved for a future external Purchasing system that will be reached via a JWT-based SSO browser redirect.
-
-**Planned integration shape (NOT yet implemented):**
-
-- The integration partner will provide a redirect URL plus a JWT (token issuance / refresh mechanism TBD).
-- On click of the Purchasing top-nav entry, the app should redirect the browser to that URL carrying the JWT so the user lands logged-in on the Purchasing side.
-- The exact token carrier (query param vs `Authorization` header on a server bounce vs hidden form POST) will be decided once the partner publishes their contract.
-- Config (URL, secret/keys for signing if any) should live in environment variables, never hard-coded.
-
-**Current state:**
-
-- Top-nav button is rendered to the right of Admin using the `ShoppingCart` Lucide icon.
-- Click handler shows a "Coming soon" toast — there is no route, no side menu, no API call.
-- Visibility currently bypasses `hasAnyChildAccess('purchasing')` via a `bypassPermissionCheck` flag (no menu-master row exists yet). Once a `purchasing` menu row is seeded, remove that flag so role-based permissions take over.
-
-When the integration URL and token contract become available, wire the redirect into the placeholder click handler in `TopMenuBar.tsx` — do not introduce a separate component.
+## Purchasing (Shipskart)
+LIVE — do not treat as placeholder. Backend: server/modules/shipskart/. Frontend: client/src/pages/purchasing/. Shore-only integration; ships hold no Shipskart credentials. Do NOT modify this module unless the task explicitly names it.
 
 ## Running the Project
 
@@ -211,7 +196,7 @@ Follow them on every change.
 ### TypeScript
 
 - **Never increase the tsc baseline.** Run `npx tsc --noEmit` before 
-  committing. The count must not exceed the current baseline of 374. 
+  committing. The count must not exceed the current baseline of 290. 
   Do not increase it. If you introduce new errors, fix them before 
   committing.
 
@@ -286,7 +271,7 @@ Follow them on every change.
 
 Before pushing any commit:
 
-1. `npx tsc --noEmit` — count must not exceed baseline (374). 
+1. `npx tsc --noEmit` — count must not exceed baseline (290). 
    Do not increase.
 2. If you added a migration: re-run it locally to verify 
    idempotency.
