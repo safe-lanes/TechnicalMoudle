@@ -41239,7 +41239,8 @@ function buildCategoryPayload(opts) {
       categoryCode: opts.categoryCode,
       allowChildren: opts.hasChildren,
       status: 1,
-      description: opts.name,
+      // Rev01: description is the PLAIN name (no code prefix) even when `name` is coded.
+      description: opts.description ?? opts.name,
       impaChapterId: null,
       impaChapterName: null,
       impaGroupId: null,
@@ -41265,14 +41266,16 @@ function buildCategoryMappingPayload(opts) {
 }
 function buildProductMasterPayload(opts) {
   const c = opts.component;
+  const displayName = (opts.nameStyle ?? "coded") === "coded" ? codedName(c.componentCode, c.name) : c.name;
   return {
     data: {
       productCode: sanitizeCode(`${opts.vesselCode}-${c.componentCode}`),
       // COLLISION SAFETY: see header; charset per their validation
-      name: c.name,
+      name: displayName,
       categoryId: opts.categoryId,
       categoryName: opts.categoryName,
       description: c.name,
+      // Rev01: plain name only, no code prefix
       status: "Active",
       impaCode: null,
       issaCode: null,
@@ -41282,9 +41285,11 @@ function buildProductMasterPayload(opts) {
       isActive: true,
       searchKeywords: slugify(c.name),
       make: c.maker ?? null,
+      // Rev01 (Jeevan's correction): the COMPONENT's maker
       model: c.model ?? null,
       serialNumber: c.serialNo ?? null,
-      year: null,
+      year: yearFromInstallationDate(c.installationDate),
+      // Rev01: from installation_date
       partNumber: null
     }
   };
@@ -41322,8 +41327,9 @@ function buildSkuPayload(src, product, category, ref) {
       unitOfMeasurementName: src.uomName || ref.unitOfMeasurementName,
       countryId: null,
       countryOfOrigin: null,
-      productSpecifications: {}
-      // Sachin §3: {} on create; free text lives in skuDescription
+      // Rev01: real spec pairs when the caller has them (their Postman sample shows an
+      // object of name/value strings); {} otherwise. Free text still lives in skuDescription.
+      productSpecifications: src.specs && Object.keys(src.specs).length ? src.specs : {}
     }
   };
 }
@@ -41334,10 +41340,17 @@ function buildSkuFromSpare(spare, product, category, ref) {
     description: [spare.specification, spare.note].filter(Boolean).join(" | ") || null,
     partNumber: spare.partNumber,
     make: spare.maker,
-    model: spare.model,
+    // Rev01 (Jeevan's correction): the SPARE's maker
+    model: spare.partNumber ?? null,
+    // Rev01: part number doubles as the model field
     manufacturerName: spare.maker,
     uomName: spare.uom,
-    unitCost: spare.unitCost != null ? Number(spare.unitCost) : null
+    unitCost: 0,
+    // Rev01: baseMrp always 0 for spares (stores keep unit_cost)
+    specs: {
+      ...spare.drawingNumber ? { drawingNumber: String(spare.drawingNumber) } : {},
+      ...spare.positionNumber ? { positionNumber: String(spare.positionNumber) } : {}
+    }
   }, product, category, ref);
 }
 function buildSkuFromStoreItem(item, product, category, ref) {
@@ -41360,7 +41373,7 @@ function buildCatalogueAddPayload(opts) {
       smcTenantId: opts.smc.smcTenantId,
       vesselId: opts.vessel.vesselId,
       vesselName: opts.vessel.vesselName,
-      productId: opts.productId,
+      productId: opts.skuId,
       status: 1,
       isLocked: false,
       type: "ProductMaster",
@@ -41373,12 +41386,18 @@ function buildCatalogueAddPayload(opts) {
     }
   };
 }
-var sanitizeCode, slugify;
+var sanitizeCode, slugify, codedName, yearFromInstallationDate, padCategoryCode;
 var init_shipskartCatalogueMapper = __esm({
   "server/modules/shipskart/services/shipskartCatalogueMapper.ts"() {
     "use strict";
     sanitizeCode = (s) => String(s || "").toUpperCase().trim().replace(/[^A-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
     slugify = (s) => String(s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    codedName = (code, name) => name ? `${code} - ${name}` : code;
+    yearFromInstallationDate = (v) => {
+      const m = /(\d{4})(?!.*\d{4})/.exec(String(v ?? ""));
+      return m ? m[1] : null;
+    };
+    padCategoryCode = (code) => String(code).length >= 3 ? String(code) : `C-${code}`;
   }
 });
 
@@ -41457,8 +41476,8 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
     if (!link) throw new Error(`Vessel ${v.name} has no pushed Shipskart vessel link \u2014 push the vessel first (Stage 2 reconciler)`);
     const ref = getReferenceIds();
     const comps = (await pool4.query(
-      `SELECT DISTINCT c.cuuid, c.component_code, c.name, c.maker, c.model, c.serial_no
-         FROM components c JOIN spares s ON s.component_id=c.cuuid AND s.is_deleted=false
+      `SELECT c.cuuid, c.component_code, c.name, c.maker, c.model, c.serial_no, c.installation_date
+         FROM components c
         WHERE c.vessel_id=$1 AND c.is_deleted=false AND c.component_code IS NOT NULL`,
       [vesselId]
     )).rows;
@@ -41469,7 +41488,8 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
     const nameByCode = new Map(allComps.map((c) => [c.component_code, c.name]));
     const spares2 = (await pool4.query(
       `SELECT suuid, component_id, part_code "partCode", part_name "partName", part_number "partNumber",
-              maker, model, uom, unit_cost "unitCost", specification, note
+              maker, model, uom, unit_cost "unitCost", specification, note,
+              drawing_number "drawingNumber", position_number "positionNumber"
          FROM spares WHERE vessel_id=$1 AND is_deleted=false ORDER BY part_code`,
       [vesselId]
     )).rows;
@@ -41481,13 +41501,14 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
     const cats = /* @__PURE__ */ new Map();
     for (const c of comps) {
       const chain = deriveCodeChain(c.component_code);
-      const catChain = chain.slice(0, -1);
+      const catChain = chain.length > 1 ? chain.slice(0, -1) : chain;
       catChain.forEach((code, i) => {
-        if (!cats.has(code)) cats.set(code, {
-          code,
-          name: nameByCode.get(code) || code,
+        const key = padCategoryCode(code);
+        if (!cats.has(key)) cats.set(key, {
+          code: key,
+          name: codedName(code, nameByCode.get(code)),
           level: i + 1,
-          parent: i > 0 ? catChain[i - 1] : null,
+          parent: i > 0 ? padCategoryCode(catChain[i - 1]) : null,
           hasChildren: true
         });
       });
@@ -41535,11 +41556,11 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       const r = await requestWithBackoff(
         "POST",
         "/integration/SAIL/create-category",
-        { body: buildCategoryPayload({ name: cat.name, categoryCode: cat.code, level: cat.level, hasChildren: cat.hasChildren }) }
+        { body: buildCategoryPayload({ name: cat.name, categoryCode: cat.code, level: cat.level, hasChildren: cat.hasChildren, description: nameByCode.get(cat.code) }) }
       );
       await sleep(PACE_MS);
       if (r.ok) {
-        await markPushed(l.id, r.json?.id ?? null);
+        await markPushed(l.id, r.json?.data?.id ?? null);
         res.categories.pushed++;
       } else if (isDuplicateAnswer(r.status, r.json)) {
         await markPushed(l.id);
@@ -41564,11 +41585,13 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         continue;
       }
       const r = await requestWithBackoff("POST", "/integration/SAIL/category-mapping", {
+        // Rev01: ids are theirs, NAMES are built from OUR components table (coded format) —
+        // never Shipskart's stored name (which may predate the format change).
         body: buildCategoryMappingPayload({
           categoryId: child.id,
-          categoryName: child.name,
+          categoryName: cat.name,
           parentCategoryId: parent.id,
-          parentCategoryName: parent.name
+          parentCategoryName: cats.get(cat.parent)?.name ?? parent.name
         })
       });
       await sleep(PACE_MS);
@@ -41585,7 +41608,7 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
     const productSpecs = [];
     for (const c of comps) {
       const chain = deriveCodeChain(c.component_code);
-      const catCode = chain.length > 1 ? chain[chain.length - 2] : chain[0];
+      const catCode = padCategoryCode(chain.length > 1 ? chain[chain.length - 2] : chain[0]);
       const rc = remoteCats.get(catCode);
       if (!rc) {
         res.products.failed++;
@@ -41598,7 +41621,7 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         catCode,
         payload: buildProductMasterPayload({
           vesselCode,
-          component: { componentCode: c.component_code, name: c.name, maker: c.maker, model: c.model, serialNo: c.serial_no },
+          component: { componentCode: c.component_code, name: c.name, maker: c.maker, model: c.model, serialNo: c.serial_no, installationDate: c.installation_date },
           categoryId: rc.id,
           categoryName: rc.name
         })
@@ -41620,7 +41643,9 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
           vesselCode,
           component: { componentCode: code, name: `Stores \u2014 ${cat}` },
           categoryId: rc.id,
-          categoryName: rc.name
+          categoryName: rc.name,
+          nameStyle: "plain"
+          // synthetic stores master — coded prefix would read as noise
         })
       });
     }
@@ -41636,7 +41661,7 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       const r = await requestWithBackoff("POST", "/integration/SAIL/create-product-masters", { body: spec.payload });
       await sleep(PACE_MS);
       if (r.ok || isDuplicateAnswer(r.status, r.json)) {
-        await markPushed(l.id, r.json?.id ?? null);
+        await markPushed(l.id, r.json?.data?.id ?? null);
         res.products.pushed++;
       } else {
         await markFailed(l.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
@@ -41657,7 +41682,8 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         skuCode: sanitizeCode(s.partCode),
         skuName: s.partName,
         make: s.maker,
-        model: s.model,
+        model: s.partNumber,
+        // Rev01: part number doubles as model
         productKey: s.component_id,
         buildSku: () => {
           const pr = productByLocal.get(s.component_id);
@@ -41692,6 +41718,7 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         continue;
       }
       const sl = await ensurePending("sku", job.localKey, vesselId, job.skuCode);
+      let skuId = sl.remoteId ?? null;
       const firstHolder = sanitizedSeen.get(job.skuCode);
       if (firstHolder && firstHolder !== job.localKey) {
         await markFailed(sl.id, `SANITIZE COLLISION: code '${job.skuCode}' also produced by ${firstHolder} in this vessel \u2014 needs human decision`);
@@ -41711,7 +41738,8 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         const r = await requestWithBackoff("POST", "/integration/SAIL/create-spare-part", { body: job.buildSku() });
         await sleep(PACE_MS);
         if (r.ok || isDuplicateAnswer(r.status, r.json)) {
-          await markPushed(sl.id, r.json?.id ?? null);
+          await markPushed(sl.id, r.json?.data?.id ?? null);
+          skuId = r.json?.data?.id ?? null;
           res.skus.pushed++;
           consecutive429 = 0;
         } else {
@@ -41728,10 +41756,16 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         res.catalogue.skipped++;
         continue;
       }
+      if (!skuId) {
+        await markFailed(cl.id, "SKU id unknown (pushed before the Option-B fix, or duplicate answer carried no id) \u2014 no SKU read endpoint to recover it; needs re-create or Shipskart lookup");
+        res.catalogue.failed++;
+        res.errors.push(`catalogue ${job.skuCode}: sku id unknown`);
+        continue;
+      }
       const addBody = buildCatalogueAddPayload({
         skuCode: job.skuCode,
         skuName: job.skuName,
-        productId: pr.productId,
+        skuId,
         productMasterCode: pr.productCode,
         categoryId: pr.categoryId,
         smc,
