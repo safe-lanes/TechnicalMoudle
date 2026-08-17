@@ -353,8 +353,15 @@ export async function pushVesselCatalogue(
         // COLLISION GUARD (mapper contract): same code under another vessel → human, never silent.
         const clash = await links.findSkuCodeOtherVessel(job.skuCode, vesselId);
         if (clash) {
-          await links.markFailed(sl.id, `SKU CODE COLLISION: '${job.skuCode}' already pushed for vessel ${clash.vesselId} — needs human decision`);
-          res.skus.failed++; res.errors.push(`sku ${job.skuCode}: cross-vessel collision`);
+          // SISTER-VESSEL CASE (Jeevan, 17-Aug): the same part code on two vessels is
+          // LEGITIMATE (shared equipment). Shipskart keeps one SKU per code tenant-wide, so
+          // the right action is to LINK the existing SKU into this vessel's catalogue — not
+          // to create it again, and not to refuse. Linking needs the existing SKU's id;
+          // until Shipskart's get-all-spare-parts lookup exists we cannot obtain it, so the
+          // row stays retryable ('failed' + AWAITING-LINK reason) and Retry picks it up once
+          // the lookup is wired. Never 'pushed' (that would attach it to the wrong vessel).
+          await links.markFailed(sl.id, `AWAITING LINK: '${job.skuCode}' already exists on Shipskart for vessel ${clash.vesselId} (sister-vessel share) — will be linked to this vessel once the spare lookup API is available`);
+          res.skus.failed++; res.errors.push(`sku ${job.skuCode}: awaiting link (shared with another vessel)`);
           continue;
         }
         const r = await requestWithBackoff('POST', '/integration/SAIL/create-spare-part', { body: job.buildSku() });

@@ -254,11 +254,12 @@ export default function ShipskartCatalogue() {
               {(s.preflight?.collisions ?? 0) > 0 && (
                 <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded p-2">
                   <AlertTriangle className="h-4 w-4 inline mr-1" />
-                  <b>{s.preflight!.collisions} part code(s) on this vessel are already on Shipskart under a different vessel</b>
+                  <b>{s.preflight!.collisions} part code(s) on this vessel already exist on Shipskart under another vessel</b>
                   {' '}({s.preflight!.byOtherVessel.map(o => `${o.vesselName ?? o.vesselId}: ${o.count}, e.g. ${o.sample.join(', ')}`).join('; ')}).
-                  Shipskart part codes must be unique across the whole account, so these will be <b>refused</b> — they will not be attached
-                  to the other vessel and they will not be pushed here. Usually the two vessels share the same spare data (a copied test
-                  vessel). Fix the part codes, or push only the vessel that truly owns them.
+                  Shipskart keeps one record per part code across the account, so these will <b>not be created again — they will be linked
+                  to this vessel's catalogue</b> (normal for sister vessels sharing equipment). Linking needs Shipskart's spare lookup API,
+                  which is pending — until it arrives these items stay "awaiting link" and are picked up automatically by
+                  <b> Retry failed &amp; continue</b> once available.
                 </p>
               )}
               {s.progress.skus.failed > 0 && !s.running && (
