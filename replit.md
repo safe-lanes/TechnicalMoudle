@@ -90,7 +90,7 @@ Every new table in `shared/schema.ts` must have:
 - `isDeleted` — BOOLEAN NOT NULL `.default(false)`
 - `isSync` — BOOLEAN NOT NULL `.default(false)`
 
-These columns enable the upcoming ship-cloud bidirectional sync per the Sync Readiness Analysis.
+These columns are REQUIRED by the live ship-shore sync (shared/syncConfig.ts registry, server/modules/sync/). A table missing them cannot sync or provision.
 
 ### Workflow Applies Everywhere
 
@@ -107,6 +107,7 @@ Historical record of migration entries deleted from source. The corresponding ro
 ```
 client/src/
   pages/           — Page components (pms/, stores/, spares/, defects/, admin/)
+  pages/purchasing/ — Purchasing (Shipskart SSO) page — LIVE
   components/      — Reusable UI components (ui/ for shadcn primitives)
   contexts/        — Global state (Auth, Vessel, Permissions, Offline)
   hooks/           — Custom hooks (useVessels, usePermissions, useToast)
@@ -120,6 +121,8 @@ server/
   migrations.ts    — Legacy migration runner (entries 001-081, FROZEN)
   middleware/auth.ts — requireAuth, requirePMSAdmin middleware
   modules/         — Feature modules (access-control, stores, spares, etc.)
+    modules/sync/        — Ship↔shore sync engine (HIGHEST RISK — see Sync Layer rules; do not modify unless the task names it)
+    modules/shipskart/   — Purchasing / Shipskart integration (LIVE, shore-only — do not modify unless the task names it)
 
 shared/
   schema.ts        — Drizzle ORM schema definitions (single source of truth)
@@ -130,7 +133,7 @@ migrations/        — SQL migration files (auto-generated + hand-written)
 
 ## Access Control Pattern
 
-- **Backend**: `requireAuth` on GET routes, `requirePMSAdmin` on write routes (POST/PUT/PATCH/DELETE)
+- **Backend**: route guards are `requireRole([...])`, `requirePMSAdmin`, and `requirePermission(resource, action)` from server/middleware/. There is NO `requireAuth` middleware — do not invent one. Note: `requirePermission` fails OPEN for roles with no configured row; prefer `requireRole` for admin-only writes.
 - **Frontend**: `usePermissions()` hook provides `canCreate/canEdit/canDelete("pms-{resource}")` flags
 - **Database**: `adm_menumaster_ac` (menus), `admn_role_master` (roles), `adm_role_menu_access` (role-menu permissions with can_view/can_create/can_edit/can_delete)
 - **UIRole types**: `Sail_Admin | Client_Admin | Tech_Superintendent | Head_of_Dept | Vessel | External`
