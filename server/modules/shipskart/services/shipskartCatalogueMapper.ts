@@ -61,8 +61,36 @@ export function getReferenceIds(): CatalogueRefIds {
 export const sanitizeCode = (s: string) => String(s || '').toUpperCase().trim()
   .replace(/[^A-Z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 
-const slugify = (s: string) => String(s || '').toLowerCase().trim()
-  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+/**
+ * Their product-code cap is 50 characters (live 400 on dev, 17-Aug: "Product code must
+ * not exceed 50 characters" — dev components carry longer codes than the pilot's).
+ * Deterministic and collision-safe: keep a readable prefix and append a short hash of
+ * the FULL code, so two long codes that share a prefix still get distinct product codes.
+ */
+export const PRODUCT_CODE_MAX = 50;
+/** THE product-code builder — every caller (mapper AND pusher ledger keys) must use this so ledger keys and payloads agree. */
+export const productCodeFor = (vesselCode: string, componentCode: string) => fitProductCode(sanitizeCode(`${vesselCode}-${componentCode}`));
+export function fitProductCode(fullSanitized: string): string {
+  if (fullSanitized.length <= PRODUCT_CODE_MAX) return fullSanitized;
+  let h = 0;
+  for (let i = 0; i < fullSanitized.length; i++) h = (h * 31 + fullSanitized.charCodeAt(i)) >>> 0;
+  const tag = h.toString(36).toUpperCase().padStart(7, '0').slice(-7);
+  return `${fullSanitized.slice(0, PRODUCT_CODE_MAX - 8)}-${tag}`.replace(/-+/g, '-');
+}
+
+/**
+ * Their slug rule is strict: lowercase letters, digits and hyphens ONLY (live 400 on dev,
+ * 17-Aug: "Slug must contain only lowercase letters, numbers, and hyphens"). The old
+ * slugify let a trailing/leading hyphen or a non-ASCII letter through after `slice(0, 80)`
+ * cut mid-run. Strip accents, collapse everything else to single hyphens, trim hyphens
+ * AFTER truncation, and never return empty.
+ */
+const slugify = (s: string) => {
+  const base = String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '').slice(0, 80).replace(/^-+|-+$/g, '');
+  return base || 'item';
+};
 
 /**
  * Display name convention (Rev01 mapping, Jeevan 14-Aug): categories and product
@@ -156,7 +184,7 @@ export function buildProductMasterPayload(opts: {
   const displayName = (opts.nameStyle ?? 'coded') === 'coded' ? codedName(c.componentCode, c.name) : c.name;
   return {
     data: {
-      productCode: sanitizeCode(`${opts.vesselCode}-${c.componentCode}`), // COLLISION SAFETY: see header; charset per their validation
+      productCode: productCodeFor(opts.vesselCode, c.componentCode), // COLLISION SAFETY: see header; charset + 50-char cap per their validation
       name: displayName,
       categoryId: opts.categoryId,
       categoryName: opts.categoryName,

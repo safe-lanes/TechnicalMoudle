@@ -130,6 +130,33 @@ export async function findSkuCodeOtherVessel(skuCode: string, vesselId: string):
   return r.rows.length ? rowToLink(r.rows[0]) : null;
 }
 
+/**
+ * PRE-FLIGHT (17-Aug, dev round): BEFORE a push, list this vessel's spare/store codes
+ * that the ledger already holds as pushed for a DIFFERENT vessel. Shipskart SKU codes
+ * are tenant-unique, so every one of these will fail the run's collision guard — the
+ * user should see that up front (with the other vessel named), not item-by-item after
+ * 1,100 attempts. Pure ledger lookup: zero Shipskart calls. Codes are compared in
+ * their SANITIZED form (what the ledger stores as remote_code).
+ */
+export async function findCrossVesselSkuCollisions(
+  vesselId: string,
+  sanitizedCodes: string[],
+): Promise<Array<{ skuCode: string; otherVesselId: string; otherVesselName: string | null }>> {
+  if (!sanitizedCodes.length) return [];
+  const p = await pool();
+  const r = await p.query(
+    `SELECT l.remote_code AS "skuCode", l.vessel_id AS "otherVesselId", v.name AS "otherVesselName"
+       FROM shipskart_catalogue_links l
+       LEFT JOIN vessels v ON v.vuuid = l.vessel_id
+      WHERE l.entity_type='sku' AND l.push_status='pushed'
+        AND l.vessel_id IS DISTINCT FROM $1
+        AND l.remote_code = ANY($2::text[])
+      ORDER BY l.remote_code`,
+    [vesselId, sanitizedCodes],
+  );
+  return r.rows;
+}
+
 /** Per-vessel/per-entity counts for the status console. */
 export async function statusSummary(): Promise<any[]> {
   const p = await pool();
