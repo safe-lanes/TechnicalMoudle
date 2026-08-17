@@ -251,7 +251,7 @@ export async function pushVesselCatalogue(
       const rc = remoteCats.get(catCode);
       if (!rc) { res.products.failed++; res.errors.push(`product ${c.component_code}: category ${catCode} unresolved`); continue; }
       productSpecs.push({
-        localKey: c.cuuid, code: map.sanitizeCode(`${vesselCode}-${c.component_code}`), catCode,
+        localKey: c.cuuid, code: map.productCodeFor(vesselCode, c.component_code), catCode,
         payload: map.buildProductMasterPayload({
           vesselCode, component: { componentCode: c.component_code, name: c.name, maker: c.maker, model: c.model, serialNo: c.serial_no, installationDate: c.installation_date },
           categoryId: rc.id, categoryName: rc.name,
@@ -263,7 +263,7 @@ export async function pushVesselCatalogue(
       const rc = remoteCats.get(code);
       if (!rc) { res.products.failed++; res.errors.push(`stores product for ${cat}: category unresolved`); continue; }
       productSpecs.push({
-        localKey: `STORES:${cat}`, code: map.sanitizeCode(`${vesselCode}-${code}`), catCode: code,
+        localKey: `STORES:${cat}`, code: map.productCodeFor(vesselCode, code), catCode: code,
         payload: map.buildProductMasterPayload({
           vesselCode, component: { componentCode: code, name: `Stores — ${cat}` },
           categoryId: rc.id, categoryName: rc.name,
@@ -353,8 +353,15 @@ export async function pushVesselCatalogue(
         // COLLISION GUARD (mapper contract): same code under another vessel → human, never silent.
         const clash = await links.findSkuCodeOtherVessel(job.skuCode, vesselId);
         if (clash) {
-          await links.markFailed(sl.id, `SKU CODE COLLISION: '${job.skuCode}' already pushed for vessel ${clash.vesselId} — needs human decision`);
-          res.skus.failed++; res.errors.push(`sku ${job.skuCode}: cross-vessel collision`);
+          // SISTER-VESSEL CASE (Jeevan, 17-Aug): the same part code on two vessels is
+          // LEGITIMATE (shared equipment). Shipskart keeps one SKU per code tenant-wide, so
+          // the right action is to LINK the existing SKU into this vessel's catalogue — not
+          // to create it again, and not to refuse. Linking needs the existing SKU's id;
+          // until Shipskart's get-all-spare-parts lookup exists we cannot obtain it, so the
+          // row stays retryable ('failed' + AWAITING-LINK reason) and Retry picks it up once
+          // the lookup is wired. Never 'pushed' (that would attach it to the wrong vessel).
+          await links.markFailed(sl.id, `AWAITING LINK: '${job.skuCode}' already exists on Shipskart for vessel ${clash.vesselId} (sister-vessel share) — will be linked to this vessel once the spare lookup API is available`);
+          res.skus.failed++; res.errors.push(`sku ${job.skuCode}: awaiting link (shared with another vessel)`);
           continue;
         }
         const r = await requestWithBackoff('POST', '/integration/SAIL/create-spare-part', { body: job.buildSku() });
@@ -405,4 +412,30 @@ export async function pushVesselCatalogue(
       });
     }
   }
+}
+
+/**
+ * PRE-FLIGHT (17-Aug, dev round with Jeevan): tell the admin BEFORE the run which of this
+ * vessel's spare/store codes are already pushed for ANOTHER vessel — every one of them
+ * will hit the collision guard. On dev the test vessels are clones of each other (Vessel 5
+ * carried Vessel 2's exact MV0001-* codes), so a second-vessel push failed 1,100 items one
+ * by one with no warning up front. Zero Shipskart calls: our own DB only.
+ */
+export async function preflightVesselCatalogue(vesselId: string): Promise<{
+  collisions: number;
+  byOtherVessel: Array<{ vesselId: string; vesselName: string | null; count: number; sample: string[] }>;
+}> {
+  const pool = await getPool();
+  if (!pool) return { collisions: 0, byOtherVessel: [] };
+  const spares = (await pool.query(`SELECT part_code c FROM spares WHERE vessel_id=$1 AND is_deleted=false`, [vesselId])).rows;
+  const stores = (await pool.query(`SELECT item_code c FROM stores_items WHERE vessel_id=$1 AND deleted IS NOT TRUE`, [vesselId])).rows;
+  const codes = Array.from(new Set([...spares, ...stores].map((r: any) => map.sanitizeCode(r.c)).filter(Boolean)));
+  const hits = await links.findCrossVesselSkuCollisions(vesselId, codes);
+  const grouped = new Map<string, { vesselId: string; vesselName: string | null; count: number; sample: string[] }>();
+  for (const h of hits) {
+    const g = grouped.get(h.otherVesselId) ?? { vesselId: h.otherVesselId, vesselName: h.otherVesselName, count: 0, sample: [] };
+    g.count++; if (g.sample.length < 5) g.sample.push(h.skuCode);
+    grouped.set(h.otherVesselId, g);
+  }
+  return { collisions: hits.length, byOtherVessel: Array.from(grouped.values()).sort((a, b) => b.count - a.count) };
 }

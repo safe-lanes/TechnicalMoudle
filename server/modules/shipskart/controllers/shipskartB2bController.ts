@@ -185,11 +185,15 @@ export async function catalogueVesselStatusHandler(req: AuthenticatedRequest, re
   const links = await import('../repositories/shipskartCatalogueLinkRepository');
   const svc = await import('../services/shipskartCataloguePushService');
   const st = await links.vesselStatus(vesselId);
+  // Pre-flight collision check (17-Aug): shown on the card BEFORE the user presses push —
+  // codes already pushed for another vessel will fail the run's collision guard.
+  const preflight = await svc.preflightVesselCatalogue(vesselId).catch(() => ({ collisions: 0, byOtherVessel: [] }));
   const get = (e: string, s: string) => st.counts.find(c => c.entityType === e && c.pushStatus === s)?.n ?? 0;
   const skuTotal = st.totals.spares + st.totals.stores;
   res.json({
     vesselId,
     running: svc.isCataloguePushRunning(vesselId),
+    preflight,
     totals: { skus: skuTotal, products: st.totals.components, spares: st.totals.spares, stores: st.totals.stores },
     progress: {
       categories: { pushed: get('category', 'pushed'), failed: get('category', 'failed') },

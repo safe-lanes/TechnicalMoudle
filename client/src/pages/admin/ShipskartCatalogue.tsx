@@ -52,6 +52,8 @@ interface VesselStatus {
     catalogue: { pushed: number; failed: number; remaining: number };
   };
   failures: Array<{ entity_type: string; local_key: string; remote_code: string | null; last_error: string | null; updated_at: string }>;
+  /** Pre-flight (17-Aug): this vessel's part codes already pushed for ANOTHER vessel — each will be refused by the collision guard. */
+  preflight?: { collisions: number; byOtherVessel: Array<{ vesselId: string; vesselName: string | null; count: number; sample: string[] }> };
   lastRun: { finishedAt: string; ok: boolean; errors: string[]; warnings: string[] } | null;
 }
 
@@ -249,6 +251,17 @@ export default function ShipskartCatalogue() {
                 <StatBox label="Failed (retryable)" value={s.progress.skus.failed} tone={s.progress.skus.failed ? "warn" : "neutral"} />
                 <StatBox label="Categories / Equipment" value={`${s.progress.categories.pushed} / ${s.progress.products.pushed}`} tone="neutral" />
               </div>
+              {(s.preflight?.collisions ?? 0) > 0 && (
+                <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded p-2">
+                  <AlertTriangle className="h-4 w-4 inline mr-1" />
+                  <b>{s.preflight!.collisions} part code(s) on this vessel already exist on Shipskart under another vessel</b>
+                  {' '}({s.preflight!.byOtherVessel.map(o => `${o.vesselName ?? o.vesselId}: ${o.count}, e.g. ${o.sample.join(', ')}`).join('; ')}).
+                  Shipskart keeps one record per part code across the account, so these will <b>not be created again — they will be linked
+                  to this vessel's catalogue</b> (normal for sister vessels sharing equipment). Linking needs Shipskart's spare lookup API,
+                  which is pending — until it arrives these items stay "awaiting link" and are picked up automatically by
+                  <b> Retry failed &amp; continue</b> once available.
+                </p>
+              )}
               {s.progress.skus.failed > 0 && !s.running && (
                 <p className="text-sm text-amber-700 bg-amber-50 rounded p-2">
                   <AlertTriangle className="h-4 w-4 inline mr-1" />
