@@ -324,7 +324,15 @@ export class WorkOrderService {
                 );
               }
 
-              const completionDate = updatesAny.dateOfCompletion || updatesAny.completionDateTime?.split('T')[0] || new Date().toISOString().split('T')[0];
+              // Task #427: canonicalize to the shared YYYY-MM-DD calendar-day
+              // contract before validation AND the audit write below — this
+              // legacy path previously persisted the raw caller text.
+              const { requireReadingDayInput: reqRhDate, todayReadingDay: todayRhDay } = await import('../modules/running-hours/utils/readingDate');
+              // Absent → today; PRESENT-but-unparseable → reject (never silently 'today').
+              const completionDate =
+                reqRhDate(updatesAny.dateOfCompletion ?? null, 'completion date')
+                || reqRhDate(updatesAny.completionDateTime?.split('T')[0] ?? null, 'completion date')
+                || todayRhDay();
               const validation = await validateRHEntry(component.cuuid, completionDate, runningHours);
 
               updatesAny.completionRHValidationDetails = {
@@ -356,6 +364,13 @@ export class WorkOrderService {
             }
           }
         } catch (err: any) {
+          // Task #427: validation failures (bad RH value, malformed supplied
+          // date) MUST fail the request — silently skipping the snapshot would
+          // accept the update while dropping its RH audit. Only infrastructure
+          // failures of the best-effort audit write are suppressed.
+          if (err instanceof ValidationError || err?.name === 'ValidationError' || err?.code === 'RH_INVALID_READING_DATE') {
+            throw err;
+          }
           console.warn(`⚠️ [Layer 7] RH audit trail creation failed: ${err.message}`);
         }
       }

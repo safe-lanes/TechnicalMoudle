@@ -11,7 +11,14 @@ import {
   useViewModeResolution,
   type ViewModeResolution,
 } from "@/hooks/useViewModeResolution";
-import { secureGetItem, secureClear } from "@/utils/secureStorage";
+import {
+  secureGetItem,
+  secureClear,
+  setLoggedOutMarker,
+  clearLoggedOutMarker,
+  hasLoggedOutMarker,
+} from "@/utils/secureStorage";
+import { isReplit } from "@/lib/env";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 import {
   setActiveRank,
@@ -347,7 +354,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // identity inputs — only the encrypted keys written by the real login
     // flow count. Absent/undecryptable keys fall through to DEFAULT_USER.
 
-    if (!resolvedUser) {
+    // Dev-only fallback (Task #422): the default user exists purely as a
+    // Replit-workspace convenience (VITE_APP_ENV=replit). In production /
+    // SAILERP-hosted / local builds, a missing or cleared profile ALWAYS means
+    // signed out — the token layer (`getAccessToken`) redirects to the parent
+    // app's /login on the first request with no credentials. Inside Replit, an
+    // explicit logout sets a marker that suppresses the fallback so logout
+    // sticks across reloads; fresh dev sessions that never logged in keep it.
+    if (!resolvedUser && isReplit() && !hasLoggedOutMarker()) {
       resolvedUser = DEFAULT_USER;
     }
 
@@ -421,6 +435,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+    // A real login supersedes any prior logout — clear the marker so the
+    // next hydration trusts the freshly stored profile (and, in Replit,
+    // restores the dev fallback convenience).
+    clearLoggedOutMarker();
+
     // View mode resolves reactively from the server via useViewModeResolution
     // once currentUser updates (Task #324) — no synchronous mapping here.
     setCurrentUser(sanitizedUser);
@@ -469,13 +488,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // auth (it currently runs mock auth), also call its server logout endpoint
     // here to invalidate the server session. Today logout is client-side only.
 
-    // Wipe all auth-related localStorage so a reload cannot re-hydrate the
-    // previous user (otherwise AuthContext's mount effect re-authenticates).
+    // Wipe all auth-related storage (localStorage AND sessionStorage — the
+    // token reader checks sessionStorage first, so a leftover `credentials`
+    // blob there would keep authenticating requests after logout). Must run
+    // BEFORE any navigation/refetch so no request re-attaches a stale token.
     secureClear();
-    // secureClear() is localStorage-only, and the capture guard lives in sessionStorage —
-    // which survives logout. Without this the next login in the SAME TAB skips the vessel
-    // capture, so an assignment changed between the two logins never reaches the server.
+    // The capture guard lives in sessionStorage under its own key. Without this
+    // the next login in the SAME TAB skips the vessel capture, so an assignment
+    // changed between the two logins never reaches the server.
     clearVesselCaptureGuard();
+    // Suppress the Replit dev default-user fallback on the next hydration so
+    // an intentional logout sticks across reloads. Cleared by login().
+    setLoggedOutMarker();
 
     setCurrentUser(null);
     setMyVessels([]);
@@ -485,6 +509,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setActiveIdentity(null);
     if (rankChanged) {
       invalidateRankScopedQueries();
+    }
+
+    // Drop ALL cached query data so the next user on this browser never sees
+    // the previous user's screens (rank-scoped invalidation above is not
+    // enough — it only covers rank-scoped keys).
+    queryClient.clear();
+
+    // Navigation: outside Replit, hard-redirect to the parent app's /login
+    // page (same convention as onTokenFailure/ViewModeGate — it is NOT an
+    // in-app route). Inside Replit there is no parent login page; the app
+    // renders its signed-out (no-user) state instead.
+    if (!isReplit() && typeof window !== "undefined") {
+      window.location.assign("/login");
     }
   };
 

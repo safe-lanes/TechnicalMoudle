@@ -18,11 +18,20 @@ export interface RHValidationInput {
   adminOverride?: boolean;
 }
 
+import { parseReadingDayStrict, canonicalizeReadingDateInput } from './readingDate';
+
 const MAX_HOURS_PER_DAY = 25;
 
-function getCalendarDate(dateStr: string): Date {
-  const date = new Date(dateStr);
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+/**
+ * Task #427: calendar-day parse via the SHARED strict parser (no unrestricted
+ * `new Date(str)` — locale text must not shift days by machine timezone).
+ * Returns null for unparseable values; callers decide the fallback.
+ */
+function getCalendarDate(dateStr: string): Date | null {
+  const strict = parseReadingDayStrict(dateStr);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(dateStr);
+  return canonical ? parseReadingDayStrict(canonical) : null;
 }
 
 function getDaysBetweenCalendarDates(date1: Date, date2: Date): number {
@@ -32,8 +41,8 @@ function getDaysBetweenCalendarDates(date1: Date, date2: Date): number {
 
 function formatDMY(dateStr: string): string {
   if (!dateStr) return dateStr;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  const d = getCalendarDate(dateStr);
+  if (!d) return dateStr;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
@@ -52,10 +61,10 @@ export function validateRunningHoursIncrease(
   let daysSinceLastUpdate = 0;
   let sameDayUpdate = false;
 
-  if (componentLastUpdated) {
-    const lastCalendarDate = getCalendarDate(componentLastUpdated);
-    const newCalendarDate = getCalendarDate(newUpdateDate);
+  const lastCalendarDate = componentLastUpdated ? getCalendarDate(componentLastUpdated) : null;
+  const newCalendarDate = getCalendarDate(newUpdateDate);
 
+  if (lastCalendarDate && newCalendarDate) {
     daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
 
     if (daysSinceLastUpdate < 0) {
@@ -73,7 +82,7 @@ export function validateRunningHoursIncrease(
         backdatedLower: requestedIncrease <= 0,
         message: canOverride
           ? 'Sail Admin override applied for backdated running-hours entry.'
-          : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated)}). Running hours can only be recorded on or after the latest reading.`,
+          : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated || '')}). Running hours can only be recorded on or after the latest reading.`,
         requiresAdminOverride: !canOverride
       };
     }
@@ -164,24 +173,15 @@ export function safeParseDate(value: string | Date | null | undefined): Date | n
   }
   const trimmed = String(value).trim();
   if (!trimmed) return null;
-  const d = new Date(trimmed);
-  if (!isNaN(d.getTime())) return d;
-  // Try DD-MMM-YYYY or DD-MMM-YYYY HH:mm
-  const months: Record<string, number> = {
-    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
-  };
-  const match = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
-  if (match) {
-    const [, day, mon, year, hh = '0', mm = '0'] = match;
-    const month = months[mon.toLowerCase()];
-    if (month !== undefined) {
-      const parsed = new Date(
-        parseInt(year), month, parseInt(day),
-        parseInt(hh), parseInt(mm)
-      );
-      return isNaN(parsed.getTime()) ? null : parsed;
-    }
+  // Full ISO timestamps (e.g. "2026-08-05T14:30:00Z", entered_at values) keep
+  // their time-of-day for MAX comparisons; anything else parses to a UTC-day
+  // via the SHARED strict parser (Task #427: no unrestricted `new Date(str)`).
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}/.test(trimmed)) {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return d;
   }
-  return null;
+  const strict = parseReadingDayStrict(trimmed);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(trimmed);
+  return canonical ? parseReadingDayStrict(canonical) : null;
 }

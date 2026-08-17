@@ -337,7 +337,7 @@ export interface IStorage {
   updateMasterRunningHours(params: {
     componentId: string;
     newRHValue: number;
-    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
+    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'WORKORDER';
     userId: string;
     userUuid?: string;
     comments?: string;

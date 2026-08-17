@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { secureGetItem } from "@/utils/secureStorage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,13 +19,22 @@ interface AddCommentModalProps {
 
 export default function AddCommentModal({ open, onClose, requestId }: AddCommentModalProps) {
   const { toast } = useToast();
+  const { currentUser } = useAuth();
+  // Match AuthContext's own session-validity check: requires BOTH encrypted userType
+  // AND a role on the profile to distinguish a real session from the DEFAULT_USER fallback.
+  const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
+  const encryptedUserType = secureGetItem<string>("userType");
+  const hasRealSession = !!(encryptedProfile && encryptedUserType && encryptedProfile?.role);
+  const resolvedUserName = hasRealSession
+    ? (currentUser?.fullName || currentUser?.username || 'Unknown')
+    : 'Unknown';
   const [message, setMessage] = useState("");
 
   const addCommentMutation = useMutation({
     mutationFn: async () => {
       return apiRequest('POST', `/technical/api/change-requests/${requestId}/comments`, {
         message,
-        userId: 'Current User' // In real app, get from auth context
+        userId: resolvedUserName
       });
     },
     onSuccess: () => {
