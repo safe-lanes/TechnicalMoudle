@@ -41215,6 +41215,7 @@ var init_shipskartReconcilerService = __esm({
 var shipskartCatalogueLinkRepository_exports = {};
 __export(shipskartCatalogueLinkRepository_exports, {
   ensurePending: () => ensurePending,
+  findCrossVesselSkuCollisions: () => findCrossVesselSkuCollisions,
   findSkuCodeOtherVessel: () => findSkuCodeOtherVessel,
   getStatusMap: () => getStatusMap,
   markFailed: () => markFailed,
@@ -41313,6 +41314,21 @@ async function findSkuCodeOtherVessel(skuCode, vesselId) {
   );
   return r.rows.length ? rowToLink(r.rows[0]) : null;
 }
+async function findCrossVesselSkuCollisions(vesselId, sanitizedCodes) {
+  if (!sanitizedCodes.length) return [];
+  const p = await pool3();
+  const r = await p.query(
+    `SELECT l.remote_code AS "skuCode", l.vessel_id AS "otherVesselId", v.name AS "otherVesselName"
+       FROM shipskart_catalogue_links l
+       LEFT JOIN vessels v ON v.vuuid = l.vessel_id
+      WHERE l.entity_type='sku' AND l.push_status='pushed'
+        AND l.vessel_id IS DISTINCT FROM $1
+        AND l.remote_code = ANY($2::text[])
+      ORDER BY l.remote_code`,
+    [vesselId, sanitizedCodes]
+  );
+  return r.rows;
+}
 async function statusSummary() {
   const p = await pool3();
   const r = await p.query(
@@ -41382,6 +41398,13 @@ function getReferenceIds() {
     packTypeName: null
   };
 }
+function fitProductCode(fullSanitized) {
+  if (fullSanitized.length <= PRODUCT_CODE_MAX) return fullSanitized;
+  let h = 0;
+  for (let i = 0; i < fullSanitized.length; i++) h = h * 31 + fullSanitized.charCodeAt(i) >>> 0;
+  const tag = h.toString(36).toUpperCase().padStart(7, "0").slice(-7);
+  return `${fullSanitized.slice(0, PRODUCT_CODE_MAX - 8)}-${tag}`.replace(/-+/g, "-");
+}
 function deriveCodeChain(componentCode) {
   const code = String(componentCode || "").trim();
   if (!code) return [];
@@ -41434,8 +41457,8 @@ function buildProductMasterPayload(opts) {
   const displayName = (opts.nameStyle ?? "coded") === "coded" ? codedName(c.componentCode, c.name) : c.name;
   return {
     data: {
-      productCode: sanitizeCode(`${opts.vesselCode}-${c.componentCode}`),
-      // COLLISION SAFETY: see header; charset per their validation
+      productCode: productCodeFor(opts.vesselCode, c.componentCode),
+      // COLLISION SAFETY: see header; charset + 50-char cap per their validation
       name: displayName,
       categoryId: opts.categoryId,
       categoryName: opts.categoryName,
@@ -41551,12 +41574,17 @@ function buildCatalogueAddPayload(opts) {
     }
   };
 }
-var sanitizeCode, slugify, codedName, yearFromInstallationDate, padCategoryCode;
+var sanitizeCode, PRODUCT_CODE_MAX, productCodeFor, slugify, codedName, yearFromInstallationDate, padCategoryCode;
 var init_shipskartCatalogueMapper = __esm({
   "server/modules/shipskart/services/shipskartCatalogueMapper.ts"() {
     "use strict";
     sanitizeCode = (s) => String(s || "").toUpperCase().trim().replace(/[^A-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-    slugify = (s) => String(s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    PRODUCT_CODE_MAX = 50;
+    productCodeFor = (vesselCode, componentCode) => fitProductCode(sanitizeCode(`${vesselCode}-${componentCode}`));
+    slugify = (s) => {
+      const base = String(s || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80).replace(/^-+|-+$/g, "");
+      return base || "item";
+    };
     codedName = (code, name) => name ? `${code} - ${name}` : code;
     yearFromInstallationDate = (v) => {
       const m = /(\d{4})(?!.*\d{4})/.exec(String(v ?? ""));
@@ -41571,6 +41599,7 @@ var shipskartCataloguePushService_exports = {};
 __export(shipskartCataloguePushService_exports, {
   getLastRunInfo: () => getLastRunInfo,
   isCataloguePushRunning: () => isCataloguePushRunning,
+  preflightVesselCatalogue: () => preflightVesselCatalogue,
   pushVesselCatalogue: () => pushVesselCatalogue
 });
 async function requestWithBackoff(method, path14, opts) {
@@ -41782,7 +41811,7 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       }
       productSpecs.push({
         localKey: c.cuuid,
-        code: sanitizeCode(`${vesselCode}-${c.component_code}`),
+        code: productCodeFor(vesselCode, c.component_code),
         catCode,
         payload: buildProductMasterPayload({
           vesselCode,
@@ -41802,7 +41831,7 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       }
       productSpecs.push({
         localKey: `STORES:${cat}`,
-        code: sanitizeCode(`${vesselCode}-${code}`),
+        code: productCodeFor(vesselCode, code),
         catCode: code,
         payload: buildProductMasterPayload({
           vesselCode,
@@ -41895,9 +41924,9 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       if (sl.pushStatus !== "pushed") {
         const clash = await findSkuCodeOtherVessel(job.skuCode, vesselId);
         if (clash) {
-          await markFailed(sl.id, `SKU CODE COLLISION: '${job.skuCode}' already pushed for vessel ${clash.vesselId} \u2014 needs human decision`);
+          await markFailed(sl.id, `AWAITING LINK: '${job.skuCode}' already exists on Shipskart for vessel ${clash.vesselId} (sister-vessel share) \u2014 will be linked to this vessel once the spare lookup API is available`);
           res.skus.failed++;
-          res.errors.push(`sku ${job.skuCode}: cross-vessel collision`);
+          res.errors.push(`sku ${job.skuCode}: awaiting link (shared with another vessel)`);
           continue;
         }
         const r = await requestWithBackoff("POST", "/integration/SAIL/create-spare-part", { body: job.buildSku() });
@@ -41966,6 +41995,22 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       });
     }
   }
+}
+async function preflightVesselCatalogue(vesselId) {
+  const pool4 = await getPool();
+  if (!pool4) return { collisions: 0, byOtherVessel: [] };
+  const spares2 = (await pool4.query(`SELECT part_code c FROM spares WHERE vessel_id=$1 AND is_deleted=false`, [vesselId])).rows;
+  const stores = (await pool4.query(`SELECT item_code c FROM stores_items WHERE vessel_id=$1 AND deleted IS NOT TRUE`, [vesselId])).rows;
+  const codes = Array.from(new Set([...spares2, ...stores].map((r) => sanitizeCode(r.c)).filter(Boolean)));
+  const hits = await findCrossVesselSkuCollisions(vesselId, codes);
+  const grouped = /* @__PURE__ */ new Map();
+  for (const h of hits) {
+    const g = grouped.get(h.otherVesselId) ?? { vesselId: h.otherVesselId, vesselName: h.otherVesselName, count: 0, sample: [] };
+    g.count++;
+    if (g.sample.length < 5) g.sample.push(h.skuCode);
+    grouped.set(h.otherVesselId, g);
+  }
+  return { collisions: hits.length, byOtherVessel: Array.from(grouped.values()).sort((a, b) => b.count - a.count) };
 }
 var PACE_MS, sleep, inFlight, lastRunByVessel, zero, isDuplicateAnswer;
 var init_shipskartCataloguePushService = __esm({
@@ -83950,11 +83995,13 @@ async function catalogueVesselStatusHandler(req, res) {
   const links = await Promise.resolve().then(() => (init_shipskartCatalogueLinkRepository(), shipskartCatalogueLinkRepository_exports));
   const svc = await Promise.resolve().then(() => (init_shipskartCataloguePushService(), shipskartCataloguePushService_exports));
   const st = await links.vesselStatus(vesselId);
+  const preflight = await svc.preflightVesselCatalogue(vesselId).catch(() => ({ collisions: 0, byOtherVessel: [] }));
   const get = (e, s) => st.counts.find((c) => c.entityType === e && c.pushStatus === s)?.n ?? 0;
   const skuTotal = st.totals.spares + st.totals.stores;
   res.json({
     vesselId,
     running: svc.isCataloguePushRunning(vesselId),
+    preflight,
     totals: { skus: skuTotal, products: st.totals.components, spares: st.totals.spares, stores: st.totals.stores },
     progress: {
       categories: { pushed: get("category", "pushed"), failed: get("category", "failed") },
