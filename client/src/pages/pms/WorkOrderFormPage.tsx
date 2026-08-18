@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown, ChevronsUpDown, ListChecks, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown, ChevronsUpDown, ListChecks, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
@@ -91,7 +91,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 }) => {
   const { toast } = useToast();
   const { vesselId: contextVesselId, vessels } = useVessel();
-  const { isVessel } = useUIRole();
+  const { isVessel, isSailAdmin, isClientAdmin } = useUIRole();
   const [location, navigate] = useLocation();
   const [, params] = useRoute("/pms/work-order/:id");
   const [, newParams] = useRoute("/pms/work-order/new/:componentId");
@@ -553,6 +553,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // the server returns RH_OVERRIDE_REQUIRED. A Sail Admin (canOverride) can re-approve with the
   // override flag; anyone else just sees the reason.
   const [rhOverridePrompt, setRhOverridePrompt] = useState<{ message: string; canOverride: boolean } | null>(null);
+  // Part B office edit mode — Office users can edit B1/B2 while WO is Pending Approval
+  // B4 (consumedSpareParts) is excluded: inventory transactions were already applied at
+  // submission and editing them here would bypass the consumption-delta reversal logic.
+  const [partBEditMode, setPartBEditMode] = useState(false);
+  const [savedExecutionDataForCancel, setSavedExecutionDataForCancel] = useState<any>(null);
+  const [isSavingPartB, setIsSavingPartB] = useState(false);
   const [skippedCyclesJustification, setSkippedCyclesJustification] = useState('');
   const [ceApprovalRemarks, setCeApprovalRemarks] = useState('');
   // Company approval policy — the approval section renders the EFFECTIVE tier
@@ -599,7 +605,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const isReopenedWO = !!(context?.workOrder?.wasReopened === true && currentWorkOrderStatus !== 'Completed' && currentWorkOrderStatus !== 'Pending Approval');
   const isRejectedWO = !!(context?.workOrder?.wasRejected === true && currentWorkOrderStatus !== 'Completed' && currentWorkOrderStatus !== 'Pending Approval') || isReopenedWO;
 
-  const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' || (currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO);
+  // Office/PMS Admin/Sail Admin can toggle Part B into edit mode while Pending Approval.
+  // Eligible roles mirror the backend allowlist exactly: isSailAdmin (Sail Admin) and
+  // isClientAdmin (PMS Admin + regular Office users). Tech_Superintendent ('Admin' role)
+  // and all Vessel roles are excluded — the backend enforces the same boundary.
+  // Superintendent-locked WOs stay fully locked (approver action required first).
+  const canOfficeEditPartB = (isSailAdmin || isClientAdmin) && !embedded &&
+    currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO &&
+    context?.workOrder?.approvalTier !== 'superintendent_locked';
+
+  const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' ||
+    (currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO && !partBEditMode);
+
+  // B3 Running Hours stays locked even while partBEditMode is active — these fields
+  // drive the delta cascade applied to all child components at approval time. Editing
+  // them post-submission risks corrupting component RH records.
+  const isB3EditLocked = partBEditMode && currentWorkOrderStatus === 'Pending Approval';
 
   useEffect(() => {
     if (
@@ -3200,6 +3221,69 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
+  // ── Part B Office Edit Handlers ────────────────────────────────────────────
+
+  const handleStartPartBEdit = () => {
+    setSavedExecutionDataForCancel({ ...executionData });
+    setPartBEditMode(true);
+  };
+
+  const handleCancelPartBEdit = () => {
+    if (savedExecutionDataForCancel) {
+      setExecutionData(savedExecutionDataForCancel);
+    }
+    setPartBEditMode(false);
+    setSavedExecutionDataForCancel(null);
+  };
+
+  const handleSavePartBEdit = async () => {
+    if (!workOrderId) return;
+    setIsSavingPartB(true);
+    try {
+      const payload: Record<string, unknown> = {
+        // B1 — Risk Assessment, Checklists & Records
+        riskAssessmentStatus: executionData.riskAssessment || '',
+        safetyChecklistsStatus: executionData.safetyChecklists || '',
+        operationalFormsStatus: executionData.operationalForms || '',
+        uploadedDocuments: executionData.uploadedDocuments || [],
+        // B2 — Work Details
+        startDateTime: executionData.startDateTime || '',
+        completionDateTime: executionData.completionDateTime || '',
+        executionAssignedTo: executionData.executionAssignedTo || '',
+        performedBy: executionData.performedBy || '',
+        noOfPersons: executionData.noOfPersons || '',
+        totalTimeHours: executionData.totalTimeHours || '',
+        manhours: executionData.manhours || '',
+        workCarriedOut: executionData.workCarriedOut || '',
+        jobExperienceNotes: executionData.jobExperienceNotes || '',
+        remarks: executionData.remarks || '',
+        completionRemarks: executionData.completionRemarks || '',
+        // B4 (consumedSpareParts) intentionally excluded: inventory transactions were
+        // already applied when the WO was submitted. Editing them here without the
+        // full consumption-delta + _deductedQty reversal would corrupt stock balances.
+        // Scoped edit marker — backend enforces the field whitelist
+        partBOfficeEdit: true,
+      };
+      await apiRequest('PATCH', `/technical/api/work-orders/${workOrderId}`, payload);
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
+      toast({ title: 'Part B Updated', description: 'Work completion details saved successfully.' });
+      setPartBEditMode(false);
+      setSavedExecutionDataForCancel(null);
+    } catch (error: any) {
+      toast({
+        title: 'Save Failed',
+        description: error.message || 'Failed to save Part B changes.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingPartB(false);
+    }
+  };
+
+  // ── End Part B Office Edit Handlers ────────────────────────────────────────
+
   const [isDraftSaving, setIsDraftSaving] = useState(false);
 
   const isExistingDraftUnplanned = !isUnplannedCreate && workOrderType === 'Unplanned' && currentWorkOrderStatus === 'Draft';
@@ -5446,13 +5530,53 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             <>
             <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
               <div data-testid="WOF.B"><Marker id="WOF.B" /></div>
-              <PartHeader
-                id="part-b"
-                label="Part B"
-                title="Work Completion Record"
-                description="Enter work completion details here including Risk assessment, checklists, comments etc."
-                variant="inline"
-              />
+              <div className="flex items-start justify-between gap-4">
+                <PartHeader
+                  id="part-b"
+                  label="Part B"
+                  title="Work Completion Record"
+                  description="Enter work completion details here including Risk assessment, checklists, comments etc."
+                  variant="inline"
+                />
+                {canOfficeEditPartB && !partBEditMode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleStartPartBEdit}
+                    className="shrink-0 mt-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+                    data-testid="button-edit-partb"
+                  >
+                    <Edit2 className="h-4 w-4 mr-1" />
+                    Edit Part B
+                  </Button>
+                )}
+                {canOfficeEditPartB && partBEditMode && (
+                  <div className="flex gap-2 shrink-0 mt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelPartBEdit}
+                      disabled={isSavingPartB}
+                      data-testid="button-cancel-partb-edit"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSavePartBEdit}
+                      disabled={isSavingPartB}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      data-testid="button-save-partb-edit"
+                    >
+                      {isSavingPartB
+                        ? <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        : <Check className="h-4 w-4 mr-1" />}
+                      Save
+                    </Button>
+                  </div>
+                )}
+              </div>
 
           {/* B1. Risk Assessment, Checklists & Records */}
           <div data-testid="WOF.B1.1"><Marker id="WOF.B1.1" /></div>
@@ -5822,13 +5946,27 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       : (executionData.currentReading || '');
                     return (
                       <div className="space-y-2">
-                        <Label className="text-sm text-[#8798ad]" data-testid="label-wo-completion-rh">WO Completion RH</Label>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-[#8798ad]" data-testid="label-wo-completion-rh">WO Completion RH</Label>
+                          {isB3EditLocked && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Lock className="h-3.5 w-3.5 text-amber-500 cursor-default" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-xs text-xs">WO Completion RH cannot be edited after submission — it drives the next scheduled RH cycle.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                         <Input
                           type="number"
                           min="0"
                           value={woRhValue}
                           onChange={(e) => handleExecutionChange('woCompletionRh', e.target.value)}
-                          disabled={isPartBReadOnly}
+                          disabled={isPartBReadOnly || isB3EditLocked}
                           className="text-sm"
                           placeholder="RH at completion (prefilled from Current Reading)"
                           data-testid="input-wo-completion-rh"
@@ -6075,6 +6213,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             title="Running Hours"
             variant="inline"
           >
+            {isB3EditLocked && (
+              <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Running Hours cannot be edited after submission — changes would affect the child component RH cascade at approval.</span>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.3"><Marker id="WOF.B3.3" />Previous reading</Label>
@@ -6137,7 +6281,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     min="0"
                     value={executionData.currentReading}
                     onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
-                    disabled={isPartBReadOnly}
+                    disabled={isPartBReadOnly || isB3EditLocked}
                     className={`text-sm flex-1 ${
                       rhValidation.status === 'valid' ? 'border-green-400 focus:ring-green-400' :
                       rhValidation.status === 'invalid' ? 'border-red-400 focus:ring-red-400' :
@@ -6146,7 +6290,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     }`}
                     data-testid="WOF.B3.6"
                   />
-                  {!isPartBReadOnly && (
+                  {!isPartBReadOnly && !isB3EditLocked && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -6171,7 +6315,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     value={executionData.currentReadingDate || new Date().toISOString().split('T')[0]}
                     max={new Date().toISOString().split('T')[0]}
                     onChange={(e) => handleExecutionChange('currentReadingDate', e.target.value)}
-                    disabled={isPartBReadOnly}
+                    disabled={isPartBReadOnly || isB3EditLocked}
                     className="text-sm"
                     data-testid="input-current-reading-date"
                   />
@@ -6342,14 +6486,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             title="Spare Parts Consumed"
             variant="inline"
           >
-            <div className="space-y-3">
+            {isB3EditLocked && (
+              <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Spare parts consumed cannot be edited after submission — changes to consumed quantities require the work order to be rejected and resubmitted so inventory balances are correctly recalculated.</span>
+              </div>
+            )}
+            {/* When Part B is in office-edit mode, B4 inputs are non-interactive.
+                All qty/location/comments controls inside use disabled={isReadOnly},
+                and isReadOnly is false for Pending Approval — so we overlay a
+                pointer-events-none wrapper to prevent any interaction. */}
+            <div className={`space-y-3${isB3EditLocked ? ' pointer-events-none opacity-60 select-none' : ''}`}>
               <div className="flex justify-end">
                 {!isReadOnly && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleOpenSparePartsModal}
-                  disabled={isPartBReadOnly}
+                  disabled={isPartBReadOnly || isB3EditLocked}
                   data-testid="WOF.B4.10"
                 >
                   <Marker id="WOF.B4.10" />
@@ -6540,7 +6694,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                disabled={isPartBReadOnly || consumedIndex < 0}
+                                disabled={isPartBReadOnly || isB3EditLocked || consumedIndex < 0}
                                 onClick={() => {
                                   setExecutionData(prev => ({
                                     ...prev,
@@ -6779,7 +6933,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  disabled={isPartBReadOnly}
+                                  disabled={isPartBReadOnly || isB3EditLocked}
                                   onClick={() => handleDeleteConsumedSparePart(actualIndex)}
                                   title="Remove spare part"
                                   aria-label="Remove spare part"

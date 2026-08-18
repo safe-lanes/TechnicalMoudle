@@ -973,6 +973,101 @@ export async function updateWorkOrder(id: string, body: any) {
     throw new NotFoundError('Work order not found');
   }
 
+  // ── Part B Office Edit (Pending Approval) ──────────────────────────────────
+  // Office/PMS Admin/Sail Admin can correct B1/B2/B4 fields while a WO awaits
+  // approval. B3 Running Hours are EXPLICITLY BLOCKED — they drive the delta
+  // cascade applied to all child components at approval time; editing them
+  // post-submission risks corrupting component RH records.
+  if (body.partBOfficeEdit === true) {
+    if (existingWO.status !== 'Pending Approval') {
+      throw new ValidationError('Part B office edit is only permitted when the work order is in Pending Approval status.');
+    }
+    // Role check — explicitly allowlist eligible office roles. body.userRole is set
+    // server-side by the controller from the authenticated session; the client cannot spoof it.
+    const PART_B_EDIT_ALLOWED_ROLES = ['Office', 'PMS Admin', 'Sail Admin'];
+    if (!PART_B_EDIT_ALLOWED_ROLES.includes(body.userRole)) {
+      throw new ValidationError('Only Office, PMS Admin, or Sail Admin users can edit Part B on a Pending Approval work order.');
+    }
+    // Superintendent-locked WOs cannot be edited via this path — the lock requires
+    // the superintendent to act first. Hiding the button in the UI is not sufficient;
+    // the server must enforce this so direct PATCH calls cannot bypass the lock.
+    if (existingWO.approvalTier === 'superintendent_locked') {
+      throw new ValidationError('This work order is superintendent-locked. The superintendent must act on it before Part B can be edited.');
+    }
+    // B3 Running Hours fields — explicitly blocked (delta cascade risk)
+    const B3_FIELDS = ['runningHours', 'previousReading', 'runningHoursDifference', 'readingDate', 'currentReadingDate', 'currentReading'];
+    // Approval/workflow fields — must never change through this path
+    const PROTECTED_FIELDS = ['status', 'approvalAction', 'approvalDate', 'submittedDate', 'rhSyncedAt', 'wasRejected', 'approvalTier', 'rejectionComments', 'missedCycles', 'dateCompleted', 'isDeleted'];
+    const attempted = Object.keys(body);
+    const blockedB3 = attempted.filter((f: string) => B3_FIELDS.includes(f));
+    const blockedProtected = attempted.filter((f: string) => PROTECTED_FIELDS.includes(f));
+    if (blockedB3.length > 0 || blockedProtected.length > 0) {
+      throw new ValidationError(
+        `Part B office edit cannot modify: ${[...blockedB3, ...blockedProtected].join(', ')}. Running Hours and approval fields are protected.`
+      );
+    }
+    // Whitelist: only B1/B2/B4 fields and controller-injected audit fields
+    // B4 (consumedSpareParts) is intentionally excluded: those inventory transactions
+    // were already applied when the WO was submitted. Editing quantities/locations here
+    // without running the full consumption-delta + _deductedQty reversal logic would
+    // corrupt stock balances. B4 changes must go through the normal Pending→Rejected→
+    // Resubmit cycle so the inventory reconciliation path runs correctly.
+    const ALLOWED_FIELDS = new Set([
+      // B1 — Risk Assessment, Checklists & Records
+      'riskAssessmentStatus', 'safetyChecklistsStatus', 'operationalFormsStatus',
+      'uploadedDocuments',
+      // B2 — Work Execution Details
+      'startDateTime', 'completionDateTime', 'executionAssignedTo', 'performedBy',
+      'noOfPersons', 'totalTimeHours', 'manhours', 'workCarriedOut', 'jobExperienceNotes',
+      'remarks', 'completionRemarks',
+      // controller-injected fields (safe, set server-side)
+      'userId', 'userRole', 'userUuid',
+    ]);
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (key === 'partBOfficeEdit') continue; // strip the marker
+      if (ALLOWED_FIELDS.has(key)) updateData[key] = value;
+    }
+    console.log(`📝 Part B office edit — WO ${existingWO.workOrderNo}: updating [${Object.keys(updateData).filter(k => !['userId','userRole','userUuid'].includes(k)).join(', ')}]`);
+    // updatedAt is set automatically by the Drizzle .$onUpdateFn on the column,
+    // ensuring shore's edit wins over any in-flight ship sync for the same fields.
+    const workOrder = await repo.update(id, updateData);
+    return workOrder;
+  }
+  // ── End Part B Office Edit ─────────────────────────────────────────────────
+
+  // ── Pending Approval Field Guard (general PATCH path) ─────────────────────
+  // B3 Running Hours, B4 consumed spares, and explicit status transitions are
+  // blocked on the generic PATCH path for Pending Approval WOs. This guard runs
+  // regardless of what the client sends — partBOfficeEdit already returned above,
+  // and approvalAction routes through the explicit approval flow further below.
+  //
+  // Ship users also land here (no early-return) and are subject to the same guard,
+  // meaning they cannot re-write RH or spare fields once submitted.
+  //
+  // Sync engine operations use oneWayApplier.ts and bypass updateWorkOrder entirely,
+  // so bidirectional sync for other fields is not affected.
+  if (existingWO.status === 'Pending Approval' && !body.approvalAction && !body.partBOfficeEdit) {
+    const PENDING_APPROVAL_BLOCKED_FIELDS = [
+      // B3 Running Hours — drive the delta cascade at approval; immutable post-submission
+      'runningHours', 'previousReading', 'runningHoursDifference',
+      'readingDate', 'currentReadingDate', 'currentReading', 'woCompletionRh',
+      // B4 Consumed Spare Parts — inventory already applied; reversal requires reject/resubmit
+      'consumedSpareParts',
+      // Status transitions must use explicit approval actions, not raw field writes
+      'status', 'approvalDate', 'submittedDate', 'approvalTier',
+    ];
+    const attempted = Object.keys(body).filter((k: string) => PENDING_APPROVAL_BLOCKED_FIELDS.includes(k));
+    if (attempted.length > 0) {
+      console.warn(`⚠️ Blocked attempt to modify protected fields on Pending Approval WO ${existingWO.workOrderNo}: ${attempted.join(', ')}`);
+      throw new ValidationError(
+        `Cannot modify [${attempted.join(', ')}] on a Pending Approval work order. ` +
+        `Running Hours and consumed spare parts are locked until the work order is approved or rejected.`
+      );
+    }
+  }
+  // ── End Pending Approval Field Guard ──────────────────────────────────────
+
   // Check if WO is completed - if so, only allow limited updates
   const { isCompletedStatus } = await import('../../../utils/workOrderStatus');
   const woIsCompleted = isCompletedStatus(existingWO.status);
