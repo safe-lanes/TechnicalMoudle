@@ -251,16 +251,6 @@ export default function ShipskartCatalogue() {
                 <StatBox label="Failed (retryable)" value={s.progress.skus.failed} tone={s.progress.skus.failed ? "warn" : "neutral"} />
                 <StatBox label="Categories / Equipment" value={`${s.progress.categories.pushed} / ${s.progress.products.pushed}`} tone="neutral" />
               </div>
-              {(s.preflight?.collisions ?? 0) > 0 && (
-                <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded p-2">
-                  <AlertTriangle className="h-4 w-4 inline mr-1" />
-                  <b>{s.preflight!.collisions} part code(s) on this vessel already exist on Shipskart under another vessel</b>
-                  {' '}({s.preflight!.byOtherVessel.map(o => `${o.vesselName ?? o.vesselId}: ${o.count}, e.g. ${o.sample.join(', ')}`).join('; ')}).
-                  Shipskart keeps one record per part code across the account, so these will <b>not be created again — the existing
-                  record will be linked to this vessel's catalogue</b> (normal for sister vessels sharing equipment). This happens
-                  automatically during the push; the vessel that first pushed the code keeps its record, this vessel gets a link to it.
-                </p>
-              )}
               {s.progress.skus.failed > 0 && !s.running && (
                 <p className="text-sm text-amber-700 bg-amber-50 rounded p-2">
                   <AlertTriangle className="h-4 w-4 inline mr-1" />
