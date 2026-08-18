@@ -6949,29 +6949,131 @@ var init_requestContext = __esm({
   }
 });
 
+// server/modules/running-hours/utils/readingDate.ts
+var readingDate_exports = {};
+__export(readingDate_exports, {
+  InvalidReadingDateError: () => InvalidReadingDateError,
+  canonicalReadingDay: () => canonicalReadingDay,
+  canonicalizeReadingDateInput: () => canonicalizeReadingDateInput,
+  formatReadingDay: () => formatReadingDay,
+  parseReadingDayStrict: () => parseReadingDayStrict,
+  requireReadingDayInput: () => requireReadingDayInput,
+  todayReadingDay: () => todayReadingDay
+});
+function daysInMonth(yearNum, monthIdx) {
+  return new Date(Date.UTC(yearNum, monthIdx + 1, 0)).getUTCDate();
+}
+function utcDay(y, mIdx, d) {
+  if (mIdx < 0 || mIdx > 11) return null;
+  if (d < 1 || d > daysInMonth(y, mIdx)) return null;
+  return new Date(Date.UTC(y, mIdx, d));
+}
+function parseReadingDayStrict(value) {
+  if (value === null || value === void 0) return null;
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  }
+  const str = String(value).trim();
+  if (!str) return null;
+  const iso = str.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})/);
+  if (iso) {
+    return utcDay(parseInt(iso[1], 10), parseInt(iso[2], 10) - 1, parseInt(iso[3], 10));
+  }
+  const legacy = str.match(
+    /^([0-9]{1,2})[-\s]+([A-Za-z]{3,})[-\s]+([0-9]{4})(?:[-\s]+([0-9]{1,2}):([0-9]{1,2}))?/
+  );
+  if (legacy) {
+    const monthIdx = MONTH_INDEX[legacy[2].slice(0, 3).toLowerCase()];
+    if (monthIdx === void 0) return null;
+    if (legacy[4] !== void 0) {
+      const hh = parseInt(legacy[4], 10);
+      const mi = parseInt(legacy[5], 10);
+      if (hh > 23 || mi > 59) return null;
+    }
+    return utcDay(parseInt(legacy[3], 10), monthIdx, parseInt(legacy[1], 10));
+  }
+  return null;
+}
+function formatReadingDay(d) {
+  return d.toISOString().slice(0, 10);
+}
+function canonicalReadingDay(value) {
+  const d = parseReadingDayStrict(value);
+  return d ? formatReadingDay(d) : null;
+}
+function canonicalizeReadingDateInput(value) {
+  const strict = canonicalReadingDay(value);
+  if (strict) return strict;
+  if (typeof value !== "string") return null;
+  const m = value.trim().match(/^([0-9]{1,2})[-\/]([0-9]{1,2})[-\/]([0-9]{4})/);
+  if (m) {
+    const d = utcDay(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+    return d ? formatReadingDay(d) : null;
+  }
+  return null;
+}
+function todayReadingDay() {
+  return formatReadingDay(/* @__PURE__ */ new Date());
+}
+function requireReadingDayInput(value, field = "reading date") {
+  if (value === null || value === void 0) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const canonical = canonicalizeReadingDateInput(value);
+  if (!canonical) throw new InvalidReadingDateError(value, field);
+  return canonical;
+}
+var MONTH_INDEX, InvalidReadingDateError;
+var init_readingDate = __esm({
+  "server/modules/running-hours/utils/readingDate.ts"() {
+    "use strict";
+    MONTH_INDEX = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11
+    };
+    InvalidReadingDateError = class extends Error {
+      status = 400;
+      code = "RH_INVALID_READING_DATE";
+      constructor(value, field = "reading date") {
+        super(`Invalid ${field} "${String(value)}". Use a real calendar date (e.g. ${todayReadingDay()}).`);
+        this.name = "ValidationError";
+      }
+    };
+  }
+});
+
 // server/modules/running-hours/rhEventComparator.ts
 var rhEventComparator_exports = {};
 __export(rhEventComparator_exports, {
+  RH_GUARD_STRIP_COLUMNS: () => RH_GUARD_STRIP_COLUMNS,
   applyWinningRhToComponent: () => applyWinningRhToComponent,
   claimWoRhSync: () => claimWoRhSync,
   compareRhEvents: () => compareRhEvents,
   effectiveReadingDay: () => effectiveReadingDay,
+  incomingRhStamp: () => incomingRhStamp,
+  localRhClaimDay: () => localRhClaimDay,
   originRank: () => originRank,
   parseReadingDay: () => parseReadingDay,
   releaseWoRhSync: () => releaseWoRhSync,
   resolveRhBaselineDay: () => resolveRhBaselineDay,
-  selectWinningRhEvent: () => selectWinningRhEvent
+  selectWinningRhEvent: () => selectWinningRhEvent,
+  selfHealInheritedRhCaches: () => selfHealInheritedRhCaches,
+  selfHealRhComponents: () => selfHealRhComponents,
+  shouldStripIncomingRh: () => shouldStripIncomingRh
 });
 function parseReadingDay(dateStr) {
   if (!dateStr) return null;
-  const m = String(dateStr).match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})/);
-  if (m) {
-    const d = new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
-    return isNaN(d.getTime()) ? null : d;
-  }
-  const p = new Date(String(dateStr));
-  if (isNaN(p.getTime())) return null;
-  return new Date(Date.UTC(p.getUTCFullYear(), p.getUTCMonth(), p.getUTCDate()));
+  return parseReadingDayStrict(String(dateStr));
 }
 function originRank(originSide) {
   const o = (originSide || "").toLowerCase();
@@ -6992,6 +7094,9 @@ function effectiveReadingDay(e) {
   return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
 }
 function compareRhEvents(a, b) {
+  const pa = parseReadingDay(a.dateUpdatedLocal);
+  const pb = parseReadingDay(b.dateUpdatedLocal);
+  if (!!pa !== !!pb) return pa ? 1 : -1;
   const da = effectiveReadingDay(a)?.getTime() ?? -Infinity;
   const db2 = effectiveReadingDay(b)?.getTime() ?? -Infinity;
   if (da !== db2) return da - db2 > 0 ? 1 : -1;
@@ -7002,6 +7107,18 @@ function compareRhEvents(a, b) {
   const eb = enteredAtMs(b);
   if (ea !== eb) return ea - eb > 0 ? 1 : -1;
   return a.rhauuid > b.rhauuid ? 1 : -1;
+}
+function incomingRhStamp(row) {
+  return row["rh_master_updated_at"] ?? row["rhMasterUpdatedAt"] ?? row["rh_inherited_updated_at"] ?? row["rhInheritedUpdatedAt"] ?? row["last_updated"] ?? row["lastUpdated"];
+}
+function localRhClaimDay(winnerDay, localCacheStampRaw) {
+  const cacheDay = localCacheStampRaw ? parseReadingDay(String(localCacheStampRaw instanceof Date ? localCacheStampRaw.toISOString() : localCacheStampRaw)) : null;
+  if (winnerDay && cacheDay) return winnerDay.getTime() >= cacheDay.getTime() ? winnerDay : cacheDay;
+  return winnerDay ?? cacheDay ?? null;
+}
+function shouldStripIncomingRh(incomingStampRaw, localWinnerDay) {
+  const incomingDay = incomingStampRaw ? parseReadingDay(String(incomingStampRaw instanceof Date ? incomingStampRaw.toISOString() : incomingStampRaw)) : null;
+  return !incomingDay || incomingDay.getTime() <= localWinnerDay.getTime();
 }
 async function latestRotationDay(conn, componentId) {
   try {
@@ -7023,9 +7140,7 @@ async function selectWinningRhEvent(conn, componentId) {
   const params = [componentId];
   let rotClause = "";
   if (rotDay) {
-    rotClause = ` AND (CASE WHEN date_updated_local ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                        THEN substring(date_updated_local from 1 for 10)::date
-                        ELSE entered_at_utc::date END) >= $2::date`;
+    rotClause = ` AND ${READING_DAY_SQL} >= $2::date`;
     params.push(rotDay.toISOString().split("T")[0]);
   }
   const r = await conn.query(
@@ -7033,9 +7148,8 @@ async function selectWinningRhEvent(conn, componentId) {
        FROM running_hours_audit
       WHERE component_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
         AND (cumulative_rh IS NOT NULL OR new_rh IS NOT NULL)${rotClause}
-      ORDER BY (CASE WHEN date_updated_local ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                  THEN substring(date_updated_local from 1 for 10)::date
-                  ELSE entered_at_utc::date END) DESC,
+      ORDER BY ${PARSED_DAY_SQL} DESC NULLS LAST,
+               ${READING_DAY_SQL} DESC,
                (CASE WHEN lower(origin_side) = 'ship' THEN 0 WHEN origin_side IS NULL OR origin_side = '' THEN 1 ELSE 2 END) ASC,
                entered_at_utc DESC,
                rhauuid DESC
@@ -7059,15 +7173,191 @@ async function selectWinningRhEvent(conn, componentId) {
 async function applyWinningRhToComponent(conn, componentId, context) {
   const winner = await selectWinningRhEvent(conn, componentId);
   if (!winner) return false;
-  const lastUpdatedText = winner.dateUpdatedLocal || winner.readingDay.toISOString();
-  await conn.query(
-    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1,
-        rh_master_updated_at = $2, last_updated = $3, updated_at = NOW()
-      WHERE cuuid = $4`,
-    [winner.rh.toFixed(2), winner.readingDay, lastUpdatedText, componentId]
-  );
-  console.log(`[RH-Derive:${context}] component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
+  const lastUpdatedText = canonicalReadingDay(winner.dateUpdatedLocal) || formatReadingDay(winner.readingDay);
+  let comp = null;
+  try {
+    const c = await conn.query(
+      `SELECT id, rh_counter_type, rh_master_component_id, rh_counter_source,
+              meter_replaced_last_rh, component_code, vessel_id,
+              current_cumulative_rh, rh_current_inherited_cached, rh_inherited_updated_at, last_updated,
+              rh_current_master, rh_master_updated_at
+         FROM components WHERE cuuid = $1 LIMIT 1`,
+      [componentId]
+    );
+    comp = c.rows[0] || null;
+  } catch {
+  }
+  const counterType = String(comp?.rh_counter_type || "").toUpperCase();
+  const masterRef = comp?.rh_master_component_id || comp?.rh_counter_source || null;
+  if (counterType === "INHERITED" && masterRef) {
+    let cache3 = null;
+    let cacheDay = null;
+    try {
+      const m = await conn.query(
+        `SELECT cuuid, meter_replaced_last_rh FROM components
+          WHERE (cuuid = $1 OR ((component_code = $1 OR id = $1) AND vessel_id = $2))
+            AND (is_deleted = false OR is_deleted IS NULL)
+          ORDER BY (cuuid = $1) DESC LIMIT 1`,
+        [masterRef, comp.vessel_id]
+      );
+      const master = m.rows[0];
+      if (master) {
+        const baseline = parseFloat(master.meter_replaced_last_rh || "0") || 0;
+        const masterWinner = await selectWinningRhEvent(conn, master.cuuid);
+        if (masterWinner) {
+          cache3 = (baseline + masterWinner.rh).toFixed(2);
+          cacheDay = masterWinner.readingDay;
+        }
+      }
+    } catch (e) {
+      console.log(`[RH-Derive:${context}] INHERITED cache lookup failed for master=${masterRef}: ${String(e?.message || e).substring(0, 120)} \u2014 cache preserved`);
+    }
+    const num = (v) => v === null || v === void 0 ? null : parseFloat(String(v));
+    const day = (v) => v ? parseReadingDay(String(v instanceof Date ? v.toISOString() : v))?.getTime() ?? null : null;
+    const childLastUpdatedText = cacheDay && cacheDay.getTime() > winner.readingDay.getTime() ? formatReadingDay(cacheDay) : lastUpdatedText;
+    const unchanged = num(comp.current_cumulative_rh) === num(winner.rh.toFixed(2)) && (cache3 === null || num(comp.rh_current_inherited_cached) === num(cache3)) && (cacheDay === null || day(comp.rh_inherited_updated_at) === cacheDay.getTime()) && String(comp.last_updated ?? "") === childLastUpdatedText;
+    if (unchanged) {
+      return "unchanged";
+    }
+    await conn.query(
+      `UPDATE components SET current_cumulative_rh = $1,
+          rh_current_inherited_cached = COALESCE($2, rh_current_inherited_cached),
+          rh_inherited_updated_at = COALESCE($3, rh_inherited_updated_at),
+          last_updated = $4, updated_at = NOW()
+        WHERE cuuid = $5`,
+      [winner.rh.toFixed(2), cache3, cacheDay, childLastUpdatedText, componentId]
+    );
+    console.log(`[RH-Derive:${context}] INHERITED component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} cache=${cache3 ?? "preserved"} cacheDay=${cacheDay ? cacheDay.toISOString().split("T")[0] : "preserved"} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
+    return true;
+  }
+  const numM = (v) => v === null || v === void 0 ? null : parseFloat(String(v));
+  const dayM = (v) => v ? parseReadingDay(String(v instanceof Date ? v.toISOString() : v))?.getTime() ?? null : null;
+  const masterUnchanged = comp && numM(comp.current_cumulative_rh) === numM(winner.rh.toFixed(2)) && numM(comp.rh_current_master) === numM(winner.rh.toFixed(2)) && dayM(comp.rh_master_updated_at) === winner.readingDay.getTime() && String(comp.last_updated ?? "") === lastUpdatedText;
+  if (!masterUnchanged) {
+    await conn.query(
+      `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1,
+          rh_master_updated_at = $2, last_updated = $3, updated_at = NOW()
+        WHERE cuuid = $4`,
+      [winner.rh.toFixed(2), winner.readingDay, lastUpdatedText, componentId]
+    );
+    console.log(`[RH-Derive:${context}] component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
+  }
+  let childrenRefreshed = 0;
+  if (counterType === "MASTER") {
+    try {
+      const baseline = parseFloat(comp?.meter_replaced_last_rh || "0") || 0;
+      const total = (baseline + winner.rh).toFixed(2);
+      const r = await conn.query(
+        `UPDATE components SET rh_current_inherited_cached = $1,
+            rh_inherited_updated_at = $2,
+            -- Task #427 convergence: only ADVANCE the child's last_updated to the
+            -- master's reading day; a child whose own reading day is newer keeps
+            -- its stamp (the INHERITED derive stamps max(child day, master day)).
+            last_updated = CASE
+              WHEN safe_rh_reading_day(last_updated) IS NULL
+                OR safe_rh_reading_day(last_updated) < ($2 AT TIME ZONE 'UTC')::date THEN $3
+              ELSE last_updated END,
+            updated_at = NOW()
+          WHERE (rh_master_component_id = $4
+                 OR (vessel_id = $6 AND (
+                      ($5::text IS NOT NULL AND (rh_master_component_id = $5 OR rh_counter_source = $5))
+                      OR ($7::text IS NOT NULL AND rh_master_component_id = $7))))
+            AND upper(rh_counter_type) = 'INHERITED'
+            AND (is_deleted = false OR is_deleted IS NULL)
+            AND (rh_current_inherited_cached IS DISTINCT FROM $1::decimal
+                 OR rh_inherited_updated_at IS DISTINCT FROM $2
+                 OR ((safe_rh_reading_day(last_updated) IS NULL
+                      OR safe_rh_reading_day(last_updated) < ($2 AT TIME ZONE 'UTC')::date)
+                     AND last_updated IS DISTINCT FROM $3))`,
+        [total, winner.readingDay, lastUpdatedText, componentId, comp?.component_code ?? null, comp?.vessel_id ?? null, comp?.id ?? null]
+      );
+      if (r.rowCount) {
+        childrenRefreshed = r.rowCount;
+        console.log(`[RH-Derive:${context}] master=${componentId} refreshed inherited cache on ${r.rowCount} child component(s) total=${total}`);
+      }
+    } catch (e) {
+      console.log(`[RH-Derive:${context}] inherited-children cache refresh failed for master=${componentId}: ${String(e?.message || e).substring(0, 120)}`);
+    }
+  }
+  if (masterUnchanged && childrenRefreshed === 0) return "unchanged";
   return true;
+}
+async function selfHealInheritedRhCaches(conn) {
+  const r = await conn.query(
+    `SELECT cuuid FROM components
+      WHERE upper(rh_counter_type) = 'INHERITED'
+        AND (rh_master_component_id IS NOT NULL OR rh_counter_source IS NOT NULL)
+        AND (is_deleted = false OR is_deleted IS NULL)`
+  );
+  let healed = 0;
+  for (const row of r.rows) {
+    try {
+      const res = await applyWinningRhToComponent(conn, row.cuuid, "self-heal");
+      if (res === true) healed++;
+    } catch (e) {
+      console.log(`[RH-SelfHeal] component=${row.cuuid} failed: ${String(e?.message || e).substring(0, 120)}`);
+    }
+  }
+  return { scanned: r.rows.length, healed };
+}
+async function selfHealRhComponents(conn, opts) {
+  const started = Date.now();
+  const batchSize = opts?.batchSize ?? 100;
+  const vesselClause = opts?.vesselId ? ` AND vessel_id = $1` : "";
+  const vesselParams = opts?.vesselId ? [opts.vesselId] : [];
+  const metrics = {
+    mastersScanned: 0,
+    childrenScanned: 0,
+    mastersHealed: 0,
+    childrenHealed: 0,
+    rhDecreases: 0,
+    errors: 0,
+    durationMs: 0
+  };
+  const healSet = async (rows, kind) => {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        const oldRh = row.current_cumulative_rh !== null && row.current_cumulative_rh !== void 0 ? parseFloat(String(row.current_cumulative_rh)) : null;
+        const res = await applyWinningRhToComponent(conn, row.cuuid, "self-heal");
+        if (res === true) {
+          if (kind === "master") metrics.mastersHealed++;
+          else metrics.childrenHealed++;
+          const after = await conn.query(`SELECT current_cumulative_rh FROM components WHERE cuuid = $1`, [row.cuuid]);
+          const newRh = after.rows?.[0]?.current_cumulative_rh != null ? parseFloat(String(after.rows[0].current_cumulative_rh)) : null;
+          if (oldRh !== null && newRh !== null && newRh < oldRh) {
+            metrics.rhDecreases++;
+            console.warn(`[RH-SelfHeal] \u26A0\uFE0F RH DECREASE on ${kind} ${row.component_code || row.cuuid}: ${oldRh} \u2192 ${newRh} (rotation-guard/winner change \u2014 audit if unexpected)`);
+          }
+        }
+      } catch (e) {
+        metrics.errors++;
+        console.log(`[RH-SelfHeal] ${kind}=${row.cuuid} failed: ${String(e?.message || e).substring(0, 120)}`);
+      }
+      if ((i + 1) % batchSize === 0) {
+        console.log(`[RH-SelfHeal] progress: ${i + 1}/${rows.length} ${kind}s processed`);
+      }
+    }
+  };
+  const masters = await conn.query(
+    `SELECT cuuid, component_code, current_cumulative_rh FROM components
+      WHERE upper(rh_counter_type) = 'MASTER'
+        AND (is_deleted = false OR is_deleted IS NULL)${vesselClause}`,
+    vesselParams
+  );
+  metrics.mastersScanned = masters.rows.length;
+  await healSet(masters.rows, "master");
+  const children = await conn.query(
+    `SELECT cuuid, component_code, current_cumulative_rh FROM components
+      WHERE upper(rh_counter_type) = 'INHERITED'
+        AND (rh_master_component_id IS NOT NULL OR rh_counter_source IS NOT NULL)
+        AND (is_deleted = false OR is_deleted IS NULL)${vesselClause}`,
+    vesselParams
+  );
+  metrics.childrenScanned = children.rows.length;
+  await healSet(children.rows, "child");
+  metrics.durationMs = Date.now() - started;
+  return metrics;
 }
 async function resolveRhBaselineDay(conn, componentId, componentStampFallback) {
   try {
@@ -7098,9 +7388,29 @@ async function releaseWoRhSync(conn, wouuid) {
     console.error(`[RH-Claim] release failed for WO ${wouuid}: ${e?.message || e}`);
   }
 }
+var READING_DAY_SQL, PARSED_DAY_SQL, RH_GUARD_STRIP_COLUMNS;
 var init_rhEventComparator = __esm({
   "server/modules/running-hours/rhEventComparator.ts"() {
     "use strict";
+    init_readingDate();
+    READING_DAY_SQL = `COALESCE(safe_rh_reading_day(date_updated_local), (entered_at_utc AT TIME ZONE 'UTC' AT TIME ZONE 'UTC')::date)`;
+    PARSED_DAY_SQL = `safe_rh_reading_day(date_updated_local)`;
+    RH_GUARD_STRIP_COLUMNS = [
+      "current_cumulative_rh",
+      "currentCumulativeRH",
+      "rh_current_master",
+      "rhCurrentMaster",
+      "rh_master_updated_at",
+      "rhMasterUpdatedAt",
+      "rh_master_update_source",
+      "rhMasterUpdateSource",
+      "last_updated",
+      "lastUpdated",
+      "rh_current_inherited_cached",
+      "rhCurrentInheritedCached",
+      "rh_inherited_updated_at",
+      "rhInheritedUpdatedAt"
+    ];
   }
 });
 
@@ -7180,12 +7490,12 @@ async function getColumnMeta(pool4, tableName) {
 async function getLatestRotationDate(conn, componentId, excludeRhruuid) {
   try {
     const params = [componentId];
-    let sql24 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
+    let sql25 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
     if (excludeRhruuid) {
-      sql24 += ` AND rhruuid <> $2`;
+      sql25 += ` AND rhruuid <> $2`;
       params.push(excludeRhruuid);
     }
-    const res = await conn.query(sql24, params);
+    const res = await conn.query(sql25, params);
     const v = res.rows[0]?.latest;
     if (!v) return null;
     const d = v instanceof Date ? v : new Date(String(v));
@@ -7387,7 +7697,11 @@ async function applyOneWayRows(tableName, rows) {
                     "rh_master_update_source",
                     "rhMasterUpdateSource",
                     "last_updated",
-                    "lastUpdated"
+                    "lastUpdated",
+                    "rh_current_inherited_cached",
+                    "rhCurrentInheritedCached",
+                    "rh_inherited_updated_at",
+                    "rhInheritedUpdatedAt"
                   ]) {
                     delete rowToApply[col];
                   }
@@ -7395,28 +7709,26 @@ async function applyOneWayRows(tableName, rows) {
                 }
               }
               try {
-                const { selectWinningRhEvent: selectWinningRhEvent2, parseReadingDay: parseReadingDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+                const { selectWinningRhEvent: selectWinningRhEvent2, incomingRhStamp: incomingRhStamp2, shouldStripIncomingRh: shouldStripIncomingRh2, localRhClaimDay: localRhClaimDay2, RH_GUARD_STRIP_COLUMNS: RH_GUARD_STRIP_COLUMNS2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
                 const localWinner = await selectWinningRhEvent2(pool4, cuuid);
-                if (localWinner) {
-                  const incomingRhStampRaw = row["rh_master_updated_at"] ?? row["rhMasterUpdatedAt"] ?? row["last_updated"] ?? row["lastUpdated"];
-                  const incomingRhDay = incomingRhStampRaw ? parseReadingDay2(String(incomingRhStampRaw instanceof Date ? incomingRhStampRaw.toISOString() : incomingRhStampRaw)) : null;
-                  if (!incomingRhDay || incomingRhDay.getTime() < localWinner.readingDay.getTime()) {
+                let localCacheStamp = null;
+                try {
+                  const cs = await pool4.query(
+                    `SELECT rh_inherited_updated_at FROM components WHERE cuuid = $1 LIMIT 1`,
+                    [cuuid]
+                  );
+                  localCacheStamp = cs.rows[0]?.rh_inherited_updated_at ?? null;
+                } catch {
+                }
+                const claimDay = localRhClaimDay2(localWinner?.readingDay ?? null, localCacheStamp);
+                if (claimDay) {
+                  const incomingRhStampRaw = incomingRhStamp2(row);
+                  if (shouldStripIncomingRh2(incomingRhStampRaw, claimDay)) {
                     if (rowToApply === row) rowToApply = { ...row };
-                    for (const col of [
-                      "current_cumulative_rh",
-                      "currentCumulativeRH",
-                      "rh_current_master",
-                      "rhCurrentMaster",
-                      "rh_master_updated_at",
-                      "rhMasterUpdatedAt",
-                      "rh_master_update_source",
-                      "rhMasterUpdateSource",
-                      "last_updated",
-                      "lastUpdated"
-                    ]) {
+                    for (const col of RH_GUARD_STRIP_COLUMNS2) {
                       delete rowToApply[col];
                     }
-                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? "none"}) loses to local winning reading ${localWinner.readingDay.toISOString().split("T")[0]} \u2014 RH columns preserved`);
+                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? "none"}) does not beat local RH claim ${claimDay.toISOString().split("T")[0]} \u2014 RH columns preserved`);
                   }
                 }
               } catch (rhGuardErr) {
@@ -10576,6 +10888,7 @@ __export(dateUtils_exports, {
   calculateMissedCycles: () => calculateMissedCycles,
   calculateMissedCyclesRH: () => calculateMissedCyclesRH,
   calculateNextDueDate: () => calculateNextDueDate,
+  formatLocalDateTimeDDMMMYYYY: () => formatLocalDateTimeDDMMMYYYY,
   formatRHWithSeparators: () => formatRHWithSeparators,
   formatRelativeTime: () => formatRelativeTime,
   normalizeDateToDDMMMYYYY: () => normalizeDateToDDMMMYYYY,
@@ -10730,6 +11043,10 @@ function shouldGenerateWorkOrder(nextDueDate, currentDate = /* @__PURE__ */ new 
     return false;
   }
 }
+function formatLocalDateTimeDDMMMYYYY(date2) {
+  const pad2 = (n) => String(n).padStart(2, "0");
+  return `${pad2(date2.getDate())} ${MONTH_ABBREV_3[date2.getMonth()]} ${date2.getFullYear()} ${pad2(date2.getHours())}:${pad2(date2.getMinutes())}`;
+}
 function formatRelativeTime(dateStr) {
   if (!dateStr) return "";
   const normalized = normalizeDateToDDMMMYYYY(dateStr);
@@ -10765,10 +11082,12 @@ function formatRHWithSeparators(value) {
   if (isNaN(num)) return String(value);
   return num.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
+var MONTH_ABBREV_3;
 var init_dateUtils = __esm({
   "shared/dateUtils.ts"() {
     "use strict";
     init_dateParse();
+    MONTH_ABBREV_3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   }
 });
 
@@ -21358,6 +21677,21 @@ var init_sync = __esm({
   }
 });
 
+// server/modules/running-hours/repositories/dateUpdatedLocalSql.ts
+import { sql as sql7 } from "drizzle-orm";
+function readingDayLocalExpr() {
+  return sql7`safe_rh_reading_day(${runningHoursAudit.dateUpdatedLocal})`;
+}
+function targetReadingDay(targetDate) {
+  return targetDate.toISOString().split("T")[0];
+}
+var init_dateUpdatedLocalSql = __esm({
+  "server/modules/running-hours/repositories/dateUpdatedLocalSql.ts"() {
+    "use strict";
+    init_schema();
+  }
+});
+
 // server/modules/rotational-items/repositories/rotationalItemRepository.ts
 var rotationalItemRepository_exports = {};
 __export(rotationalItemRepository_exports, {
@@ -21374,7 +21708,7 @@ __export(rotationalItemRepository_exports, {
   softDelete: () => softDelete,
   update: () => update
 });
-import { and as and3, eq as eq3, isNotNull, sql as sql7 } from "drizzle-orm";
+import { and as and3, eq as eq3, isNotNull, sql as sql8 } from "drizzle-orm";
 async function listByVessel(vesselId, status) {
   const db2 = await getDb();
   const conditions = [eq3(rotationalItems.vesselId, vesselId), notDeleted];
@@ -21465,10 +21799,10 @@ async function create(data) {
 }
 async function claimStamp(riuuid, userUuid) {
   const db2 = await getDb();
-  const rows = await db2.update(rotationalItems).set({ status: "Installed", updatedByUuid: userUuid ?? void 0, updatedAt: sql7`NOW()` }).where(and3(
+  const rows = await db2.update(rotationalItems).set({ status: "Installed", updatedByUuid: userUuid ?? void 0, updatedAt: sql8`NOW()` }).where(and3(
     eq3(rotationalItems.riuuid, riuuid),
     notDeleted,
-    sql7`${rotationalItems.status} IN ('Spare', 'In Store')`
+    sql8`${rotationalItems.status} IN ('Spare', 'In Store')`
   )).returning();
   return rows[0];
 }
@@ -21479,7 +21813,7 @@ async function releaseStamp(riuuid, rhSnapshot, userUuid) {
     updatedByUuid: userUuid ?? void 0,
     ...rhSnapshot.currentRh != null ? { currentRh: rhSnapshot.currentRh } : {},
     ...rhSnapshot.rhLastUpdated != null ? { rhLastUpdated: rhSnapshot.rhLastUpdated } : {},
-    updatedAt: sql7`NOW()`
+    updatedAt: sql8`NOW()`
   }).where(and3(
     eq3(rotationalItems.riuuid, riuuid),
     notDeleted,
@@ -21489,12 +21823,12 @@ async function releaseStamp(riuuid, rhSnapshot, userUuid) {
 }
 async function update(riuuid, data) {
   const db2 = await getDb();
-  const rows = await db2.update(rotationalItems).set({ ...data, updatedAt: sql7`NOW()` }).where(and3(eq3(rotationalItems.riuuid, riuuid), notDeleted)).returning();
+  const rows = await db2.update(rotationalItems).set({ ...data, updatedAt: sql8`NOW()` }).where(and3(eq3(rotationalItems.riuuid, riuuid), notDeleted)).returning();
   return rows[0];
 }
 async function softDelete(riuuid, userUuid) {
   const db2 = await getDb();
-  const rows = await db2.update(rotationalItems).set({ isDeleted: true, updatedByUuid: userUuid ?? void 0, updatedAt: sql7`NOW()` }).where(and3(eq3(rotationalItems.riuuid, riuuid), notDeleted)).returning();
+  const rows = await db2.update(rotationalItems).set({ isDeleted: true, updatedByUuid: userUuid ?? void 0, updatedAt: sql8`NOW()` }).where(and3(eq3(rotationalItems.riuuid, riuuid), notDeleted)).returning();
   return rows[0];
 }
 var notDeleted;
@@ -22670,7 +23004,7 @@ var init_componentService = __esm({
 
 // server/postgresStorage.ts
 import { randomUUID as randomUUID2 } from "crypto";
-import { eq as eq7, and as and6, desc as desc2, sql as sql8, inArray as inArray2, or, ilike as ilike2, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
+import { eq as eq7, and as and6, desc as desc2, sql as sql9, inArray as inArray2, or, ilike as ilike2, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
 async function getRhOriginSide() {
   if (cachedRhOriginSide !== void 0) return cachedRhOriginSide;
   try {
@@ -22698,6 +23032,8 @@ var init_postgresStorage = __esm({
     init_db();
     init_schema();
     init_sync();
+    init_dateUpdatedLocalSql();
+    init_readingDate();
     init_requestContext();
     _woNumericFields = null;
     PostgresStorage = class {
@@ -22712,7 +23048,7 @@ var init_postgresStorage = __esm({
           );
           const db2 = await getDb();
           await db2.execute(
-            sql8.raw(
+            sql9.raw(
               `SELECT setval('${tableName}_id_seq', (SELECT COALESCE(MAX(id), 0) FROM "${tableName}"))`
             )
           );
@@ -23046,7 +23382,7 @@ var init_postgresStorage = __esm({
       }
       async countMasterListItemsByType(listTypeKey) {
         const db2 = await getDb();
-        const result = await db2.select({ count: sql8`count(*)::int` }).from(masterLists).where(eq7(masterLists.listType, listTypeKey));
+        const result = await db2.select({ count: sql9`count(*)::int` }).from(masterLists).where(eq7(masterLists.listType, listTypeKey));
         return Number(result[0]?.count || 0);
       }
       // ============= MODULE 2: MAKER LIST =============
@@ -23666,7 +24002,7 @@ var init_postgresStorage = __esm({
         }
         const rhStr = params.newRHValue.toFixed(2);
         return db2.transaction(async (tx) => {
-          await tx.execute(sql8`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
+          await tx.execute(sql9`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
           const freshRows = await tx.select().from(components).where(eq7(components.cuuid, component.cuuid)).limit(1);
           const fresh = freshRows[0] || component;
           const previousRH = parseFloat(fresh.currentCumulativeRH || "0");
@@ -23683,9 +24019,8 @@ var init_postgresStorage = __esm({
       async updateMasterRunningHours(params) {
         const db2 = await getDb();
         const now = /* @__PURE__ */ new Date();
-        const parsedReadingDate = params.dateUpdated ? new Date(params.dateUpdated) : null;
-        const readingDate = parsedReadingDate && !isNaN(parsedReadingDate.getTime()) ? parsedReadingDate : now;
-        const readingDateLocal = readingDate.toISOString().split("T")[0];
+        const readingDateLocal = requireReadingDayInput(params.dateUpdated ?? null) ?? formatReadingDay(now);
+        const readingDate = parseReadingDayStrict(readingDateLocal);
         const component = await this.getComponent(params.componentId);
         if (!component) {
           throw new Error(`Component ${params.componentId} not found`);
@@ -23700,7 +24035,7 @@ var init_postgresStorage = __esm({
           inheritedComponents = await this.getInheritedComponents(component.cuuid, masterVesselId);
         }
         const txResult = await db2.transaction(async (tx) => {
-          await tx.execute(sql8`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
+          await tx.execute(sql9`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
           const freshMaster = await tx.select().from(components).where(eq7(components.cuuid, component.cuuid)).limit(1);
           const freshComponent = freshMaster[0] || component;
           const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || "0");
@@ -23714,7 +24049,7 @@ var init_postgresStorage = __esm({
             rhMasterUpdatedAt: readingDate,
             rhMasterUpdatedBy: params.userId,
             rhMasterUpdateSource: params.updateSource,
-            lastUpdated: readingDate.toISOString(),
+            lastUpdated: readingDateLocal,
             updatedAt: now
           }).where(eq7(components.cuuid, component.cuuid)).returning();
           if (!masterResult[0]) {
@@ -23752,7 +24087,7 @@ var init_postgresStorage = __esm({
           } catch (e) {
             console.error("[FieldLogger] rha tx create:", e);
           }
-          await this.accrueStampRhDelta(tx, masterVesselId, freshComponent.currentStamp, delta, readingDate.toISOString(), params.userId);
+          await this.accrueStampRhDelta(tx, masterVesselId, freshComponent.currentStamp, delta, readingDateLocal, params.userId);
           let inheritedUpdated = 0;
           for (const inherited of inheritedComponents) {
             const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || "0");
@@ -23767,7 +24102,7 @@ var init_postgresStorage = __esm({
               // Stamp the reading date (WO completion date / RH section date), not the server
               // clock, so the family's Last Updated reflects when the hours were observed.
               rhInheritedUpdatedAt: readingDate,
-              lastUpdated: readingDate.toISOString(),
+              lastUpdated: readingDateLocal,
               updatedAt: now
             }).where(eq7(components.cuuid, inherited.cuuid));
             const childNotes = params.comments ? `${params.comments} (cascade from master ${masterComponentCode})` : `Cascade from master ${masterComponentCode}`;
@@ -23798,7 +24133,7 @@ var init_postgresStorage = __esm({
             } catch (e) {
               console.error("[FieldLogger] rha cascade create:", e);
             }
-            await this.accrueStampRhDelta(tx, inherited.vesselId || masterVesselId, inherited.currentStamp, delta, readingDate.toISOString(), params.userId);
+            await this.accrueStampRhDelta(tx, inherited.vesselId || masterVesselId, inherited.currentStamp, delta, readingDateLocal, params.userId);
             inheritedUpdated++;
           }
           return { masterUpdated: masterResult[0], inheritedUpdated };
@@ -23811,18 +24146,17 @@ var init_postgresStorage = __esm({
       async setComponentRunningHours(params) {
         const db2 = await getDb();
         const now = /* @__PURE__ */ new Date();
-        const lastUpdatedValue = params.lastUpdatedDate || now.toISOString();
+        const lastUpdatedValue = requireReadingDayInput(params.lastUpdatedDate ?? null, "last updated date") ?? formatReadingDay(now);
         const component = await this.getComponent(params.componentId);
         if (!component) {
           throw new Error(`Component ${params.componentId} not found`);
         }
         const rhValueStr = params.newRHValue.toString();
         let inheritedUpdated = 0;
-        const parsedReading = params.lastUpdatedDate ? new Date(params.lastUpdatedDate) : null;
-        const readingIso = parsedReading && !isNaN(parsedReading.getTime()) ? parsedReading.toISOString() : now.toISOString();
+        const readingIso = lastUpdatedValue;
         let inheritedComponentsPre = component.rhCounterType === "MASTER" && component.vesselId ? await this.getInheritedComponents(component.cuuid, component.vesselId) : [];
         return db2.transaction(async (tx) => {
-          await tx.execute(sql8`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
+          await tx.execute(sql9`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
           const freshRows = await tx.select().from(components).where(eq7(components.cuuid, component.cuuid)).limit(1);
           const freshComponent = freshRows[0] || component;
           if (inheritedComponentsPre.length > 0) {
@@ -24008,7 +24342,7 @@ var init_postgresStorage = __esm({
         }).from(workOrderAnomalies).where(
           and6(
             eq7(workOrderAnomalies.anomalyType, "BACKDATING"),
-            sql8`${workOrderAnomalies.workOrderId} = ANY(ARRAY[${sql8.join(workOrderIds.map((id) => sql8`${id}`), sql8`, `)}]::text[])`
+            sql9`${workOrderAnomalies.workOrderId} = ANY(ARRAY[${sql9.join(workOrderIds.map((id) => sql9`${id}`), sql9`, `)}]::text[])`
           )
         );
         const backdatingMap = /* @__PURE__ */ new Map();
@@ -24082,8 +24416,10 @@ var init_postgresStorage = __esm({
       // ============= MODULE 3: RUNNING HOURS AUDIT =============
       async createRunningHoursAudit(audit) {
         const db2 = await getDb();
+        const canonicalDateUpdatedLocal = requireReadingDayInput(audit.dateUpdatedLocal ?? null, "reading date (dateUpdatedLocal)") ?? formatReadingDay(/* @__PURE__ */ new Date());
         const auditWithActor = {
           ...audit,
+          dateUpdatedLocal: canonicalDateUpdatedLocal,
           actorLabel: audit.actorLabel ?? getAuditActor().actorLabel,
           originSide: audit.originSide ?? await getRhOriginSide()
         };
@@ -24097,7 +24433,7 @@ var init_postgresStorage = __esm({
       }
       async getEarliestAuditTimestamp(vesselId) {
         const db2 = await getDb();
-        const result = await db2.select({ earliest: sql8`MIN(${runningHoursAudit.enteredAtUTC})` }).from(runningHoursAudit).where(eq7(runningHoursAudit.vesselId, vesselId));
+        const result = await db2.select({ earliest: sql9`MIN(${runningHoursAudit.enteredAtUTC})` }).from(runningHoursAudit).where(eq7(runningHoursAudit.vesselId, vesselId));
         return result[0]?.earliest || null;
       }
       async getRunningHoursAudits(componentId, limit) {
@@ -24125,7 +24461,7 @@ var init_postgresStorage = __esm({
         const comp = await this.getComponent(componentId);
         const resolvedId = comp ? comp.cuuid : componentId;
         const result = await db2.select({
-          total: sql8`COALESCE(SUM(CASE WHEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) > 0 THEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) ELSE 0 END), 0)`
+          total: sql9`COALESCE(SUM(CASE WHEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) > 0 THEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) ELSE 0 END), 0)`
         }).from(runningHoursAudit).where(and6(
           or(eq7(runningHoursAudit.componentId, resolvedId), eq7(runningHoursAudit.componentId, componentId)),
           gte(runningHoursAudit.enteredAtUTC, startDate),
@@ -24137,19 +24473,16 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const comp = await this.getComponent(componentId);
         const resolvedId = comp ? comp.cuuid : componentId;
-        const parsedDateExpr = sql8`CASE 
-      WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' 
-        THEN TO_TIMESTAMP(${runningHoursAudit.dateUpdatedLocal}, 'YYYY-MM-DD')
-      ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
-    END`;
+        const parsedDateExpr = readingDayLocalExpr();
+        const targetDay = targetReadingDay(targetDate);
         const idCondition = or(eq7(runningHoursAudit.componentId, resolvedId), eq7(runningHoursAudit.componentId, componentId));
         const result = await db2.select({
           runningHours: runningHoursAudit.cumulativeRH,
           enteredAtUTC: runningHoursAudit.enteredAtUTC
         }).from(runningHoursAudit).where(and6(
           idCondition,
-          sql8`${parsedDateExpr} <= ${targetDate}`
-        )).orderBy(sql8`${parsedDateExpr} DESC`).limit(1);
+          sql9`${parsedDateExpr} <= ${targetDay}::date`
+        )).orderBy(sql9`${parsedDateExpr} DESC`).limit(1);
         if (result.length > 0) {
           return {
             runningHours: parseFloat(result[0].runningHours || "0"),
@@ -24162,8 +24495,8 @@ var init_postgresStorage = __esm({
           enteredAtUTC: runningHoursAudit.enteredAtUTC
         }).from(runningHoursAudit).where(and6(
           idCondition,
-          sql8`${parsedDateExpr} > ${targetDate}`
-        )).orderBy(sql8`${parsedDateExpr} ASC`).limit(1);
+          sql9`${parsedDateExpr} > ${targetDay}::date`
+        )).orderBy(sql9`${parsedDateExpr} ASC`).limit(1);
         if (fallback.length > 0) {
           return {
             runningHours: parseFloat(fallback[0].runningHours || "0"),
@@ -25859,7 +26192,7 @@ var init_postgresStorage = __esm({
           today.setHours(0, 0, 0, 0);
           const todayStr = today.toISOString().split("T")[0];
           conditions.push(lt(defects.targetCloseDate, todayStr));
-          conditions.push(sql8`(${defects.verified} IS NULL OR ${defects.verified} = false)`);
+          conditions.push(sql9`(${defects.verified} IS NULL OR ${defects.verified} = false)`);
         } else if (filters?.dueOverdue === "due") {
           const today = /* @__PURE__ */ new Date();
           today.setHours(0, 0, 0, 0);
@@ -25900,7 +26233,7 @@ var init_postgresStorage = __esm({
         if (filters?.isCoC !== void 0) {
           conditions.push(eq7(defects.is_coc, filters.isCoC));
         }
-        let query = db2.select({ count: sql8`count(*)` }).from(defects);
+        let query = db2.select({ count: sql9`count(*)` }).from(defects);
         if (conditions.length > 0) {
           query = query.where(and6(...conditions));
         }
@@ -25927,12 +26260,12 @@ var init_postgresStorage = __esm({
         const vesselResult = await db2.select({ vesselSequence: vessels.vesselSequence }).from(vessels).where(eq7(vessels.vuuid, vesselId));
         let vesselSeq = vesselResult[0]?.vesselSequence;
         if (vesselResult.length > 0 && !vesselSeq) {
-          const maxSeqResult = await db2.select({ max: sql8`COALESCE(MAX(vessel_sequence), 0)` }).from(vessels);
+          const maxSeqResult = await db2.select({ max: sql9`COALESCE(MAX(vessel_sequence), 0)` }).from(vessels);
           vesselSeq = (maxSeqResult[0]?.max || 0) + 1;
           await db2.update(vessels).set({ vesselSequence: vesselSeq }).where(eq7(vessels.vuuid, vesselId));
         }
         if (!vesselSeq) {
-          const existingVesselSeqs = await db2.execute(sql8`
+          const existingVesselSeqs = await db2.execute(sql9`
         SELECT DISTINCT vessel_id FROM defect_sequences ORDER BY vessel_id
       `);
           const vesselIds = existingVesselSeqs.rows.map((r) => r.vessel_id);
@@ -26289,9 +26622,9 @@ var init_postgresStorage = __esm({
         }
         if (filters?.acknowledged !== void 0) {
           if (filters.acknowledged) {
-            conditions.push(sql8`${alertEvents.ackBy} IS NOT NULL`);
+            conditions.push(sql9`${alertEvents.ackBy} IS NOT NULL`);
           } else {
-            conditions.push(sql8`${alertEvents.ackBy} IS NULL`);
+            conditions.push(sql9`${alertEvents.ackBy} IS NULL`);
           }
         }
         if (conditions.length > 0) {
@@ -26394,7 +26727,7 @@ var init_postgresStorage = __esm({
       async getWorkOrdersWithMissedCycles() {
         const db2 = await getDb();
         return await db2.select().from(workOrders).where(and6(
-          sql8`${workOrders.missedCycles} > 0`,
+          sql9`${workOrders.missedCycles} > 0`,
           eq7(workOrders.dataScope, "vessel")
         ));
       }
@@ -26408,7 +26741,7 @@ var init_postgresStorage = __esm({
       async getUnacknowledgedAlertEventsForRole(userRole, vesselId) {
         const db2 = await getDb();
         const conditions = [
-          sql8`${alertEvents.ackBy} IS NULL`
+          sql9`${alertEvents.ackBy} IS NULL`
         ];
         if (vesselId) {
           conditions.push(eq7(alertEvents.vesselId, vesselId));
@@ -26435,7 +26768,7 @@ var init_postgresStorage = __esm({
           return [];
         }
         conditions.push(
-          sql8`${alertEvents.policyUuid} IN (${sql8.join(allowedPolicyUuids.map((u) => sql8`${u}`), sql8`, `)})`
+          sql9`${alertEvents.policyUuid} IN (${sql9.join(allowedPolicyUuids.map((u) => sql9`${u}`), sql9`, `)})`
         );
         return await db2.select().from(alertEvents).where(and6(...conditions)).orderBy(desc2(alertEvents.createdAt));
       }
@@ -27070,7 +27403,48 @@ var init_postgresStorage = __esm({
           safeUpdateData.maintenanceType = safeUpdateData.taskType;
           delete safeUpdateData.taskType;
         }
-        const invalidFields = ["woTemplateCode", "componentName", "componentCode", "nextDueReading"];
+        if ("woTemplateCode" in safeUpdateData) {
+          console.log(`[CR_APPLY] Job field translation: woTemplateCode -> jobNo`);
+          safeUpdateData.jobNo = safeUpdateData.woTemplateCode;
+          delete safeUpdateData.woTemplateCode;
+        }
+        if ("jobNo" in safeUpdateData) {
+          const trimmed = (safeUpdateData.jobNo || "").trim();
+          if (!trimmed) {
+            throw new Error("Job code cannot be blank. Please provide a valid job code.");
+          }
+          safeUpdateData.jobNo = trimmed;
+        }
+        if ("jobNo" in safeUpdateData && safeUpdateData.jobNo !== beforeState.jobNo) {
+          const vesselId = beforeState.vesselId;
+          const links = await tx.select({ componentId: jobComponentLinks.componentId }).from(jobComponentLinks).where(eq7(jobComponentLinks.jobId, resolvedJuuid));
+          const componentIds = Array.from(
+            /* @__PURE__ */ new Set([
+              ...links.map((l) => l.componentId),
+              ...beforeState.componentId ? [beforeState.componentId] : []
+            ])
+          );
+          for (const compId of componentIds) {
+            const direct = await tx.select({ juuid: jobs.juuid }).from(jobs).where(and6(
+              eq7(jobs.vesselId, vesselId),
+              eq7(jobs.componentId, compId),
+              eq7(jobs.jobNo, safeUpdateData.jobNo)
+            ));
+            if (direct.find((j) => j.juuid !== resolvedJuuid)) {
+              throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
+            }
+            const siblingLinks = await tx.select({ jobId: jobComponentLinks.jobId }).from(jobComponentLinks).where(eq7(jobComponentLinks.componentId, compId));
+            for (const sl of siblingLinks) {
+              if (sl.jobId === resolvedJuuid) continue;
+              const linked = await tx.select({ jobNo: jobs.jobNo }).from(jobs).where(eq7(jobs.juuid, sl.jobId));
+              if (linked[0]?.jobNo === safeUpdateData.jobNo) {
+                throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
+              }
+            }
+          }
+          console.log(`[CR_APPLY] Job ${resolvedJuuid}: jobNo duplicate check passed for "${safeUpdateData.jobNo}"`);
+        }
+        const invalidFields = ["componentName", "componentCode", "nextDueReading"];
         for (const field of invalidFields) {
           if (field in safeUpdateData) {
             console.log(`[CR_APPLY] Removing invalid job field: ${field}`);
@@ -27590,7 +27964,7 @@ var init_postgresStorage = __esm({
       async getImportHistory(type, limit = 20, offset = 0) {
         const db2 = await getDb();
         let query = db2.select().from(importHistory);
-        let countQuery = db2.select({ count: sql8`count(*)` }).from(importHistory);
+        let countQuery = db2.select({ count: sql9`count(*)` }).from(importHistory);
         if (type) {
           query = query.where(eq7(importHistory.type, type));
           countQuery = countQuery.where(eq7(importHistory.type, type));
@@ -27764,11 +28138,11 @@ var init_postgresStorage = __esm({
         if (filters.source) conditions.push(eq7(auditLog.source, filters.source));
         if (filters.actor) {
           const a = `%${filters.actor}%`;
-          conditions.push(sql8`(${auditLog.userId} ILIKE ${a} OR ${auditLog.payload}->>'actorLabel' ILIKE ${a})`);
+          conditions.push(sql9`(${auditLog.userId} ILIKE ${a} OR ${auditLog.payload}->>'actorLabel' ILIKE ${a})`);
         }
         if (filters.entityCode) {
           const c = `%${filters.entityCode}%`;
-          conditions.push(sql8`(${auditLog.componentCode} ILIKE ${c} OR ${auditLog.entityId} ILIKE ${c} OR ${auditLog.payload}->>'workOrderNo' ILIKE ${c} OR ${auditLog.payload}->>'componentCode' ILIKE ${c})`);
+          conditions.push(sql9`(${auditLog.componentCode} ILIKE ${c} OR ${auditLog.entityId} ILIKE ${c} OR ${auditLog.payload}->>'workOrderNo' ILIKE ${c} OR ${auditLog.payload}->>'componentCode' ILIKE ${c})`);
         }
         if (filters.startDate) conditions.push(gte(auditLog.timestamp, filters.startDate));
         if (filters.endDate) conditions.push(lte(auditLog.timestamp, filters.endDate));
@@ -27777,7 +28151,7 @@ var init_postgresStorage = __esm({
       async countAuditLogs(filters) {
         const db2 = await getDb();
         const conditions = this.buildAuditLogConditions(filters);
-        let q = db2.select({ n: sql8`count(*)::int` }).from(auditLog);
+        let q = db2.select({ n: sql9`count(*)::int` }).from(auditLog);
         if (conditions.length > 0) q = q.where(and6(...conditions));
         const r = await q;
         return Number(r[0]?.n ?? 0);
@@ -27864,18 +28238,18 @@ var init_postgresStorage = __esm({
           conditions.push(eq7(workOrderAnomalies.vesselId, filters.vesselId));
         }
         if (filters?.dateFrom) {
-          conditions.push(sql8`${workOrderAnomalies.detectedAt} >= ${filters.dateFrom}`);
+          conditions.push(sql9`${workOrderAnomalies.detectedAt} >= ${filters.dateFrom}`);
         }
         if (filters?.dateTo) {
-          conditions.push(sql8`${workOrderAnomalies.detectedAt} <= ${filters.dateTo}`);
+          conditions.push(sql9`${workOrderAnomalies.detectedAt} <= ${filters.dateTo}`);
         }
         const query = db2.select().from(workOrderAnomalies);
         const whereClause = conditions.length > 0 ? and6(...conditions) : void 0;
         const results = whereClause ? await query.where(whereClause).orderBy(
-          sql8`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
+          sql9`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
           desc2(workOrderAnomalies.detectedAt)
         ).limit(filters?.limit || 50) : await query.orderBy(
-          sql8`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
+          sql9`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
           desc2(workOrderAnomalies.detectedAt)
         ).limit(filters?.limit || 50);
         return results;
@@ -28124,7 +28498,7 @@ var init_postgresStorage = __esm({
       }
       async getWorkOrderPostponementCount(workOrderId) {
         const db2 = await getDb();
-        const result = await db2.select({ count: sql8`count(*)` }).from(workOrderPostponements).where(eq7(workOrderPostponements.workOrderId, workOrderId));
+        const result = await db2.select({ count: sql9`count(*)` }).from(workOrderPostponements).where(eq7(workOrderPostponements.workOrderId, workOrderId));
         return Number(result[0]?.count || 0);
       }
       async createWorkOrderPostponement(postponement) {
@@ -28220,10 +28594,10 @@ var init_postgresStorage = __esm({
       }
       async cascadeRunningHoursUpdate(params) {
         const db2 = await getDb();
-        const { parentComponentId, mode, value, dateUpdated, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+        const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
         const now = /* @__PURE__ */ new Date();
-        const parsedReadingDate = dateUpdated ? new Date(dateUpdated) : null;
-        const readingDate = parsedReadingDate && !isNaN(parsedReadingDate.getTime()) ? parsedReadingDate : now;
+        const dateUpdated = requireReadingDayInput(params.dateUpdated ?? null) ?? formatReadingDay(now);
+        const readingDate = parseReadingDayStrict(dateUpdated);
         const parentResult = await db2.select().from(components).where(or(eq7(components.cuuid, parentComponentId), eq7(components.id, parentComponentId))).limit(1);
         const resolvedParentId = parentResult.length > 0 ? parentResult[0].cuuid : parentComponentId;
         const children = await db2.select().from(components).where(or(eq7(components.parentId, resolvedParentId), eq7(components.parentId, parentComponentId)));
@@ -28292,21 +28666,16 @@ var init_postgresStorage = __esm({
           const parent = parentResult[0];
           currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || "0");
           const latestAudit = await db2.select().from(runningHoursAudit).where(or(eq7(runningHoursAudit.componentId, resolvedParentId), eq7(runningHoursAudit.componentId, parentComponentId))).orderBy(desc2(runningHoursAudit.enteredAtUTC)).limit(1);
-          if (latestAudit.length > 0) {
-            const latestDate = latestAudit[0].dateUpdatedLocal;
-            const parseDate6 = (dateStr) => {
-              const months = { "Jan": 0, "Feb": 1, "Mar": 2, "Apr": 3, "May": 4, "Jun": 5, "Jul": 6, "Aug": 7, "Sep": 8, "Oct": 9, "Nov": 10, "Dec": 11 };
-              const parts = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{4})\s*(\d{2})?:?(\d{2})?/);
-              if (parts) {
-                const [, day, month, year, hours = "00", minutes = "00"] = parts;
-                return new Date(parseInt(year), months[month], parseInt(day), parseInt(hours), parseInt(minutes));
+          {
+            const { selectWinningRhEvent: selectWinningRhEvent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+            const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+            const rhPool = await getPool2();
+            const winner = await selectWinningRhEvent2(rhPool, resolvedParentId);
+            if (winner) {
+              const newDay = parseReadingDayStrict(dateUpdated);
+              if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
+                throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
               }
-              return new Date(dateStr);
-            };
-            const latestParsedDate = parseDate6(latestDate);
-            const newParsedDate = parseDate6(dateUpdated);
-            if (newParsedDate < latestParsedDate) {
-              throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${latestDate}).`);
             }
           }
           if (mode === "setTotal" && value < currentRH && !isRenewalReset) {
@@ -28341,7 +28710,7 @@ var init_postgresStorage = __esm({
           let updatedComponents = 0;
           let auditsCreated = 0;
           if (parentResult.length > 0) {
-            await tx.execute(sql8`SELECT pg_advisory_xact_lock(hashtext(${resolvedParentId}))`);
+            await tx.execute(sql9`SELECT pg_advisory_xact_lock(hashtext(${resolvedParentId}))`);
             const freshParentResult = await tx.select().from(components).where(eq7(components.cuuid, resolvedParentId)).limit(1);
             if (freshParentResult.length > 0) {
               computeDerived(freshParentResult[0]);
@@ -28358,7 +28727,7 @@ var init_postgresStorage = __esm({
               console.error("[FieldLogger] rha cascade parent:", e);
             }
             if (!meterReplaced && !isRenewalReset) {
-              await this.accrueStampRhDelta(tx, freshParent.vesselId, freshParent.currentStamp, newRH - currentRH, readingDate.toISOString(), userId || null);
+              await this.accrueStampRhDelta(tx, freshParent.vesselId, freshParent.currentStamp, newRH - currentRH, dateUpdated, userId || null);
             }
             updatedComponents++;
             auditsCreated++;
@@ -28396,7 +28765,7 @@ var init_postgresStorage = __esm({
                 console.error("[FieldLogger] rha cascade inherited:", e);
               }
               if (!meterReplaced && !isRenewalReset) {
-                await this.accrueStampRhDelta(tx, inherited.vesselId || parentResult[0]?.vesselId || null, inherited.currentStamp, inheritedDelta, readingDate.toISOString(), userId || null);
+                await this.accrueStampRhDelta(tx, inherited.vesselId || parentResult[0]?.vesselId || null, inherited.currentStamp, inheritedDelta, dateUpdated, userId || null);
               }
               updatedComponents++;
               auditsCreated++;
@@ -28444,7 +28813,7 @@ var init_postgresStorage = __esm({
               console.error("[FieldLogger] rha cascade child:", e);
             }
             if (!meterReplaced && !isRenewalReset) {
-              await this.accrueStampRhDelta(tx, child.vesselId, child.currentStamp, structuralDelta, readingDate.toISOString(), userId || null);
+              await this.accrueStampRhDelta(tx, child.vesselId, child.currentStamp, structuralDelta, dateUpdated, userId || null);
             }
             updatedComponents++;
             auditsCreated++;
@@ -28615,10 +28984,10 @@ var init_postgresStorage = __esm({
       }
       async getFleetAdminMetrics() {
         const db2 = await getDb();
-        const makersResult = await db2.select({ count: sql8`count(*)` }).from(makers);
-        const masterListsResult = await db2.select({ count: sql8`count(*)` }).from(masterLists);
-        const fleetComponentsResult = await db2.select({ count: sql8`count(*)` }).from(components).where(eq7(components.dataScope, "fleet"));
-        const modelsResult = await db2.select({ count: sql8`count(distinct model)` }).from(components).where(sql8`model is not null`);
+        const makersResult = await db2.select({ count: sql9`count(*)` }).from(makers);
+        const masterListsResult = await db2.select({ count: sql9`count(*)` }).from(masterLists);
+        const fleetComponentsResult = await db2.select({ count: sql9`count(*)` }).from(components).where(eq7(components.dataScope, "fleet"));
+        const modelsResult = await db2.select({ count: sql9`count(distinct model)` }).from(components).where(sql9`model is not null`);
         return {
           totalMakers: Number(makersResult[0]?.count || 0),
           totalModels: Number(modelsResult[0]?.count || 0),
@@ -28806,7 +29175,7 @@ var init_postgresStorage = __esm({
         const normalizedName = locationName.trim().toUpperCase();
         const result = await db2.select().from(locations).where(and6(
           eq7(locations.vesselId, vesselId),
-          sql8`UPPER(TRIM(${locations.locationName})) = ${normalizedName}`
+          sql9`UPPER(TRIM(${locations.locationName})) = ${normalizedName}`
         ));
         return result[0];
       }
@@ -28868,7 +29237,7 @@ var init_postgresStorage = __esm({
       }
       async getSpareComponentLinkCountByVessel(vesselId) {
         const db2 = await getDb();
-        const result = await db2.select({ count: sql8`count(*)` }).from(spareComponentLinks).where(eq7(spareComponentLinks.vesselId, vesselId));
+        const result = await db2.select({ count: sql9`count(*)` }).from(spareComponentLinks).where(eq7(spareComponentLinks.vesselId, vesselId));
         return Number(result[0]?.count ?? 0);
       }
       async getSpareComponentLinksByComponent(componentId) {
@@ -28925,7 +29294,7 @@ var init_postgresStorage = __esm({
         if (!comp[0] || !comp[0].parentId) return [];
         const siblings = await db2.select({ cuuid: components.cuuid, name: components.name }).from(components).where(and6(
           eq7(components.parentId, comp[0].parentId),
-          sql8`${components.cuuid} != ${componentId}`
+          sql9`${components.cuuid} != ${componentId}`
         ));
         return siblings;
       }
@@ -28956,7 +29325,7 @@ var init_postgresStorage = __esm({
       }
       async backfillSiblingLinks(vesselId) {
         const db2 = await getDb();
-        const result = await db2.execute(sql8`
+        const result = await db2.execute(sql9`
       WITH existing_links AS (
         SELECT scl.spare_id, scl.spare_uuid, scl.component_id, scl.vessel_id, c.parent_id
         FROM spare_component_links scl
@@ -29299,7 +29668,7 @@ var init_postgresStorage = __esm({
         const result = await db2.select({
           id: locations.id,
           locationName: locations.locationName,
-          sparesCount: sql8`count(distinct ${spareLocationStock.spareId})`.as("spares_count")
+          sparesCount: sql9`count(distinct ${spareLocationStock.spareId})`.as("spares_count")
         }).from(spareLocationStock).innerJoin(locations, eq7(spareLocationStock.locationId, locations.id)).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(and6(
           eq7(spares.vesselId, vesselId),
           gt2(spareLocationStock.qty, 0)
@@ -29559,7 +29928,7 @@ var init_postgresStorage = __esm({
       }
       async getSparesWithInventoryByVessel(vesselId) {
         const db2 = await getDb();
-        const result = await db2.execute(sql8`
+        const result = await db2.execute(sql9`
       SELECT s.*,
         COALESCE(json_agg(DISTINCT jsonb_build_object(
           'locationId', sls.location_id,
@@ -29576,7 +29945,7 @@ var init_postgresStorage = __esm({
       LEFT JOIN locations l ON sls.location_id = l.id
       LEFT JOIN spare_component_links scl ON scl.spare_id = s.id
       LEFT JOIN components c ON scl.component_id = c.cuuid
-      WHERE ${vesselId === "all" ? sql8`TRUE` : sql8`s.vessel_id = ${vesselId}`}
+      WHERE ${vesselId === "all" ? sql9`TRUE` : sql9`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
         AND s.data_scope = 'vessel'
       GROUP BY s.id
@@ -29664,21 +30033,21 @@ var init_postgresStorage = __esm({
         const page = Math.max(1, Math.floor(opts.page || 1));
         const pageSize = Math.min(200, Math.max(1, Math.floor(opts.pageSize || 50)));
         const offset = (page - 1) * pageSize;
-        const dir = (opts.sortDir || "asc").toLowerCase() === "desc" ? sql8.raw("DESC") : sql8.raw("ASC");
+        const dir = (opts.sortDir || "asc").toLowerCase() === "desc" ? sql9.raw("DESC") : sql9.raw("ASC");
         const filters = [
-          sql8`s.deleted = false`,
-          sql8`s.data_scope = 'vessel'`
+          sql9`s.deleted = false`,
+          sql9`s.data_scope = 'vessel'`
         ];
         if (vesselId !== "all") {
-          filters.push(sql8`s.vessel_id = ${vesselId}`);
+          filters.push(sql9`s.vessel_id = ${vesselId}`);
         } else if (opts.vesselIds && opts.vesselIds.length > 0) {
           filters.push(
-            sql8`s.vessel_id = ANY(ARRAY[${sql8.join(opts.vesselIds.map((id) => sql8`${id}`), sql8`, `)}]::text[])`
+            sql9`s.vessel_id = ANY(ARRAY[${sql9.join(opts.vesselIds.map((id) => sql9`${id}`), sql9`, `)}]::text[])`
           );
         }
         if (opts.search && opts.search.trim()) {
           const q = `%${opts.search.trim()}%`;
-          filters.push(sql8`(
+          filters.push(sql9`(
         s.part_code ILIKE ${q} OR
         s.part_name ILIKE ${q} OR
         s.component_code ILIKE ${q} OR
@@ -29688,29 +30057,29 @@ var init_postgresStorage = __esm({
       )`);
         }
         if (opts.criticality === "Critical") {
-          filters.push(sql8`(s.critical = 'Critical' OR s.critical = 'Yes')`);
+          filters.push(sql9`(s.critical = 'Critical' OR s.critical = 'Yes')`);
         } else if (opts.criticality === "Non-critical") {
-          filters.push(sql8`(s.critical IS NULL OR (s.critical <> 'Critical' AND s.critical <> 'Yes'))`);
+          filters.push(sql9`(s.critical IS NULL OR (s.critical <> 'Critical' AND s.critical <> 'Yes'))`);
         }
         if (opts.rotation === "Rotation Items") {
-          filters.push(sql8`s.is_rotation_item = true`);
+          filters.push(sql9`s.is_rotation_item = true`);
         } else if (opts.rotation === "Non-Rotation Items") {
-          filters.push(sql8`(s.is_rotation_item IS NULL OR s.is_rotation_item = false)`);
+          filters.push(sql9`(s.is_rotation_item IS NULL OR s.is_rotation_item = false)`);
         }
         if (opts.stockStatus === "Low") {
-          filters.push(sql8`COALESCE(s.rob, 0) < COALESCE(s.min, 0)`);
+          filters.push(sql9`COALESCE(s.rob, 0) < COALESCE(s.min, 0)`);
         } else if (opts.stockStatus === "At Min") {
-          filters.push(sql8`COALESCE(s.rob, 0) = COALESCE(s.min, 0)`);
+          filters.push(sql9`COALESCE(s.rob, 0) = COALESCE(s.min, 0)`);
         } else if (opts.stockStatus === "OK") {
-          filters.push(sql8`COALESCE(s.rob, 0) > COALESCE(s.min, 0)`);
+          filters.push(sql9`COALESCE(s.rob, 0) > COALESCE(s.min, 0)`);
         }
         if (opts.activeOnly) {
-          filters.push(sql8`(s.is_active IS NULL OR s.is_active = true)`);
+          filters.push(sql9`(s.is_active IS NULL OR s.is_active = true)`);
         }
         if (opts.componentId && opts.componentId.trim()) {
           const cid = opts.componentId.trim();
           const cidPrefix = `${cid}.%`;
-          filters.push(sql8`(
+          filters.push(sql9`(
         s.component_code = ${cid}
         OR s.component_code LIKE ${cidPrefix}
         OR EXISTS (
@@ -29724,13 +30093,13 @@ var init_postgresStorage = __esm({
         }
         let whereClause = filters[0];
         for (let i = 1; i < filters.length; i++) {
-          whereClause = sql8`${whereClause} AND ${filters[i]}`;
+          whereClause = sql9`${whereClause} AND ${filters[i]}`;
         }
-        const countResult = await db2.execute(sql8`
+        const countResult = await db2.execute(sql9`
       SELECT COUNT(*)::int AS total FROM spares s WHERE ${whereClause}
     `);
         const total = Number(countResult.rows[0]?.total || 0);
-        const pageResult = await db2.execute(sql8`
+        const pageResult = await db2.execute(sql9`
       WITH filtered AS (
         SELECT * FROM spares s WHERE ${whereClause}
         ORDER BY s.part_code ${dir} NULLS LAST, s.id ASC
@@ -30082,9 +30451,9 @@ var init_postgresStorage = __esm({
           }).onConflictDoUpdate({
             target: [approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName],
             set: {
-              level1Enabled: sql8`EXCLUDED.level1_enabled`,
-              level2Enabled: sql8`EXCLUDED.level2_enabled`,
-              updatedByUuid: sql8`EXCLUDED.updated_by_uuid`,
+              level1Enabled: sql9`EXCLUDED.level1_enabled`,
+              level2Enabled: sql9`EXCLUDED.level2_enabled`,
+              updatedByUuid: sql9`EXCLUDED.updated_by_uuid`,
               updatedAt: /* @__PURE__ */ new Date()
             }
           }).returning();
@@ -31211,7 +31580,7 @@ var init_jobService = __esm({
 });
 
 // server/modules/running-hours/repositories/runningHoursRepository.ts
-import { desc as desc3, asc as asc3, eq as eq8, and as and7, gte as gte2, lte as lte2, or as or2, ilike as ilike3, sql as sql9, inArray as inArray3 } from "drizzle-orm";
+import { desc as desc3, asc as asc3, eq as eq8, and as and7, gte as gte2, lte as lte2, or as or2, ilike as ilike3, sql as sql10, inArray as inArray3 } from "drizzle-orm";
 async function getComponents(vesselId, vesselIds) {
   return storage.getComponents(vesselId, vesselIds);
 }
@@ -31267,11 +31636,8 @@ async function getRunningHoursAtDateBatch(masters, targetDate) {
   const db2 = await getDb();
   const { identifiers, idToCuuid } = buildIdentifierIndex(masters);
   if (identifiers.length === 0) return result;
-  const parsedDateExpr = sql9`CASE 
-    WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' 
-      THEN TO_TIMESTAMP(${runningHoursAudit.dateUpdatedLocal}, 'YYYY-MM-DD')
-    ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
-  END`;
+  const parsedDateExpr = readingDayLocalExpr();
+  const targetDay = targetReadingDay(targetDate);
   const parsedTimes = /* @__PURE__ */ new Map();
   const apply = (cuuid, runningHours, enteredAtUTC, parsedMs, isFallback, preferLatest) => {
     const existing = parsedTimes.get(cuuid);
@@ -31284,11 +31650,11 @@ async function getRunningHoursAtDateBatch(masters, targetDate) {
     componentId: runningHoursAudit.componentId,
     runningHours: runningHoursAudit.cumulativeRH,
     enteredAtUTC: runningHoursAudit.enteredAtUTC,
-    parsedAt: sql9`${parsedDateExpr}`
+    parsedAt: sql10`${parsedDateExpr}`
   }).from(runningHoursAudit).where(and7(
     inArray3(runningHoursAudit.componentId, identifiers),
-    sql9`${parsedDateExpr} <= ${targetDate}`
-  )).orderBy(runningHoursAudit.componentId, sql9`${parsedDateExpr} DESC`);
+    sql10`${parsedDateExpr} <= ${targetDay}::date`
+  )).orderBy(runningHoursAudit.componentId, sql10`${parsedDateExpr} DESC`);
   for (const row of primary) {
     const cuuid = idToCuuid.get(row.componentId);
     if (!cuuid) continue;
@@ -31308,11 +31674,11 @@ async function getRunningHoursAtDateBatch(masters, targetDate) {
       componentId: runningHoursAudit.componentId,
       runningHours: runningHoursAudit.cumulativeRH,
       enteredAtUTC: runningHoursAudit.enteredAtUTC,
-      parsedAt: sql9`${parsedDateExpr}`
+      parsedAt: sql10`${parsedDateExpr}`
     }).from(runningHoursAudit).where(and7(
       inArray3(runningHoursAudit.componentId, missingIds),
-      sql9`${parsedDateExpr} > ${targetDate}`
-    )).orderBy(runningHoursAudit.componentId, sql9`${parsedDateExpr} ASC`);
+      sql10`${parsedDateExpr} > ${targetDay}::date`
+    )).orderBy(runningHoursAudit.componentId, sql10`${parsedDateExpr} ASC`);
     for (const row of fallback) {
       const cuuid = idToCuuid.get(row.componentId);
       if (!cuuid) continue;
@@ -31443,7 +31809,7 @@ async function getRunningHoursHistory(query) {
     );
   }
   const whereClause = conditions.length > 0 ? and7(...conditions) : void 0;
-  const [countResult] = await db2.select({ count: sql9`count(*)` }).from(runningHoursAudit).where(whereClause);
+  const [countResult] = await db2.select({ count: sql10`count(*)` }).from(runningHoursAudit).where(whereClause);
   const total = Number(countResult?.count || 0);
   const totalPages = Math.ceil(total / query.pageSize);
   const offset = (query.page - 1) * query.pageSize;
@@ -31480,6 +31846,7 @@ var init_runningHoursRepository = __esm({
     init_storage();
     init_db();
     init_schema();
+    init_dateUpdatedLocalSql();
   }
 });
 
@@ -31492,8 +31859,10 @@ __export(rhTimelineValidationService_exports, {
   validateRHEntry: () => validateRHEntry
 });
 function parseDate2(dateStr) {
-  const d = new Date(dateStr);
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const d = parseReadingDayStrict(dateStr);
+  if (d) return d;
+  const now = /* @__PURE__ */ new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 function getDaysBetween(date1, date2) {
   const msPerDay = 24 * 60 * 60 * 1e3;
@@ -31509,38 +31878,14 @@ function formatDMY(isoDate) {
 }
 function normalizeAuditDate(audit) {
   if (audit.dateUpdatedLocal) {
-    const dateStr = audit.dateUpdatedLocal;
-    const parsed = new Date(dateStr);
-    if (!isNaN(parsed.getTime())) {
-      return parsed.toISOString().split("T")[0];
-    }
-    const formats = dateStr.match(/(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
-    if (formats) {
-      const months = {
-        Jan: "01",
-        Feb: "02",
-        Mar: "03",
-        Apr: "04",
-        May: "05",
-        Jun: "06",
-        Jul: "07",
-        Aug: "08",
-        Sep: "09",
-        Oct: "10",
-        Nov: "11",
-        Dec: "12"
-      };
-      const month = months[formats[2]];
-      if (month) {
-        return `${formats[3]}-${month}-${formats[1].padStart(2, "0")}`;
-      }
-    }
-    return dateStr;
+    const day = canonicalReadingDay(String(audit.dateUpdatedLocal));
+    if (day) return day;
   }
   if (audit.enteredAtUTC) {
-    return new Date(audit.enteredAtUTC).toISOString().split("T")[0];
+    const entered = audit.enteredAtUTC instanceof Date ? audit.enteredAtUTC : new Date(String(audit.enteredAtUTC));
+    if (!isNaN(entered.getTime())) return entered.toISOString().split("T")[0];
   }
-  return (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  return todayReadingDay();
 }
 async function getTimelineForComponent(componentId) {
   const audits = await getRunningHoursAudits(componentId);
@@ -31551,7 +31896,7 @@ async function getTimelineForComponent(componentId) {
     sourceReference: a.notes || void 0,
     id: a.id
   }));
-  entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  entries.sort((a, b) => a.date.localeCompare(b.date));
   return entries;
 }
 async function getValidRange(machineryId, completionDate) {
@@ -31798,9 +32143,7 @@ async function getRHTimeline(machineryId, dateFrom, dateTo) {
     });
   }
   filtered.sort((a, b) => {
-    const dateA = normalizeAuditDate(a);
-    const dateB = normalizeAuditDate(b);
-    return new Date(dateA).getTime() - new Date(dateB).getTime();
+    return normalizeAuditDate(a).localeCompare(normalizeAuditDate(b));
   });
   const entries = [];
   let prevRH = null;
@@ -31901,6 +32244,7 @@ var init_rhTimelineValidationService = __esm({
   "server/modules/running-hours/services/rhTimelineValidationService.ts"() {
     "use strict";
     init_runningHoursRepository();
+    init_readingDate();
     MAX_HOURS_PER_DAY = 25;
     HIGH_UTILIZATION_THRESHOLD = 20;
   }
@@ -32100,7 +32444,8 @@ var init_workOrderService = __esm({
                       }
                     );
                   }
-                  const completionDate = updatesAny.dateOfCompletion || updatesAny.completionDateTime?.split("T")[0] || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+                  const { requireReadingDayInput: reqRhDate, todayReadingDay: todayRhDay } = await Promise.resolve().then(() => (init_readingDate(), readingDate_exports));
+                  const completionDate = reqRhDate(updatesAny.dateOfCompletion ?? null, "completion date") || reqRhDate(updatesAny.completionDateTime?.split("T")[0] ?? null, "completion date") || todayRhDay();
                   const validation = await validateRHEntry3(component.cuuid, completionDate, runningHours);
                   updatesAny.completionRHValidationDetails = {
                     isValid: validation.isValid,
@@ -32129,6 +32474,9 @@ var init_workOrderService = __esm({
                 }
               }
             } catch (err) {
+              if (err instanceof ValidationError || err?.name === "ValidationError" || err?.code === "RH_INVALID_READING_DATE") {
+                throw err;
+              }
               console.warn(`\u26A0\uFE0F [Layer 7] RH audit trail creation failed: ${err.message}`);
             }
           }
@@ -34620,8 +34968,10 @@ var init_hodResolutionService = __esm({
 
 // server/modules/running-hours/utils/rhValidation.ts
 function getCalendarDate(dateStr) {
-  const date2 = new Date(dateStr);
-  return new Date(Date.UTC(date2.getUTCFullYear(), date2.getUTCMonth(), date2.getUTCDate()));
+  const strict = parseReadingDayStrict(dateStr);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(dateStr);
+  return canonical ? parseReadingDayStrict(canonical) : null;
 }
 function getDaysBetweenCalendarDates(date1, date2) {
   const msPerDay = 24 * 60 * 60 * 1e3;
@@ -34629,8 +34979,8 @@ function getDaysBetweenCalendarDates(date1, date2) {
 }
 function formatDMY2(dateStr) {
   if (!dateStr) return dateStr;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  const d = getCalendarDate(dateStr);
+  if (!d) return dateStr;
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const day = String(d.getUTCDate()).padStart(2, "0");
   return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
@@ -34640,9 +34990,9 @@ function validateRunningHoursIncrease(input) {
   const requestedIncrease = newRH - currentRH;
   let daysSinceLastUpdate = 0;
   let sameDayUpdate = false;
-  if (componentLastUpdated) {
-    const lastCalendarDate = getCalendarDate(componentLastUpdated);
-    const newCalendarDate = getCalendarDate(newUpdateDate);
+  const lastCalendarDate = componentLastUpdated ? getCalendarDate(componentLastUpdated) : null;
+  const newCalendarDate = getCalendarDate(newUpdateDate);
+  if (lastCalendarDate && newCalendarDate) {
     daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
     if (daysSinceLastUpdate < 0) {
       const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
@@ -34653,7 +35003,7 @@ function validateRunningHoursIncrease(input) {
         daysSinceLastUpdate,
         lastUpdateDate: componentLastUpdated,
         backdatedLower: requestedIncrease <= 0,
-        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY2(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY2(componentLastUpdated)}). Running hours can only be recorded on or after the latest reading.`,
+        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY2(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY2(componentLastUpdated || "")}). Running hours can only be recorded on or after the latest reading.`,
         requiresAdminOverride: !canOverride2
       };
     }
@@ -34722,43 +35072,20 @@ function safeParseDate(value) {
   }
   const trimmed = String(value).trim();
   if (!trimmed) return null;
-  const d = new Date(trimmed);
-  if (!isNaN(d.getTime())) return d;
-  const months = {
-    jan: 0,
-    feb: 1,
-    mar: 2,
-    apr: 3,
-    may: 4,
-    jun: 5,
-    jul: 6,
-    aug: 7,
-    sep: 8,
-    oct: 9,
-    nov: 10,
-    dec: 11
-  };
-  const match = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
-  if (match) {
-    const [, day, mon, year, hh = "0", mm = "0"] = match;
-    const month = months[mon.toLowerCase()];
-    if (month !== void 0) {
-      const parsed = new Date(
-        parseInt(year),
-        month,
-        parseInt(day),
-        parseInt(hh),
-        parseInt(mm)
-      );
-      return isNaN(parsed.getTime()) ? null : parsed;
-    }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}/.test(trimmed)) {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return d;
   }
-  return null;
+  const strict = parseReadingDayStrict(trimmed);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(trimmed);
+  return canonical ? parseReadingDayStrict(canonical) : null;
 }
 var MAX_HOURS_PER_DAY2;
 var init_rhValidation = __esm({
   "server/modules/running-hours/utils/rhValidation.ts"() {
     "use strict";
+    init_readingDate();
     MAX_HOURS_PER_DAY2 = 25;
   }
 });
@@ -34784,7 +35111,13 @@ __export(runningHoursService_exports, {
 });
 import { z as z2 } from "zod";
 function resolveLastUpdated(component) {
-  return component.lastUpdated || (component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt).toISOString() : null) || (component.updatedAt ? new Date(component.updatedAt).toISOString() : null);
+  const own = canonicalizeReadingDateInput(component.lastUpdated ?? null);
+  if (own) return own;
+  const master = canonicalizeReadingDateInput(
+    component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt) : null
+  );
+  if (master) return master;
+  return canonicalizeReadingDateInput(component.updatedAt ? new Date(component.updatedAt) : null);
 }
 async function getAuditsForComponent(componentId) {
   return getRunningHoursAudits(componentId);
@@ -34794,7 +35127,18 @@ async function createAudit(body) {
   if (!parseResult.success) {
     throw new ValidationError("Invalid audit data", { details: parseResult.error.errors });
   }
-  return createRunningHoursAudit(parseResult.data);
+  const data = parseResult.data;
+  if (data.dateUpdatedLocal !== void 0 && data.dateUpdatedLocal !== null && String(data.dateUpdatedLocal).trim() !== "") {
+    const canonical = canonicalizeReadingDateInput(String(data.dateUpdatedLocal));
+    if (!canonical) {
+      throw new ValidationError(
+        `Invalid reading date "${data.dateUpdatedLocal}". Use a real calendar date (e.g. 2026-08-17).`,
+        { code: "RH_INVALID_READING_DATE" }
+      );
+    }
+    data.dateUpdatedLocal = canonical;
+  }
+  return createRunningHoursAudit(data);
 }
 async function cascadeUpdate(body) {
   const parseResult = cascadeRunningHoursSchema.safeParse(body);
@@ -34802,6 +35146,7 @@ async function cascadeUpdate(body) {
     throw new ValidationError("Invalid cascade data", { details: parseResult.error.errors });
   }
   const validatedData = parseResult.data;
+  validatedData.dateUpdated = requireReadingDayInput(validatedData.dateUpdated ?? null) ?? todayReadingDay();
   const parentComponent = await getComponent(validatedData.parentComponentId);
   if (!parentComponent) {
     throw new NotFoundError("Parent component not found");
@@ -35032,11 +35377,12 @@ async function updateChildRH(componentId, body) {
   const previousRH = component.currentCumulativeRH || "0.00";
   const currentRHValue = parseFloat(previousRH);
   const componentLastUpdated = resolveLastUpdated(component);
+  const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
   const validation = validateRunningHoursIncrease({
     currentRH: currentRHValue,
     newRH: newRHValue,
     componentLastUpdated,
-    newUpdateDate: dateUpdated || (/* @__PURE__ */ new Date()).toISOString(),
+    newUpdateDate: canonicalDay,
     userRole: userRole || "Ship",
     adminOverride: adminOverride || false
   });
@@ -35053,19 +35399,15 @@ async function updateChildRH(componentId, body) {
     });
   }
   const newRHFormatted = newRHValue.toFixed(2);
-  const stampReadingIso = (() => {
-    const d = dateUpdated ? new Date(dateUpdated) : /* @__PURE__ */ new Date();
-    return isNaN(d.getTime()) ? (/* @__PURE__ */ new Date()).toISOString() : d.toISOString();
-  })();
   const atomicResult = await updateChildRhWithStampAccrual({
     componentId,
     newRHValue,
-    lastUpdated: dateUpdated || (/* @__PURE__ */ new Date()).toISOString(),
-    readingDateIso: stampReadingIso,
+    lastUpdated: canonicalDay,
+    readingDateIso: canonicalDay,
     userId: userId || null
   });
   const committedPreviousRH = atomicResult.previousRH.toFixed(2);
-  const auditDateLocal = dateUpdated ? dateUpdated.split("T")[0] : (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const auditDateLocal = canonicalDay;
   await createRunningHoursAudit({
     vesselId: component.vesselId || "",
     componentId,
@@ -35233,6 +35575,7 @@ async function updateMasterRH(componentId, body) {
     throw new ValidationError("Invalid request body", { details: parseResult.error.format() });
   }
   const { newRHValue, updateSource, userId, userUuid, userRole, adminOverride, comments, dateUpdated } = parseResult.data;
+  const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
   const component = await getComponent(componentId);
   if (!component) {
     throw new NotFoundError("Component not found");
@@ -35247,7 +35590,7 @@ async function updateMasterRH(componentId, body) {
       currentRH: currentRHValue,
       newRH: newRHValue,
       componentLastUpdated: lastUpdate,
-      newUpdateDate: dateUpdated || (/* @__PURE__ */ new Date()).toISOString(),
+      newUpdateDate: canonicalDay,
       userRole: userRole || "Ship",
       adminOverride: adminOverride || false
     });
@@ -35273,7 +35616,8 @@ async function updateMasterRH(componentId, body) {
     comments,
     // Persist the reading date (WO completion date / RH Section "Date Updated") so the stored
     // reading and the component's last-updated reflect when the hours were observed, not "now".
-    dateUpdated
+    // Task #427: canonical YYYY-MM-DD only.
+    dateUpdated: canonicalDay
   });
   let woGenerationResult = { rhJobsChecked: 0, rhWOsGenerated: 0 };
   try {
@@ -35359,6 +35703,7 @@ var init_runningHoursService = __esm({
     "use strict";
     init_runningHoursRepository();
     init_rhValidation();
+    init_readingDate();
     init_errors();
     init_schema();
     updateRHConfigSchema2 = z2.object({
@@ -36631,14 +36976,8 @@ async function updateWorkOrder(id, body) {
       }
       const rhCounterType = (rhComp?.rhCounterType || "MASTER").toUpperCase();
       const rhValue = parseInt(rhRaw);
-      const normRhDate = (d) => {
-        if (!d) return void 0;
-        if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split("T")[0];
-        const m = d.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
-        if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-        const p = new Date(d);
-        return !isNaN(p.getTime()) ? p.toISOString().split("T")[0] : void 0;
-      };
+      const { requireReadingDayInput: requireReadingDayInput2 } = await Promise.resolve().then(() => (init_readingDate(), readingDate_exports));
+      const normRhDate = (d) => requireReadingDayInput2(d ?? null, "reading/completion date") ?? void 0;
       const completionDateNorm = normRhDate(existingWO2.completionDateTime || existingWO2.dateCompleted || updateData.completionDateTime);
       const readingDateNorm = normRhDate(existingWO2.currentReadingDate || updateData.currentReadingDate) || completionDateNorm;
       if (!isShipForRhWrite && !readingDateNorm) {
@@ -38263,7 +38602,7 @@ __export(certificateRepository_exports, {
   insertCertificateData: () => insertCertificateData,
   updateCertificateData: () => updateCertificateData
 });
-import { eq as eq16, and as and13, asc as asc4, inArray as inArray4, or as or3, isNull as isNull3, sql as sql11 } from "drizzle-orm";
+import { eq as eq16, and as and13, asc as asc4, inArray as inArray4, or as or3, isNull as isNull3, sql as sql12 } from "drizzle-orm";
 function getDb3() {
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -38347,7 +38686,7 @@ async function insertCertificateData(data) {
   if (!db2) return null;
   const inserted = await db2.insert(vesselCertificateData).values(data).onConflictDoNothing({
     target: [vesselCertificateData.vesselId, vesselCertificateData.masterId],
-    where: sql11`${vesselCertificateData.isDeleted} = false`
+    where: sql12`${vesselCertificateData.isDeleted} = false`
   }).returning();
   if (inserted.length > 0) return inserted;
   const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
@@ -38381,7 +38720,7 @@ __export(surveyRepository_exports, {
   insertSurveyData: () => insertSurveyData,
   updateSurveyData: () => updateSurveyData
 });
-import { eq as eq17, and as and14, asc as asc5, inArray as inArray5, or as or4, sql as sql12 } from "drizzle-orm";
+import { eq as eq17, and as and14, asc as asc5, inArray as inArray5, or as or4, sql as sql13 } from "drizzle-orm";
 function getDb4() {
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -38392,7 +38731,7 @@ async function getApplicableSurveys() {
   if (!db2) return null;
   return db2.select().from(vesselSurveyApplicability).where(and14(
     eq17(vesselSurveyApplicability.isApplicable, true),
-    or4(eq17(vesselSurveyApplicability.isDeleted, false), sql12`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or4(eq17(vesselSurveyApplicability.isDeleted, false), sql13`${vesselSurveyApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getMasterSurveysByIds(masterIds) {
@@ -38473,7 +38812,7 @@ var init_surveyRepository = __esm({
 });
 
 // server/modules/reports/repositories/reportRepository.ts
-import { eq as eq22, and as and19, gte as gte3, desc as desc4, sql as sql15 } from "drizzle-orm";
+import { eq as eq22, and as and19, gte as gte3, desc as desc4, sql as sql16 } from "drizzle-orm";
 async function getVessels6() {
   return storage.getVessels();
 }
@@ -38550,7 +38889,7 @@ __export(monthlySnapshotService_exports, {
   getSnapshotDetail: () => getSnapshotDetail,
   regenerateSnapshots: () => regenerateSnapshots
 });
-import { eq as eq24, and as and21, sql as sql17 } from "drizzle-orm";
+import { eq as eq24, and as and21, sql as sql18 } from "drizzle-orm";
 function buildVesselGraceSettings2(vesselSettings) {
   if (!vesselSettings) {
     return {
@@ -38719,9 +39058,9 @@ async function ensureSnapshotsExist(vesselId, year, month) {
       }).onConflictDoUpdate({
         target: [monthlySnapshots.vesselId, monthlySnapshots.snapshotMonth, monthlySnapshots.snapshotType, monthlySnapshots.category],
         set: {
-          count: sql17`excluded.count`,
-          workOrderIds: sql17`excluded.work_order_ids`,
-          generatedAt: sql17`NOW()`
+          count: sql18`excluded.count`,
+          workOrderIds: sql18`excluded.work_order_ids`,
+          generatedAt: sql18`NOW()`
         }
       });
     }
@@ -38740,9 +39079,9 @@ async function ensureSnapshotsExist(vesselId, year, month) {
       }).onConflictDoUpdate({
         target: [monthlySnapshots.vesselId, monthlySnapshots.snapshotMonth, monthlySnapshots.snapshotType, monthlySnapshots.category],
         set: {
-          count: sql17`excluded.count`,
-          workOrderIds: sql17`excluded.work_order_ids`,
-          generatedAt: sql17`NOW()`
+          count: sql18`excluded.count`,
+          workOrderIds: sql18`excluded.work_order_ids`,
+          generatedAt: sql18`NOW()`
         }
       });
     }
@@ -40876,6 +41215,7 @@ var init_shipskartReconcilerService = __esm({
 var shipskartCatalogueLinkRepository_exports = {};
 __export(shipskartCatalogueLinkRepository_exports, {
   ensurePending: () => ensurePending,
+  findCrossVesselSkuCollisions: () => findCrossVesselSkuCollisions,
   findSkuCodeOtherVessel: () => findSkuCodeOtherVessel,
   getStatusMap: () => getStatusMap,
   markFailed: () => markFailed,
@@ -40974,6 +41314,21 @@ async function findSkuCodeOtherVessel(skuCode, vesselId) {
   );
   return r.rows.length ? rowToLink(r.rows[0]) : null;
 }
+async function findCrossVesselSkuCollisions(vesselId, sanitizedCodes) {
+  if (!sanitizedCodes.length) return [];
+  const p = await pool3();
+  const r = await p.query(
+    `SELECT l.remote_code AS "skuCode", l.vessel_id AS "otherVesselId", v.name AS "otherVesselName"
+       FROM shipskart_catalogue_links l
+       LEFT JOIN vessels v ON v.vuuid = l.vessel_id
+      WHERE l.entity_type='sku' AND l.push_status='pushed'
+        AND l.vessel_id IS DISTINCT FROM $1
+        AND l.remote_code = ANY($2::text[])
+      ORDER BY l.remote_code`,
+    [vesselId, sanitizedCodes]
+  );
+  return r.rows;
+}
 async function statusSummary() {
   const p = await pool3();
   const r = await p.query(
@@ -41043,6 +41398,13 @@ function getReferenceIds() {
     packTypeName: null
   };
 }
+function fitProductCode(fullSanitized) {
+  if (fullSanitized.length <= PRODUCT_CODE_MAX) return fullSanitized;
+  let h = 0;
+  for (let i = 0; i < fullSanitized.length; i++) h = h * 31 + fullSanitized.charCodeAt(i) >>> 0;
+  const tag = h.toString(36).toUpperCase().padStart(7, "0").slice(-7);
+  return `${fullSanitized.slice(0, PRODUCT_CODE_MAX - 8)}-${tag}`.replace(/-+/g, "-");
+}
 function deriveCodeChain(componentCode) {
   const code = String(componentCode || "").trim();
   if (!code) return [];
@@ -41065,7 +41427,8 @@ function buildCategoryPayload(opts) {
       categoryCode: opts.categoryCode,
       allowChildren: opts.hasChildren,
       status: 1,
-      description: opts.name,
+      // Rev01: description is the PLAIN name (no code prefix) even when `name` is coded.
+      description: opts.description ?? opts.name,
       impaChapterId: null,
       impaChapterName: null,
       impaGroupId: null,
@@ -41091,14 +41454,16 @@ function buildCategoryMappingPayload(opts) {
 }
 function buildProductMasterPayload(opts) {
   const c = opts.component;
+  const displayName = (opts.nameStyle ?? "coded") === "coded" ? codedName(c.componentCode, c.name) : c.name;
   return {
     data: {
-      productCode: sanitizeCode(`${opts.vesselCode}-${c.componentCode}`),
-      // COLLISION SAFETY: see header; charset per their validation
-      name: c.name,
+      productCode: productCodeFor(opts.vesselCode, c.componentCode),
+      // COLLISION SAFETY: see header; charset + 50-char cap per their validation
+      name: displayName,
       categoryId: opts.categoryId,
       categoryName: opts.categoryName,
       description: c.name,
+      // Rev01: plain name only, no code prefix
       status: "Active",
       impaCode: null,
       issaCode: null,
@@ -41108,9 +41473,11 @@ function buildProductMasterPayload(opts) {
       isActive: true,
       searchKeywords: slugify(c.name),
       make: c.maker ?? null,
+      // Rev01 (Jeevan's correction): the COMPONENT's maker
       model: c.model ?? null,
       serialNumber: c.serialNo ?? null,
-      year: null,
+      year: yearFromInstallationDate(c.installationDate),
+      // Rev01: from installation_date
       partNumber: null
     }
   };
@@ -41148,8 +41515,9 @@ function buildSkuPayload(src, product, category, ref) {
       unitOfMeasurementName: src.uomName || ref.unitOfMeasurementName,
       countryId: null,
       countryOfOrigin: null,
-      productSpecifications: {}
-      // Sachin §3: {} on create; free text lives in skuDescription
+      // Rev01: real spec pairs when the caller has them (their Postman sample shows an
+      // object of name/value strings); {} otherwise. Free text still lives in skuDescription.
+      productSpecifications: src.specs && Object.keys(src.specs).length ? src.specs : {}
     }
   };
 }
@@ -41160,10 +41528,17 @@ function buildSkuFromSpare(spare, product, category, ref) {
     description: [spare.specification, spare.note].filter(Boolean).join(" | ") || null,
     partNumber: spare.partNumber,
     make: spare.maker,
-    model: spare.model,
+    // Rev01 (Jeevan's correction): the SPARE's maker
+    model: spare.partNumber ?? null,
+    // Rev01: part number doubles as the model field
     manufacturerName: spare.maker,
     uomName: spare.uom,
-    unitCost: spare.unitCost != null ? Number(spare.unitCost) : null
+    unitCost: 0,
+    // Rev01: baseMrp always 0 for spares (stores keep unit_cost)
+    specs: {
+      ...spare.drawingNumber ? { drawingNumber: String(spare.drawingNumber) } : {},
+      ...spare.positionNumber ? { positionNumber: String(spare.positionNumber) } : {}
+    }
   }, product, category, ref);
 }
 function buildSkuFromStoreItem(item, product, category, ref) {
@@ -41186,7 +41561,7 @@ function buildCatalogueAddPayload(opts) {
       smcTenantId: opts.smc.smcTenantId,
       vesselId: opts.vessel.vesselId,
       vesselName: opts.vessel.vesselName,
-      productId: opts.productId,
+      productId: opts.skuId,
       status: 1,
       isLocked: false,
       type: "ProductMaster",
@@ -41199,20 +41574,33 @@ function buildCatalogueAddPayload(opts) {
     }
   };
 }
-var sanitizeCode, slugify;
+var sanitizeCode, PRODUCT_CODE_MAX, productCodeFor, slugify, codedName, yearFromInstallationDate, padCategoryCode;
 var init_shipskartCatalogueMapper = __esm({
   "server/modules/shipskart/services/shipskartCatalogueMapper.ts"() {
     "use strict";
     sanitizeCode = (s) => String(s || "").toUpperCase().trim().replace(/[^A-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-    slugify = (s) => String(s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    PRODUCT_CODE_MAX = 50;
+    productCodeFor = (vesselCode, componentCode) => fitProductCode(sanitizeCode(`${vesselCode}-${componentCode}`));
+    slugify = (s) => {
+      const base = String(s || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80).replace(/^-+|-+$/g, "");
+      return base || "item";
+    };
+    codedName = (code, name) => name ? `${code} - ${name}` : code;
+    yearFromInstallationDate = (v) => {
+      const m = /(\d{4})(?!.*\d{4})/.exec(String(v ?? ""));
+      return m ? m[1] : null;
+    };
+    padCategoryCode = (code) => String(code).length >= 3 ? String(code) : `C-${code}`;
   }
 });
 
 // server/modules/shipskart/services/shipskartCataloguePushService.ts
 var shipskartCataloguePushService_exports = {};
 __export(shipskartCataloguePushService_exports, {
+  findRemoteSpareByCode: () => findRemoteSpareByCode,
   getLastRunInfo: () => getLastRunInfo,
   isCataloguePushRunning: () => isCataloguePushRunning,
+  preflightVesselCatalogue: () => preflightVesselCatalogue,
   pushVesselCatalogue: () => pushVesselCatalogue
 });
 async function requestWithBackoff(method, path14, opts) {
@@ -41225,6 +41613,14 @@ async function requestWithBackoff(method, path14, opts) {
     r = await authorizedB2bRequest(method, path14, opts);
   }
   return r;
+}
+async function findRemoteSpareByCode(skuCode) {
+  const r = await requestWithBackoff("GET", `/integration/SAIL/get-all-spare-part?filterQuery=${encodeURIComponent(`skuCode_eq=${skuCode}`)}&pageSize=5`);
+  if (!r.ok || !Array.isArray(r.json?.items)) {
+    throw new Error(`spare lookup by code ${skuCode} failed: HTTP ${r.status} ${JSON.stringify(r.json ?? r.text)?.slice(0, 200)}`);
+  }
+  const hit = r.json.items.find((i) => String(i.skuCode) === skuCode) ?? null;
+  return hit?.id ? { id: String(hit.id), skuCode: String(hit.skuCode), productId: hit.productId ? String(hit.productId) : null } : null;
 }
 function isCataloguePushRunning(vesselId) {
   return inFlight.has(vesselId);
@@ -41283,8 +41679,8 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
     if (!link) throw new Error(`Vessel ${v.name} has no pushed Shipskart vessel link \u2014 push the vessel first (Stage 2 reconciler)`);
     const ref = getReferenceIds();
     const comps = (await pool4.query(
-      `SELECT DISTINCT c.cuuid, c.component_code, c.name, c.maker, c.model, c.serial_no
-         FROM components c JOIN spares s ON s.component_id=c.cuuid AND s.is_deleted=false
+      `SELECT c.cuuid, c.component_code, c.name, c.maker, c.model, c.serial_no, c.installation_date
+         FROM components c
         WHERE c.vessel_id=$1 AND c.is_deleted=false AND c.component_code IS NOT NULL`,
       [vesselId]
     )).rows;
@@ -41295,7 +41691,8 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
     const nameByCode = new Map(allComps.map((c) => [c.component_code, c.name]));
     const spares2 = (await pool4.query(
       `SELECT suuid, component_id, part_code "partCode", part_name "partName", part_number "partNumber",
-              maker, model, uom, unit_cost "unitCost", specification, note
+              maker, model, uom, unit_cost "unitCost", specification, note,
+              drawing_number "drawingNumber", position_number "positionNumber"
          FROM spares WHERE vessel_id=$1 AND is_deleted=false ORDER BY part_code`,
       [vesselId]
     )).rows;
@@ -41307,13 +41704,14 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
     const cats = /* @__PURE__ */ new Map();
     for (const c of comps) {
       const chain = deriveCodeChain(c.component_code);
-      const catChain = chain.slice(0, -1);
+      const catChain = chain.length > 1 ? chain.slice(0, -1) : chain;
       catChain.forEach((code, i) => {
-        if (!cats.has(code)) cats.set(code, {
-          code,
-          name: nameByCode.get(code) || code,
+        const key = padCategoryCode(code);
+        if (!cats.has(key)) cats.set(key, {
+          code: key,
+          name: codedName(code, nameByCode.get(code)),
           level: i + 1,
-          parent: i > 0 ? catChain[i - 1] : null,
+          parent: i > 0 ? padCategoryCode(catChain[i - 1]) : null,
           hasChildren: true
         });
       });
@@ -41361,11 +41759,11 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       const r = await requestWithBackoff(
         "POST",
         "/integration/SAIL/create-category",
-        { body: buildCategoryPayload({ name: cat.name, categoryCode: cat.code, level: cat.level, hasChildren: cat.hasChildren }) }
+        { body: buildCategoryPayload({ name: cat.name, categoryCode: cat.code, level: cat.level, hasChildren: cat.hasChildren, description: nameByCode.get(cat.code) }) }
       );
       await sleep(PACE_MS);
       if (r.ok) {
-        await markPushed(l.id, r.json?.id ?? null);
+        await markPushed(l.id, r.json?.data?.id ?? null);
         res.categories.pushed++;
       } else if (isDuplicateAnswer(r.status, r.json)) {
         await markPushed(l.id);
@@ -41390,11 +41788,13 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         continue;
       }
       const r = await requestWithBackoff("POST", "/integration/SAIL/category-mapping", {
+        // Rev01: ids are theirs, NAMES are built from OUR components table (coded format) —
+        // never Shipskart's stored name (which may predate the format change).
         body: buildCategoryMappingPayload({
           categoryId: child.id,
-          categoryName: child.name,
+          categoryName: cat.name,
           parentCategoryId: parent.id,
-          parentCategoryName: parent.name
+          parentCategoryName: cats.get(cat.parent)?.name ?? parent.name
         })
       });
       await sleep(PACE_MS);
@@ -41411,7 +41811,7 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
     const productSpecs = [];
     for (const c of comps) {
       const chain = deriveCodeChain(c.component_code);
-      const catCode = chain.length > 1 ? chain[chain.length - 2] : chain[0];
+      const catCode = padCategoryCode(chain.length > 1 ? chain[chain.length - 2] : chain[0]);
       const rc = remoteCats.get(catCode);
       if (!rc) {
         res.products.failed++;
@@ -41420,11 +41820,11 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       }
       productSpecs.push({
         localKey: c.cuuid,
-        code: sanitizeCode(`${vesselCode}-${c.component_code}`),
+        code: productCodeFor(vesselCode, c.component_code),
         catCode,
         payload: buildProductMasterPayload({
           vesselCode,
-          component: { componentCode: c.component_code, name: c.name, maker: c.maker, model: c.model, serialNo: c.serial_no },
+          component: { componentCode: c.component_code, name: c.name, maker: c.maker, model: c.model, serialNo: c.serial_no, installationDate: c.installation_date },
           categoryId: rc.id,
           categoryName: rc.name
         })
@@ -41440,13 +41840,15 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       }
       productSpecs.push({
         localKey: `STORES:${cat}`,
-        code: sanitizeCode(`${vesselCode}-${code}`),
+        code: productCodeFor(vesselCode, code),
         catCode: code,
         payload: buildProductMasterPayload({
           vesselCode,
           component: { componentCode: code, name: `Stores \u2014 ${cat}` },
           categoryId: rc.id,
-          categoryName: rc.name
+          categoryName: rc.name,
+          nameStyle: "plain"
+          // synthetic stores master — coded prefix would read as noise
         })
       });
     }
@@ -41462,7 +41864,7 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       const r = await requestWithBackoff("POST", "/integration/SAIL/create-product-masters", { body: spec.payload });
       await sleep(PACE_MS);
       if (r.ok || isDuplicateAnswer(r.status, r.json)) {
-        await markPushed(l.id, r.json?.id ?? null);
+        await markPushed(l.id, r.json?.data?.id ?? null);
         res.products.pushed++;
       } else {
         await markFailed(l.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
@@ -41483,7 +41885,8 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         skuCode: sanitizeCode(s.partCode),
         skuName: s.partName,
         make: s.maker,
-        model: s.model,
+        model: s.partNumber,
+        // Rev01: part number doubles as model
         productKey: s.component_id,
         buildSku: () => {
           const pr = productByLocal.get(s.component_id);
@@ -41518,6 +41921,7 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         continue;
       }
       const sl = await ensurePending("sku", job.localKey, vesselId, job.skuCode);
+      let skuId = sl.remoteId ?? null;
       const firstHolder = sanitizedSeen.get(job.skuCode);
       if (firstHolder && firstHolder !== job.localKey) {
         await markFailed(sl.id, `SANITIZE COLLISION: code '${job.skuCode}' also produced by ${firstHolder} in this vessel \u2014 needs human decision`);
@@ -41529,24 +41933,61 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       if (sl.pushStatus !== "pushed") {
         const clash = await findSkuCodeOtherVessel(job.skuCode, vesselId);
         if (clash) {
-          await markFailed(sl.id, `SKU CODE COLLISION: '${job.skuCode}' already pushed for vessel ${clash.vesselId} \u2014 needs human decision`);
-          res.skus.failed++;
-          res.errors.push(`sku ${job.skuCode}: cross-vessel collision`);
-          continue;
+          try {
+            const remote = await findRemoteSpareByCode(job.skuCode);
+            await sleep(PACE_MS);
+            if (remote) {
+              await markPushedWithWarning(sl.id, remote.id, `LINKED (shared): SKU '${job.skuCode}' exists on Shipskart (first pushed for vessel ${clash.vesselId}) \u2014 reused id, not re-created`);
+              skuId = remote.id;
+              res.skus.pushed++;
+              res.warnings.push(`sku ${job.skuCode}: linked to existing (shared with vessel ${clash.vesselId})`);
+            } else {
+              res.warnings.push(`sku ${job.skuCode}: ledger says shared with ${clash.vesselId} but absent on Shipskart \u2014 creating`);
+            }
+          } catch (lookupErr) {
+            await markFailed(sl.id, `LOOKUP FAILED for shared SKU '${job.skuCode}': ${String(lookupErr?.message || lookupErr).slice(0, 300)} \u2014 retry later`);
+            res.skus.failed++;
+            res.errors.push(`sku ${job.skuCode}: lookup failed`);
+            continue;
+          }
         }
-        const r = await requestWithBackoff("POST", "/integration/SAIL/create-spare-part", { body: job.buildSku() });
-        await sleep(PACE_MS);
-        if (r.ok || isDuplicateAnswer(r.status, r.json)) {
-          await markPushed(sl.id, r.json?.id ?? null);
-          res.skus.pushed++;
-          consecutive429 = 0;
-        } else {
-          await markFailed(sl.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
-          res.skus.failed++;
-          res.errors.push(`sku ${job.skuCode}: ${r.status}`);
-          if (r.status === 429) consecutive429++;
-          else consecutive429 = 0;
-          continue;
+        if (!skuId) {
+          const r = await requestWithBackoff("POST", "/integration/SAIL/create-spare-part", { body: job.buildSku() });
+          await sleep(PACE_MS);
+          if (r.ok && r.json?.data?.id) {
+            await markPushed(sl.id, r.json.data.id);
+            skuId = String(r.json.data.id);
+            res.skus.pushed++;
+            consecutive429 = 0;
+          } else if (isDuplicateAnswer(r.status, r.json) || r.status === 409) {
+            try {
+              const remote = await findRemoteSpareByCode(job.skuCode);
+              await sleep(PACE_MS);
+              if (remote) {
+                await markPushed(sl.id, remote.id);
+                skuId = remote.id;
+                res.skus.pushed++;
+                consecutive429 = 0;
+              } else {
+                await markFailed(sl.id, `${r.status} duplicate but lookup by code found nothing \u2014 ask Shipskart which record holds '${job.skuCode}'`);
+                res.skus.failed++;
+                res.errors.push(`sku ${job.skuCode}: duplicate but not found by lookup`);
+                continue;
+              }
+            } catch (lookupErr) {
+              await markFailed(sl.id, `${r.status} duplicate; id lookup failed: ${String(lookupErr?.message || lookupErr).slice(0, 300)}`);
+              res.skus.failed++;
+              res.errors.push(`sku ${job.skuCode}: duplicate, lookup failed`);
+              continue;
+            }
+          } else {
+            await markFailed(sl.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
+            res.skus.failed++;
+            res.errors.push(`sku ${job.skuCode}: ${r.status}`);
+            if (r.status === 429) consecutive429++;
+            else consecutive429 = 0;
+            continue;
+          }
         }
       } else res.skus.skipped++;
       const cl = await ensurePending("catalogue", job.localKey, vesselId, job.skuCode);
@@ -41554,10 +41995,31 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         res.catalogue.skipped++;
         continue;
       }
+      if (!skuId) {
+        try {
+          const remote = await findRemoteSpareByCode(job.skuCode);
+          await sleep(PACE_MS);
+          if (remote) {
+            skuId = remote.id;
+            await markPushed(sl.id, remote.id);
+          }
+        } catch (lookupErr) {
+          await markFailed(cl.id, `SKU id unknown and lookup failed: ${String(lookupErr?.message || lookupErr).slice(0, 300)} \u2014 retry later`);
+          res.catalogue.failed++;
+          res.errors.push(`catalogue ${job.skuCode}: id lookup failed`);
+          continue;
+        }
+        if (!skuId) {
+          await markFailed(cl.id, `SKU id unknown and '${job.skuCode}' not found on Shipskart by code \u2014 needs re-create (ledger says pushed; their side has no such SKU)`);
+          res.catalogue.failed++;
+          res.errors.push(`catalogue ${job.skuCode}: sku id unknown, not found remotely`);
+          continue;
+        }
+      }
       const addBody = buildCatalogueAddPayload({
         skuCode: job.skuCode,
         skuName: job.skuName,
-        productId: pr.productId,
+        skuId,
         productMasterCode: pr.productCode,
         categoryId: pr.categoryId,
         smc,
@@ -41593,6 +42055,22 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       });
     }
   }
+}
+async function preflightVesselCatalogue(vesselId) {
+  const pool4 = await getPool();
+  if (!pool4) return { collisions: 0, byOtherVessel: [] };
+  const spares2 = (await pool4.query(`SELECT part_code c FROM spares WHERE vessel_id=$1 AND is_deleted=false`, [vesselId])).rows;
+  const stores = (await pool4.query(`SELECT item_code c FROM stores_items WHERE vessel_id=$1 AND deleted IS NOT TRUE`, [vesselId])).rows;
+  const codes = Array.from(new Set([...spares2, ...stores].map((r) => sanitizeCode(r.c)).filter(Boolean)));
+  const hits = await findCrossVesselSkuCollisions(vesselId, codes);
+  const grouped = /* @__PURE__ */ new Map();
+  for (const h of hits) {
+    const g = grouped.get(h.otherVesselId) ?? { vesselId: h.otherVesselId, vesselName: h.otherVesselName, count: 0, sample: [] };
+    g.count++;
+    if (g.sample.length < 5) g.sample.push(h.skuCode);
+    grouped.set(h.otherVesselId, g);
+  }
+  return { collisions: hits.length, byOtherVessel: Array.from(grouped.values()).sort((a, b) => b.count - a.count) };
 }
 var PACE_MS, sleep, inFlight, lastRunByVessel, zero, isDuplicateAnswer;
 var init_shipskartCataloguePushService = __esm({
@@ -44929,6 +45407,35 @@ async function updateJob(id, body) {
   if (!existingJob) {
     throw new NotFoundError("Job not found");
   }
+  if ("jobNo" in updateData) {
+    const trimmed = (updateData.jobNo || "").trim();
+    if (!trimmed) {
+      throw new ValidationError("Job code cannot be blank. Please provide a valid job code.");
+    }
+    updateData.jobNo = trimmed;
+  }
+  if ("jobNo" in updateData && updateData.jobNo !== existingJob.jobNo) {
+    const effectiveVesselId = existingJob.vesselId || "";
+    const { storage: store } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+    const links = await store.getJobComponentLinksByJob(existingJob.juuid);
+    const componentIds = Array.from(
+      /* @__PURE__ */ new Set([
+        ...links.map((l) => l.componentId),
+        ...existingJob.componentId ? [existingJob.componentId] : []
+      ])
+    );
+    for (const compId of componentIds) {
+      const componentJobs = await findJobs(effectiveVesselId, compId);
+      const duplicate = componentJobs.find(
+        (j) => j.jobNo === updateData.jobNo && j.juuid !== existingJob.juuid && j.id !== id
+      );
+      if (duplicate) {
+        throw new ValidationError(
+          `Job code "${updateData.jobNo}" is already used by another job on this component (${duplicate.jobTitle || duplicate.juuid}). Please choose a different code.`
+        );
+      }
+    }
+  }
   const effectiveBasis = updateData.maintenanceBasis ?? existingJob.maintenanceBasis;
   const effectiveComponentId = updateData.componentId ?? existingJob.componentId;
   const basisChangingToDual = updateData.maintenanceBasis === "Dual Frequency" && existingJob.maintenanceBasis !== "Dual Frequency";
@@ -46454,8 +46961,9 @@ async function completeWorkOrder(workOrderId, body) {
   }
   if (runningHours && counterType !== "NOT_RH_DRIVEN" && (isShipForRhSync || officeRhEntryAllowedCompletion)) {
     const newRH = parseInt(runningHours);
-    const completionDateForValidation = dateOfCompletion || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const readingDateForRH = currentReadingDate || completionDateForValidation;
+    const { requireReadingDayInput: requireReadingDayInput2, todayReadingDay: todayReadingDay2 } = await Promise.resolve().then(() => (init_readingDate(), readingDate_exports));
+    const completionDateForValidation = requireReadingDayInput2(dateOfCompletion ?? null, "completion date") || todayReadingDay2();
+    const readingDateForRH = requireReadingDayInput2(currentReadingDate ?? null, "current reading date") || completionDateForValidation;
     if (!isShipForRhSync && !currentReadingDate && !dateOfCompletion) {
       throw new ValidationError(
         "Office RH entry requires the reading date (Current Reading Date or Date of Completion). Enter the date the counter was actually read.",
@@ -47889,7 +48397,7 @@ import sharp from "sharp";
 // server/modules/work-orders/repositories/documentRepository.ts
 init_db();
 init_schema();
-import { eq as eq13, and as and11, sql as sql10 } from "drizzle-orm";
+import { eq as eq13, and as and11, sql as sql11 } from "drizzle-orm";
 async function findByWorkOrderId(workOrderId) {
   const db2 = await getDb();
   return db2.select().from(workOrderDocuments).where(eq13(workOrderDocuments.workOrderId, workOrderId));
@@ -47910,7 +48418,7 @@ async function deleteById(id) {
 }
 async function countByWorkOrderAndType(workOrderId, documentType) {
   const db2 = await getDb();
-  const [result] = await db2.select({ count: sql10`count(*)::int` }).from(workOrderDocuments).where(and11(
+  const [result] = await db2.select({ count: sql11`count(*)::int` }).from(workOrderDocuments).where(and11(
     eq13(workOrderDocuments.workOrderId, workOrderId),
     eq13(workOrderDocuments.documentType, documentType)
   ));
@@ -53462,7 +53970,7 @@ async function createSurvey3(req, res) {
 // server/modules/cert-surveys/repositories/certAdminRepository.ts
 init_postgresClient();
 init_schema();
-import { eq as eq18, and as and15, inArray as inArray6, or as or5, like, sql as sql13 } from "drizzle-orm";
+import { eq as eq18, and as and15, inArray as inArray6, or as or5, like, sql as sql14 } from "drizzle-orm";
 function getDb5(tx) {
   if (tx) return tx;
   const postgres = getPostgresClient();
@@ -53519,7 +54027,7 @@ async function getApplicabilityByVesselIds(vesselIdList) {
   if (!db2) return null;
   return db2.select().from(vesselCertificateApplicability).where(and15(
     inArray6(vesselCertificateApplicability.vesselId, vesselIdList),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql13`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getApplicabilityByVesselId(vesselId) {
@@ -53527,7 +54035,7 @@ async function getApplicabilityByVesselId(vesselId) {
   if (!db2) return null;
   return db2.select().from(vesselCertificateApplicability).where(and15(
     eq18(vesselCertificateApplicability.vesselId, vesselId),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql13`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getApplicabilityByVesselAndMaster(vesselId, masterId, tx) {
@@ -53536,7 +54044,7 @@ async function getApplicabilityByVesselAndMaster(vesselId, masterId, tx) {
   return db2.select().from(vesselCertificateApplicability).where(and15(
     eq18(vesselCertificateApplicability.vesselId, vesselId),
     eq18(vesselCertificateApplicability.masterId, masterId),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql13`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function insertApplicability(data, tx) {
@@ -53544,7 +54052,7 @@ async function insertApplicability(data, tx) {
   if (!db2) return null;
   return db2.insert(vesselCertificateApplicability).values(data).onConflictDoNothing({
     target: [vesselCertificateApplicability.vesselId, vesselCertificateApplicability.masterId],
-    where: sql13`${vesselCertificateApplicability.isDeleted} = false`
+    where: sql14`${vesselCertificateApplicability.isDeleted} = false`
   }).returning();
 }
 async function insertApplicabilityBulk(data, tx) {
@@ -53552,7 +54060,7 @@ async function insertApplicabilityBulk(data, tx) {
   if (!db2) return null;
   return db2.insert(vesselCertificateApplicability).values(data).onConflictDoNothing({
     target: [vesselCertificateApplicability.vesselId, vesselCertificateApplicability.masterId],
-    where: sql13`${vesselCertificateApplicability.isDeleted} = false`
+    where: sql14`${vesselCertificateApplicability.isDeleted} = false`
   }).returning();
 }
 async function updateApplicability(vesselId, masterId, isApplicable, tx) {
@@ -53561,7 +54069,7 @@ async function updateApplicability(vesselId, masterId, isApplicable, tx) {
   return db2.update(vesselCertificateApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and15(
     eq18(vesselCertificateApplicability.vesselId, vesselId),
     eq18(vesselCertificateApplicability.masterId, masterId),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql13`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
   )).returning();
 }
 async function bulkUpdateApplicability(vesselIds, masterId, isApplicable, tx) {
@@ -53570,7 +54078,7 @@ async function bulkUpdateApplicability(vesselIds, masterId, isApplicable, tx) {
   return db2.update(vesselCertificateApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and15(
     inArray6(vesselCertificateApplicability.vesselId, vesselIds),
     eq18(vesselCertificateApplicability.masterId, masterId),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql13`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
   )).returning();
 }
 async function getApplicabilityByMasterIds(masterIds, tx) {
@@ -53581,7 +54089,7 @@ async function getApplicabilityByMasterIds(masterIds, tx) {
     masterId: vesselCertificateApplicability.masterId
   }).from(vesselCertificateApplicability).where(and15(
     inArray6(vesselCertificateApplicability.masterId, masterIds),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql13`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getAllVessels(tx) {
@@ -53629,7 +54137,7 @@ async function getAllApplicabilityRecords(tx) {
     vesselId: vesselCertificateApplicability.vesselId,
     masterId: vesselCertificateApplicability.masterId
   }).from(vesselCertificateApplicability).where(
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql13`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
   );
 }
 async function softDeleteApplicabilityByMasterIds(masterIds, tx) {
@@ -53639,7 +54147,7 @@ async function softDeleteApplicabilityByMasterIds(masterIds, tx) {
   return db2.update(vesselCertificateApplicability).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(
     and15(
       inArray6(vesselCertificateApplicability.masterId, masterIds),
-      or5(eq18(vesselCertificateApplicability.isDeleted, false), sql13`${vesselCertificateApplicability.isDeleted} IS NULL`)
+      or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
     )
   ).returning({ masterId: vesselCertificateApplicability.masterId });
 }
@@ -54216,7 +54724,7 @@ async function bulkUpdateApplicability3(req, res) {
 // server/modules/cert-surveys/repositories/surveyAdminRepository.ts
 init_postgresClient();
 init_schema();
-import { eq as eq19, and as and16, inArray as inArray7, or as or6, like as like2, sql as sql14 } from "drizzle-orm";
+import { eq as eq19, and as and16, inArray as inArray7, or as or6, like as like2, sql as sql15 } from "drizzle-orm";
 function getDb6() {
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -54287,7 +54795,7 @@ async function getApplicabilityByVesselIds2(vesselIdList) {
   if (!db2) return null;
   return db2.select().from(vesselSurveyApplicability).where(and16(
     inArray7(vesselSurveyApplicability.vesselId, vesselIdList),
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql14`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getApplicabilityByVesselId2(vesselId) {
@@ -54295,7 +54803,7 @@ async function getApplicabilityByVesselId2(vesselId) {
   if (!db2) return null;
   return db2.select().from(vesselSurveyApplicability).where(and16(
     eq19(vesselSurveyApplicability.vesselId, vesselId),
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql14`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
   ));
 }
 async function insertApplicabilityBulk2(data) {
@@ -54303,7 +54811,7 @@ async function insertApplicabilityBulk2(data) {
   if (!db2) return null;
   return db2.insert(vesselSurveyApplicability).values(data).onConflictDoNothing({
     target: [vesselSurveyApplicability.vesselId, vesselSurveyApplicability.masterId],
-    where: sql14`${vesselSurveyApplicability.isDeleted} = false`
+    where: sql15`${vesselSurveyApplicability.isDeleted} = false`
   }).returning();
 }
 async function bulkUpdateApplicability4(vesselIds, masterId, isApplicable) {
@@ -54312,7 +54820,7 @@ async function bulkUpdateApplicability4(vesselIds, masterId, isApplicable) {
   return db2.update(vesselSurveyApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and16(
     inArray7(vesselSurveyApplicability.vesselId, vesselIds),
     eq19(vesselSurveyApplicability.masterId, masterId),
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql14`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
   )).returning();
 }
 async function getAllApplicability() {
@@ -54322,7 +54830,7 @@ async function getAllApplicability() {
     vesselId: vesselSurveyApplicability.vesselId,
     masterId: vesselSurveyApplicability.masterId
   }).from(vesselSurveyApplicability).where(
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql14`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
   );
 }
 async function getAllVessels2() {
@@ -54370,7 +54878,7 @@ async function getAllApplicabilityRecords2() {
     vesselId: vesselSurveyApplicability.vesselId,
     masterId: vesselSurveyApplicability.masterId
   }).from(vesselSurveyApplicability).where(
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql14`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
   );
 }
 async function softDeleteApplicabilityByMasterIds2(masterIds) {
@@ -54380,7 +54888,7 @@ async function softDeleteApplicabilityByMasterIds2(masterIds) {
   return db2.update(vesselSurveyApplicability).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(
     and16(
       inArray7(vesselSurveyApplicability.masterId, masterIds),
-      or6(eq19(vesselSurveyApplicability.isDeleted, false), sql14`${vesselSurveyApplicability.isDeleted} IS NULL`)
+      or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
     )
   ).returning({ masterId: vesselSurveyApplicability.masterId });
 }
@@ -59830,7 +60338,7 @@ import ExcelJS2 from "exceljs";
 init_storage();
 init_db();
 init_schema();
-import { eq as eq23, and as and20, gte as gte4, sql as sql16, desc as desc5 } from "drizzle-orm";
+import { eq as eq23, and as and20, gte as gte4, sql as sql17, desc as desc5 } from "drizzle-orm";
 var LowStockReportService = class {
   async computeReport(vesselId, filters) {
     const allItems = await storage.getStoresItems(vesselId);
@@ -59841,9 +60349,9 @@ var LowStockReportService = class {
     const db2 = await getDb();
     const consumptionData = await db2.select({
       itemId: storesLedger.itemId,
-      totalConsumed: sql16`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
-      eventCount: sql16`COUNT(*)`,
-      lastConsumed: sql16`MAX(${storesLedger.timestampUTC})`
+      totalConsumed: sql17`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
+      eventCount: sql17`COUNT(*)`,
+      lastConsumed: sql17`MAX(${storesLedger.timestampUTC})`
     }).from(storesLedger).where(and20(
       eq23(storesLedger.vesselId, vesselId),
       eq23(storesLedger.eventType, "CONSUME"),
@@ -65077,7 +65585,7 @@ init_reportRepository();
 init_db();
 init_schema();
 import ExcelJS5 from "exceljs";
-import { sql as sql18 } from "drizzle-orm";
+import { sql as sql19 } from "drizzle-orm";
 function parseDateVal(dateVal) {
   if (!dateVal) return null;
   try {
@@ -65105,7 +65613,7 @@ async function getRunningHoursAnomalyDetection(vesselId, startDate, endDate, ano
   const vessel = vessels2.find((v) => v.id === vesselId || v.vesselCode === vesselId);
   const vesselName = vessel?.name || vessel?.vesselName || String(vesselId);
   const db2 = await getDb();
-  const allAuditLogs = await db2.select().from(runningHoursAudit).where(sql18`${runningHoursAudit.vesselId} = ${vesselId}`);
+  const allAuditLogs = await db2.select().from(runningHoursAudit).where(sql19`${runningHoursAudit.vesselId} = ${vesselId}`);
   console.log(`[ANOMALY] Vessel: ${vesselId}, Audit logs found: ${allAuditLogs.length}`);
   if (allAuditLogs.length > 0) {
     const firstLog = allAuditLogs[0];
@@ -65274,7 +65782,7 @@ async function exportRunningHoursAnomalyDetectionExcel(vesselId, startDate, endD
   const vessel = vessels2.find((v) => v.id === vesselId || v.vesselCode === vesselId);
   const vesselName = vessel?.name || vessel?.vesselName || String(vesselId);
   const db2 = await getDb();
-  const allAuditLogs = await db2.select().from(runningHoursAudit).where(sql18`${runningHoursAudit.vesselId} = ${vesselId}`);
+  const allAuditLogs = await db2.select().from(runningHoursAudit).where(sql19`${runningHoursAudit.vesselId} = ${vesselId}`);
   const now = /* @__PURE__ */ new Date();
   const defaultStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1e3);
   const periodStart = startDate ? parseDateVal(startDate) : defaultStartDate;
@@ -65944,7 +66452,7 @@ init_reportRepository();
 init_db();
 init_schema();
 import ExcelJS6 from "exceljs";
-import { sql as sql19 } from "drizzle-orm";
+import { sql as sql20 } from "drizzle-orm";
 async function getWorkOrdersComputed2(vesselId, vesselIds) {
   const { getWorkOrdersWithComputedStatus: getWorkOrdersWithComputedStatus2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
   return getWorkOrdersWithComputedStatus2(vesselId, vesselIds);
@@ -66349,7 +66857,7 @@ async function getEquipmentUtilizationSummary(vesselId, startDate, endDate, cate
   if (!periodStart || !periodEnd) {
     throw new Error("Invalid date format");
   }
-  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql19`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
+  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql20`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
   console.log(`[UTILIZATION] Vessel: ${vesselId}, Components: ${rhComponents.length}, Audit logs in period: ${rhAuditLogs.length}`);
   const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1e3 * 60 * 60 * 24)));
   const utilizationData = rhComponents.map((component, index3) => {
@@ -66476,7 +66984,7 @@ async function exportEquipmentUtilizationSummaryExcel(vesselId, startDate, endDa
   if (!periodStart || !periodEnd) {
     throw new Error("Invalid date format");
   }
-  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql19`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
+  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql20`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
   console.log(`[UTILIZATION EXCEL] Vessel: ${vesselId}, Components: ${rhComponents.length}, Audit logs in period: ${rhAuditLogs.length}`);
   const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1e3 * 60 * 60 * 24)));
   const utilizationData = rhComponents.map((component, index3) => {
@@ -80176,7 +80684,7 @@ init_constants();
 init_externalApi();
 init_sync();
 init_schema();
-import { sql as sql20, eq as eq28, and as and25 } from "drizzle-orm";
+import { sql as sql21, eq as eq28, and as and25 } from "drizzle-orm";
 async function jobDueScan(req, res) {
   const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
   const vesselId = req.body?.vesselId;
@@ -80529,7 +81037,7 @@ async function syncMasters(req, res) {
           vesselType,
           isActive: true,
           updatedAt: now,
-          vuuid: sql20`COALESCE(${vessels.vuuid}, EXCLUDED.vuuid)`
+          vuuid: sql21`COALESCE(${vessels.vuuid}, EXCLUDED.vuuid)`
         }
       });
       stats.vessels.updated++;
@@ -81206,7 +81714,7 @@ init_syncRole();
 // server/modules/access-control/repositories/viewModeRepository.ts
 init_db();
 init_schema();
-import { eq as eq29, and as and26, asc as asc6, sql as sql21 } from "drizzle-orm";
+import { eq as eq29, and as and26, asc as asc6, sql as sql22 } from "drizzle-orm";
 async function getActiveViewModes() {
   const db2 = await getDb();
   return db2.select().from(viewModesMaster).where(and26(eq29(viewModesMaster.isDeleted, false), eq29(viewModesMaster.isActive, true))).orderBy(asc6(viewModesMaster.sortOrder), asc6(viewModesMaster.code));
@@ -81214,14 +81722,14 @@ async function getActiveViewModes() {
 async function getRolesWithMappings() {
   const db2 = await getDb();
   const rows = await db2.select({
-    roleRuid: sql21`${admnRoleMaster.ruid}::text`,
+    roleRuid: sql22`${admnRoleMaster.ruid}::text`,
     roleName: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype,
     viewModeCode: roleViewModeMapping.viewModeCode
   }).from(admnRoleMaster).leftJoin(
     roleViewModeMapping,
     and26(
-      sql21`${roleViewModeMapping.roleRuid} = ${admnRoleMaster.ruid}::text`,
+      sql22`${roleViewModeMapping.roleRuid} = ${admnRoleMaster.ruid}::text`,
       eq29(roleViewModeMapping.isDeleted, false)
     )
   ).where(and26(eq29(admnRoleMaster.isActive, true), eq29(admnRoleMaster.isDeleted, false))).orderBy(asc6(admnRoleMaster.roletype), asc6(admnRoleMaster.assignedRole));
@@ -81230,7 +81738,7 @@ async function getRolesWithMappings() {
 async function getActiveRoleByTypeAndName(roletype, assignedRole) {
   const db2 = await getDb();
   const rows = await db2.select({
-    ruid: sql21`${admnRoleMaster.ruid}::text`,
+    ruid: sql22`${admnRoleMaster.ruid}::text`,
     assignedRole: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype
   }).from(admnRoleMaster).where(
@@ -81246,12 +81754,12 @@ async function getActiveRoleByTypeAndName(roletype, assignedRole) {
 async function getActiveRoleByRuid(roleRuid) {
   const db2 = await getDb();
   const rows = await db2.select({
-    ruid: sql21`${admnRoleMaster.ruid}::text`,
+    ruid: sql22`${admnRoleMaster.ruid}::text`,
     assignedRole: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype
   }).from(admnRoleMaster).where(
     and26(
-      sql21`${admnRoleMaster.ruid}::text = ${roleRuid}`,
+      sql22`${admnRoleMaster.ruid}::text = ${roleRuid}`,
       eq29(admnRoleMaster.isActive, true),
       eq29(admnRoleMaster.isDeleted, false)
     )
@@ -83547,11 +84055,13 @@ async function catalogueVesselStatusHandler(req, res) {
   const links = await Promise.resolve().then(() => (init_shipskartCatalogueLinkRepository(), shipskartCatalogueLinkRepository_exports));
   const svc = await Promise.resolve().then(() => (init_shipskartCataloguePushService(), shipskartCataloguePushService_exports));
   const st = await links.vesselStatus(vesselId);
+  const preflight = await svc.preflightVesselCatalogue(vesselId).catch(() => ({ collisions: 0, byOtherVessel: [] }));
   const get = (e, s) => st.counts.find((c) => c.entityType === e && c.pushStatus === s)?.n ?? 0;
   const skuTotal = st.totals.spares + st.totals.stores;
   res.json({
     vesselId,
     running: svc.isCataloguePushRunning(vesselId),
+    preflight,
     totals: { skus: skuTotal, products: st.totals.components, spares: st.totals.spares, stores: st.totals.stores },
     progress: {
       categories: { pushed: get("category", "pushed"), failed: get("category", "failed") },
@@ -83773,11 +84283,11 @@ import { eq as eq36, and as and31, desc as desc8, gte as gte5, lte as lte3 } fro
 // server/modules/noon-report/utils/existingDataAdapter.ts
 init_db();
 init_schema();
-import { eq as eq34, sql as sql23 } from "drizzle-orm";
+import { eq as eq34, sql as sql24 } from "drizzle-orm";
 async function getVesselById(vesselId) {
   const db2 = await getDb();
   const result = await db2.execute(
-    sql23`SELECT vuuid, name, imo_number, flag, vessel_type, deadweight, gross_tonnage
+    sql24`SELECT vuuid, name, imo_number, flag, vessel_type, deadweight, gross_tonnage
         FROM vessels WHERE vuuid = ${vesselId} LIMIT 1`
   );
   const row = result.rows[0] ?? null;
@@ -85547,6 +86057,40 @@ async function registerRoutes(app2) {
     }
   });
   const httpServer = createServer(app2);
+  (async () => {
+    const RH_SELF_HEAL_LOCK_KEY = 427167001;
+    let lockClient = null;
+    try {
+      const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const pool4 = await getPool2();
+      const ready = await pool4.query(`
+        SELECT
+          EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'safe_rh_reading_day') AS fn_ready,
+          EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'rh_date_normalization_backup') AS norm_ready
+      `);
+      if (!ready.rows[0]?.fn_ready || !ready.rows[0]?.norm_ready) {
+        console.error("\u274C [RH-SelfHeal] SKIPPED \u2014 migration 167 not applied (safe_rh_reading_day/backup table missing). This build must include migrations 166 + 167; RH winner selection stays on legacy ranking until it runs.");
+        return;
+      }
+      lockClient = await pool4.connect();
+      const lock = await lockClient.query("SELECT pg_try_advisory_lock($1) AS locked", [RH_SELF_HEAL_LOCK_KEY]);
+      if (!lock.rows[0]?.locked) {
+        console.log("\u2139\uFE0F [RH-SelfHeal] another instance holds the self-heal lock \u2014 skipping on this instance");
+        return;
+      }
+      try {
+        const { selfHealRhComponents: selfHealRhComponents2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+        const m = await selfHealRhComponents2(pool4);
+        console.log(`\u2705 RH self-heal complete: masters ${m.mastersHealed}/${m.mastersScanned} healed, inherited ${m.childrenHealed}/${m.childrenScanned} healed, rhDecreases=${m.rhDecreases}, errors=${m.errors}, ${m.durationMs}ms${m.mastersHealed + m.childrenHealed === 0 ? " (no-op \u2014 converged)" : ""}`);
+      } finally {
+        await lockClient.query("SELECT pg_advisory_unlock($1)", [RH_SELF_HEAL_LOCK_KEY]);
+      }
+    } catch (err) {
+      console.error("\u26A0\uFE0F Error during RH self-heal:", err);
+    } finally {
+      lockClient?.release?.();
+    }
+  })();
   storage.recalculateAllRecurringDefects().then(() => {
     console.log("\u2705 Recurring defects recalculated successfully");
   }).catch((err) => {
