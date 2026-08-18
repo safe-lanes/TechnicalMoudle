@@ -256,10 +256,9 @@ export default function ShipskartCatalogue() {
                   <AlertTriangle className="h-4 w-4 inline mr-1" />
                   <b>{s.preflight!.collisions} part code(s) on this vessel already exist on Shipskart under another vessel</b>
                   {' '}({s.preflight!.byOtherVessel.map(o => `${o.vesselName ?? o.vesselId}: ${o.count}, e.g. ${o.sample.join(', ')}`).join('; ')}).
-                  Shipskart keeps one record per part code across the account, so these will <b>not be created again — they will be linked
-                  to this vessel's catalogue</b> (normal for sister vessels sharing equipment). Linking needs Shipskart's spare lookup API,
-                  which is pending — until it arrives these items stay "awaiting link" and are picked up automatically by
-                  <b> Retry failed &amp; continue</b> once available.
+                  Shipskart keeps one record per part code across the account, so these will <b>not be created again — the existing
+                  record will be linked to this vessel's catalogue</b> (normal for sister vessels sharing equipment). This happens
+                  automatically during the push; the vessel that first pushed the code keeps its record, this vessel gets a link to it.
                 </p>
               )}
               {s.progress.skus.failed > 0 && !s.running && (
