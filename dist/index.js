@@ -41597,6 +41597,7 @@ var init_shipskartCatalogueMapper = __esm({
 // server/modules/shipskart/services/shipskartCataloguePushService.ts
 var shipskartCataloguePushService_exports = {};
 __export(shipskartCataloguePushService_exports, {
+  findRemoteSpareByCode: () => findRemoteSpareByCode,
   getLastRunInfo: () => getLastRunInfo,
   isCataloguePushRunning: () => isCataloguePushRunning,
   preflightVesselCatalogue: () => preflightVesselCatalogue,
@@ -41612,6 +41613,14 @@ async function requestWithBackoff(method, path14, opts) {
     r = await authorizedB2bRequest(method, path14, opts);
   }
   return r;
+}
+async function findRemoteSpareByCode(skuCode) {
+  const r = await requestWithBackoff("GET", `/integration/SAIL/get-all-spare-part?filterQuery=${encodeURIComponent(`skuCode_eq=${skuCode}`)}&pageSize=5`);
+  if (!r.ok || !Array.isArray(r.json?.items)) {
+    throw new Error(`spare lookup by code ${skuCode} failed: HTTP ${r.status} ${JSON.stringify(r.json ?? r.text)?.slice(0, 200)}`);
+  }
+  const hit = r.json.items.find((i) => String(i.skuCode) === skuCode) ?? null;
+  return hit?.id ? { id: String(hit.id), skuCode: String(hit.skuCode), productId: hit.productId ? String(hit.productId) : null } : null;
 }
 function isCataloguePushRunning(vesselId) {
   return inFlight.has(vesselId);
@@ -41924,25 +41933,61 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
       if (sl.pushStatus !== "pushed") {
         const clash = await findSkuCodeOtherVessel(job.skuCode, vesselId);
         if (clash) {
-          await markFailed(sl.id, `AWAITING LINK: '${job.skuCode}' already exists on Shipskart for vessel ${clash.vesselId} (sister-vessel share) \u2014 will be linked to this vessel once the spare lookup API is available`);
-          res.skus.failed++;
-          res.errors.push(`sku ${job.skuCode}: awaiting link (shared with another vessel)`);
-          continue;
+          try {
+            const remote = await findRemoteSpareByCode(job.skuCode);
+            await sleep(PACE_MS);
+            if (remote) {
+              await markPushedWithWarning(sl.id, remote.id, `LINKED (shared): SKU '${job.skuCode}' exists on Shipskart (first pushed for vessel ${clash.vesselId}) \u2014 reused id, not re-created`);
+              skuId = remote.id;
+              res.skus.pushed++;
+              res.warnings.push(`sku ${job.skuCode}: linked to existing (shared with vessel ${clash.vesselId})`);
+            } else {
+              res.warnings.push(`sku ${job.skuCode}: ledger says shared with ${clash.vesselId} but absent on Shipskart \u2014 creating`);
+            }
+          } catch (lookupErr) {
+            await markFailed(sl.id, `LOOKUP FAILED for shared SKU '${job.skuCode}': ${String(lookupErr?.message || lookupErr).slice(0, 300)} \u2014 retry later`);
+            res.skus.failed++;
+            res.errors.push(`sku ${job.skuCode}: lookup failed`);
+            continue;
+          }
         }
-        const r = await requestWithBackoff("POST", "/integration/SAIL/create-spare-part", { body: job.buildSku() });
-        await sleep(PACE_MS);
-        if (r.ok || isDuplicateAnswer(r.status, r.json)) {
-          await markPushed(sl.id, r.json?.data?.id ?? null);
-          skuId = r.json?.data?.id ?? null;
-          res.skus.pushed++;
-          consecutive429 = 0;
-        } else {
-          await markFailed(sl.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
-          res.skus.failed++;
-          res.errors.push(`sku ${job.skuCode}: ${r.status}`);
-          if (r.status === 429) consecutive429++;
-          else consecutive429 = 0;
-          continue;
+        if (!skuId) {
+          const r = await requestWithBackoff("POST", "/integration/SAIL/create-spare-part", { body: job.buildSku() });
+          await sleep(PACE_MS);
+          if (r.ok && r.json?.data?.id) {
+            await markPushed(sl.id, r.json.data.id);
+            skuId = String(r.json.data.id);
+            res.skus.pushed++;
+            consecutive429 = 0;
+          } else if (isDuplicateAnswer(r.status, r.json) || r.status === 409) {
+            try {
+              const remote = await findRemoteSpareByCode(job.skuCode);
+              await sleep(PACE_MS);
+              if (remote) {
+                await markPushed(sl.id, remote.id);
+                skuId = remote.id;
+                res.skus.pushed++;
+                consecutive429 = 0;
+              } else {
+                await markFailed(sl.id, `${r.status} duplicate but lookup by code found nothing \u2014 ask Shipskart which record holds '${job.skuCode}'`);
+                res.skus.failed++;
+                res.errors.push(`sku ${job.skuCode}: duplicate but not found by lookup`);
+                continue;
+              }
+            } catch (lookupErr) {
+              await markFailed(sl.id, `${r.status} duplicate; id lookup failed: ${String(lookupErr?.message || lookupErr).slice(0, 300)}`);
+              res.skus.failed++;
+              res.errors.push(`sku ${job.skuCode}: duplicate, lookup failed`);
+              continue;
+            }
+          } else {
+            await markFailed(sl.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
+            res.skus.failed++;
+            res.errors.push(`sku ${job.skuCode}: ${r.status}`);
+            if (r.status === 429) consecutive429++;
+            else consecutive429 = 0;
+            continue;
+          }
         }
       } else res.skus.skipped++;
       const cl = await ensurePending("catalogue", job.localKey, vesselId, job.skuCode);
@@ -41951,10 +41996,25 @@ async function pushVesselCatalogue(vesselId, opts = {}) {
         continue;
       }
       if (!skuId) {
-        await markFailed(cl.id, "SKU id unknown (pushed before the Option-B fix, or duplicate answer carried no id) \u2014 no SKU read endpoint to recover it; needs re-create or Shipskart lookup");
-        res.catalogue.failed++;
-        res.errors.push(`catalogue ${job.skuCode}: sku id unknown`);
-        continue;
+        try {
+          const remote = await findRemoteSpareByCode(job.skuCode);
+          await sleep(PACE_MS);
+          if (remote) {
+            skuId = remote.id;
+            await markPushed(sl.id, remote.id);
+          }
+        } catch (lookupErr) {
+          await markFailed(cl.id, `SKU id unknown and lookup failed: ${String(lookupErr?.message || lookupErr).slice(0, 300)} \u2014 retry later`);
+          res.catalogue.failed++;
+          res.errors.push(`catalogue ${job.skuCode}: id lookup failed`);
+          continue;
+        }
+        if (!skuId) {
+          await markFailed(cl.id, `SKU id unknown and '${job.skuCode}' not found on Shipskart by code \u2014 needs re-create (ledger says pushed; their side has no such SKU)`);
+          res.catalogue.failed++;
+          res.errors.push(`catalogue ${job.skuCode}: sku id unknown, not found remotely`);
+          continue;
+        }
       }
       const addBody = buildCatalogueAddPayload({
         skuCode: job.skuCode,
