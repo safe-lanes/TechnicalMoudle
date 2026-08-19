@@ -137,10 +137,19 @@ router.post('/work-orders/:id/reopen-completion',
 );
 
 // POST /work-orders/bulk-superintendent-acknowledge — must be before /:id route
-router.post('/work-orders/bulk-superintendent-acknowledge', asyncHandler(woCtrl.bulkSuperintendentAcknowledge));
+// Phase 0 / P0.4 (defect D4): releasing the compliance lock is an office action — the same
+// guard as reviewer-approve. (The 12-Jun-2026 "How to Acknowledge the Locked WO" note called
+// the vessel-side option a testing-phase allowance to be removed in production.)
+router.post('/work-orders/bulk-superintendent-acknowledge',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.bulkSuperintendentAcknowledge)
+);
 
 // POST /work-orders/:id/superintendent-acknowledge
-router.post('/work-orders/:id/superintendent-acknowledge', asyncHandler(woCtrl.superintendentAcknowledge));
+router.post('/work-orders/:id/superintendent-acknowledge',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.superintendentAcknowledge)
+);
 
 // GET /superintendent/notifications — unacknowledged only
 router.get('/superintendent/notifications', asyncHandler(woCtrl.getSuperintendentNotifications));

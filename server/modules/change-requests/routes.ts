@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import { requirePermission } from '../../middleware/permissions';
+import { requireRole } from '../../middleware/auth';
 import * as crCtrl from './controllers/changeRequestsController';
 
 const router = Router();
@@ -30,8 +31,13 @@ router.get('/change-requests/:id/comments', asyncHandler(crCtrl.getComments));
 router.post('/change-requests/:id/comments', requirePermission('change-requests', 'edit'), asyncHandler(crCtrl.createComment));
 router.get('/change-requests/:id/attachments', asyncHandler(crCtrl.getAttachments));
 router.post('/change-requests/:id/attachments', requirePermission('change-requests', 'edit'), asyncHandler(crCtrl.createAttachment));
-router.put('/change-requests/:id/approve', requirePermission('change-requests', 'edit'), asyncHandler(crCtrl.approveChangeRequest));
-router.put('/change-requests/:id/reject', requirePermission('change-requests', 'edit'), asyncHandler(crCtrl.rejectChangeRequest));
+// Phase 0 / P0.4 (defect D4): deciding a CR is an office action — the forwarded identity must be
+// Office-typed (or a named admin); vessel ranks and anonymous callers are refused (403). The
+// existing requirePermission stays; its enforcement on the real role (incl. unconfigured → deny)
+// is NOT switched on here — see PHASE0-REPORT.md (dev data has no 'change-requests' rows for any
+// configured role; enforcing would 403 office approvers). Flip = { enforce: true, unconfigured: 'deny' }.
+router.put('/change-requests/:id/approve', requireRole(['Office', 'PMS Admin', 'Sail Admin']), requirePermission('change-requests', 'edit'), asyncHandler(crCtrl.approveChangeRequest));
+router.put('/change-requests/:id/reject', requireRole(['Office', 'PMS Admin', 'Sail Admin']), requirePermission('change-requests', 'edit'), asyncHandler(crCtrl.rejectChangeRequest));
 router.get('/change-requests/:id/rejection-history', asyncHandler(crCtrl.getRejectionHistory));
 
 // ── Get by ID (MUST be last — catch-all) ──
