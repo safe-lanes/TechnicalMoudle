@@ -235,6 +235,19 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     throw new ValidationError(`Work order is not pending office review (status: ${existingWO.status})`);
   }
 
+  // Phase 0 / P0.2 (defect D1): the office step must not complete a WO that is still held by
+  // the superintendent lock. The HOD step now gates before the L2 hand-off, but a WO that
+  // reached "Pending Office Review" before that fix (or any future path) must still be
+  // refused here — same code the HOD step uses, same live policy read.
+  if (existingWO.approvalTier === 'superintendent_locked' && !existingWO.superintendentAcknowledged) {
+    if (await isSuperintendentLockEnabled()) {
+      throw new ValidationError(
+        'This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The office reviewer cannot complete it until the Superintendent has acknowledged.',
+        { code: 'SUPERINTENDENT_LOCKED' }
+      );
+    }
+  }
+
   const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
   const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
 

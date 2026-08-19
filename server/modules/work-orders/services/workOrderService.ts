@@ -1360,26 +1360,14 @@ export async function updateWorkOrder(id: string, body: any) {
   const isApprovalTransition = (updateData.approvalAction === 'approved' && updateData.status === 'Completed') ||
     (updateData.status === 'Completed' && existingWO.status === 'Pending Approval');
 
-  // ── Level 2 Review Interception ──────────────────────────────────────────
-  // If the linked job requires a Level 2 Office reviewer, redirect the WO to
-  // "Pending Office Review" instead of completing it. This gate covers the
-  // direct-PATCH path; the bulk-approve path has its own identical check.
+  // Phase 0 / P0.2 (defect D1): the Layer-5 safety gates below run for EVERY approval
+  // transition — the Level 2 interception happens AFTER them (see below), so an L2 job
+  // is held to exactly the same justification / superintendent-lock / CE-remarks rules
+  // as a non-L2 job. Previously the intercept ran first and the gates were skipped for
+  // intercepted WOs (DEFECT-REPRODUCTION-REPORT.md §1). The bulk path already gates first.
   let interceptedForL2Review = false;
-  if (isApprovalTransition && existingWO.jobId) {
-    try {
-      const linkedJob = await repo.findJob(existingWO.jobId);
-      if (linkedJob && (linkedJob as any).level2ReviewerRankId) {
-        interceptedForL2Review = true;
-        updateData.status = 'Pending Office Review';
-        updateData.approvalDate = new Date().toISOString();
-        console.log(`🔒 [L2 Review] WO ${existingWO.workOrderNo} intercepted — job requires Level 2 reviewer rank "${(linkedJob as any).level2ReviewerRankId}"`);
-      }
-    } catch (err) {
-      console.warn(`[L2 Review] Could not load linked job ${existingWO.jobId} for L2 check — proceeding without interception:`, err);
-    }
-  }
 
-  if (isApprovalTransition && !interceptedForL2Review) {
+  if (isApprovalTransition) {
     const { resolveHodForDepartment, getHodShortLabel } = await import('../../ranks/hodResolutionService');
     const hodResolution = await resolveHodForDepartment(
       existingWO.vesselId,
@@ -1457,6 +1445,26 @@ export async function updateWorkOrder(id: string, body: any) {
           { code: 'CE_REMARKS_REQUIRED', minLength: 10 }
         );
       }
+    }
+  }
+
+  // ── Level 2 Review Interception ──────────────────────────────────────────
+  // If the linked job requires a Level 2 Office reviewer, redirect the WO to
+  // "Pending Office Review" instead of completing it. Runs AFTER the gates above
+  // (Phase 0 / P0.2) — only a WO that has passed every safety rule is handed to the
+  // office reviewer. This covers the direct-PATCH path; the bulk-approve path has its
+  // own identical check (after its own gates).
+  if (isApprovalTransition && existingWO.jobId) {
+    try {
+      const linkedJob = await repo.findJob(existingWO.jobId);
+      if (linkedJob && (linkedJob as any).level2ReviewerRankId) {
+        interceptedForL2Review = true;
+        updateData.status = 'Pending Office Review';
+        updateData.approvalDate = new Date().toISOString();
+        console.log(`🔒 [L2 Review] WO ${existingWO.workOrderNo} intercepted — job requires Level 2 reviewer rank "${(linkedJob as any).level2ReviewerRankId}"`);
+      }
+    } catch (err) {
+      console.warn(`[L2 Review] Could not load linked job ${existingWO.jobId} for L2 check — proceeding without interception:`, err);
     }
   }
 
