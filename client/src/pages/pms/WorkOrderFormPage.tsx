@@ -992,8 +992,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     jobExperienceNotes: "",
     previousReading: "",
     currentReading: "",
-    // RH accuracy (migration 139): B2.1 completion-time RH (prefilled from Current
-    // Reading via display fallback) + B3 date the reading was taken.
+    // RH accuracy (migration 139): B2.1 completion-time RH and B3 date the
+    // reading was taken. These remain independent from the B3 Current Reading.
     woCompletionRh: "",
     currentReadingDate: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
@@ -5944,9 +5944,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   {(() => {
                     const b21Basis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
                     if (b21Basis !== 'Running Hours' && b21Basis !== 'Dual Frequency') return null;
-                    const woRhValue = executionData.woCompletionRh !== '' && executionData.woCompletionRh != null
-                      ? executionData.woCompletionRh
-                      : (executionData.currentReading || '');
+                    const woRhValue = executionData.woCompletionRh ?? '';
                     return (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
