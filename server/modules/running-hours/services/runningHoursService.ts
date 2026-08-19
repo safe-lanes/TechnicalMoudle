@@ -1,11 +1,19 @@
 import * as repo from '../repositories/runningHoursRepository';
+/**
+ * Missing settings are deliberately treated as validation ON. This also makes
+ * the setting safe during first sync, before a vessel receives its PMS row.
+ */
+export function isRhValidationEnabledForVessel(settings?: { rhValidationEnabled?: boolean | null }): boolean {
+  return settings?.rhValidationEnabled !== false;
+}
+
 import type { RHHistoryQuery, RHHistoryResult } from '../repositories/runningHoursRepository';
 import { validateRunningHoursIncrease, canAdminOverride, safeParseDate } from '../utils/rhValidation';
 import { canonicalizeReadingDateInput, requireReadingDayInput, todayReadingDay } from '../utils/readingDate';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../shared/errors';
 import { z } from 'zod';
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema } from '@shared/schema';
-import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
+import type { InsertRunningHoursAudit, RunningHoursAudit, Component, CascadeRunningHoursRequest } from '@shared/schema';
 
 // ── Zod schemas for RH configuration API validation ──
 
@@ -25,6 +33,35 @@ const updateMasterRHSchema = z.object({
   comments: z.string().optional(),
   dateUpdated: z.string().optional()
 });
+
+/**
+ * Checks that depend on the vessel RH policy are deliberately performed after
+ * the component and its settings have been loaded. The transport flag is never
+ * used to decide these rules.
+ */
+export function validateCascadePolicyRules(
+  data: CascadeRunningHoursRequest,
+  vesselValidationEnabled: boolean,
+  validationBypassAuthorized: boolean,
+): void {
+  if (data.mode === 'addDelta' && data.value <= 0 && (!validationBypassAuthorized || data.meterReplaced)) {
+    throw new ValidationError('addDelta mode requires value > 0');
+  }
+
+  if (
+    data.mode === 'setTotal' &&
+    data.value === 0 &&
+    (vesselValidationEnabled || data.meterReplaced) &&
+    !(
+      data.isRenewalReset === true &&
+      !!data.renewalActionType &&
+      !!data.renewalReason &&
+      data.renewalReason.trim().length > 0
+    )
+  ) {
+    throw new ValidationError('When setting RH to 0, renewal confirmation with action type and reason is required');
+  }
+}
 
 // ── Helper: resolve last-updated date with fallback chain ──
 // Task #427: canonicalize legacy stamp text via the shared calendar-day
@@ -85,19 +122,6 @@ export async function cascadeUpdate(body: unknown, authenticatedRole?: string) {
   const validatedData = parseResult.data;
   const validationBypassRequested = validatedData.rhValidationEnabled === false;
 
-  // The request flag is only a preference. Authorization is based exclusively on
-  // the role placed on the request by the server authentication middleware.
-  if (validationBypassRequested && authenticatedRole !== 'Sail Admin') {
-    throw new ForbiddenError('Only Sail Admin users can turn off Running Hours validation.');
-  }
-
-  // Meter replacement deliberately retains its complete existing validation and
-  // calculation path regardless of the screen-level validation switch.
-  const validationBypassAuthorized =
-    validationBypassRequested &&
-    authenticatedRole === 'Sail Admin' &&
-    !validatedData.meterReplaced;
-
   // Task #427: canonicalize the user's reading date ONCE at the service
   // boundary — validation and the cascade's persistence (date_updated_local,
   // component stamps, rotational stamp accrual) all see the same YYYY-MM-DD.
@@ -109,6 +133,26 @@ export async function cascadeUpdate(body: unknown, authenticatedRole?: string) {
   if (!parentComponent) {
     throw new NotFoundError('Parent component not found');
   }
+
+  // This is a vessel policy, never a client-controlled permission. Missing
+  // settings (including vessels awaiting their first settings sync) fail closed
+  // to ON. A client requesting OFF cannot override a vessel configured ON.
+  const vesselSettings = parentComponent.vesselId
+    ? await repo.getPmsVesselSettings(parentComponent.vesselId)
+    : undefined;
+  const vesselValidationEnabled = isRhValidationEnabledForVessel(vesselSettings);
+
+  // Preserve an explicit authorization failure for an untrusted request trying
+  // to bypass an ON vessel. When the vessel policy is OFF, synced ship users
+  // are deliberately allowed through regardless of their local role.
+  if (validationBypassRequested && vesselValidationEnabled && authenticatedRole !== 'Sail Admin') {
+    throw new ForbiddenError('Running Hours validation is enabled for this vessel.');
+  }
+
+  // Meter replacement deliberately retains its complete existing validation and
+  // calculation path regardless of the vessel RH validation policy.
+  const validationBypassAuthorized = !vesselValidationEnabled && !validatedData.meterReplaced;
+  validateCascadePolicyRules(validatedData, vesselValidationEnabled, validationBypassAuthorized);
 
   const currentRH = parseFloat(parentComponent.currentCumulativeRH || '0');
   const effectiveUserRole = authenticatedRole || 'Ship';
@@ -174,7 +218,7 @@ export async function cascadeUpdate(body: unknown, authenticatedRole?: string) {
 
   if (validationBypassAuthorized) {
     console.warn(
-      `[RH Validation Bypass] Sail Admin saved RH correction for component ${validatedData.parentComponentId} ` +
+      `[RH Validation Bypass] Vessel RH policy allowed correction for component ${validatedData.parentComponentId} ` +
       `(mode=${validatedData.mode}, value=${validatedData.value}, date=${validatedData.dateUpdated}).`
     );
   }
@@ -441,10 +485,6 @@ export async function updateChildRH(componentId: string, body: {
   const { newRHValue, comments, userId, userUuid, adminOverride, dateUpdated, rhValidationEnabled = true } = body;
   const validationBypassRequested = rhValidationEnabled === false;
 
-  if (validationBypassRequested && authenticatedRole !== 'Sail Admin') {
-    throw new ForbiddenError('Only Sail Admin users can turn off Running Hours validation.');
-  }
-  const validationBypassAuthorized = validationBypassRequested && authenticatedRole === 'Sail Admin';
   const effectiveUserRole = authenticatedRole || 'Ship';
 
   // Validate newRHValue
@@ -457,6 +497,17 @@ export async function updateChildRH(componentId: string, body: {
   if (!component) {
     throw new NotFoundError('Component not found');
   }
+
+  // Child updates use the exact same vessel policy as parent cascades. It is
+  // read server-side so a request cannot disable validation for an ON vessel.
+  const vesselSettings = component.vesselId
+    ? await repo.getPmsVesselSettings(component.vesselId)
+    : undefined;
+  const vesselValidationEnabled = isRhValidationEnabledForVessel(vesselSettings);
+  if (validationBypassRequested && vesselValidationEnabled && authenticatedRole !== 'Sail Admin') {
+    throw new ForbiddenError('Running Hours validation is enabled for this vessel.');
+  }
+  const validationBypassAuthorized = !vesselValidationEnabled;
 
   // Only allow updating INHERITED components via this endpoint
   // MASTER components should be updated via the cascade endpoint
@@ -503,7 +554,7 @@ export async function updateChildRH(componentId: string, body: {
     }
   } else {
     console.warn(
-      `[RH Validation Bypass] Sail Admin saved inherited-child RH correction for component ${componentId} ` +
+      `[RH Validation Bypass] Vessel RH policy allowed inherited-child RH correction for component ${componentId} ` +
       `(value=${newRHValue}, date=${canonicalDay}).`
     );
   }
@@ -548,7 +599,7 @@ export async function updateChildRH(componentId: string, body: {
     updatedByUuid: userUuid || null,
     source: 'manual',
     notes: validationBypassAuthorized
-      ? `RH validation bypassed by Sail Admin. ${comments || ''}`.trim()
+      ? `RH validation bypassed by vessel policy. ${comments || ''}`.trim()
       : comments || 'Manual update of child component RH',
     // (previousRH above reflects the committed in-tx read)
     meterReplaced: false,

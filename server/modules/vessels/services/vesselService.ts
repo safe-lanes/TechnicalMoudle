@@ -217,17 +217,22 @@ export async function createPmsVesselSettings(data: {
   updatedBy?: string;
   [key: string]: any;
 }, username: string): Promise<PmsVesselSettings> {
+  // Defense in depth for non-HTTP callers: generic settings creation always
+  // gets the safe ON policy. Only setRhValidationEnabled may write it OFF.
+  const { rhValidationEnabled: _ignoredRhValidationEnabled, ...safeData } = data;
+
   // Check if settings already exist
-  const existing = await repo.getPmsVesselSettings(data.vesselId);
+  const existing = await repo.getPmsVesselSettings(safeData.vesselId);
   if (existing) {
     throw new ConflictError('PMS vessel settings already exist for this vessel. Use PUT to update.');
   }
 
-  const updatedBy = data.updatedBy || username || 'test';
+  const updatedBy = safeData.updatedBy || username || 'test';
   return repo.createOrUpdatePmsVesselSettings({
-    ...data,
+    ...safeData,
+    rhValidationEnabled: true,
     updatedBy,
-  });
+  } as InsertPmsVesselSettings);
 }
 
 /**
@@ -255,6 +260,21 @@ export async function setOfficeRhEntryEnabled(vesselId: string, enabled: boolean
     ...(existing ?? { vesselId }),
     vesselId,
     officeRhEntryEnabled: enabled,
+    updatedBy: username || 'unknown',
+  } as any);
+}
+
+/**
+ * Per-vessel RH validation policy (migration 163). Default is ON and the
+ * settings row is upserted so a vessel can be configured before any other PMS
+ * settings are saved. Role/instance enforcement lives in the controller.
+ */
+export async function setRhValidationEnabled(vesselId: string, enabled: boolean, username: string): Promise<PmsVesselSettings> {
+  const existing = await repo.getPmsVesselSettings(vesselId);
+  return repo.createOrUpdatePmsVesselSettings({
+    ...(existing ?? { vesselId }),
+    vesselId,
+    rhValidationEnabled: enabled,
     updatedBy: username || 'unknown',
   } as any);
 }

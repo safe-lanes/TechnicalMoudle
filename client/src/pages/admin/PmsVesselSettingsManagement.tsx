@@ -197,6 +197,27 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
     },
   });
 
+  // Vessel-specific RH validation policy (migration 163): shore Sail Admin /
+  // Super Admin only. The setting syncs with the existing PMS settings row.
+  const rhValidationSwitchMutation = useMutation({
+    mutationFn: async (data: { vesselId: string; enabled: boolean }) => {
+      const res = await apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}/rh-validation`, { enabled: data.enabled });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
+      toast({
+        title: data.rhValidationEnabled ? "RH validation ENABLED" : "RH validation DISABLED",
+        description: data.rhValidationEnabled
+          ? "Normal Running Hours validation is enforced for this vessel."
+          : "Authorized Running Hours corrections for this vessel may bypass normal validation after sync.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not change RH validation", description: error?.message, variant: "destructive" });
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (data: { vesselId: string; settings: typeof formData }) => {
       return apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}`, data.settings);
@@ -497,6 +518,28 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                       disabled={officeRhSwitchMutation.isPending}
                       onCheckedChange={(checked) => officeRhSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
                       data-testid={`switch-office-rh-entry-${vessel.id}`}
+                    />
+                  </div>
+                )}
+                {canToggleOfficeWoGeneration && (
+                  <div
+                    className="mt-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`row-rh-validation-${vessel.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">RH Validation</p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {(settingsMap.get(vessel.id) as any)?.rhValidationEnabled !== false
+                          ? "On — standard Running Hours validation"
+                          : "Off — applies to this vessel after sync"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={(settingsMap.get(vessel.id) as any)?.rhValidationEnabled !== false}
+                      disabled={rhValidationSwitchMutation.isPending}
+                      onCheckedChange={(checked) => rhValidationSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
+                      data-testid={`switch-rh-validation-${vessel.id}`}
                     />
                   </div>
                 )}

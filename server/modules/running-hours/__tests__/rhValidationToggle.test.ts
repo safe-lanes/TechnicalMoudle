@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cascadeRunningHoursSchema } from '@shared/schema';
-import { cascadeUpdate } from '../services/runningHoursService';
+import { isRhValidationEnabledForVessel, validateCascadePolicyRules } from '../services/runningHoursService';
 
 const baseRequest = {
   parentComponentId: 'test-component',
@@ -9,25 +9,26 @@ const baseRequest = {
 };
 
 describe('Running Hours validation toggle contract', () => {
-  it('keeps the existing Add Delta positive-value rule when validation is on', () => {
+  it('defers policy-dependent Add Delta checks until the vessel policy is resolved', () => {
     const result = cascadeRunningHoursSchema.safeParse({
       ...baseRequest,
       mode: 'addDelta',
       value: 0,
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    expect(() => validateCascadePolicyRules(result.data, true, false)).toThrow('addDelta mode requires value > 0');
   });
 
-  it('allows a negative Add Delta value only when validation is requested off', () => {
+  it('allows a negative Add Delta value when the resolved vessel policy is off', () => {
     const result = cascadeRunningHoursSchema.safeParse({
       ...baseRequest,
       mode: 'addDelta',
       value: -25,
-      rhValidationEnabled: false,
     });
 
     expect(result.success).toBe(true);
+    expect(() => validateCascadePolicyRules(result.data, false, true)).not.toThrow();
   });
 
   it('keeps Set Total readings non-negative regardless of toggle state', () => {
@@ -47,10 +48,21 @@ describe('Running Hours validation toggle contract', () => {
       mode: 'setTotal',
       value: 0,
       meterReplaced: false,
-      rhValidationEnabled: false,
     });
 
     expect(result.success).toBe(true);
+    expect(() => validateCascadePolicyRules(result.data, false, true)).not.toThrow();
+  });
+
+  it('requires zero-reset confirmation when the resolved vessel policy is on', () => {
+    const result = cascadeRunningHoursSchema.safeParse({
+      ...baseRequest,
+      mode: 'setTotal',
+      value: 0,
+    });
+
+    expect(result.success).toBe(true);
+    expect(() => validateCascadePolicyRules(result.data, true, false)).toThrow('renewal confirmation');
   });
 
   it('keeps Meter Replaced Old Meter Final validation mandatory while validation is off', () => {
@@ -79,19 +91,20 @@ describe('Running Hours validation toggle contract', () => {
       rhValidationEnabled: false,
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error?.issues.some(issue => issue.path.includes('value'))).toBe(true);
+    expect(result.success).toBe(true);
+    expect(() => validateCascadePolicyRules(result.data, false, false)).toThrow('addDelta mode requires value > 0');
   });
 
-  it('rejects a direct validation-off request from a non-Sail Admin before touching data', async () => {
-    await expect(cascadeUpdate({
-      ...baseRequest,
-      mode: 'addDelta',
-      value: -25,
-      rhValidationEnabled: false,
-    }, 'PMS Admin')).rejects.toMatchObject({
-      statusCode: 403,
-      message: 'Only Sail Admin users can turn off Running Hours validation.',
-    });
+  it('defaults a vessel without settings to validation ON', () => {
+    expect(isRhValidationEnabledForVessel(undefined)).toBe(true);
+    expect(isRhValidationEnabledForVessel({})).toBe(true);
+  });
+
+  it('keeps validation policy isolated by the vessel settings row', () => {
+    const vesselA = { rhValidationEnabled: false };
+    const vesselB = { rhValidationEnabled: true };
+
+    expect(isRhValidationEnabledForVessel(vesselA)).toBe(false);
+    expect(isRhValidationEnabledForVessel(vesselB)).toBe(true);
   });
 });

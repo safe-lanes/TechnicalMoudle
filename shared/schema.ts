@@ -237,22 +237,6 @@ export const cascadeRunningHoursSchema = z.object({
 }).refine(data => data.mode !== 'setTotal' || data.value >= 0, {
   message: "setTotal mode requires value >= 0",
   path: ["value"]
-}).refine(data => (data.rhValidationEnabled === false && !data.meterReplaced) || data.mode === 'setTotal' || data.value > 0, {
-  message: "addDelta mode requires value > 0",
-  path: ["value"]
-}).refine(data => {
-  // When value is 0 in setTotal mode, isRenewalReset must be true with required fields
-  // Meter replacement remains protected even while normal RH validation is off.
-  if (data.mode === 'setTotal' && data.value === 0 && (data.rhValidationEnabled || data.meterReplaced)) {
-    return data.isRenewalReset === true && 
-           !!data.renewalActionType && 
-           !!data.renewalReason && 
-           data.renewalReason.trim().length > 0;
-  }
-  return true;
-}, {
-  message: "When setting RH to 0, renewal confirmation with action type and reason is required",
-  path: ["renewalReason"]
 }).refine(data => {
   // When meterReplaced is true, oldMeterFinal is mandatory
   if (data.meterReplaced === true) {
@@ -2382,6 +2366,10 @@ export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   // Office RH entry kill switch (migration 162, Task #394): per-vessel opt-in for
   // office-side running-hours entry via WO completion. Default OFF (fail closed).
   officeRhEntryEnabled: boolean("office_rh_entry_enabled").notNull().default(false),
+
+  // Running Hours validation policy (migration 163): per-vessel opt-out for
+  // normal RH correction validation. Default ON (fail closed).
+  rhValidationEnabled: boolean("rh_validation_enabled").notNull().default(true),
 
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),

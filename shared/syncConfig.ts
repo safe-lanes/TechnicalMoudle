@@ -523,7 +523,7 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isGlobal: false,
     isConfigurable: false,
     businessRules: null,
-    notes: 'Per-vessel PMS settings (lead times, grace periods). Integer PK, no UUID.',
+    notes: 'Per-vessel PMS settings (lead times, grace periods, office controls, and RH validation policy). Integer PK, no UUID.',
   },
 
   // ── Certificates & Surveys (Master / Config) ──
