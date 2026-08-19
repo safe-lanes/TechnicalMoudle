@@ -2916,21 +2916,7 @@ export async function approvePostponement(id: string, body: any) {
   const today = new Date().toISOString().split('T')[0];
   const newDueDate = wo.postponeRequestedDate || body.newDueDate;
 
-  const updatedWO = await repo.update(id, {
-    status: 'Postponement Approved',
-    dueDate: newDueDate,
-    postponementEndDate: newDueDate,
-    postponeApprover: body.approvedBy || 'Office',
-    postponementApprovalDate: today,
-    postponementApprovalRemarks: body.approvalRemarks || null,
-  });
-
-  // Sync field logging — log the work_orders UPDATE so the office's approval reaches the vessel.
-  try {
-    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || 'system');
-  } catch (err) { console.error('[FieldLogger] WO postpone-approve:', err); }
-
-  // Insert a new immutable decision audit row (approve)
+  // Values for the new immutable decision audit row (approve) — unchanged business logic.
   const existingRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
   const prevMaxApprove = existingRows?.length
     ? existingRows.reduce((a: any, b: any) =>
@@ -2943,24 +2929,49 @@ export async function approvePostponement(id: string, body: any) {
       )
     : null;
 
-  await repo.createPostponement({
-    id: crypto.randomUUID(),
-    workOrderId: wo.wouuid,
-    vesselId: wo.vesselId!,
-    postponementNumber: prevMaxApprove + 1,
-    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
-    newDueDate: newDueDate,
-    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
-    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
-    authorizedBy: body.approvedBy || 'Office',
-    approvedBy: body.approvedBy || 'Office',
-    approvedDate: today,
-    approvalRemarks: body.approvalRemarks || null,
-    approver: body.approvedBy || 'Office',
-    durationDays: latestApprove?.durationDays || null,
-    submittedDate: today,
-    status: 'Approved',
-    informOffice: true,
+  // Phase 0 / P0.3d (defect D3): the finalize is ONE transaction — WO update + its field log,
+  // the 'Awaiting Approval' REQUEST row settled to 'Approved' (it was left dangling before, and
+  // getLatestAwaitingPostponement kept matching it), and the decision row + its log. A failure
+  // in any of the writes rolls all of them back. The status guard at the top of this function
+  // is unchanged: a second call on an approved WO is still refused before reaching here.
+  const actor = body.approvedBy || body.userId || 'system';
+  const updatedWO = await repo.finalizePostponementApproval({
+    workOrderId: id,
+    woUpdates: {
+      status: 'Postponement Approved',
+      dueDate: newDueDate,
+      postponementEndDate: newDueDate,
+      postponeApprover: body.approvedBy || 'Office',
+      postponementApprovalDate: today,
+      postponementApprovalRemarks: body.approvalRemarks || null,
+    },
+    awaitingPostponementId: awaitingPostponement?.id ?? null,
+    awaitingUpdates: {
+      status: 'Approved',
+      approvedBy: body.approvedBy || 'Office',
+      approvedDate: today,
+      approvalRemarks: body.approvalRemarks || null,
+    },
+    decisionRow: {
+      id: crypto.randomUUID(),
+      workOrderId: wo.wouuid,
+      vesselId: wo.vesselId!,
+      postponementNumber: prevMaxApprove + 1,
+      originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+      newDueDate: newDueDate,
+      postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+      postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+      authorizedBy: body.approvedBy || 'Office',
+      approvedBy: body.approvedBy || 'Office',
+      approvedDate: today,
+      approvalRemarks: body.approvalRemarks || null,
+      approver: body.approvedBy || 'Office',
+      durationDays: latestApprove?.durationDays || null,
+      submittedDate: today,
+      status: 'Approved',
+      informOffice: true,
+    },
+    actor,
   });
 
   return updatedWO;

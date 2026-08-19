@@ -1067,6 +1067,15 @@ export interface IStorage {
   createWoPostponementApprovalStep(step: InsertWoPostponementApproval): Promise<WoPostponementApproval>;
   updateWoPostponementApprovalStep(id: number, data: Partial<WoPostponementApproval>): Promise<WoPostponementApproval>;
   getLatestAwaitingPostponement(workOrderId: string): Promise<WorkOrderPostponement | undefined>;
+  /** Phase 0 / P0.3d — transactional postponement-approval finalize (WO update + request row + decision row, tx-joined logs). */
+  finalizePostponementApproval(params: {
+    workOrderId: string;
+    woUpdates: Partial<InsertWorkOrder>;
+    awaitingPostponementId: string | null;
+    awaitingUpdates: Partial<InsertWorkOrderPostponement>;
+    decisionRow: InsertWorkOrderPostponement;
+    actor: string;
+  }): Promise<WorkOrder>;
   verifyApproverForLevel(reviewerId: string, approvalLevel: string): Promise<boolean>;
 }
 

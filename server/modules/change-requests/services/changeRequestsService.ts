@@ -1,7 +1,7 @@
 import * as crRepo from '../repositories/changeRequestsRepository';
 import { insertChangeRequestSchema, insertChangeRequestCommentSchema, insertChangeRequestAttachmentSchema } from '@shared/schema';
 import { getFieldDefinitions, getEditableFields, type TargetType } from '@shared/changeRequestFields';
-import { ValidationError, NotFoundError } from '../../shared/errors';
+import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from '../../shared/errors';
 
 const VALID_TARGET_TYPES: TargetType[] = ['component', 'job', 'work_order', 'spare', 'store'];
 const VALID_STATUSES = ['draft', 'submitted', 'returned', 'approved', 'rejected'];
@@ -362,6 +362,35 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
 
 // ── Approve / Reject ──
 
+/** CR target type → the PMS table the approved changes are applied to. */
+const CR_TARGET_TABLE: Record<string, string> = {
+  component: 'components',
+  job: 'jobs',
+  work_order: 'work_orders',
+  spare: 'spares',
+  store: 'stores_items',
+};
+
+/**
+ * Phase 0 / P0.3b (defect D2): a CR whose target table is ONE_WAY_SHORE_TO_SHIP (components,
+ * jobs — "managed by office, ship reads only", shared/syncConfig.ts) must not be APPLIED on a
+ * ship instance: the ship's write can never travel to shore, while the CR row itself syncs as
+ * "approved" — proven divergence (DEFECT-REPRODUCTION-REPORT.md §2.2, D2.5). Shore owns those
+ * tables (design §2a); the ship keeps raising and viewing CRs exactly as before.
+ */
+async function assertTargetApplicableOnThisInstance(targetType: string | null | undefined, crId: number): Promise<void> {
+  const table = targetType ? CR_TARGET_TABLE[targetType] : undefined;
+  if (!table) return;
+  const { getTableSyncConfig } = await import('@shared/syncConfig');
+  if (getTableSyncConfig(table)?.category !== 'ONE_WAY_SHORE_TO_SHIP') return;
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (!(await isShipInstance())) return;
+  throw new ForbiddenError(
+    `Change request ${crId} targets ${table}, which is managed by the office and synced to ships one-way. It must be approved on the shore server; the approval will reach this vessel through sync.`,
+    { code: 'SHORE_OWNED_TARGET', targetType, table }
+  );
+}
+
 export async function approveChangeRequest(id: number, body: {
   comment: string;
   reviewerId?: string;
@@ -375,6 +404,19 @@ export async function approveChangeRequest(id: number, body: {
   }
 
   const existing = await crRepo.getChangeRequest(id);
+  if (!existing) throw new NotFoundError('Change request not found');
+
+  // Phase 0 / P0.3c (defect D3): a CR that is already decided cannot be approved again —
+  // previously the zero-step (legacy) path re-finalised on every call (revision bump + re-apply).
+  if (existing.status === 'approved' || existing.status === 'rejected') {
+    throw new ConflictError(
+      `Change request ${id} is already ${existing.status} (revision ${existing.revisionNumber ?? 0}); it cannot be approved again.`,
+      { code: 'CR_ALREADY_DECIDED', status: existing.status, revisionNumber: existing.revisionNumber ?? 0 }
+    );
+  }
+
+  await assertTargetApplicableOnThisInstance(existing.targetType, id);
+
   console.log(`[CR_SERVICE] Approving change request ${id}`, {
     id: existing?.id,
     targetType: existing?.targetType,
@@ -393,6 +435,17 @@ export async function rejectChangeRequest(id: number, body: { comment: string; r
 
   if (!comment) {
     throw new ValidationError('Comment is required for rejection');
+  }
+
+  // Phase 0 / P0.3c (defect D3, same class): a decided CR cannot be decided again — observed on
+  // the pilot: rejecting an already-approved CR answered 200.
+  const existing = await crRepo.getChangeRequest(id);
+  if (!existing) throw new NotFoundError('Change request not found');
+  if (existing.status === 'approved' || existing.status === 'rejected') {
+    throw new ConflictError(
+      `Change request ${id} is already ${existing.status}; it cannot be rejected again.`,
+      { code: 'CR_ALREADY_DECIDED', status: existing.status, revisionNumber: existing.revisionNumber ?? 0 }
+    );
   }
 
   console.log('Rejecting change request:', id, 'with comment:', comment);

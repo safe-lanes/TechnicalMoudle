@@ -6101,6 +6101,12 @@ export class PostgresStorage {
         console.warn(`[CR_APPLY] WARNING: Field ${field} was not updated correctly`);
       }
     }
+    // Phase 0 / P0.3a (defect D2): sync field logging — tx-JOINED, symmetric with the
+    // work_orders / spares / stores applies. `components` is a ONE_WAY_SHORE_TO_SHIP row table,
+    // so shore→ship transport still happens via updated_at; the log is the audit/field-level
+    // record the other three applies already write (and what the engine's §2a callback
+    // contract expects). Throwing on log failure is intentional (apply-without-log not allowed).
+    await logFieldChanges('components', resolvedCuuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   /**
@@ -6234,6 +6240,9 @@ export class PostgresStorage {
       const success = String(applied) === String(expected);
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
+    // Phase 0 / P0.3a (defect D2): sync field logging — tx-JOINED, symmetric with the
+    // work_orders / spares / stores applies (see applyComponentChangesInTx for the rationale).
+    await logFieldChanges('jobs', resolvedJuuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   /**
@@ -7704,6 +7713,55 @@ export class PostgresStorage {
     } catch (e) { console.error('[FieldLogger] WOPApproval update:', e); }
 
     return result[0];
+  }
+
+  /**
+   * Phase 0 / P0.3d (defect D3): the postponement-approval finalize as ONE transaction.
+   * Previously approvePostponement issued four sequential writes on the global pool (WO update,
+   * WO field log, decision-row insert, its field log) and never touched the 'Awaiting Approval'
+   * request row — a dangling row per approval that getLatestAwaitingPostponement kept matching
+   * (DEFECT-REPRODUCTION-REPORT.md §3). Here: WO update + log, request row → 'Approved' + log,
+   * decision row insert + log — all tx-joined, so a failure rolls every write back.
+   * The caller still decides the business values; this method only owns atomicity.
+   */
+  async finalizePostponementApproval(params: {
+    workOrderId: string;               // work_orders.id (or wouuid) — same dual lookup as updateWorkOrder
+    woUpdates: Partial<InsertWorkOrder>;
+    awaitingPostponementId: string | null;
+    awaitingUpdates: Partial<InsertWorkOrderPostponement>;
+    decisionRow: InsertWorkOrderPostponement;
+    actor: string;
+  }): Promise<WorkOrder> {
+    const db = await getDb();
+    return db.transaction(async (tx) => {
+      const before = (await tx.select().from(workOrders)
+        .where(or(eq(workOrders.wouuid, params.workOrderId), eq(workOrders.id, params.workOrderId))).limit(1))[0];
+      if (!before) throw new Error(`Work order ${params.workOrderId} not found`);
+
+      const updated = (await tx.update(workOrders)
+        .set({ ...params.woUpdates, updatedAt: new Date() })
+        .where(eq(workOrders.wouuid, before.wouuid))
+        .returning())[0];
+      // tx-JOINED field logs: commit or roll back WITH the writes (same contract as the CR applies).
+      await logFieldChanges('work_orders', before.wouuid, before.vesselId || null, before, updated, params.actor, tx);
+
+      if (params.awaitingPostponementId) {
+        const reqBefore = (await tx.select().from(workOrderPostponements)
+          .where(eq(workOrderPostponements.id, params.awaitingPostponementId)).limit(1))[0];
+        if (reqBefore) {
+          const reqAfter = (await tx.update(workOrderPostponements)
+            .set({ ...params.awaitingUpdates, updatedAt: new Date() } as any)
+            .where(eq(workOrderPostponements.id, params.awaitingPostponementId))
+            .returning())[0];
+          await logFieldChanges('work_order_postponements', params.awaitingPostponementId, (reqBefore as any).vesselId || null, reqBefore, reqAfter, params.actor, tx);
+        }
+      }
+
+      const decision = (await tx.insert(workOrderPostponements).values(params.decisionRow).returning())[0];
+      await logFieldChanges('work_order_postponements', decision.id, decision.vesselId || null, null, decision, params.actor, tx);
+
+      return updated;
+    });
   }
 
   async getLatestAwaitingPostponement(workOrderId: string): Promise<WorkOrderPostponement | undefined> {
