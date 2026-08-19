@@ -44,6 +44,7 @@ router.get('/pms-vessel-settings/:vesselId', asyncHandler(ctrl.getPmsVesselSetti
 router.put('/pms-vessel-settings/:vesselId/office-wo-generation', requirePermission('pms-admin', 'edit'), asyncHandler(ctrl.updateOfficeWoGenerationSwitch));
 router.put('/pms-vessel-settings/:vesselId/office-rh-entry', requirePermission('pms-admin', 'edit'), asyncHandler(ctrl.updateOfficeRhEntrySwitch));
 router.put('/pms-vessel-settings/:vesselId/rh-validation', requirePermission('pms-admin', 'edit'), asyncHandler(ctrl.updateRhValidationSwitch));
+router.put('/pms-vessel-settings/:vesselId/superintendent-lock', requirePermission('pms-admin', 'edit'), asyncHandler(ctrl.updateSuperintendentLockSwitch));
 router.put('/pms-vessel-settings/:vesselId', requirePermission('pms-admin', 'edit'), asyncHandler(ctrl.updatePmsVesselSettings));
 router.delete('/pms-vessel-settings/:vesselId', requirePermission('pms-admin', 'delete'), asyncHandler(ctrl.deletePmsVesselSettings));
 

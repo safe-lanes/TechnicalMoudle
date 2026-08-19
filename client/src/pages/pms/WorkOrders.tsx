@@ -251,9 +251,9 @@ const WorkOrders: React.FC = () => {
   // Office (shore) replacement for the removed every-minute auto-scan: on shore,
   // WO generation is on-demand. The ship generates on its daily schedule.
   const { isShore } = useSyncInstanceInfo();
-  // Company approval policy — lock badges render the EFFECTIVE tier (stamped
-  // locked + toggle OFF → notification), mirroring the server's live downgrade.
-  const { superintendentLockEnabled } = useApprovalPolicy();
+  // The effective tier is resolved from each row's vessel settings. This keeps
+  // mixed My Vessels and fleet views aligned with the server's live policy.
+  const { isSuperintendentLockEnabled } = useApprovalPolicy();
   const { data: vessels = [] } = useVessels();
   
   // Debounce the search box so each keystroke doesn't fire a server round-trip
@@ -676,8 +676,8 @@ const WorkOrders: React.FC = () => {
           minWidth: 130,
           flex: 0,
           cellRenderer: (params: any) => {
-            const tier = effectiveApprovalTier(params.value, superintendentLockEnabled);
             const wo = params.data;
+            const tier = effectiveApprovalTier(params.value, isSuperintendentLockEnabled(wo?.vesselId));
             const approverLabel = wo?.approver || 'HOD';
             if (tier === "superintendent_locked") return (
               <TooltipProvider delayDuration={150}>
@@ -774,8 +774,8 @@ const WorkOrders: React.FC = () => {
           minWidth: 130,
           flex: 0,
           cellRenderer: (params: any) => {
-            const tier = params.value;
             const woCompleted = params.data;
+            const tier = effectiveApprovalTier(params.value, isSuperintendentLockEnabled(woCompleted?.vesselId));
             if (tier === "superintendent_locked") return (
               <TooltipProvider delayDuration={150}>
                 <Tooltip>
@@ -820,7 +820,7 @@ const WorkOrders: React.FC = () => {
         if (!wo) return null;
         return (
           <div className="flex items-center justify-center gap-2">
-            {activeTab === "Pending Approval" && effectiveApprovalTier(wo.approvalTier, superintendentLockEnabled) === "superintendent_locked" ? (
+            {activeTab === "Pending Approval" && effectiveApprovalTier(wo.approvalTier, isSuperintendentLockEnabled(wo.vesselId)) === "superintendent_locked" ? (
               <div className="relative group" data-testid={`locked-action-${wo.id}`}>
                 <Lock className="h-4 w-4 text-gray-400" />
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[9999]">
@@ -869,7 +869,7 @@ const WorkOrders: React.FC = () => {
     });
 
     return cols;
-  }, [activeTab, isVessel, superintendentLockEnabled]);
+  }, [activeTab, isVessel, isSuperintendentLockEnabled]);
 
   const handleWoSortChanged = (field: string | null, direction: 'asc' | 'desc') => {
     if (!field) {

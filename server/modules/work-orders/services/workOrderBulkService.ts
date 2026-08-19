@@ -21,9 +21,6 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
     failed: []
   };
 
-  // Layer 5 — the bulk path must enforce the SAME approval-tier gates as the
-  // single-approve path (workOrderService). Live policy read, once per batch.
-  const lockEnabled = await isSuperintendentLockEnabled();
   const remarks = (approverRemarks || '').trim();
 
   for (const workOrderId of workOrderIds) {
@@ -107,6 +104,9 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
 
       // ── Layer 5 approval-tier gates (same rules as the single-approve path) ──
       const currentTier = existingWO.approvalTier || 'standard';
+      // A bulk request can contain several vessels, so resolve this policy for
+      // each work order instead of using one fleet-wide setting.
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
 
       if (currentTier === 'superintendent_locked' && lockEnabled) {
         results.failed.push({

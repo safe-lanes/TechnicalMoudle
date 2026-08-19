@@ -217,9 +217,13 @@ export async function createPmsVesselSettings(data: {
   updatedBy?: string;
   [key: string]: any;
 }, username: string): Promise<PmsVesselSettings> {
-  // Defense in depth for non-HTTP callers: generic settings creation always
-  // gets the safe ON policy. Only setRhValidationEnabled may write it OFF.
-  const { rhValidationEnabled: _ignoredRhValidationEnabled, ...safeData } = data;
+  // Policy switches can only be changed through their dedicated, authorized
+  // endpoints. Generic settings creation uses their explicit defaults.
+  const {
+    rhValidationEnabled: _ignoredRhValidationEnabled,
+    superintendentLockEnabled: _ignoredSuperintendentLockEnabled,
+    ...safeData
+  } = data;
 
   // Check if settings already exist
   const existing = await repo.getPmsVesselSettings(safeData.vesselId);
@@ -231,6 +235,7 @@ export async function createPmsVesselSettings(data: {
   return repo.createOrUpdatePmsVesselSettings({
     ...safeData,
     rhValidationEnabled: true,
+    superintendentLockEnabled: false,
     updatedBy,
   } as InsertPmsVesselSettings);
 }
@@ -279,7 +284,29 @@ export async function setRhValidationEnabled(vesselId: string, enabled: boolean,
   } as any);
 }
 
+/**
+ * Per-vessel Superintendent approval lock (migration 168). Default OFF means
+ * notify-only; only this dedicated path may enable or disable the policy.
+ */
+export async function setSuperintendentLockEnabled(vesselId: string, enabled: boolean, username: string): Promise<PmsVesselSettings> {
+  const existing = await repo.getPmsVesselSettings(vesselId);
+  return repo.createOrUpdatePmsVesselSettings({
+    ...(existing ?? { vesselId }),
+    vesselId,
+    superintendentLockEnabled: enabled,
+    updatedBy: username || 'unknown',
+  } as any);
+}
+
 export async function updatePmsVesselSettings(vesselId: string, data: Record<string, any>, username: string): Promise<{ settings: PmsVesselSettings; recalcResult?: { statusesUpdated: number } }> {
+  // Defense in depth for non-HTTP callers: policy switches have dedicated
+  // authorized setter paths and must never be changed by a generic settings save.
+  const {
+    rhValidationEnabled: _ignoredRhValidationEnabled,
+    superintendentLockEnabled: _ignoredSuperintendentLockEnabled,
+    ...safeData
+  } = data;
+  data = safeData;
   const updatedBy = data.updatedBy || username || 'test';
 
   const settingsMode = data.settingsMode || 'COMPANY_STANDARD';

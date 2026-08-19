@@ -2371,6 +2371,10 @@ export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   // normal RH correction validation. Default ON (fail closed).
   rhValidationEnabled: boolean("rh_validation_enabled").notNull().default(true),
 
+  // Superintendent approval lock (migration 168): per-vessel control of
+  // high-severity work-order approval. Default OFF = notify-only path.
+  superintendentLockEnabled: boolean("superintendent_lock_enabled").notNull().default(false),
+
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
@@ -2442,11 +2446,9 @@ export type CompanyStandardGraceSettings = typeof companyStandardGraceSettings.$
 export type CompanyGraceMethod = 'FIXED_DAYS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH';
 export type CompanyGraceScope = 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH';
 
-// Company approval-policy settings (migration 137) — singleton, shore-configured,
-// synced ONE_WAY_SHORE_TO_SHIP (same pattern as companyStandardGraceSettings).
-// superintendent_lock_enabled toggles the Layer-5 'superintendent_locked' tier:
-// TRUE (default) = today's behaviour; FALSE = downgrade to notify-only (approval
-// allowed, Superintendent notification + mandatory HOD remarks unchanged).
+// Legacy company approval-policy settings (migration 137). Kept for historical
+// compatibility only; active Superintendent lock enforcement is vessel-specific
+// in pms_vessel_settings as of migration 168.
 export const companyApprovalSettings = pgTable("company_approval_settings", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   singletonKey: text("singleton_key").notNull().unique().default("ACTIVE"),

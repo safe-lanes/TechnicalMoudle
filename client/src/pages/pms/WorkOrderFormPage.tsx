@@ -561,10 +561,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [isSavingPartB, setIsSavingPartB] = useState(false);
   const [skippedCyclesJustification, setSkippedCyclesJustification] = useState('');
   const [ceApprovalRemarks, setCeApprovalRemarks] = useState('');
-  // Company approval policy — the approval section renders the EFFECTIVE tier
-  // (a stamped superintendent_locked behaves as notification while the lock
-  // toggle is OFF; the server gate applies the same live downgrade).
-  const { superintendentLockEnabled } = useApprovalPolicy();
+  // Vessel policy — a stamped locked tier behaves as notification only when
+  // this work order's vessel has its Superintendent lock turned OFF.
+  const { isSuperintendentLockEnabled } = useApprovalPolicy();
   // Phase 2 — approval queue: position of this WO in the active review queue
   // (sessionStorage-backed, survives reloads; null when not reviewing a queue).
   // Read per render — cheap, and the route is keyed by WO id so each queue
@@ -609,10 +608,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Eligible roles mirror the backend allowlist exactly: isSailAdmin (Sail Admin) and
   // isClientAdmin (PMS Admin + regular Office users). Tech_Superintendent ('Admin' role)
   // and all Vessel roles are excluded — the backend enforces the same boundary.
-  // Superintendent-locked WOs stay fully locked (approver action required first).
+  // A stamped locked tier stays fully locked only while this vessel's live
+  // Superintendent lock remains ON.
   const canOfficeEditPartB = (isSailAdmin || isClientAdmin) && !embedded &&
     currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO &&
-    context?.workOrder?.approvalTier !== 'superintendent_locked';
+    effectiveApprovalTier(
+      context?.workOrder?.approvalTier,
+      isSuperintendentLockEnabled(context?.workOrder?.vesselId || contextVesselId),
+    ) !== 'superintendent_locked';
 
   const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' ||
     (currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO && !partBEditMode);
@@ -4075,7 +4078,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       {!embedded && currentWorkOrderStatus === 'Pending Approval' && (() => {
         const topTier: string = effectiveApprovalTier(
           (workOrderContext as any)?.workOrder?.approvalTier,
-          superintendentLockEnabled
+          isSuperintendentLockEnabled((workOrderContext as any)?.workOrder?.vesselId || contextVesselId)
         );
         const topDaysLate = (workOrderContext as any)?.workOrder?.daysLate || 0;
         const topMissedCycles = (workOrderContext as any)?.workOrder?.missedCycles || 0;
@@ -6959,11 +6962,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             const approvalOriginalDueDate = (workOrderContext as any)?.workOrder?.originalDueDate || '';
             const approvalDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime || '';
             const approvalDaysLate = (workOrderContext as any)?.workOrder?.daysLate || 0;
-            // EFFECTIVE tier: stamped locked + company lock toggle OFF → renders/gates
-            // as the notification tier (mirrors the server's live enforcement).
+            // EFFECTIVE tier: stamped locked + this vessel lock OFF renders/gates
+            // as the notification tier, mirroring the server's live enforcement.
             const approvalTier: string = effectiveApprovalTier(
               (workOrderContext as any)?.workOrder?.approvalTier,
-              superintendentLockEnabled
+              isSuperintendentLockEnabled((workOrderContext as any)?.workOrder?.vesselId || contextVesselId)
             );
             const justificationValid = skippedCyclesJustification.trim().length >= 30;
 

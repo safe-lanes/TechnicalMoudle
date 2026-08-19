@@ -14,6 +14,7 @@ import {
 import { useLocation } from "wouter";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import WOAgGridTable from "@/components/WOAgGridTable";
+import { effectiveApprovalTier, useApprovalPolicy } from "@/hooks/useApprovalPolicy";
 
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return "—";
@@ -43,6 +44,14 @@ export default function SuperintendentPage() {
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; notification: any | null }>({ open: false, notification: null });
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const { isSuperintendentLockEnabled } = useApprovalPolicy();
+  const getEffectiveTier = useCallback(
+    (notification: any) => effectiveApprovalTier(
+      notification?.approvalTier,
+      isSuperintendentLockEnabled(notification?.vesselId),
+    ),
+    [isSuperintendentLockEnabled],
+  );
 
   const { data: allNotifications = [], isLoading } = useQuery<any[]>({
     queryKey: ["/technical/api/superintendent/notifications/all"],
@@ -87,15 +96,15 @@ export default function SuperintendentPage() {
 
   const isRowSelectable = useCallback((params: any) => {
     const n = params.data;
-    return !!(n && n.approvalTier === 'superintendent_locked' && !n.isAcknowledged);
-  }, []);
+    return !!(n && getEffectiveTier(n) === 'superintendent_locked' && !n.isAcknowledged);
+  }, [getEffectiveTier]);
 
   const onSelectionChanged = useCallback((event: SelectionChangedEvent) => {
     setSelectedRows(event.api.getSelectedRows());
   }, []);
 
   const eligibleSelected = selectedRows.filter(
-    (n) => n.approvalTier === 'superintendent_locked' && !n.isAcknowledged
+    (n) => getEffectiveTier(n) === 'superintendent_locked' && !n.isAcknowledged
   );
 
   const columnDefs: ColDef[] = useMemo(() => [
@@ -215,7 +224,7 @@ export default function SuperintendentPage() {
       filter: "agSetColumnFilter",
       cellStyle: { justifyContent: "center" },
       headerClass: "ag-header-center",
-      cellRenderer: (params: any) => getTierBadge(params.data?.approvalTier, params.data?.approver),
+      cellRenderer: (params: any) => getTierBadge(getEffectiveTier(params.data), params.data?.approver),
     },
     {
       headerName: "Notified At",
@@ -245,9 +254,10 @@ export default function SuperintendentPage() {
             </span>
           );
         }
+        const requiresAcknowledgment = getEffectiveTier(n) === 'superintendent_locked';
         return (
           <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700" data-testid={`status-awaiting-${n.id}`}>
-            Awaiting Acknowledgment
+            {requiresAcknowledgment ? 'Awaiting Acknowledgment' : 'Notification Sent'}
           </span>
         );
       },
@@ -262,7 +272,7 @@ export default function SuperintendentPage() {
         const n = p.data;
         if (!n) return "";
         if (n.isAcknowledged) return "Acknowledged";
-        if (n.approvalTier === "superintendent_locked") return "Acknowledge";
+        if (getEffectiveTier(n) === "superintendent_locked") return "Acknowledge";
         return "Info Only";
       },
       cellStyle: { justifyContent: "center" },
@@ -278,7 +288,7 @@ export default function SuperintendentPage() {
             </Button>
           );
         }
-        if (n.approvalTier === 'superintendent_locked') {
+        if (getEffectiveTier(n) === 'superintendent_locked') {
           return (
             <Button
               size="sm"
@@ -298,7 +308,7 @@ export default function SuperintendentPage() {
         );
       },
     },
-  ], [acknowledgeMutation.isPending, setLocation]);
+  ], [acknowledgeMutation.isPending, getEffectiveTier, setLocation]);
 
   return (
     <div className="space-y-6" data-testid="superintendent-page">

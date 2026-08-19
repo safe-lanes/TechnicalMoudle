@@ -127,19 +127,19 @@ function calculateBackdatingDaysForApproval(completionDate: string | null | unde
 }
 
 /**
- * Company approval policy — superintendent lock toggle (migration 137).
- * Read LIVE at both tier assignment and the approval gate so flipping the
- * setting OFF unlocks already-stamped 'superintendent_locked' WOs immediately
- * (no data migration). Fail-safe: any read error resolves to TRUE (locked
- * stays locked) — never accidentally weaken the compliance gate.
+ * Vessel approval policy — Superintendent lock toggle (migration 168).
+ * The vessel setting overrides the legacy company approval policy. OFF is the
+ * requested default, so a missing or unreadable vessel settings row stays on
+ * the notify-only path rather than reading the legacy global value.
  */
-export async function isSuperintendentLockEnabled(): Promise<boolean> {
+export async function isSuperintendentLockEnabled(vesselId: string | null | undefined): Promise<boolean> {
+  if (!vesselId) return false;
   try {
-    const settings = await storage.getCompanyApprovalSettings();
-    return settings?.superintendentLockEnabled ?? true;
+    const settings = await storage.getPmsVesselSettings(vesselId);
+    return settings?.superintendentLockEnabled === true;
   } catch (err: any) {
-    console.warn(`[ApprovalPolicy] Could not read company approval settings (defaulting to lock ENABLED): ${err.message}`);
-    return true;
+    console.warn(`[ApprovalPolicy] Could not read vessel settings for ${vesselId} (defaulting to lock OFF): ${err.message}`);
+    return false;
   }
 }
 
@@ -151,7 +151,7 @@ export function calculateApprovalTier(
   // Superintendent lock toggle: when FALSE the high-severity branch assigns
   // 'superintendent_notification' instead of 'superintendent_locked' — approval
   // allowed, Superintendent still notified, HOD remarks (>=20) still mandatory.
-  superintendentLockEnabled: boolean = true
+  superintendentLockEnabled: boolean = false
 ) {
   // SHARED parser (dateParse.ts contract): raw new Date() made DD-MM-YYYY due
   // dates Invalid (daysLate NaN) or month/day-swapped (daysLate 0) → WOs that
@@ -177,7 +177,7 @@ export function calculateApprovalTier(
       superintendentNotifiedAt = new Date().toISOString();
       approvalBlockReason = 'Awaiting Superintendent acknowledgment';
     } else {
-      // Lock disabled by company policy — notify-only downgrade. Notification
+      // Lock disabled by this vessel policy — notify-only downgrade. Notification
       // still fires (notification tier), remarks (>=20) still mandatory, no block.
       approvalTier = 'superintendent_notification';
       superintendentNotifiedAt = new Date().toISOString();
@@ -543,6 +543,21 @@ export interface ListWorkOrdersPagedResult {
   rankOptions: string[];
 }
 
+async function computeVesselAwareApprovalTierCounts(workOrders: any[]) {
+  const vesselSettings = await repo.findAllPmsVesselSettings();
+  const lockByVessel = new Map(
+    vesselSettings.map((settings: any) => [settings.vesselId, settings.superintendentLockEnabled === true]),
+  );
+
+  return computeApprovalTierCounts(
+    workOrders.map((workOrder: any) => (
+      workOrder.approvalTier === 'superintendent_locked' && !lockByVessel.get(workOrder.vesselId)
+        ? { ...workOrder, approvalTier: 'superintendent_notification' }
+        : workOrder
+    )),
+  );
+}
+
 /**
  * Paginated variant of listWorkOrders. Reuses the exact same enrichment as the
  * non-paged path, then applies the shared filter/search/sort logic (single
@@ -569,7 +584,7 @@ export async function listWorkOrdersPaged(
   ).sort((a, b) => a.localeCompare(b));
 
   const filtered = filterAndSortWorkOrders(enriched, params);
-  const approvalTierCounts = computeApprovalTierCounts(filtered);
+  const approvalTierCounts = await computeVesselAwareApprovalTierCounts(filtered);
 
   const total = filtered.length;
   const pageSize = params.pageSize;
@@ -988,10 +1003,10 @@ export async function updateWorkOrder(id: string, body: any) {
     if (!PART_B_EDIT_ALLOWED_ROLES.includes(body.userRole)) {
       throw new ValidationError('Only Office, PMS Admin, or Sail Admin users can edit Part B on a Pending Approval work order.');
     }
-    // Superintendent-locked WOs cannot be edited via this path — the lock requires
-    // the superintendent to act first. Hiding the button in the UI is not sufficient;
-    // the server must enforce this so direct PATCH calls cannot bypass the lock.
-    if (existingWO.approvalTier === 'superintendent_locked') {
+    // A stamped locked tier only remains locked while its vessel's live policy
+    // is ON. Switching this vessel OFF immediately restores the notify-only
+    // path, including the Part B edit behavior.
+    if (existingWO.approvalTier === 'superintendent_locked' && await isSuperintendentLockEnabled(existingWO.vesselId)) {
       throw new ValidationError('This work order is superintendent-locked. The superintendent must act on it before Part B can be edited.');
     }
     // B3 Running Hours fields — explicitly blocked (delta cascade risk)
@@ -1413,7 +1428,7 @@ export async function updateWorkOrder(id: string, body: any) {
       tierCompDate,
       updateData.submittedDate || existingWO.submittedDate
     );
-    const lockEnabledAtSubmit = await isSuperintendentLockEnabled();
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled(existingWO.vesselId);
     const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
@@ -1519,9 +1534,9 @@ export async function updateWorkOrder(id: string, body: any) {
     const ceRemarks = (updateData.ceApprovalRemarks || '').trim();
 
     if (currentTier === 'superintendent_locked') {
-      // Live policy read: toggling the company setting OFF unlocks already-stamped
-      // locked WOs immediately — they fall through to the notify-tier remarks rule.
-      const lockEnabled = await isSuperintendentLockEnabled();
+      // Live vessel policy read: turning this vessel OFF unlocks already-stamped
+      // locked WOs immediately; other vessels remain unaffected.
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
       if (lockEnabled) {
         throw new ValidationError(
           `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
@@ -1530,7 +1545,7 @@ export async function updateWorkOrder(id: string, body: any) {
       }
       if (!ceRemarks || ceRemarks.length < 20) {
         throw new ValidationError(
-          `This work order has high severity issues and the Superintendent lock is disabled by company policy. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
+          `This work order has high severity issues and the Superintendent lock is disabled for this vessel. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
           { code: 'CE_REMARKS_REQUIRED', minLength: 20 }
         );
       }

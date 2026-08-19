@@ -35,44 +35,22 @@ function resolveActorIdentity(req: Request): string | undefined {
   return undefined;
 }
 
-// ── Company Approval Policy (superintendent lock toggle, migration 137) ──
-
-const APPROVAL_POLICY_EDITOR_ROLES = new Set(['Sail Admin', 'Super Admin']);
+// ── Retired company approval policy endpoint ──
 
 export async function getApprovalPolicy(_req: Request, res: Response) {
-  const settings = await storage.getCompanyApprovalSettings();
   res.json({
-    superintendentLockEnabled: settings?.superintendentLockEnabled ?? true,
-    updatedBy: settings?.updatedBy ?? null,
-    updatedAt: settings?.updatedAt ?? null,
+    superintendentLockEnabled: false,
+    deprecated: true,
+    message: 'The Superintendent approval lock is now configured per vessel in PMS Vessel Settings.',
+    updatedBy: null,
+    updatedAt: null,
   });
 }
 
 export async function updateApprovalPolicy(req: Request, res: Response) {
-  // Shore-configured setting synced ONE_WAY_SHORE_TO_SHIP — a ship-side edit
-  // would be silently overwritten by the next pull, so refuse it outright.
-  const { isShipInstance } = await import('../../sync/syncRole');
-  if (await isShipInstance()) {
-    return res.status(403).json({ error: 'shore_only', message: 'The approval policy is configured on the shore server and synced to ships.' });
-  }
-
-  const userRole = (req as AuthenticatedRequest).user?.role || '';
-  if (!APPROVAL_POLICY_EDITOR_ROLES.has(userRole)) {
-    return res.status(403).json({ error: 'forbidden', message: 'Only Sail Admin / Super Admin may edit the approval policy.' });
-  }
-
-  const { superintendentLockEnabled } = req.body ?? {};
-  if (typeof superintendentLockEnabled !== 'boolean') {
-    return res.status(400).json({ error: 'superintendentLockEnabled (boolean) is required' });
-  }
-
-  const username = (req as AuthenticatedRequest).user?.username || null;
-  const saved = await storage.upsertCompanyApprovalSettings({ superintendentLockEnabled, updatedBy: username });
-  console.log(`[ApprovalPolicy] superintendent_lock_enabled set to ${superintendentLockEnabled} by ${username || 'unknown'}`);
-  res.json({
-    superintendentLockEnabled: saved.superintendentLockEnabled,
-    updatedBy: saved.updatedBy,
-    updatedAt: saved.updatedAt,
+  return res.status(410).json({
+    error: 'deprecated',
+    message: 'The company-wide Superintendent approval lock is retired. Configure the lock for an individual vessel in PMS Vessel Settings.',
   });
 }
 
@@ -635,8 +613,19 @@ export async function updateExecution(req: Request, res: Response) {
 
 // ── Superintendent Endpoints (Layer 5) ──
 
+const SUPERINTENDENT_ACKNOWLEDGER_ROLES = new Set(['PMS Admin', 'Sail Admin', 'Super Admin']);
+
+function canAcknowledgeAsSuperintendent(req: Request): boolean {
+  // Do not consult forwardedRole: it is client-forwarded identity metadata and
+  // cannot be trusted for authorization.
+  return SUPERINTENDENT_ACKNOWLEDGER_ROLES.has(((req as AuthenticatedRequest).user?.role || '').trim());
+}
+
 export async function bulkSuperintendentAcknowledge(req: Request, res: Response) {
   try {
+    if (!canAcknowledgeAsSuperintendent(req)) {
+      return res.status(403).json({ error: 'forbidden', message: 'Only authorized shore administrators may acknowledge Superintendent-locked work orders.' });
+    }
     const { workOrderIds } = req.body as { workOrderIds: string[] };
     if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
       return res.status(400).json({ error: 'workOrderIds must be a non-empty array' });
@@ -649,6 +638,10 @@ export async function bulkSuperintendentAcknowledge(req: Request, res: Response)
         const wo = await woService.getWorkOrder(id);
         if (!wo) { results.push({ id, success: false, error: 'Not found' }); continue; }
         if (wo.approvalTier !== 'superintendent_locked') { results.push({ id, success: false, error: 'Not locked' }); continue; }
+        if (!await woService.isSuperintendentLockEnabled(wo.vesselId)) {
+          results.push({ id, success: false, error: 'Superintendent lock is disabled for this vessel' });
+          continue;
+        }
 
         await woService.updateWorkOrder(id, {
           superintendentAcknowledged: true,
@@ -682,6 +675,9 @@ export async function bulkSuperintendentAcknowledge(req: Request, res: Response)
 
 export async function superintendentAcknowledge(req: Request, res: Response) {
   try {
+    if (!canAcknowledgeAsSuperintendent(req)) {
+      return res.status(403).json({ error: 'forbidden', message: 'Only authorized shore administrators may acknowledge Superintendent-locked work orders.' });
+    }
     const wo = await woService.getWorkOrder(req.params.id);
     if (!wo) {
       return res.status(404).json({ error: 'Work order not found' });
@@ -689,6 +685,11 @@ export async function superintendentAcknowledge(req: Request, res: Response) {
 
     if (wo.approvalTier !== 'superintendent_locked') {
       return res.status(400).json({ error: 'This WO does not require Superintendent acknowledgment' });
+    }
+    if (!await woService.isSuperintendentLockEnabled(wo.vesselId)) {
+      return res.status(400).json({
+        error: 'This vessel has the Superintendent lock disabled; this work order follows the notify-only approval path.',
+      });
     }
 
     await woService.updateWorkOrder(req.params.id, {
