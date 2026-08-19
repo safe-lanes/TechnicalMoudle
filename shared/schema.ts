@@ -212,7 +212,9 @@ export type RenewalActionType = typeof RENEWAL_ACTION_TYPES[number];
 export const cascadeRunningHoursSchema = z.object({
   parentComponentId: z.string(),
   mode: z.enum(['setTotal', 'addDelta']),
-  value: z.number().nonnegative(), // Allow zero for setTotal (meter replacement), but addDelta will be validated separately
+  // Set Total remains non-negative. Add Delta may be negative only when the
+  // Sail Admin-authorized validation bypass is requested and approved server-side.
+  value: z.number().finite(),
   dateUpdated: z.string(), // DD-MMM-YYYY HH:mm format
   dateUpdatedTZ: z.string().default('UTC'),
   comments: z.string().optional(),
@@ -223,18 +225,25 @@ export const cascadeRunningHoursSchema = z.object({
   userUuid: z.string().optional(),
   userRole: z.string().optional().default('Ship'),
   adminOverride: z.boolean().optional().default(false),
+  // Request preference only. The running-hours service authorizes a false value
+  // using the authenticated server session; never trust this flag by itself.
+  rhValidationEnabled: z.boolean().optional().default(true),
   // Renewal/Replacement fields (required when value = 0)
   isRenewalReset: z.boolean().optional().default(false),
   renewalActionType: z.enum(RENEWAL_ACTION_TYPES).optional(),
   renewalReason: z.string().optional(),
   renewalReference: z.string().optional(),
   renewalEvidenceUrls: z.array(z.string()).optional(),
-}).refine(data => data.mode === 'setTotal' || data.value > 0, {
+}).refine(data => data.mode !== 'setTotal' || data.value >= 0, {
+  message: "setTotal mode requires value >= 0",
+  path: ["value"]
+}).refine(data => (data.rhValidationEnabled === false && !data.meterReplaced) || data.mode === 'setTotal' || data.value > 0, {
   message: "addDelta mode requires value > 0",
   path: ["value"]
 }).refine(data => {
   // When value is 0 in setTotal mode, isRenewalReset must be true with required fields
-  if (data.mode === 'setTotal' && data.value === 0) {
+  // Meter replacement remains protected even while normal RH validation is off.
+  if (data.mode === 'setTotal' && data.value === 0 && (data.rhValidationEnabled || data.meterReplaced)) {
     return data.isRenewalReset === true && 
            !!data.renewalActionType && 
            !!data.renewalReason && 

@@ -388,6 +388,7 @@ export async function cascadeRunningHoursUpdate(params: {
   meterReplaced?: boolean;
   oldMeterFinal?: string;
   newMeterStart?: string;
+  rhValidationBypassed?: boolean;
 }): Promise<{
   updatedComponents: number;
   auditsCreated: number;

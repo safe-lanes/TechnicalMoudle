@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import * as rhService from '../services/runningHoursService';
 import * as rhTimelineValidation from '../services/rhTimelineValidationService';
 import { ValidationError } from '../../shared/errors';
+import { ForbiddenError } from '../../shared/errors';
+import type { AuthenticatedRequest } from '../../../middleware/auth';
 
 const PLACEHOLDER_USER_IDS = ['admin', 'system', 'User', 'user', ''];
 
@@ -55,11 +57,13 @@ export async function cascadeUpdate(req: Request, res: Response) {
   try {
     req.body.userId = resolveUserId(req);
     req.body.userUuid = resolveUserUuid(req);
-    const result = await rhService.cascadeUpdate(req.body);
+    // Role comes from the authenticated server session, never from the browser payload.
+    const authenticatedRole = (req as AuthenticatedRequest).user?.role;
+    const result = await rhService.cascadeUpdate(req.body, authenticatedRole);
     res.json(result);
   } catch (error: any) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ error: error.message, ...error.details });
+    if (error instanceof ValidationError || error instanceof ForbiddenError) {
+      return res.status(error.statusCode).json({ error: error.message, ...error.details });
     }
     console.error('Error cascading running hours update:', error);
     res.status(500).json({ error: error.message || "Failed to cascade running hours update" });
@@ -113,11 +117,12 @@ export async function updateChildRH(req: Request, res: Response) {
   try {
     req.body.userId = resolveUserId(req);
     req.body.userUuid = resolveUserUuid(req);
-    const result = await rhService.updateChildRH(req.params.componentId, req.body);
+    const authenticatedRole = (req as AuthenticatedRequest).user?.role;
+    const result = await rhService.updateChildRH(req.params.componentId, req.body, authenticatedRole);
     res.json(result);
   } catch (error: any) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ error: error.message, ...error.details });
+    if (error instanceof ValidationError || error instanceof ForbiddenError) {
+      return res.status(error.statusCode).json({ error: error.message, ...error.details });
     }
     console.error("Error updating child RH:", error);
     res.status(500).json({ error: "Failed to update child running hours" });

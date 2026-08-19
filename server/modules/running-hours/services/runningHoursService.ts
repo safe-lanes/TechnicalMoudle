@@ -2,7 +2,7 @@ import * as repo from '../repositories/runningHoursRepository';
 import type { RHHistoryQuery, RHHistoryResult } from '../repositories/runningHoursRepository';
 import { validateRunningHoursIncrease, canAdminOverride, safeParseDate } from '../utils/rhValidation';
 import { canonicalizeReadingDateInput, requireReadingDayInput, todayReadingDay } from '../utils/readingDate';
-import { NotFoundError, ValidationError } from '../../shared/errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '../../shared/errors';
 import { z } from 'zod';
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema } from '@shared/schema';
 import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
@@ -77,12 +77,26 @@ export async function createAudit(body: unknown): Promise<RunningHoursAudit> {
 // Cascade Update (from routes.ts)
 // ══════════════════════════════════════════════════════════
 
-export async function cascadeUpdate(body: unknown) {
+export async function cascadeUpdate(body: unknown, authenticatedRole?: string) {
   const parseResult = cascadeRunningHoursSchema.safeParse(body);
   if (!parseResult.success) {
     throw new ValidationError("Invalid cascade data", { details: parseResult.error.errors });
   }
   const validatedData = parseResult.data;
+  const validationBypassRequested = validatedData.rhValidationEnabled === false;
+
+  // The request flag is only a preference. Authorization is based exclusively on
+  // the role placed on the request by the server authentication middleware.
+  if (validationBypassRequested && authenticatedRole !== 'Sail Admin') {
+    throw new ForbiddenError('Only Sail Admin users can turn off Running Hours validation.');
+  }
+
+  // Meter replacement deliberately retains its complete existing validation and
+  // calculation path regardless of the screen-level validation switch.
+  const validationBypassAuthorized =
+    validationBypassRequested &&
+    authenticatedRole === 'Sail Admin' &&
+    !validatedData.meterReplaced;
 
   // Task #427: canonicalize the user's reading date ONCE at the service
   // boundary — validation and the cascade's persistence (date_updated_local,
@@ -97,6 +111,7 @@ export async function cascadeUpdate(body: unknown) {
   }
 
   const currentRH = parseFloat(parentComponent.currentCumulativeRH || '0');
+  const effectiveUserRole = authenticatedRole || 'Ship';
   let targetRH: number;
 
   if (validatedData.mode === 'setTotal') {
@@ -106,8 +121,12 @@ export async function cascadeUpdate(body: unknown) {
     targetRH = currentRH + validatedData.value;
   }
 
+  if (!Number.isFinite(targetRH) || targetRH < 0) {
+    throw new ValidationError('Resulting Running Hours cannot be negative.');
+  }
+
   // Skip daily-limit validation for meter replacements (physical device swap, not normal accumulation)
-  if (!validatedData.meterReplaced) {
+  if (!validatedData.meterReplaced && !validationBypassAuthorized) {
     // Validate running hours increase against daily limits
     // Use same fallback logic as the Running Hours display
     const componentLastUpdated = resolveLastUpdated(parentComponent);
@@ -121,7 +140,7 @@ export async function cascadeUpdate(body: unknown) {
       newRH: targetRH,
       componentLastUpdated: componentLastUpdated,
       newUpdateDate: validatedData.dateUpdated,
-      userRole: validatedData.userRole || 'Ship',
+      userRole: effectiveUserRole,
       adminOverride: validatedData.adminOverride || false
     });
 
@@ -135,12 +154,15 @@ export async function cascadeUpdate(body: unknown) {
           daysSinceLastUpdate: validation.daysSinceLastUpdate,
           lastUpdateDate: validation.lastUpdateDate,
           requiresAdminOverride: validation.requiresAdminOverride,
-          canOverride: canAdminOverride(validatedData.userRole || 'Ship')
+          canOverride: canAdminOverride(effectiveUserRole)
         }
       });
     }
 
-    const result = await repo.cascadeRunningHoursUpdate(validatedData);
+    const result = await repo.cascadeRunningHoursUpdate({
+      ...validatedData,
+      rhValidationBypassed: false,
+    });
     return {
       ...result,
       validation: {
@@ -150,7 +172,17 @@ export async function cascadeUpdate(body: unknown) {
     };
   }
 
-  const result = await repo.cascadeRunningHoursUpdate(validatedData);
+  if (validationBypassAuthorized) {
+    console.warn(
+      `[RH Validation Bypass] Sail Admin saved RH correction for component ${validatedData.parentComponentId} ` +
+      `(mode=${validatedData.mode}, value=${validatedData.value}, date=${validatedData.dateUpdated}).`
+    );
+  }
+
+  const result = await repo.cascadeRunningHoursUpdate({
+    ...validatedData,
+    rhValidationBypassed: validationBypassAuthorized,
+  });
   return {
     ...result,
     validation: {
@@ -404,8 +436,16 @@ export async function updateChildRH(componentId: string, body: {
   userRole?: string;
   adminOverride?: boolean;
   dateUpdated?: string;
-}) {
-  const { newRHValue, comments, userId, userUuid, userRole, adminOverride, dateUpdated } = body;
+  rhValidationEnabled?: boolean;
+}, authenticatedRole?: string) {
+  const { newRHValue, comments, userId, userUuid, adminOverride, dateUpdated, rhValidationEnabled = true } = body;
+  const validationBypassRequested = rhValidationEnabled === false;
+
+  if (validationBypassRequested && authenticatedRole !== 'Sail Admin') {
+    throw new ForbiddenError('Only Sail Admin users can turn off Running Hours validation.');
+  }
+  const validationBypassAuthorized = validationBypassRequested && authenticatedRole === 'Sail Admin';
+  const effectiveUserRole = authenticatedRole || 'Ship';
 
   // Validate newRHValue
   if (typeof newRHValue !== 'number' || newRHValue < 0) {
@@ -437,27 +477,35 @@ export async function updateChildRH(componentId: string, body: {
   // Absent → today; PRESENT-but-unparseable → reject (never silently 'today').
   const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
 
-  // Validate running hours increase against daily limits
-  const validation = validateRunningHoursIncrease({
-    currentRH: currentRHValue,
-    newRH: newRHValue,
-    componentLastUpdated: componentLastUpdated,
-    newUpdateDate: canonicalDay,
-    userRole: userRole || 'Ship',
-    adminOverride: adminOverride || false
-  });
-
-  if (!validation.allowed) {
-    throw new ValidationError(validation.message, {
-      validation: {
-        maxAllowedIncrease: validation.maxAllowedIncrease,
-        requestedIncrease: validation.requestedIncrease,
-        daysSinceLastUpdate: validation.daysSinceLastUpdate,
-        lastUpdateDate: validation.lastUpdateDate,
-        requiresAdminOverride: validation.requiresAdminOverride,
-        canOverride: canAdminOverride(userRole || 'Ship')
-      }
+  let validation: ReturnType<typeof validateRunningHoursIncrease> | null = null;
+  if (!validationBypassAuthorized) {
+    // Validate running hours increase against daily limits
+    validation = validateRunningHoursIncrease({
+      currentRH: currentRHValue,
+      newRH: newRHValue,
+      componentLastUpdated: componentLastUpdated,
+      newUpdateDate: canonicalDay,
+      userRole: effectiveUserRole,
+      adminOverride: adminOverride || false
     });
+
+    if (!validation.allowed) {
+      throw new ValidationError(validation.message, {
+        validation: {
+          maxAllowedIncrease: validation.maxAllowedIncrease,
+          requestedIncrease: validation.requestedIncrease,
+          daysSinceLastUpdate: validation.daysSinceLastUpdate,
+          lastUpdateDate: validation.lastUpdateDate,
+          requiresAdminOverride: validation.requiresAdminOverride,
+          canOverride: canAdminOverride(effectiveUserRole)
+        }
+      });
+    }
+  } else {
+    console.warn(
+      `[RH Validation Bypass] Sail Admin saved inherited-child RH correction for component ${componentId} ` +
+      `(value=${newRHValue}, date=${canonicalDay}).`
+    );
   }
 
   const newRHFormatted = newRHValue.toFixed(2);
@@ -499,7 +547,9 @@ export async function updateChildRH(componentId: string, body: {
     userId: userId || 'system',
     updatedByUuid: userUuid || null,
     source: 'manual',
-    notes: comments || 'Manual update of child component RH',
+    notes: validationBypassAuthorized
+      ? `RH validation bypassed by Sail Admin. ${comments || ''}`.trim()
+      : comments || 'Manual update of child component RH',
     // (previousRH above reflects the committed in-tx read)
     meterReplaced: false,
     version: 1
@@ -511,8 +561,8 @@ export async function updateChildRH(componentId: string, body: {
     previousRH,
     newRH: newRHFormatted,
     validation: {
-      maxAllowedIncrease: validation.maxAllowedIncrease,
-      actualIncrease: validation.requestedIncrease
+      maxAllowedIncrease: validation?.maxAllowedIncrease ?? null,
+      actualIncrease: validation?.requestedIncrease ?? null
     }
   };
 }

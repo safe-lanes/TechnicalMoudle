@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { Search, FileSpreadsheet, Users, Settings, Pencil, AlertTriangle, Download, Clock, History, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
@@ -80,6 +81,9 @@ const RunningHours = () => {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<RunningHoursData | null>(null);
+  // Sail Admin-only, screen-level control. It is sent with each cascade update;
+  // the server independently authorizes any requested validation bypass.
+  const [rhValidationEnabled, setRhValidationEnabled] = useState(true);
   
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
@@ -803,6 +807,7 @@ const RunningHours = () => {
           comments: update.comments || '',
           userId: currentUser?.fullName || currentUser?.username || 'system',
           userUuid: currentUser?.userUuid || undefined,
+          rhValidationEnabled: update.rhValidationEnabled,
           meterReplaced: update.meterReplaced,
           oldMeterFinal: update.oldMeterFinal,
           newMeterStart: update.newMeterStart
@@ -835,12 +840,13 @@ const RunningHours = () => {
 
   // Mutation for updating individual child component RH
   const updateChildRHMutation = useMutation({
-    mutationFn: async (data: { componentId: string; newRHValue: number; comments?: string }) => {
+    mutationFn: async (data: { componentId: string; newRHValue: number; comments?: string; rhValidationEnabled: boolean }) => {
       return await apiRequest('PUT', `/technical/api/running-hours/child/${data.componentId}`, {
         newRHValue: data.newRHValue,
         comments: data.comments || '',
         userId: currentUser?.fullName || currentUser?.username || 'system',
-        userUuid: currentUser?.userUuid || undefined
+        userUuid: currentUser?.userUuid || undefined,
+        rhValidationEnabled: data.rhValidationEnabled,
       });
     },
     onSuccess: () => {
@@ -895,7 +901,8 @@ const RunningHours = () => {
     updateChildRHMutation.mutate({
       componentId: editingChildId,
       newRHValue: newValue,
-      comments: editingChildComments
+      comments: editingChildComments,
+      rhValidationEnabled,
     });
   };
 
@@ -1061,7 +1068,7 @@ const RunningHours = () => {
     }
     
     // Check if user is trying to set RH to 0 - require confirmation (skip if meter replaced, already confirmed)
-    if (updateMode === 'setTotal' && newValue === 0 && !meterReplaced) {
+    if (updateMode === 'setTotal' && newValue === 0 && !meterReplaced && rhValidationEnabled) {
       setPendingZeroRHUpdate({
         componentId: selectedComponent.id,
         componentName: selectedComponent.component,
@@ -1083,6 +1090,7 @@ const RunningHours = () => {
       comments: updateForm.comments,
       userId: currentUser?.fullName || currentUser?.username || 'system',
       userUuid: currentUser?.userUuid || undefined,
+      rhValidationEnabled,
       meterReplaced,
       oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
       newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined,
@@ -1111,6 +1119,7 @@ const RunningHours = () => {
       comments: pendingZeroRHUpdate.comments,
       userId: currentUser?.fullName || currentUser?.username || 'system',
       userUuid: currentUser?.userUuid || undefined,
+      rhValidationEnabled,
       meterReplaced: true,
       isRenewalReset: true,
       renewalActionType: renewalData.renewalActionType,
@@ -1272,14 +1281,17 @@ const RunningHours = () => {
     const newVal = parseFloat(updateForm.newValue);
     if (isNaN(newVal)) return null;
     if (updateMode === "setTotal") {
+      if (newVal < 0) {
+        return "New value cannot be negative.";
+      }
       if (!meterReplaced) {
         const currentRH = parseFloat(updateForm.oldValue.replace(/,/g, ''));
-        if (!isNaN(currentRH) && newVal < currentRH) {
+        if (rhValidationEnabled && !isNaN(currentRH) && newVal < currentRH) {
           return `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs). Use 'Meter Replaced' if the meter was reset.`;
         }
       }
     } else if (updateMode === "addDelta") {
-      if (newVal <= 0) {
+      if (rhValidationEnabled && newVal <= 0) {
         return "Delta value must be a positive number. Running hours can only increase.";
       }
     }
@@ -1292,17 +1304,20 @@ const RunningHours = () => {
     const inputValue = parseFloat(updateData.value.replace(/,/g, ''));
     if (isNaN(inputValue)) return null;
     if (bulkUpdateMode === "setTotal") {
+      if (inputValue < 0) {
+        return "New value cannot be negative.";
+      }
       if (!updateData.meterReplaced) {
         const component = runningHoursData.find(c => c.id === componentId);
         if (component) {
           const currentRH = parseFloat(component.runningHours.replace(" hrs", "").replace(/,/g, ""));
-          if (!isNaN(currentRH) && inputValue < currentRH) {
+          if (rhValidationEnabled && !isNaN(currentRH) && inputValue < currentRH) {
             return `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs). Use 'Meter Replaced' if the meter was reset.`;
           }
         }
       }
     } else if (bulkUpdateMode === "addDelta") {
-      if (inputValue <= 0) {
+      if (rhValidationEnabled && inputValue <= 0) {
         return "Delta value must be a positive number. Running hours can only increase.";
       }
     }
@@ -1349,12 +1364,12 @@ const RunningHours = () => {
       }
       
       // Block zero values in bulk update - must use individual update with renewal confirmation
-      if (bulkUpdateMode === 'setTotal' && inputValue === 0) {
+      if (bulkUpdateMode === 'setTotal' && inputValue === 0 && rhValidationEnabled) {
         errors[component.id] = "Cannot set RH to 0 in bulk update. Use individual update for renewal/replacement.";
         continue;
       }
       
-      if (bulkUpdateMode === 'setTotal' && !updateData.meterReplaced) {
+      if (bulkUpdateMode === 'setTotal' && !updateData.meterReplaced && rhValidationEnabled) {
         const currentRH = parseFloat(component.runningHours.replace(" hrs", "").replace(/,/g, ""));
         if (!isNaN(currentRH) && inputValue < currentRH) {
           errors[component.id] = `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs).`;
@@ -1362,7 +1377,7 @@ const RunningHours = () => {
         }
       }
       
-      if (bulkUpdateMode === 'addDelta' && inputValue <= 0) {
+      if (bulkUpdateMode === 'addDelta' && inputValue <= 0 && rhValidationEnabled) {
         errors[component.id] = "Delta value must be a positive number.";
         continue;
       }
@@ -1373,6 +1388,7 @@ const RunningHours = () => {
         value: inputValue,
         dateUpdated: dateLocal,
         comments: bulkUpdateGlobal.comments,
+        rhValidationEnabled,
         meterReplaced: updateData.meterReplaced || false,
         oldMeterFinal: updateData.meterReplaced ? updateData.oldMeterFinal : undefined,
         newMeterStart: updateData.meterReplaced ? updateData.newMeterStart : undefined
@@ -1420,6 +1436,30 @@ const RunningHours = () => {
           </div>
           {activeTab === 'main' && (
             <div className="flex gap-2 items-center">
+              {isSailAdmin && (
+                <div
+                  className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                    rhValidationEnabled
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                      : 'border-amber-300 bg-amber-50 text-amber-900'
+                  }`}
+                  data-testid="rh-validation-toggle"
+                >
+                  <Label htmlFor="rh-validation-enabled" className="cursor-pointer font-medium">
+                    RH Validation
+                  </Label>
+                  <Switch
+                    id="rh-validation-enabled"
+                    checked={rhValidationEnabled}
+                    onCheckedChange={(enabled) => {
+                      setRhValidationEnabled(enabled);
+                      setBulkUpdateErrors({});
+                    }}
+                    data-testid="switch-rh-validation"
+                  />
+                  <span className="font-semibold">{rhValidationEnabled ? 'ON' : 'OFF'}</span>
+                </div>
+              )}
               <Button 
                 variant="outline" 
                 size="sm"
