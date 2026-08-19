@@ -139,6 +139,24 @@ Switch: **`PMS_AUTH_MOCK_RBAC`** (both `.env.*.example` files ship it as `0`).
 `req.user.role` is still the legacy mock value (`Sail Admin`) for the ~40 business-logic consumers
 that read it; the real role is on `req.rbac.role` / `req.user.forwardedRole`.
 
+## Clock / timezone check (operator, Phase 0 / P0.5)
+
+The pilot's **host Postgres clock was 5.5 h behind real UTC** (19-Aug-2026): DB-default
+timestamps (`changed_at`, `created_at` = `now()`) were 5.5 h earlier than node-written ones, so
+the ship STALE-SKIPPED shore field logs and the one-way pull checkpoint stalled. Before trusting
+any sync timing — and once on **production shore and on each ship** — run on the DB **and** compare
+with the app host's clock:
+
+```sql
+SELECT now() AS db_now, now() AT TIME ZONE 'UTC' AS db_utc, current_setting('TimeZone') AS db_tz;
+```
+```bash
+date -u        # app host, same second
+```
+`db_utc` must equal the host's UTC within seconds. If it does not, fix the DB/host timezone
+configuration (not the app). On the pilot the workaround was to start the shore process with
+`TZ=UTC` (node-written stamps become consistent; DB defaults still follow the DB clock).
+
 ---
 
 ## Files — permanent vs throwaway
