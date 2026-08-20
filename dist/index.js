@@ -5247,6 +5247,18 @@ var init_db = __esm({
 });
 
 // shared/syncConfig.ts
+var syncConfig_exports = {};
+__export(syncConfig_exports, {
+  SYNC_CONFIG: () => SYNC_CONFIG,
+  getConfigurableTables: () => getConfigurableTables,
+  getIdentityColumn: () => getIdentityColumn,
+  getProvisioningTables: () => getProvisioningTables,
+  getSyncPhaseOrder: () => getSyncPhaseOrder,
+  getTableSyncConfig: () => getTableSyncConfig,
+  getTablesByCategory: () => getTablesByCategory,
+  getTablesWithBusinessRules: () => getTablesWithBusinessRules,
+  requiresFieldLogging: () => requiresFieldLogging
+});
 function getTablesByCategory(category) {
   return Object.values(SYNC_CONFIG).filter((t) => t.category === category);
 }
@@ -5259,6 +5271,15 @@ function requiresFieldLogging(tableName) {
 }
 function getIdentityColumn(tableName) {
   return SYNC_CONFIG[tableName]?.identityColumn ?? null;
+}
+function getConfigurableTables() {
+  return Object.values(SYNC_CONFIG).filter((t) => t.isConfigurable);
+}
+function getProvisioningTables() {
+  return Object.values(SYNC_CONFIG).filter((t) => t.category !== "NO_SYNC");
+}
+function getTablesWithBusinessRules() {
+  return Object.values(SYNC_CONFIG).filter((t) => t.businessRules !== null);
 }
 function getSyncPhaseOrder() {
   return [
@@ -21535,12 +21556,118 @@ var init_syncTenantGuard = __esm({
   }
 });
 
+// server/middleware/auth.ts
+function isMockRbacEnabled() {
+  const v = (process.env.PMS_AUTH_MOCK_RBAC ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+function getRbacIdentity(req) {
+  return req.rbac ?? { role: null, userType: null, source: "none" };
+}
+function rbacMatches(identity, allowed) {
+  if (identity.role && allowed.includes(identity.role)) return true;
+  if (identity.userType === "Office" && allowed.includes("Office")) return true;
+  if (identity.userType === "Ship" && allowed.includes("Ship")) return true;
+  return false;
+}
+async function initMockAuthRankId() {
+  console.log(
+    `\u2705 Mock auth resolves rank_name per-request (x-rank header \u2192 body.rank \u2192 "${DEFAULT_MOCK_RANK_NAME}")`
+  );
+}
+function readForwardedHeader(req, name) {
+  const raw = req.headers[name];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== "string" || !value.trim()) return void 0;
+  try {
+    const decoded = decodeURIComponent(value).trim();
+    return decoded || void 0;
+  } catch {
+    return value.trim();
+  }
+}
+var DEFAULT_MOCK_RANK_NAME, RBAC_BYPASS_ROLES, requireAuth, requireRole, legacyPassThrough, requirePMSAdmin, requireOfficeOrAdmin, requireShipUser, mockAuthMiddleware;
+var init_auth = __esm({
+  "server/middleware/auth.ts"() {
+    "use strict";
+    DEFAULT_MOCK_RANK_NAME = "Chief Engineer";
+    RBAC_BYPASS_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "PMS Admin"]);
+    requireAuth = (req, res, next) => {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized - Authentication required" });
+      }
+      next();
+    };
+    requireRole = (roles) => {
+      return (req, res, next) => {
+        if (!req.user) {
+          return res.status(401).json({ error: "Unauthorized - Authentication required" });
+        }
+        const allowedRoles = Array.isArray(roles) ? roles : [roles];
+        const identity = getRbacIdentity(req);
+        if (!rbacMatches(identity, allowedRoles)) {
+          return res.status(403).json({
+            error: "Forbidden - Insufficient permissions",
+            required: allowedRoles,
+            current: identity.role ?? "anonymous"
+          });
+        }
+        next();
+      };
+    };
+    legacyPassThrough = (_req, _res, next) => next();
+    requirePMSAdmin = legacyPassThrough;
+    requireOfficeOrAdmin = legacyPassThrough;
+    requireShipUser = requireRole("Ship");
+    mockAuthMiddleware = (req, res, next) => {
+      const headerRankRaw = req.headers["x-rank"];
+      const headerRank = Array.isArray(headerRankRaw) ? headerRankRaw[0] : headerRankRaw;
+      const body = req.body && typeof req.body === "object" ? req.body : null;
+      const bodyRank = body && typeof body.rank === "string" ? body.rank : void 0;
+      const resolvedRank = typeof headerRank === "string" && headerRank.trim() || bodyRank && bodyRank.trim() || DEFAULT_MOCK_RANK_NAME;
+      const fwdId = readForwardedHeader(req, "x-user-id");
+      const fwdName = readForwardedHeader(req, "x-user-name");
+      const fwdEmail = readForwardedHeader(req, "x-user-email");
+      const fwdType = readForwardedHeader(req, "x-user-type");
+      const fwdRole = readForwardedHeader(req, "x-user-role");
+      req.user = {
+        id: 1,
+        username: "sail_admin",
+        fullName: fwdName || "Sail Administrator",
+        firstname: "Sail",
+        lastname: "Administrator",
+        email: fwdEmail || "admin@seafarer.com",
+        role: "Sail Admin",
+        // RBAC mock — unchanged in Phase 0 (frontend reads the real role independently)
+        vesselId: null,
+        isActive: true,
+        userUuid: fwdId || "00000000-0000-0000-0000-000000000001",
+        crewDesignation: "Marine Manager",
+        rank_name: resolvedRank,
+        userType: fwdType || "Office",
+        createdAt: /* @__PURE__ */ new Date(),
+        updatedAt: /* @__PURE__ */ new Date()
+      };
+      if (fwdRole) req.user.forwardedRole = fwdRole;
+      if (isMockRbacEnabled()) {
+        req.rbac = { role: "Sail Admin", userType: "Office", source: "mock" };
+      } else if (fwdRole || fwdType) {
+        const userType = fwdType === "Office" || fwdType === "Ship" ? fwdType : null;
+        req.rbac = { role: fwdRole ?? null, userType, source: "forwarded" };
+      } else {
+        req.rbac = { role: null, userType: null, source: "none" };
+      }
+      next();
+    };
+  }
+});
+
 // server/middleware/permissions.ts
 async function getPermState(req) {
   const cached2 = req[REQ_CACHE_KEY];
   if (cached2) return cached2;
   let state;
-  const roleName = req.user?.role ?? "";
+  const roleName = getRbacIdentity(req).role ?? "";
   const role = roleName ? await storage.getRoleByName(roleName) : null;
   if (!role) {
     state = { status: "unconfigured", menuByName: /* @__PURE__ */ new Map(), permsByMuid: /* @__PURE__ */ new Map() };
@@ -21560,16 +21687,29 @@ async function getPermState(req) {
   req[REQ_CACHE_KEY] = state;
   return state;
 }
-function requirePermission(resource, action) {
+function requirePermission(resource, action, options = {}) {
   const actions = Array.isArray(action) ? action : [action];
+  const denyUnconfigured = options.unconfigured === "deny";
+  const enforce = options.enforce === true;
   return async (req, res, next) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: "Unauthorized - Authentication required" });
       }
-      if (BYPASS_ROLES.has(req.user.role)) return next();
+      if (!enforce) return next();
+      const identity = getRbacIdentity(req);
+      if (identity.role && RBAC_BYPASS_ROLES.has(identity.role)) return next();
       const state = await getPermState(req);
-      if (state.status === "unconfigured") return next();
+      if (state.status === "unconfigured") {
+        if (!denyUnconfigured) return next();
+        return res.status(403).json({
+          error: "Forbidden - Insufficient permissions",
+          reason: "ROLE_UNCONFIGURED",
+          resource,
+          action: actions.join("|"),
+          current: identity.role ?? "anonymous"
+        });
+      }
       const muid = state.menuByName.get(resource);
       const perm = muid ? state.permsByMuid.get(muid) : void 0;
       const allowed = !!perm && actions.some((a) => perm[ACTION_FLAG[a]] === true);
@@ -21586,12 +21726,12 @@ function requirePermission(resource, action) {
     }
   };
 }
-var BYPASS_ROLES, ACTION_FLAG, REQ_CACHE_KEY;
+var ACTION_FLAG, REQ_CACHE_KEY;
 var init_permissions = __esm({
   "server/middleware/permissions.ts"() {
     "use strict";
+    init_auth();
     init_storage();
-    BYPASS_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "PMS Admin"]);
     ACTION_FLAG = {
       create: "canCreate",
       edit: "canEdit",
@@ -22931,15 +23071,15 @@ async function update3(id, data, userId) {
   return component;
 }
 async function updateSortOrder2(body) {
-  const { z: z7 } = await import("zod");
-  const sortOrderSchema = z7.object({
-    updates: z7.array(z7.object({
-      id: z7.string(),
-      sortOrder: z7.number()
+  const { z: z8 } = await import("zod");
+  const sortOrderSchema = z8.object({
+    updates: z8.array(z8.object({
+      id: z8.string(),
+      sortOrder: z8.number()
     })),
-    reparents: z7.array(z7.object({
-      id: z7.string(),
-      newParentCode: z7.string()
+    reparents: z8.array(z8.object({
+      id: z8.string(),
+      newParentCode: z8.string()
     })).optional().default([])
   });
   const { updates, reparents } = sortOrderSchema.parse(body);
@@ -27376,6 +27516,7 @@ var init_postgresStorage = __esm({
             console.warn(`[CR_APPLY] WARNING: Field ${field} was not updated correctly`);
           }
         }
+        await logFieldChanges("components", resolvedCuuid, beforeState.vesselId || null, beforeState, afterState, "system", tx);
       }
       /**
        * Apply changes to a Job record within a transaction
@@ -27471,6 +27612,7 @@ var init_postgresStorage = __esm({
           const success = String(applied) === String(expected);
           console.log(`  - ${field}: "${applied}" (${success ? "OK" : "MISMATCH - expected: " + expected})`);
         }
+        await logFieldChanges("jobs", resolvedJuuid, beforeState.vesselId || null, beforeState, afterState, "system", tx);
       }
       /**
        * Apply changes to a Work Order record within a transaction
@@ -28561,6 +28703,34 @@ var init_postgresStorage = __esm({
           console.error("[FieldLogger] WOPApproval update:", e);
         }
         return result[0];
+      }
+      /**
+       * Phase 0 / P0.3d (defect D3): the postponement-approval finalize as ONE transaction.
+       * Previously approvePostponement issued four sequential writes on the global pool (WO update,
+       * WO field log, decision-row insert, its field log) and never touched the 'Awaiting Approval'
+       * request row — a dangling row per approval that getLatestAwaitingPostponement kept matching
+       * (DEFECT-REPRODUCTION-REPORT.md §3). Here: WO update + log, request row → 'Approved' + log,
+       * decision row insert + log — all tx-joined, so a failure rolls every write back.
+       * The caller still decides the business values; this method only owns atomicity.
+       */
+      async finalizePostponementApproval(params) {
+        const db2 = await getDb();
+        return db2.transaction(async (tx) => {
+          const before = (await tx.select().from(workOrders).where(or(eq7(workOrders.wouuid, params.workOrderId), eq7(workOrders.id, params.workOrderId))).limit(1))[0];
+          if (!before) throw new Error(`Work order ${params.workOrderId} not found`);
+          const updated = (await tx.update(workOrders).set({ ...params.woUpdates, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(workOrders.wouuid, before.wouuid)).returning())[0];
+          await logFieldChanges("work_orders", before.wouuid, before.vesselId || null, before, updated, params.actor, tx);
+          if (params.awaitingPostponementId) {
+            const reqBefore = (await tx.select().from(workOrderPostponements).where(eq7(workOrderPostponements.id, params.awaitingPostponementId)).limit(1))[0];
+            if (reqBefore) {
+              const reqAfter = (await tx.update(workOrderPostponements).set({ ...params.awaitingUpdates, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(workOrderPostponements.id, params.awaitingPostponementId)).returning())[0];
+              await logFieldChanges("work_order_postponements", params.awaitingPostponementId, reqBefore.vesselId || null, reqBefore, reqAfter, params.actor, tx);
+            }
+          }
+          const decision = (await tx.insert(workOrderPostponements).values(params.decisionRow).returning())[0];
+          await logFieldChanges("work_order_postponements", decision.id, decision.vesselId || null, null, decision, params.actor, tx);
+          return updated;
+        });
       }
       async getLatestAwaitingPostponement(workOrderId) {
         const db2 = await getDb();
@@ -33748,6 +33918,9 @@ async function updateWoPostponementApprovalStep(id, data) {
 async function getLatestAwaitingPostponement(workOrderId) {
   return storage.getLatestAwaitingPostponement(workOrderId);
 }
+async function finalizePostponementApproval(params) {
+  return storage.finalizePostponementApproval(params);
+}
 async function verifyApproverForLevel(reviewerId, approvalLevel) {
   return storage.verifyApproverForLevel(reviewerId, approvalLevel);
 }
@@ -36863,20 +37036,7 @@ async function updateWorkOrder(id, body) {
   console.log("\u{1F4DD} Cleaned update data keys:", Object.keys(updateData));
   const isApprovalTransition = updateData.approvalAction === "approved" && updateData.status === "Completed" || updateData.status === "Completed" && existingWO2.status === "Pending Approval";
   let interceptedForL2Review = false;
-  if (isApprovalTransition && existingWO2.jobId) {
-    try {
-      const linkedJob = await findJob(existingWO2.jobId);
-      if (linkedJob && linkedJob.level2ReviewerRankId) {
-        interceptedForL2Review = true;
-        updateData.status = "Pending Office Review";
-        updateData.approvalDate = (/* @__PURE__ */ new Date()).toISOString();
-        console.log(`\u{1F512} [L2 Review] WO ${existingWO2.workOrderNo} intercepted \u2014 job requires Level 2 reviewer rank "${linkedJob.level2ReviewerRankId}"`);
-      }
-    } catch (err) {
-      console.warn(`[L2 Review] Could not load linked job ${existingWO2.jobId} for L2 check \u2014 proceeding without interception:`, err);
-    }
-  }
-  if (isApprovalTransition && !interceptedForL2Review) {
+  if (isApprovalTransition) {
     const { resolveHodForDepartment: resolveHodForDepartment2, getHodShortLabel: getHodShortLabel2 } = await Promise.resolve().then(() => (init_hodResolutionService(), hodResolutionService_exports));
     const hodResolution = await resolveHodForDepartment2(
       existingWO2.vesselId,
@@ -36945,6 +37105,19 @@ async function updateWorkOrder(id, body) {
           { code: "CE_REMARKS_REQUIRED", minLength: 10 }
         );
       }
+    }
+  }
+  if (isApprovalTransition && existingWO2.jobId) {
+    try {
+      const linkedJob = await findJob(existingWO2.jobId);
+      if (linkedJob && linkedJob.level2ReviewerRankId) {
+        interceptedForL2Review = true;
+        updateData.status = "Pending Office Review";
+        updateData.approvalDate = (/* @__PURE__ */ new Date()).toISOString();
+        console.log(`\u{1F512} [L2 Review] WO ${existingWO2.workOrderNo} intercepted \u2014 job requires Level 2 reviewer rank "${linkedJob.level2ReviewerRankId}"`);
+      }
+    } catch (err) {
+      console.warn(`[L2 Review] Could not load linked job ${existingWO2.jobId} for L2 check \u2014 proceeding without interception:`, err);
     }
   }
   const isBeingPostponed = updateData.status === "Postponed";
@@ -38051,19 +38224,6 @@ async function approvePostponement(id, body) {
   }
   const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
   const newDueDate = wo.postponeRequestedDate || body.newDueDate;
-  const updatedWO = await update6(id, {
-    status: "Postponement Approved",
-    dueDate: newDueDate,
-    postponementEndDate: newDueDate,
-    postponeApprover: body.approvedBy || "Office",
-    postponementApprovalDate: today,
-    postponementApprovalRemarks: body.approvalRemarks || null
-  });
-  try {
-    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || "system");
-  } catch (err) {
-    console.error("[FieldLogger] WO postpone-approve:", err);
-  }
   const existingRows = await findPostponementsByWorkOrderId(wo.wouuid);
   const prevMaxApprove = existingRows?.length ? existingRows.reduce(
     (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
@@ -38071,24 +38231,44 @@ async function approvePostponement(id, body) {
   const latestApprove = existingRows?.length ? existingRows.reduce(
     (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
   ) : null;
-  await createPostponement({
-    id: crypto.randomUUID(),
-    workOrderId: wo.wouuid,
-    vesselId: wo.vesselId,
-    postponementNumber: prevMaxApprove + 1,
-    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
-    newDueDate,
-    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
-    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
-    authorizedBy: body.approvedBy || "Office",
-    approvedBy: body.approvedBy || "Office",
-    approvedDate: today,
-    approvalRemarks: body.approvalRemarks || null,
-    approver: body.approvedBy || "Office",
-    durationDays: latestApprove?.durationDays || null,
-    submittedDate: today,
-    status: "Approved",
-    informOffice: true
+  const actor = body.approvedBy || body.userId || "system";
+  const updatedWO = await finalizePostponementApproval({
+    workOrderId: id,
+    woUpdates: {
+      status: "Postponement Approved",
+      dueDate: newDueDate,
+      postponementEndDate: newDueDate,
+      postponeApprover: body.approvedBy || "Office",
+      postponementApprovalDate: today,
+      postponementApprovalRemarks: body.approvalRemarks || null
+    },
+    awaitingPostponementId: awaitingPostponement?.id ?? null,
+    awaitingUpdates: {
+      status: "Approved",
+      approvedBy: body.approvedBy || "Office",
+      approvedDate: today,
+      approvalRemarks: body.approvalRemarks || null
+    },
+    decisionRow: {
+      id: crypto.randomUUID(),
+      workOrderId: wo.wouuid,
+      vesselId: wo.vesselId,
+      postponementNumber: prevMaxApprove + 1,
+      originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+      newDueDate,
+      postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+      postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+      authorizedBy: body.approvedBy || "Office",
+      approvedBy: body.approvedBy || "Office",
+      approvedDate: today,
+      approvalRemarks: body.approvalRemarks || null,
+      approver: body.approvedBy || "Office",
+      durationDays: latestApprove?.durationDays || null,
+      submittedDate: today,
+      status: "Approved",
+      informOffice: true
+    },
+    actor
   });
   return updatedWO;
 }
@@ -43658,84 +43838,9 @@ var routes_default2 = router2;
 
 // server/modules/components/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router3 } from "express";
 import multer from "multer";
-
-// server/middleware/auth.ts
-var DEFAULT_MOCK_RANK_NAME = "Chief Engineer";
-var requireAuth = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ error: "Unauthorized - Authentication required" });
-  }
-  next();
-};
-var requireRole = (roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized - Authentication required" });
-    }
-    const allowedRoles = Array.isArray(roles) ? roles : [roles];
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({
-        error: "Forbidden - Insufficient permissions",
-        required: allowedRoles,
-        current: req.user.role
-      });
-    }
-    next();
-  };
-};
-var requirePMSAdmin = requireRole(["PMS Admin", "Sail Admin"]);
-var requireOfficeOrAdmin = requireRole(["Office", "PMS Admin", "Sail Admin"]);
-var requireShipUser = requireRole("Ship");
-async function initMockAuthRankId() {
-  console.log(
-    `\u2705 Mock auth resolves rank_name per-request (x-rank header \u2192 body.rank \u2192 "${DEFAULT_MOCK_RANK_NAME}")`
-  );
-}
-function readForwardedHeader(req, name) {
-  const raw = req.headers[name];
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (typeof value !== "string" || !value.trim()) return void 0;
-  try {
-    const decoded = decodeURIComponent(value).trim();
-    return decoded || void 0;
-  } catch {
-    return value.trim();
-  }
-}
-var mockAuthMiddleware = (req, res, next) => {
-  const headerRankRaw = req.headers["x-rank"];
-  const headerRank = Array.isArray(headerRankRaw) ? headerRankRaw[0] : headerRankRaw;
-  const body = req.body && typeof req.body === "object" ? req.body : null;
-  const bodyRank = body && typeof body.rank === "string" ? body.rank : void 0;
-  const resolvedRank = typeof headerRank === "string" && headerRank.trim() || bodyRank && bodyRank.trim() || DEFAULT_MOCK_RANK_NAME;
-  const fwdId = readForwardedHeader(req, "x-user-id");
-  const fwdName = readForwardedHeader(req, "x-user-name");
-  const fwdEmail = readForwardedHeader(req, "x-user-email");
-  const fwdType = readForwardedHeader(req, "x-user-type");
-  const fwdRole = readForwardedHeader(req, "x-user-role");
-  req.user = {
-    id: 1,
-    username: "sail_admin",
-    fullName: fwdName || "Sail Administrator",
-    firstname: "Sail",
-    lastname: "Administrator",
-    email: fwdEmail || "admin@seafarer.com",
-    role: "Sail Admin",
-    // RBAC mock — unchanged in Phase 0 (frontend reads the real role independently)
-    vesselId: null,
-    isActive: true,
-    userUuid: fwdId || "00000000-0000-0000-0000-000000000001",
-    crewDesignation: "Marine Manager",
-    rank_name: resolvedRank,
-    userType: fwdType || "Office",
-    createdAt: /* @__PURE__ */ new Date(),
-    updatedAt: /* @__PURE__ */ new Date()
-  };
-  if (fwdRole) req.user.forwardedRole = fwdRole;
-  next();
-};
 
 // server/modules/components/controllers/componentController.ts
 init_componentService();
@@ -45086,8 +45191,9 @@ var routes_default3 = router3;
 
 // server/modules/jobs/routes.ts
 init_middleware();
-import { Router as Router4 } from "express";
+init_auth();
 init_permissions();
+import { Router as Router4 } from "express";
 
 // server/modules/jobs/repositories/jobRepository.ts
 init_storage();
@@ -45250,8 +45356,8 @@ async function getJob(id) {
 async function createJob(body) {
   const { insertJobSchema: insertJobSchema2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
   const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-  const { z: z7 } = await import("zod");
-  const jobCreateSchema = insertJobSchema2.extend({ juuid: z7.string().optional() });
+  const { z: z8 } = await import("zod");
+  const jobCreateSchema = insertJobSchema2.extend({ juuid: z8.string().optional() });
   let jobData = jobCreateSchema.parse(body);
   let component = null;
   if (jobData.componentId) {
@@ -46262,6 +46368,7 @@ var routes_default4 = router4;
 
 // server/modules/work-orders/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router5 } from "express";
 import multer2 from "multer";
 
@@ -47904,6 +48011,14 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
   }
   if (existingWO2.status !== "Pending Office Review") {
     throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
+  }
+  if (existingWO2.approvalTier === "superintendent_locked" && !existingWO2.superintendentAcknowledged) {
+    if (await isSuperintendentLockEnabled()) {
+      throw new ValidationError(
+        "This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The office reviewer cannot complete it until the Superintendent has acknowledged.",
+        { code: "SUPERINTENDENT_LOCKED" }
+      );
+    }
   }
   const actualCompletionDate = existingWO2.completionDateTime || existingWO2.dateCompleted;
   const originalDueDate = existingWO2.nextDueDate || existingWO2.dueDate || null;
@@ -50078,8 +50193,16 @@ router5.post(
   requireRole(["Office", "PMS Admin", "Sail Admin"]),
   asyncHandler(reopenCompletion)
 );
-router5.post("/work-orders/bulk-superintendent-acknowledge", asyncHandler(bulkSuperintendentAcknowledge));
-router5.post("/work-orders/:id/superintendent-acknowledge", asyncHandler(superintendentAcknowledge));
+router5.post(
+  "/work-orders/bulk-superintendent-acknowledge",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(bulkSuperintendentAcknowledge)
+);
+router5.post(
+  "/work-orders/:id/superintendent-acknowledge",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(superintendentAcknowledge)
+);
 router5.get("/superintendent/notifications", asyncHandler(getSuperintendentNotifications));
 router5.get("/superintendent/notifications/all", asyncHandler(getAllSuperintendentNotifications));
 router5.get("/superintendent/notifications/summary", asyncHandler(getSuperintendentNotificationsSummary));
@@ -50130,6 +50253,7 @@ var routes_default5 = router5;
 
 // server/modules/running-hours/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router6 } from "express";
 
 // server/modules/running-hours/controllers/runningHoursController.ts
@@ -51832,6 +51956,7 @@ async function getSparesByComponentCode(req, res) {
 }
 
 // server/modules/spares/routes.ts
+init_auth();
 var router7 = Router7();
 router7.get("/spares", requireAuth, asyncHandler(getAllSpares3));
 router7.get("/spares/history/:vesselId", requireAuth, asyncHandler(getSpareHistoryByVessel));
@@ -52249,6 +52374,7 @@ async function batchReceive4(req, res) {
 }
 
 // server/modules/stores/routes.ts
+init_auth();
 var router8 = Router8();
 router8.get("/stores", requireAuth, asyncHandler(getAllStores2));
 router8.get("/stores/item/:id/history", requireAuth, asyncHandler(getItemHistory2));
@@ -55388,8 +55514,9 @@ var routes_default10 = router10;
 
 // server/modules/fleet/routes.ts
 init_middleware();
-import { Router as Router11 } from "express";
+init_auth();
 init_permissions();
+import { Router as Router11 } from "express";
 
 // server/modules/fleet/services/fleetService.ts
 init_schema();
@@ -67856,6 +67983,7 @@ var routes_default12 = router12;
 // server/modules/change-requests/routes.ts
 init_middleware();
 init_permissions();
+init_auth();
 import { Router as Router13 } from "express";
 
 // server/modules/change-requests/repositories/changeRequestsRepository.ts
@@ -68336,12 +68464,39 @@ async function submitChangeRequestWorkflow(id, userId) {
   console.log(`[CR_WORKFLOW] CR ${id} (${cr.targetType}) submitted \u2014 classification: ${classLabel}, L1: ${level1Enabled}, L2: ${level2Enabled}`);
   return updated;
 }
+var CR_TARGET_TABLE = {
+  component: "components",
+  job: "jobs",
+  work_order: "work_orders",
+  spare: "spares",
+  store: "stores_items"
+};
+async function assertTargetApplicableOnThisInstance(targetType, crId) {
+  const table = targetType ? CR_TARGET_TABLE[targetType] : void 0;
+  if (!table) return;
+  const { getTableSyncConfig: getTableSyncConfig2 } = await Promise.resolve().then(() => (init_syncConfig(), syncConfig_exports));
+  if (getTableSyncConfig2(table)?.category !== "ONE_WAY_SHORE_TO_SHIP") return;
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (!await isShipInstance2()) return;
+  throw new ForbiddenError(
+    `Change request ${crId} targets ${table}, which is managed by the office and synced to ships one-way. It must be approved on the shore server; the approval will reach this vessel through sync.`,
+    { code: "SHORE_OWNED_TARGET", targetType, table }
+  );
+}
 async function approveChangeRequest2(id, body) {
   const { comment, reviewerId, role, overriddenChanges } = body;
   if (!comment) {
     throw new ValidationError("Comment is required for approval");
   }
   const existing = await getChangeRequest(id);
+  if (!existing) throw new NotFoundError("Change request not found");
+  if (existing.status === "approved" || existing.status === "rejected") {
+    throw new ConflictError(
+      `Change request ${id} is already ${existing.status} (revision ${existing.revisionNumber ?? 0}); it cannot be approved again.`,
+      { code: "CR_ALREADY_DECIDED", status: existing.status, revisionNumber: existing.revisionNumber ?? 0 }
+    );
+  }
+  await assertTargetApplicableOnThisInstance(existing.targetType, id);
   console.log(`[CR_SERVICE] Approving change request ${id}`, {
     id: existing?.id,
     targetType: existing?.targetType,
@@ -68357,6 +68512,14 @@ async function rejectChangeRequest2(id, body) {
   const { comment, reviewerId, role } = body;
   if (!comment) {
     throw new ValidationError("Comment is required for rejection");
+  }
+  const existing = await getChangeRequest(id);
+  if (!existing) throw new NotFoundError("Change request not found");
+  if (existing.status === "approved" || existing.status === "rejected") {
+    throw new ConflictError(
+      `Change request ${id} is already ${existing.status}; it cannot be rejected again.`,
+      { code: "CR_ALREADY_DECIDED", status: existing.status, revisionNumber: existing.revisionNumber ?? 0 }
+    );
   }
   console.log("Rejecting change request:", id, "with comment:", comment);
   const updated = await rejectChangeRequest(id, reviewerId || "reviewer", comment, role);
@@ -68519,8 +68682,8 @@ router13.get("/change-requests/:id/comments", asyncHandler(getComments2));
 router13.post("/change-requests/:id/comments", requirePermission("change-requests", "edit"), asyncHandler(createComment2));
 router13.get("/change-requests/:id/attachments", asyncHandler(getAttachments2));
 router13.post("/change-requests/:id/attachments", requirePermission("change-requests", "edit"), asyncHandler(createAttachment2));
-router13.put("/change-requests/:id/approve", requirePermission("change-requests", "edit"), asyncHandler(approveChangeRequest3));
-router13.put("/change-requests/:id/reject", requirePermission("change-requests", "edit"), asyncHandler(rejectChangeRequest3));
+router13.put("/change-requests/:id/approve", requireRole(["Office", "PMS Admin", "Sail Admin"]), requirePermission("change-requests", "edit"), asyncHandler(approveChangeRequest3));
+router13.put("/change-requests/:id/reject", requireRole(["Office", "PMS Admin", "Sail Admin"]), requirePermission("change-requests", "edit"), asyncHandler(rejectChangeRequest3));
 router13.get("/change-requests/:id/rejection-history", asyncHandler(getRejectionHistory4));
 router13.get("/change-requests/:id", asyncHandler(getChangeRequest3));
 var routes_default13 = router13;
@@ -78035,8 +78198,9 @@ router16.get("/forms/runtime/:name", asyncHandler(getRuntimeSchema2));
 var routes_default16 = router16;
 
 // server/modules/chatbot/routes.ts
-import { Router as Router17 } from "express";
+init_auth();
 init_middleware();
+import { Router as Router17 } from "express";
 
 // server/services/chatbotService.ts
 init_db();
@@ -80623,6 +80787,7 @@ var routes_default17 = router17;
 
 // server/modules/misc/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router18 } from "express";
 import multer4 from "multer";
 
@@ -81706,6 +81871,7 @@ var routes_default18 = router18;
 
 // server/modules/access-control/routes.ts
 init_storage();
+init_auth();
 import { Router as Router19 } from "express";
 
 // server/modules/access-control/controllers/viewModeController.ts
@@ -82039,6 +82205,7 @@ var routes_default19 = router19;
 
 // server/modules/audit/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router20 } from "express";
 
 // server/modules/audit/service.ts
@@ -82412,6 +82579,7 @@ var routes_default20 = router20;
 
 // server/modules/retention/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router21 } from "express";
 
 // server/modules/retention/service.ts
@@ -84107,6 +84275,7 @@ var routes_default24 = router24;
 
 // server/modules/rotational-items/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router25 } from "express";
 
 // server/modules/rotational-items/controllers/rotationalItemController.ts
@@ -84193,6 +84362,7 @@ var NOON_MODULE_ENABLED = false;
 
 // server/modules/noon-report/routes.ts
 init_middleware();
+init_auth();
 init_permissions();
 
 // server/modules/noon-report/repositories/noonReportRepository.ts
@@ -85335,6 +85505,10 @@ moduleRouter.use(routes_default25);
 moduleRouter.use(routes_default26);
 var modules_default = moduleRouter;
 
+// server/routes.ts
+init_auth();
+import { z as z7 } from "zod";
+
 // server/middleware/tenantMiddleware.ts
 init_tenantConnectionManager();
 import jwt from "jsonwebtoken";
@@ -86043,19 +86217,37 @@ async function registerRoutes(app2) {
       res.status(500).json({ success: false, error: "Failed to fetch approval workflow config" });
     }
   });
-  app2.put("/technical/api/admin/approval-workflow-config", async (req, res) => {
-    try {
-      const { rows } = req.body;
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return res.status(400).json({ success: false, error: "rows array required" });
+  const awcRowSchema = z7.object({
+    moduleId: z7.string().min(1),
+    subModuleId: z7.string().min(1),
+    functionId: z7.string().min(1),
+    variableName: z7.string().min(1),
+    level1Enabled: z7.boolean(),
+    level2Enabled: z7.boolean()
+  }).passthrough();
+  const awcPutSchema = z7.object({ rows: z7.array(awcRowSchema).min(1) });
+  app2.put(
+    "/technical/api/admin/approval-workflow-config",
+    requireRole(["Office", "PMS Admin", "Sail Admin"]),
+    async (req, res) => {
+      try {
+        const { isShipInstance: isShipInstance3 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+        if (await isShipInstance3()) {
+          return res.status(403).json({ success: false, error: "shore_only", message: "The approval workflow matrix is configured on the shore server and synced to ships." });
+        }
+        const parsed = awcPutSchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: "Invalid approval workflow config payload", details: parsed.error.errors });
+        }
+        const actor = req.user?.userUuid || req.user?.username || "system";
+        const updated = await storage.upsertApprovalWorkflowConfig(parsed.data.rows, actor);
+        res.json({ success: true, data: updated });
+      } catch (err) {
+        console.error("[ApprovalWorkflowConfig] PUT error:", err);
+        res.status(500).json({ success: false, error: "Failed to save approval workflow config" });
       }
-      const updated = await storage.upsertApprovalWorkflowConfig(rows);
-      res.json({ success: true, data: updated });
-    } catch (err) {
-      console.error("[ApprovalWorkflowConfig] PUT error:", err);
-      res.status(500).json({ success: false, error: "Failed to save approval workflow config" });
     }
-  });
+  );
   const httpServer = createServer(app2);
   (async () => {
     const RH_SELF_HEAL_LOCK_KEY = 427167001;
