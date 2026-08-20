@@ -2731,7 +2731,7 @@ export async function rejectCompletedWorkOrder(
  */
 // ── Classify a WO for the postponement approval workflow ─────────────────────
 
-async function classifyWoForPostponement(wo: any): Promise<{
+export async function classifyWoForPostponement(wo: any): Promise<{
   classification: 'criticalEquipment' | 'critical' | 'normal';
   level1Enabled: boolean;
   level2Enabled: boolean;
@@ -2848,6 +2848,16 @@ export async function submitPostponeRequest(id: string, body: any) {
     });
   }
 
+  // Phase 2 / W3 — offer the request to the approval engine (no-op on ships / no workflow /
+  // disabled — legacy behaviour byte-identical). Runs AFTER the legacy snapshot + steps.
+  try {
+    const gw = await import('../../approvals/engineGateway');
+    const requuid = await gw.maybeEngineSubmit('pms-wo-postponement', wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId ?? null, body.userId || body.performedBy || null);
+    if (requuid && (classification.level1Enabled || classification.level2Enabled)) {
+      console.warn(`[approvals] WO ${wo.wouuid}: BOTH an engine workflow and legacy awc levels are active for pms-wo-postponement — cutover rule is workflow XOR awc levels`);
+    }
+  } catch (e) { console.error('[approvals] postponement engine submit hook failed (legacy continues):', e); }
+
   return updatedWO;
 }
 
@@ -2874,6 +2884,17 @@ export async function approvePostponement(id: string, body: any) {
     throw new ValidationError(
       `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
     );
+  }
+
+  // Phase 2 / W3 — ENGINE-FIRST, after the status guard. When the engine owns a pending
+  // chain for this WO the decision goes through it (403/409 there); on the terminal step
+  // its onDecision re-enters this function — no pending engine request remains, so the
+  // legacy path below finalizes (zero-step branch under the cutover rule). Non-terminal
+  // steps return the WO unchanged. No engine request → legacy path exactly as before.
+  {
+    const gw = await import('../../approvals/engineGateway');
+    const decided = await gw.maybeEngineDecide('pms-wo-postponement', wo.wouuid, 'approve', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
+    if (decided) return (await repo.findById(id)) || wo;
   }
 
   // ── Multi-level approval gate ────────────────────────────────────────────
@@ -2993,6 +3014,13 @@ export async function rejectPostponement(id: string, body: any) {
     );
   }
 
+  // Phase 2 / W3 — ENGINE-FIRST (same shape as approvePostponement).
+  {
+    const gw = await import('../../approvals/engineGateway');
+    const decided = await gw.maybeEngineDecide('pms-wo-postponement', wo.wouuid, 'reject', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
+    if (decided) return (await repo.findById(id)) || wo;
+  }
+
   // ── Mark the active approval step as Rejected (if steps exist) ──────────
   const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
   if (awaitingPostponement) {
@@ -3109,7 +3137,7 @@ export async function rejectPostponement(id: string, body: any) {
  * proceed if config is absent — a missing config produces a stuck WO that
  * cannot be approved or rejected through the normal UI.
  */
-async function classifyWoForRePostponement(wo: any): Promise<{
+export async function classifyWoForRePostponement(wo: any): Promise<{
   classification: 'criticalEquipment' | 'critical' | 'normal';
   level1Enabled: boolean;
   level2Enabled: boolean;
@@ -3273,7 +3301,15 @@ export async function submitRePostponeRequest(id: string, body: any) {
   // that rejectRePostponement must restore if the request is rejected
   const dueDateSnapshot = wo.dueDate;
 
-  return createRePostponementRecord(wo, body, dueDateSnapshot);
+  const rePostponeResult = await createRePostponementRecord(wo, body, dueDateSnapshot);
+
+  // Phase 2 / W3 — offer the re-postponement to the approval engine (no-op fallbacks as above).
+  try {
+    const gw = await import('../../approvals/engineGateway');
+    await gw.maybeEngineSubmit('pms-wo-re-postponement', wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId ?? null, body.userId || body.performedBy || null);
+  } catch (e) { console.error('[approvals] re-postponement engine submit hook failed (legacy continues):', e); }
+
+  return rePostponeResult;
 }
 
 /**
@@ -3319,6 +3355,13 @@ export async function approveRePostponement(id: string, body: any) {
     throw new ValidationError(
       `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
     );
+  }
+
+  // Phase 2 / W3 — ENGINE-FIRST (same shape as approvePostponement; re-postponement scope).
+  {
+    const gw = await import('../../approvals/engineGateway');
+    const decided = await gw.maybeEngineDecide('pms-wo-re-postponement', wo.wouuid, 'approve', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
+    if (decided) return (await repo.findById(id)) || wo;
   }
 
   // ── Multi-level approval gate ────────────────────────────────────────────
@@ -3431,6 +3474,13 @@ export async function rejectRePostponement(id: string, body: any) {
     throw new ValidationError(
       `Only work orders with status "Awaiting Office Approval" can be rejected. Current status: ${wo.status}`
     );
+  }
+
+  // Phase 2 / W3 — ENGINE-FIRST (same shape as approvePostponement; re-postponement scope).
+  {
+    const gw = await import('../../approvals/engineGateway');
+    const decided = await gw.maybeEngineDecide('pms-wo-re-postponement', wo.wouuid, 'reject', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
+    if (decided) return (await repo.findById(id)) || wo;
   }
 
   // ── Mark the active approval step as Rejected ────────────────────────────

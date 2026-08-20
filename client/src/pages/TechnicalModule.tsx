@@ -42,6 +42,7 @@ import SyncConflictReview from "./admin/SyncConflictReview";
 import SyncProvisioning from "./admin/SyncProvisioning";
 import SyncFleetOverview from "./admin/SyncFleetOverview";
 import ApprovalWorkflow from "./admin/ApprovalWorkflow";
+import ApprovalEngineAdminPage from "./admin/ApprovalEngineAdminPage";
 // ====== NOON REPORT MODULE — START (remove to disable) ======
 import NoonEntryForm from "./noon-report/NoonEntryForm";
 import ReportHistory from "./noon-report/ReportHistory";
@@ -285,6 +286,8 @@ export const TechnicalModule = () => {
             <ShipskartCatalogue />
           ) : selectedSubModule === "admin" && selectedMenuItem === "approval-workflow" ? (
             <ApprovalWorkflow />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "approval-engine" ? (
+            <ApprovalEngineAdminPage />
           ) : selectedSubModule === "admin" && selectedMenuItem === "fleet-component-editor" ? (
             <AddEditFleetComponent />
           ) : selectedSubModule === "admin" ? (

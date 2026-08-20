@@ -118,7 +118,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
 }) => {
   const [, setLocation] = useLocation();
   const { canViewSidebarItem } = usePermissions();
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isVessel } = useUIRole();
   const vesselCtx = useContext(VesselContext);
   const vesselId = vesselCtx?.vesselId ?? "";
   const { isShore } = useSyncInstanceInfo();
@@ -145,6 +145,11 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   }
   if (subModule === "admin") {
     allMenuItems = [...allMenuItems, { id: "approval-workflow", label: "Approval Workflow", icon: Workflow }];
+  }
+  // Phase 2 / W4 — the generic engine builder, office-only, SHORE-only (the engine does not
+  // mount on ships). The legacy Approval Workflow screen above stays untouched until cutover.
+  if (subModule === "admin" && isShore && !isVessel) {
+    allMenuItems = [...allMenuItems, { id: "approval-engine", label: "Approval Engine", icon: Workflow }];
   }
   const menuItems = allMenuItems.filter((item) => {
     if (item.id === "access-control") return isSailAdmin;

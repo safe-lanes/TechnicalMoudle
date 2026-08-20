@@ -49,6 +49,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount modular architecture router (modules extracted from routes.ts go here)
   app.use('/technical/api', moduleRouter);
 
+  // ── Approval Engine (Phase 2 / W1) — SHORE ONLY, distinct base path (no :param collision).
+  // Registers the Technical card (fail-loud), injects ALS tenant resolution + Phase-0 RBAC
+  // on config writes. Ships skip the mount entirely (design v3 §2a / D-4); with no workflow
+  // configured every module path behaves exactly as before (fallback contract).
+  const { mountTechnicalApprovals } = await import('./modules/approvals/mount');
+  await mountTechnicalApprovals(app);
+
   app.get('/technical/api/admin/local-approvers', async (req, res) => {
     try {
       const rows = await storage.getLocalApprovers();

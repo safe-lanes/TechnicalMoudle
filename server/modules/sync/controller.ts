@@ -187,6 +187,18 @@ export async function completeSyncHandler(req: Request, res: Response) {
         })
         .catch(err => console.warn(`[WO-Reconciler] post-sync trigger failed (next sync retries): ${err?.message || err}`));
     });
+
+    // ── APPROVAL ARRIVAL SWEEP (Phase 2 / W3, explicit instruction) ──
+    // Same rationale and shape as the reconciler trigger above: the sync cycle that just
+    // completed is the moment a ship-created CR / postponement request became visible on
+    // shore, so submit it to the approval engine here. Fire-and-forget after the response;
+    // idempotent (ALREADY_PENDING short-circuits, NO_WORKFLOW/DISABLED do nothing); a
+    // failure costs nothing — the next sync fires it again. No-op on ships (engine unset).
+    setImmediate(() => {
+      import('../approvals/engineGateway')
+        .then(gw => gw.approvalArrivalSweep(vesselId))
+        .catch(err => console.warn(`[approvals] arrival sweep failed (next sync retries): ${err?.message || err}`));
+    });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] complete error:', error);

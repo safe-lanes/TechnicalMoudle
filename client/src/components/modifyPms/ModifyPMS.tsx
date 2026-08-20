@@ -27,6 +27,7 @@ import { useUIRole } from '@/contexts/UIRoleContext';
 import { useVessels } from '@/hooks/useVessels';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalApprovers } from '@/hooks/useExternalMasterData';
+import { ApprovalChainProgress, useApprovalChain } from '@/components/approvals/ApprovalChainProgress';
 import { useResolvedUserName } from '@/hooks/useResolvedUserName';
 import {
   Select,
@@ -79,6 +80,7 @@ type ViewMode = 'dashboard' | 'pending' | 'history';
 
 interface ChangeRequest {
   id: number;
+  cruuid?: string;
   vesselId: string;
   category: string;
   title: string;
@@ -171,13 +173,25 @@ export function ModifyPMS() {
     || assignedVesselIds.length === 0
     || (!!crVesselId && assignedVesselIds.includes(crVesselId));
 
-  const userCanAct = crVesselIsAssigned && (
+  // Phase 2 / W3 — approval-engine gate. When the engine owns a pending chain for this CR,
+  // the approve/reject buttons follow the chain's ACTIVE slot (canDecide); with no chain
+  // (ships, legacy, no workflow) everything below behaves exactly as before (fail-soft hook).
+  const engineScreenId =
+    viewingRequest?.targetType === 'component' ? 'pms-components-cr'
+    : viewingRequest?.targetType === 'job' ? 'pms-jobs-cr'
+    : viewingRequest?.targetType === 'spare' ? 'pms-spares-cr'
+    : viewingRequest?.targetType === 'store' ? 'pms-stores-cr'
+    : null;
+  const engineChain = useApprovalChain(engineScreenId ?? 'none', engineScreenId && viewingRequest?.status === 'submitted' ? (viewingRequest as any)?.cruuid : null);
+
+  const legacyUserCanAct = crVesselIsAssigned && (
     (approversLoading || stepsLoading || approversError || stepsError)
       ? false
       : (noStepsYet || noApproversConfigured)
         ? (!isVessel && !isHeadOfDept)
         : userIsApproverForActiveStep
   );
+  const userCanAct = engineChain.hasChain ? engineChain.canDecide : legacyUserCanAct;
 
   const [showApproveModal, setShowApproveModal] = useState(false);
 
@@ -587,6 +601,9 @@ export function ModifyPMS() {
             </Button>
           )}
           
+          {viewingRequest && engineScreenId && (
+            <ApprovalChainProgress screenId={engineScreenId} subjectRef={(viewingRequest as any)?.cruuid ?? null} />
+          )}
           {viewingRequest && viewingRequest.status === 'submitted' && userCanAct && (
             <>
               <Button

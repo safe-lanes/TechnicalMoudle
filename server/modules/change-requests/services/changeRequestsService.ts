@@ -215,6 +215,67 @@ export async function updateStatus(id: number, body: { status: string; reviewedB
 // Classifies the target component, reads the approval workflow config,
 // snapshots it on the CR, and creates the required approval step rows.
 
+/**
+ * Phase 2 — the CR classification, extracted as the SINGLE SOURCE for both the legacy awc
+ * path (below) and the approval-engine card (server/modules/approvals/approvalCard.ts).
+ * Behaviour is byte-identical to the previous inline logic:
+ *   component: critical/classItem → 'Critical Equipment' else 'Normal Equipment'
+ *   spare:     critical text 'Critical'|'Yes' → 'Critical Spares' else 'Normal Spares'
+ *   job:       component critical → 'Critical Equipment Jobs'; job criticality 'Yes' →
+ *              'Critical Jobs'; else 'Normal Jobs'
+ *   store:     flat 'Store Items'
+ *   work_order / unresolvable target: no scope (functionId null) — no config, no chain.
+ */
+export interface CrScopeClassification {
+  functionId: 'pms-components-cr' | 'pms-jobs-cr' | 'pms-spares-cr' | 'pms-stores-cr' | null;
+  variableName: string | null;
+  equipmentClassification: 'normal' | 'critical' | 'unknown';
+  spareClassification: 'normal' | 'critical' | 'unknown';
+  jobClassification: 'criticalEquipment' | 'critical' | 'normal' | 'unknown';
+}
+export async function classifyChangeRequestScope(cr: { targetType: string | null; targetId: string | null }): Promise<CrScopeClassification> {
+  const out: CrScopeClassification = {
+    functionId: null, variableName: null,
+    equipmentClassification: 'unknown', spareClassification: 'unknown', jobClassification: 'unknown',
+  };
+  if (cr.targetType === 'component' && cr.targetId) {
+    const component = await crRepo.getComponent(cr.targetId);
+    if (component) {
+      const isCritical = (component as any).critical === true || (component as any).classItem === true;
+      out.equipmentClassification = isCritical ? 'critical' : 'normal';
+      out.functionId = 'pms-components-cr';
+      out.variableName = isCritical ? 'Critical Equipment' : 'Normal Equipment';
+    }
+  } else if (cr.targetType === 'spare' && cr.targetId) {
+    const spare = await crRepo.getSpare(cr.targetId);
+    if (spare) {
+      const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
+      out.spareClassification = isCritical ? 'critical' : 'normal';
+      out.functionId = 'pms-spares-cr';
+      out.variableName = isCritical ? 'Critical Spares' : 'Normal Spares';
+    }
+  } else if (cr.targetType === 'job' && cr.targetId) {
+    const job = await crRepo.getJob(cr.targetId);
+    if (job) {
+      let isOnCriticalEquipment = false;
+      if (job.componentId) {
+        const comp = await crRepo.getComponent(job.componentId);
+        isOnCriticalEquipment = (comp as any)?.critical === true;
+      }
+      out.jobClassification = isOnCriticalEquipment ? 'criticalEquipment' : job.criticality === 'Yes' ? 'critical' : 'normal';
+      out.functionId = 'pms-jobs-cr';
+      out.variableName =
+        out.jobClassification === 'criticalEquipment' ? 'Critical Equipment Jobs'
+        : out.jobClassification === 'critical'        ? 'Critical Jobs'
+        :                                               'Normal Jobs';
+    }
+  } else if (cr.targetType === 'store') {
+    out.functionId = 'pms-stores-cr';
+    out.variableName = 'Store Items';
+  }
+  return out;
+}
+
 async function submitChangeRequestWorkflow(id: number, userId: string) {
   const cr = await crRepo.getChangeRequest(id);
   if (!cr) throw new NotFoundError('Change request not found');
@@ -224,92 +285,16 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
     throw new ValidationError(`Cannot submit a change request with status '${cr.status}'. Only draft or returned CRs can be submitted.`);
   }
 
-  let equipmentClassification: 'normal' | 'critical' | 'unknown' = 'unknown';
-  let spareClassification: 'normal' | 'critical' | 'unknown' = 'unknown';
-  let jobClassification: 'criticalEquipment' | 'critical' | 'normal' | 'unknown' = 'unknown';
+  const cls = await classifyChangeRequestScope(cr);
+  const { equipmentClassification, spareClassification, jobClassification } = cls;
 
-  // Classify the target component
-  if (cr.targetType === 'component' && cr.targetId) {
-    const component = await crRepo.getComponent(cr.targetId);
-    if (component) {
-      const isCritical = (component as any).critical === true || (component as any).classItem === true;
-      equipmentClassification = isCritical ? 'critical' : 'normal';
-    }
-  }
-
-  // Classify the target spare using its own critical TEXT field
-  if (cr.targetType === 'spare' && cr.targetId) {
-    const spare = await crRepo.getSpare(cr.targetId);
-    if (spare) {
-      const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
-      spareClassification = isCritical ? 'critical' : 'normal';
-    }
-  }
-
-  // Classify a job CR:
-  //   Priority 1 — Critical Equipment Jobs: job's component has critical = true
-  //   Priority 2 — Critical Jobs: job itself has criticality = 'Yes'
-  //   Default    — Normal Jobs
-  if (cr.targetType === 'job' && cr.targetId) {
-    const job = await crRepo.getJob(cr.targetId);
-    if (job) {
-      let isOnCriticalEquipment = false;
-      if (job.componentId) {
-        const comp = await crRepo.getComponent(job.componentId);
-        isOnCriticalEquipment = (comp as any)?.critical === true;
-      }
-      if (isOnCriticalEquipment) {
-        jobClassification = 'criticalEquipment';
-      } else if (job.criticality === 'Yes') {
-        jobClassification = 'critical';
-      } else {
-        jobClassification = 'normal';
-      }
-    }
-  }
-
-  // Look up the approval workflow config for this CR category
+  // Look up the approval workflow config for this CR category (same rows as before)
   let level1Enabled = false;
   let level2Enabled = false;
-
-  if (cr.targetType === 'spare' && spareClassification !== 'unknown') {
-    const allConfigs = await crRepo.getApprovalWorkflowConfig();
-    const variableName = spareClassification === 'critical' ? 'Critical Spares' : 'Normal Spares';
-    const config = allConfigs.find(
-      c => c.functionId === 'pms-spares-cr' && c.variableName === variableName && !c.isDeleted
-    );
-    if (config) {
-      level1Enabled = config.level1Enabled;
-      level2Enabled = config.level2Enabled;
-    }
-  } else if (cr.targetType === 'store') {
-    // Stores have no classification split — one flat config row covers all store items
+  if (cls.functionId && cls.variableName) {
     const allConfigs = await crRepo.getApprovalWorkflowConfig();
     const config = allConfigs.find(
-      c => c.functionId === 'pms-stores-cr' && c.variableName === 'Store Items' && !c.isDeleted
-    );
-    if (config) {
-      level1Enabled = config.level1Enabled;
-      level2Enabled = config.level2Enabled;
-    }
-  } else if (cr.targetType === 'job' && jobClassification !== 'unknown') {
-    const allConfigs = await crRepo.getApprovalWorkflowConfig();
-    const variableName =
-      jobClassification === 'criticalEquipment' ? 'Critical Equipment Jobs'
-      : jobClassification === 'critical'        ? 'Critical Jobs'
-      :                                           'Normal Jobs';
-    const config = allConfigs.find(
-      c => c.functionId === 'pms-jobs-cr' && c.variableName === variableName && !c.isDeleted
-    );
-    if (config) {
-      level1Enabled = config.level1Enabled;
-      level2Enabled = config.level2Enabled;
-    }
-  } else if (equipmentClassification !== 'unknown') {
-    const allConfigs = await crRepo.getApprovalWorkflowConfig();
-    const variableName = equipmentClassification === 'normal' ? 'Normal Equipment' : 'Critical Equipment';
-    const config = allConfigs.find(
-      c => c.functionId === 'pms-components-cr' && c.variableName === variableName && !c.isDeleted
+      c => c.functionId === cls.functionId && c.variableName === cls.variableName && !c.isDeleted
     );
     if (config) {
       level1Enabled = config.level1Enabled;
@@ -350,6 +335,22 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
       approvalLevel: 'Level 2',
       status: 'Pending',
     });
+  }
+
+  // Phase 2 / W3 — offer the submitted CR to the approval engine (shore only; the gateway is
+  // a no-op on ships / with no workflow / disabled scope — legacy behaviour byte-identical).
+  // Runs AFTER the legacy snapshot+steps so a NO_WORKFLOW fallback has everything it had before.
+  // Dynamic import: the approvals card imports this service (inward); keep the reverse edge lazy.
+  if (cls.functionId) {
+    try {
+      const gw = await import('../../approvals/engineGateway');
+      const requuid = await gw.maybeEngineSubmit(cls.functionId, cr.cruuid, { kind: 'cr', targetType: cr.targetType, targetId: cr.targetId }, cr.vesselId, userId);
+      if (requuid && (level1Enabled || level2Enabled)) {
+        console.warn(`[approvals] CR ${cr.cruuid}: BOTH an engine workflow and legacy awc levels are active for ${cls.functionId}/${cls.variableName} — cutover rule is workflow XOR awc levels (see PHASE2-REPORT)`);
+      }
+    } catch (e) {
+      console.error('[approvals] CR engine submit hook failed (legacy path continues):', e);
+    }
   }
 
   const classLabel = cr.targetType === 'spare' ? spareClassification
@@ -417,6 +418,21 @@ export async function approveChangeRequest(id: number, body: {
 
   await assertTargetApplicableOnThisInstance(existing.targetType, id);
 
+  // Phase 2 / W3 — ENGINE-FIRST, after every safety check above. If the approval engine owns
+  // a pending chain for this CR, the decision goes through it: the engine enforces
+  // whose-turn/quorum (403/409), and on the terminal step its onDecision callback re-enters
+  // this function — by then no pending engine request exists, so the legacy path below runs
+  // and applies. A non-terminal step returns the CR unchanged (chain progress via the
+  // engine status API). No engine request → legacy path exactly as before.
+  {
+    const gw = await import('../../approvals/engineGateway');
+    const cls = await classifyChangeRequestScope(existing);
+    if (cls.functionId) {
+      const decided = await gw.maybeEngineDecide(cls.functionId, existing.cruuid, 'approve', reviewerId || 'reviewer', comment);
+      if (decided) return (await crRepo.getChangeRequest(id))!;
+    }
+  }
+
   console.log(`[CR_SERVICE] Approving change request ${id}`, {
     id: existing?.id,
     targetType: existing?.targetType,
@@ -446,6 +462,17 @@ export async function rejectChangeRequest(id: number, body: { comment: string; r
       `Change request ${id} is already ${existing.status}; it cannot be rejected again.`,
       { code: 'CR_ALREADY_DECIDED', status: existing.status, revisionNumber: existing.revisionNumber ?? 0 }
     );
+  }
+
+  // Phase 2 / W3 — ENGINE-FIRST (same shape as approveChangeRequest above): a reject on the
+  // active step returns the whole request; onDecision re-enters this function to apply.
+  {
+    const gw = await import('../../approvals/engineGateway');
+    const cls = await classifyChangeRequestScope(existing);
+    if (cls.functionId) {
+      const decided = await gw.maybeEngineDecide(cls.functionId, existing.cruuid, 'reject', reviewerId || 'reviewer', comment);
+      if (decided) return (await crRepo.getChangeRequest(id))!;
+    }
   }
 
   console.log('Rejecting change request:', id, 'with comment:', comment);

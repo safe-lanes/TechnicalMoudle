@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ApprovalChainProgress, useApprovalChain } from '@/components/approvals/ApprovalChainProgress';
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -21,6 +22,7 @@ interface PostponeApprovalDialogProps {
   onClose: () => void;
   workOrder: {
     id?: string | null;
+    wouuid?: string | null;
     workOrderNo?: string | null;
     templateCode?: string | null;
     executionId?: string | null;
@@ -104,13 +106,21 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
     || assignedVesselIds.length === 0
     || (!!requestVesselId && assignedVesselIds.includes(requestVesselId));
 
-  const userCanAct = vesselIsAssigned && (
+  // Phase 2 / W3 — approval-engine gate (fail-soft: no chain → legacy gating unchanged).
+  // Postponement vs re-postponement share the WO subject; check both scopes.
+  const chainPost = useApprovalChain('pms-wo-postponement', isOpen ? workOrder?.wouuid : null);
+  const chainRePost = useApprovalChain('pms-wo-re-postponement', isOpen ? workOrder?.wouuid : null);
+  const engineChain = chainPost.hasChain ? chainPost : chainRePost;
+
+  const legacyUserCanAct = vesselIsAssigned && (
     (approversLoading || stepsLoading || approversError || stepsError)
       ? false
       : (noStepsYet || noApproversConfigured)
         ? (!isVessel && !isHeadOfDept)
         : !!activeStep && userApproverLevels.includes(activeStep.approvalLevel)
   );
+  const userCanAct = engineChain.hasChain ? engineChain.canDecide : legacyUserCanAct;
+  const engineScreenId = chainPost.hasChain ? 'pms-wo-postponement' : chainRePost.hasChain ? 'pms-wo-re-postponement' : null;
 
   useEffect(() => {
     if (isOpen) {
@@ -148,6 +158,7 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
           <DialogTitle>
             Review Postponement Request
           </DialogTitle>
+          {engineScreenId && <ApprovalChainProgress screenId={engineScreenId} subjectRef={workOrder?.wouuid ?? null} />}
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-1">
