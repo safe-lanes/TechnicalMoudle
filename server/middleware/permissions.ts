@@ -6,26 +6,41 @@
  * so Access Control edits take effect immediately (per-request lookup, no process cache).
  *
  * Policy — mirrors client/src/contexts/PermissionsContext.tsx exactly:
- *   • Role resolved SERVER-SIDE from the authenticated request (req.user.role, set by
- *     the session/auth middleware) — never from client-supplied role ruids or headers.
+ *   • Role resolved SERVER-SIDE from the authenticated request — Phase 0 / P0.1: the
+ *     FORWARDED SAILERP role name on req.rbac (mockAuthMiddleware), i.e. the same value the
+ *     frontend looks up via /admin/role-by-name — never from client-supplied ruids.
  *   • HARDCODED BYPASS: 'Sail Admin' (and 'PMS Admin', which the existing
  *     requirePMSAdmin middleware treats as an admin peer) always pass, so admins with
  *     missing/stale permission rows are never locked out. Parity with the frontend's
  *     admin flows and viewModeService's Sail Admin bypass.
- *   • UNCONFIGURED = FAIL-OPEN: a role with no row in admn_role_master, or with ZERO
- *     adm_role_menu_access rows, is allowed through (the frontend shows everything for
- *     such roles today; the "missing permissions" task owns changing that policy).
+ *   • ENFORCEMENT IS OPT-IN (Phase 0 / P0.1): without `{ enforce: true }` the guard is a
+ *     pass-through — exactly its runtime behaviour before Phase 0 (the role was always the
+ *     Sail Admin mock, so every call hit the bypass). Evidence for keeping it opt-in: on the
+ *     dev data configured roles (Super Admin, Admin, Vessel Admin, Vessel User) have
+ *     adm_role_menu_access rows for ~13 menus only — none for 'change-requests',
+ *     'pms-modify-pms', 'admin-masters', … — while the UI gates those screens by different
+ *     resource names; switching this on for real roles would 403 crew CR creation and office
+ *     CR approval. Flip the default once the permission rows are complete (see PHASE0-REPORT).
+ *   • UNCONFIGURED = FAIL-OPEN by default (when enforcing): a role with no row in
+ *     admn_role_master, or with ZERO adm_role_menu_access rows, is allowed through (the
+ *     frontend shows everything for such roles today). `{ unconfigured: 'deny' }` closes that
+ *     branch — an unconfigured (or absent) role is then refused with reason ROLE_UNCONFIGURED.
  *   • CONFIGURED = FAIL-CLOSED: once permission rows exist, the matching
  *     can_create/can_edit/can_delete flag must be true; a missing menu row or missing
  *     permission row denies (403), exactly like the frontend's canCreate/canEdit/canDelete.
  */
 import type { Response, NextFunction } from "express";
-import type { AuthenticatedRequest } from "./auth";
+import { getRbacIdentity, RBAC_BYPASS_ROLES, type AuthenticatedRequest } from "./auth";
 import { storage } from "../storage";
 
 export type PermissionAction = "create" | "edit" | "delete";
 
-const BYPASS_ROLES = new Set(["Sail Admin", "PMS Admin"]);
+export interface RequirePermissionOptions {
+  /** false (default) = pass-through (pre-Phase-0 runtime behaviour); true = evaluate the forwarded role. */
+  enforce?: boolean;
+  /** 'allow' (default) keeps parity with the frontend; 'deny' refuses unconfigured/absent roles. */
+  unconfigured?: "allow" | "deny";
+}
 
 const ACTION_FLAG: Record<PermissionAction, "canCreate" | "canEdit" | "canDelete"> = {
   create: "canCreate",
@@ -49,10 +64,10 @@ async function getPermState(req: AuthenticatedRequest): Promise<PermState> {
   if (cached) return cached;
 
   let state: PermState;
-  const roleName = req.user?.role ?? "";
+  const roleName = getRbacIdentity(req).role ?? "";
   const role = roleName ? await storage.getRoleByName(roleName) : null;
   if (!role) {
-    // Unknown role name — mirrors the frontend's 404 → "unconfigured" fail-open path.
+    // Unknown role name — mirrors the frontend's 404 → "unconfigured" path.
     state = { status: "unconfigured", menuByName: new Map(), permsByMuid: new Map() };
   } else {
     const rows = await storage.getRoleMenuPermissions((role as any).ruid);
@@ -78,17 +93,31 @@ async function getPermState(req: AuthenticatedRequest): Promise<PermState> {
 export function requirePermission(
   resource: string,
   action: PermissionAction | PermissionAction[],
+  options: RequirePermissionOptions = {},
 ) {
   const actions = Array.isArray(action) ? action : [action];
+  const denyUnconfigured = options.unconfigured === "deny";
+  const enforce = options.enforce === true;
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: "Unauthorized - Authentication required" });
       }
-      if (BYPASS_ROLES.has(req.user.role)) return next();
+      if (!enforce) return next(); // opt-in enforcement — see header comment
+      const identity = getRbacIdentity(req);
+      if (identity.role && RBAC_BYPASS_ROLES.has(identity.role)) return next();
 
       const state = await getPermState(req);
-      if (state.status === "unconfigured") return next(); // fail-open parity with frontend
+      if (state.status === "unconfigured") {
+        if (!denyUnconfigured) return next(); // fail-open parity with frontend
+        return res.status(403).json({
+          error: "Forbidden - Insufficient permissions",
+          reason: "ROLE_UNCONFIGURED",
+          resource,
+          action: actions.join("|"),
+          current: identity.role ?? "anonymous",
+        });
+      }
 
       const muid = state.menuByName.get(resource);
       const perm = muid ? state.permsByMuid.get(muid) : undefined;

@@ -120,6 +120,43 @@ Server-side no shim is needed: `tenantMiddleware` returns early when `MASTER_DAT
 (single-tenant), so the domain is never consulted. Provisioning's `tenant_instances` write is
 likewise skipped without a master DB.
 
+## Identity and roles on the pilot (Phase 0 / P0.1)
+
+There is no SAILERP here, and none is needed: the MFE shell only ever contributes **HTTP headers**
+(`x-user-id`, `x-user-name`, `x-user-email`, `x-user-type` = `Office|Ship`, `x-user-role` = the
+SAILERP role name as in `admn_role_master.assigned_role`, `x-rank`). `mockAuthMiddleware`
+(`server/middleware/auth.ts`) resolves them onto `req.rbac`; `requireRole` / `requirePermission`
+evaluate that. A harness therefore simulates any user by sending the headers — see
+`scripts/drepro-common.ts` (`api(base, method, path, body, who)`).
+
+Switch: **`PMS_AUTH_MOCK_RBAC`** (both `.env.*.example` files ship it as `0`).
+- `0` / unset (**default, and what production runs**): guards evaluate the forwarded role; a
+  request with no identity headers is "anonymous" and gets 403 on guarded routes.
+- `1`: every request is treated as `Sail Admin / Office` — the pre-Phase-0 behaviour. Use it ONLY
+  for a standalone browser session on the pilot (no shell → no headers → the approval surfaces
+  would 403). Restart the process after changing it. Never set it in production.
+
+`req.user.role` is still the legacy mock value (`Sail Admin`) for the ~40 business-logic consumers
+that read it; the real role is on `req.rbac.role` / `req.user.forwardedRole`.
+
+## Clock / timezone check (operator, Phase 0 / P0.5)
+
+The pilot's **host Postgres clock was 5.5 h behind real UTC** (19-Aug-2026): DB-default
+timestamps (`changed_at`, `created_at` = `now()`) were 5.5 h earlier than node-written ones, so
+the ship STALE-SKIPPED shore field logs and the one-way pull checkpoint stalled. Before trusting
+any sync timing — and once on **production shore and on each ship** — run on the DB **and** compare
+with the app host's clock:
+
+```sql
+SELECT now() AS db_now, now() AT TIME ZONE 'UTC' AS db_utc, current_setting('TimeZone') AS db_tz;
+```
+```bash
+date -u        # app host, same second
+```
+`db_utc` must equal the host's UTC within seconds. If it does not, fix the DB/host timezone
+configuration (not the app). On the pilot the workaround was to start the shore process with
+`TZ=UTC` (node-written stamps become consistent; DB defaults still follow the DB clock).
+
 ---
 
 ## Files — permanent vs throwaway

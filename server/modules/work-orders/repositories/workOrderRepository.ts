@@ -221,6 +221,11 @@ export async function getLatestAwaitingPostponement(workOrderId: string) {
   return storage.getLatestAwaitingPostponement(workOrderId);
 }
 
+/** Phase 0 / P0.3d — one-transaction postponement-approval finalize (see postgresStorage). */
+export async function finalizePostponementApproval(params: Parameters<typeof storage.finalizePostponementApproval>[0]) {
+  return storage.finalizePostponementApproval(params);
+}
+
 export async function verifyApproverForLevel(reviewerId: string, approvalLevel: string) {
   return storage.verifyApproverForLevel(reviewerId, approvalLevel);
 }
