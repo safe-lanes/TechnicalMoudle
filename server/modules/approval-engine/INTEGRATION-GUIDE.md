@@ -82,6 +82,42 @@ Rules for `onDecision`:
 - **Never read or write `apprv_*` tables directly.** `engine.status()` / `GET
   /approval-engine/requests/status` is the read API.
 
+### 3b. The engine-first decide pattern (learned wiring Technical — Phase 2)
+
+Your existing approve/reject services stay the single entry point. Inside them, AFTER your
+own guards, check the engine and hand over when it owns the subject:
+
+```ts
+// in approveMyThing(id, body) — after your comment/status/instance guards:
+const pending = await gw.pendingEngineRequest(screenId, subject.uuid);
+if (pending) {
+  const r = await engine.decide(ctx, pending.requuid, { decision: 'approve', remarks });
+  return reload(id);   // non-terminal: entity unchanged; terminal: onDecision already applied
+}
+// … legacy path unchanged …
+```
+This is recursion-safe by construction: the engine FINALIZES the request before calling your
+`onDecision`, so when `onDecision` re-enters `approveMyThing` there is no pending engine
+request and the legacy branch applies. Your legacy branch must therefore be a valid direct
+finalise when its own step/config rows are absent (the "zero-step" shape).
+
+### 3c. Subjects that arrive by sync (shore-only engines)
+
+If your requests are CREATED on a ship and reach shore via sync, the create-route hook never
+fires on shore. Hook the ARRIVAL: a post-sync sweep (fire-and-forget, per vessel) that finds
+subjects awaiting approval with no engine request and submits them — idempotent for free
+(`ALREADY_PENDING` short-circuits, `NO_WORKFLOW`/`DISABLED` do nothing, the next sync retries).
+Technical's `approvalArrivalSweep` (server/modules/approvals/engineGateway.ts) is the template;
+it fires next to the existing post-sync reconciler trigger in the sync complete handler.
+
+### 3d. Cutover rule when replacing an old per-module approval config
+
+While the old config still drives step creation in your module, an active engine workflow AND
+enabled old-config levels would double-gate. The rule is **workflow XOR old levels** per scope:
+enable the generated workflow and disable the old level flags in the same support action (the
+Technical submit hooks log a loud warning when both are active). Keep the old config table —
+read-only in practice — until the module's step-creation code is retired.
+
 ## Writing a card (the demo is the template)
 
 ```ts
@@ -98,6 +134,10 @@ const myCard: ApprovalCard = {
 ```
 Registration is validated at boot — a missing function, duplicate module/scope/classification
 id refuses the start with a precise message. Fix the card; never catch that error.
+
+Classification ids should be your module's existing STABLE config keys (Technical uses the
+awc variableNames like 'Critical Spares'), not display strings invented for the card — the
+old-config generator and support reports then map 1:1 without a translation table.
 
 ## Verification checklist (run before calling an integration done)
 
