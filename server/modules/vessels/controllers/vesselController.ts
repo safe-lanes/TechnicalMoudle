@@ -94,6 +94,15 @@ export async function getAllPmsVesselSettings(_req: Request, res: Response) {
 }
 
 export async function createPmsVesselSettings(req: Request, res: Response) {
+  // RH validation may only change through the dedicated shore-admin endpoint.
+  // Reject rather than silently accepting the field so callers cannot mistake
+  // this generic settings endpoint for an authorization bypass.
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'rhValidationEnabled')) {
+    return res.status(400).json({ error: 'Use the dedicated RH validation endpoint to change this setting.' });
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'superintendentLockEnabled')) {
+    return res.status(400).json({ error: 'Use the dedicated Superintendent lock endpoint to change this setting.' });
+  }
   const username = (req as any).user?.username || 'test';
   const settings = await service.createPmsVesselSettings(req.body, username);
   res.status(201).json(settings);
@@ -105,12 +114,30 @@ export async function getPmsVesselSettings(req: Request, res: Response) {
 }
 
 export async function updatePmsVesselSettings(req: Request, res: Response) {
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'rhValidationEnabled')) {
+    return res.status(400).json({ error: 'Use the dedicated RH validation endpoint to change this setting.' });
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'superintendentLockEnabled')) {
+    return res.status(400).json({ error: 'Use the dedicated Superintendent lock endpoint to change this setting.' });
+  }
   const username = (req as any).user?.username || 'test';
   const { settings } = await service.updatePmsVesselSettings(req.params.vesselId, req.body, username);
   res.json(settings);
 }
 
 export async function deletePmsVesselSettings(req: Request, res: Response) {
+  // Deleting a settings row changes the effective RH policy back to the
+  // missing-row default (ON), so it is a policy mutation as well.
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (await isShipInstance()) {
+    return res.status(403).json({ error: 'shore_only', message: 'PMS vessel settings are configured on the shore server.' });
+  }
+  // Authorization must use the server-authenticated role. forwardedRole is
+  // request metadata for audit attribution, not an RBAC source.
+  const userRole = ((req as any).user?.role || '').trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: 'forbidden', message: 'Only Sail Admin / Super Admin may delete PMS vessel settings.' });
+  }
   await service.deletePmsVesselSettings(req.params.vesselId);
   res.json({ success: true });
 }
@@ -162,6 +189,52 @@ export async function updateOfficeRhEntrySwitch(req: Request, res: Response) {
   const settings = await service.setOfficeRhEntryEnabled(req.params.vesselId, enabled, username);
   console.log(`[OfficeRhSwitch] vessel=${req.params.vesselId} office_rh_entry_enabled=${enabled} by ${username}`);
   res.json({ vesselId: req.params.vesselId, officeRhEntryEnabled: (settings as any).officeRhEntryEnabled, updatedBy: settings.updatedBy });
+}
+
+// PUT /pms-vessel-settings/:vesselId/rh-validation — per-vessel RH policy
+// (migration 163). Shore-only, Sail Admin / Super Admin only. The setting is
+// synced to the vessel and controls validation there after receipt.
+export async function updateRhValidationSwitch(req: Request, res: Response) {
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (await isShipInstance()) {
+    return res.status(403).json({ error: 'shore_only', message: 'RH validation is configured on the shore server.' });
+  }
+  const userRole = ((req as any).user?.forwardedRole || (req as any).user?.role || '').trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: 'forbidden', message: 'Only Sail Admin / Super Admin may change RH validation.' });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled (boolean) is required' });
+  }
+  const username = (req as any).user?.username || 'unknown';
+  const settings = await service.setRhValidationEnabled(req.params.vesselId, enabled, username);
+  console.log(`[RhValidationSwitch] vessel=${req.params.vesselId} rh_validation_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, rhValidationEnabled: settings.rhValidationEnabled, updatedBy: settings.updatedBy });
+}
+
+// PUT /pms-vessel-settings/:vesselId/superintendent-lock — vessel-specific
+// approval lock. Shore-only and Sail Admin / Super Admin only; ships receive
+// this setting through the existing one-way PMS settings synchronization.
+export async function updateSuperintendentLockSwitch(req: Request, res: Response) {
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (await isShipInstance()) {
+    return res.status(403).json({ error: 'shore_only', message: 'Superintendent approval lock is configured on the shore server.' });
+  }
+  // forwardedRole is request metadata used for audit attribution only; RBAC
+  // must rely on the server-authenticated session role.
+  const userRole = ((req as any).user?.role || '').trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: 'forbidden', message: 'Only Sail Admin / Super Admin may change the Superintendent approval lock.' });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled (boolean) is required' });
+  }
+  const username = (req as any).user?.username || 'unknown';
+  const settings = await service.setSuperintendentLockEnabled(req.params.vesselId, enabled, username);
+  console.log(`[SuperintendentLock] vessel=${req.params.vesselId} superintendent_lock_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy });
 }
 
 // ── Company Standard Grace Settings controllers ──

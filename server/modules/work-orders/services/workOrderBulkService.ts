@@ -21,9 +21,6 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
     failed: []
   };
 
-  // Layer 5 — the bulk path must enforce the SAME approval-tier gates as the
-  // single-approve path (workOrderService). Live policy read, once per batch.
-  const lockEnabled = await isSuperintendentLockEnabled();
   const remarks = (approverRemarks || '').trim();
 
   for (const workOrderId of workOrderIds) {
@@ -107,6 +104,9 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
 
       // ── Layer 5 approval-tier gates (same rules as the single-approve path) ──
       const currentTier = existingWO.approvalTier || 'standard';
+      // A bulk request can contain several vessels, so resolve this policy for
+      // each work order instead of using one fleet-wide setting.
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
 
       if (currentTier === 'superintendent_locked' && lockEnabled) {
         results.failed.push({
@@ -240,7 +240,11 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
   // reached "Pending Office Review" before that fix (or any future path) must still be
   // refused here — same code the HOD step uses, same live policy read.
   if (existingWO.approvalTier === 'superintendent_locked' && !existingWO.superintendentAcknowledged) {
-    if (await isSuperintendentLockEnabled()) {
+    // Merge note (21-Aug): Jeevan's vessel-settings refactor made isSuperintendentLockEnabled
+    // per-vessel (required vesselId). P0.2 was written against the old no-arg global signature;
+    // pass existingWO.vesselId so the office-step lock read matches the HOD-step read (the gate
+    // in updateWorkOrder already reads per-vessel). Same P0.2 intent, now vessel-scoped.
+    if (await isSuperintendentLockEnabled(existingWO.vesselId)) {
       throw new ValidationError(
         'This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The office reviewer cannot complete it until the Superintendent has acknowledged.',
         { code: 'SUPERINTENDENT_LOCKED' }

@@ -127,19 +127,19 @@ function calculateBackdatingDaysForApproval(completionDate: string | null | unde
 }
 
 /**
- * Company approval policy — superintendent lock toggle (migration 137).
- * Read LIVE at both tier assignment and the approval gate so flipping the
- * setting OFF unlocks already-stamped 'superintendent_locked' WOs immediately
- * (no data migration). Fail-safe: any read error resolves to TRUE (locked
- * stays locked) — never accidentally weaken the compliance gate.
+ * Vessel approval policy — Superintendent lock toggle (migration 168).
+ * The vessel setting overrides the legacy company approval policy. OFF is the
+ * requested default, so a missing or unreadable vessel settings row stays on
+ * the notify-only path rather than reading the legacy global value.
  */
-export async function isSuperintendentLockEnabled(): Promise<boolean> {
+export async function isSuperintendentLockEnabled(vesselId: string | null | undefined): Promise<boolean> {
+  if (!vesselId) return false;
   try {
-    const settings = await storage.getCompanyApprovalSettings();
-    return settings?.superintendentLockEnabled ?? true;
+    const settings = await storage.getPmsVesselSettings(vesselId);
+    return settings?.superintendentLockEnabled === true;
   } catch (err: any) {
-    console.warn(`[ApprovalPolicy] Could not read company approval settings (defaulting to lock ENABLED): ${err.message}`);
-    return true;
+    console.warn(`[ApprovalPolicy] Could not read vessel settings for ${vesselId} (defaulting to lock OFF): ${err.message}`);
+    return false;
   }
 }
 
@@ -151,7 +151,7 @@ export function calculateApprovalTier(
   // Superintendent lock toggle: when FALSE the high-severity branch assigns
   // 'superintendent_notification' instead of 'superintendent_locked' — approval
   // allowed, Superintendent still notified, HOD remarks (>=20) still mandatory.
-  superintendentLockEnabled: boolean = true
+  superintendentLockEnabled: boolean = false
 ) {
   // SHARED parser (dateParse.ts contract): raw new Date() made DD-MM-YYYY due
   // dates Invalid (daysLate NaN) or month/day-swapped (daysLate 0) → WOs that
@@ -177,7 +177,7 @@ export function calculateApprovalTier(
       superintendentNotifiedAt = new Date().toISOString();
       approvalBlockReason = 'Awaiting Superintendent acknowledgment';
     } else {
-      // Lock disabled by company policy — notify-only downgrade. Notification
+      // Lock disabled by this vessel policy — notify-only downgrade. Notification
       // still fires (notification tier), remarks (>=20) still mandatory, no block.
       approvalTier = 'superintendent_notification';
       superintendentNotifiedAt = new Date().toISOString();
@@ -543,6 +543,21 @@ export interface ListWorkOrdersPagedResult {
   rankOptions: string[];
 }
 
+async function computeVesselAwareApprovalTierCounts(workOrders: any[]) {
+  const vesselSettings = await repo.findAllPmsVesselSettings();
+  const lockByVessel = new Map(
+    vesselSettings.map((settings: any) => [settings.vesselId, settings.superintendentLockEnabled === true]),
+  );
+
+  return computeApprovalTierCounts(
+    workOrders.map((workOrder: any) => (
+      workOrder.approvalTier === 'superintendent_locked' && !lockByVessel.get(workOrder.vesselId)
+        ? { ...workOrder, approvalTier: 'superintendent_notification' }
+        : workOrder
+    )),
+  );
+}
+
 /**
  * Paginated variant of listWorkOrders. Reuses the exact same enrichment as the
  * non-paged path, then applies the shared filter/search/sort logic (single
@@ -569,7 +584,7 @@ export async function listWorkOrdersPaged(
   ).sort((a, b) => a.localeCompare(b));
 
   const filtered = filterAndSortWorkOrders(enriched, params);
-  const approvalTierCounts = computeApprovalTierCounts(filtered);
+  const approvalTierCounts = await computeVesselAwareApprovalTierCounts(filtered);
 
   const total = filtered.length;
   const pageSize = params.pageSize;
@@ -973,6 +988,106 @@ export async function updateWorkOrder(id: string, body: any) {
     throw new NotFoundError('Work order not found');
   }
 
+  // ── Part B Office Edit (Pending Approval) ──────────────────────────────────
+  // Office/PMS Admin/Sail Admin can correct B1/B2/B4 fields while a WO awaits
+  // approval. B3 Running Hours are EXPLICITLY BLOCKED — they drive the delta
+  // cascade applied to all child components at approval time; editing them
+  // post-submission risks corrupting component RH records.
+  if (body.partBOfficeEdit === true) {
+    if (existingWO.status !== 'Pending Approval') {
+      throw new ValidationError('Part B office edit is only permitted when the work order is in Pending Approval status.');
+    }
+    // Role check — explicitly allowlist eligible office roles. body.userRole is set
+    // server-side by the controller from the authenticated session; the client cannot spoof it.
+    const PART_B_EDIT_ALLOWED_ROLES = ['Office', 'PMS Admin', 'Sail Admin'];
+    if (!PART_B_EDIT_ALLOWED_ROLES.includes(body.userRole)) {
+      throw new ValidationError('Only Office, PMS Admin, or Sail Admin users can edit Part B on a Pending Approval work order.');
+    }
+    // A stamped locked tier only remains locked while its vessel's live policy
+    // is ON. Switching this vessel OFF immediately restores the notify-only
+    // path, including the Part B edit behavior.
+    if (existingWO.approvalTier === 'superintendent_locked' && await isSuperintendentLockEnabled(existingWO.vesselId)) {
+      throw new ValidationError('This work order is superintendent-locked. The superintendent must act on it before Part B can be edited.');
+    }
+    // B3 Running Hours fields — explicitly blocked (delta cascade risk)
+    const B3_FIELDS = ['runningHours', 'previousReading', 'runningHoursDifference', 'readingDate', 'currentReadingDate', 'currentReading'];
+    // Approval/workflow fields — must never change through this path
+    const PROTECTED_FIELDS = ['status', 'approvalAction', 'approvalDate', 'submittedDate', 'rhSyncedAt', 'wasRejected', 'approvalTier', 'rejectionComments', 'missedCycles', 'dateCompleted', 'isDeleted'];
+    const attempted = Object.keys(body);
+    const blockedB3 = attempted.filter((f: string) => B3_FIELDS.includes(f));
+    const blockedProtected = attempted.filter((f: string) => PROTECTED_FIELDS.includes(f));
+    if (blockedB3.length > 0 || blockedProtected.length > 0) {
+      throw new ValidationError(
+        `Part B office edit cannot modify: ${[...blockedB3, ...blockedProtected].join(', ')}. Running Hours and approval fields are protected.`
+      );
+    }
+    // Whitelist: only B1/B2/B4 fields and controller-injected audit fields
+    // B4 (consumedSpareParts) is intentionally excluded: those inventory transactions
+    // were already applied when the WO was submitted. Editing quantities/locations here
+    // without running the full consumption-delta + _deductedQty reversal logic would
+    // corrupt stock balances. B4 changes must go through the normal Pending→Rejected→
+    // Resubmit cycle so the inventory reconciliation path runs correctly.
+    const ALLOWED_FIELDS = new Set([
+      // B1 — Risk Assessment, Checklists & Records
+      'riskAssessmentStatus', 'safetyChecklistsStatus', 'operationalFormsStatus',
+      'uploadedDocuments',
+      // B2 — Work Execution Details
+      'startDateTime', 'completionDateTime', 'executionAssignedTo', 'performedBy',
+      'noOfPersons', 'totalTimeHours', 'manhours', 'workCarriedOut', 'jobExperienceNotes',
+      'remarks', 'completionRemarks',
+      // controller-injected fields (safe, set server-side)
+      'userId', 'userRole', 'userUuid',
+    ]);
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (key === 'partBOfficeEdit') continue; // strip the marker
+      if (ALLOWED_FIELDS.has(key)) updateData[key] = value;
+    }
+    console.log(`📝 Part B office edit — WO ${existingWO.workOrderNo}: updating [${Object.keys(updateData).filter(k => !['userId','userRole','userUuid'].includes(k)).join(', ')}]`);
+    // updatedAt is set automatically by the Drizzle .$onUpdateFn on the column,
+    // ensuring shore's edit wins over any in-flight ship sync for the same fields.
+    const workOrder = await repo.update(id, updateData);
+    return workOrder;
+  }
+  // ── End Part B Office Edit ─────────────────────────────────────────────────
+
+  // ── Pending Approval Field Guard (general PATCH path) ─────────────────────
+  // B3 Running Hours, B4 consumed spares, and explicit status transitions are
+  // blocked on the generic PATCH path for Pending Approval WOs. This guard runs
+  // regardless of what the client sends — partBOfficeEdit already returned above,
+  // and approvalAction routes through the explicit approval flow further below.
+  //
+  // Ship users also land here (no early-return) and are subject to the same guard,
+  // meaning they cannot re-write RH or spare fields once submitted.
+  //
+  // Sync engine operations use oneWayApplier.ts and bypass updateWorkOrder entirely,
+  // so bidirectional sync for other fields is not affected.
+  // Merge note (21-Aug): the superintendent-acknowledge flow (P0.2/P0.4) legitimately downgrades
+  // approvalTier ('superintendent_locked' → 'ce_with_justification') on a Pending Approval WO so the
+  // HOD can then approve with mandatory remarks. It is an authorized office action guarded at the
+  // route (requireRole) and controller level, so it is exempt from this field guard — same shape as
+  // the partBOfficeEdit bypass. Jeevan's guard otherwise still blocks raw RH/spares/status writes.
+  if (existingWO.status === 'Pending Approval' && !body.approvalAction && !body.partBOfficeEdit && !body.superintendentAck) {
+    const PENDING_APPROVAL_BLOCKED_FIELDS = [
+      // B3 Running Hours — drive the delta cascade at approval; immutable post-submission
+      'runningHours', 'previousReading', 'runningHoursDifference',
+      'readingDate', 'currentReadingDate', 'currentReading', 'woCompletionRh',
+      // B4 Consumed Spare Parts — inventory already applied; reversal requires reject/resubmit
+      'consumedSpareParts',
+      // Status transitions must use explicit approval actions, not raw field writes
+      'status', 'approvalDate', 'submittedDate', 'approvalTier',
+    ];
+    const attempted = Object.keys(body).filter((k: string) => PENDING_APPROVAL_BLOCKED_FIELDS.includes(k));
+    if (attempted.length > 0) {
+      console.warn(`⚠️ Blocked attempt to modify protected fields on Pending Approval WO ${existingWO.workOrderNo}: ${attempted.join(', ')}`);
+      throw new ValidationError(
+        `Cannot modify [${attempted.join(', ')}] on a Pending Approval work order. ` +
+        `Running Hours and consumed spare parts are locked until the work order is approved or rejected.`
+      );
+    }
+  }
+  // ── End Pending Approval Field Guard ──────────────────────────────────────
+
   // Check if WO is completed - if so, only allow limited updates
   const { isCompletedStatus } = await import('../../../utils/workOrderStatus');
   const woIsCompleted = isCompletedStatus(existingWO.status);
@@ -1007,6 +1122,7 @@ export async function updateWorkOrder(id: string, body: any) {
   }
 
   let updateData = { ...body };
+  delete (updateData as any).superintendentAck; // control flag (field-guard bypass), not a WO column
 
   // Run the assignment-sync helper only when the request actually
   // touches the assignment fields, so a partial PATCH (e.g. remarks
@@ -1318,7 +1434,7 @@ export async function updateWorkOrder(id: string, body: any) {
       tierCompDate,
       updateData.submittedDate || existingWO.submittedDate
     );
-    const lockEnabledAtSubmit = await isSuperintendentLockEnabled();
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled(existingWO.vesselId);
     const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
@@ -1412,9 +1528,9 @@ export async function updateWorkOrder(id: string, body: any) {
     const ceRemarks = (updateData.ceApprovalRemarks || '').trim();
 
     if (currentTier === 'superintendent_locked') {
-      // Live policy read: toggling the company setting OFF unlocks already-stamped
-      // locked WOs immediately — they fall through to the notify-tier remarks rule.
-      const lockEnabled = await isSuperintendentLockEnabled();
+      // Live vessel policy read: turning this vessel OFF unlocks already-stamped
+      // locked WOs immediately; other vessels remain unaffected.
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
       if (lockEnabled) {
         throw new ValidationError(
           `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
@@ -1423,7 +1539,7 @@ export async function updateWorkOrder(id: string, body: any) {
       }
       if (!ceRemarks || ceRemarks.length < 20) {
         throw new ValidationError(
-          `This work order has high severity issues and the Superintendent lock is disabled by company policy. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
+          `This work order has high severity issues and the Superintendent lock is disabled for this vessel. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
           { code: 'CE_REMARKS_REQUIRED', minLength: 20 }
         );
       }
