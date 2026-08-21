@@ -511,7 +511,7 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isGlobal: true,
     isConfigurable: false,
     businessRules: null,
-    notes: 'Company approval policy (superintendent lock toggle, migration 137). Single-row global config, shore-configured. Integer PK, no UUID.',
+    notes: 'Legacy company approval policy (migration 137). Retained for history; vessel-specific PMS settings supersede it for active lock enforcement.',
   },
   pms_vessel_settings: {
     tableName: 'pms_vessel_settings',
@@ -523,7 +523,7 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isGlobal: false,
     isConfigurable: false,
     businessRules: null,
-    notes: 'Per-vessel PMS settings (lead times, grace periods). Integer PK, no UUID.',
+    notes: 'Per-vessel PMS settings (lead times, grace periods, office controls, RH validation, and Superintendent approval lock). Integer PK, no UUID.',
   },
 
   // ── Certificates & Surveys (Master / Config) ──

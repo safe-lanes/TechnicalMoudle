@@ -7826,9 +7826,12 @@ export class PostgresStorage {
     renewalReason?: string;
     renewalReference?: string;
     renewalEvidenceUrls?: string[];
+    // Internal service flag: set only after the authenticated Sail Admin role
+    // has authorized a normal (non-meter-replacement) validation bypass.
+    rhValidationBypassed?: boolean;
   }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
-    const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+    const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls, rhValidationBypassed } = params;
     const now = new Date();
     // Reading date: when the hours were actually observed (user-entered date), not when
     // the row is written. Falls back to "now" only when omitted or unparseable.
@@ -7881,6 +7884,10 @@ export class PostgresStorage {
         newRH = mode === 'addDelta' ? currentRH + value : value;
       }
 
+      if (!Number.isFinite(newRH) || newRH < 0) {
+        throw new Error('Invalid Running Hours. Resulting reading cannot be negative.');
+      }
+
       updateData = {
         currentCumulativeRH: newRH.toString(),
         lastUpdated: dateUpdated,
@@ -7916,6 +7923,8 @@ export class PostgresStorage {
         source: 'cascade',
         notes: meterReplaced
           ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ''}`
+          : rhValidationBypassed
+            ? `RH validation bypassed by Sail Admin. ${comments || ''}`.trim()
           : comments,
         meterReplaced: meterReplaced || false,
         isRenewalReset: isRenewalReset || false,
@@ -7940,41 +7949,32 @@ export class PostgresStorage {
       const parent = parentResult[0];
       currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || '0');
 
-      // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
-      const latestAudit = await db.select()
-        .from(runningHoursAudit)
-        .where(or(eq(runningHoursAudit.componentId, resolvedParentId), eq(runningHoursAudit.componentId, parentComponentId)))
-        .orderBy(desc(runningHoursAudit.enteredAtUTC))
-        .limit(1);
-
-      // Task #427: the date guard uses the SAME winner selection as every other
-      // RH consumer (shared calendar-day parser + latest-reading-wins ranking) —
-      // no more ad-hoc DD-MMM-YYYY parsing that disagreed with the comparator.
-      {
-        const { selectWinningRhEvent } = await import('./modules/running-hours/rhEventComparator');
-        // Tenant-aware pool seam (server/db.ts contract) — NOT the deprecated
-        // eager `pool` export: winner selection must run against the SAME
-        // tenant database as the rest of this writer. Guard failures propagate:
-        // silently skipping the date guard would let a backdated entry through.
-        const { getPool } = await import('./db');
-        const rhPool = await getPool();
-        const winner = await selectWinningRhEvent(rhPool, resolvedParentId);
-        if (winner) {
-          const newDay = parseReadingDayStrict(dateUpdated);
-          if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
-            throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
+      if (!rhValidationBypassed) {
+        // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
+        // Task #427: the date guard uses the SAME winner selection as every other
+        // RH consumer (shared calendar-day parser + latest-reading-wins ranking).
+        {
+          const { selectWinningRhEvent } = await import('./modules/running-hours/rhEventComparator');
+          const { getPool } = await import('./db');
+          const rhPool = await getPool();
+          const winner = await selectWinningRhEvent(rhPool, resolvedParentId);
+          if (winner) {
+            const newDay = parseReadingDayStrict(dateUpdated);
+            if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
+              throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
+            }
           }
         }
-      }
 
-      // VALIDATION 2: Value Rule - RH must never go backwards (except when isRenewalReset is true for 0)
-      if (mode === 'setTotal' && value < currentRH && !isRenewalReset) {
-        throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
-      }
+        // VALIDATION 2: Value Rule - RH must never go backwards (except when isRenewalReset is true for 0)
+        if (mode === 'setTotal' && value < currentRH && !isRenewalReset) {
+          throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
+        }
 
-      // VALIDATION 3: When value is 0, isRenewalReset must be true
-      if (mode === 'setTotal' && value === 0 && !isRenewalReset) {
-        throw new Error('Running Hours cannot be set to 0 without confirming renewal/replacement.');
+        // VALIDATION 3: When value is 0, isRenewalReset must be true
+        if (mode === 'setTotal' && value === 0 && !isRenewalReset) {
+          throw new Error('Running Hours cannot be set to 0 without confirming renewal/replacement.');
+        }
       }
 
       // Compute all derived values from the Phase-1 read (recomputed inside the tx
@@ -8116,6 +8116,21 @@ export class PostgresStorage {
         ? await tx.select().from(components)
             .where(inArray(components.cuuid, children.map((c: any) => c.cuuid)))
         : [];
+
+      // Preserve the existing parent/child cascade invariant: every structural
+      // child receives the parent's exact delta. An authorized downward
+      // correction must therefore fail atomically when that delta would make a
+      // child negative, rather than clamping only that child and causing it to
+      // diverge from its parent.
+      for (const child of freshChildren) {
+        if (inheritedCuuidSet.has(child.cuuid)) continue;
+        const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
+        if (!Number.isFinite(childCurrentRH) || childCurrentRH + structuralDelta < 0) {
+          throw new Error(
+            `Running Hours correction would make structural child "${child.componentCode || child.name || child.cuuid}" negative.`
+          );
+        }
+      }
 
       // Update all structural children (by parentId hierarchy)
       for (const child of freshChildren) {

@@ -15,6 +15,10 @@ export async function getComponent(id: string): Promise<Component | undefined> {
   return storage.getComponent(id);
 }
 
+export async function getPmsVesselSettings(vesselId: string) {
+  return storage.getPmsVesselSettings(vesselId);
+}
+
 // RH follows the Stamp (Task #369): accrue a running-hours DELTA onto the component's
 // currently Installed rotational item (field-logged; delta-based, never absolute).
 export async function accrueInstalledStampRh(params: {
@@ -388,6 +392,7 @@ export async function cascadeRunningHoursUpdate(params: {
   meterReplaced?: boolean;
   oldMeterFinal?: string;
   newMeterStart?: string;
+  rhValidationBypassed?: boolean;
 }): Promise<{
   updatedComponents: number;
   auditsCreated: number;

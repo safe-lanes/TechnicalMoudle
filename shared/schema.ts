@@ -212,7 +212,9 @@ export type RenewalActionType = typeof RENEWAL_ACTION_TYPES[number];
 export const cascadeRunningHoursSchema = z.object({
   parentComponentId: z.string(),
   mode: z.enum(['setTotal', 'addDelta']),
-  value: z.number().nonnegative(), // Allow zero for setTotal (meter replacement), but addDelta will be validated separately
+  // Set Total remains non-negative. Add Delta may be negative only when the
+  // Sail Admin-authorized validation bypass is requested and approved server-side.
+  value: z.number().finite(),
   dateUpdated: z.string(), // DD-MMM-YYYY HH:mm format
   dateUpdatedTZ: z.string().default('UTC'),
   comments: z.string().optional(),
@@ -223,27 +225,18 @@ export const cascadeRunningHoursSchema = z.object({
   userUuid: z.string().optional(),
   userRole: z.string().optional().default('Ship'),
   adminOverride: z.boolean().optional().default(false),
+  // Request preference only. The running-hours service authorizes a false value
+  // using the authenticated server session; never trust this flag by itself.
+  rhValidationEnabled: z.boolean().optional().default(true),
   // Renewal/Replacement fields (required when value = 0)
   isRenewalReset: z.boolean().optional().default(false),
   renewalActionType: z.enum(RENEWAL_ACTION_TYPES).optional(),
   renewalReason: z.string().optional(),
   renewalReference: z.string().optional(),
   renewalEvidenceUrls: z.array(z.string()).optional(),
-}).refine(data => data.mode === 'setTotal' || data.value > 0, {
-  message: "addDelta mode requires value > 0",
+}).refine(data => data.mode !== 'setTotal' || data.value >= 0, {
+  message: "setTotal mode requires value >= 0",
   path: ["value"]
-}).refine(data => {
-  // When value is 0 in setTotal mode, isRenewalReset must be true with required fields
-  if (data.mode === 'setTotal' && data.value === 0) {
-    return data.isRenewalReset === true && 
-           !!data.renewalActionType && 
-           !!data.renewalReason && 
-           data.renewalReason.trim().length > 0;
-  }
-  return true;
-}, {
-  message: "When setting RH to 0, renewal confirmation with action type and reason is required",
-  path: ["renewalReason"]
 }).refine(data => {
   // When meterReplaced is true, oldMeterFinal is mandatory
   if (data.meterReplaced === true) {
@@ -2374,6 +2367,14 @@ export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   // office-side running-hours entry via WO completion. Default OFF (fail closed).
   officeRhEntryEnabled: boolean("office_rh_entry_enabled").notNull().default(false),
 
+  // Running Hours validation policy (migration 163): per-vessel opt-out for
+  // normal RH correction validation. Default ON (fail closed).
+  rhValidationEnabled: boolean("rh_validation_enabled").notNull().default(true),
+
+  // Superintendent approval lock (migration 168): per-vessel control of
+  // high-severity work-order approval. Default OFF = notify-only path.
+  superintendentLockEnabled: boolean("superintendent_lock_enabled").notNull().default(false),
+
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
@@ -2445,11 +2446,9 @@ export type CompanyStandardGraceSettings = typeof companyStandardGraceSettings.$
 export type CompanyGraceMethod = 'FIXED_DAYS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH';
 export type CompanyGraceScope = 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH';
 
-// Company approval-policy settings (migration 137) — singleton, shore-configured,
-// synced ONE_WAY_SHORE_TO_SHIP (same pattern as companyStandardGraceSettings).
-// superintendent_lock_enabled toggles the Layer-5 'superintendent_locked' tier:
-// TRUE (default) = today's behaviour; FALSE = downgrade to notify-only (approval
-// allowed, Superintendent notification + mandatory HOD remarks unchanged).
+// Legacy company approval-policy settings (migration 137). Kept for historical
+// compatibility only; active Superintendent lock enforcement is vessel-specific
+// in pms_vessel_settings as of migration 168.
 export const companyApprovalSettings = pgTable("company_approval_settings", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   singletonKey: text("singleton_key").notNull().unique().default("ACTIVE"),

@@ -10,13 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Clock, Settings, Ship, Save, X, Calendar, Gauge, CheckCircle2, ArrowLeft, Search, Building2, Lock, Unlock } from "lucide-react";
+import { Clock, Settings, Ship, Save, X, Calendar, Gauge, CheckCircle2, ArrowLeft, Search, Building2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { PmsVesselSettings } from "@shared/schema";
 import { Marker } from "@/components/Marker";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
-import { useApprovalPolicy } from "@/hooks/useApprovalPolicy";
 
 interface Vessel {
   id: string;
@@ -194,6 +193,46 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
     },
     onError: (error: any) => {
       toast({ title: "Could not change office RH entry", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  // Vessel-specific RH validation policy (migration 163): shore Sail Admin /
+  // Super Admin only. The setting syncs with the existing PMS settings row.
+  const rhValidationSwitchMutation = useMutation({
+    mutationFn: async (data: { vesselId: string; enabled: boolean }) => {
+      const res = await apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}/rh-validation`, { enabled: data.enabled });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
+      toast({
+        title: data.rhValidationEnabled ? "RH validation ENABLED" : "RH validation DISABLED",
+        description: data.rhValidationEnabled
+          ? "Normal Running Hours validation is enforced for this vessel."
+          : "Authorized Running Hours corrections for this vessel may bypass normal validation after sync.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not change RH validation", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  const superintendentLockSwitchMutation = useMutation({
+    mutationFn: async (data: { vesselId: string; enabled: boolean }) => {
+      const res = await apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}/superintendent-lock`, { enabled: data.enabled });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
+      toast({
+        title: data.superintendentLockEnabled ? "Superintendent lock ENABLED" : "Superintendent lock DISABLED",
+        description: data.superintendentLockEnabled
+          ? "High-severity work orders for this vessel require Superintendent acknowledgment."
+          : "High-severity work orders for this vessel are notify-only; detailed remarks remain mandatory.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not change Superintendent lock", description: error?.message, variant: "destructive" });
     },
   });
 
@@ -415,8 +454,6 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
             )}
           </div>
 
-          <ApprovalPolicyCard />
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredVessels.map((vessel) => {
           const configured = isConfigured(vessel.id);
@@ -482,6 +519,28 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                   <div
                     className="mt-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
                     onClick={(e) => e.stopPropagation()}
+                    data-testid={`row-superintendent-lock-${vessel.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">Superintendent Approval Lock</p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {(settingsMap.get(vessel.id) as any)?.superintendentLockEnabled === true
+                            ? "Per-vessel: On — Superintendent acknowledgment required"
+                            : "Per-vessel: Off — notify-only approval path (default)"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={(settingsMap.get(vessel.id) as any)?.superintendentLockEnabled === true}
+                      disabled={superintendentLockSwitchMutation.isPending}
+                      onCheckedChange={(checked) => superintendentLockSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
+                      data-testid={`switch-superintendent-lock-${vessel.id}`}
+                    />
+                  </div>
+                )}
+                {canToggleOfficeWoGeneration && (
+                  <div
+                    className="mt-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
                     data-testid={`row-office-rh-entry-${vessel.id}`}
                   >
                     <div className="min-w-0">
@@ -497,6 +556,28 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                       disabled={officeRhSwitchMutation.isPending}
                       onCheckedChange={(checked) => officeRhSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
                       data-testid={`switch-office-rh-entry-${vessel.id}`}
+                    />
+                  </div>
+                )}
+                {canToggleOfficeWoGeneration && (
+                  <div
+                    className="mt-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`row-rh-validation-${vessel.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">RH Validation</p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {(settingsMap.get(vessel.id) as any)?.rhValidationEnabled !== false
+                          ? "On — standard Running Hours validation"
+                          : "Off — applies to this vessel after sync"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={(settingsMap.get(vessel.id) as any)?.rhValidationEnabled !== false}
+                      disabled={rhValidationSwitchMutation.isPending}
+                      onCheckedChange={(checked) => rhValidationSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
+                      data-testid={`switch-rh-validation-${vessel.id}`}
                     />
                   </div>
                 )}
@@ -1454,70 +1535,6 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-// ── Approval Policy card (superintendent lock toggle, migration 137) ──
-// Shore-only editing (same isShore gate as the Shipskart mapping card): the
-// setting syncs ONE_WAY shore→ship, so ship edits would be overwritten — the
-// server also refuses ship PUTs with 403. Editors: Sail Admin / Super Admin.
-function ApprovalPolicyCard() {
-  const { hasRole } = useAuth();
-  const { isShore } = useSyncInstanceInfo();
-  const { toast } = useToast();
-  const { superintendentLockEnabled, isLoading, policy } = useApprovalPolicy();
-
-  const canEdit = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
-
-  const saveMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const res = await apiRequest("PUT", "/technical/api/approval-policy", {
-        superintendentLockEnabled: enabled,
-      });
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/approval-policy"] });
-      toast({
-        title: data.superintendentLockEnabled ? "Superintendent lock ENABLED" : "Superintendent lock DISABLED",
-        description: data.superintendentLockEnabled
-          ? "High-severity overdue work orders are locked until the Superintendent acknowledges."
-          : "High-severity work orders are notify-only: approval allowed, Superintendent still notified, detailed remarks still mandatory.",
-      });
-    },
-    onError: (err: any) => {
-      toast({ title: "Could not save approval policy", description: err?.message, variant: "destructive" });
-    },
-  });
-
-  if (!canEdit) return null;
-
-  return (
-    <div className="flex items-center gap-4 mb-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm" data-testid="card-approval-policy">
-      {superintendentLockEnabled
-        ? <Lock className="h-5 w-5 text-red-600 shrink-0" />
-        : <Unlock className="h-5 w-5 text-amber-600 shrink-0" />}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900">Superintendent Approval Lock</p>
-        <p className="text-xs text-gray-600">
-          When ON (default), work orders with 3+ missed cycles, 21+ days late, or 7+ days backdating are LOCKED
-          until the Superintendent acknowledges. When OFF, they become notify-only: the HOD can approve, the
-          Superintendent is still notified, and detailed remarks (min 20 characters) remain mandatory.
-          Applies company-wide and syncs to all vessels.
-        </p>
-        {policy?.updatedBy && (
-          <p className="text-[11px] text-gray-400 mt-0.5" data-testid="text-approval-policy-updated-by">
-            Last changed by {policy.updatedBy}
-          </p>
-        )}
-      </div>
-      <Switch
-        checked={superintendentLockEnabled}
-        disabled={isLoading || saveMutation.isPending}
-        onCheckedChange={(checked) => saveMutation.mutate(checked)}
-        data-testid="switch-superintendent-lock"
-      />
     </div>
   );
 }
