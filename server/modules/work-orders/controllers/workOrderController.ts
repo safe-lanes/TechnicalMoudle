@@ -9,7 +9,7 @@ import * as complianceAnomalyService from '../services/complianceAnomalyService'
 import * as plannerService from '../services/workOrderPlannerService';
 import { ValidationError } from '../../shared/errors';
 import { storage } from '../../../storage';
-import type { AuthenticatedRequest } from '../../../middleware/auth';
+import { getRbacIdentity, rbacMatches, type AuthenticatedRequest } from '../../../middleware/auth';
 import type {
   WorkOrderPeriodFilter,
   WorkOrderSortField,
@@ -613,12 +613,16 @@ export async function updateExecution(req: Request, res: Response) {
 
 // ── Superintendent Endpoints (Layer 5) ──
 
-const SUPERINTENDENT_ACKNOWLEDGER_ROLES = new Set(['PMS Admin', 'Sail Admin', 'Super Admin']);
+// Aligned with the P0.4 route guard on these same endpoints (requireRole(['Office','PMS Admin',
+// 'Sail Admin'])): an authorised OFFICE user must be able to acknowledge a locked WO (product
+// owner confirmed). 'Super Admin' is kept — it is a real role (shared/schema.ts UserRole,
+// admn_role_master seed) and an Office-type admin. Both guards now evaluate the SAME source —
+// the RBAC identity (req.rbac / forwarded SAILERP role + userType) via rbacMatches — instead of
+// the legacy req.user.role mock, so they cannot diverge.
+const SUPERINTENDENT_ACKNOWLEDGER_ROLES = ['Office', 'PMS Admin', 'Sail Admin', 'Super Admin'] as const;
 
 function canAcknowledgeAsSuperintendent(req: Request): boolean {
-  // Do not consult forwardedRole: it is client-forwarded identity metadata and
-  // cannot be trusted for authorization.
-  return SUPERINTENDENT_ACKNOWLEDGER_ROLES.has(((req as AuthenticatedRequest).user?.role || '').trim());
+  return rbacMatches(getRbacIdentity(req as AuthenticatedRequest), SUPERINTENDENT_ACKNOWLEDGER_ROLES);
 }
 
 export async function bulkSuperintendentAcknowledge(req: Request, res: Response) {
