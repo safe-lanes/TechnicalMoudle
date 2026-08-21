@@ -155,6 +155,11 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
     if (item.id === "access-control") return isSailAdmin;
     if (item.id === "audit-trail") return isSailAdmin;
     if (item.id === "retention-settings") return isSailAdmin;
+    // Approval Engine builder is office-only + shore-only — already enforced at add time above
+    // (isShore && !isVessel). It has no adm_role_menu_access registry row, so the generic
+    // permission-map lookup below would resolve to no menu and hide it from EVERY configured
+    // role (incl. Sail Admin). Bypass it here; the add-condition is the gate. (E2E-1 fix)
+    if (item.id === "approval-engine") return true;
     return canViewSidebarItem(subModule, item.id);
   });
 

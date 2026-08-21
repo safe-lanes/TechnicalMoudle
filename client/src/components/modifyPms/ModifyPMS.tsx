@@ -15,9 +15,7 @@ import type { ColDef } from 'ag-grid-community';
 import WOAgGridTable from '@/components/WOAgGridTable';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
-import { useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { ChangeRequestModal } from '@/components/modify/ChangeRequestModal';
 import ApproveRejectModal from '@/pages/change-requests/ApproveRejectModal';
@@ -28,7 +26,6 @@ import { useVessels } from '@/hooks/useVessels';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalApprovers } from '@/hooks/useExternalMasterData';
 import { ApprovalChainProgress, useApprovalChain } from '@/components/approvals/ApprovalChainProgress';
-import { useResolvedUserName } from '@/hooks/useResolvedUserName';
 import {
   Select,
   SelectContent,
@@ -103,12 +100,10 @@ export function ModifyPMS() {
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
   const [viewingRequest, setViewingRequest] = useState<ChangeRequest | null>(null);
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
   const { vesselId, setVesselId, applyVesselScope, pickerVessels, myVesselsEmpty, assignedVesselIds } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
   const { currentUser } = useAuth();
-  const { resolvedUserName } = useResolvedUserName();
   const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
 
   const periodDateRange = useMemo(() => periodFilter ? periodFilterToDateRange(periodFilter) : null, [periodFilter]);
@@ -193,42 +188,9 @@ export function ModifyPMS() {
   );
   const userCanAct = engineChain.hasChain ? engineChain.canDecide : legacyUserCanAct;
 
-  const [showApproveModal, setShowApproveModal] = useState(false);
-
-  // Reject mutation
-  const rejectMutation = useMutation({
-    mutationFn: async ({ id, comment }: { id: number; comment: string }) => {
-      const response = await fetch(`/technical/api/change-requests/${id}/reject`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment, reviewerId: resolvedUserName })
-      });
-      if (!response.ok) throw new Error('Failed to reject request');
-      return response.json();
-    },
-    onMutate: async ({ id }) => {
-      // Optimistically update the UI immediately
-      if (viewingRequest) {
-        setViewingRequest({ ...viewingRequest, status: 'rejected' });
-      }
-    },
-    onSuccess: (updatedRequest) => {
-      // Invalidate both list queries and individual request query
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-      if (viewingRequest) {
-        queryClient.invalidateQueries({ queryKey: [`/technical/api/change-requests/${viewingRequest.id}`] });
-      }
-      
-      // Force refetch to ensure UI updates immediately - include vesselId for proper cache matching
-      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests'] });
-      
-      setViewingRequest(null);
-      toast({
-        title: "Request rejected",
-        description: "The change request has been rejected"
-      });
-    }
-  });
+  // Reviewer decision modal — approve OR reject. Both go through ApproveRejectModal so the
+  // reviewer enters a real comment (the reject reason is shown to the requester). (E2E-2 fix)
+  const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | null>(null);
 
   const handleRowClick = (request: ChangeRequest) => {
     setViewingRequest(request);
@@ -609,22 +571,16 @@ export function ModifyPMS() {
               <Button
                 variant="outline"
                 className="border-red-300 text-red-600 hover:bg-red-50"
-                onClick={() => {
-                  if (viewingRequest) {
-                    rejectMutation.mutate({
-                      id: viewingRequest.id,
-                      comment: 'Request rejected'
-                    });
-                  }
-                }}
-                disabled={rejectMutation.isPending}
+                onClick={() => setReviewAction('reject')}
+                data-testid="button-cr-reject"
               >
                 <X className="w-4 h-4 mr-2" />
                 Reject
               </Button>
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => setShowApproveModal(true)}
+                onClick={() => setReviewAction('approve')}
+                data-testid="button-cr-approve"
               >
                 <Check className="w-4 h-4 mr-2" />
                 Approve
@@ -638,14 +594,14 @@ export function ModifyPMS() {
       </DialogContent>
     </Dialog>
 
-    {showApproveModal && viewingRequest && (
+    {reviewAction && viewingRequest && (
       <ApproveRejectModal
-        open={showApproveModal}
-        onClose={() => setShowApproveModal(false)}
+        open={!!reviewAction}
+        onClose={() => setReviewAction(null)}
         requestId={viewingRequest.id}
-        action="approve"
+        action={reviewAction}
         onProcessed={() => {
-          setShowApproveModal(false);
+          setReviewAction(null);
           queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests'] });
           setViewingRequest(null);
         }}

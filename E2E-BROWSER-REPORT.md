@@ -11,14 +11,14 @@
 
 | # | Scenario | Screen(s) under test | Checks | Result |
 |---|----------|----------------------|:------:|:------:|
-| S1 | Admin builder (Sahil §5) | Approval-Engine admin builder, menu-visibility matrix | 17 | **16 PASS / 1 FAIL** → finding **E2E-1** |
+| S1 | Admin builder (Sahil §5) | Approval-Engine admin builder, menu-visibility matrix | 17 | **17 PASS** (E2E-1 fixed; was 16/1) |
 | S2 | CR through the chain | Modify PMS CR dialog: progress panel + approve-gate across live contexts | 14 | **14 PASS** |
 | S3 | Reject path | Modify PMS CR reject + requester-visible return | 8 | **8 PASS** → finding **E2E-2** |
 | S4 | Notification bell | Bell badge / panel / mark-read / own-rows-only | 6 | **6 PASS** |
 | S5 | Postponement via **ship** | Ship + shore Work Orders round-trip; ship engine-quiet | 16 | **16 PASS** |
 | S6 | Fallback in browser | Scope-off CR = legacy, no progress panel | 3 | **3 PASS** |
 | S7 | Legacy screens regression | Legacy Approval Workflow + Modify PMS list | 2 | **2 PASS** |
-| | **TOTAL** | | **66** | **65 PASS / 1 FAIL** |
+| | **TOTAL** | | **66** | **66 PASS** (post-fix; initial run 65/1) |
 
 **Console:** every recorded console error/warning is environmental — the AG-Grid Enterprise trial watermark (`VITE_AG_GRID_LICENSE_KEY` unset on the dev clone) and Google-Fonts (`fonts.gstatic.com`) blocked on the offline pilot. **None originate in the approval engine, notifications, or any Phase-2 code.**
 
@@ -26,10 +26,10 @@
 
 ## Verdict
 
-**Ready for the Sahil demo after one one-line fix (E2E-1); E2E-2 strongly recommended first.**
+**Ready for the Sahil demo. Both findings are now FIXED and re-verified in-browser — the full suite is 66/66 (S1 17/17, S2 14/14, S3–S7 19/19, S5 16/16); `tsc --noEmit` unchanged at the 290 baseline.**
 
-- **E2E-1 is a hard blocker for the demo path:** the "Approval Engine" admin menu item is invisible to every *configured* office role — **including Sail Admin** — so an office user cannot navigate to the builder Sahil is being shown. The builder itself works perfectly (proven in S1 via a fail-open role and direct URL). Fix is a single map entry.
-- **E2E-2 is UX roughness that undercuts the demo narrative:** the reject reason a reviewer types is never captured — Reject fires a canned "Request rejected". The pitch is "a real approval chain whose decisions are visible to the requester," so a real reject reason matters. The plumbing is already correct end-to-end; only the button needs wiring to the existing modal.
+- **E2E-1 — FIXED** (`client/src/components/SideMenuBar.tsx`): the "Approval Engine" admin item now renders for the configured Sail Admin (S1 re-run 17/17); the vessel user still does not see it.
+- **E2E-2 — FIXED** (`client/src/components/modifyPms/ModifyPMS.tsx`): Reject now opens the remarks modal; the reviewer's real reason flows to the requester's "Returned" notification and the reopened-CR UI (S3 re-run: the returned remark is the typed reason, not "Request rejected").
 - Everything else — the full multi-actor CR chain, quorum gating, notifications (in-app + SES email path), fallback-to-legacy, the ship→shore→ship postponement round-trip, and legacy-screen regression — **passes cleanly through the real UIs.**
 
 ---
@@ -38,7 +38,8 @@
 
 ### (a) Real defects
 
-#### E2E-1 — "Approval Engine" admin menu item is invisible to configured roles (browser-only) — **FIX BEFORE DEMO**
+#### E2E-1 — "Approval Engine" admin menu item is invisible to configured roles (browser-only) — **RESOLVED**
+- **Resolved (21-Aug):** the engine item has no `adm_role_menu_access` registry row, and `/admin/:subpage` renders `TechnicalModule` with **no `canViewRoute` guard**, so the only real gate is the sidebar item's visibility. Fixed in `SideMenuBar.tsx` by special-casing `approval-engine` in the menu filter to bypass the permission-map lookup (the add-condition `isShore && !isVessel` is the gate) — matching the existing `access-control` / `audit-trail` / `retention-settings` pattern. Re-verified: **S1 17/17** (Sail Admin sees it; vessel user does not).
 - **What the browser reveals:** signed in as **Sail Admin** (a *configured* role), the Admin submodule does **not** render the "Approval Engine" item; the legacy "Approval Workflow" item beside it renders normally. A role with **zero** `adm_role_menu_access` rows (fail-open) *does* see it — which is the only reason S1's builder walkthrough could run in-browser at all.
 - **Root cause (READ):** `client/src/components/SideMenuBar.tsx:151` correctly adds the item for `isShore && !isVessel`, but the final filter calls `canViewSidebarItem('admin','approval-engine')` (`client/src/contexts/PermissionsContext.tsx`), and `MENU_NAME_MAP.admin` has **no `approval-engine` key** (it lists `sync-fleet`, `shipskart-catalogue`, `approval-workflow`, …). For a configured role the lookup misses → returns `false` → the item is filtered out. Fail-open roles skip the check, so they see it.
 - **Impact:** office users on real (configured) tenants cannot reach the engine builder from the menu. This is exactly the browser-only class the brief targets — the API and the page work; the sidebar gate hides the door.
@@ -47,12 +48,13 @@
 
 ### (b) UX roughness worth fixing before the Sahil demo
 
-#### E2E-2 — Reject on the Modify PMS CR dialog captures no reviewer remarks
+#### E2E-2 — Reject on the Modify PMS CR dialog captures no reviewer remarks — **RESOLVED**
+- **Resolved (21-Aug):** `modifyPms/ModifyPMS.tsx` now routes **both** Approve and Reject through `ApproveRejectModal` via a single `reviewAction: 'approve' | 'reject' | null` state; the hardcoded-comment `rejectMutation` (and its now-orphaned `useMutation` / `useToast` / `useResolvedUserName` deps) was removed. Re-verified: **S3 19/19** — the reviewer's typed reason reaches the submitter's "Returned" notification and the reopened-CR UI, and Approve is unregressed (**S2 14/14**).
 - **What the browser reveals:** on a submitted CR the **Approve** button opens `ApproveRejectModal` (a required comment field), but **Reject** (`client/src/components/modifyPms/ModifyPMS.tsx:612-618`) calls `rejectMutation.mutate({ id, comment: 'Request rejected' })` immediately — **no modal, no chance to type a reason.** No remarks dialog appears (asserted in S3).
 - **Consequence, proven end-to-end:** the reject *does* travel through the engine (engine request → `returned`, CR → `rejected`, value not applied) and the submitter *does* receive a "Returned" notification — but its remarks are always the canned **"Request rejected"**, never the reviewer's real reason. The engine + notifier propagate real remarks correctly (proven at API level: a `/reject` with `comment:"wrong part number"` yields `Remarks: wrong part number` to the submitter), so the gap is purely this one front-end button.
 - **Why it matters for the demo:** the reject reason "will be visible to the requester" is part of the value story; a hardcoded string defeats it, and it's inconsistent with Approve.
 - **Fix:** wire Reject to the existing `ApproveRejectModal` with `action="reject"` (already has `textarea-comment` + `button-reject`), symmetric with Approve.
-- **Evidence:** [s3/02-after-reject-no-modal.png](local-test-env/e2e-screens/s3/02-after-reject-no-modal.png), [s3/03-requester-sees-rejected.png](local-test-env/e2e-screens/s3/03-requester-sees-rejected.png).
+- **Evidence (post-fix):** [s3/02-reject-modal.png](local-test-env/e2e-screens/s3/02-reject-modal.png) (the remarks modal now opens), [s3/03-requester-sees-rejected.png](local-test-env/e2e-screens/s3/03-requester-sees-rejected.png) (requester sees the real reason).
 
 ### (c) Cosmetic / environment
 
