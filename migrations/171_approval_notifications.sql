@@ -1,4 +1,5 @@
--- 169: Approval notifications (Sahil, 21-Aug-2026: in-app + email, both). Per-user inbox rows
+-- 171: Approval notifications (Sahil, 21-Aug-2026: in-app + email, both). Per-user inbox rows
+-- (Renumbered from 169 → 171 on 21-Aug-2026 alongside 168→170 — see 170_approval_engine_tables.sql.)
 -- written by the approval-engine notifier on shore (engine is shore-only; ships see subject
 -- status via existing synced tables — these rows are NO_SYNC). Idempotent; no FKs/CHECKs.
 

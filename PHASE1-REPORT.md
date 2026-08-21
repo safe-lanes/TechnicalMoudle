@@ -2,7 +2,7 @@
 
 **Branch:** `feature/approval-engine-phase1` from `feature/approval-engine-phase0` HEAD (`c3ccf454c`, = current `replit_dev`). **Date:** 2026-08-20. **Commits:** `65e697352` design v3 · `73c3c3a03` engine + demo + migration (+ this report). Not merged, not pushed.
 **Baselines:** tsc **290 → 290** · vitest **144 → 176** passed (engine/demo add 32; opt-in DB suite adds 5 more under `AE_DB_TESTS=1`) · `npm run build` clean · **`dist/index.js` contains 0 references to the engine — zero runtime change to the product** (nothing imports it; the demo card is the only consumer). Golden rule intact: no Technical code, route, screen or table touched.
-**Migration numbers used:** **168** (`168_approval_engine_tables.sql`) — next-free confirmed against 167 before creating; 144 stays reserved. Nothing else.
+**Migration numbers used:** **170** (`170_approval_engine_tables.sql`) — RENUMBERED from 168 on 21-Aug-2026 (168 was claimed by `168_vessel_superintendent_lock` once Jeevan's work merged to replit_dev; renumbered so this stack merges cleanly). 144 stays reserved. Nothing else. (Phase-2 notifications later added `171_approval_notifications.sql`, renumbered from 169.)
 
 ---
 
@@ -27,7 +27,7 @@ One document, committed before any code, folding all ten §A decisions with a ta
 
 **Outside the engine folder (boundary proof):** `server/approval-demo/` — `demoCard.ts` (2 screens, 2 classifications each, 3 fake roles, in-memory `resolveApprovers`, call-recording `onDecision`/`onPending`), `standaloneDemo.ts` runner, `__tests__/` (in-memory repository test double + 3 suites).
 
-**Tables (migration 168, per tenant DB, all `apprv_`):** workflows (versioned, mode, partial unique = one active per scope+classification) · workflow_nodes (type, quorum) · node_edges (the graph) · node_slots (role_id + role_label snapshot) · requests (snapshot_json, status, subject_ref, vessel, partial unique = one pending per scope+subject) · request_slots (5 statuses, decided_by/at, remarks, resolved approver ids) · scope_settings (enable flag, default true). NO_SYNC (not in syncConfig — the sync engine only touches configured tables), no FKs/CHECKs on text columns, idempotent.
+**Tables (migration 170, per tenant DB, all `apprv_`):** workflows (versioned, mode, partial unique = one active per scope+classification) · workflow_nodes (type, quorum) · node_edges (the graph) · node_slots (role_id + role_label snapshot) · requests (snapshot_json, status, subject_ref, vessel, partial unique = one pending per scope+subject) · request_slots (5 statuses, decided_by/at, remarks, resolved approver ids) · scope_settings (enable flag, default true). NO_SYNC (not in syncConfig — the sync engine only touches configured tables), no FKs/CHECKs on text columns, idempotent.
 
 ## 3. Test matrix (all executed; commands in the file headers)
 
@@ -48,7 +48,7 @@ Full `npx vitest run`: **176 passed** (repo-wide), 0 failed. tsc 290.
 
 ## 4. Standalone-boot proof + admin-screen walkthrough (pilot, `pms_arch`)
 
-- Shore restarted from the branch tree → boot log `Applying SQL migration: 168_approval_engine_tables … applied successfully`; `schema_migrations` row present; all 7 tables created. Second boot: 0 apply lines (skipped as applied). Direct re-run of the SQL file on `pms_arch`: clean no-op, still 7 tables.
+- Shore restarted from the branch tree → boot log `Applying SQL migration: 170_approval_engine_tables … applied successfully` (the original Phase-1 run logged `168_…` before the 21-Aug renumber); `schema_migrations` row present; all 7 tables created. Second boot: 0 apply lines (skipped as applied). Direct re-run of the SQL file on `pms_arch`: clean no-op, still 7 tables.
 - `AE_DATABASE_URL=<pilot> npx tsx server/approval-demo/standaloneDemo.ts` → `GET :5055/health` = `{"status":"ok","service":"approval-engine","mode":"standalone"}`; `GET /approval-engine/registry` = the demo tree. **Standalone boots against a pilot DB — proven, not designed.**
 - Route-level walkthrough of the admin screen's exact calls (`scripts/p1-walkthrough.ts`, log `local-test-env/p1-walkthrough.log`) — **16/16**: registry tree → roles dropdown (3 demo roles) → save as vessel 403 → mode `advanced` 400 → save v1 (201 active) → save again v2 (v1 superseded) → versions list → tenant toggle off → submit `DISABLED` → toggle on → submit STARTED at step-1 → manager in `pendingForUser` → director too early 403 → manager approves (OR) → step-2 activated → director approves → **approved** → replay 409 → status shows reviewer slot `superseded` (kept). Every `apprv_*` row deleted afterwards (counts in the log).
 

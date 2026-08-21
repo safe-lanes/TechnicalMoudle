@@ -5,7 +5,7 @@ need to read the engine source; the demo card (`server/approval-demo/demoCard.ts
 complete minimal example and `server/approval-demo/__tests__/` shows every call in use.
 
 The engine is **shore-only**, **tenant-aware**, and owns only its own `apprv_*` tables
-(migration 168). Your module keeps its own tables, screens and safety rules.
+(migration 170). Your module keeps its own tables, screens and safety rules.
 
 ## The three wiring points
 

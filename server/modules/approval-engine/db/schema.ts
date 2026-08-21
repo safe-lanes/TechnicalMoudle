@@ -1,5 +1,5 @@
 /**
- * Engine-owned tables (prefix apprv_) — created by migrations/168_approval_engine_tables.sql,
+ * Engine-owned tables (prefix apprv_) — created by migrations/170_approval_engine_tables.sql,
  * NO_SYNC, one set per tenant DB. Deliberately NOT in shared/schema.ts: the engine folder is
  * self-contained (import boundary) and the engine owns only its own tables.
  */

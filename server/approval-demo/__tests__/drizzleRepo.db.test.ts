@@ -2,7 +2,7 @@
  * Phase 1 / B8 — the PRODUCTION repository (Drizzle/Postgres) + real tenant isolation on two
  * databases. Opt-in like the RH DB suite: runs only with AE_DB_TESTS=1 (needs local Postgres).
  *   AE_DB_TESTS=1 npx vitest run server/approval-demo/__tests__/drizzleRepo.db.test.ts
- * Creates scratch DBs apprv_p1_t1 / apprv_p1_t2, applies migrations/168_approval_engine_tables.sql
+ * Creates scratch DBs apprv_p1_t1 / apprv_p1_t2, applies migrations/170_approval_engine_tables.sql
  * (twice — idempotency assertion), drops them afterwards.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -37,7 +37,7 @@ d('drizzle repository on real Postgres (B8 pilot leg)', () => {
 
   beforeAll(async () => {
     const admin = new Pool({ connectionString: ADMIN_URL });
-    const ddl = fs.readFileSync(path.resolve(__dirname, '../../../migrations/168_approval_engine_tables.sql'), 'utf8');
+    const ddl = fs.readFileSync(path.resolve(__dirname, '../../../migrations/170_approval_engine_tables.sql'), 'utf8');
     for (const db of DBS) {
       await admin.query(`DROP DATABASE IF EXISTS ${db}`);
       await admin.query(`CREATE DATABASE ${db}`);

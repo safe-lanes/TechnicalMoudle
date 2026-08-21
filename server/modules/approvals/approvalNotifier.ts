@@ -2,7 +2,7 @@
  * Phase 2 follow-up (Sahil, 21-Aug-2026: notifications = BOTH in-app + email via AWS SES).
  *
  * On engine events this notifier now:
- *   1. writes per-user IN-APP rows (approval_notifications, migration 169) — approvers whose
+ *   1. writes per-user IN-APP rows (approval_notifications, migration 171) — approvers whose
  *      turn it is on step-activated; the submitter on completed/returned,
  *   2. sends EMAIL through the same SES SMTP transport pattern Technical already uses
  *      (noon-report mailer): APPROVAL_SMTP_HOST/PORT/USER/PASS/FROM, falling back to the

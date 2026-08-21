@@ -1,6 +1,6 @@
 /**
  * approval_notifications — Technical's in-app inbox rows for approval-engine events
- * (migration 169). Module-owned like the engine's own tables: defined here, NOT in
+ * (migration 171). Module-owned like the engine's own tables: defined here, NOT in
  * shared/schema.ts (frozen surface), NO_SYNC (shore-only writes; ships see subject
  * status through the existing synced tables per D-4).
  */

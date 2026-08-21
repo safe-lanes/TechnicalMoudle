@@ -1,4 +1,6 @@
--- 168: Approval Engine tables (Phase 1, design v3). Engine-owned, NO_SYNC, per tenant DB.
+-- 170: Approval Engine tables (Phase 1, design v3). Engine-owned, NO_SYNC, per tenant DB.
+-- (Renumbered from 168 → 170 on 21-Aug-2026: 168 was taken by 168_vessel_superintendent_lock
+--  once Jeevan's work merged to replit_dev; renumbered here so this stack merges cleanly.)
 -- Idempotent: second run is a clean no-op. No hardcoded ids, no FKs/CHECKs on text columns
 -- (values validated in the engine service layer). Prefix apprv_.
 

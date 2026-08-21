@@ -84,7 +84,7 @@ On a fresh chain: pool member A's bell **badge ≥ 1**, panel lists an **"Approv
 ### S5 — Postponement via the **ship** (round-trip across both instances) — 16/16
 The headline cross-instance scenario, proven through **both** UIs:
 - **Ship (`:5100`) raises** the postponement → ship Work Orders screen shows the WO as **"Awaiting Office Approval"** (Postponed tab).
-- **Ship is engine-quiet:** **no "Approval Engine" admin item** (the ship reports `isShore:false`; the item is `isShore && !isVessel`-gated), the legacy "Approval Workflow" item correctly remains (unchanged until cutover), the **`approval_notifications` table does not exist on the ship** (migration 169 is shore-only / NO_SYNC), and the bell shows no approval section — *even while a chain is live on shore*.
+- **Ship is engine-quiet:** **no "Approval Engine" admin item** (the ship reports `isShore:false`; the item is `isShore && !isVessel`-gated), the legacy "Approval Workflow" item correctly remains (unchanged until cutover), the **`approval_notifications` table does not exist on the ship** (migration 171 is shore-only / NO_SYNC), and the bell shows no approval section — *even while a chain is live on shore*.
 - **Sync ship→shore** → the shore **arrival sweep starts the engine chain** (pending @ step-1); the shore Work Orders screen shows the arrived WO as **"Awaiting Office Approval"**.
 - **Shore approves both engine steps** (pool → office) → engine request completed, WO → **"Postponement Approved"**.
 - **Sync shore→ship** → the **ship Work Orders screen now shows "Postponement Approved"** (green badge) — full round-trip visible in the ship UI. Screenshots: [s5/](local-test-env/e2e-screens/s5/) (notably [s5/05-ship-approved.png](local-test-env/e2e-screens/s5/05-ship-approved.png)).
