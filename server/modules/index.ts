@@ -26,6 +26,7 @@ import shipskartRoutes from './shipskart/routes';
 import rotationalItemRoutes from './rotational-items/routes';
 // ====== NOON REPORT MODULE — START (remove this line to disable) ======
 import noonReportRoutes from './noon-report/routes';
+import approvalNotificationRoutes from './approvals/routes';
 // ====== NOON REPORT MODULE — END ======
 
 const moduleRouter = Router();
@@ -57,7 +58,8 @@ moduleRouter.use(dashboardRoutes);
 moduleRouter.use(shipskartRoutes);
 moduleRouter.use(rotationalItemRoutes);
 // ====== NOON REPORT MODULE — START (remove this line to disable) ======
-moduleRouter.use(noonReportRoutes);
+moduleRouter.use(noonReportRoutes);
+moduleRouter.use(approvalNotificationRoutes); // approval notifications inbox (Phase 2 follow-up)
 // ====== NOON REPORT MODULE — END ======
 
 export default moduleRouter;

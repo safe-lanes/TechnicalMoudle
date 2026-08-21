@@ -78,6 +78,31 @@ export const NotificationBell: React.FC = () => {
     refetchInterval: 60000, // Poll every minute
   });
 
+  // ── Approval notifications (Phase 2 follow-up — Sahil: in-app + email) ──
+  // Per-user inbox rows written by the approval engine's notifier on shore. Fail-soft:
+  // on ships / errors these return empty and only the alerts section renders, as before.
+  interface ApprovalNotification { anuuid: string; kind: 'pending-approval' | 'approved' | 'returned'; title: string; readAt: string | null; createdAt: string; }
+  const { data: approvalRows = [] } = useQuery<ApprovalNotification[]>({
+    queryKey: ['/technical/api/approvals/notifications'],
+    queryFn: async () => {
+      const response = await fetch('/technical/api/approvals/notifications');
+      if (!response.ok) return [];
+      return response.json();
+    },
+    refetchInterval: 60000,
+    retry: false,
+  });
+  const approvalUnread = approvalRows.filter(r => !r.readAt);
+  const approvalInvalidate = () => queryClient.invalidateQueries({ queryKey: ['/technical/api/approvals/notifications'] });
+  const approvalMarkRead = useMutation({
+    mutationFn: (anuuid: string) => fetch(`/technical/api/approvals/notifications/${anuuid}/read`, { method: 'PATCH' }),
+    onSuccess: approvalInvalidate,
+  });
+  const approvalMarkAll = useMutation({
+    mutationFn: () => fetch('/technical/api/approvals/notifications/read-all', { method: 'POST' }),
+    onSuccess: approvalInvalidate,
+  });
+
   const acknowledgeMutation = useMutation({
     mutationFn: async ({ eventId, comments }: { eventId: string; comments?: string }) => {
       const response = await fetch(`/technical/api/alerts/events/${eventId}/acknowledge`, {
@@ -108,9 +133,9 @@ export const NotificationBell: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const unackCount = events.length;
-  const highestPriority = unackCount > 0 ? getHighestPriority(events) : 'low';
-  const badgeColor = highestPriority === 'high' ? 'bg-red-500' : highestPriority === 'medium' ? 'bg-orange-400' : 'bg-gray-400';
+  const unackCount = events.length + approvalUnread.length;
+  const highestPriority = events.length > 0 ? getHighestPriority(events) : 'low';
+  const badgeColor = approvalUnread.length > 0 ? 'bg-blue-500' : highestPriority === 'high' ? 'bg-red-500' : highestPriority === 'medium' ? 'bg-orange-400' : 'bg-gray-400';
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -144,7 +169,45 @@ export const NotificationBell: React.FC = () => {
 
           {/* Event List */}
           <div className="overflow-y-auto max-h-[400px]">
-            {events.length === 0 ? (
+            {/* Approvals section (per-user inbox from the approval engine) */}
+            {approvalRows.length > 0 && (
+              <div>
+                <div className="px-4 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Approvals</span>
+                  {approvalUnread.length > 0 && (
+                    <button
+                      className="text-[11px] text-blue-600 hover:underline"
+                      onClick={(e) => { e.stopPropagation(); approvalMarkAll.mutate(); }}
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {approvalRows.slice(0, 20).map(r => (
+                  <div
+                    key={r.anuuid}
+                    className={cn('px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer', !r.readAt && 'bg-blue-50/40')}
+                    style={{ opacity: r.readAt ? 0.6 : 1 }}
+                    onClick={() => { if (!r.readAt) approvalMarkRead.mutate(r.anuuid); }}
+                    data-testid={`approval-notification-${r.anuuid}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="mt-1.5 inline-block flex-shrink-0" style={{ width: 8, height: 8, borderRadius: 4, background: r.kind === 'pending-approval' ? '#2e90fa' : r.kind === 'approved' ? '#12b76a' : '#f04438' }} />
+                      <div className="min-w-0">
+                        <div className="text-sm text-gray-800 leading-snug">{r.title}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">{formatTimeAgo(r.createdAt)}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {events.length > 0 && (
+                  <div className="px-4 py-1.5 bg-gray-50 border-b border-gray-100">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Alerts</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {events.length === 0 && approvalRows.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-500">
                 No new notifications
               </div>
