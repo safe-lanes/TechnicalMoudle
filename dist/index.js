@@ -883,8 +883,9 @@ var init_schema = __esm({
     cascadeRunningHoursSchema = z.object({
       parentComponentId: z.string(),
       mode: z.enum(["setTotal", "addDelta"]),
-      value: z.number().nonnegative(),
-      // Allow zero for setTotal (meter replacement), but addDelta will be validated separately
+      // Set Total remains non-negative. Add Delta may be negative only when the
+      // Sail Admin-authorized validation bypass is requested and approved server-side.
+      value: z.number().finite(),
       dateUpdated: z.string(),
       // DD-MMM-YYYY HH:mm format
       dateUpdatedTZ: z.string().default("UTC"),
@@ -896,23 +897,18 @@ var init_schema = __esm({
       userUuid: z.string().optional(),
       userRole: z.string().optional().default("Ship"),
       adminOverride: z.boolean().optional().default(false),
+      // Request preference only. The running-hours service authorizes a false value
+      // using the authenticated server session; never trust this flag by itself.
+      rhValidationEnabled: z.boolean().optional().default(true),
       // Renewal/Replacement fields (required when value = 0)
       isRenewalReset: z.boolean().optional().default(false),
       renewalActionType: z.enum(RENEWAL_ACTION_TYPES).optional(),
       renewalReason: z.string().optional(),
       renewalReference: z.string().optional(),
       renewalEvidenceUrls: z.array(z.string()).optional()
-    }).refine((data) => data.mode === "setTotal" || data.value > 0, {
-      message: "addDelta mode requires value > 0",
+    }).refine((data) => data.mode !== "setTotal" || data.value >= 0, {
+      message: "setTotal mode requires value >= 0",
       path: ["value"]
-    }).refine((data) => {
-      if (data.mode === "setTotal" && data.value === 0) {
-        return data.isRenewalReset === true && !!data.renewalActionType && !!data.renewalReason && data.renewalReason.trim().length > 0;
-      }
-      return true;
-    }, {
-      message: "When setting RH to 0, renewal confirmation with action type and reason is required",
-      path: ["renewalReason"]
     }).refine((data) => {
       if (data.meterReplaced === true) {
         return !!data.oldMeterFinal && data.oldMeterFinal.trim().length > 0;
@@ -3073,6 +3069,12 @@ var init_schema = __esm({
       // Office RH entry kill switch (migration 162, Task #394): per-vessel opt-in for
       // office-side running-hours entry via WO completion. Default OFF (fail closed).
       officeRhEntryEnabled: boolean2("office_rh_entry_enabled").notNull().default(false),
+      // Running Hours validation policy (migration 163): per-vessel opt-out for
+      // normal RH correction validation. Default ON (fail closed).
+      rhValidationEnabled: boolean2("rh_validation_enabled").notNull().default(true),
+      // Superintendent approval lock (migration 168): per-vessel control of
+      // high-severity work-order approval. Default OFF = notify-only path.
+      superintendentLockEnabled: boolean2("superintendent_lock_enabled").notNull().default(false),
       updatedBy: text2("updated_by").notNull(),
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
@@ -5784,7 +5786,7 @@ var init_syncConfig = __esm({
         isGlobal: true,
         isConfigurable: false,
         businessRules: null,
-        notes: "Company approval policy (superintendent lock toggle, migration 137). Single-row global config, shore-configured. Integer PK, no UUID."
+        notes: "Legacy company approval policy (migration 137). Retained for history; vessel-specific PMS settings supersede it for active lock enforcement."
       },
       pms_vessel_settings: {
         tableName: "pms_vessel_settings",
@@ -5796,7 +5798,7 @@ var init_syncConfig = __esm({
         isGlobal: false,
         isConfigurable: false,
         businessRules: null,
-        notes: "Per-vessel PMS settings (lead times, grace periods). Integer PK, no UUID."
+        notes: "Per-vessel PMS settings (lead times, grace periods, office controls, RH validation, and Superintendent approval lock). Integer PK, no UUID."
       },
       // ── Certificates & Surveys (Master / Config) ──
       ship_certificates_master: {
@@ -28764,7 +28766,7 @@ var init_postgresStorage = __esm({
       }
       async cascadeRunningHoursUpdate(params) {
         const db2 = await getDb();
-        const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+        const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls, rhValidationBypassed } = params;
         const now = /* @__PURE__ */ new Date();
         const dateUpdated = requireReadingDayInput(params.dateUpdated ?? null) ?? formatReadingDay(now);
         const readingDate = parseReadingDayStrict(dateUpdated);
@@ -28788,6 +28790,9 @@ var init_postgresStorage = __esm({
             newRH = value;
           } else {
             newRH = mode === "addDelta" ? currentRH + value : value;
+          }
+          if (!Number.isFinite(newRH) || newRH < 0) {
+            throw new Error("Invalid Running Hours. Resulting reading cannot be negative.");
           }
           updateData = {
             currentCumulativeRH: newRH.toString(),
@@ -28819,7 +28824,7 @@ var init_postgresStorage = __esm({
             // Audit Phase 0: frozen human actor at write time
             updatedByUuid: userUuid || null,
             source: "cascade",
-            notes: meterReplaced ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ""}` : comments,
+            notes: meterReplaced ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ""}` : rhValidationBypassed ? `RH validation bypassed by Sail Admin. ${comments || ""}`.trim() : comments,
             meterReplaced: meterReplaced || false,
             isRenewalReset: isRenewalReset || false,
             renewalActionType: renewalActionType || null,
@@ -28835,24 +28840,25 @@ var init_postgresStorage = __esm({
         if (parentResult.length > 0) {
           const parent = parentResult[0];
           currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || "0");
-          const latestAudit = await db2.select().from(runningHoursAudit).where(or(eq7(runningHoursAudit.componentId, resolvedParentId), eq7(runningHoursAudit.componentId, parentComponentId))).orderBy(desc2(runningHoursAudit.enteredAtUTC)).limit(1);
-          {
-            const { selectWinningRhEvent: selectWinningRhEvent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-            const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-            const rhPool = await getPool2();
-            const winner = await selectWinningRhEvent2(rhPool, resolvedParentId);
-            if (winner) {
-              const newDay = parseReadingDayStrict(dateUpdated);
-              if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
-                throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
+          if (!rhValidationBypassed) {
+            {
+              const { selectWinningRhEvent: selectWinningRhEvent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+              const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+              const rhPool = await getPool2();
+              const winner = await selectWinningRhEvent2(rhPool, resolvedParentId);
+              if (winner) {
+                const newDay = parseReadingDayStrict(dateUpdated);
+                if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
+                  throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
+                }
               }
             }
-          }
-          if (mode === "setTotal" && value < currentRH && !isRenewalReset) {
-            throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
-          }
-          if (mode === "setTotal" && value === 0 && !isRenewalReset) {
-            throw new Error("Running Hours cannot be set to 0 without confirming renewal/replacement.");
+            if (mode === "setTotal" && value < currentRH && !isRenewalReset) {
+              throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
+            }
+            if (mode === "setTotal" && value === 0 && !isRenewalReset) {
+              throw new Error("Running Hours cannot be set to 0 without confirming renewal/replacement.");
+            }
           }
           computeDerived(parent);
           if (parent.rhCounterType === "MASTER") {
@@ -28943,6 +28949,15 @@ var init_postgresStorage = __esm({
           }
           const inheritedCuuidSet = new Set(inheritedComponents.map((i) => i.cuuid));
           const freshChildren = children.length > 0 ? await tx.select().from(components).where(inArray2(components.cuuid, children.map((c) => c.cuuid))) : [];
+          for (const child of freshChildren) {
+            if (inheritedCuuidSet.has(child.cuuid)) continue;
+            const childCurrentRH = parseFloat(child.currentCumulativeRH || "0");
+            if (!Number.isFinite(childCurrentRH) || childCurrentRH + structuralDelta < 0) {
+              throw new Error(
+                `Running Hours correction would make structural child "${child.componentCode || child.name || child.cuuid}" negative.`
+              );
+            }
+          }
           for (const child of freshChildren) {
             if (inheritedCuuidSet.has(child.cuuid)) continue;
             const childCurrentRH = parseFloat(child.currentCumulativeRH || "0");
@@ -31756,6 +31771,9 @@ async function getComponents(vesselId, vesselIds) {
 }
 async function getComponent(id) {
   return storage.getComponent(id);
+}
+async function getPmsVesselSettings4(vesselId) {
+  return storage.getPmsVesselSettings(vesselId);
 }
 async function updateChildRhWithStampAccrual(params) {
   return storage.updateChildRhWithStampAccrual(params);
@@ -35272,6 +35290,7 @@ __export(runningHoursService_exports, {
   getMeterReplacementHistory: () => getMeterReplacementHistory2,
   getRHConfig: () => getRHConfig,
   getRunningHoursHistory: () => getRunningHoursHistory2,
+  isRhValidationEnabledForVessel: () => isRhValidationEnabledForVessel,
   listChildren: () => listChildren,
   listInheritedComponents: () => listInheritedComponents,
   listMasterComponents: () => listMasterComponents,
@@ -35280,9 +35299,21 @@ __export(runningHoursService_exports, {
   resetChildRH: () => resetChildRH,
   updateChildRH: () => updateChildRH,
   updateMasterRH: () => updateMasterRH,
-  updateRHConfig: () => updateRHConfig2
+  updateRHConfig: () => updateRHConfig2,
+  validateCascadePolicyRules: () => validateCascadePolicyRules
 });
 import { z as z2 } from "zod";
+function isRhValidationEnabledForVessel(settings) {
+  return settings?.rhValidationEnabled !== false;
+}
+function validateCascadePolicyRules(data, vesselValidationEnabled, validationBypassAuthorized) {
+  if (data.mode === "addDelta" && data.value <= 0 && (!validationBypassAuthorized || data.meterReplaced)) {
+    throw new ValidationError("addDelta mode requires value > 0");
+  }
+  if (data.mode === "setTotal" && data.value === 0 && (vesselValidationEnabled || data.meterReplaced) && !(data.isRenewalReset === true && !!data.renewalActionType && !!data.renewalReason && data.renewalReason.trim().length > 0)) {
+    throw new ValidationError("When setting RH to 0, renewal confirmation with action type and reason is required");
+  }
+}
 function resolveLastUpdated(component) {
   const own = canonicalizeReadingDateInput(component.lastUpdated ?? null);
   if (own) return own;
@@ -35313,25 +35344,37 @@ async function createAudit(body) {
   }
   return createRunningHoursAudit(data);
 }
-async function cascadeUpdate(body) {
+async function cascadeUpdate(body, authenticatedRole) {
   const parseResult = cascadeRunningHoursSchema.safeParse(body);
   if (!parseResult.success) {
     throw new ValidationError("Invalid cascade data", { details: parseResult.error.errors });
   }
   const validatedData = parseResult.data;
+  const validationBypassRequested = validatedData.rhValidationEnabled === false;
   validatedData.dateUpdated = requireReadingDayInput(validatedData.dateUpdated ?? null) ?? todayReadingDay();
   const parentComponent = await getComponent(validatedData.parentComponentId);
   if (!parentComponent) {
     throw new NotFoundError("Parent component not found");
   }
+  const vesselSettings = parentComponent.vesselId ? await getPmsVesselSettings4(parentComponent.vesselId) : void 0;
+  const vesselValidationEnabled = isRhValidationEnabledForVessel(vesselSettings);
+  if (validationBypassRequested && vesselValidationEnabled && authenticatedRole !== "Sail Admin") {
+    throw new ForbiddenError("Running Hours validation is enabled for this vessel.");
+  }
+  const validationBypassAuthorized = !vesselValidationEnabled && !validatedData.meterReplaced;
+  validateCascadePolicyRules(validatedData, vesselValidationEnabled, validationBypassAuthorized);
   const currentRH = parseFloat(parentComponent.currentCumulativeRH || "0");
+  const effectiveUserRole = authenticatedRole || "Ship";
   let targetRH;
   if (validatedData.mode === "setTotal") {
     targetRH = validatedData.value;
   } else {
     targetRH = currentRH + validatedData.value;
   }
-  if (!validatedData.meterReplaced) {
+  if (!Number.isFinite(targetRH) || targetRH < 0) {
+    throw new ValidationError("Resulting Running Hours cannot be negative.");
+  }
+  if (!validatedData.meterReplaced && !validationBypassAuthorized) {
     const componentLastUpdated = resolveLastUpdated(parentComponent);
     console.log("[RH Validation Debug] componentLastUpdated:", componentLastUpdated);
     console.log("[RH Validation Debug] newUpdateDate:", validatedData.dateUpdated);
@@ -35341,7 +35384,7 @@ async function cascadeUpdate(body) {
       newRH: targetRH,
       componentLastUpdated,
       newUpdateDate: validatedData.dateUpdated,
-      userRole: validatedData.userRole || "Ship",
+      userRole: effectiveUserRole,
       adminOverride: validatedData.adminOverride || false
     });
     console.log("[RH Validation Debug] result:", validation);
@@ -35353,11 +35396,14 @@ async function cascadeUpdate(body) {
           daysSinceLastUpdate: validation.daysSinceLastUpdate,
           lastUpdateDate: validation.lastUpdateDate,
           requiresAdminOverride: validation.requiresAdminOverride,
-          canOverride: canAdminOverride(validatedData.userRole || "Ship")
+          canOverride: canAdminOverride(effectiveUserRole)
         }
       });
     }
-    const result2 = await cascadeRunningHoursUpdate(validatedData);
+    const result2 = await cascadeRunningHoursUpdate({
+      ...validatedData,
+      rhValidationBypassed: false
+    });
     return {
       ...result2,
       validation: {
@@ -35366,7 +35412,15 @@ async function cascadeUpdate(body) {
       }
     };
   }
-  const result = await cascadeRunningHoursUpdate(validatedData);
+  if (validationBypassAuthorized) {
+    console.warn(
+      `[RH Validation Bypass] Vessel RH policy allowed correction for component ${validatedData.parentComponentId} (mode=${validatedData.mode}, value=${validatedData.value}, date=${validatedData.dateUpdated}).`
+    );
+  }
+  const result = await cascadeRunningHoursUpdate({
+    ...validatedData,
+    rhValidationBypassed: validationBypassAuthorized
+  });
   return {
     ...result,
     validation: {
@@ -35535,8 +35589,10 @@ async function listChildren(parentCode, vesselId) {
     children: childrenWithRH
   };
 }
-async function updateChildRH(componentId, body) {
-  const { newRHValue, comments, userId, userUuid, userRole, adminOverride, dateUpdated } = body;
+async function updateChildRH(componentId, body, authenticatedRole) {
+  const { newRHValue, comments, userId, userUuid, adminOverride, dateUpdated, rhValidationEnabled = true } = body;
+  const validationBypassRequested = rhValidationEnabled === false;
+  const effectiveUserRole = authenticatedRole || "Ship";
   if (typeof newRHValue !== "number" || newRHValue < 0) {
     throw new ValidationError("newRHValue must be a non-negative number");
   }
@@ -35544,6 +35600,12 @@ async function updateChildRH(componentId, body) {
   if (!component) {
     throw new NotFoundError("Component not found");
   }
+  const vesselSettings = component.vesselId ? await getPmsVesselSettings4(component.vesselId) : void 0;
+  const vesselValidationEnabled = isRhValidationEnabledForVessel(vesselSettings);
+  if (validationBypassRequested && vesselValidationEnabled && authenticatedRole !== "Sail Admin") {
+    throw new ForbiddenError("Running Hours validation is enabled for this vessel.");
+  }
+  const validationBypassAuthorized = !vesselValidationEnabled;
   if (component.rhCounterType === "MASTER") {
     throw new ValidationError("Cannot update MASTER component via this endpoint. Use the Update RH button instead.");
   }
@@ -35551,25 +35613,32 @@ async function updateChildRH(componentId, body) {
   const currentRHValue = parseFloat(previousRH);
   const componentLastUpdated = resolveLastUpdated(component);
   const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
-  const validation = validateRunningHoursIncrease({
-    currentRH: currentRHValue,
-    newRH: newRHValue,
-    componentLastUpdated,
-    newUpdateDate: canonicalDay,
-    userRole: userRole || "Ship",
-    adminOverride: adminOverride || false
-  });
-  if (!validation.allowed) {
-    throw new ValidationError(validation.message, {
-      validation: {
-        maxAllowedIncrease: validation.maxAllowedIncrease,
-        requestedIncrease: validation.requestedIncrease,
-        daysSinceLastUpdate: validation.daysSinceLastUpdate,
-        lastUpdateDate: validation.lastUpdateDate,
-        requiresAdminOverride: validation.requiresAdminOverride,
-        canOverride: canAdminOverride(userRole || "Ship")
-      }
+  let validation = null;
+  if (!validationBypassAuthorized) {
+    validation = validateRunningHoursIncrease({
+      currentRH: currentRHValue,
+      newRH: newRHValue,
+      componentLastUpdated,
+      newUpdateDate: canonicalDay,
+      userRole: effectiveUserRole,
+      adminOverride: adminOverride || false
     });
+    if (!validation.allowed) {
+      throw new ValidationError(validation.message, {
+        validation: {
+          maxAllowedIncrease: validation.maxAllowedIncrease,
+          requestedIncrease: validation.requestedIncrease,
+          daysSinceLastUpdate: validation.daysSinceLastUpdate,
+          lastUpdateDate: validation.lastUpdateDate,
+          requiresAdminOverride: validation.requiresAdminOverride,
+          canOverride: canAdminOverride(effectiveUserRole)
+        }
+      });
+    }
+  } else {
+    console.warn(
+      `[RH Validation Bypass] Vessel RH policy allowed inherited-child RH correction for component ${componentId} (value=${newRHValue}, date=${canonicalDay}).`
+    );
   }
   const newRHFormatted = newRHValue.toFixed(2);
   const atomicResult = await updateChildRhWithStampAccrual({
@@ -35593,7 +35662,7 @@ async function updateChildRH(componentId, body) {
     userId: userId || "system",
     updatedByUuid: userUuid || null,
     source: "manual",
-    notes: comments || "Manual update of child component RH",
+    notes: validationBypassAuthorized ? `RH validation bypassed by vessel policy. ${comments || ""}`.trim() : comments || "Manual update of child component RH",
     // (previousRH above reflects the committed in-tx read)
     meterReplaced: false,
     version: 1
@@ -35604,8 +35673,8 @@ async function updateChildRH(componentId, body) {
     previousRH,
     newRH: newRHFormatted,
     validation: {
-      maxAllowedIncrease: validation.maxAllowedIncrease,
-      actualIncrease: validation.requestedIncrease
+      maxAllowedIncrease: validation?.maxAllowedIncrease ?? null,
+      actualIncrease: validation?.requestedIncrease ?? null
     }
   };
 }
@@ -36149,16 +36218,17 @@ function calculateBackdatingDaysForApproval(completionDate, submittedDate) {
   const diffMs = reference.getTime() - comp.getTime();
   return Math.max(0, Math.floor(diffMs / (1e3 * 60 * 60 * 24)));
 }
-async function isSuperintendentLockEnabled() {
+async function isSuperintendentLockEnabled(vesselId) {
+  if (!vesselId) return false;
   try {
-    const settings = await storage.getCompanyApprovalSettings();
-    return settings?.superintendentLockEnabled ?? true;
+    const settings = await storage.getPmsVesselSettings(vesselId);
+    return settings?.superintendentLockEnabled === true;
   } catch (err) {
-    console.warn(`[ApprovalPolicy] Could not read company approval settings (defaulting to lock ENABLED): ${err.message}`);
-    return true;
+    console.warn(`[ApprovalPolicy] Could not read vessel settings for ${vesselId} (defaulting to lock OFF): ${err.message}`);
+    return false;
   }
 }
-function calculateApprovalTier(dueDate, completionDate, missedCycles, backdatingDays = 0, superintendentLockEnabled = true) {
+function calculateApprovalTier(dueDate, completionDate, missedCycles, backdatingDays = 0, superintendentLockEnabled = false) {
   let daysLate = 0;
   const due = parseWorkOrderDate(dueDate);
   const comp = parseWorkOrderDate(completionDate);
@@ -36424,6 +36494,15 @@ async function getWorkOrdersWithComputedStatus(vesselId, vesselIds) {
   const enriched = await listWorkOrders(vesselId, vesselIds);
   return enriched.map((wo) => ({ ...wo, status: wo.computedStatus ?? wo.status }));
 }
+async function computeVesselAwareApprovalTierCounts(workOrders2) {
+  const vesselSettings = await findAllPmsVesselSettings();
+  const lockByVessel = new Map(
+    vesselSettings.map((settings) => [settings.vesselId, settings.superintendentLockEnabled === true])
+  );
+  return computeApprovalTierCounts(
+    workOrders2.map((workOrder) => workOrder.approvalTier === "superintendent_locked" && !lockByVessel.get(workOrder.vesselId) ? { ...workOrder, approvalTier: "superintendent_notification" } : workOrder)
+  );
+}
 async function listWorkOrdersPaged(vesselId, vesselIds, params) {
   const enriched = await listWorkOrders(vesselId, vesselIds);
   const statusCounts = computeWorkOrderTabCounts(enriched);
@@ -36433,7 +36512,7 @@ async function listWorkOrdersPaged(vesselId, vesselIds, params) {
     )
   ).sort((a, b) => a.localeCompare(b));
   const filtered = filterAndSortWorkOrders(enriched, params);
-  const approvalTierCounts = computeApprovalTierCounts(filtered);
+  const approvalTierCounts = await computeVesselAwareApprovalTierCounts(filtered);
   const total = filtered.length;
   const pageSize = params.pageSize;
   const page = params.page;
@@ -36737,6 +36816,85 @@ async function updateWorkOrder(id, body) {
   if (!existingWO2) {
     throw new NotFoundError("Work order not found");
   }
+  if (body.partBOfficeEdit === true) {
+    if (existingWO2.status !== "Pending Approval") {
+      throw new ValidationError("Part B office edit is only permitted when the work order is in Pending Approval status.");
+    }
+    const PART_B_EDIT_ALLOWED_ROLES = ["Office", "PMS Admin", "Sail Admin"];
+    if (!PART_B_EDIT_ALLOWED_ROLES.includes(body.userRole)) {
+      throw new ValidationError("Only Office, PMS Admin, or Sail Admin users can edit Part B on a Pending Approval work order.");
+    }
+    if (existingWO2.approvalTier === "superintendent_locked" && await isSuperintendentLockEnabled(existingWO2.vesselId)) {
+      throw new ValidationError("This work order is superintendent-locked. The superintendent must act on it before Part B can be edited.");
+    }
+    const B3_FIELDS = ["runningHours", "previousReading", "runningHoursDifference", "readingDate", "currentReadingDate", "currentReading"];
+    const PROTECTED_FIELDS = ["status", "approvalAction", "approvalDate", "submittedDate", "rhSyncedAt", "wasRejected", "approvalTier", "rejectionComments", "missedCycles", "dateCompleted", "isDeleted"];
+    const attempted = Object.keys(body);
+    const blockedB3 = attempted.filter((f) => B3_FIELDS.includes(f));
+    const blockedProtected = attempted.filter((f) => PROTECTED_FIELDS.includes(f));
+    if (blockedB3.length > 0 || blockedProtected.length > 0) {
+      throw new ValidationError(
+        `Part B office edit cannot modify: ${[...blockedB3, ...blockedProtected].join(", ")}. Running Hours and approval fields are protected.`
+      );
+    }
+    const ALLOWED_FIELDS = /* @__PURE__ */ new Set([
+      // B1 — Risk Assessment, Checklists & Records
+      "riskAssessmentStatus",
+      "safetyChecklistsStatus",
+      "operationalFormsStatus",
+      "uploadedDocuments",
+      // B2 — Work Execution Details
+      "startDateTime",
+      "completionDateTime",
+      "executionAssignedTo",
+      "performedBy",
+      "noOfPersons",
+      "totalTimeHours",
+      "manhours",
+      "workCarriedOut",
+      "jobExperienceNotes",
+      "remarks",
+      "completionRemarks",
+      // controller-injected fields (safe, set server-side)
+      "userId",
+      "userRole",
+      "userUuid"
+    ]);
+    const updateData2 = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (key === "partBOfficeEdit") continue;
+      if (ALLOWED_FIELDS.has(key)) updateData2[key] = value;
+    }
+    console.log(`\u{1F4DD} Part B office edit \u2014 WO ${existingWO2.workOrderNo}: updating [${Object.keys(updateData2).filter((k) => !["userId", "userRole", "userUuid"].includes(k)).join(", ")}]`);
+    const workOrder2 = await update6(id, updateData2);
+    return workOrder2;
+  }
+  if (existingWO2.status === "Pending Approval" && !body.approvalAction && !body.partBOfficeEdit && !body.superintendentAck) {
+    const PENDING_APPROVAL_BLOCKED_FIELDS = [
+      // B3 Running Hours — drive the delta cascade at approval; immutable post-submission
+      "runningHours",
+      "previousReading",
+      "runningHoursDifference",
+      "readingDate",
+      "currentReadingDate",
+      "currentReading",
+      "woCompletionRh",
+      // B4 Consumed Spare Parts — inventory already applied; reversal requires reject/resubmit
+      "consumedSpareParts",
+      // Status transitions must use explicit approval actions, not raw field writes
+      "status",
+      "approvalDate",
+      "submittedDate",
+      "approvalTier"
+    ];
+    const attempted = Object.keys(body).filter((k) => PENDING_APPROVAL_BLOCKED_FIELDS.includes(k));
+    if (attempted.length > 0) {
+      console.warn(`\u26A0\uFE0F Blocked attempt to modify protected fields on Pending Approval WO ${existingWO2.workOrderNo}: ${attempted.join(", ")}`);
+      throw new ValidationError(
+        `Cannot modify [${attempted.join(", ")}] on a Pending Approval work order. Running Hours and consumed spare parts are locked until the work order is approved or rejected.`
+      );
+    }
+  }
   const { isCompletedStatus: isCompletedStatus3 } = await Promise.resolve().then(() => (init_workOrderStatus(), workOrderStatus_exports));
   const woIsCompleted = isCompletedStatus3(existingWO2.status);
   if (woIsCompleted) {
@@ -36766,6 +36924,7 @@ async function updateWorkOrder(id, body) {
     }
   }
   let updateData = { ...body };
+  delete updateData.superintendentAck;
   if ("assignedTo" in updateData || "assignedToRankId" in updateData) {
     await applyAssignmentSync(updateData);
   }
@@ -37007,7 +37166,7 @@ async function updateWorkOrder(id, body) {
       tierCompDate,
       updateData.submittedDate || existingWO2.submittedDate
     );
-    const lockEnabledAtSubmit = await isSuperintendentLockEnabled();
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled(existingWO2.vesselId);
     const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
@@ -37076,7 +37235,7 @@ async function updateWorkOrder(id, body) {
     const currentTier = existingWO2.approvalTier || "standard";
     const ceRemarks = (updateData.ceApprovalRemarks || "").trim();
     if (currentTier === "superintendent_locked") {
-      const lockEnabled = await isSuperintendentLockEnabled();
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO2.vesselId);
       if (lockEnabled) {
         throw new ValidationError(
           `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
@@ -37085,7 +37244,7 @@ async function updateWorkOrder(id, body) {
       }
       if (!ceRemarks || ceRemarks.length < 20) {
         throw new ValidationError(
-          `This work order has high severity issues and the Superintendent lock is disabled by company policy. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
+          `This work order has high severity issues and the Superintendent lock is disabled for this vessel. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
           { code: "CE_REMARKS_REQUIRED", minLength: 20 }
         );
       }
@@ -39047,7 +39206,7 @@ async function getStoresItem2(storesItemId) {
 async function getWorkOrderPostponements(vesselId, filters, vesselIds) {
   return storage.getWorkOrderPostponements(vesselId, filters, vesselIds);
 }
-async function getPmsVesselSettings4(vesselId) {
+async function getPmsVesselSettings5(vesselId) {
   return storage.getPmsVesselSettings(vesselId);
 }
 var init_reportRepository = __esm({
@@ -39160,7 +39319,7 @@ async function computeSnapshotAtTimestamp(vesselId, snapshotDate) {
   const componentsMap = new Map(components2.map((c) => [c.cuuid, c]));
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
-  const vesselSettings = await getPmsVesselSettings4(vesselId);
+  const vesselSettings = await getPmsVesselSettings5(vesselId);
   const vesselGraceSettings = buildVesselGraceSettings2(vesselSettings);
   const categoryCounts = {
     "Planned": { count: 0, woIds: [] },
@@ -39277,7 +39436,7 @@ async function computeMonthlyMovement(vesselId, year, month) {
   const vesselWOs = allWorkOrders.filter((wo) => wo.dataScope === "vessel");
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
-  const vesselSettings = await getPmsVesselSettings4(vesselId);
+  const vesselSettings = await getPmsVesselSettings5(vesselId);
   const vesselGraceSettings = buildVesselGraceSettings2(vesselSettings);
   const isInMonth = (d) => {
     if (!d) return false;
@@ -43350,13 +43509,20 @@ async function getPmsVesselSettings2(vesselId) {
   return settings;
 }
 async function createPmsVesselSettings(data, username) {
-  const existing = await getPmsVesselSettings(data.vesselId);
+  const {
+    rhValidationEnabled: _ignoredRhValidationEnabled,
+    superintendentLockEnabled: _ignoredSuperintendentLockEnabled,
+    ...safeData
+  } = data;
+  const existing = await getPmsVesselSettings(safeData.vesselId);
   if (existing) {
     throw new ConflictError("PMS vessel settings already exist for this vessel. Use PUT to update.");
   }
-  const updatedBy = data.updatedBy || username || "test";
+  const updatedBy = safeData.updatedBy || username || "test";
   return createOrUpdatePmsVesselSettings({
-    ...data,
+    ...safeData,
+    rhValidationEnabled: true,
+    superintendentLockEnabled: false,
     updatedBy
   });
 }
@@ -43378,7 +43544,31 @@ async function setOfficeRhEntryEnabled(vesselId, enabled, username) {
     updatedBy: username || "unknown"
   });
 }
+async function setRhValidationEnabled(vesselId, enabled, username) {
+  const existing = await getPmsVesselSettings(vesselId);
+  return createOrUpdatePmsVesselSettings({
+    ...existing ?? { vesselId },
+    vesselId,
+    rhValidationEnabled: enabled,
+    updatedBy: username || "unknown"
+  });
+}
+async function setSuperintendentLockEnabled(vesselId, enabled, username) {
+  const existing = await getPmsVesselSettings(vesselId);
+  return createOrUpdatePmsVesselSettings({
+    ...existing ?? { vesselId },
+    vesselId,
+    superintendentLockEnabled: enabled,
+    updatedBy: username || "unknown"
+  });
+}
 async function updatePmsVesselSettings(vesselId, data, username) {
+  const {
+    rhValidationEnabled: _ignoredRhValidationEnabled,
+    superintendentLockEnabled: _ignoredSuperintendentLockEnabled,
+    ...safeData
+  } = data;
+  data = safeData;
   const updatedBy = data.updatedBy || username || "test";
   const settingsMode = data.settingsMode || "COMPANY_STANDARD";
   if (settingsMode !== "COMPANY_STANDARD" && settingsMode !== "CUSTOM") {
@@ -43729,6 +43919,12 @@ async function getAllPmsVesselSettings3(_req, res) {
   res.json(settings);
 }
 async function createPmsVesselSettings2(req, res) {
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "rhValidationEnabled")) {
+    return res.status(400).json({ error: "Use the dedicated RH validation endpoint to change this setting." });
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "superintendentLockEnabled")) {
+    return res.status(400).json({ error: "Use the dedicated Superintendent lock endpoint to change this setting." });
+  }
   const username = req.user?.username || "test";
   const settings = await createPmsVesselSettings(req.body, username);
   res.status(201).json(settings);
@@ -43738,11 +43934,25 @@ async function getPmsVesselSettings3(req, res) {
   res.json(settings);
 }
 async function updatePmsVesselSettings2(req, res) {
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "rhValidationEnabled")) {
+    return res.status(400).json({ error: "Use the dedicated RH validation endpoint to change this setting." });
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "superintendentLockEnabled")) {
+    return res.status(400).json({ error: "Use the dedicated Superintendent lock endpoint to change this setting." });
+  }
   const username = req.user?.username || "test";
   const { settings } = await updatePmsVesselSettings(req.params.vesselId, req.body, username);
   res.json(settings);
 }
 async function deletePmsVesselSettings3(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "PMS vessel settings are configured on the shore server." });
+  }
+  const userRole = (req.user?.role || "").trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may delete PMS vessel settings." });
+  }
   await deletePmsVesselSettings2(req.params.vesselId);
   res.json({ success: true });
 }
@@ -43782,6 +43992,42 @@ async function updateOfficeRhEntrySwitch(req, res) {
   const settings = await setOfficeRhEntryEnabled(req.params.vesselId, enabled, username);
   console.log(`[OfficeRhSwitch] vessel=${req.params.vesselId} office_rh_entry_enabled=${enabled} by ${username}`);
   res.json({ vesselId: req.params.vesselId, officeRhEntryEnabled: settings.officeRhEntryEnabled, updatedBy: settings.updatedBy });
+}
+async function updateRhValidationSwitch(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "RH validation is configured on the shore server." });
+  }
+  const userRole = (req.user?.forwardedRole || req.user?.role || "").trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may change RH validation." });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled (boolean) is required" });
+  }
+  const username = req.user?.username || "unknown";
+  const settings = await setRhValidationEnabled(req.params.vesselId, enabled, username);
+  console.log(`[RhValidationSwitch] vessel=${req.params.vesselId} rh_validation_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, rhValidationEnabled: settings.rhValidationEnabled, updatedBy: settings.updatedBy });
+}
+async function updateSuperintendentLockSwitch(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "Superintendent approval lock is configured on the shore server." });
+  }
+  const userRole = (req.user?.role || "").trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may change the Superintendent approval lock." });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled (boolean) is required" });
+  }
+  const username = req.user?.username || "unknown";
+  const settings = await setSuperintendentLockEnabled(req.params.vesselId, enabled, username);
+  console.log(`[SuperintendentLock] vessel=${req.params.vesselId} superintendent_lock_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy });
 }
 async function getCompanyStandardGraceSettings3(_req, res) {
   const settings = await getCompanyStandardGraceSettings2();
@@ -43828,6 +44074,8 @@ router2.post("/pms-vessel-settings", requirePermission("pms-admin", ["create", "
 router2.get("/pms-vessel-settings/:vesselId", asyncHandler(getPmsVesselSettings3));
 router2.put("/pms-vessel-settings/:vesselId/office-wo-generation", requirePermission("pms-admin", "edit"), asyncHandler(updateOfficeWoGenerationSwitch));
 router2.put("/pms-vessel-settings/:vesselId/office-rh-entry", requirePermission("pms-admin", "edit"), asyncHandler(updateOfficeRhEntrySwitch));
+router2.put("/pms-vessel-settings/:vesselId/rh-validation", requirePermission("pms-admin", "edit"), asyncHandler(updateRhValidationSwitch));
+router2.put("/pms-vessel-settings/:vesselId/superintendent-lock", requirePermission("pms-admin", "edit"), asyncHandler(updateSuperintendentLockSwitch));
 router2.put("/pms-vessel-settings/:vesselId", requirePermission("pms-admin", "edit"), asyncHandler(updatePmsVesselSettings2));
 router2.delete("/pms-vessel-settings/:vesselId", requirePermission("pms-admin", "delete"), asyncHandler(deletePmsVesselSettings3));
 router2.get("/company-standard-grace-settings", asyncHandler(getCompanyStandardGraceSettings3));
@@ -47838,7 +48086,6 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
     success: [],
     failed: []
   };
-  const lockEnabled = await isSuperintendentLockEnabled();
   const remarks = (approverRemarks || "").trim();
   for (const workOrderId of workOrderIds) {
     try {
@@ -47904,6 +48151,7 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         console.log(`\u26A0\uFE0F Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
       }
       const currentTier = existingWO2.approvalTier || "standard";
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO2.vesselId);
       if (currentTier === "superintendent_locked" && lockEnabled) {
         results.failed.push({
           id: workOrderId,
@@ -48013,7 +48261,7 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
     throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
   }
   if (existingWO2.approvalTier === "superintendent_locked" && !existingWO2.superintendentAcknowledged) {
-    if (await isSuperintendentLockEnabled()) {
+    if (await isSuperintendentLockEnabled(existingWO2.vesselId)) {
       throw new ValidationError(
         "This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The office reviewer cannot complete it until the Superintendent has acknowledged.",
         { code: "SUPERINTENDENT_LOCKED" }
@@ -49259,6 +49507,7 @@ async function exportPlannerExcelFromItems(items) {
 // server/modules/work-orders/controllers/workOrderController.ts
 init_errors();
 init_storage();
+init_auth();
 function resolveActorIdentity(req) {
   const { user } = req;
   if (!user) return void 0;
@@ -49275,35 +49524,19 @@ function resolveActorIdentity(req) {
   }
   return void 0;
 }
-var APPROVAL_POLICY_EDITOR_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
 async function getApprovalPolicy(_req, res) {
-  const settings = await storage.getCompanyApprovalSettings();
   res.json({
-    superintendentLockEnabled: settings?.superintendentLockEnabled ?? true,
-    updatedBy: settings?.updatedBy ?? null,
-    updatedAt: settings?.updatedAt ?? null
+    superintendentLockEnabled: false,
+    deprecated: true,
+    message: "The Superintendent approval lock is now configured per vessel in PMS Vessel Settings.",
+    updatedBy: null,
+    updatedAt: null
   });
 }
 async function updateApprovalPolicy(req, res) {
-  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
-  if (await isShipInstance2()) {
-    return res.status(403).json({ error: "shore_only", message: "The approval policy is configured on the shore server and synced to ships." });
-  }
-  const userRole = req.user?.role || "";
-  if (!APPROVAL_POLICY_EDITOR_ROLES.has(userRole)) {
-    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may edit the approval policy." });
-  }
-  const { superintendentLockEnabled } = req.body ?? {};
-  if (typeof superintendentLockEnabled !== "boolean") {
-    return res.status(400).json({ error: "superintendentLockEnabled (boolean) is required" });
-  }
-  const username = req.user?.username || null;
-  const saved = await storage.upsertCompanyApprovalSettings({ superintendentLockEnabled, updatedBy: username });
-  console.log(`[ApprovalPolicy] superintendent_lock_enabled set to ${superintendentLockEnabled} by ${username || "unknown"}`);
-  res.json({
-    superintendentLockEnabled: saved.superintendentLockEnabled,
-    updatedBy: saved.updatedBy,
-    updatedAt: saved.updatedAt
+  return res.status(410).json({
+    error: "deprecated",
+    message: "The company-wide Superintendent approval lock is retired. Configure the lock for an individual vessel in PMS Vessel Settings."
   });
 }
 async function listWorkOrders2(req, res) {
@@ -49749,8 +49982,15 @@ async function updateExecution3(req, res) {
     throw error;
   }
 }
+var SUPERINTENDENT_ACKNOWLEDGER_ROLES = ["Office", "PMS Admin", "Sail Admin", "Super Admin"];
+function canAcknowledgeAsSuperintendent(req) {
+  return rbacMatches(getRbacIdentity(req), SUPERINTENDENT_ACKNOWLEDGER_ROLES);
+}
 async function bulkSuperintendentAcknowledge(req, res) {
   try {
+    if (!canAcknowledgeAsSuperintendent(req)) {
+      return res.status(403).json({ error: "forbidden", message: "Only authorized shore administrators may acknowledge Superintendent-locked work orders." });
+    }
     const { workOrderIds } = req.body;
     if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
       return res.status(400).json({ error: "workOrderIds must be a non-empty array" });
@@ -49767,7 +50007,13 @@ async function bulkSuperintendentAcknowledge(req, res) {
           results.push({ id, success: false, error: "Not locked" });
           continue;
         }
+        if (!await isSuperintendentLockEnabled(wo.vesselId)) {
+          results.push({ id, success: false, error: "Superintendent lock is disabled for this vessel" });
+          continue;
+        }
         await updateWorkOrder(id, {
+          superintendentAck: true,
+          // authorized ack — exempt from the Pending-Approval field guard
           superintendentAcknowledged: true,
           superintendentAcknowledgedAt: (/* @__PURE__ */ new Date()).toISOString(),
           approvalTier: "ce_with_justification",
@@ -49795,6 +50041,9 @@ async function bulkSuperintendentAcknowledge(req, res) {
 }
 async function superintendentAcknowledge(req, res) {
   try {
+    if (!canAcknowledgeAsSuperintendent(req)) {
+      return res.status(403).json({ error: "forbidden", message: "Only authorized shore administrators may acknowledge Superintendent-locked work orders." });
+    }
     const wo = await getWorkOrder(req.params.id);
     if (!wo) {
       return res.status(404).json({ error: "Work order not found" });
@@ -49802,7 +50051,14 @@ async function superintendentAcknowledge(req, res) {
     if (wo.approvalTier !== "superintendent_locked") {
       return res.status(400).json({ error: "This WO does not require Superintendent acknowledgment" });
     }
+    if (!await isSuperintendentLockEnabled(wo.vesselId)) {
+      return res.status(400).json({
+        error: "This vessel has the Superintendent lock disabled; this work order follows the notify-only approval path."
+      });
+    }
     await updateWorkOrder(req.params.id, {
+      superintendentAck: true,
+      // authorized ack — exempt from the Pending-Approval field guard
       superintendentAcknowledged: true,
       superintendentAcknowledgedAt: (/* @__PURE__ */ new Date()).toISOString(),
       approvalTier: "ce_with_justification",
@@ -50260,6 +50516,7 @@ import { Router as Router6 } from "express";
 init_runningHoursService();
 init_rhTimelineValidationService();
 init_errors();
+init_errors();
 var PLACEHOLDER_USER_IDS = ["admin", "system", "User", "user", ""];
 function resolveUserId(req) {
   const user = req.user;
@@ -50297,11 +50554,12 @@ async function cascadeUpdate2(req, res) {
   try {
     req.body.userId = resolveUserId(req);
     req.body.userUuid = resolveUserUuid(req);
-    const result = await cascadeUpdate(req.body);
+    const authenticatedRole = req.user?.role;
+    const result = await cascadeUpdate(req.body, authenticatedRole);
     res.json(result);
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ error: error.message, ...error.details });
+    if (error instanceof ValidationError || error instanceof ForbiddenError) {
+      return res.status(error.statusCode).json({ error: error.message, ...error.details });
     }
     console.error("Error cascading running hours update:", error);
     res.status(500).json({ error: error.message || "Failed to cascade running hours update" });
@@ -50346,11 +50604,12 @@ async function updateChildRH2(req, res) {
   try {
     req.body.userId = resolveUserId(req);
     req.body.userUuid = resolveUserUuid(req);
-    const result = await updateChildRH(req.params.componentId, req.body);
+    const authenticatedRole = req.user?.role;
+    const result = await updateChildRH(req.params.componentId, req.body, authenticatedRole);
     res.json(result);
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ error: error.message, ...error.details });
+    if (error instanceof ValidationError || error instanceof ForbiddenError) {
+      return res.status(error.statusCode).json({ error: error.message, ...error.details });
     }
     console.error("Error updating child RH:", error);
     res.status(500).json({ error: "Failed to update child running hours" });
@@ -65062,7 +65321,7 @@ async function getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesse
     workOrders2.map((wo) => wo.vesselId).filter((id) => typeof id === "string" && id.length > 0)
   ));
   for (const vid of uniqueVesselIds) {
-    const vs = await getPmsVesselSettings4(vid);
+    const vs = await getPmsVesselSettings5(vid);
     vesselGraceCache.set(vid, buildVesselGraceSettings3(vs));
   }
   const eligibleWorkOrders = workOrders2.filter((wo) => {
@@ -86511,7 +86770,12 @@ var vite_config_default = defineConfig({
     alias: {
       "@": path11.resolve(import.meta.dirname, "client", "src"),
       "@shared": path11.resolve(import.meta.dirname, "shared"),
-      "@assets": path11.resolve(import.meta.dirname, "attached_assets")
+      "@assets": path11.resolve(import.meta.dirname, "attached_assets"),
+      // jspdf is blanket-blocked by the workspace security policy (CVE).
+      // These stubs let the build resolve; PDF export shows a graceful message.
+      // Restore by removing these two lines once the block is lifted.
+      "jspdf": path11.resolve(import.meta.dirname, "client", "src", "lib", "stubs", "jspdf.ts"),
+      "jspdf-autotable": path11.resolve(import.meta.dirname, "client", "src", "lib", "stubs", "jspdf-autotable.ts")
     }
   },
   root: path11.resolve(import.meta.dirname, "client"),
