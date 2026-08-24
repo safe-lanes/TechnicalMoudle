@@ -67,6 +67,46 @@ interface ComponentNode {
   [key: string]: any; // Allow additional properties from component data
 }
 
+const COMPONENT_VIEW_STATE_VERSION = 1;
+const COMPONENT_VIEW_STATE_KEY_PREFIX = "pms-components-view-state:";
+const DEFAULT_COMPONENT_SECTIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+interface ComponentViewState {
+  version: number;
+  selectedComponentCode: string | null;
+  selectedComponentId: string | null;
+  expandedNodeIds: string[];
+  expandedSectionIds: string[];
+  searchTerm: string;
+  criticalFilter: string;
+  treeScrollTop?: number;
+}
+
+const getComponentViewStateKey = (vesselId: string) =>
+  `${COMPONENT_VIEW_STATE_KEY_PREFIX}${vesselId}`;
+
+const findComponentNode = (
+  nodes: ComponentNode[],
+  predicate: (node: ComponentNode) => boolean,
+): ComponentNode | null => {
+  for (const node of nodes) {
+    if (predicate(node)) return node;
+    if (node.children) {
+      const found = findComponentNode(node.children, predicate);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+const collectComponentNodeIds = (nodes: ComponentNode[], ids = new Set<string>()) => {
+  nodes.forEach(node => {
+    ids.add(node.id);
+    if (node.children) collectComponentNodeIds(node.children, ids);
+  });
+  return ids;
+};
+
 
 const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedComponent: ComponentNode | null; isModifyMode?: boolean; onDataChange?: (data: any) => void; previewChanges?: any[]; isPreviewMode?: boolean }> = ({ isExpanded, selectedComponent, isModifyMode = false, onDataChange, previewChanges = [], isPreviewMode = false }) => {
   const { isChangeRequestMode } = useChangeRequest();
@@ -2439,15 +2479,24 @@ const Components: React.FC = () => {
   const [validationErrorDialogOpen, setValidationErrorDialogOpen] = useState(false);
   const [validationErrorMessage, setValidationErrorMessage] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const componentTreeScrollRef = useRef<HTMLDivElement>(null);
+  const hydratedViewStateVesselRef = useRef<string | null>(null);
+  const pendingTreeScrollTopRef = useRef<number | null>(null);
   
   const prevVesselIdRef = React.useRef(vesselId);
   React.useEffect(() => {
     if (prevVesselIdRef.current !== vesselId) {
       setSelectedComponent(null);
+      setExpandedNodes(new Set());
+      setExpandedSections(new Set(DEFAULT_COMPONENT_SECTIONS));
+      setSearchTerm("");
+      setCriticalFilter("all");
       setEditingComponentId(null);
       setEditingComponentCode(null);
       setShowAddEditFullPage(false);
       setShowReviewDrawer(false);
+      hydratedViewStateVesselRef.current = null;
+      pendingTreeScrollTopRef.current = null;
       prevVesselIdRef.current = vesselId;
     }
   }, [vesselId]);
@@ -2771,6 +2820,149 @@ const Components: React.FC = () => {
     
     return filterTree(componentTreeData);
   }, [componentTreeData, searchTerm, criticalFilter, isVessel, isHeadOfDept, isExternal]);
+
+  const persistComponentViewState = useCallback(() => {
+    if (
+      !vesselId ||
+      vesselId === "all" ||
+      vesselId === "my" ||
+      hydratedViewStateVesselRef.current !== vesselId
+    ) {
+      return;
+    }
+
+    const viewState: ComponentViewState = {
+      version: COMPONENT_VIEW_STATE_VERSION,
+      selectedComponentCode: selectedComponent?.code || null,
+      selectedComponentId: selectedComponent?.actualId || selectedComponent?.id || null,
+      expandedNodeIds: Array.from(expandedNodes),
+      expandedSectionIds: Array.from(expandedSections),
+      searchTerm,
+      criticalFilter,
+      treeScrollTop: componentTreeScrollRef.current?.scrollTop || 0,
+    };
+
+    try {
+      sessionStorage.setItem(
+        getComponentViewStateKey(vesselId),
+        JSON.stringify(viewState),
+      );
+    } catch {
+      // Browser storage can be unavailable or full; the page should still work.
+    }
+  }, [
+    vesselId,
+    selectedComponent,
+    expandedNodes,
+    expandedSections,
+    searchTerm,
+    criticalFilter,
+  ]);
+
+  // Restore the last Component Register view after fresh vessel data is available.
+  // Targeted navigation (for example, from a dashboard drill-down) intentionally wins.
+  useEffect(() => {
+    if (
+      !vesselId ||
+      vesselId === "all" ||
+      vesselId === "my" ||
+      isLoadingComponents ||
+      componentTreeData.length === 0 ||
+      hydratedViewStateVesselRef.current === vesselId
+    ) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    let hasExplicitTarget = false;
+    try {
+      hasExplicitTarget =
+        !!sessionStorage.getItem("targetComponentCode") ||
+        (params.get("previewChanges") === "1" && !!params.get("targetId"));
+    } catch {
+      // Treat unavailable storage as having no target flag.
+    }
+
+    if (hasExplicitTarget) {
+      hydratedViewStateVesselRef.current = vesselId;
+      return;
+    }
+
+    let savedState: ComponentViewState | null = null;
+    try {
+      const raw = sessionStorage.getItem(getComponentViewStateKey(vesselId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          parsed.version === COMPONENT_VIEW_STATE_VERSION &&
+          Array.isArray(parsed.expandedNodeIds) &&
+          Array.isArray(parsed.expandedSectionIds) &&
+          typeof parsed.searchTerm === "string" &&
+          typeof parsed.criticalFilter === "string"
+        ) {
+          savedState = parsed as ComponentViewState;
+        }
+      }
+    } catch {
+      savedState = null;
+    }
+
+    if (!savedState) {
+      hydratedViewStateVesselRef.current = vesselId;
+      return;
+    }
+
+    const validNodeIds = collectComponentNodeIds(componentTreeData);
+    const validExpandedNodeIds = savedState.expandedNodeIds.filter(id =>
+      typeof id === "string" && validNodeIds.has(id),
+    );
+    const selectedNode = findComponentNode(componentTreeData, node =>
+      (!!savedState?.selectedComponentCode &&
+        node.code === savedState.selectedComponentCode) ||
+      (!!savedState?.selectedComponentId &&
+        (node.actualId === savedState.selectedComponentId ||
+          node.id === savedState.selectedComponentId)),
+    );
+
+    setSearchTerm(savedState.searchTerm);
+    setCriticalFilter(savedState.criticalFilter);
+    setExpandedNodes(new Set(validExpandedNodeIds));
+    setExpandedSections(new Set(savedState.expandedSectionIds.filter(section =>
+      typeof section === "string" && /^[A-H]$/.test(section),
+    )));
+    setSelectedComponent(selectedNode);
+
+    if (typeof savedState.treeScrollTop === "number" && savedState.treeScrollTop >= 0) {
+      pendingTreeScrollTopRef.current = savedState.treeScrollTop;
+    }
+    hydratedViewStateVesselRef.current = vesselId;
+  }, [vesselId, isLoadingComponents, componentTreeData]);
+
+  // Persist after each view change, once the current vessel has been hydrated.
+  useEffect(() => {
+    persistComponentViewState();
+  }, [persistComponentViewState]);
+
+  // Apply the saved tree scroll position after restored filters/expansion state render.
+  useEffect(() => {
+    if (
+      !vesselId ||
+      pendingTreeScrollTopRef.current === null ||
+      hydratedViewStateVesselRef.current !== vesselId
+    ) {
+      return;
+    }
+
+    const scrollTop = pendingTreeScrollTopRef.current;
+    pendingTreeScrollTopRef.current = null;
+    const frame = window.requestAnimationFrame(() => {
+      if (componentTreeScrollRef.current) {
+        componentTreeScrollRef.current.scrollTop = scrollTop;
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [vesselId, searchTerm, criticalFilter, expandedNodes, selectedComponent, filteredComponentTree]);
 
   // Helper function to find component by ID
   const findComponentById = (id: string): ComponentNode | null => {
@@ -3797,7 +3989,11 @@ const Components: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div
+              ref={componentTreeScrollRef}
+              className="flex-1 overflow-auto"
+              onScroll={persistComponentViewState}
+            >
               <div>
                 {renderComponentTree(isEditMode ? editTreeData : filteredComponentTree)}
               </div>
