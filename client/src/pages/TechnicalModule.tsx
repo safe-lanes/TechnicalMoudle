@@ -56,7 +56,7 @@ import FleetOverviewPlaceholder from "./noon-report/FleetOverview";
 export const TechnicalModule = () => {
   const [location, setLocation] = useLocation();
   const params = useParams();
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isVessel } = useUIRole();
   const { canViewSidebarItem, status: permissionStatus } = usePermissions();
   
   // Derive state from URL
@@ -176,7 +176,7 @@ export const TechnicalModule = () => {
         
         {/* Main Content Area */}
         <div className={`flex-1 min-h-0 overflow-auto ${selectedMenuItem === "fleet-component-editor" ? "" : "p-6"}`}>
-          {(permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem) ? (
+          {(permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && !(selectedMenuItem === "approval-engine" && !isVessel) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem) ? (
             <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
               <div className="text-center">
                 <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
