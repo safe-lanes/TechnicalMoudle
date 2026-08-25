@@ -2313,12 +2313,14 @@ export class PostgresStorage {
 
   async getJobs(vesselId?: string, componentId?: string, vesselIds?: string[]): Promise<Job[]> {
     const db = await getDb();
+    const notDeleted = or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted));
 
     if (vesselIds && vesselIds.length > 0) {
       return await db.select().from(jobs)
         .where(and(
           inArray(jobs.vesselId, vesselIds),
-          eq(jobs.dataScope, 'vessel')
+          eq(jobs.dataScope, 'vessel'),
+          notDeleted
         ))
         .orderBy(asc(jobs.jobNo));
     }
@@ -2330,7 +2332,8 @@ export class PostgresStorage {
         .where(and(
           eq(jobs.vesselId, vesselId),
           eq(jobs.componentId, componentId),
-          eq(jobs.dataScope, 'vessel')
+          eq(jobs.dataScope, 'vessel'),
+          notDeleted
         ))
         .orderBy(asc(jobs.jobNo));
       
@@ -2366,27 +2369,34 @@ export class PostgresStorage {
       return await db.select().from(jobs)
         .where(and(
           eq(jobs.vesselId, vesselId),
-          eq(jobs.dataScope, 'vessel')
+          eq(jobs.dataScope, 'vessel'),
+          notDeleted
         ))
         .orderBy(asc(jobs.jobNo));
     }
     
     return await db.select().from(jobs)
-      .where(eq(jobs.dataScope, 'vessel'))
+      .where(and(eq(jobs.dataScope, 'vessel'), notDeleted))
       .orderBy(asc(jobs.jobNo));
   }
 
   async getJob(id: string): Promise<Job | undefined> {
     const db = await getDb();
     const result = await db.select().from(jobs).where(
-      or(eq(jobs.juuid, id), eq(jobs.id, id))
+      and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+      )
     );
     return result[0];
   }
 
   async getJobByJobNo(jobNo: string): Promise<Job | undefined> {
     const db = await getDb();
-    const result = await db.select().from(jobs).where(eq(jobs.jobNo, jobNo));
+    const result = await db.select().from(jobs).where(and(
+      eq(jobs.jobNo, jobNo),
+      or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+    ));
     return result[0];
   }
 
@@ -2406,7 +2416,10 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(jobs)
       .set({ ...data, updatedAt: new Date() })
-      .where(or(eq(jobs.juuid, id), eq(jobs.id, id)))
+      .where(and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+      ))
       .returning();
     if (!result[0]) {
       throw new Error(`Job ${id} not found`);
@@ -2416,7 +2429,27 @@ export class PostgresStorage {
 
   async deleteJob(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(jobs).where(or(eq(jobs.juuid, id), eq(jobs.id, id)));
+    const existing = await db.select().from(jobs).where(
+      and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+      )
+    );
+    if (!existing[0]) {
+      throw new Error(`Job ${id} not found`);
+    }
+
+    const result = await db.update(jobs)
+      .set({ isDeleted: true, isActive: false, updatedAt: new Date() })
+      .where(eq(jobs.juuid, existing[0].juuid))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Job ${id} not found`);
+    }
+
+    // Jobs are shore-to-ship full-row synchronized records. Updating updatedAt
+    // makes this lifecycle marker eligible for the next one-way sync snapshot;
+    // field logs intentionally apply only to BOTH_EDITABLE tables.
   }
 
   async bulkCreateJobs(jobList: InsertJob[]): Promise<Job[]> {
@@ -2492,11 +2525,15 @@ export class PostgresStorage {
       result = await db.select().from(jobs)
         .where(and(
           inArray(jobs.jobNo, jobNos),
-          eq(jobs.vesselId, vesselId)
+          eq(jobs.vesselId, vesselId),
+          or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
         ));
     } else {
       result = await db.select().from(jobs)
-        .where(inArray(jobs.jobNo, jobNos));
+        .where(and(
+          inArray(jobs.jobNo, jobNos),
+          or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+        ));
     }
     
     const map = new Map<string, Job>();

@@ -306,6 +306,11 @@ export async function updateJob(id: string, body: any) {
 
   let updateData = { ...body };
 
+  if (Object.prototype.hasOwnProperty.call(updateData, 'isDeleted') ||
+      Object.prototype.hasOwnProperty.call(updateData, 'is_deleted')) {
+    throw new ValidationError('Job deletion status can only be changed through the Delete Job action');
+  }
+
   if (updateData.isActive === 'Yes') updateData.isActive = true;
   if (updateData.isActive === 'No') updateData.isActive = false;
 
@@ -459,7 +464,7 @@ export async function deleteJob(id: string) {
   await repo.remove(id);
 }
 
-// ── Job Inactivation (Soft Delete) ──
+// ── Job Inactivation ──
 
 export async function inactivateJob(id: string, vesselId: string) {
   const job = await repo.findById(id);
@@ -543,7 +548,7 @@ export async function generateWorkOrder(jobId: string, reason: string, activeCom
   if (!job) {
     throw new NotFoundError('Job not found');
   }
-  if (job.isActive === false) {
+  if (job.isDeleted === true || job.isActive === false) {
     throw new ValidationError('Cannot generate work orders for an inactive job');
   }
 
