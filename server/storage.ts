@@ -378,7 +378,7 @@ export interface IStorage {
   getSpare(id: string): Promise<Spare | undefined>;
   createSpare(spare: InsertSpare, skipSiblingSync?: boolean): Promise<Spare>;
   updateSpare(id: string, data: Partial<Spare>, skipSiblingSync?: boolean): Promise<Spare>;
-  deleteSpare(id: string): Promise<void>;
+  deleteSpare(id: string, userId?: string): Promise<void>;
   consumeSpare(id: string, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
   consumeSpareFromLocation(id: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, workOrderRef?: string, dateLocal?: string): Promise<{
     spare: Spare;

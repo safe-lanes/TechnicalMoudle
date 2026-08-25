@@ -2835,7 +2835,10 @@ export class PostgresStorage {
   async getAllSpares(): Promise<Spare[]> {
     const db = await getDb();
     return await db.select().from(spares)
-      .where(eq(spares.deleted, false));
+      .where(and(
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
+      ));
   }
 
   async getSpares(vesselId: string, vesselIds?: string[]): Promise<Spare[]> {
@@ -2845,21 +2848,24 @@ export class PostgresStorage {
         .where(and(
           inArray(spares.vesselId, vesselIds),
           eq(spares.dataScope, 'vessel'),
-          eq(spares.deleted, false)
+          eq(spares.deleted, false),
+          or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
         ));
     }
     if (!vesselId || vesselId === 'all') {
       return await db.select().from(spares)
         .where(and(
           eq(spares.dataScope, 'vessel'),
-          eq(spares.deleted, false)
+          eq(spares.deleted, false),
+          or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
         ));
     }
     return await db.select().from(spares)
       .where(and(
         eq(spares.vesselId, vesselId),
         eq(spares.dataScope, 'vessel'),
-        eq(spares.deleted, false)
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ));
   }
 
@@ -2870,6 +2876,14 @@ export class PostgresStorage {
       or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : []))
     );
     return result[0];
+  }
+
+  private async getOperationalSpare(id: string): Promise<Spare> {
+    const spare = await this.getSpare(id);
+    if (!spare || spare.deleted || spare.isDeleted) {
+      throw Object.assign(new Error(`Spare ${id} not found`), { statusCode: 404 });
+    }
+    return spare;
   }
 
   async createSpare(spare: InsertSpare, skipSiblingSync: boolean = false): Promise<Spare> {
@@ -3069,20 +3083,23 @@ export class PostgresStorage {
     return updatedSpare;
   }
 
-  async deleteSpare(id: string): Promise<void> {
+  async deleteSpare(id: string, userId = 'system'): Promise<void> {
     const db = await getDb();
     // Fetch-before-delete for sync field logging
     const existingSpare = await this.getSpare(id);
+    if (!existingSpare || existingSpare.deleted || existingSpare.isDeleted) {
+      throw new Error(`Spare ${id} not found`);
+    }
 
     const numId = Number(id);
     await db.update(spares)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ deleted: true, isDeleted: true, isActive: false, updatedAt: new Date() })
       .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])));
 
     // Sync field logging — spare soft-delete
     if (existingSpare) {
       try {
-        await logSoftDelete('spares', existingSpare.suuid, existingSpare.vesselId || null, 'system');
+        await logSoftDelete('spares', existingSpare.suuid, existingSpare.vesselId || null, userId);
       } catch (err) { console.error('[FieldLogger] Spare delete:', err); }
     }
   }
@@ -3159,11 +3176,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const newRob = (spare.rob ?? 0) - quantity;
     const newRobA = (spare.robLocationA ?? 0) - quantity;
@@ -3228,11 +3242,8 @@ export class PostgresStorage {
     workOrderRef?: string,
     dateLocal?: string
   ): Promise<{ spare: Spare; deducted: number; requested: number; shortageQty: number }> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const currentRobA = spare.robLocationA ?? 0;
     const currentRobB = spare.robLocationB ?? 0;
@@ -3316,11 +3327,8 @@ export class PostgresStorage {
     supplierPO?: string,
     dateLocal?: string
   ): Promise<{ spare: Spare; received: number }> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const currentRobA = spare.robLocationA ?? 0;
     const currentRobB = spare.robLocationB ?? 0;
@@ -3399,11 +3407,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     if (isNaN(newRob) || newRob < 0) {
       throw new Error('newRob must be a valid non-negative number');
@@ -3489,11 +3494,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<{ spare: Spare; isTransfer: boolean }> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const oldLocA = spare.robLocationA ?? 0;
     const oldLocB = spare.robLocationB ?? 0;
@@ -3625,11 +3627,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const newRob = (spare.rob ?? 0) + quantity;
     const newRobA = (spare.robLocationA ?? 0) + quantity;
@@ -3689,11 +3688,8 @@ export class PostgresStorage {
     reference?: string,
     notes?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(spareId);
     const db = await getDb();
-    const spare = await this.getSpare(spareId);
-    if (!spare) {
-      throw new Error(`Spare ${spareId} not found`);
-    }
     
     const currentRob = spare.rob ?? 0;
     const currentRobA = spare.robLocationA ?? 0;
@@ -5386,7 +5382,8 @@ export class PostgresStorage {
     return await db.select().from(spares)
       .where(and(
         eq(spares.dataScope, 'vessel'),
-        eq(spares.deleted, false)
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ));
   }
 
@@ -9445,7 +9442,11 @@ export class PostgresStorage {
     })
     .from(spareLocationStock)
     .innerJoin(spares, eq(spareLocationStock.spareUuid, spares.suuid))
-    .where(eq(spareLocationStock.locationId, locationId));
+    .where(and(
+      eq(spareLocationStock.locationId, locationId),
+      eq(spares.deleted, false),
+      or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
+    ));
     
     return result;
   }
@@ -9488,6 +9489,8 @@ export class PostgresStorage {
     .where(and(
       eq(spareLocationStock.locationId, locationId),
       eq(spares.vesselId, vesselId),
+      eq(spares.deleted, false),
+      or(eq(spares.isDeleted, false), isNull(spares.isDeleted)),
       gt(spareLocationStock.qty, 0)
     ));
     
@@ -9506,6 +9509,8 @@ export class PostgresStorage {
     .innerJoin(spares, eq(spareLocationStock.spareUuid, spares.suuid))
     .where(and(
       eq(spares.vesselId, vesselId),
+      eq(spares.deleted, false),
+      or(eq(spares.isDeleted, false), isNull(spares.isDeleted)),
       gt(spareLocationStock.qty, 0)
     ))
     .groupBy(locations.id, locations.locationName)
@@ -9587,6 +9592,7 @@ export class PostgresStorage {
     referenceNote?: string;
     userId: string;
   }): Promise<{ transaction: InventoryTransaction; newLocationQty: number; newTotalRob: number }> {
+    await this.getOperationalSpare(String(input.spareId));
     const db = await getDb();
     
     // Validate location exists
@@ -9855,7 +9861,7 @@ export class PostgresStorage {
 
   async getSpareWithInventory(spareId: string): Promise<SpareWithInventory | null> {
     const spare = await this.getSpare(spareId);
-    if (!spare) return null;
+    if (!spare || spare.deleted || spare.isDeleted) return null;
     
     // Include ALL stock rows (no name filtering) so no location stock is silently dropped
     const locationsWithQty = await this.getSpareLocationsWithQty(spare.id);
@@ -9898,6 +9904,7 @@ export class PostgresStorage {
       LEFT JOIN components c ON scl.component_id = c.cuuid
       WHERE ${vesselId === 'all' ? sql`TRUE` : sql`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
+        AND (s.is_deleted IS NULL OR s.is_deleted = false)
         AND s.data_scope = 'vessel'
       GROUP BY s.id
     `);
@@ -10016,6 +10023,7 @@ export class PostgresStorage {
     // filter and return spares across every vessel (still paginated).
     const filters: any[] = [
       sql`s.deleted = false`,
+      sql`(s.is_deleted IS NULL OR s.is_deleted = false)`,
       sql`s.data_scope = 'vessel'`,
     ];
     if (vesselId !== 'all') {
@@ -10228,7 +10236,11 @@ export class PostgresStorage {
     // MANY-TO-MANY SUPPORT: Get spares directly assigned to component
     // AND spares linked via spare_component_links table
     const directSpares = await db.select().from(spares)
-      .where(eq(spares.componentId, componentId));
+      .where(and(
+        eq(spares.componentId, componentId),
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
+      ));
     
     // Get spares linked via spare_component_links
     const links = await this.getSpareComponentLinksByComponent(componentId);

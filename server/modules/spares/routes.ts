@@ -3,6 +3,7 @@ import { asyncHandler } from '../shared/middleware';
 import * as sparesCtrl from './controllers/sparesController';
 import * as invCtrl from './controllers/inventoryController';
 import { requireAuth, requirePMSAdmin } from '../../middleware/auth';
+import { requirePermission } from '../../middleware/permissions';
 
 const router = Router();
 
@@ -53,7 +54,7 @@ router.get('/spares/:vesselId/history', requireAuth, asyncHandler(sparesCtrl.get
 // GET  /spares/:vesselId/low-stock — low stock spares
 router.get('/spares/:vesselId/low-stock', requireAuth, asyncHandler(sparesCtrl.getLowStockSpares));
 
-// POST /spares/:vesselId/:id/inactivate — soft delete (deactivate) spare
+// POST /spares/:vesselId/:id/inactivate — reversible inactivation
 router.post('/spares/:vesselId/:id/inactivate', requirePMSAdmin, asyncHandler(sparesCtrl.inactivateSpare));
 
 // POST /spares/:vesselId/:id/adjustment — adjust spare ROB at location
@@ -73,8 +74,12 @@ router.post('/spares/:vesselId', requirePMSAdmin, asyncHandler(sparesCtrl.create
 // PATCH /spares/:vesselId/:id — update spare
 router.patch('/spares/:vesselId/:id', requirePMSAdmin, asyncHandler(sparesCtrl.updateSpare));
 
-// DELETE /spares/:vesselId/:id — delete spare
-router.delete('/spares/:vesselId/:id', requirePMSAdmin, asyncHandler(sparesCtrl.deleteSpare));
+// DELETE /spares/:vesselId/:id — retained delete spare
+router.delete(
+  '/spares/:vesselId/:id',
+  requirePermission('pms-spares', 'delete', { enforce: true, unconfigured: 'deny' }),
+  asyncHandler(sparesCtrl.deleteSpare)
+);
 
 // GET  /spares/:vesselId — get spares for vessel (CATCH-ALL — must be last in /spares/:vesselId group)
 router.get('/spares/:vesselId', requireAuth, asyncHandler(sparesCtrl.getSparesByVessel));

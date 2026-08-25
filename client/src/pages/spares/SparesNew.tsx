@@ -209,9 +209,11 @@ const Spares: React.FC = () => {
   }, []); // Run only on mount
   
   // Dialog states
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
   const [selectedSpareIds, setSelectedSpareIds] = useState<Set<number>>(new Set());
+  const [spareToDelete, setSpareToDelete] = useState<Spare | null>(null);
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
   const [componentCodePopoverOpen, setComponentCodePopoverOpen] = useState(false);
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
@@ -1065,6 +1067,11 @@ const Spares: React.FC = () => {
   };
 
   const handleDeleteSpare = (spare: Spare) => {
+    setSpareToDelete(spare);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeactivateSpare = (spare: Spare) => {
     setIsBulkDeleteMode(true);
     setSelectedSpareIds(new Set([spare.id]));
   };
@@ -1827,6 +1834,33 @@ const Spares: React.FC = () => {
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to deactivate spares", variant: "destructive" });
     }
+  });
+
+  const deleteSpareMutation = useMutation({
+    mutationFn: async (spare: Spare) => {
+      return apiRequest('DELETE', `/technical/api/spares/${vesselId}/${spare.id}`);
+    },
+    onSuccess: async (_result, spare) => {
+      await invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      await invalidateByUrlPrefix('/technical/api/spares');
+      if (selectedSpare?.id === spare.id) {
+        setSelectedSpare(null);
+        setIsInfoModalOpen(false);
+      }
+      setShowDeleteDialog(false);
+      setSpareToDelete(null);
+      toast({
+        title: 'Spare deleted',
+        description: 'The Spare was removed from inventory views. Its stock and transaction history were retained.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Unable to delete Spare',
+        description: error.message || 'The Spare could not be deleted.',
+        variant: 'destructive',
+      });
+    },
   });
 
   const reactivateSpareMutation = useMutation({
@@ -3078,11 +3112,22 @@ const Spares: React.FC = () => {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => handleDeleteSpare(spare)}
-                  title="Deactivate"
+                  onClick={() => handleDeactivateSpare(spare)}
+                  title="Deactivate Spare"
                   data-testid={isFirstRow ? 'E36' : `button-delete-${spare.id}`}
                 >
                   {isFirstRow && <Marker id="E36" />}
+                  <Minus className="h-4 w-4 text-amber-600" />
+                </Button>
+              )}
+              {(isOfficeUser || isChangeMode) && canDeleteSpare && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDeleteSpare(spare)}
+                  title="Delete Spare"
+                  data-testid={`button-delete-spare-${spare.id}`}
+                >
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
               )}
@@ -3512,7 +3557,7 @@ const Spares: React.FC = () => {
                 data-testid="button-bulk-delete-confirm"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                Delete{selectedSpareIds.size > 0 ? ` (${selectedSpareIds.size})` : ''}
+                Deactivate{selectedSpareIds.size > 0 ? ` (${selectedSpareIds.size})` : ''}
               </Button>
               <Button size="sm" variant="outline" onClick={exitBulkDeleteMode} data-testid="button-bulk-delete-cancel">
                 Cancel
@@ -5926,6 +5971,43 @@ const Spares: React.FC = () => {
         </DialogContent>
       </Dialog>
       
+
+      {/* Delete Spare Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+        setShowDeleteDialog(open);
+        if (!open && !deleteSpareMutation.isPending) setSpareToDelete(null);
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Spare</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{spareToDelete?.partName || 'this Spare'}</strong>?
+              The Spare will be removed from normal inventory views and cannot be reactivated. Its stock, component links, transaction history, and audit records will be retained.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setSpareToDelete(null);
+              }}
+              disabled={deleteSpareMutation.isPending}
+              data-testid="button-cancel-delete-spare"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => spareToDelete && deleteSpareMutation.mutate(spareToDelete)}
+              disabled={!spareToDelete || deleteSpareMutation.isPending}
+              data-testid="button-confirm-delete-spare"
+            >
+              {deleteSpareMutation.isPending ? 'Deleting...' : 'Delete Spare'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Deactivate Spare Confirmation Dialog */}
       <Dialog open={showDeactivateDialog} onOpenChange={(open) => { setShowDeactivateDialog(open); }}>

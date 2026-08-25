@@ -134,6 +134,9 @@ export async function getSpareStock(req: Request, res: Response) {
     res.json({ success: true, data });
   } catch (error: any) {
     console.error("Error fetching spare stock:", error);
+    if (error.statusCode === 404 || error.message?.includes('not found')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -188,6 +191,12 @@ export async function upsertStock(req: Request, res: Response) {
   } catch (error: any) {
     if (error.statusCode === 400) {
       return res.status(400).json({ success: false, error: error.message });
+    }
+    if (error.statusCode === 404 || error.message?.includes('not found')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    if (error.statusCode === 403) {
+      return res.status(403).json({ success: false, error: error.message });
     }
     console.error("Error setting spare stock:", error);
     res.status(500).json({ success: false, error: error.message });

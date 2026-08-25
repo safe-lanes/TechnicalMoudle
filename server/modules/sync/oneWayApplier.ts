@@ -43,7 +43,7 @@ export interface ColumnMeta {
 
 /** SQL assignment for a received soft-delete marker. Lifecycle-managed records are inactive once deleted. */
 export function getSoftDeleteSetClause(tableName: string): string {
-  return tableName === 'jobs' || tableName === 'components'
+  return tableName === 'jobs' || tableName === 'components' || tableName === 'spares'
     ? 'is_deleted = true, is_active = false, updated_at = NOW()'
     : 'is_deleted = true, updated_at = NOW()';
 }
