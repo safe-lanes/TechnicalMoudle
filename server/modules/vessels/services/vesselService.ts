@@ -78,7 +78,7 @@ export async function getVesselsByFleet(fleetId: string): Promise<Vessel[]> {
 
 // ── Vessel operations ──
 
-export async function getVessels(): Promise<Array<{ id: string; vuuid: string; name: string; code: string; imoNumber: string | null; vesselType: string | null }>> {
+export async function getVessels(): Promise<Array<{ id: string; vuuid: string; name: string; code: string; vCode: string | null; imoNumber: string | null; vesselType: string | null }>> {
   return repo.getVessels();
 }
 

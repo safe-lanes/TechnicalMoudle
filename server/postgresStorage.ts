@@ -467,7 +467,7 @@ export class PostgresStorage {
 
   // ============= VESSELS (Module 1) =============
 
-  async getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string, imoNumber: string | null, vesselType: string | null}>> {
+  async getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>> {
     const db = await getDb();
     const result = await db.select().from(vessels);
     return result.map(v => ({
@@ -475,6 +475,7 @@ export class PostgresStorage {
       vuuid: v.vuuid,
       name: v.name,
       code: v.code,
+      vCode: v.vCode ?? null,
       imoNumber: v.imoNumber ?? null,
       vesselType: v.vesselType ?? null,
     }));

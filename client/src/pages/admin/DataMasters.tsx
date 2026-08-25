@@ -59,6 +59,7 @@ const masterTypes: MasterType[] = [
     idFields: ["vuid", "vuuid", "vesselId", "id"],
     columns: [
       { header: "Vessel", fields: ["vessel", "vesselName", "name"] },
+      { header: "Vessel Code", fields: ["vCode", "v_code"] },
       { header: "IMO Number", fields: ["imo_number", "imoNumber", "imo_no", "imo"] },
       { header: "Vessel Type", fields: ["vessel_type_name", "vesselTypeName", "vessel_type", "vesselType", "type"] },
     ],
@@ -402,6 +403,7 @@ export default function DataMasters() {
         (stats.approvers?.updated || 0) + (stats.approvers?.inserted || 0);
       
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/local-approvers'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/vessels'] });
       
       toast({
         title: "Master data sync completed successfully",
