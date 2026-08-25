@@ -1122,24 +1122,32 @@ export class PostgresStorage {
       return await db.select().from(components)
         .where(and(
           inArray(components.vesselId, vesselIds),
-          eq(components.dataScope, 'vessel')
+          eq(components.dataScope, 'vessel'),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
         ));
     }
     if (!vesselId || vesselId === 'all') {
       return await db.select().from(components)
-        .where(eq(components.dataScope, 'vessel'));
+        .where(and(
+          eq(components.dataScope, 'vessel'),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
+        ));
     }
     return await db.select().from(components)
       .where(and(
         eq(components.vesselId, vesselId),
-        eq(components.dataScope, 'vessel')
+        eq(components.dataScope, 'vessel'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
   }
 
   async getComponent(id: string): Promise<Component | undefined> {
     const db = await getDb();
     const result = await db.select().from(components).where(
-      or(eq(components.cuuid, id), eq(components.id, id))
+      and(
+        or(eq(components.cuuid, id), eq(components.id, id)),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
+      )
     );
     return result[0];
   }
@@ -1149,7 +1157,8 @@ export class PostgresStorage {
     const result = await db.select().from(components)
       .where(and(
         eq(components.componentCode, componentCode),
-        eq(components.vesselId, vesselId)
+        eq(components.vesselId, vesselId),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
     return result[0];
   }
@@ -1170,7 +1179,10 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(components)
       .set({ ...data, updatedAt: new Date() })
-      .where(or(eq(components.cuuid, id), eq(components.id, id)))
+      .where(and(
+        or(eq(components.cuuid, id), eq(components.id, id)),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
+      ))
       .returning();
     if (!result[0]) {
       throw new Error(`Component ${id} not found`);
@@ -1178,12 +1190,68 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async deleteComponent(id: string): Promise<void> {
+  async deleteComponent(id: string, userId?: string): Promise<void> {
     const db = await getDb();
-    await db.delete(components).where(or(eq(components.cuuid, id), eq(components.id, id)));
+    await db.transaction(async (tx) => {
+      const existing = await tx.select().from(components)
+        .where(and(
+          or(eq(components.cuuid, id), eq(components.id, id)),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
+        ))
+        .limit(1);
+      const component = existing[0];
+      if (!component) {
+        throw new Error(`Component ${id} not found`);
+      }
+
+      // The installed link is derived from the Component's current stamp. Release
+      // the matching registry row in the same transaction as the retained delete
+      // so the position cannot be deleted while its physical item stays installed.
+      const currentStamp = (component as any).currentStamp;
+      if (component.vesselId && currentStamp) {
+        const installed = await tx.select().from(rotationalItems)
+          .where(and(
+            eq(rotationalItems.vesselId, component.vesselId),
+            eq(rotationalItems.stamp, currentStamp),
+            eq(rotationalItems.status, 'Installed'),
+            eq(rotationalItems.isDeleted, false)
+          ))
+          .limit(1);
+        if (installed[0]) {
+          const released = await tx.update(rotationalItems)
+            .set({ status: 'Spare', updatedAt: new Date(), updatedByUuid: userId })
+            .where(eq(rotationalItems.riuuid, installed[0].riuuid))
+            .returning();
+          if (!released[0]) {
+            throw new Error(`Unable to release rotational item for component ${id}`);
+          }
+          await logFieldChanges(
+            'rotational_items',
+            installed[0].riuuid,
+            component.vesselId,
+            installed[0],
+            released[0],
+            userId || 'system',
+            tx
+          );
+        }
+      }
+
+      const result = await tx.update(components)
+        .set({ isDeleted: true, isActive: false, updatedAt: new Date() })
+        .where(eq(components.cuuid, component.cuuid))
+        .returning();
+      if (!result[0]) {
+        throw new Error(`Component ${id} not found`);
+      }
+    });
+
+    // Components are shore-to-ship full-row synchronized records. The updated
+    // lifecycle flags are picked up by the regular one-way snapshot; no field
+    // log is needed because components are not BOTH_EDITABLE.
   }
 
-  async inactivateComponent(id: string, vesselId: string, userId?: string): Promise<{
+  async inactivateComponent(id: string, vesselId: string, userId?: string, apply = true): Promise<{
     success: boolean;
     message: string;
     code?: string;
@@ -1198,7 +1266,8 @@ export class PostgresStorage {
     const componentResult = await db.select().from(components)
       .where(and(
         or(eq(components.cuuid, id), eq(components.id, id)),
-        eq(components.vesselId, vesselId)
+        eq(components.vesselId, vesselId),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ))
       .limit(1);
     
@@ -1216,7 +1285,8 @@ export class PostgresStorage {
       .where(and(
         or(eq(components.parentId, component.cuuid), eq(components.parentId, component.id)),
         eq(components.isActive, true),
-        eq(components.vesselId, vesselId)
+        eq(components.vesselId, vesselId),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
     
     if (activeChildren.length > 0) {
@@ -1239,7 +1309,8 @@ export class PostgresStorage {
           ...(componentCode ? [eq(jobs.componentCode, componentCode)] : [])
         ),
         eq(jobs.isActive, true),
-        eq(jobs.vesselId, vesselId)
+        eq(jobs.vesselId, vesselId),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
       ));
     for (const job of directJobs) {
       activeJobIds.add(job.juuid);
@@ -1253,7 +1324,12 @@ export class PostgresStorage {
     const linkedJobs = Array.from(linkedJobsMap.values());
     for (const link of linkedJobs) {
       const jobResult = await db.select().from(jobs)
-        .where(and(eq(jobs.juuid, link.jobId), eq(jobs.isActive, true), eq(jobs.vesselId, vesselId)))
+        .where(and(
+          eq(jobs.juuid, link.jobId),
+          eq(jobs.isActive, true),
+          eq(jobs.vesselId, vesselId),
+          or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+        ))
         .limit(1);
       if (jobResult.length > 0) {
         activeJobIds.add(link.jobId);
@@ -1279,7 +1355,8 @@ export class PostgresStorage {
           ...(componentCode ? [eq(spares.componentCode, componentCode)] : [])
         ),
         eq(spares.isActive, true),
-        eq(spares.vesselId, vesselId)
+        eq(spares.vesselId, vesselId),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ));
     for (const s of directSpares) {
       activeSpareIds.add(s.id);
@@ -1292,7 +1369,8 @@ export class PostgresStorage {
           eq(spares.id, spareComponentLinks.spareId)
         ),
         eq(spares.isActive, true),
-        eq(spares.vesselId, vesselId)
+        eq(spares.vesselId, vesselId),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ))
       .where(or(
         eq(spareComponentLinks.componentId, component.cuuid),
@@ -1322,9 +1400,20 @@ export class PostgresStorage {
       const { isBlockingStatus } = await import('./utils/workOrderStatus');
       activeWorkOrdersCount = woResults.filter(wo => isBlockingStatus(wo.status)).length;
     }
+
+    // Delete Component uses this preflight to apply the same dependency policy
+    // without changing the record before its rotational-item release succeeds.
+    if (!apply) {
+      return {
+        success: true,
+        message: 'Component passed lifecycle dependency checks.',
+        componentsInactivated: 0,
+        activeWorkOrdersCount,
+      };
+    }
     
     await db.update(components)
-      .set({ isActive: false })
+      .set({ isActive: false, updatedAt: new Date() })
       .where(and(
         eq(components.cuuid, component.cuuid),
         eq(components.vesselId, vesselId)
@@ -1344,7 +1433,10 @@ export class PostgresStorage {
   async getFleetScopedComponents(): Promise<Component[]> {
     const db = await getDb();
     return await db.select().from(components)
-      .where(eq(components.dataScope, 'fleet'));
+      .where(and(
+        eq(components.dataScope, 'fleet'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
+      ));
   }
 
   async getFleetScopedComponent(id: string): Promise<Component | undefined> {
@@ -1352,7 +1444,8 @@ export class PostgresStorage {
     const result = await db.select().from(components)
       .where(and(
         or(eq(components.cuuid, id), eq(components.id, id)),
-        eq(components.dataScope, 'fleet')
+        eq(components.dataScope, 'fleet'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
     return result[0];
   }
@@ -1385,7 +1478,8 @@ export class PostgresStorage {
       .where(and(
         eq(components.vesselId, vesselId),
         eq(components.rhCounterType, 'MASTER'),
-        eq(components.dataScope, 'vessel')
+        eq(components.dataScope, 'vessel'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
   }
 
@@ -1401,7 +1495,10 @@ export class PostgresStorage {
     // If not found by ID, try finding by component code
     if (!masterComponent) {
       const byCode = await db.select().from(components)
-        .where(eq(components.componentCode, masterComponentId))
+        .where(and(
+          eq(components.componentCode, masterComponentId),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
+        ))
         .limit(1);
       masterComponent = byCode[0] || null;
     }
@@ -1433,7 +1530,8 @@ export class PostgresStorage {
           eq(components.rhMasterComponentId, masterComponentCode),
           eq(components.rhMasterComponentId, masterComponentId),
           eq(components.rhCounterSource, masterComponentCode)
-        )
+        ),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
   }
 

@@ -2507,16 +2507,14 @@ const Components: React.FC = () => {
     enabled: !!vesselId && vesselId !== 'all' && vesselId !== 'my',
   });
   
-  const inactivateMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: async ({ componentId }: { componentId: string }) => {
-      const response = await fetch(`/technical/api/components/${componentId}/inactivate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vesselId, userId: 'User' }),
+      const response = await fetch(`/technical/api/components/${componentId}`, {
+        method: 'DELETE',
       });
       const data = await response.json();
       if (!response.ok) {
-        const error: any = new Error(data.error || 'Failed to deactivate component');
+        const error: any = new Error(data.error || 'Failed to delete component');
         error.code = data.code;
         error.activeChildrenCount = data.activeChildrenCount;
         error.activeJobsCount = data.activeJobsCount;
@@ -2531,19 +2529,19 @@ const Components: React.FC = () => {
       setPendingDeleteId(null);
       setSelectedComponent(null);
       toast({
-        title: "Component deactivated",
-        description: data.message || "The component has been successfully deactivated.",
+        title: "Component deleted",
+        description: data.message || "The component has been deleted and retained for audit history.",
       });
     },
     onError: (error: any) => {
       setDeleteDialogOpen(false);
       let message = error.message;
       if (error.code === 'ACTIVE_CHILDREN') {
-        message = `This component has ${error.activeChildrenCount || ''} active child component(s). Please deactivate the child components first before deactivating this component.`;
+        message = `This component has ${error.activeChildrenCount || ''} active child component(s). Please deactivate the child components first before deleting this component.`;
       } else if (error.code === 'ACTIVE_JOBS') {
-        message = `This component cannot be deactivated because it has ${error.activeJobsCount || ''} active Job(s) linked to it. Please deactivate or delete all linked Jobs first.`;
+        message = `This component cannot be deleted because it has ${error.activeJobsCount || ''} active Job(s) linked to it. Please deactivate or delete all linked Jobs first.`;
       } else if (error.code === 'ACTIVE_SPARES' || error.code === 'LINKED_SPARES') {
-        message = `This component cannot be deactivated because it has ${error.linkedSparesCount || ''} active Spare(s) linked to it. Please deactivate or delete all linked Spares first.`;
+        message = `This component cannot be deleted because it has ${error.linkedSparesCount || ''} active Spare(s) linked to it. Please deactivate or delete all linked Spares first.`;
       }
       setValidationErrorMessage(message);
       setValidationErrorDialogOpen(true);
@@ -2558,7 +2556,7 @@ const Components: React.FC = () => {
 
   const confirmDelete = () => {
     if (!pendingDeleteId) return;
-    inactivateMutation.mutate({ componentId: pendingDeleteId });
+    deleteMutation.mutate({ componentId: pendingDeleteId });
   };
 
   const handleExportComponents = useCallback(() => {
@@ -4029,13 +4027,13 @@ const Components: React.FC = () => {
                         Edit Component
                       </Button>
                       )}
-                      {canDeleteComponent && selectedComponent.actualId && (selectedComponent as any).isActive !== false && (
+                      {canDeleteComponent && selectedComponent.actualId && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="text-red-500 border-red-300 hover:bg-red-50 hover:text-red-700"
                           onClick={handleDeleteComponent}
-                          disabled={inactivateMutation.isPending}
+                          disabled={deleteMutation.isPending}
                           data-testid="btn-delete-component"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -4280,10 +4278,10 @@ const Components: React.FC = () => {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Deactivate Component</DialogTitle>
+            <DialogTitle>Delete Component</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600" data-testid="text-delete-confirm-message">
-            Are you sure you want to deactivate this component? It will no longer appear for vessel and department users.
+            Are you sure you want to delete this component? It will be hidden from normal Office and Vessel Component views and cannot be restored through normal editing. Existing Work Orders and maintenance history will be retained.
           </p>
           <div className="flex justify-end gap-2 mt-4">
             <Button
@@ -4296,10 +4294,10 @@ const Components: React.FC = () => {
             <Button
               variant="destructive"
               onClick={() => confirmDelete()}
-              disabled={inactivateMutation.isPending}
+              disabled={deleteMutation.isPending}
               data-testid="btn-delete-confirm"
             >
-              {inactivateMutation.isPending ? "Deactivating..." : "Deactivate"}
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </div>
         </DialogContent>
@@ -4310,7 +4308,7 @@ const Components: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertCircle className="h-5 w-5" />
-              Cannot Deactivate Component
+              Cannot Delete Component
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600" data-testid="text-validation-error-message">

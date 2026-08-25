@@ -41,9 +41,9 @@ export interface ColumnMeta {
   requiredCols: Set<string>;
 }
 
-/** SQL assignment for a received soft-delete marker. Jobs must always become inactive too. */
+/** SQL assignment for a received soft-delete marker. Lifecycle-managed records are inactive once deleted. */
 export function getSoftDeleteSetClause(tableName: string): string {
-  return tableName === 'jobs'
+  return tableName === 'jobs' || tableName === 'components'
     ? 'is_deleted = true, is_active = false, updated_at = NOW()'
     : 'is_deleted = true, updated_at = NOW()';
 }

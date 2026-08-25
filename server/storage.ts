@@ -260,8 +260,8 @@ export interface IStorage {
   getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined>;
   createComponent(component: InsertComponent): Promise<Component>;
   updateComponent(id: string, data: Partial<Component>): Promise<Component>;
-  deleteComponent(id: string): Promise<void>;
-  inactivateComponent(id: string, vesselId: string, userId?: string): Promise<{
+  deleteComponent(id: string, userId?: string): Promise<void>;
+  inactivateComponent(id: string, vesselId: string, userId?: string, apply?: boolean): Promise<{
     success: boolean;
     message: string;
     code?: string;
