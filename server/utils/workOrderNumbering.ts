@@ -1,13 +1,14 @@
 import type { IStorage } from '../storage';
+import { ValidationError } from '../modules/shared/errors';
 
 /**
  * Spec-compliant Work Order Numbering System
  * 
- * Planned WO Format: <JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
- * Example: MK-000041-711.001-2025-001
+ * Planned WO Format: <V_CODE>-<JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
+ * Example: 001-MK-000041-711.001-2025-001
  * 
- * Unplanned WO Format: UWO-<COMPONENT_CODE>-<YEAR>-<RUNNING_NUMBER>
- * Example: UWO-702.005.01-2026-001
+ * Unplanned WO Format: <V_CODE>-UWO-<COMPONENT_CODE>-<YEAR>-<RUNNING_NUMBER>
+ * Example: 001-UWO-702.005.01-2026-001
  * 
  * Running numbers are:
  * - Per vessel (for uniqueness)
@@ -20,7 +21,7 @@ import type { IStorage } from '../storage';
 
 /**
  * Generate next work order number for a planned WO
- * Format: <JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
+ * Format: <V_CODE>-<JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
  */
 export async function generatePlannedWorkOrderNumber(
   storage: IStorage,
@@ -38,38 +39,33 @@ export async function generatePlannedWorkOrderNumber(
   // Ensure job code is never empty - fallback to UNKNOWN-JOB if needed
   const safeJobCode = jobCode && jobCode.trim() ? jobCode.trim() : 'UNKNOWN-JOB';
   const safeComponentCode = componentCode.trim();
+  const vesselCode = await resolveVesselCode(storage, vesselId);
   
-  // Find all WOs for this job+component in current year with planned numbering format
+  // Do not reset a sequence when a vessel begins using the v_code-prefixed
+  // format. Existing legacy work orders remain part of the no-reuse sequence.
   const allWorkOrders = await storage.getWorkOrders(vesselId);
-  
-  const existingWOsForJobComponent = allWorkOrders.filter(wo => {
-    // Match planned WO format: <JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
-    const plannedPattern = new RegExp(`^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`);
-    return plannedPattern.test(wo.workOrderNo);
-  });
-  
-  // Extract running numbers and find max
-  let maxRunningNumber = 0;
-  existingWOsForJobComponent.forEach(wo => {
-    const match = wo.workOrderNo.match(/-(\d+)$/);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxRunningNumber) {
-        maxRunningNumber = num;
-      }
-    }
-  });
+  const legacyPattern = new RegExp(
+    `^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const vesselPrefixedPattern = new RegExp(
+    `^${escapeRegex(vesselCode)}-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+
+  const maxRunningNumber = findMaxSequence(
+    allWorkOrders.map(wo => wo.workOrderNo),
+    [legacyPattern, vesselPrefixedPattern]
+  );
   
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, '0');
   
-  return `${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${vesselCode}-${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 
 /**
  * Generate next work order number for an unplanned WO
- * Format: UWO-<COMPONENT_CODE>-<YEAR>-<RUNNING_NUMBER>
- * Example: UWO-702.005.01-2026-001
+ * Format: <V_CODE>-UWO-<COMPONENT_CODE>-<YEAR>-<RUNNING_NUMBER>
+ * Example: 001-UWO-702.005.01-2026-001
  * 
  * Numbers are unique per vessel, sequential per year
  */
@@ -86,34 +82,68 @@ export async function generateUnplannedWorkOrderNumber(
   }
   
   const safeComponentCode = componentCode.trim();
+  const vesselCode = await resolveVesselCode(storage, vesselId);
   
-  // Find all unplanned WOs for this vessel in current year
-  // We check all UWO-* patterns to ensure uniqueness across the vessel
+  // Count the legacy format as well as the vessel-prefixed format so a
+  // vessel's component/year sequence never restarts during the rollout.
   const allWorkOrders = await storage.getWorkOrders(vesselId);
-  
-  // Find existing UWOs for this specific component code in current year
-  const existingUnplannedWOs = allWorkOrders.filter(wo => {
-    // Match unplanned WO format: UWO-<COMPONENT_CODE>-<YEAR>-<RUNNING_NUMBER>
-    const unplannedPattern = new RegExp(`^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`);
-    return unplannedPattern.test(wo.workOrderNo);
-  });
-  
-  // Extract running numbers and find max
-  let maxRunningNumber = 0;
-  existingUnplannedWOs.forEach(wo => {
-    const match = wo.workOrderNo.match(/-(\d+)$/);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxRunningNumber) {
-        maxRunningNumber = num;
-      }
-    }
-  });
+  const legacyPattern = new RegExp(
+    `^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const vesselPrefixedPattern = new RegExp(
+    `^${escapeRegex(vesselCode)}-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const maxRunningNumber = findMaxSequence(
+    allWorkOrders.map(wo => wo.workOrderNo),
+    [legacyPattern, vesselPrefixedPattern]
+  );
   
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, '0');
   
-  return `UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${vesselCode}-UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+}
+
+/**
+ * Resolve the external vessel code for one exact vessel UUID. The generated
+ * number must never use a first-row, name-based, or internal-code fallback.
+ */
+export async function resolveVesselCode(storage: IStorage, vesselId?: string): Promise<string> {
+  const normalizedVesselId = vesselId?.trim();
+  if (!normalizedVesselId) {
+    throw new ValidationError(
+      'Vessel ID is required to generate a work order number.',
+      { code: 'VESSEL_ID_REQUIRED_FOR_WO_NUMBER' }
+    );
+  }
+
+  const vessel = await storage.getVessel(normalizedVesselId);
+  const vesselCode = vessel?.vCode?.trim();
+  if (!vesselCode) {
+    throw new ValidationError(
+      'Vessel external code (v_code) is required before generating a work order number.',
+      { code: 'VESSEL_CODE_REQUIRED_FOR_WO_NUMBER', vesselId: normalizedVesselId }
+    );
+  }
+
+  return vesselCode;
+}
+
+function findMaxSequence(workOrderNumbers: Array<string | null | undefined>, patterns: RegExp[]): number {
+  let maxRunningNumber = 0;
+  for (const workOrderNo of workOrderNumbers) {
+    if (!workOrderNo) continue;
+    for (const pattern of patterns) {
+      const match = workOrderNo.match(pattern);
+      if (!match) continue;
+      const sequence = parseInt(match[1], 10);
+      if (!isNaN(sequence) && sequence > maxRunningNumber) {
+        maxRunningNumber = sequence;
+      }
+      break;
+    }
+  }
+  return maxRunningNumber;
 }
 
 /**

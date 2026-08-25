@@ -7,6 +7,7 @@ import { invalidateComplianceCache } from './complianceAnomalyService';
 import { validateRHEntry } from '../../running-hours/services/rhTimelineValidationService';
 import { logFieldChanges } from '../../sync';
 import { isShipInstance } from '../../sync/syncRole';
+import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 
 // ── Complete Work Order ──
 
@@ -64,6 +65,9 @@ export async function completeWorkOrder(
   if (!workOrder) {
     throw new NotFoundError('Work order not found');
   }
+  const vesselCode = workOrder.vesselId
+    ? (await repo.getStorage().getVessel(workOrder.vesselId))?.vCode
+    : undefined;
 
   // Try multiple methods to find the component:
   // 1. By ID (workOrder.component might be an ID for some work orders)
@@ -894,6 +898,9 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
     console.error(`[Finalize] Work order ${workOrderId} not found`);
     return;
   }
+  const vesselCode = workOrder.vesselId
+    ? (await repo.getStorage().getVessel(workOrder.vesselId))?.vCode
+    : undefined;
 
   // ── 1. Resolve component ─────────────────────────────────────────────────
   let component: any = await repo.findComponent(workOrder.component);
@@ -937,7 +944,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
           componentCode: workOrder.componentCode || component.componentCode,
           vesselCode: workOrder.vesselId,
           jobId: workOrder.jobId || null,
-          jobCode: workOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+          jobCode: extractJobNoFromWorkOrderNo(workOrder.workOrderNo, vesselCode) || null,
           workOrderId: workOrder.wouuid,
           workOrderNo: workOrder.workOrderNo || `WO-${workOrder.id}`,
           jobTitle: workOrder.jobTitle,
@@ -969,9 +976,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
     let job: any = null;
     if (workOrder.jobId) job = await repo.findJob(workOrder.jobId);
     if (!job && workOrder.workOrderNo) {
-      const m1 = workOrder.workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-      const m2 = workOrder.workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-      const extractedJobNo = m1 ? m1[1] : (m2 ? m2[1] : null);
+      const extractedJobNo = extractJobNoFromWorkOrderNo(workOrder.workOrderNo, vesselCode);
       if (extractedJobNo && workOrder.vesselId) {
         const jobs = await repo.findJobs(workOrder.vesselId);
         job = jobs.find((j: any) => j.jobNo === extractedJobNo) || null;

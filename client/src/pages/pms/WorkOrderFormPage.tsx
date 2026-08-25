@@ -1219,8 +1219,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Check multiple sources: explicit workOrderType field, or infer from WO number prefix (UWO- = Unplanned)
       if (context.workOrder?.workOrderType) {
         setWorkOrderType(context.workOrder.workOrderType as 'Planned' | 'Unplanned');
-      } else if (context.workOrder?.workOrderNo?.startsWith('UWO-')) {
-        // Fallback: detect unplanned WO from number format (UWO-{component_code}-{year}-{increment})
+      } else if (/(?:^|-)UWO-[^-]+-\d{4}-\d+$/.test(context.workOrder?.workOrderNo?.trim() || '')) {
+        // Fallback: detect both legacy UWO-{component}-{year}-{increment} and
+        // vessel-prefixed V_CODE-UWO-{component}-{year}-{increment} formats.
         setWorkOrderType('Unplanned');
       }
 

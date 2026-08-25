@@ -3219,6 +3219,10 @@ export async function updateComponentFromRow(componentCode: string, row: any, ve
 
 // Helper function to create work order from Excel row
 export async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?: string) {
+  if (!vesselId?.trim()) {
+    throw new Error('Vessel ID is required for bulk-import work order generation');
+  }
+
   const componentCode = String(row['Generated_Component_Code']).trim();
   const component = await storage.getComponent(componentCode);
   
@@ -3226,7 +3230,7 @@ export async function createWorkOrderFromRow(row: any, templateCode: string, ves
   let jobId = null;
   let matchingJob = null;
   const jobTitle = row['Job_Title'] || '';
-  const effectiveVesselId = vesselId || 'V001';
+  const effectiveVesselId = vesselId;
   
   if (component && jobTitle) {
     try {
@@ -3244,7 +3248,8 @@ export async function createWorkOrderFromRow(row: any, templateCode: string, ves
     }
   }
   
-  // Generate spec-compliant work order number: <JOB_CODE>-<COMPONENT_CODE>-<YEAR>-<RUNNING NUMBER>
+  // Generate a vessel-prefixed work order number. The shared helpers require
+  // the exact target vessel UUID and never fall back to an internal vessel id.
   // Use job code from matched job, or from Excel row, or generate unplanned format
   let workOrderNo: string;
   const jobCode = matchingJob?.jobNo || row['Job_Code'];

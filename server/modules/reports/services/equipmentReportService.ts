@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import * as repo from '../repositories/reportRepository';
+import { isUnplannedWorkOrderNo } from '../../../utils/workOrderStatus';
 import {
   COLORS,
   applyStandardHeader,
@@ -368,7 +369,7 @@ export async function getUnplannedBreakdownJobs(
         wo.taskType.toLowerCase().includes('unplanned') ||
         wo.taskType.toLowerCase().includes('breakdown')
       )) ||
-      (wo.workOrderNo && wo.workOrderNo.startsWith('UWO'));
+      isUnplannedWorkOrderNo(wo.workOrderNo);
 
     if (!isUnplanned) return false;
 
@@ -504,7 +505,7 @@ export async function exportUnplannedBreakdownJobsExcel(
         wo.taskType.toLowerCase().includes('unplanned') ||
         wo.taskType.toLowerCase().includes('breakdown')
       )) ||
-      (wo.workOrderNo && wo.workOrderNo.startsWith('UWO'));
+      isUnplannedWorkOrderNo(wo.workOrderNo);
 
     if (!isUnplanned) return false;
     if (wo.status !== 'Completed') return false;

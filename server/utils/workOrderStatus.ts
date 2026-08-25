@@ -88,33 +88,64 @@ export function isCompletedStatus(status: string | null | undefined): boolean {
 /**
  * Extract jobNo from a work order number
  * Handles multiple formats:
- * - NEW format: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING> (e.g., MKR-IN-00002-403.001-2025-439)
+ * - NEW format: <V_CODE>-<JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING>
+ *   (e.g., 001-MKR-IN-00002-403.001-2025-439)
+ * - PREVIOUS format: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING>
+ *   (e.g., MKR-IN-00002-403.001-2025-439)
  * - OLD format: <JOB_NO>-<YYYY>-<RUNNING> (e.g., MKR-IN-00001-2025-001)
  * - Variant: <JOB_NO>.WO-<YYYY>-<RUNNING> (e.g., MKR-SE-00005.WO-2025-002)
  */
-export function extractJobNoFromWorkOrderNo(workOrderNo: string | undefined): string | null {
+export function extractJobNoFromWorkOrderNo(
+  workOrderNo: string | undefined,
+  vesselCode?: string | null
+): string | null {
   if (!workOrderNo) return null;
+  if (isUnplannedWorkOrderNo(workOrderNo)) return null;
+
+  const knownVesselCode = vesselCode?.trim();
+  const numberWithoutKnownVesselPrefix =
+    knownVesselCode && workOrderNo.startsWith(`${knownVesselCode}-`)
+      ? workOrderNo.slice(knownVesselCode.length + 1)
+      : workOrderNo;
+
+  // New vessel-prefixed numbers retain the standard MKR job number after the
+  // prefix. This keeps legacy fallback matching working even where only the
+  // work-order number is available.
+  const vesselPrefixedMkrMatch = numberWithoutKnownVesselPrefix.match(
+    /^(?:.+-)?(MKR-[^-]+-\d+)-\d+\.\d+.*-\d{4}-\d+$/
+  );
+  if (vesselPrefixedMkrMatch) {
+    return vesselPrefixedMkrMatch[1];
+  }
   
   // Try NEW format first: has component code with dots before the year
   // Pattern: capture everything before -<digits>.<digits> pattern
-  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+  const newFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
   if (newFormatMatch) {
     return newFormatMatch[1];
   }
   
   // Try OLD format with .WO suffix: MKR-SE-00005.WO-2025-002
-  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
+  const woSuffixMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)\.WO-\d{4}-\d+$/);
   if (woSuffixMatch) {
     return woSuffixMatch[1];
   }
   
   // Try OLD format: MKR-IN-00001-2025-001 (jobNo-year-running)
-  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
+  const oldFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+)-\d{4}-\d+$/);
   if (oldFormatMatch) {
     return oldFormatMatch[1];
   }
   
   return null;
+}
+
+/**
+ * Supports both legacy UWO numbers and the vessel-prefixed UWO format.
+ */
+export function isUnplannedWorkOrderNo(workOrderNo: string | undefined | null): boolean {
+  if (!workOrderNo) return false;
+  return /(?:^|-)UWO-[^-]+-\d{4}-\d+$/.test(workOrderNo.trim());
 }
 
 /**

@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
 import { getDb } from './db';
+import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
 import {
   users,
   fleets,
@@ -9020,19 +9021,21 @@ export class PostgresStorage {
     if (job.length === 0 || !job[0].jobNo) return [];
     
     const jobNo = job[0].jobNo;
+    const vessel = job[0].vesselId
+      ? await db.select({ vCode: vessels.vCode }).from(vessels).where(eq(vessels.vuuid, job[0].vesselId)).limit(1)
+      : [];
+    const vesselCode = vessel[0]?.vCode;
     
     // Get all maintenance history for this component, then filter by jobNo match
     const allRecords = await db.select().from(componentMaintenanceHistory)
       .where(eq(componentMaintenanceHistory.componentCode, componentCode))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     
-    // Filter records where work_order_no starts with the jobNo
+    // Legacy and vessel-prefixed work order numbers both resolve to the
+    // underlying job number before comparison.
     return allRecords.filter(record => {
       if (!record.workOrderNo) return false;
-      // Work order format: "JOBNO-COMPCODE-YEAR-SEQ" 
-      // e.g., "MKR-IN-00063-601.004.03-2026-001"
-      // JobNo is at the start, before the component code
-      return record.workOrderNo.startsWith(jobNo + '-');
+      return extractJobNoFromWorkOrderNo(record.workOrderNo, vesselCode) === jobNo;
     });
   }
 

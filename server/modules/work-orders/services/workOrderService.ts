@@ -18,6 +18,7 @@ import {
   computeApprovalTierCounts,
   type WorkOrderFilterParams,
 } from '@shared/utils/workOrderFilters';
+import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 
 async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Promise<string | null> {
   if (!assignedTo) return null;
@@ -778,6 +779,12 @@ export async function createWorkOrder(body: any) {
   const { insertWorkOrderSchema } = await import('@shared/schema');
   let workOrderData = insertWorkOrderSchema.parse(body);
 
+  if (!workOrderData.vesselId) {
+    throw new ValidationError('Vessel ID is required to generate a work order number', {
+      code: 'VESSEL_ID_REQUIRED_FOR_WO_NUMBER'
+    });
+  }
+
   // AUTO-CORRECT: Fetch correct componentCode from database
   if (workOrderData.vesselId && (workOrderData.component || workOrderData.componentCode)) {
     let resolvedComponent: any = null;
@@ -871,7 +878,7 @@ export async function createWorkOrder(body: any) {
         storage, jobCode, componentCode, workOrderData.vesselId || undefined
       );
     } else {
-      const vesselId = workOrderData.vesselId || 'V001';
+      const vesselId = workOrderData.vesselId;
       let unplannedComponentCode = workOrderData.componentCode || '';
       if (!unplannedComponentCode && workOrderData.component) {
         const components = await repo.findComponents(vesselId);
@@ -2052,6 +2059,10 @@ export async function updateWorkOrder(id: string, body: any) {
     if (!freshWorkOrder) {
       console.error('Failed to get work order for completion processing');
     } else {
+      const freshVesselCode = freshWorkOrder.vesselId
+        ? (await storage.getVessel(freshWorkOrder.vesselId))?.vCode
+        : undefined;
+
       // Find the component for maintenance history
       let component = await repo.findComponent(freshWorkOrder.component);
 
@@ -2144,7 +2155,7 @@ export async function updateWorkOrder(id: string, body: any) {
                   componentCode: freshWorkOrder.componentCode || component.componentCode,
                   vesselCode: freshWorkOrder.vesselId,
                   jobId: freshWorkOrder.jobId || null,
-                  jobCode: freshWorkOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+                  jobCode: extractJobNoFromWorkOrderNo(freshWorkOrder.workOrderNo, freshVesselCode) || null,
                   workOrderId: freshWorkOrder.wouuid,
                   workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
                   jobTitle: freshWorkOrder.jobTitle,
@@ -2184,16 +2195,7 @@ export async function updateWorkOrder(id: string, body: any) {
 
           // Fallback: Extract jobNo from work order number
           if (!job && freshWorkOrder.workOrderNo) {
-            const woNumber = freshWorkOrder.workOrderNo;
-            let extractedJobNo: string | null = null;
-
-            const newFormatMatch = woNumber.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-            if (newFormatMatch) extractedJobNo = newFormatMatch[1];
-
-            if (!extractedJobNo) {
-              const oldFormatMatch = woNumber.match(/^(.+)-\d{4}-\d+$/);
-              if (oldFormatMatch) extractedJobNo = oldFormatMatch[1];
-            }
+            const extractedJobNo = extractJobNoFromWorkOrderNo(freshWorkOrder.workOrderNo, freshVesselCode);
 
             if (extractedJobNo && freshWorkOrder.vesselId) {
               const jobs = await repo.findJobs(freshWorkOrder.vesselId);
