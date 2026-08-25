@@ -79,6 +79,7 @@ export const vessels = pgTable("vessels", {
   vuuid: text("vuuid").notNull().unique(), // Canonical UUID identity — FK target for all child tables
   name: text("name").notNull(), // Vessel display name
   code: text("code").notNull(), // Same as id for compatibility
+  vCode: text("v_code"), // External vessel code; stored as text to preserve leading zeros
   fleetId: text("fleet_id"), // Optional reference to fleet
   imoNumber: text("imo_number"), // IMO number if applicable
   vesselType: text("vessel_type"), // e.g., Tanker, Bulk Carrier, Container

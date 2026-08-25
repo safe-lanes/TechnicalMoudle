@@ -1,0 +1,2 @@
+ALTER TABLE vessels
+  ADD COLUMN IF NOT EXISTS v_code TEXT;

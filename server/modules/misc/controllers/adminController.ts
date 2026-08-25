@@ -410,6 +410,11 @@ export async function syncMasters(req: Request, res: Response) {
       const name = getFieldValue(v, ['vessel', 'vesselName', 'name']) || 'Unknown';
       const imoNumber = getFieldValue(v, ['imo_number', 'imoNumber', 'imo_no', 'imo']);
       const vesselType = getFieldValue(v, ['vessel_type_name', 'vesselTypeName', 'vessel_type', 'vesselType', 'type']);
+      const externalVCode = getFieldValue(v, ['v_code']);
+      const vCodeValue = externalVCode && externalVCode.trim().length > 0
+        ? externalVCode.trim()
+        : null;
+      const vCodeFields = vCodeValue === null ? {} : { vCode: vCodeValue };
       await db.insert(vesselsTable).values({
         id: entryId,
         vuuid: entryId,
@@ -420,6 +425,7 @@ export async function syncMasters(req: Request, res: Response) {
         isActive: true,
         createdAt: now,
         updatedAt: now,
+        ...vCodeFields,
       }).onConflictDoUpdate({
         target: vesselsTable.id,
         set: {
@@ -430,6 +436,7 @@ export async function syncMasters(req: Request, res: Response) {
           isActive: true,
           updatedAt: now,
           vuuid: sql`COALESCE(${vesselsTable.vuuid}, EXCLUDED.vuuid)`,
+          ...vCodeFields,
         },
       });
       stats.vessels.updated++;
