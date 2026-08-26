@@ -83,6 +83,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { useApprovalChain, resolveCanAct } from "@/components/approvals/ApprovalChainProgress";
 
 interface Spare {
   id: number;
@@ -844,6 +845,20 @@ const Dashboard = () => {
     : (crNoStepsYet || noApproversConfigured)
       ? (!isVessel && !isHeadOfDept)
       : crUserIsApproverForActiveStep;
+  // F2 (AE-10) fix: this dashboard popup is a SECOND render path for the CR approve/reject
+  // buttons and was gated on the legacy check only. Apply the SAME engine gate the Modify PMS
+  // dialog uses (resolveCanAct): when the engine owns a pending chain, canDecide is authoritative.
+  const crEngineScreenId =
+    opDetailChangeRequest?.targetType === 'component' ? 'pms-components-cr'
+    : opDetailChangeRequest?.targetType === 'job' ? 'pms-jobs-cr'
+    : opDetailChangeRequest?.targetType === 'spare' ? 'pms-spares-cr'
+    : opDetailChangeRequest?.targetType === 'store' ? 'pms-stores-cr'
+    : null;
+  const crEngineChain = useApprovalChain(
+    crEngineScreenId ?? 'none',
+    crEngineScreenId && opDetailChangeRequest?.status?.toLowerCase() === 'submitted' ? (opDetailChangeRequest as any)?.cruuid : null,
+  );
+  const crUserCanActFinal = resolveCanAct(crEngineChain, crUserCanAct);
 
   // Gate logic for the postponement decision dialog
   const postponeUserApproverLevels: string[] = localApprovers
@@ -870,6 +885,14 @@ const Dashboard = () => {
         ? (!isVessel && !isHeadOfDept)
         : !!postponeActiveStep && postponeUserApproverLevels.includes(postponeActiveStep.approvalLevel)
   );
+  // F2 (bonus, undiscovered by QA): the dashboard postponement decision dialog is a second
+  // render path for the postpone approve/reject buttons and, like the CR one, was legacy-only.
+  // Apply the same engine gate PostponeApprovalDialog uses (postponement + re-postponement scopes).
+  const postponeWoUuid = (postponeDecisionDialog.wo as any)?.wouuid ?? null;
+  const postponeChainPost = useApprovalChain('pms-wo-postponement', postponeDecisionDialog.open ? postponeWoUuid : null);
+  const postponeChainRePost = useApprovalChain('pms-wo-re-postponement', postponeDecisionDialog.open ? postponeWoUuid : null);
+  const postponeEngineChain = postponeChainPost.hasChain ? postponeChainPost : postponeChainRePost;
+  const postponeUserCanActFinal = resolveCanAct(postponeEngineChain, postponeUserCanAct);
 
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
@@ -3518,7 +3541,7 @@ const Dashboard = () => {
                           >
                             Cancel
                           </Button>
-                          {postponeUserCanAct ? (
+                          {postponeUserCanActFinal ? (
                             <>
                               {(postponeDecisionDialog.action === 'reject' || postponeDecisionDialog.action === 'review') && (
                                 <Button
@@ -4686,7 +4709,7 @@ const Dashboard = () => {
                   <Eye className="h-4 w-4 mr-1" />
                   View Changes
                 </Button>
-                {opDetailChangeRequest.status?.toLowerCase() === 'submitted' && crUserCanAct && (
+                {opDetailChangeRequest.status?.toLowerCase() === 'submitted' && crUserCanActFinal && (
                   <>
                     <Button
                       variant="destructive"

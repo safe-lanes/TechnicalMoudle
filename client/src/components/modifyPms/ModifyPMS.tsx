@@ -25,7 +25,7 @@ import { useUIRole } from '@/contexts/UIRoleContext';
 import { useVessels } from '@/hooks/useVessels';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalApprovers } from '@/hooks/useExternalMasterData';
-import { ApprovalChainProgress, useApprovalChain } from '@/components/approvals/ApprovalChainProgress';
+import { ApprovalChainProgress, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
 import {
   Select,
   SelectContent,
@@ -186,7 +186,7 @@ export function ModifyPMS() {
         ? (!isVessel && !isHeadOfDept)
         : userIsApproverForActiveStep
   );
-  const userCanAct = engineChain.hasChain ? engineChain.canDecide : legacyUserCanAct;
+  const userCanAct = resolveCanAct(engineChain, legacyUserCanAct);
 
   // Reviewer decision modal — approve OR reject. Both go through ApproveRejectModal so the
   // reviewer enters a real comment (the reject reason is shown to the requester). (E2E-2 fix)

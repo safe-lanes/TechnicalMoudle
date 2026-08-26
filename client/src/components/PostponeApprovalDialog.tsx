@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ApprovalChainProgress, useApprovalChain } from '@/components/approvals/ApprovalChainProgress';
+import { ApprovalChainProgress, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -119,7 +119,7 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
         ? (!isVessel && !isHeadOfDept)
         : !!activeStep && userApproverLevels.includes(activeStep.approvalLevel)
   );
-  const userCanAct = engineChain.hasChain ? engineChain.canDecide : legacyUserCanAct;
+  const userCanAct = resolveCanAct(engineChain, legacyUserCanAct);
   const engineScreenId = chainPost.hasChain ? 'pms-wo-postponement' : chainRePost.hasChain ? 'pms-wo-re-postponement' : null;
 
   useEffect(() => {

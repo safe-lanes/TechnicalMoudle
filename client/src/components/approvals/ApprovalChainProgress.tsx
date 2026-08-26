@@ -25,6 +25,9 @@ interface RequestView {
   slots: SlotView[];
 }
 
+/** Host admin roles that get a blanket decide override (mirror of mount.ts APPROVAL_ADMIN_ROLES). */
+const APPROVAL_ADMIN_ROLES: ReadonlySet<string> = new Set(["Sail Admin", "Super Admin", "PMS Admin"]);
+
 export function useApprovalChain(screenId: string, subjectRef: string | null | undefined) {
   const { currentUser } = useAuth();
   const q = useQuery({
@@ -40,8 +43,38 @@ export function useApprovalChain(screenId: string, subjectRef: string | null | u
   });
   const pending = (q.data ?? []).find((r) => r.status === "pending") ?? null;
   const activeSlots = pending?.slots.filter((s) => s.status === "active") ?? [];
-  const canDecide = !!currentUser?.userUuid && activeSlots.some((s) => (s.resolvedApproverIds ?? []).includes(currentUser.userUuid!));
-  return { hasChain: !!pending, request: pending, canDecide, isLoading: q.isLoading && !!subjectRef };
+  // F3b: admins can always decide a pending chain (parity with the server override in
+  // engine.decide + the legacy Sail-Admin bypass) — so a Super Admin configured as an approver
+  // sees the button even when the crew directory can't name them, and an admin can unstick a
+  // step that resolved to zero approvers.
+  const isAdmin = !!currentUser?.role && APPROVAL_ADMIN_ROLES.has(currentUser.role);
+  const canDecide = !!pending && (isAdmin || (!!currentUser?.userUuid && activeSlots.some((s) => (s.resolvedApproverIds ?? []).includes(currentUser.userUuid!))));
+  // F3 safety-net: an ACTIVE slot that resolved to zero approvers would otherwise sit forever
+  // with no button, no notification and no error. Surface it so the caller (progress panel /
+  // admin view) can show "no approver resolved" instead of stalling silently.
+  const unresolvedActiveSlots = activeSlots.filter((s) => (s.resolvedApproverIds ?? []).length === 0);
+  return {
+    hasChain: !!pending,
+    request: pending,
+    canDecide,
+    hasUnresolvedApprover: !!pending && unresolvedActiveSlots.length > 0,
+    unresolvedRoleLabels: unresolvedActiveSlots.map((s) => s.roleLabel),
+    isLoading: q.isLoading && !!subjectRef,
+  };
+}
+
+/**
+ * The SINGLE source of truth for "can this user act on this request".
+ * When the engine owns a pending chain, the engine's canDecide is authoritative; otherwise
+ * the caller's legacy gate stands (fallback contract). EVERY screen that renders a CR or
+ * postponement approve/reject button must gate on this — never re-derive the rule inline
+ * (that divergence was the AE-10 dashboard leak).
+ */
+export function resolveCanAct(
+  engine: { hasChain: boolean; canDecide: boolean },
+  legacyCanAct: boolean,
+): boolean {
+  return engine.hasChain ? engine.canDecide : legacyCanAct;
 }
 
 const DOT: Record<string, string> = {
@@ -61,13 +94,18 @@ export function ApprovalChainProgress({ screenId, subjectRef }: { screenId: stri
         return (
           <div key={n.key} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
             <span style={{ minWidth: 60 }}>{n.label || n.key}</span>
-            {slots.map((s) => (
-              <span key={s.slotOrdinal} title={s.decidedBy ? `${s.status} by ${s.decidedBy}${s.remarks ? ` — ${s.remarks}` : ""}` : s.status}
-                style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#f9fafb", borderRadius: 10, padding: "1px 8px" }}>
-                <span style={{ width: 8, height: 8, borderRadius: 4, background: DOT[s.status] ?? "#98a2b3", display: "inline-block" }} />
-                {s.roleLabel}
-              </span>
-            ))}
+            {slots.map((s) => {
+              // F3 safety-net: an active slot with no resolved approver would stall silently.
+              const unresolved = s.status === "active" && (s.resolvedApproverIds ?? []).length === 0;
+              return (
+                <span key={s.slotOrdinal} title={s.decidedBy ? `${s.status} by ${s.decidedBy}${s.remarks ? ` — ${s.remarks}` : ""}` : unresolved ? `No approver resolved for ${s.roleLabel} on this vessel` : s.status}
+                  data-testid={unresolved ? "approval-slot-unresolved" : undefined}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, background: unresolved ? "#fef3f2" : "#f9fafb", border: unresolved ? "1px solid #fda29b" : undefined, color: unresolved ? "#b42318" : undefined, borderRadius: 10, padding: "1px 8px" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 4, background: DOT[s.status] ?? "#98a2b3", display: "inline-block" }} />
+                  {s.roleLabel}{unresolved ? " — ⚠ no approver resolved" : ""}
+                </span>
+              );
+            })}
             {(n.quorum?.rule === "any" && slots.length > 1) && <span style={{ color: "#667085" }}>(any one)</span>}
             {(n.quorum?.rule === "nOfM") && <span style={{ color: "#667085" }}>({n.quorum.n} of {slots.length})</span>}
           </div>
