@@ -22,6 +22,7 @@
 | F4 / F7 endpoints | **PROVEN** |
 | Q2 (F6) admin-only builder — browser + API | **PROVEN** — Office "User" 403/denied, admin allowed |
 | Q3 (F3b) narrowed override — API | **PROVEN** — admin decides only zero-approver steps, recorded as override |
+| **AE-18 ship round-trip** (`phase2-ship`, real ship↔shore sync) | **Core PROVEN** — arrival sweep starts the chain on shore, approver approves both steps, chain completes + applies. 2 residual "ship sees status back" checks fail **identically on the original `fc52a3c6f`** → pre-existing ship-status-sync issue, NOT this fix-round (see below) |
 | `p01` (1 fail) + `p02` (5 fails) | **Pre-existing branch diffs** (superintendent-lock work is on prod, not this branch) — NOT caused by these fixes (PROVEN by file-overlap: none of the 16 changed files touch that surface) |
 
 ---
@@ -165,6 +166,33 @@ Defects module card · Advanced mode · WO completion.
 5. **F5 / AE-21** — the legacy Level-1 approver can now approve; confirm this is the intended policy (a non-office configured approver deciding).
 6. **F6** — confirm the intended policy: office-only (current) vs admin-only builder access.
 7. **F1** — badge persists across refresh (already PROVEN on the pilot).
+
+## AE-18 — ship round-trip proof (`test-phase2-ship`, live ship :5100 ↔ shore :5000)
+
+Ran on the real shore+ship pilot (ship image rebuilt/provisioned). **The core of AE-18 — the exact QA failure (a synced postponement's approver had no Approve button, so the chain couldn't complete) — is PROVEN:**
+- ship raises the postponement → sync ship→shore → **arrival sweep starts the chain on shore (step-1)** ✓
+- **pool member approves → step-2** ✓ · **office approves → Postponement Approved + rows settled on shore** ✓
+- (and for a CR: ship CR → sync → sweep → 2-step chain → approved + value applied on shore) ✓
+- ship stays engine-quiet: engine not mounted, status route 404, `apprv_*` empty ✓
+
+**2 residual FAILs — "SHIP sees the approved status reflected back":** after the shore approval, the ship still shows the CR as `submitted` and the WO as `Awaiting Office Approval` (the applied **spare value DID sync back**; only the CR/WO **status** did not). **This is PROVEN pre-existing, not caused by this fix-round:** I re-ran `test-phase2-ship` against the **original branch code (`fc52a3c6f`, this branch's tip before any fix)** and got the **identical two failures with identical values** (ship CR `submitted`, ship WO `Awaiting Office Approval`, spare `P2E2E-VIA-CHAIN`). All four tables (change_request, work_orders, work_order_postponements, spares) are field-logged, so this is a **CR/WO status shore→ship propagation gap** (consistent with the documented "work_orders writes not storage-logged" lesson and/or the stale ship image), independent of the approval engine. → **Tracked as a separate issue; not in scope for this fix-round.**
+
+## Follow-up (DO NOT FIX NOW) — sweep for code reading the mock identity `req.user.role`
+
+`req.user.role` is deliberately the **mock `'Sail Admin'`** (`server/middleware/auth.ts:14`); the REAL forwarded SAILERP role is `req.rbac.role` (or `req.user.forwardedRole`). Any **authorization/scoping** decision made on `req.user.role` therefore evaluates the mock, not the caller — the class of bug F5 (route guard, already fixed) and the F3b gateway (fixed this round: `engineGateway.engineCtx` now reads the real role via `RequestContext.rbacRole`) belonged to. This is a **code scan (READ), not verified per-site and not exhaustive** — for scheduling a separate hardening task. The fix pattern is: read `getRbacIdentity(req).role` / `req.user.forwardedRole` for authz; `req.user.role` is fine for audit-actor/display only.
+
+**Likely authorization/scoping on the mock role (verify + fix first):**
+- `server/middleware/auth.ts:146` `requireVesselAccess` — `req.user.role === 'Sail Admin'|'PMS Admin'|'Office'` bypasses vessel scoping and the `role === 'Ship'` vessel check (`:161`) is effectively dead (mock is always Sail Admin). *Mitigating: not wired to any live route today (dead code) — remove or fix if revived.*
+- `server/modules/components/services/documentService.ts:57-58, 205, 211` — document view/download visibility by role (`'PMS Admin'|'Sail Admin'|'Office'|'Ship'`).
+- `server/modules/components/services/subEntityService.ts:146` (`role !== 'PMS Admin' && role !== 'Sail Admin'`) + the many `role === 'Ship'` vessel-scoping branches (`:17,53,98,108,119,137,175,195`).
+- `server/modules/spares/controllers/sparesController.ts:9` — `ROTATION_ITEM_ALLOWED_ROLES.includes(user.role)`.
+- `server/modules/jobs/services/jobService.ts:499` — `role === 'Ship'` scoping.
+- `server/modules/change-requests/controllers/changeRequestsController.ts:107,123` — passes `role: authReq.user.role` (mock) into `crService.approve/rejectChangeRequest` (the route is now guarded by the real role via `requireApproverOrRole`, so this `role` feeds the legacy apply/audit only — confirm it isn't used for a decision).
+- `server/modules/sync/middleware.ts:29` — `req.user.role`.
+
+**Already correct (reads the real role — use as the model):** `server/modules/vessels/controllers/vesselController.ts:129,153` (`user.forwardedRole || user.role`); all `requireRole`/`requireApproverOrRole` guards (read `req.rbac`).
+
+**Likely display/logging only (lower priority):** `work-orders/controllers/workOrderController.ts` (`sessionRole` logs, `body.userRole`), `jobs/controllers/jobController.ts:111`, `chatbot/controllers/chatbotController.ts:23`, `access-control/controllers/viewModeController.ts:43`.
 
 ## Decisions applied (Ghazi, round 2)
 - **Q1 (F5):** CONFIRMED — a configured approver can decide regardless of user type; `requireApproverOrRole` kept as implemented; non-approvers still refused (`p04` stands).
