@@ -468,9 +468,11 @@ export class PostgresStorage {
 
   // ============= VESSELS (Module 1) =============
 
-  async getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>> {
+  async getVessels(options: { includeDeleted?: boolean } = {}): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>> {
     const db = await getDb();
-    const result = await db.select().from(vessels);
+    const result = options.includeDeleted
+      ? await db.select().from(vessels)
+      : await db.select().from(vessels).where(or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted)));
     return result.map(v => ({
       id: v.id,
       vuuid: v.vuuid,
@@ -482,21 +484,27 @@ export class PostgresStorage {
     }));
   }
 
-  async getVessel(id: string): Promise<Vessel | undefined> {
+  async getVessel(id: string, options: { includeDeleted?: boolean } = {}): Promise<Vessel | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.vuuid, id));
+    const result = await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.vuuid, id)
+      : and(eq(vessels.vuuid, id), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
     return result[0];
   }
 
-  async getVesselByCode(code: string): Promise<Vessel | undefined> {
+  async getVesselByCode(code: string, options: { includeDeleted?: boolean } = {}): Promise<Vessel | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.code, code));
+    const result = await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.code, code)
+      : and(eq(vessels.code, code), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
     return result[0];
   }
 
-  async getVesselIdByName(vesselName: string): Promise<string | undefined> {
+  async getVesselIdByName(vesselName: string, options: { includeDeleted?: boolean } = {}): Promise<string | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.name, vesselName));
+    const result = await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.name, vesselName)
+      : and(eq(vessels.name, vesselName), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
     return result[0]?.vuuid;
   }
 
@@ -8396,15 +8404,18 @@ export class PostgresStorage {
     return { jobsDeleted: jobResult.length, workOrdersDeleted };
   }
 
-  async getVesselsByFleet(fleetId: string): Promise<Vessel[]> {
+  async getVesselsByFleet(fleetId: string, options: { includeDeleted?: boolean } = {}): Promise<Vessel[]> {
     const db = await getDb();
-    return await db.select().from(vessels)
-      .where(eq(vessels.fleetId, fleetId));
+    return await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.fleetId, fleetId)
+      : and(eq(vessels.fleetId, fleetId), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
   }
 
-  async getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>> {
+  async getVesselsWithFleets(options: { includeDeleted?: boolean } = {}): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>> {
     const db = await getDb();
-    const allVessels = await db.select().from(vessels);
+    const allVessels = options.includeDeleted
+      ? await db.select().from(vessels)
+      : await db.select().from(vessels).where(or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted)));
     const allFleets = await db.select().from(fleets);
     
     const fleetMap = new Map(allFleets.map(f => [f.id, f]));

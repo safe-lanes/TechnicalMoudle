@@ -680,7 +680,7 @@ export interface IStorage {
   
   // Seed helper methods
   getDefectBySeedId(seedId: string): Promise<Defect | undefined>;
-  getVesselIdByName(vesselName: string): Promise<string | undefined>;
+  getVesselIdByName(vesselName: string, options?: { includeDeleted?: boolean }): Promise<string | undefined>;
   createVessel(vessel: InsertVessel): Promise<Vessel>;
   
   // Import History methods
@@ -753,8 +753,8 @@ export interface IStorage {
     mappedBy: string;
   }): Promise<any[]>;
   deleteFleetVesselMapping(id: string): Promise<void>;
-  getVessel(id: string): Promise<Vessel | undefined>;
-  getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>>;
+  getVessel(id: string, options?: { includeDeleted?: boolean }): Promise<Vessel | undefined>;
+  getVessels(options?: { includeDeleted?: boolean }): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>>;
   
   // On-Demand Work Order Generation (Rule #4)
   // activeComponentCode: optional override for multi-linked jobs to bind WO to specific component context
@@ -886,9 +886,9 @@ export interface IStorage {
   createFleet(fleet: InsertFleet): Promise<Fleet>;
   updateFleet(id: string, data: Partial<Fleet>): Promise<Fleet>;
   deleteFleet(id: string): Promise<void>;
-  getVesselsByFleet(fleetId: string): Promise<Vessel[]>;
+  getVesselsByFleet(fleetId: string, options?: { includeDeleted?: boolean }): Promise<Vessel[]>;
   assignVesselToFleet(vesselId: string, fleetId: string | null): Promise<Vessel>;
-  getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>>;
+  getVesselsWithFleets(options?: { includeDeleted?: boolean }): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>>;
   updateVessel(id: string, data: Partial<Vessel>): Promise<Vessel>;
 
   getFleetClasses(fleetId: string): Promise<FleetClass[]>;
