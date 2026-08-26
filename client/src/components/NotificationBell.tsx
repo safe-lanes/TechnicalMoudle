@@ -82,8 +82,18 @@ export const NotificationBell: React.FC = () => {
   // Per-user inbox rows written by the approval engine's notifier on shore. Fail-soft:
   // on ships / errors these return empty and only the alerts section renders, as before.
   interface ApprovalNotification { anuuid: string; kind: 'pending-approval' | 'approved' | 'returned'; title: string; readAt: string | null; createdAt: string; }
+  // F1 fix: key the query on the authenticated user's UUID and gate with `enabled`.
+  // The server scopes these rows by req.user.userUuid (forwarded x-user-id header). On a
+  // fresh page load this bell's child effect runs BEFORE AuthProvider's setActiveIdentity,
+  // so a static-keyed, always-enabled query fired header-less → scoped to the placeholder
+  // user → empty → and (because the key never changed) was never refetched, so unread rows
+  // vanished on refresh. Keying on userUuid + enabling only once identity exists makes it
+  // wait for hydration and refetch when identity lands (same self-healing the alerts query
+  // gets from keying on role/vesselId).
+  const approvalUserUuid = currentUser?.userUuid || '';
   const { data: approvalRows = [] } = useQuery<ApprovalNotification[]>({
-    queryKey: ['/technical/api/approvals/notifications'],
+    queryKey: ['/technical/api/approvals/notifications', approvalUserUuid],
+    enabled: !!approvalUserUuid,
     queryFn: async () => {
       const response = await fetch('/technical/api/approvals/notifications');
       if (!response.ok) return [];
