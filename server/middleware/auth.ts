@@ -87,6 +87,45 @@ export const requireRole = (roles: UserRole | UserRole[]) => {
 };
 
 /**
+ * F5 (AE-21): decide-an-approval guard that RESTORES the legacy contract the P0.4 office-role
+ * guard broke. It passes when EITHER the forwarded identity matches an allowed role/type
+ * (office/admin, as before) OR the caller is a currently-configured, active approver
+ * (moc_approvers) for the Technical module. A user configured as a Level-1/2 approver whose
+ * SAILERP role/type is not Office-typed (e.g. a superintendent rank on DEV) was being 403'd on
+ * the legacy path even though the pre-engine code let them approve; this reinstates that without
+ * re-opening the surface to arbitrary callers (randos with no approver row are still refused).
+ * Use ONLY on the approval-DECISION routes (CR + postponement approve/reject) — not on the
+ * reviewer/compliance-lock routes, which are genuinely office-only.
+ */
+export const requireApproverOrRole = (roles: UserRole | UserRole[]) => {
+  const allowed = Array.isArray(roles) ? roles : [roles];
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({ error: "Unauthorized - Authentication required" });
+    if (rbacMatches(getRbacIdentity(req), allowed)) return next();
+    try {
+      const uuid = req.user.userUuid;
+      if (uuid) {
+        const [{ getPostgresClient }, { mocApprovers }, { and, eq }, { getCurrentTenantContext }] = await Promise.all([
+          import("../postgresClient"),
+          import("@shared/schema"),
+          import("drizzle-orm"),
+          import("../utils/asyncLocalStorage"),
+        ]);
+        const db = getCurrentTenantContext()?.db ?? getPostgresClient().db;
+        const rows = await db.select({ id: mocApprovers.id }).from(mocApprovers)
+          .where(and(eq(mocApprovers.userUuid, uuid), eq(mocApprovers.isActive, 1),
+            eq(mocApprovers.isDeleted, false), eq(mocApprovers.modulename, "Technical"))).limit(1);
+        if (rows.length > 0) return next();
+      }
+    } catch (e) {
+      console.error("[requireApproverOrRole] approver lookup failed (denying):", e);
+    }
+    const identity = getRbacIdentity(req);
+    return res.status(403).json({ error: "Forbidden - Insufficient permissions", required: allowed, current: identity.role ?? "anonymous" });
+  };
+};
+
+/**
  * LEGACY ALIASES — deliberately NON-ENFORCING in Phase 0.
  * They sit on ~65 routes (spares/stores consume+receive, running-hours config, components
  * sub-entities, rotational items, retention, audit, fleet-admin, noon-report) that were written

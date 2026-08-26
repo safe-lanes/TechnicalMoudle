@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { asyncHandler } from '../shared/middleware';
-import { requireRole } from '../../middleware/auth';
+import { requireRole, requireApproverOrRole } from '../../middleware/auth';
 import * as woCtrl from './controllers/workOrderController';
 import * as woDocCtrl from './controllers/woDocumentController';
 
@@ -202,15 +202,15 @@ router.post('/work-orders/:id/postpone-request', asyncHandler(woCtrl.submitPostp
 // PUT /work-orders/:id/postpone-request — ship edits & resubmits a pending/rejected request
 router.put('/work-orders/:id/postpone-request', asyncHandler(woCtrl.editPostponeRequest));
 
-// POST /work-orders/:id/postpone-approve — office approves a postponement request
+// POST /work-orders/:id/postpone-approve — office (or a configured approver — F5) approves
 router.post('/work-orders/:id/postpone-approve',
-  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  requireApproverOrRole(['Office', 'PMS Admin', 'Sail Admin']),
   asyncHandler(woCtrl.approvePostponement)
 );
 
-// POST /work-orders/:id/postpone-reject — office rejects a postponement request
+// POST /work-orders/:id/postpone-reject — office (or a configured approver — F5) rejects
 router.post('/work-orders/:id/postpone-reject',
-  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  requireApproverOrRole(['Office', 'PMS Admin', 'Sail Admin']),
   asyncHandler(woCtrl.rejectPostponement)
 );
 
@@ -225,15 +225,15 @@ router.post('/work-orders/:id/re-postpone-request', asyncHandler(woCtrl.submitRe
 // PUT /work-orders/:id/re-postpone-request — ship edits & resubmits a pending re-postponement request
 router.put('/work-orders/:id/re-postpone-request', asyncHandler(woCtrl.editRePostponeRequest));
 
-// POST /work-orders/:id/re-postpone-approve — office approves a re-postponement request
+// POST /work-orders/:id/re-postpone-approve — office (or a configured approver — F5) approves
 router.post('/work-orders/:id/re-postpone-approve',
-  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  requireApproverOrRole(['Office', 'PMS Admin', 'Sail Admin']),
   asyncHandler(woCtrl.approveRePostponement)
 );
 
-// POST /work-orders/:id/re-postpone-reject — office rejects a re-postponement request
+// POST /work-orders/:id/re-postpone-reject — office (or a configured approver — F5) rejects
 router.post('/work-orders/:id/re-postpone-reject',
-  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  requireApproverOrRole(['Office', 'PMS Admin', 'Sail Admin']),
   asyncHandler(woCtrl.rejectRePostponement)
 );
 
