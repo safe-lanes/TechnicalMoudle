@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   generatePlannedWorkOrderNumber,
   generateUnplannedWorkOrderNumber,
@@ -62,19 +62,70 @@ describe('vessel-coded work order numbering', () => {
     expect(number).toBe(`001-UWO-601.001-${year}-003`);
   });
 
-  it('rejects generation when the exact vessel has no external code', async () => {
+  it('uses legacy numbering and warns when the exact vessel has no external code', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const number = await generatePlannedWorkOrderNumber(
+      numberingStorage(null, [
+        `MKR-IN-00001-601.001-${year}-002`,
+        `001-MKR-IN-00001-601.001-${year}-003`,
+      ]),
+      'MKR-IN-00001',
+      '601.001',
+      vesselId,
+    );
+
+    expect(number).toBe(`MKR-IN-00001-601.001-${year}-004`);
+    expect(warning).toHaveBeenCalledWith(
+      `⚠️ [WO#] vessel ${vesselId} has no v_code — using legacy (non-prefixed) work order number.`,
+    );
+    warning.mockRestore();
+  });
+
+  it('uses legacy unplanned numbering when v_code is blank', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const number = await generateUnplannedWorkOrderNumber(
+      numberingStorage('   ', [
+        `UWO-601.001-${year}-001`,
+        `001-UWO-601.001-${year}-002`,
+      ]),
+      vesselId,
+      '601.001',
+    );
+
+    expect(number).toBe(`UWO-601.001-${year}-003`);
+    warning.mockRestore();
+  });
+
+  it('still rejects generation when the vessel UUID is missing', async () => {
     await expect(
       generatePlannedWorkOrderNumber(
-        numberingStorage(null),
+        numberingStorage('001'),
         'MKR-IN-00001',
         '601.001',
-        vesselId,
       ),
     ).rejects.toMatchObject({
       name: 'ValidationError',
       details: {
-        code: 'VESSEL_CODE_REQUIRED_FOR_WO_NUMBER',
-        vesselId,
+        code: 'VESSEL_ID_REQUIRED_FOR_WO_NUMBER',
+      },
+    });
+  });
+
+  it('rejects generation when the vessel UUID does not exist', async () => {
+    await expect(
+      generatePlannedWorkOrderNumber(
+        numberingStorage('001'),
+        'MKR-IN-00001',
+        '601.001',
+        'unknown-vessel',
+      ),
+    ).rejects.toMatchObject({
+      name: 'ValidationError',
+      details: {
+        code: 'VESSEL_NOT_FOUND_FOR_WO_NUMBER',
+        vesselId: 'unknown-vessel',
       },
     });
   });

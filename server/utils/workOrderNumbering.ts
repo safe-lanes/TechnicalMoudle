@@ -40,6 +40,7 @@ export async function generatePlannedWorkOrderNumber(
   const safeJobCode = jobCode && jobCode.trim() ? jobCode.trim() : 'UNKNOWN-JOB';
   const safeComponentCode = componentCode.trim();
   const vesselCode = await resolveVesselCode(storage, vesselId);
+  const prefix = vesselCode ? `${vesselCode}-` : '';
   
   // Do not reset a sequence when a vessel begins using the v_code-prefixed
   // format. Existing legacy work orders remain part of the no-reuse sequence.
@@ -48,7 +49,9 @@ export async function generatePlannedWorkOrderNumber(
     `^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const vesselPrefixedPattern = new RegExp(
-    `^${escapeRegex(vesselCode)}-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+    vesselCode
+      ? `^${escapeRegex(vesselCode)}-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+      : `^.+-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
 
   const maxRunningNumber = findMaxSequence(
@@ -59,7 +62,7 @@ export async function generatePlannedWorkOrderNumber(
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, '0');
   
-  return `${vesselCode}-${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${prefix}${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 
 /**
@@ -83,6 +86,7 @@ export async function generateUnplannedWorkOrderNumber(
   
   const safeComponentCode = componentCode.trim();
   const vesselCode = await resolveVesselCode(storage, vesselId);
+  const prefix = vesselCode ? `${vesselCode}-` : '';
   
   // Count the legacy format as well as the vessel-prefixed format so a
   // vessel's component/year sequence never restarts during the rollout.
@@ -91,7 +95,9 @@ export async function generateUnplannedWorkOrderNumber(
     `^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const vesselPrefixedPattern = new RegExp(
-    `^${escapeRegex(vesselCode)}-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+    vesselCode
+      ? `^${escapeRegex(vesselCode)}-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+      : `^.+-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const maxRunningNumber = findMaxSequence(
     allWorkOrders.map(wo => wo.workOrderNo),
@@ -101,14 +107,15 @@ export async function generateUnplannedWorkOrderNumber(
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, '0');
   
-  return `${vesselCode}-UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${prefix}UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 
 /**
- * Resolve the external vessel code for one exact vessel UUID. The generated
- * number must never use a first-row, name-based, or internal-code fallback.
+ * Resolve the external vessel code for one exact vessel UUID. A missing code
+ * is a supported transitional state for offline ships: generation falls back
+ * to the legacy number format while support is warned.
  */
-export async function resolveVesselCode(storage: IStorage, vesselId?: string): Promise<string> {
+export async function resolveVesselCode(storage: IStorage, vesselId?: string): Promise<string | null> {
   const normalizedVesselId = vesselId?.trim();
   if (!normalizedVesselId) {
     throw new ValidationError(
@@ -118,12 +125,19 @@ export async function resolveVesselCode(storage: IStorage, vesselId?: string): P
   }
 
   const vessel = await storage.getVessel(normalizedVesselId);
+  if (!vessel) {
+    throw new ValidationError(
+      `Vessel ${normalizedVesselId} was not found.`,
+      { code: 'VESSEL_NOT_FOUND_FOR_WO_NUMBER', vesselId: normalizedVesselId }
+    );
+  }
+
   const vesselCode = vessel?.vCode?.trim();
   if (!vesselCode) {
-    throw new ValidationError(
-      'Vessel external code (v_code) is required before generating a work order number.',
-      { code: 'VESSEL_CODE_REQUIRED_FOR_WO_NUMBER', vesselId: normalizedVesselId }
+    console.warn(
+      `⚠️ [WO#] vessel ${normalizedVesselId} has no v_code — using legacy (non-prefixed) work order number.`
     );
+    return null;
   }
 
   return vesselCode;
