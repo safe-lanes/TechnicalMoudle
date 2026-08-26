@@ -20,6 +20,8 @@
 | F1 browser (badge survives refresh) | **PASS** — exact QA repro fixed (PROVEN) |
 | F2 gate data (approver in / non-approver out) | **PROVEN** |
 | F4 / F7 endpoints | **PROVEN** |
+| Q2 (F6) admin-only builder — browser + API | **PROVEN** — Office "User" 403/denied, admin allowed |
+| Q3 (F3b) narrowed override — API | **PROVEN** — admin decides only zero-approver steps, recorded as override |
 | `p01` (1 fail) + `p02` (5 fails) | **Pre-existing branch diffs** (superintendent-lock work is on prod, not this branch) — NOT caused by these fixes (PROVEN by file-overlap: none of the 16 changed files touch that surface) |
 
 ---
@@ -77,14 +79,18 @@
 
 **ACTUAL root cause (READ):** `approvalCard.ts:117-121` — Super Admin is `roletype='Office'`, so it resolves fleet-wide, **but** by a plain `master_users.role == 'Super Admin'` name match. Admin accounts are usually absent from the synced crew `master_users` directory (or carry a different role string) → zero users → empty set → no button. The **legacy** path grants Sail Admin an explicit bypass (`postgresStorage.ts:5856`); the engine had none.
 
-**Fix (implemented):** an admin decide-override, parity with the legacy bypass, kept host-role-agnostic in the engine:
-- `EngineCtx.actor` gained `isAdmin?` (`core/types.ts`); the host sets it in `resolveActor` for `Sail Admin | Super Admin | PMS Admin` (`server/modules/approvals/mount.ts` `APPROVAL_ADMIN_ROLES`).
-- `engine.decide` lets an admin actor act on the first active slot when not otherwise resolved (`core/engine.ts`).
-- Client mirror: `useApprovalChain.canDecide` returns true for those admin roles on any pending chain (`ApprovalChainProgress.tsx`), so the button shows.
+**Q3 decision (Ghazi):** narrow to what was asked — **remove the blanket override**; an admin may decide **only a step that resolved to ZERO approvers**, and that decision is **recorded distinctly as an admin override** in the approval record + audit.
 
-This also gives F3 a manual unstick path (an admin can always decide a stalled step).
+**Fix (implemented):**
+- `EngineCtx.actor` gained `isAdmin?` (`core/types.ts`); the host marks it for `Sail/Super/PMS Admin` — in `mount.resolveActor` for the engine's own routes, and (crucially, for the CR/postpone service path) in `engineGateway.engineCtx` from the request's **real rbac role** (carried on `RequestContext.rbacRole`, set in `requestContext.ts`). The engine never inspects role names.
+- `engine.decide`: an admin falls back to the first active slot **only when every active slot resolved to zero approvers** (`stepStuck`). The decision remark is prefixed `[ADMIN OVERRIDE — <role>; step had no resolved approver]` and a warning is logged — recorded distinctly, not a normal approval. Admins do **not** get to decide steps that already have other resolved approvers.
+- Client mirror: `useApprovalChain.canDecide` shows the button to an admin **only** when the active step is fully unresolved (`ApprovalChainProgress.tsx`).
 
-**Proof (PROVEN, no-regression):** `p04` all-pass (non-admins still 403); `test-phase2-shore` all-pass (normal approver flow unchanged). **DEV re-test:** log in as the configured Super Admin and confirm the buttons now render and the decision applies.
+This covers Jeevan's case (a Super Admin configured as the sole approver whose crew row is absent → the step resolves to zero → the admin can act) and gives F3 a manual, audited unstick path — without letting any admin decide any step.
+
+**Where it is recorded:** `apprv_request_slots.remarks` on the decided slot (surfaced in the approval-progress panel and the audit row via `onDecision`), e.g. `"[ADMIN OVERRIDE — Super Admin; step had no resolved approver] admin unstick"`.
+
+**Proof (PROVEN):** `scripts/fix-round-1-q2q3-proof.ts` Q3 — (a) zero-approver step: Super Admin decides → **200**, slot remark contains **`[ADMIN OVERRIDE …]`**; (b) a non-admin office user on the same zero-approver step → **403**; (c) Super Admin on a step that HAS resolved approvers → **403** (no blanket override). Plus `p04` all-pass (non-admins 403) and `test-phase2-shore` all-pass (normal multi-step approver flow unchanged).
 
 ---
 
@@ -125,11 +131,18 @@ If `NR_SMTP_*` already works for noon-report email, those same SES creds enable 
 
 ---
 
-## F6 — AE-07 (was blocked): RBAC negative case
+## F6 — AE-07: RBAC negative case  →  Q2 decision: tighten to ADMIN-ONLY
 
-**Executed (READ + PROVEN partial).** Server: the workflow-save/scope-enable API is guarded by `requireRole(['Office','PMS Admin','Sail Admin'])` (`mount.ts:20`). `rbacMatches` passes for any `userType==='Office'`, so the builder is **office-only, and the menu (`SideMenuBar.tsx:151`), the page (`TechnicalModule.tsx:179`) and the API are consistent** on that. A **Vessel/Ship user** is denied everywhere (menu hidden, page Access-Denied, API 403 — `p04` shows vessel/anonymous 403 on the decision surface; the same guard family denies config writes).
+**Decision (Ghazi):** align to QA — the Approval Engine builder (menu, page, and all config-write APIs) is restricted to **admin roles only** (`PMS Admin` / `Sail Admin` / `Super Admin`). A plain Office "User" must not see the menu, must not open the page by URL, and must get 403 on save. All three gates use the **same** role set — no three-way divergence.
 
-**Finding:** a *plain Office "User"* is **allowed** by the current design (office-only, not admin-only). That is not a bug against the code — it's a **policy question**: should the Approval Engine builder be office-only (current) or admin-only (Sail/PMS Admin)? No code change made; **flag for Ghazi/Jeevan**. If admin-only is desired, it's a one-line tightening in the menu-add + page-guard + `requireConfigWrite` to the admin roles.
+**Fix (implemented):** the single admin set `['PMS Admin','Sail Admin','Super Admin']` applied at:
+- **Menu** — `client/src/components/SideMenuBar.tsx`: add-condition `isShore && isApprovalEngineAdmin` (from `currentUser.role`).
+- **Page** — `client/src/pages/TechnicalModule.tsx`: an explicit unconditional Access-Denied for `approval-engine` when `!isApprovalEngineAdmin` (independent of permission status — a plain Office User hitting the URL is refused).
+- **API** — `server/modules/approvals/mount.ts`: `requireConfigWrite = requireRole(['Sail Admin','Super Admin','PMS Admin'])` (dropped the `'Office'` userType match). F7's read endpoint tightened to the same set.
+
+**Proof (PROVEN):**
+- **Browser:** plain Office "User" — Approval Engine menu **absent**, direct URL `/admin/approval-engine` → **Access Denied** (no builder tree). Admin (Sail Admin) — menu **present**, builder **renders**. (`scripts/fix-round-1-q2q3-proof.ts` Q2; screenshots `e2e-screens/q2 admin-only-builder/01–04`.)
+- **API:** `POST /approval-engine/workflows` as plain Office "User" → **403**; as Sail Admin → **201**. `GET /approvals/role-approvers` as Office "User" → **403**; as Sail Admin → **200**.
 
 ---
 
@@ -153,7 +166,7 @@ Defects module card · Advanced mode · WO completion.
 6. **F6** — confirm the intended policy: office-only (current) vs admin-only builder access.
 7. **F1** — badge persists across refresh (already PROVEN on the pilot).
 
-## Open decisions for Ghazi/Jeevan
-- **F5 policy:** allow configured non-office approvers to decide (implemented) vs keep strictly office-typed.
-- **F6 policy:** office-only vs admin-only Approval Engine builder access.
-- **F3b breadth:** admin blanket decide-override (implemented, parity with legacy) — confirm acceptable.
+## Decisions applied (Ghazi, round 2)
+- **Q1 (F5):** CONFIRMED — a configured approver can decide regardless of user type; `requireApproverOrRole` kept as implemented; non-approvers still refused (`p04` stands).
+- **Q2 (F6):** TIGHTENED to admin-only (`PMS/Sail/Super Admin`) across menu + page + API, one shared role set. PROVEN in browser + API.
+- **Q3 (F3b):** NARROWED — blanket override removed; admin override only on a zero-approver step, recorded distinctly as an admin override in `apprv_request_slots.remarks` + audit. PROVEN.
