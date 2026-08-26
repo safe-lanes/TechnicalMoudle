@@ -129,6 +129,15 @@ export class ApprovalEngine {
     for (let i = 0; i < (node.slots ?? []).length; i++) {
       const slot = (node.slots ?? [])[i];
       const ids = await card.resolveApprovers({ tenantId: ctx.tenantId }, request.scope, slot.roleId, request.subjectRef);
+      // F3 safety-net: a slot that resolves to zero approvers activates with no one able to
+      // decide — the request would sit stuck with no button and no notification. Never let that
+      // be silent: warn loudly (support/logs) here; the UI surfaces it via the empty
+      // resolvedApproverIds (ApprovalChainProgress "no approver resolved" marker).
+      if (ids.length === 0) {
+        console.warn(
+          `[approval-engine] ZERO APPROVERS RESOLVED — request ${request.requuid} node "${nodeKey}" slot ${i} role "${slot.roleLabel ?? slot.roleId}" scope ${JSON.stringify(request.scope)} subject ${request.subjectRef}. The step will stall until an approver resolves for this role/vessel.`,
+        );
+      }
       ids.forEach((id) => approverUnion.add(id));
       updates.push({ nodeKey, slotOrdinal: i, status: 'active', resolvedApproverIds: ids });
     }
@@ -152,7 +161,13 @@ export class ApprovalEngine {
     const { card } = this.cardFor(request!.scope);
     const slots = await repo.getSlots(requuid);
     const active = slots.filter((s) => s.status === 'active');
-    const mine = active.find((s) => (s.resolvedApproverIds ?? []).includes(ctx.actor.userId));
+    // F3b: admins (Sail/Super/PMS Admin) can always decide a pending request — parity with the
+    // legacy Sail-Admin bypass. This makes a Super Admin CONFIGURED as an approver actually able
+    // to act (their crew master_users row may be absent, so resolveApprovers can't name them),
+    // and lets an admin unstick a step that resolved to zero approvers (F3 safety-net).
+    const isAdminActor = !!ctx.actor.isAdmin;
+    let mine = active.find((s) => (s.resolvedApproverIds ?? []).includes(ctx.actor.userId));
+    if (!mine && isAdminActor) mine = active[0];
     if (!mine) {
       err(403, 'NOT_YOUR_TURN', 'you are not an approver for the currently active step of this request');
     }

@@ -108,7 +108,10 @@ export interface PendingItem {
 /** Tenant + actor context every operation carries (v3 §A7). */
 export interface EngineCtx {
   tenantId: string;
-  actor: { userId: string; role: string | null; userType: 'Office' | 'Ship' | null };
+  // isAdmin (optional): the HOST marks admin actors (e.g. Sail/Super/PMS Admin) so the engine
+  // can grant them a decide override — parity with the host's legacy admin bypass. The engine
+  // stays host-role-agnostic; it never inspects role NAMES.
+  actor: { userId: string; role: string | null; userType: 'Office' | 'Ship' | null; isAdmin?: boolean };
 }
 export type SubmitOutcome =
   | { outcome: 'STARTED'; requuid: string; activeNodeKey: string }

@@ -11,6 +11,9 @@ import { approvalEventNotifier } from './approvalNotifier';
 import { AlsTenantRepositoryProvider, currentEngineTenantId } from './tenantProvider';
 import { setTechnicalEngine } from './engineGateway';
 
+/** Host admin roles that get a blanket decide override on the engine (parity with legacy). */
+const APPROVAL_ADMIN_ROLES: ReadonlySet<string> = new Set(['Sail Admin', 'Super Admin', 'PMS Admin']);
+
 export async function mountTechnicalApprovals(app: Express): Promise<void> {
   const { isShipInstance } = await import('../sync/syncRole');
   if (await isShipInstance()) {
@@ -26,7 +29,10 @@ export async function mountTechnicalApprovals(app: Express): Promise<void> {
     resolveActor: (req: Request) => {
       const r = req as AuthenticatedRequest;
       const id = getRbacIdentity(r);
-      return { userId: r.user?.userUuid ?? 'anonymous', role: id.role, userType: id.userType };
+      // F3b: mark admin actors so the engine grants them a decide override (parity with the
+      // host's legacy Sail-Admin bypass). Host owns the role names; the engine stays agnostic.
+      const isAdmin = !!id.role && APPROVAL_ADMIN_ROLES.has(id.role);
+      return { userId: r.user?.userUuid ?? 'anonymous', role: id.role, userType: id.userType, isAdmin };
     },
     requireConfigWrite: (req: Request, res: Response, next: NextFunction) => configGuard(req as AuthenticatedRequest, res, next),
     onEvent: approvalEventNotifier,
