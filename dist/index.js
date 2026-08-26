@@ -31529,12 +31529,13 @@ async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, 
   const safeJobCode = jobCode && jobCode.trim() ? jobCode.trim() : "UNKNOWN-JOB";
   const safeComponentCode = componentCode.trim();
   const vesselCode = await resolveVesselCode(storage2, vesselId);
+  const prefix = vesselCode ? `${vesselCode}-` : "";
   const allWorkOrders = await storage2.getWorkOrders(vesselId);
   const legacyPattern = new RegExp(
     `^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const vesselPrefixedPattern = new RegExp(
-    `^${escapeRegex(vesselCode)}-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+    vesselCode ? `^${escapeRegex(vesselCode)}-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$` : `^.+-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const maxRunningNumber = findMaxSequence(
     allWorkOrders.map((wo) => wo.workOrderNo),
@@ -31542,7 +31543,7 @@ async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, 
   );
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, "0");
-  return `${vesselCode}-${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${prefix}${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCode) {
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
@@ -31551,12 +31552,13 @@ async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCod
   }
   const safeComponentCode = componentCode.trim();
   const vesselCode = await resolveVesselCode(storage2, vesselId);
+  const prefix = vesselCode ? `${vesselCode}-` : "";
   const allWorkOrders = await storage2.getWorkOrders(vesselId);
   const legacyPattern = new RegExp(
     `^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const vesselPrefixedPattern = new RegExp(
-    `^${escapeRegex(vesselCode)}-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+    vesselCode ? `^${escapeRegex(vesselCode)}-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$` : `^.+-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const maxRunningNumber = findMaxSequence(
     allWorkOrders.map((wo) => wo.workOrderNo),
@@ -31564,7 +31566,7 @@ async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCod
   );
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, "0");
-  return `${vesselCode}-UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${prefix}UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 async function resolveVesselCode(storage2, vesselId) {
   const normalizedVesselId = vesselId?.trim();
@@ -31575,12 +31577,18 @@ async function resolveVesselCode(storage2, vesselId) {
     );
   }
   const vessel = await storage2.getVessel(normalizedVesselId);
+  if (!vessel) {
+    throw new ValidationError(
+      `Vessel ${normalizedVesselId} was not found.`,
+      { code: "VESSEL_NOT_FOUND_FOR_WO_NUMBER", vesselId: normalizedVesselId }
+    );
+  }
   const vesselCode = vessel?.vCode?.trim();
   if (!vesselCode) {
-    throw new ValidationError(
-      "Vessel external code (v_code) is required before generating a work order number.",
-      { code: "VESSEL_CODE_REQUIRED_FOR_WO_NUMBER", vesselId: normalizedVesselId }
+    console.warn(
+      `\u26A0\uFE0F [WO#] vessel ${normalizedVesselId} has no v_code \u2014 using legacy (non-prefixed) work order number.`
     );
+    return null;
   }
   return vesselCode;
 }
