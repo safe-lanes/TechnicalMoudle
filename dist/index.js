@@ -757,6 +757,8 @@ var init_schema = __esm({
       // Vessel display name
       code: text2("code").notNull(),
       // Same as id for compatibility
+      vCode: text2("v_code"),
+      // External vessel code; stored as text to preserve leading zeros
       fleetId: text2("fleet_id"),
       // Optional reference to fleet
       imoNumber: text2("imo_number"),
@@ -5248,6 +5250,182 @@ var init_db = __esm({
   }
 });
 
+// server/utils/workOrderStatus.ts
+var workOrderStatus_exports = {};
+__export(workOrderStatus_exports, {
+  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
+  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
+  buildRhCycleWOMap: () => buildRhCycleWOMap,
+  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
+  findBlockingWOForJob: () => findBlockingWOForJob,
+  isBlockingStatus: () => isBlockingStatus,
+  isCompletedStatus: () => isCompletedStatus,
+  isUnplannedWorkOrderNo: () => isUnplannedWorkOrderNo
+});
+function isBlockingStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
+}
+function isCompletedStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
+}
+function extractJobNoFromWorkOrderNo(workOrderNo, vesselCode) {
+  if (!workOrderNo) return null;
+  if (isUnplannedWorkOrderNo(workOrderNo)) return null;
+  const knownVesselCode = vesselCode?.trim();
+  const numberWithoutKnownVesselPrefix = knownVesselCode && workOrderNo.startsWith(`${knownVesselCode}-`) ? workOrderNo.slice(knownVesselCode.length + 1) : workOrderNo;
+  const vesselPrefixedMkrMatch = numberWithoutKnownVesselPrefix.match(
+    /^(?:.+-)?(MKR-[^-]+-\d+)-\d+\.\d+.*-\d{4}-\d+$/
+  );
+  if (vesselPrefixedMkrMatch) {
+    return vesselPrefixedMkrMatch[1];
+  }
+  const newFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+  if (newFormatMatch) {
+    return newFormatMatch[1];
+  }
+  const woSuffixMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)\.WO-\d{4}-\d+$/);
+  if (woSuffixMatch) {
+    return woSuffixMatch[1];
+  }
+  const oldFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+)-\d{4}-\d+$/);
+  if (oldFormatMatch) {
+    return oldFormatMatch[1];
+  }
+  return null;
+}
+function isUnplannedWorkOrderNo(workOrderNo) {
+  if (!workOrderNo) return false;
+  return /(?:^|-)UWO-[^-]+-\d{4}-\d+$/.test(workOrderNo.trim());
+}
+function buildJobsWithActiveWOSet(workOrders2, vesselId) {
+  const byJobId = /* @__PURE__ */ new Set();
+  const byJobNo = /* @__PURE__ */ new Set();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (isBlockingStatus(wo.status)) {
+      if (wo.jobId) {
+        byJobId.add(wo.jobId);
+      }
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        byJobNo.add(`${woVesselId}|${jobNo}`);
+      }
+    }
+  });
+  return { byJobId, byJobNo };
+}
+function buildRhCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
+    }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (wo.cycleDueRhSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
+      }
+    }
+  });
+  return cycleMap;
+}
+function buildCalendarCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
+    }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (wo.cycleDueDateSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
+      }
+    }
+  });
+  return cycleMap;
+}
+function findBlockingWOForJob(workOrders2, jobId, jobNo) {
+  return workOrders2.find((wo) => {
+    if (wo.isDeleted === true) return false;
+    if (!isBlockingStatus(wo.status)) return false;
+    if (wo.jobId === jobId) return true;
+    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+    return woJobNo === jobNo;
+  });
+}
+var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
+var init_workOrderStatus = __esm({
+  "server/utils/workOrderStatus.ts"() {
+    "use strict";
+    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "active",
+      "due",
+      "due (grace p)",
+      "due (grace)",
+      "overdue",
+      "pending approval",
+      "pending_approval",
+      "pendingapproval",
+      "postponed",
+      "in progress",
+      "in_progress",
+      "inprogress",
+      "open",
+      "rejected",
+      // Rejected WOs block new generation - work needs rework before cycle can advance
+      "awaiting office approval",
+      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
+      "postponement approved"
+      // Postponement approved — WO is still active, scanner must not re-generate
+    ]);
+    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "completed",
+      "closed",
+      "approved",
+      "cancelled",
+      "canceled"
+    ]);
+  }
+});
+
 // shared/syncConfig.ts
 var syncConfig_exports = {};
 __export(syncConfig_exports, {
@@ -7438,6 +7616,9 @@ var init_rhEventComparator = __esm({
 });
 
 // server/modules/sync/oneWayApplier.ts
+function getSoftDeleteSetClause(tableName) {
+  return tableName === "jobs" || tableName === "components" || tableName === "spares" ? "is_deleted = true, is_active = false, updated_at = NOW()" : "is_deleted = true, updated_at = NOW()";
+}
 async function getColumnMeta(pool4, tableName) {
   if (columnMetaCache.has(tableName)) return columnMetaCache.get(tableName);
   let identityAlwaysCols = /* @__PURE__ */ new Set();
@@ -7671,7 +7852,7 @@ async function applyOneWayRows(tableName, rows) {
       if (existCheck.rows.length > 0) {
         if (isDeleted) {
           await pool4.query(
-            `UPDATE "${tableName}" SET is_deleted = true, updated_at = NOW() WHERE ${whereClause}`,
+            `UPDATE "${tableName}" SET ${getSoftDeleteSetClause(tableName)} WHERE ${whereClause}`,
             whereValues
           );
           result.softDeleted++;
@@ -10498,168 +10679,6 @@ var init_alertsRepository = __esm({
   "server/modules/alerts/repositories/alertsRepository.ts"() {
     "use strict";
     init_storage();
-  }
-});
-
-// server/utils/workOrderStatus.ts
-var workOrderStatus_exports = {};
-__export(workOrderStatus_exports, {
-  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
-  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
-  buildRhCycleWOMap: () => buildRhCycleWOMap,
-  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
-  findBlockingWOForJob: () => findBlockingWOForJob,
-  isBlockingStatus: () => isBlockingStatus,
-  isCompletedStatus: () => isCompletedStatus
-});
-function isBlockingStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
-}
-function isCompletedStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
-}
-function extractJobNoFromWorkOrderNo(workOrderNo) {
-  if (!workOrderNo) return null;
-  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-  if (newFormatMatch) {
-    return newFormatMatch[1];
-  }
-  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
-  if (woSuffixMatch) {
-    return woSuffixMatch[1];
-  }
-  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-  if (oldFormatMatch) {
-    return oldFormatMatch[1];
-  }
-  return null;
-}
-function buildJobsWithActiveWOSet(workOrders2, vesselId) {
-  const byJobId = /* @__PURE__ */ new Set();
-  const byJobNo = /* @__PURE__ */ new Set();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (isBlockingStatus(wo.status)) {
-      if (wo.jobId) {
-        byJobId.add(wo.jobId);
-      }
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        byJobNo.add(`${woVesselId}|${jobNo}`);
-      }
-    }
-  });
-  return { byJobId, byJobNo };
-}
-function buildRhCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueRhSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function buildCalendarCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueDateSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function findBlockingWOForJob(workOrders2, jobId, jobNo) {
-  return workOrders2.find((wo) => {
-    if (wo.isDeleted === true) return false;
-    if (!isBlockingStatus(wo.status)) return false;
-    if (wo.jobId === jobId) return true;
-    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-    return woJobNo === jobNo;
-  });
-}
-var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
-var init_workOrderStatus = __esm({
-  "server/utils/workOrderStatus.ts"() {
-    "use strict";
-    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "active",
-      "due",
-      "due (grace p)",
-      "due (grace)",
-      "overdue",
-      "pending approval",
-      "pending_approval",
-      "pendingapproval",
-      "postponed",
-      "in progress",
-      "in_progress",
-      "inprogress",
-      "open",
-      "rejected",
-      // Rejected WOs block new generation - work needs rework before cycle can advance
-      "awaiting office approval",
-      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
-      "postponement approved"
-      // Postponement approved — WO is still active, scanner must not re-generate
-    ]);
-    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "completed",
-      "closed",
-      "approved",
-      "cancelled",
-      "canceled"
-    ]);
   }
 });
 
@@ -22373,14 +22392,14 @@ async function findByNameAndVessel(name, vesselId, excludeId) {
 async function update2(id, data) {
   return storage.updateComponent(id, data);
 }
-async function remove(id) {
-  return storage.deleteComponent(id);
+async function remove(id, userId) {
+  return storage.deleteComponent(id, userId);
 }
 async function createAuditLog(data) {
   return storage.createAuditLog(data);
 }
-async function inactivate(id, vesselId, userId) {
-  return storage.inactivateComponent(id, vesselId, userId);
+async function inactivate(id, vesselId, userId, apply = true) {
+  return storage.inactivateComponent(id, vesselId, userId, apply);
 }
 async function bulkUpsert(components2) {
   return storage.bulkUpsertComponents(components2);
@@ -22905,6 +22924,9 @@ async function create3(data) {
 }
 async function update3(id, data, userId) {
   console.log(`\u{1F527} PATCH /api/components/${id} with:`, JSON.stringify(data, null, 2).substring(0, 500));
+  if (Object.prototype.hasOwnProperty.call(data, "isDeleted") || Object.prototype.hasOwnProperty.call(data, "is_deleted")) {
+    throw new ValidationError("Component deletion status can only be changed through the Delete Component action");
+  }
   const existingComponent = await findById(id);
   if (!existingComponent) {
     throw new NotFoundError("Component not found");
@@ -23090,18 +23112,37 @@ async function updateSortOrder2(body) {
   }
   return updateSortOrder(updates);
 }
-async function remove2(id) {
+async function remove2(id, userId = "system") {
   const existing = await findById(id);
-  if (existing?.cuuid) {
-    const installed = await getInstalledForComponent(existing.cuuid);
-    if (installed) {
-      await detachFromComponent(installed.riuuid, {
-        currentRh: componentRhSnapshot(existing),
-        rhLastUpdated: existing.lastUpdated ?? null
-      });
-    }
+  if (!existing) {
+    throw new NotFoundError("Component not found");
   }
-  return remove(id);
+  if (!existing.vesselId) {
+    throw new ValidationError("Only vessel components can be deleted through the Component Register");
+  }
+  const lifecycleCheck = await inactivate(id, existing.vesselId, userId, false);
+  if (!lifecycleCheck.success) {
+    const error = new ValidationError(lifecycleCheck.message);
+    error.code = lifecycleCheck.code;
+    error.activeChildrenCount = lifecycleCheck.activeChildrenCount;
+    error.activeJobsCount = lifecycleCheck.activeJobsCount;
+    error.linkedSparesCount = lifecycleCheck.linkedSparesCount;
+    throw error;
+  }
+  await remove(id, userId);
+  await auditComponent({
+    actionType: "delete",
+    component: existing,
+    payload: {
+      componentCode: existing.componentCode,
+      isDeleted: { old: false, new: true },
+      isActive: { old: existing.isActive, new: false }
+    }
+  });
+  return {
+    ...lifecycleCheck,
+    message: "Component deleted successfully. Existing Work Orders and maintenance history have been retained."
+  };
 }
 async function inactivate2(id, vesselId, userId) {
   const result = await inactivate(id, vesselId, userId);
@@ -23172,6 +23213,7 @@ var init_postgresStorage = __esm({
   "server/postgresStorage.ts"() {
     "use strict";
     init_db();
+    init_workOrderStatus();
     init_schema();
     init_sync();
     init_dateUpdatedLocalSql();
@@ -23324,31 +23366,32 @@ var init_postgresStorage = __esm({
         return result[0];
       }
       // ============= VESSELS (Module 1) =============
-      async getVessels() {
+      async getVessels(options = {}) {
         const db2 = await getDb();
-        const result = await db2.select().from(vessels);
+        const result = options.includeDeleted ? await db2.select().from(vessels) : await db2.select().from(vessels).where(or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted)));
         return result.map((v) => ({
           id: v.id,
           vuuid: v.vuuid,
           name: v.name,
           code: v.code,
+          vCode: v.vCode ?? null,
           imoNumber: v.imoNumber ?? null,
           vesselType: v.vesselType ?? null
         }));
       }
-      async getVessel(id) {
+      async getVessel(id, options = {}) {
         const db2 = await getDb();
-        const result = await db2.select().from(vessels).where(eq7(vessels.vuuid, id));
+        const result = await db2.select().from(vessels).where(options.includeDeleted ? eq7(vessels.vuuid, id) : and6(eq7(vessels.vuuid, id), or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted))));
         return result[0];
       }
-      async getVesselByCode(code) {
+      async getVesselByCode(code, options = {}) {
         const db2 = await getDb();
-        const result = await db2.select().from(vessels).where(eq7(vessels.code, code));
+        const result = await db2.select().from(vessels).where(options.includeDeleted ? eq7(vessels.code, code) : and6(eq7(vessels.code, code), or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted))));
         return result[0];
       }
-      async getVesselIdByName(vesselName) {
+      async getVesselIdByName(vesselName, options = {}) {
         const db2 = await getDb();
-        const result = await db2.select().from(vessels).where(eq7(vessels.name, vesselName));
+        const result = await db2.select().from(vessels).where(options.includeDeleted ? eq7(vessels.name, vesselName) : and6(eq7(vessels.name, vesselName), or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted))));
         return result[0]?.vuuid;
       }
       async createVessel(vessel) {
@@ -23820,21 +23863,29 @@ var init_postgresStorage = __esm({
         if (vesselIds && vesselIds.length > 0) {
           return await db2.select().from(components).where(and6(
             inArray2(components.vesselId, vesselIds),
-            eq7(components.dataScope, "vessel")
+            eq7(components.dataScope, "vessel"),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
           ));
         }
         if (!vesselId || vesselId === "all") {
-          return await db2.select().from(components).where(eq7(components.dataScope, "vessel"));
+          return await db2.select().from(components).where(and6(
+            eq7(components.dataScope, "vessel"),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+          ));
         }
         return await db2.select().from(components).where(and6(
           eq7(components.vesselId, vesselId),
-          eq7(components.dataScope, "vessel")
+          eq7(components.dataScope, "vessel"),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
       }
       async getComponent(id) {
         const db2 = await getDb();
         const result = await db2.select().from(components).where(
-          or(eq7(components.cuuid, id), eq7(components.id, id))
+          and6(
+            or(eq7(components.cuuid, id), eq7(components.id, id)),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+          )
         );
         return result[0];
       }
@@ -23842,7 +23893,8 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.select().from(components).where(and6(
           eq7(components.componentCode, componentCode),
-          eq7(components.vesselId, vesselId)
+          eq7(components.vesselId, vesselId),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
         return result[0];
       }
@@ -23859,21 +23911,62 @@ var init_postgresStorage = __esm({
       }
       async updateComponent(id, data) {
         const db2 = await getDb();
-        const result = await db2.update(components).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(or(eq7(components.cuuid, id), eq7(components.id, id))).returning();
+        const result = await db2.update(components).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and6(
+          or(eq7(components.cuuid, id), eq7(components.id, id)),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+        )).returning();
         if (!result[0]) {
           throw new Error(`Component ${id} not found`);
         }
         return result[0];
       }
-      async deleteComponent(id) {
+      async deleteComponent(id, userId) {
         const db2 = await getDb();
-        await db2.delete(components).where(or(eq7(components.cuuid, id), eq7(components.id, id)));
+        await db2.transaction(async (tx) => {
+          const existing = await tx.select().from(components).where(and6(
+            or(eq7(components.cuuid, id), eq7(components.id, id)),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+          )).limit(1);
+          const component = existing[0];
+          if (!component) {
+            throw new Error(`Component ${id} not found`);
+          }
+          const currentStamp = component.currentStamp;
+          if (component.vesselId && currentStamp) {
+            const installed = await tx.select().from(rotationalItems).where(and6(
+              eq7(rotationalItems.vesselId, component.vesselId),
+              eq7(rotationalItems.stamp, currentStamp),
+              eq7(rotationalItems.status, "Installed"),
+              eq7(rotationalItems.isDeleted, false)
+            )).limit(1);
+            if (installed[0]) {
+              const released = await tx.update(rotationalItems).set({ status: "Spare", updatedAt: /* @__PURE__ */ new Date(), updatedByUuid: userId }).where(eq7(rotationalItems.riuuid, installed[0].riuuid)).returning();
+              if (!released[0]) {
+                throw new Error(`Unable to release rotational item for component ${id}`);
+              }
+              await logFieldChanges(
+                "rotational_items",
+                installed[0].riuuid,
+                component.vesselId,
+                installed[0],
+                released[0],
+                userId || "system",
+                tx
+              );
+            }
+          }
+          const result = await tx.update(components).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(components.cuuid, component.cuuid)).returning();
+          if (!result[0]) {
+            throw new Error(`Component ${id} not found`);
+          }
+        });
       }
-      async inactivateComponent(id, vesselId, userId) {
+      async inactivateComponent(id, vesselId, userId, apply = true) {
         const db2 = await getDb();
         const componentResult = await db2.select().from(components).where(and6(
           or(eq7(components.cuuid, id), eq7(components.id, id)),
-          eq7(components.vesselId, vesselId)
+          eq7(components.vesselId, vesselId),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         )).limit(1);
         if (componentResult.length === 0) {
           return {
@@ -23886,7 +23979,8 @@ var init_postgresStorage = __esm({
         const activeChildren = await db2.select().from(components).where(and6(
           or(eq7(components.parentId, component.cuuid), eq7(components.parentId, component.id)),
           eq7(components.isActive, true),
-          eq7(components.vesselId, vesselId)
+          eq7(components.vesselId, vesselId),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
         if (activeChildren.length > 0) {
           return {
@@ -23906,7 +24000,8 @@ var init_postgresStorage = __esm({
             ...componentCode ? [eq7(jobs.componentCode, componentCode)] : []
           ),
           eq7(jobs.isActive, true),
-          eq7(jobs.vesselId, vesselId)
+          eq7(jobs.vesselId, vesselId),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
         ));
         for (const job of directJobs) {
           activeJobIds.add(job.juuid);
@@ -23919,7 +24014,12 @@ var init_postgresStorage = __esm({
         }
         const linkedJobs = Array.from(linkedJobsMap.values());
         for (const link of linkedJobs) {
-          const jobResult = await db2.select().from(jobs).where(and6(eq7(jobs.juuid, link.jobId), eq7(jobs.isActive, true), eq7(jobs.vesselId, vesselId))).limit(1);
+          const jobResult = await db2.select().from(jobs).where(and6(
+            eq7(jobs.juuid, link.jobId),
+            eq7(jobs.isActive, true),
+            eq7(jobs.vesselId, vesselId),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+          )).limit(1);
           if (jobResult.length > 0) {
             activeJobIds.add(link.jobId);
           }
@@ -23940,7 +24040,8 @@ var init_postgresStorage = __esm({
             ...componentCode ? [eq7(spares.componentCode, componentCode)] : []
           ),
           eq7(spares.isActive, true),
-          eq7(spares.vesselId, vesselId)
+          eq7(spares.vesselId, vesselId),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
         ));
         for (const s of directSpares) {
           activeSpareIds.add(s.id);
@@ -23951,7 +24052,8 @@ var init_postgresStorage = __esm({
             eq7(spares.id, spareComponentLinks.spareId)
           ),
           eq7(spares.isActive, true),
-          eq7(spares.vesselId, vesselId)
+          eq7(spares.vesselId, vesselId),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
         )).where(or(
           eq7(spareComponentLinks.componentId, component.cuuid),
           ...component.id !== component.cuuid ? [eq7(spareComponentLinks.componentId, component.id)] : []
@@ -23977,7 +24079,15 @@ var init_postgresStorage = __esm({
           const { isBlockingStatus: isBlockingStatus2 } = await Promise.resolve().then(() => (init_workOrderStatus(), workOrderStatus_exports));
           activeWorkOrdersCount = woResults.filter((wo) => isBlockingStatus2(wo.status)).length;
         }
-        await db2.update(components).set({ isActive: false }).where(and6(
+        if (!apply) {
+          return {
+            success: true,
+            message: "Component passed lifecycle dependency checks.",
+            componentsInactivated: 0,
+            activeWorkOrdersCount
+          };
+        }
+        await db2.update(components).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(and6(
           eq7(components.cuuid, component.cuuid),
           eq7(components.vesselId, vesselId)
         ));
@@ -23991,13 +24101,17 @@ var init_postgresStorage = __esm({
       // Fleet-Scoped Components (legacy - queries components table with dataScope='fleet')
       async getFleetScopedComponents() {
         const db2 = await getDb();
-        return await db2.select().from(components).where(eq7(components.dataScope, "fleet"));
+        return await db2.select().from(components).where(and6(
+          eq7(components.dataScope, "fleet"),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+        ));
       }
       async getFleetScopedComponent(id) {
         const db2 = await getDb();
         const result = await db2.select().from(components).where(and6(
           or(eq7(components.cuuid, id), eq7(components.id, id)),
-          eq7(components.dataScope, "fleet")
+          eq7(components.dataScope, "fleet"),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
         return result[0];
       }
@@ -24024,7 +24138,8 @@ var init_postgresStorage = __esm({
         return await db2.select().from(components).where(and6(
           eq7(components.vesselId, vesselId),
           eq7(components.rhCounterType, "MASTER"),
-          eq7(components.dataScope, "vessel")
+          eq7(components.dataScope, "vessel"),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
       }
       // Get all INHERITED components linked to a specific MASTER
@@ -24034,7 +24149,10 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         let masterComponent = await this.getComponent(masterComponentId);
         if (!masterComponent) {
-          const byCode = await db2.select().from(components).where(eq7(components.componentCode, masterComponentId)).limit(1);
+          const byCode = await db2.select().from(components).where(and6(
+            eq7(components.componentCode, masterComponentId),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+          )).limit(1);
           masterComponent = byCode[0] || null;
         }
         const masterComponentCode = masterComponent?.componentCode || masterComponentId;
@@ -24052,7 +24170,8 @@ var init_postgresStorage = __esm({
             eq7(components.rhMasterComponentId, masterComponentCode),
             eq7(components.rhMasterComponentId, masterComponentId),
             eq7(components.rhCounterSource, masterComponentCode)
-          )
+          ),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
       }
       // Update RH counter type configuration for a component
@@ -24651,17 +24770,20 @@ var init_postgresStorage = __esm({
       // ============= MODULE 4: JOBS =============
       async getJobs(vesselId, componentId, vesselIds) {
         const db2 = await getDb();
+        const notDeleted2 = or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted));
         if (vesselIds && vesselIds.length > 0) {
           return await db2.select().from(jobs).where(and6(
             inArray2(jobs.vesselId, vesselIds),
-            eq7(jobs.dataScope, "vessel")
+            eq7(jobs.dataScope, "vessel"),
+            notDeleted2
           )).orderBy(asc2(jobs.jobNo));
         }
         if (vesselId && vesselId !== "all" && componentId) {
           const directJobs = await db2.select().from(jobs).where(and6(
             eq7(jobs.vesselId, vesselId),
             eq7(jobs.componentId, componentId),
-            eq7(jobs.dataScope, "vessel")
+            eq7(jobs.dataScope, "vessel"),
+            notDeleted2
           )).orderBy(asc2(jobs.jobNo));
           const linkedJobIds = await this.getJobComponentLinksByComponent(componentId);
           const linkedJobs = [];
@@ -24687,21 +24809,28 @@ var init_postgresStorage = __esm({
         if (vesselId && vesselId !== "all") {
           return await db2.select().from(jobs).where(and6(
             eq7(jobs.vesselId, vesselId),
-            eq7(jobs.dataScope, "vessel")
+            eq7(jobs.dataScope, "vessel"),
+            notDeleted2
           )).orderBy(asc2(jobs.jobNo));
         }
-        return await db2.select().from(jobs).where(eq7(jobs.dataScope, "vessel")).orderBy(asc2(jobs.jobNo));
+        return await db2.select().from(jobs).where(and6(eq7(jobs.dataScope, "vessel"), notDeleted2)).orderBy(asc2(jobs.jobNo));
       }
       async getJob(id) {
         const db2 = await getDb();
         const result = await db2.select().from(jobs).where(
-          or(eq7(jobs.juuid, id), eq7(jobs.id, id))
+          and6(
+            or(eq7(jobs.juuid, id), eq7(jobs.id, id)),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+          )
         );
         return result[0];
       }
       async getJobByJobNo(jobNo) {
         const db2 = await getDb();
-        const result = await db2.select().from(jobs).where(eq7(jobs.jobNo, jobNo));
+        const result = await db2.select().from(jobs).where(and6(
+          eq7(jobs.jobNo, jobNo),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+        ));
         return result[0];
       }
       async createJob(job) {
@@ -24717,7 +24846,10 @@ var init_postgresStorage = __esm({
       }
       async updateJob(id, data) {
         const db2 = await getDb();
-        const result = await db2.update(jobs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(or(eq7(jobs.juuid, id), eq7(jobs.id, id))).returning();
+        const result = await db2.update(jobs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and6(
+          or(eq7(jobs.juuid, id), eq7(jobs.id, id)),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+        )).returning();
         if (!result[0]) {
           throw new Error(`Job ${id} not found`);
         }
@@ -24725,7 +24857,19 @@ var init_postgresStorage = __esm({
       }
       async deleteJob(id) {
         const db2 = await getDb();
-        await db2.delete(jobs).where(or(eq7(jobs.juuid, id), eq7(jobs.id, id)));
+        const existing = await db2.select().from(jobs).where(
+          and6(
+            or(eq7(jobs.juuid, id), eq7(jobs.id, id)),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+          )
+        );
+        if (!existing[0]) {
+          throw new Error(`Job ${id} not found`);
+        }
+        const result = await db2.update(jobs).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(jobs.juuid, existing[0].juuid)).returning();
+        if (!result[0]) {
+          throw new Error(`Job ${id} not found`);
+        }
       }
       async bulkCreateJobs(jobList) {
         if (jobList.length === 0) return [];
@@ -24783,10 +24927,14 @@ var init_postgresStorage = __esm({
         if (vesselId) {
           result = await db2.select().from(jobs).where(and6(
             inArray2(jobs.jobNo, jobNos),
-            eq7(jobs.vesselId, vesselId)
+            eq7(jobs.vesselId, vesselId),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
           ));
         } else {
-          result = await db2.select().from(jobs).where(inArray2(jobs.jobNo, jobNos));
+          result = await db2.select().from(jobs).where(and6(
+            inArray2(jobs.jobNo, jobNos),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+          ));
         }
         const map = /* @__PURE__ */ new Map();
         for (const job of result) {
@@ -24930,7 +25078,10 @@ var init_postgresStorage = __esm({
       // ============= MODULE 7: SPARES =============
       async getAllSpares() {
         const db2 = await getDb();
-        return await db2.select().from(spares).where(eq7(spares.deleted, false));
+        return await db2.select().from(spares).where(and6(
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
+        ));
       }
       async getSpares(vesselId, vesselIds) {
         const db2 = await getDb();
@@ -24938,19 +25089,22 @@ var init_postgresStorage = __esm({
           return await db2.select().from(spares).where(and6(
             inArray2(spares.vesselId, vesselIds),
             eq7(spares.dataScope, "vessel"),
-            eq7(spares.deleted, false)
+            eq7(spares.deleted, false),
+            or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
           ));
         }
         if (!vesselId || vesselId === "all") {
           return await db2.select().from(spares).where(and6(
             eq7(spares.dataScope, "vessel"),
-            eq7(spares.deleted, false)
+            eq7(spares.deleted, false),
+            or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
           ));
         }
         return await db2.select().from(spares).where(and6(
           eq7(spares.vesselId, vesselId),
           eq7(spares.dataScope, "vessel"),
-          eq7(spares.deleted, false)
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
         ));
       }
       async getSpare(id) {
@@ -24960,6 +25114,13 @@ var init_postgresStorage = __esm({
           or(eq7(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq7(spares.id, numId)] : [])
         );
         return result[0];
+      }
+      async getOperationalSpare(id) {
+        const spare = await this.getSpare(id);
+        if (!spare || spare.deleted || spare.isDeleted) {
+          throw Object.assign(new Error(`Spare ${id} not found`), { statusCode: 404 });
+        }
+        return spare;
       }
       async createSpare(spare, skipSiblingSync = false) {
         const db2 = await getDb();
@@ -25114,14 +25275,17 @@ var init_postgresStorage = __esm({
         }
         return updatedSpare;
       }
-      async deleteSpare(id) {
+      async deleteSpare(id, userId = "system") {
         const db2 = await getDb();
         const existingSpare = await this.getSpare(id);
+        if (!existingSpare || existingSpare.deleted || existingSpare.isDeleted) {
+          throw new Error(`Spare ${id} not found`);
+        }
         const numId = Number(id);
-        await db2.update(spares).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(or(eq7(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq7(spares.id, numId)] : []));
+        await db2.update(spares).set({ deleted: true, isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(or(eq7(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq7(spares.id, numId)] : []));
         if (existingSpare) {
           try {
-            await logSoftDelete("spares", existingSpare.suuid, existingSpare.vesselId || null, "system");
+            await logSoftDelete("spares", existingSpare.suuid, existingSpare.vesselId || null, userId);
           } catch (err) {
             console.error("[FieldLogger] Spare delete:", err);
           }
@@ -25175,11 +25339,8 @@ var init_postgresStorage = __esm({
         }
       }
       async consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const newRob = (spare.rob ?? 0) - quantity;
         const newRobA = (spare.robLocationA ?? 0) - quantity;
         const stockTargets = await this.resolveLegacyStockTargets(spare);
@@ -25227,11 +25388,8 @@ var init_postgresStorage = __esm({
         return updated;
       }
       async consumeSpareFromLocation(id, quantity, location, userId, remarks, workOrderRef, dateLocal) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const currentRobA = spare.robLocationA ?? 0;
         const currentRobB = spare.robLocationB ?? 0;
         const currentRob = spare.rob ?? 0;
@@ -25291,11 +25449,8 @@ var init_postgresStorage = __esm({
         };
       }
       async receiveSpareToLocation(id, quantity, location, userId, remarks, supplierPO, dateLocal) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const currentRobA = spare.robLocationA ?? 0;
         const currentRobB = spare.robLocationB ?? 0;
         const currentRob = spare.rob ?? 0;
@@ -25351,11 +25506,8 @@ var init_postgresStorage = __esm({
         };
       }
       async adjustSpareAtLocation(id, newRob, location, userId, remarks, place, dateLocal, tz) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         if (isNaN(newRob) || newRob < 0) {
           throw new Error("newRob must be a valid non-negative number");
         }
@@ -25415,11 +25567,8 @@ var init_postgresStorage = __esm({
         return updated;
       }
       async transferSpareLocation(id, newRobLocationA, newRobLocationB, userId, remarks, place, dateLocal, tz) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const oldLocA = spare.robLocationA ?? 0;
         const oldLocB = spare.robLocationB ?? 0;
         const newLocA = Number(newRobLocationA) || 0;
@@ -25519,11 +25668,8 @@ var init_postgresStorage = __esm({
         return { spare: txResult, isTransfer: isTrueTransfer };
       }
       async receiveSpare(id, quantity, userId, remarks, supplierPO, place, dateLocal, tz) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const newRob = (spare.rob ?? 0) + quantity;
         const newRobA = (spare.robLocationA ?? 0) + quantity;
         const stockTargets = await this.resolveLegacyStockTargets(spare);
@@ -25566,11 +25712,8 @@ var init_postgresStorage = __esm({
         return updated;
       }
       async adjustSpareQuantity(spareId, qtyChange, eventType, reference, notes) {
+        const spare = await this.getOperationalSpare(spareId);
         const db2 = await getDb();
-        const spare = await this.getSpare(spareId);
-        if (!spare) {
-          throw new Error(`Spare ${spareId} not found`);
-        }
         const currentRob = spare.rob ?? 0;
         const currentRobA = spare.robLocationA ?? 0;
         const newRob = Math.max(0, currentRob + qtyChange);
@@ -26877,7 +27020,8 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         return await db2.select().from(spares).where(and6(
           eq7(spares.dataScope, "vessel"),
-          eq7(spares.deleted, false)
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
         ));
       }
       async getUnacknowledgedAlertEventsForRole(userRole, vesselId) {
@@ -29149,13 +29293,13 @@ var init_postgresStorage = __esm({
         const jobResult = await db2.delete(jobs).where(eq7(jobs.vesselId, vesselId)).returning();
         return { jobsDeleted: jobResult.length, workOrdersDeleted };
       }
-      async getVesselsByFleet(fleetId) {
+      async getVesselsByFleet(fleetId, options = {}) {
         const db2 = await getDb();
-        return await db2.select().from(vessels).where(eq7(vessels.fleetId, fleetId));
+        return await db2.select().from(vessels).where(options.includeDeleted ? eq7(vessels.fleetId, fleetId) : and6(eq7(vessels.fleetId, fleetId), or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted))));
       }
-      async getVesselsWithFleets() {
+      async getVesselsWithFleets(options = {}) {
         const db2 = await getDb();
-        const allVessels = await db2.select().from(vessels);
+        const allVessels = options.includeDeleted ? await db2.select().from(vessels) : await db2.select().from(vessels).where(or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted)));
         const allFleets = await db2.select().from(fleets);
         const fleetMap = new Map(allFleets.map((f) => [f.id, f]));
         return allVessels.map((vessel) => {
@@ -29599,10 +29743,12 @@ var init_postgresStorage = __esm({
         const job = await db2.select().from(jobs).where(eq7(jobs.juuid, jobId)).limit(1);
         if (job.length === 0 || !job[0].jobNo) return [];
         const jobNo = job[0].jobNo;
+        const vessel = job[0].vesselId ? await db2.select({ vCode: vessels.vCode }).from(vessels).where(eq7(vessels.vuuid, job[0].vesselId)).limit(1) : [];
+        const vesselCode = vessel[0]?.vCode;
         const allRecords = await db2.select().from(componentMaintenanceHistory).where(eq7(componentMaintenanceHistory.componentCode, componentCode)).orderBy(desc2(componentMaintenanceHistory.dateCompleted));
         return allRecords.filter((record) => {
           if (!record.workOrderNo) return false;
-          return record.workOrderNo.startsWith(jobNo + "-");
+          return extractJobNoFromWorkOrderNo(record.workOrderNo, vesselCode) === jobNo;
         });
       }
       async getJobComponentLinksByJob(jobId) {
@@ -29806,7 +29952,11 @@ var init_postgresStorage = __esm({
           partCode: spares.partCode,
           partName: spares.partName,
           qty: spareLocationStock.qty
-        }).from(spareLocationStock).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(eq7(spareLocationStock.locationId, locationId));
+        }).from(spareLocationStock).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(and6(
+          eq7(spareLocationStock.locationId, locationId),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
+        ));
         return result;
       }
       async getFullSparesAtLocation(locationId, vesselId) {
@@ -29844,6 +29994,8 @@ var init_postgresStorage = __esm({
         }).from(spareLocationStock).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(and6(
           eq7(spareLocationStock.locationId, locationId),
           eq7(spares.vesselId, vesselId),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted)),
           gt2(spareLocationStock.qty, 0)
         ));
         return result;
@@ -29856,6 +30008,8 @@ var init_postgresStorage = __esm({
           sparesCount: sql9`count(distinct ${spareLocationStock.spareId})`.as("spares_count")
         }).from(spareLocationStock).innerJoin(locations, eq7(spareLocationStock.locationId, locations.id)).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(and6(
           eq7(spares.vesselId, vesselId),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted)),
           gt2(spareLocationStock.qty, 0)
         )).groupBy(locations.id, locations.locationName).orderBy(asc2(locations.locationName));
         return result;
@@ -29909,6 +30063,7 @@ var init_postgresStorage = __esm({
         return await query;
       }
       async performInventoryTransaction(input) {
+        await this.getOperationalSpare(String(input.spareId));
         const db2 = await getDb();
         const location = await this.getLocationById(input.locationId);
         if (!location) {
@@ -30098,7 +30253,7 @@ var init_postgresStorage = __esm({
       }
       async getSpareWithInventory(spareId) {
         const spare = await this.getSpare(spareId);
-        if (!spare) return null;
+        if (!spare || spare.deleted || spare.isDeleted) return null;
         const locationsWithQty = await this.getSpareLocationsWithQty(spare.id);
         const robTotal = locationsWithQty.reduce((sum2, l) => sum2 + l.qty, 0);
         const linkedComponents = await this.getLinkedComponentsForSpare(spare.id, spare.vesselId || void 0);
@@ -30132,6 +30287,7 @@ var init_postgresStorage = __esm({
       LEFT JOIN components c ON scl.component_id = c.cuuid
       WHERE ${vesselId === "all" ? sql9`TRUE` : sql9`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
+        AND (s.is_deleted IS NULL OR s.is_deleted = false)
         AND s.data_scope = 'vessel'
       GROUP BY s.id
     `);
@@ -30221,6 +30377,7 @@ var init_postgresStorage = __esm({
         const dir = (opts.sortDir || "asc").toLowerCase() === "desc" ? sql9.raw("DESC") : sql9.raw("ASC");
         const filters = [
           sql9`s.deleted = false`,
+          sql9`(s.is_deleted IS NULL OR s.is_deleted = false)`,
           sql9`s.data_scope = 'vessel'`
         ];
         if (vesselId !== "all") {
@@ -30401,7 +30558,11 @@ var init_postgresStorage = __esm({
       }
       async getSparesWithInventoryByComponent(componentId) {
         const db2 = await getDb();
-        const directSpares = await db2.select().from(spares).where(eq7(spares.componentId, componentId));
+        const directSpares = await db2.select().from(spares).where(and6(
+          eq7(spares.componentId, componentId),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
+        ));
         const links = await this.getSpareComponentLinksByComponent(componentId);
         const spareIdSet = /* @__PURE__ */ new Set();
         const results = [];
@@ -31357,7 +31518,8 @@ __export(workOrderNumbering_exports, {
   generateJobNumber: () => generateJobNumber,
   generatePlannedWorkOrderNumber: () => generatePlannedWorkOrderNumber,
   generateUnplannedWorkOrderNumber: () => generateUnplannedWorkOrderNumber,
-  isValidJobNumber: () => isValidJobNumber
+  isValidJobNumber: () => isValidJobNumber,
+  resolveVesselCode: () => resolveVesselCode
 });
 async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, vesselId) {
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
@@ -31366,24 +31528,21 @@ async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, 
   }
   const safeJobCode = jobCode && jobCode.trim() ? jobCode.trim() : "UNKNOWN-JOB";
   const safeComponentCode = componentCode.trim();
+  const vesselCode = await resolveVesselCode(storage2, vesselId);
   const allWorkOrders = await storage2.getWorkOrders(vesselId);
-  const existingWOsForJobComponent = allWorkOrders.filter((wo) => {
-    const plannedPattern = new RegExp(`^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`);
-    return plannedPattern.test(wo.workOrderNo);
-  });
-  let maxRunningNumber = 0;
-  existingWOsForJobComponent.forEach((wo) => {
-    const match = wo.workOrderNo.match(/-(\d+)$/);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxRunningNumber) {
-        maxRunningNumber = num;
-      }
-    }
-  });
+  const legacyPattern = new RegExp(
+    `^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const vesselPrefixedPattern = new RegExp(
+    `^${escapeRegex(vesselCode)}-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const maxRunningNumber = findMaxSequence(
+    allWorkOrders.map((wo) => wo.workOrderNo),
+    [legacyPattern, vesselPrefixedPattern]
+  );
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, "0");
-  return `${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${vesselCode}-${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCode) {
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
@@ -31391,24 +31550,55 @@ async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCod
     throw new Error("Component code is required for unplanned work order numbering");
   }
   const safeComponentCode = componentCode.trim();
+  const vesselCode = await resolveVesselCode(storage2, vesselId);
   const allWorkOrders = await storage2.getWorkOrders(vesselId);
-  const existingUnplannedWOs = allWorkOrders.filter((wo) => {
-    const unplannedPattern = new RegExp(`^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`);
-    return unplannedPattern.test(wo.workOrderNo);
-  });
-  let maxRunningNumber = 0;
-  existingUnplannedWOs.forEach((wo) => {
-    const match = wo.workOrderNo.match(/-(\d+)$/);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxRunningNumber) {
-        maxRunningNumber = num;
-      }
-    }
-  });
+  const legacyPattern = new RegExp(
+    `^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const vesselPrefixedPattern = new RegExp(
+    `^${escapeRegex(vesselCode)}-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const maxRunningNumber = findMaxSequence(
+    allWorkOrders.map((wo) => wo.workOrderNo),
+    [legacyPattern, vesselPrefixedPattern]
+  );
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, "0");
-  return `UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${vesselCode}-UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+}
+async function resolveVesselCode(storage2, vesselId) {
+  const normalizedVesselId = vesselId?.trim();
+  if (!normalizedVesselId) {
+    throw new ValidationError(
+      "Vessel ID is required to generate a work order number.",
+      { code: "VESSEL_ID_REQUIRED_FOR_WO_NUMBER" }
+    );
+  }
+  const vessel = await storage2.getVessel(normalizedVesselId);
+  const vesselCode = vessel?.vCode?.trim();
+  if (!vesselCode) {
+    throw new ValidationError(
+      "Vessel external code (v_code) is required before generating a work order number.",
+      { code: "VESSEL_CODE_REQUIRED_FOR_WO_NUMBER", vesselId: normalizedVesselId }
+    );
+  }
+  return vesselCode;
+}
+function findMaxSequence(workOrderNumbers, patterns) {
+  let maxRunningNumber = 0;
+  for (const workOrderNo of workOrderNumbers) {
+    if (!workOrderNo) continue;
+    for (const pattern of patterns) {
+      const match = workOrderNo.match(pattern);
+      if (!match) continue;
+      const sequence = parseInt(match[1], 10);
+      if (!isNaN(sequence) && sequence > maxRunningNumber) {
+        maxRunningNumber = sequence;
+      }
+      break;
+    }
+  }
+  return maxRunningNumber;
 }
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -31443,6 +31633,7 @@ var TASK_TYPE_CODES;
 var init_workOrderNumbering = __esm({
   "server/utils/workOrderNumbering.ts"() {
     "use strict";
+    init_errors();
     TASK_TYPE_CODES = {
       "Inspection": "IN",
       "Service": "SE",
@@ -33808,7 +33999,7 @@ async function create6(data) {
 async function update6(id, data) {
   return storage.updateWorkOrder(id, data);
 }
-async function remove4(id) {
+async function remove5(id) {
   return storage.deleteWorkOrder(id);
 }
 async function findExecutions(componentId) {
@@ -36645,6 +36836,11 @@ async function getWorkOrder(id) {
 async function createWorkOrder(body) {
   const { insertWorkOrderSchema: insertWorkOrderSchema2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
   let workOrderData = insertWorkOrderSchema2.parse(body);
+  if (!workOrderData.vesselId) {
+    throw new ValidationError("Vessel ID is required to generate a work order number", {
+      code: "VESSEL_ID_REQUIRED_FOR_WO_NUMBER"
+    });
+  }
   if (workOrderData.vesselId && (workOrderData.component || workOrderData.componentCode)) {
     let resolvedComponent = null;
     if (workOrderData.component) {
@@ -36726,7 +36922,7 @@ async function createWorkOrder(body) {
         workOrderData.vesselId || void 0
       );
     } else {
-      const vesselId = workOrderData.vesselId || "V001";
+      const vesselId = workOrderData.vesselId;
       let unplannedComponentCode = workOrderData.componentCode || "";
       if (!unplannedComponentCode && workOrderData.component) {
         const components2 = await findComponents2(vesselId);
@@ -37653,6 +37849,7 @@ async function updateWorkOrder(id, body) {
     if (!freshWorkOrder) {
       console.error("Failed to get work order for completion processing");
     } else {
+      const freshVesselCode = freshWorkOrder.vesselId ? (await storage.getVessel(freshWorkOrder.vesselId))?.vCode : void 0;
       let component = await findComponent2(freshWorkOrder.component);
       if (!component && freshWorkOrder.componentCode && freshWorkOrder.vesselId) {
         const componentByCode = await findComponentByCode2(freshWorkOrder.componentCode, freshWorkOrder.vesselId);
@@ -37734,7 +37931,7 @@ async function updateWorkOrder(id, body) {
                   componentCode: freshWorkOrder.componentCode || component.componentCode,
                   vesselCode: freshWorkOrder.vesselId,
                   jobId: freshWorkOrder.jobId || null,
-                  jobCode: freshWorkOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+                  jobCode: extractJobNoFromWorkOrderNo(freshWorkOrder.workOrderNo, freshVesselCode) || null,
                   workOrderId: freshWorkOrder.wouuid,
                   workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
                   jobTitle: freshWorkOrder.jobTitle,
@@ -37766,14 +37963,7 @@ async function updateWorkOrder(id, body) {
             job = await findJob(freshWorkOrder.jobId);
           }
           if (!job && freshWorkOrder.workOrderNo) {
-            const woNumber = freshWorkOrder.workOrderNo;
-            let extractedJobNo = null;
-            const newFormatMatch = woNumber.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-            if (newFormatMatch) extractedJobNo = newFormatMatch[1];
-            if (!extractedJobNo) {
-              const oldFormatMatch = woNumber.match(/^(.+)-\d{4}-\d+$/);
-              if (oldFormatMatch) extractedJobNo = oldFormatMatch[1];
-            }
+            const extractedJobNo = extractJobNoFromWorkOrderNo(freshWorkOrder.workOrderNo, freshVesselCode);
             if (extractedJobNo && freshWorkOrder.vesselId) {
               const jobs2 = await findJobs2(freshWorkOrder.vesselId);
               job = jobs2.find((j) => j.jobNo === extractedJobNo);
@@ -38031,7 +38221,7 @@ async function updateWorkOrder(id, body) {
 }
 async function deleteWorkOrder(id) {
   const existingWO2 = await findById3(id);
-  await remove4(id);
+  await remove5(id);
   if (existingWO2) {
     try {
       await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, { is_deleted: false }, { is_deleted: true }, "system");
@@ -38926,6 +39116,7 @@ var init_workOrderService2 = __esm({
     init_schema();
     init_sync();
     init_workOrderFilters();
+    init_workOrderStatus();
   }
 });
 
@@ -39254,7 +39445,7 @@ function isUnplannedWO(wo, hasLinkedJob) {
   if (!hasLinkedJob) return true;
   if (wo.workOrderType === "Unplanned") return true;
   if (wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown"))) return true;
-  if (wo.workOrderNo && wo.workOrderNo.startsWith("UWO")) return true;
+  if (isUnplannedWorkOrderNo(wo.workOrderNo)) return true;
   return false;
 }
 function isPendingApprovalExecution(wo) {
@@ -39655,6 +39846,7 @@ var init_monthlySnapshotService = __esm({
   "server/modules/reports/services/monthlySnapshotService.ts"() {
     "use strict";
     init_db();
+    init_workOrderStatus();
     init_schema();
     init_reportRepository();
     init_status();
@@ -44087,12 +44279,21 @@ var routes_default2 = router2;
 // server/modules/components/routes.ts
 init_middleware();
 init_auth();
+init_permissions();
 import { Router as Router3 } from "express";
 import multer from "multer";
 
 // server/modules/components/controllers/componentController.ts
 init_componentService();
 init_errors();
+init_auth();
+function isShipViewer(req) {
+  const identity = getRbacIdentity(req);
+  return identity.userType === "Ship" || req.user?.userType === "Ship";
+}
+function visibleToViewer(component, req) {
+  return !isShipViewer(req) || component?.isActive !== false;
+}
 async function updateSortOrder3(req, res) {
   try {
     const result = await updateSortOrder2(req.body);
@@ -44109,7 +44310,7 @@ async function updateSortOrder3(req, res) {
   }
 }
 async function listByVessel4(req, res) {
-  const components2 = await listByVessel3(req.params.vesselId);
+  const components2 = (await listByVessel3(req.params.vesselId)).filter((component) => visibleToViewer(component, req));
   console.log(`\u{1F4CB} GET /technical/api/components/${req.params.vesselId} returning ${components2.length} components`);
   components2.slice(0, 5).forEach((c) => {
     console.log(`  - code: ${c.componentCode}, name: ${c.name?.substring(0, 30)}, parentId: ${c.parentId || "none"}`);
@@ -44118,7 +44319,7 @@ async function listByVessel4(req, res) {
 }
 async function getDetails(req, res) {
   const component = await getById(req.params.id);
-  if (!component) {
+  if (!component || !visibleToViewer(component, req)) {
     return res.status(404).json({ error: "Component not found" });
   }
   res.json(component);
@@ -44127,7 +44328,7 @@ async function listAll2(req, res) {
   const vesselId = req.query.vesselId;
   const vesselIdsRaw = req.query.vesselIds;
   const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0;
-  const components2 = await listAll(vesselId, vesselIds);
+  const components2 = (await listAll(vesselId, vesselIds)).filter((component) => visibleToViewer(component, req));
   res.json(components2);
 }
 async function create4(req, res) {
@@ -44163,6 +44364,31 @@ async function update4(req, res) {
       return res.status(400).json({ error: "Component Code already exists for this vessel. Please use a unique code." });
     }
     res.status(500).json({ error: "Failed to update component" });
+  }
+}
+async function remove3(req, res) {
+  try {
+    await remove2(req.params.id, req.user?.username || "system");
+    res.json({
+      success: true,
+      message: "Component deleted successfully. Existing Work Orders and maintenance history have been retained."
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      const lifecycleError = error;
+      return res.status(400).json({
+        success: false,
+        error: lifecycleError.message,
+        code: lifecycleError.code,
+        activeChildrenCount: lifecycleError.activeChildrenCount,
+        activeJobsCount: lifecycleError.activeJobsCount,
+        linkedSparesCount: lifecycleError.linkedSparesCount
+      });
+    }
+    if (error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: "Failed to delete component" });
   }
 }
 async function inactivate3(req, res) {
@@ -45410,6 +45636,11 @@ router3.post("/components/upload", upload2.single("file"), asyncHandler(upload))
 router3.get("/components", asyncHandler(listAll2));
 router3.post("/components", asyncHandler(create4));
 router3.patch("/components/:id", asyncHandler(update4));
+router3.delete(
+  "/components/:id",
+  requirePermission("pms-components", "delete", { enforce: true, unconfigured: "deny" }),
+  asyncHandler(remove3)
+);
 router3.post("/components/:id/inactivate", asyncHandler(inactivate3));
 router3.get("/component-documents/:componentId", requireAuth, asyncHandler(listDocuments2));
 router3.post("/component-documents", requirePMSAdmin, upload2.single("file"), asyncHandler(createDocument3));
@@ -45457,7 +45688,7 @@ async function create5(data) {
 async function update5(id, data) {
   return storage.updateJob(id, data);
 }
-async function remove3(id) {
+async function remove4(id) {
   return storage.deleteJob(id);
 }
 async function findJobComponentLinks(vesselId) {
@@ -45745,6 +45976,9 @@ async function createJob(body) {
 async function updateJob(id, body) {
   const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
   let updateData = { ...body };
+  if (Object.prototype.hasOwnProperty.call(updateData, "isDeleted") || Object.prototype.hasOwnProperty.call(updateData, "is_deleted")) {
+    throw new ValidationError("Job deletion status can only be changed through the Delete Job action");
+  }
   if (updateData.isActive === "Yes") updateData.isActive = true;
   if (updateData.isActive === "No") updateData.isActive = false;
   let component = null;
@@ -45856,7 +46090,7 @@ async function updateJob(id, body) {
   return job;
 }
 async function deleteJob(id) {
-  await remove3(id);
+  await remove4(id);
 }
 async function inactivateJob(id, vesselId) {
   const job = await findById2(id);
@@ -45920,7 +46154,7 @@ async function generateWorkOrder(jobId, reason, activeComponentCode) {
   if (!job) {
     throw new NotFoundError("Job not found");
   }
-  if (job.isActive === false) {
+  if (job.isDeleted === true || job.isActive === false) {
     throw new ValidationError("Cannot generate work orders for an inactive job");
   }
   const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
@@ -46485,22 +46719,32 @@ async function exportMaintenancePlanner(filters, format3) {
 }
 
 // server/modules/jobs/controllers/jobController.ts
+function isShipUser(req) {
+  return req.user?.userType === "Ship" || req.rbac?.userType === "Ship";
+}
+function isInactive(job) {
+  return job.isActive === false;
+}
 async function listJobs2(req, res) {
   const vesselId = req.query.vesselId;
   const componentId = req.query.componentId;
   const vesselIdsParam = req.query.vesselIds;
   const vesselIds = vesselIdsParam ? vesselIdsParam.split(",").map((v) => v.trim()).filter(Boolean) : void 0;
   const jobs2 = await listJobs(vesselId, componentId, vesselIds);
-  res.json(jobs2);
+  res.json(isShipUser(req) ? jobs2.filter((job) => !isInactive(job)) : jobs2);
 }
 async function getJob2(req, res) {
   const job = await getJob(req.params.id);
-  if (!job) {
+  if (!job || isShipUser(req) && isInactive(job)) {
     return res.status(404).json({ error: "Job not found" });
   }
   res.json(job);
 }
 async function getJobContext2(req, res) {
+  const job = await getJob(req.params.id);
+  if (!job || isShipUser(req) && isInactive(job)) {
+    return res.status(404).json({ error: "Job not found" });
+  }
   const context = await getJobContext(req.params.id);
   res.json(context);
 }
@@ -47213,6 +47457,7 @@ init_complianceAnomalyService();
 init_rhTimelineValidationService();
 init_sync();
 init_syncRole();
+init_workOrderStatus();
 async function completeWorkOrder(workOrderId, body) {
   const {
     runningHours,
@@ -47234,6 +47479,7 @@ async function completeWorkOrder(workOrderId, body) {
   if (!workOrder) {
     throw new NotFoundError("Work order not found");
   }
+  const vesselCode = workOrder.vesselId ? (await getStorage2().getVessel(workOrder.vesselId))?.vCode : void 0;
   let component = await findComponent2(workOrder.component);
   if (!component && workOrder.componentCode && workOrder.vesselId) {
     const componentByCode = await findComponentByCode2(workOrder.componentCode, workOrder.vesselId);
@@ -47898,6 +48144,7 @@ async function finalizeWorkOrderCompletion(workOrderId) {
     console.error(`[Finalize] Work order ${workOrderId} not found`);
     return;
   }
+  const vesselCode = workOrder.vesselId ? (await getStorage2().getVessel(workOrder.vesselId))?.vCode : void 0;
   let component = await findComponent2(workOrder.component);
   if (!component && workOrder.componentCode && workOrder.vesselId) {
     const byCode = await findComponentByCode2(workOrder.componentCode, workOrder.vesselId);
@@ -47933,7 +48180,7 @@ async function finalizeWorkOrderCompletion(workOrderId) {
           componentCode: workOrder.componentCode || component.componentCode,
           vesselCode: workOrder.vesselId,
           jobId: workOrder.jobId || null,
-          jobCode: workOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+          jobCode: extractJobNoFromWorkOrderNo(workOrder.workOrderNo, vesselCode) || null,
           workOrderId: workOrder.wouuid,
           workOrderNo: workOrder.workOrderNo || `WO-${workOrder.id}`,
           jobTitle: workOrder.jobTitle,
@@ -47961,9 +48208,7 @@ async function finalizeWorkOrderCompletion(workOrderId) {
     let job = null;
     if (workOrder.jobId) job = await findJob(workOrder.jobId);
     if (!job && workOrder.workOrderNo) {
-      const m1 = workOrder.workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-      const m2 = workOrder.workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-      const extractedJobNo = m1 ? m1[1] : m2 ? m2[1] : null;
+      const extractedJobNo = extractJobNoFromWorkOrderNo(workOrder.workOrderNo, vesselCode);
       if (extractedJobNo && workOrder.vesselId) {
         const jobs2 = await findJobs2(workOrder.vesselId);
         job = jobs2.find((j) => j.jobNo === extractedJobNo) || null;
@@ -50894,8 +51139,8 @@ async function createSpare(spare) {
 async function updateSpare(id, data) {
   return storage.updateSpare(id, data);
 }
-async function deleteSpare(id) {
-  return storage.deleteSpare(id);
+async function deleteSpare(id, userId) {
+  return storage.deleteSpare(id, userId);
 }
 async function consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz) {
   return storage.consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz);
@@ -50991,7 +51236,8 @@ async function getSparesByVessel(vesselId) {
   return getSpares(vesselId);
 }
 async function getSpare2(id) {
-  return getSpare(id);
+  const spare = await getSpare(id);
+  return spare && !spare.deleted && !spare.isDeleted ? spare : void 0;
 }
 async function createSpare2(vesselId, body) {
   return createSpare({
@@ -51000,6 +51246,13 @@ async function createSpare2(vesselId, body) {
   });
 }
 async function updateSpare2(spareId, body, userId) {
+  if (Object.prototype.hasOwnProperty.call(body, "isDeleted") || Object.prototype.hasOwnProperty.call(body, "is_deleted") || Object.prototype.hasOwnProperty.call(body, "deleted")) {
+    throw Object.assign(new Error("Spare deletion status can only be changed through Delete Spare."), { statusCode: 400 });
+  }
+  const existingSpare = await getSpare(spareId);
+  if (!existingSpare || existingSpare.deleted || existingSpare.isDeleted) {
+    throw Object.assign(new Error("Spare not found"), { statusCode: 404 });
+  }
   const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = body;
   if (robLocationA !== void 0 || robLocationB !== void 0) {
     if (robLocationA !== void 0 && (isNaN(Number(robLocationA)) || Number(robLocationA) < 0)) {
@@ -51008,10 +51261,7 @@ async function updateSpare2(spareId, body, userId) {
     if (robLocationB !== void 0 && (isNaN(Number(robLocationB)) || Number(robLocationB) < 0)) {
       throw Object.assign(new Error("robLocationB must be a valid non-negative number"), { statusCode: 400 });
     }
-    const currentSpare = await getSpare(spareId);
-    if (!currentSpare) {
-      throw Object.assign(new Error("Spare not found"), { statusCode: 404 });
-    }
+    const currentSpare = existingSpare;
     const newLocA = robLocationA !== void 0 ? Number(robLocationA) : currentSpare.robLocationA ?? 0;
     const newLocB = robLocationB !== void 0 ? Number(robLocationB) : currentSpare.robLocationB ?? 0;
     const result = await transferSpareLocation(
@@ -51031,12 +51281,23 @@ async function updateSpare2(spareId, body, userId) {
   }
   return updateSpare(spareId, otherUpdates);
 }
-async function deleteSpare2(id) {
-  return deleteSpare(id);
+async function deleteSpare2(id, vesselId, userId) {
+  const spare = await getSpare(id);
+  if (!spare || spare.deleted || spare.isDeleted) {
+    throw Object.assign(new Error(`Spare with ID ${id} not found`), { statusCode: 404 });
+  }
+  if (spare.vesselId !== vesselId) {
+    throw Object.assign(new Error("Access denied: Spare does not belong to this vessel"), { statusCode: 403 });
+  }
+  await deleteSpare(id, userId);
+  return {
+    success: true,
+    message: `Spare "${spare.partName}" (${spare.partCode}) was deleted. Inventory and transaction history have been retained.`
+  };
 }
 async function inactivateSpare(id, vesselId) {
   const spare = await getSpare(id);
-  if (!spare) {
+  if (!spare || spare.deleted || spare.isDeleted) {
     throw Object.assign(new Error(`Spare with ID ${id} not found`), { statusCode: 404 });
   }
   if (spare.vesselId !== vesselId) {
@@ -51477,11 +51738,21 @@ async function updateSpare3(req, res) {
 }
 async function deleteSpare3(req, res) {
   try {
-    await deleteSpare2(req.params.id);
-    res.json({ success: true, message: "Spare has been deactivated successfully" });
+    const result = await deleteSpare2(
+      req.params.id,
+      req.params.vesselId,
+      req.user?.username || "system"
+    );
+    res.json(result);
   } catch (error) {
-    if (error.message?.includes("not found")) {
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
       return res.status(404).json({ error: error.message });
+    }
+    if (error.statusCode === 403) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
     }
     res.status(500).json({ error: "Failed to delete spare" });
   }
@@ -51572,6 +51843,9 @@ async function batchConsume2(req, res) {
     const results = await batchConsume(items, workOrderId, consumedBy);
     res.json({ success: true, results });
   } catch (error) {
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message || "Failed to consume spares" });
   }
 }
@@ -51584,6 +51858,9 @@ async function batchReceive2(req, res) {
     const results = await batchReceive(items, purchaseOrderRef, receivedBy);
     res.json({ success: true, results });
   } catch (error) {
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message || "Failed to receive spares" });
   }
 }
@@ -51598,6 +51875,9 @@ async function consumeSimple2(req, res) {
   } catch (error) {
     if (error.statusCode === 400) {
       return res.status(400).json({ error: error.message });
+    }
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
     }
     console.error("Error consuming spare:", error);
     res.status(500).json({ error: error.message || "Failed to consume spare" });
@@ -51762,7 +52042,16 @@ async function getSpare3(id) {
 }
 
 // server/modules/spares/services/inventoryService.ts
-init_storage();
+async function requireOperationalSpare(spareId, vesselId) {
+  const spare = await getSpare3(String(spareId));
+  if (!spare || spare.deleted || spare.isDeleted) {
+    throw Object.assign(new Error(`Spare ${spareId} not found`), { statusCode: 404 });
+  }
+  if (vesselId && spare.vesselId !== vesselId) {
+    throw Object.assign(new Error("Access denied: Spare does not belong to this vessel"), { statusCode: 403 });
+  }
+  return spare;
+}
 async function getLocations2(vesselId) {
   return getLocations(vesselId);
 }
@@ -51809,12 +52098,9 @@ async function createSpareComponentLink2(body) {
       { statusCode: 400 }
     );
   }
-  const spare = await storage.getSpare(String(spareId));
-  if (!spare) {
-    throw Object.assign(
-      new Error(`Spare ${spareId} not found`),
-      { statusCode: 404 }
-    );
+  const spare = await requireOperationalSpare(parseInt(spareId));
+  if (spare.vesselId !== vesselId) {
+    throw Object.assign(new Error("Access denied: Spare does not belong to this vessel"), { statusCode: 403 });
   }
   return createSpareComponentLink({
     vesselId,
@@ -51828,6 +52114,7 @@ async function deleteSpareComponentLink2(spareId, componentId) {
   return deleteSpareComponentLink(spareId, componentId);
 }
 async function getSpareStock(spareId) {
+  await requireOperationalSpare(spareId);
   const stockRecords = await getSpareLocationStock(spareId);
   const locationsWithQty = await getSpareLocationsWithQty(spareId);
   const robTotal = await getSpareRobTotal(spareId);
@@ -51855,6 +52142,7 @@ async function upsertStock(spareId, locationId, body) {
   if (!vesselId) {
     throw Object.assign(new Error("vesselId is required"), { statusCode: 400 });
   }
+  await requireOperationalSpare(spareId, vesselId);
   return upsertSpareLocationStock2({
     vesselId,
     spareId,
@@ -51874,6 +52162,7 @@ async function createTransaction(body) {
       }
     };
   }
+  await requireOperationalSpare(parsed.data.spareId, parsed.data.vesselId);
   const result = await performInventoryTransaction2(parsed.data);
   return { validationError: false, response: { success: true, data: result } };
 }
@@ -52023,6 +52312,9 @@ async function getSpareStock2(req, res) {
     res.json({ success: true, data });
   } catch (error) {
     console.error("Error fetching spare stock:", error);
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -52065,6 +52357,12 @@ async function upsertStock2(req, res) {
   } catch (error) {
     if (error.statusCode === 400) {
       return res.status(400).json({ success: false, error: error.message });
+    }
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    if (error.statusCode === 403) {
+      return res.status(403).json({ success: false, error: error.message });
     }
     console.error("Error setting spare stock:", error);
     res.status(500).json({ success: false, error: error.message });
@@ -52216,6 +52514,7 @@ async function getSparesByComponentCode(req, res) {
 
 // server/modules/spares/routes.ts
 init_auth();
+init_permissions();
 var router7 = Router7();
 router7.get("/spares", requireAuth, asyncHandler(getAllSpares3));
 router7.get("/spares/history/:vesselId", requireAuth, asyncHandler(getSpareHistoryByVessel));
@@ -52234,7 +52533,11 @@ router7.post("/spares/:vesselId/:id/adjust", requirePMSAdmin, asyncHandler(adjus
 router7.get("/spares/:vesselId/:id", requireAuth, asyncHandler(getSpareById));
 router7.post("/spares/:vesselId", requirePMSAdmin, asyncHandler(createSpare3));
 router7.patch("/spares/:vesselId/:id", requirePMSAdmin, asyncHandler(updateSpare3));
-router7.delete("/spares/:vesselId/:id", requirePMSAdmin, asyncHandler(deleteSpare3));
+router7.delete(
+  "/spares/:vesselId/:id",
+  requirePermission("pms-spares", "delete", { enforce: true, unconfigured: "deny" }),
+  asyncHandler(deleteSpare3)
+);
 router7.get("/spares/:vesselId", requireAuth, asyncHandler(getSparesByVessel2));
 router7.get("/inventory/locations/:vesselId", requireAuth, asyncHandler(getLocations3));
 router7.get("/inventory/locations/:vesselId/:id", requireAuth, asyncHandler(getLocationById4));
@@ -62311,6 +62614,7 @@ async function exportStoresLowStockAlertExcel2(req, res) {
 
 // server/modules/reports/services/equipmentReportService.ts
 init_reportRepository();
+init_workOrderStatus();
 import ExcelJS3 from "exceljs";
 async function getWorkOrdersComputed(vesselId, vesselIds) {
   const { getWorkOrdersWithComputedStatus: getWorkOrdersWithComputedStatus2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
@@ -62558,7 +62862,7 @@ async function getUnplannedBreakdownJobs(vesselId, startDate, endDate, vesselIds
   const endDateObj = new Date(endDate);
   endDateObj.setHours(23, 59, 59, 999);
   const unplannedBreakdownJobs = allWorkOrders.filter((wo) => {
-    const isUnplanned = wo.workOrderType === "Unplanned" || wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown")) || wo.workOrderNo && wo.workOrderNo.startsWith("UWO");
+    const isUnplanned = wo.workOrderType === "Unplanned" || wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown")) || isUnplannedWorkOrderNo(wo.workOrderNo);
     if (!isUnplanned) return false;
     if (wo.status !== "Completed") return false;
     const completedDateStr = wo.dateCompleted ? wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted) : null;
@@ -62649,7 +62953,7 @@ async function exportUnplannedBreakdownJobsExcel(vesselId, startDate, endDate, c
   const endDateObj = new Date(endDate);
   endDateObj.setHours(23, 59, 59, 999);
   const unplannedBreakdownJobs = allWorkOrders.filter((wo) => {
-    const isUnplanned = wo.workOrderType === "Unplanned" || wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown")) || wo.workOrderNo && wo.workOrderNo.startsWith("UWO");
+    const isUnplanned = wo.workOrderType === "Unplanned" || wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown")) || isUnplannedWorkOrderNo(wo.workOrderNo);
     if (!isUnplanned) return false;
     if (wo.status !== "Completed") return false;
     const completedDateStr = wo.dateCompleted ? wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted) : null;
@@ -63873,6 +64177,7 @@ async function getCriticalEquipmentSchedule2(req, res) {
 
 // server/modules/reports/services/maintenanceReportService.ts
 init_reportRepository();
+init_workOrderStatus();
 init_status();
 init_storage();
 import ExcelJS4 from "exceljs";
@@ -64835,7 +65140,7 @@ async function exportUnplannedJobs(vesselId, dateFrom, dateTo, componentFilter) 
   const jobsMap = new Map(jobs2.map((job) => [job.juuid, job]));
   const componentsByCodeMap = new Map(components2.map((comp) => [comp.componentCode, comp]));
   const unplannedWorkOrders = workOrders2.filter(
-    (wo) => wo.workOrderType === "Unplanned" || wo.type === "Unplanned" || wo.workOrderNumber && wo.workOrderNumber.startsWith("UWO")
+    (wo) => wo.workOrderType === "Unplanned" || wo.type === "Unplanned" || isUnplannedWorkOrderNo(wo.workOrderNumber || wo.workOrderNo)
   );
   let filteredJobs = unplannedWorkOrders;
   if (dateFrom || dateTo) {
@@ -75505,12 +75810,15 @@ async function updateComponentFromRow(componentCode, row, vesselId, existingComp
   return await storage.updateComponent(component.cuuid, updateData);
 }
 async function createWorkOrderFromRow(row, templateCode, vesselId) {
+  if (!vesselId?.trim()) {
+    throw new Error("Vessel ID is required for bulk-import work order generation");
+  }
   const componentCode = String(row["Generated_Component_Code"]).trim();
   const component = await storage.getComponent(componentCode);
   let jobId = null;
   let matchingJob = null;
   const jobTitle = row["Job_Title"] || "";
-  const effectiveVesselId = vesselId || "V001";
+  const effectiveVesselId = vesselId;
   if (component && jobTitle) {
     try {
       const jobs2 = await storage.getJobs(effectiveVesselId);
@@ -81109,6 +81417,35 @@ init_externalApi();
 init_sync();
 init_schema();
 import { sql as sql21, eq as eq28, and as and25 } from "drizzle-orm";
+function normalizeSourceDeletionState(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1";
+  }
+  return false;
+}
+function getSourceDeletionState(entry) {
+  if (entry && entry.isDeleted !== void 0 && entry.isDeleted !== null) {
+    return normalizeSourceDeletionState(entry.isDeleted);
+  }
+  return normalizeSourceDeletionState(entry?.is_deleted);
+}
+async function upsertMasterRecord(db2, table, id, insertValues, updateValues, isDeleted, stats) {
+  const existing = await db2.select({ id: table.id }).from(table).where(eq28(table.id, id)).limit(1);
+  await db2.insert(table).values(insertValues).onConflictDoUpdate({
+    target: table.id,
+    set: updateValues
+  });
+  if (isDeleted) {
+    stats.deleted++;
+  } else if (existing.length > 0) {
+    stats.updated++;
+  } else {
+    stats.inserted++;
+  }
+}
 async function jobDueScan(req, res) {
   const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
   const vesselId = req.body?.vesselId;
@@ -81382,13 +81719,13 @@ async function syncMasters(req, res) {
     return res.status(400).json({ error: 'Missing required "domain" parameter in request body.' });
   }
   const stats = {
-    vessels: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    vesselTypes: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    additionalGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    ports: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    users: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    fleetGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    approvers: { inserted: 0, updated: 0, skipped: 0, errors: [] }
+    vessels: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    vesselTypes: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    additionalGroups: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    ports: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    users: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    fleetGroups: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    approvers: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] }
   };
   const fetchExternal = async (endpoint, key) => {
     const url = buildExternalMasterDataUrl(endpoint, domain);
@@ -81442,29 +81779,33 @@ async function syncMasters(req, res) {
       const name = getFieldValue(v, ["vessel", "vesselName", "name"]) || "Unknown";
       const imoNumber = getFieldValue(v, ["imo_number", "imoNumber", "imo_no", "imo"]);
       const vesselType = getFieldValue(v, ["vessel_type_name", "vesselTypeName", "vessel_type", "vesselType", "type"]);
-      await db2.insert(vessels).values({
+      const isDeleted = getSourceDeletionState(v);
+      const externalVCode = getFieldValue(v, ["v_code"]);
+      const vCodeValue = externalVCode && externalVCode.trim().length > 0 ? externalVCode.trim() : null;
+      const vCodeFields = vCodeValue === null ? {} : { vCode: vCodeValue };
+      await upsertMasterRecord(db2, vessels, entryId, {
         id: entryId,
         vuuid: entryId,
         name,
         code: entryId,
         imoNumber,
         vesselType,
-        isActive: true,
+        isActive: !isDeleted,
+        isDeleted,
         createdAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: vessels.id,
-        set: {
-          name,
-          code: entryId,
-          imoNumber,
-          vesselType,
-          isActive: true,
-          updatedAt: now,
-          vuuid: sql21`COALESCE(${vessels.vuuid}, EXCLUDED.vuuid)`
-        }
-      });
-      stats.vessels.updated++;
+        updatedAt: now,
+        ...vCodeFields
+      }, {
+        name,
+        code: entryId,
+        imoNumber,
+        vesselType,
+        isActive: !isDeleted,
+        isDeleted,
+        updatedAt: now,
+        vuuid: sql21`COALESCE(${vessels.vuuid}, EXCLUDED.vuuid)`,
+        ...vCodeFields
+      }, isDeleted, stats.vessels);
     } catch (e) {
       stats.vessels.errors.push(`Vessel ${v.vuid || v.vesselId}: ${e.message}`);
     }
@@ -81485,6 +81826,7 @@ async function syncMasters(req, res) {
         continue;
       }
       const name = getFieldValue(vt, ["vesselType", "vesselTypeName", "name", "type_name"]) || "Unknown";
+      const isDeleted = getSourceDeletionState(vt);
       const classifications = [];
       if (vt.tanker === 1) classifications.push("Tanker");
       if (vt.oilTanker === 1) classifications.push("Oil");
@@ -81493,17 +81835,14 @@ async function syncMasters(req, res) {
       if (vt.dry === 1) classifications.push("Dry");
       if (vt.container === 1) classifications.push("Container");
       const classification = classifications.length > 0 ? classifications.join(", ") : null;
-      await db2.insert(vesselTypes).values({
+      await upsertMasterRecord(db2, vesselTypes, entryId, {
         id: entryId,
         name,
         classification,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: vesselTypes.id,
-        set: { name, classification, syncedAt: now, updatedAt: now }
-      });
-      stats.vesselTypes.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { name, classification, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.vesselTypes);
     } catch (e) {
       stats.vesselTypes.errors.push(`VesselType ${vt.vtuid}: ${e.message}`);
     }
@@ -81525,17 +81864,15 @@ async function syncMasters(req, res) {
       }
       const name = getFieldValue(ag, ["group_name", "groupName", "name", "additional_group_name"]) || "Unknown";
       const description = getFieldValue(ag, ["vessels", "group_description", "desc"]);
-      await db2.insert(additionalGroups).values({
+      const isDeleted = getSourceDeletionState(ag);
+      await upsertMasterRecord(db2, additionalGroups, entryId, {
         id: entryId,
         name,
         description,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: additionalGroups.id,
-        set: { name, description, syncedAt: now, updatedAt: now }
-      });
-      stats.additionalGroups.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { name, description, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.additionalGroups);
     } catch (e) {
       stats.additionalGroups.errors.push(`AdditionalGroup ${ag.id}: ${e.message}`);
     }
@@ -81557,17 +81894,15 @@ async function syncMasters(req, res) {
       }
       const name = getFieldValue(p, ["port_name", "portName", "name"]) || "Unknown";
       const country = getFieldValue(p, ["country_name", "countryName", "country"]);
-      await db2.insert(ports).values({
+      const isDeleted = getSourceDeletionState(p);
+      await upsertMasterRecord(db2, ports, entryId, {
         id: entryId,
         name,
         country,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: ports.id,
-        set: { name, country, syncedAt: now, updatedAt: now }
-      });
-      stats.ports.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { name, country, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.ports);
     } catch (e) {
       stats.ports.errors.push(`Port ${p.puid}: ${e.message}`);
     }
@@ -81593,7 +81928,8 @@ async function syncMasters(req, res) {
       const userType = getFieldValue(u, ["user_type", "userType", "type"]);
       const department = getFieldValue(u, ["department", "department_name", "dept"]);
       const email = getFieldValue(u, ["email", "email_address", "user_email"]);
-      await db2.insert(masterUsers).values({
+      const isDeleted = getSourceDeletionState(u);
+      await upsertMasterRecord(db2, masterUsers, entryId, {
         id: entryId,
         fullName,
         role,
@@ -81602,12 +81938,9 @@ async function syncMasters(req, res) {
         department,
         email,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: masterUsers.id,
-        set: { fullName, role, designation, userType, department, email, syncedAt: now, updatedAt: now }
-      });
-      stats.users.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { fullName, role, designation, userType, department, email, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.users);
     } catch (e) {
       stats.users.errors.push(`User ${u.uuid}: ${e.message}`);
     }
@@ -81629,17 +81962,15 @@ async function syncMasters(req, res) {
       }
       const name = getFieldValue(fg, ["fleet_group_name", "fleetGroupName", "name", "group_name"]) || "Unknown";
       const description = getFieldValue(fg, ["vessels", "fleet_group_description", "desc"]);
-      await db2.insert(fleetGroups).values({
+      const isDeleted = getSourceDeletionState(fg);
+      await upsertMasterRecord(db2, fleetGroups, entryId, {
         id: entryId,
         name,
         description,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: fleetGroups.id,
-        set: { name, description, syncedAt: now, updatedAt: now }
-      });
-      stats.fleetGroups.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { name, description, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.fleetGroups);
     } catch (e) {
       stats.fleetGroups.errors.push(`FleetGroup ${fg.fleet_group_id}: ${e.message}`);
     }
@@ -81699,6 +82030,7 @@ async function reconcileApprovers(fetchedApprovers, now, stats) {
       continue;
     }
     const isActiveRaw = a.isActive ?? a.is_active;
+    const isDeleted = getSourceDeletionState(a);
     rows.push({
       name: getFieldValue(a, ["name", "fullname", "fullName", "userName"]) || null,
       userId,
@@ -81706,39 +82038,66 @@ async function reconcileApprovers(fetchedApprovers, now, stats) {
       approverLevel,
       emailId: getFieldValue(a, ["emailId", "email_id", "email"]) || null,
       modulename: getFieldValue(a, ["modulename", "moduleName"]) || "Technical",
-      isActive: isActiveRaw === 1 || isActiveRaw === true ? 1 : 0
+      isActive: isDeleted ? 0 : normalizeSourceDeletionState(isActiveRaw) ? 1 : 0,
+      isDeleted
     });
   }
+  rows.sort((left, right) => `${left.userId}\0${left.approverLevel}\0${left.modulename}`.localeCompare(`${right.userId}\0${right.approverLevel}\0${right.modulename}`));
   try {
     await client.query("BEGIN");
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('moc_approvers:Technical:reconcile'))`);
     for (const r of rows) {
-      const res = await client.query(
-        `INSERT INTO moc_approvers
-           (name, user_id, user_uuid, approver_level, email_id, modulename, is_active, is_sync, is_deleted, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,true,false,$8)
-         ON CONFLICT (user_id, approver_level, modulename) WHERE is_deleted = false
-         DO UPDATE SET
-           name = EXCLUDED.name,
-           user_uuid = EXCLUDED.user_uuid,
-           email_id = EXCLUDED.email_id,
-           is_active = EXCLUDED.is_active,
-           is_sync = true,
-           updated_at = EXCLUDED.updated_at
-         RETURNING (xmax = 0) AS inserted`,
-        [r.name, r.userId, r.userUuid, r.approverLevel, r.emailId, r.modulename, r.isActive, now]
+      const existing = await client.query(
+        `SELECT id
+           FROM moc_approvers
+          WHERE user_id = $1 AND approver_level = $2 AND modulename = $3
+          ORDER BY
+            CASE WHEN COALESCE(is_deleted, false) THEN 1 ELSE 0 END,
+            updated_at DESC NULLS LAST,
+            id DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [r.userId, r.approverLevel, r.modulename]
       );
-      if (res.rows[0]?.inserted) stats.inserted++;
-      else stats.updated++;
+      if (existing.rows[0]) {
+        await client.query(
+          `UPDATE moc_approvers
+              SET name = $1,
+                  user_uuid = $2,
+                  email_id = $3,
+                  is_active = $4,
+                  is_sync = true,
+                  is_deleted = $5,
+                  updated_at = $6
+            WHERE id = $7`,
+          [r.name, r.userUuid, r.emailId, r.isActive, r.isDeleted, now, existing.rows[0].id]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO moc_approvers
+             (name, user_id, user_uuid, approver_level, email_id, modulename, is_active, is_sync, is_deleted, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8,$9)`,
+          [r.name, r.userId, r.userUuid, r.approverLevel, r.emailId, r.modulename, r.isActive, r.isDeleted, now]
+        );
+      }
+      if (r.isDeleted) {
+        stats.deleted = (stats.deleted ?? 0) + 1;
+      } else if (existing.rows[0]) {
+        stats.updated++;
+      } else {
+        stats.inserted++;
+      }
     }
-    let evictSql = `UPDATE moc_approvers SET is_deleted = true, updated_at = $1
-        WHERE is_sync = true AND is_deleted = false AND modulename = 'Technical'`;
+    let evictSql = `UPDATE moc_approvers SET is_deleted = true, is_active = 0, updated_at = $1
+        WHERE is_sync = true AND COALESCE(is_deleted, false) = false AND modulename = 'Technical'`;
     const evictParams = [now];
     if (rows.length > 0) {
       const keyPlaceholders = rows.map((_, i) => `($${i * 2 + 2}, $${i * 2 + 3})`).join(", ");
       evictSql += ` AND (user_id, approver_level) NOT IN (${keyPlaceholders})`;
       rows.forEach((r) => evictParams.push(r.userId, r.approverLevel));
     }
-    await client.query(evictSql, evictParams);
+    const evicted = await client.query(`${evictSql} RETURNING id`, evictParams);
+    stats.deleted = (stats.deleted ?? 0) + (evicted.rowCount ?? 0);
     await client.query("COMMIT");
   } catch (err) {
     try {
