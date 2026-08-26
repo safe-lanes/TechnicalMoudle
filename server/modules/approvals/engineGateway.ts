@@ -12,6 +12,12 @@ import { ApprovalEngine, EngineError, type EngineCtx, type Scope } from '../appr
 import { AppError } from '../shared/errors';
 import { currentEngineTenantId } from './tenantProvider';
 import { TECHNICAL_MODULE_ID, type TechnicalSubject } from './approvalCard';
+import { getRequestContext } from '../../middleware/requestContext';
+
+// F3b (Q3): host admin roles that get the engine decide-override on a zero-approver step.
+// Mirror of mount.ts APPROVAL_ADMIN_ROLES — the CR/postpone service path builds its ctx here
+// (not via mount.resolveActor), so it must compute isAdmin from the request's REAL rbac role.
+const APPROVAL_ADMIN_ROLES: ReadonlySet<string> = new Set(['Sail Admin', 'Super Admin', 'PMS Admin']);
 
 let engine: ApprovalEngine | null = null;
 export function setTechnicalEngine(e: ApprovalEngine | null): void { engine = e; }
@@ -20,9 +26,15 @@ export function getTechnicalEngine(): ApprovalEngine | null { return engine; }
 export const techScope = (screenId: string): Scope => ({ moduleId: TECHNICAL_MODULE_ID, screenId, actionId: '' });
 
 export function engineCtx(actorUserId: string | null | undefined): EngineCtx {
+  const rbacRole = getRequestContext()?.rbacRole ?? null;
   return {
     tenantId: currentEngineTenantId(),
-    actor: { userId: actorUserId || 'system', role: null, userType: null },
+    actor: {
+      userId: actorUserId || 'system',
+      role: rbacRole,
+      userType: null,
+      isAdmin: !!rbacRole && APPROVAL_ADMIN_ROLES.has(rbacRole),
+    },
   };
 }
 

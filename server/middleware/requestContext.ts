@@ -27,6 +27,10 @@ export interface RequestContext {
   fullName: string;
   /** Full frozen actor for audit writers (field logger, RH audit, createAuditLog). */
   actor: AuditActor;
+  /** REAL forwarded SAILERP role (req.rbac.role) — distinct from req.user.role (the mock). Used by
+   *  the approval engine gateway to grant admins a decide override without threading role through
+   *  every service. Null when nothing was forwarded. */
+  rbacRole: string | null;
 }
 
 const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
@@ -46,6 +50,7 @@ export function requestContextMiddleware(req: Request, _res: Response, next: Nex
       userId: actor.actorId,
       fullName: actor.actorLabel,
       actor,
+      rbacRole: (req as any).rbac?.role ?? null,
     };
     asyncLocalStorage.run(ctx, () => next());
   } else {

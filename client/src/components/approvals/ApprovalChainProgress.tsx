@@ -43,12 +43,17 @@ export function useApprovalChain(screenId: string, subjectRef: string | null | u
   });
   const pending = (q.data ?? []).find((r) => r.status === "pending") ?? null;
   const activeSlots = pending?.slots.filter((s) => s.status === "active") ?? [];
-  // F3b: admins can always decide a pending chain (parity with the server override in
-  // engine.decide + the legacy Sail-Admin bypass) — so a Super Admin configured as an approver
-  // sees the button even when the crew directory can't name them, and an admin can unstick a
-  // step that resolved to zero approvers.
+  // F3b (narrowed — Q3): an admin sees the decide button ONLY when the active step resolved to
+  // ZERO approvers (nobody could otherwise act — a Super Admin configured as the sole approver
+  // whose crew row is absent, or a stalled step). Mirrors the server override in engine.decide;
+  // the decision is recorded there as an admin override. Admins do NOT get the button on steps
+  // that already have other resolved approvers.
   const isAdmin = !!currentUser?.role && APPROVAL_ADMIN_ROLES.has(currentUser.role);
-  const canDecide = !!pending && (isAdmin || (!!currentUser?.userUuid && activeSlots.some((s) => (s.resolvedApproverIds ?? []).includes(currentUser.userUuid!))));
+  const activeAllUnresolved = activeSlots.length > 0 && activeSlots.every((s) => (s.resolvedApproverIds ?? []).length === 0);
+  const canDecide = !!pending && (
+    (!!currentUser?.userUuid && activeSlots.some((s) => (s.resolvedApproverIds ?? []).includes(currentUser.userUuid!)))
+    || (isAdmin && activeAllUnresolved)
+  );
   // F3 safety-net: an ACTIVE slot that resolved to zero approvers would otherwise sit forever
   // with no button, no notification and no error. Surface it so the caller (progress panel /
   // admin view) can show "no approver resolved" instead of stalling silently.

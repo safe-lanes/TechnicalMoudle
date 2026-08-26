@@ -161,15 +161,27 @@ export class ApprovalEngine {
     const { card } = this.cardFor(request!.scope);
     const slots = await repo.getSlots(requuid);
     const active = slots.filter((s) => s.status === 'active');
-    // F3b: admins (Sail/Super/PMS Admin) can always decide a pending request — parity with the
-    // legacy Sail-Admin bypass. This makes a Super Admin CONFIGURED as an approver actually able
-    // to act (their crew master_users row may be absent, so resolveApprovers can't name them),
-    // and lets an admin unstick a step that resolved to zero approvers (F3 safety-net).
+    // F3b (narrowed — Q3): an admin (host-marked ctx.actor.isAdmin) may decide ONLY a step that
+    // resolved to ZERO approvers — i.e. nobody could otherwise act (a Super Admin configured as the
+    // sole approver whose crew directory row is absent, or a silently-stalled step). Admins do NOT
+    // get to decide steps that already have other resolved approvers. When it fires, the decision is
+    // recorded DISTINCTLY as an admin override in the slot remarks (below) + the audit row via
+    // onDecision — it is NOT a normal approval.
     const isAdminActor = !!ctx.actor.isAdmin;
     let mine = active.find((s) => (s.resolvedApproverIds ?? []).includes(ctx.actor.userId));
-    if (!mine && isAdminActor) mine = active[0];
+    let adminOverride = false;
+    if (!mine && isAdminActor) {
+      const stepStuck = active.length > 0 && active.every((s) => (s.resolvedApproverIds ?? []).length === 0);
+      if (stepStuck) { mine = active[0]; adminOverride = true; }
+    }
     if (!mine) {
       err(403, 'NOT_YOUR_TURN', 'you are not an approver for the currently active step of this request');
+    }
+    const effRemarks: string | null = adminOverride
+      ? `[ADMIN OVERRIDE — ${ctx.actor.role ?? 'admin'}; step had no resolved approver]${input.remarks ? ' ' + input.remarks : ''}`
+      : (input.remarks ?? null);
+    if (adminOverride) {
+      console.warn(`[approval-engine] ADMIN OVERRIDE decide — request ${requuid} node ${mine!.nodeKey} by ${ctx.actor.userId} (${ctx.actor.role}); the step had zero resolved approvers.`);
     }
     const now = this.nowIso();
     const nodeKey = mine!.nodeKey;
@@ -178,7 +190,7 @@ export class ApprovalEngine {
 
     if (input.decision === 'reject') {
       const updates: SlotUpdate[] = [
-        { nodeKey, slotOrdinal: mine!.slotOrdinal, status: 'rejected', decidedBy: ctx.actor.userId, decidedAt: now, remarks: input.remarks ?? null },
+        { nodeKey, slotOrdinal: mine!.slotOrdinal, status: 'rejected', decidedBy: ctx.actor.userId, decidedAt: now, remarks: effRemarks },
         // every other non-terminal slot of the whole request is superseded — NEVER deleted (audit)
         ...slots
           .filter((s) => !(s.nodeKey === nodeKey && s.slotOrdinal === mine!.slotOrdinal))
@@ -186,12 +198,12 @@ export class ApprovalEngine {
           .map((s) => ({ nodeKey: s.nodeKey, slotOrdinal: s.slotOrdinal, status: 'superseded' as const })),
       ];
       await repo.applySlotUpdates(requuid, updates, null);
-      return this.finalize(ctx, card, request!, 'returned', ctx.actor.userId, input.remarks ?? null, nodeKey);
+      return this.finalize(ctx, card, request!, 'returned', ctx.actor.userId, effRemarks, nodeKey);
     }
 
     // approve
     const updates: SlotUpdate[] = [
-      { nodeKey, slotOrdinal: mine!.slotOrdinal, status: 'approved', decidedBy: ctx.actor.userId, decidedAt: now, remarks: input.remarks ?? null },
+      { nodeKey, slotOrdinal: mine!.slotOrdinal, status: 'approved', decidedBy: ctx.actor.userId, decidedAt: now, remarks: effRemarks },
     ];
     const approvedCount = nodeSlots.filter((s) => s.status === 'approved').length + 1;
     const rule = node.quorum!;
@@ -210,7 +222,7 @@ export class ApprovalEngine {
     const next = nextNodeKey(request!.snapshot, nodeKey);
     const nextNode = request!.snapshot.nodes.find((n) => n.key === next!);
     if (!nextNode || nextNode.type === 'end') {
-      return this.finalize(ctx, card, request!, 'approved', ctx.actor.userId, input.remarks ?? null, nodeKey);
+      return this.finalize(ctx, card, request!, 'approved', ctx.actor.userId, effRemarks, nodeKey);
     }
     await this.activateNode(ctx, card, request!, nextNode.key);
     return { requuid, requestStatus: 'pending', nodeKey, nodeSatisfied: true, activatedNodeKey: nextNode.key };
