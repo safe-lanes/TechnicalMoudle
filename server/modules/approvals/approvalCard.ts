@@ -167,3 +167,27 @@ export const technicalApprovalCard: ApprovalCard = {
     }
   },
 };
+
+/**
+ * F7 (read-only view): resolve a configured slot role to approver NAMES for the admin
+ * "View configured approvers" panel. Mirrors resolveApprovers' membership rules but returns
+ * names and needs no subject. Ship-typed roles are vessel-scoped at runtime, so the names
+ * here are the fleet-wide candidate set (flagged vesselScoped). Empty names ⇒ the ⚠ marker.
+ */
+export async function resolveApproverNames(roleId: string): Promise<{ roleLabel: string | null; names: string[]; vesselScoped: boolean }> {
+  if (roleId === MOC_POOL_ROLE_L1 || roleId === MOC_POOL_ROLE_L2) {
+    const level = roleId.slice('moc:'.length);
+    const rows = await db().select({ name: masterUsers.fullName })
+      .from(mocApprovers)
+      .innerJoin(masterUsers, eq(mocApprovers.userUuid, masterUsers.id))
+      .where(and(eq(mocApprovers.approverLevel, level), eq(mocApprovers.isActive, 1),
+        eq(mocApprovers.isDeleted, false), eq(mocApprovers.modulename, 'Technical'), eq(masterUsers.isDeleted, false)));
+    return { roleLabel: `Approver Pool — ${level}`, names: rows.map((r) => r.name).filter((n): n is string => !!n), vesselScoped: false };
+  }
+  const role = (await db().select().from(admnRoleMaster)
+    .where(and(eq(admnRoleMaster.ruid, roleId), eq(admnRoleMaster.isDeleted, false))).limit(1))[0];
+  if (!role) return { roleLabel: null, names: [], vesselScoped: false };
+  const users = await db().select({ name: masterUsers.fullName }).from(masterUsers)
+    .where(and(eq(masterUsers.role, role.assignedRole), eq(masterUsers.isDeleted, false)));
+  return { roleLabel: role.assignedRole, names: users.map((u) => u.name).filter((n): n is string => !!n), vesselScoped: role.roletype === 'Ship' };
+}

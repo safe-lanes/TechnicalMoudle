@@ -9,9 +9,12 @@ import { Router } from 'express';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { asyncHandler } from '../shared/middleware';
 import type { AuthenticatedRequest } from '../../middleware/auth';
+import { requireRole } from '../../middleware/auth';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { approvalNotifications } from './notificationSchema';
+import { emailConfigStatus } from './approvalNotifier';
+import { resolveApproverNames } from './approvalCard';
 
 const db = () => {
   const ctx = getCurrentTenantContext();
@@ -31,6 +34,21 @@ router.get('/approvals/notifications', asyncHandler(async (req, res) => {
   const rows = await db().select().from(approvalNotifications).where(where)
     .orderBy(desc(approvalNotifications.createdAt)).limit(50);
   res.json(rows);
+}));
+
+// GET /approvals/role-approvers?roleId=<ruid|moc:Level N> — F7: resolved approver NAMES for the
+// admin read-only "View configured approvers" panel. Office-only (same audience as the builder).
+router.get('/approvals/role-approvers', requireRole(['Office', 'PMS Admin', 'Sail Admin']), asyncHandler(async (req, res) => {
+  const roleId = String(req.query.roleId ?? '');
+  if (!roleId) return void res.status(400).json({ error: 'roleId required' });
+  res.json(await resolveApproverNames(roleId));
+}));
+
+// GET /approvals/email-config — F4: admin-visible email delivery status (no secrets exposed).
+// Lets the Approval Engine admin screen show "email not configured — in-app only" instead of a
+// silent no-email. Does not send anything; mirrors the notifier's transport guard.
+router.get('/approvals/email-config', asyncHandler(async (_req, res) => {
+  res.json(emailConfigStatus());
 }));
 
 // GET /approvals/notifications/count — unread badge

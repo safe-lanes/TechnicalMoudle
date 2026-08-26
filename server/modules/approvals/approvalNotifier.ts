@@ -50,6 +50,22 @@ function createTransport(): { t: nodemailer.Transporter; from: string } | 'skipp
   return { t: nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } }), from };
 }
 
+/**
+ * F4: reports whether approval EMAIL is configured, so an admin can see when approvers are
+ * getting in-app notifications only. Mirrors createTransport()'s guard exactly (does not send).
+ */
+export function emailConfigStatus(): { configured: boolean; mode: 'live' | 'json-test' | 'unconfigured'; from: string | null } {
+  if (process.env.APPROVAL_SMTP_JSON === '1') {
+    return { configured: true, mode: 'json-test', from: process.env.APPROVAL_SMTP_FROM || 'approvals@test.local' };
+  }
+  const host = process.env.APPROVAL_SMTP_HOST || process.env.NR_SMTP_HOST;
+  const user = process.env.APPROVAL_SMTP_USER || process.env.NR_SMTP_USER;
+  const pass = process.env.APPROVAL_SMTP_PASS || process.env.NR_SMTP_PASS;
+  const from = process.env.APPROVAL_SMTP_FROM || process.env.NR_SMTP_FROM || user || null;
+  const configured = !!(host && user && pass && from);
+  return { configured, mode: configured ? 'live' : 'unconfigured', from: configured ? from : null };
+}
+
 async function subjectLine(scope: Scope, subjectRef: string, vesselId: string | null): Promise<string> {
   let name = '';
   try {

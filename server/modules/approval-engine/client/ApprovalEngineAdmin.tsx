@@ -50,6 +50,11 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: P
   const [rows, setRows] = useState<StepRow[]>([]);
   const [versions, setVersions] = useState<WorkflowSummary[]>([]);
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({});
+  // F7 — read-only "View configured approvers/tiers" for the active version of the selected
+  // classification: steps, roles, quorum, resolved approver names, and a ⚠ marker where a role
+  // resolves to nobody (the same silent-stall risk F3 addresses at runtime).
+  const [viewSteps, setViewSteps] = useState<Array<{ label: string; rule: string; slots: Array<{ roleId: string; roleLabel: string }> }> | null>(null);
+  const [approverNames, setApproverNames] = useState<Record<string, { names: string[]; vesselScoped: boolean }>>({});
 
   useEffect(() => { api('GET', '/registry').then(setTree).catch((e) => setMsg({ err: String(e.message) })); }, [api]);
 
@@ -65,6 +70,37 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: P
     api('GET', `/scopes/enabled?${scopeQuery}`).then((r) => setEnabled(!!r.enabled)).catch(() => setEnabled(true));
     api('GET', `/workflows?${scopeQuery}`).then(setVersions).catch(() => setVersions([]));
   }, [api, scopeQuery, scope]);
+
+  // F7 — load the active version's steps + resolved approver names for the read-only view.
+  useEffect(() => {
+    let cancelled = false;
+    setViewSteps(null); setApproverNames({});
+    if (!classification) return;
+    const active = versions
+      .filter((v) => v.classification === classification && v.status === 'active')
+      .sort((a, b) => b.version - a.version)[0]
+      ?? versions.filter((v) => v.classification === classification).sort((a, b) => b.version - a.version)[0];
+    if (!active) return;
+    api('GET', `/workflows/${active.wfuuid}`).then(async (wf: any) => {
+      if (cancelled) return;
+      const steps = (wf?.nodes ?? [])
+        .filter((n: any) => n.type === 'approval-step')
+        .sort((a: any, b: any) => a.ordinal - b.ordinal)
+        .map((n: any) => ({ label: n.label || n.key, rule: n.quorum?.rule ?? 'all', slots: (n.slots ?? []).map((s: any) => ({ roleId: s.roleId, roleLabel: s.roleLabel })) }));
+      setViewSteps(steps);
+      const uniqueRoleIds = Array.from(new Set(steps.flatMap((s: any) => s.slots.map((x: any) => x.roleId))));
+      const entries = await Promise.all(uniqueRoleIds.map(async (rid) => {
+        try {
+          const res = await fetch(`/technical/api/approvals/role-approvers?roleId=${encodeURIComponent(rid as string)}`);
+          if (!res.ok) return [rid, { names: [], vesselScoped: false }] as const;
+          const j = await res.json();
+          return [rid, { names: j.names ?? [], vesselScoped: !!j.vesselScoped }] as const;
+        } catch { return [rid, { names: [], vesselScoped: false }] as const; }
+      }));
+      if (!cancelled) setApproverNames(Object.fromEntries(entries));
+    }).catch(() => { if (!cancelled) setViewSteps(null); });
+    return () => { cancelled = true; };
+  }, [api, classification, versions]);
 
   const addRow = () => setRows((r) => [...r, { roles: [], rule: 'all' }]);
   const setRowRole = (i: number, roleId: string) => {
@@ -179,6 +215,33 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: P
                 <span style={{ color: '#667085', fontSize: 12 }}>{new Date(v.createdAt).toLocaleString()}</span>
               </div>
             ))}
+
+            {/* F7 — read-only view of the configured approvers/tiers for the active version */}
+            {viewSteps && viewSteps.length > 0 && (
+              <div data-testid="configured-approvers-view" style={{ marginTop: 16, border: '1px solid #e4e7ec', borderRadius: 8, padding: 12 }}>
+                <div style={{ ...S.h, marginTop: 0 }}>Configured approvers (active version — read-only)</div>
+                {viewSteps.map((st, i) => (
+                  <div key={i} style={{ marginBottom: 10 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>
+                      Step {i + 1}: {st.label}{st.slots.length > 1 ? ` — ${st.rule === 'any' ? 'any one approves' : 'all must approve'}` : ''}
+                    </div>
+                    {st.slots.map((sl) => {
+                      const r = approverNames[sl.roleId];
+                      const empty = !!r && r.names.length === 0;
+                      return (
+                        <div key={sl.roleId} style={{ marginLeft: 12, fontSize: 13, marginTop: 2 }}>
+                          <span style={{ fontWeight: 500 }}>{sl.roleLabel}</span>
+                          {!r ? <span style={{ color: '#667085' }}> — resolving…</span>
+                            : empty
+                              ? <span data-testid="configured-approver-unresolved" style={{ color: '#b42318' }}> — ⚠ no approver resolved for this role</span>
+                              : <span style={{ color: '#475467' }}> — {r.names.join(', ')}{r.vesselScoped ? ' (vessel-scoped at runtime)' : ''}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
           </>)}
         </div>
       )}
