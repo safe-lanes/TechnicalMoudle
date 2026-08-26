@@ -38,7 +38,7 @@ router.get('/approvals/notifications', asyncHandler(async (req, res) => {
 
 // GET /approvals/role-approvers?roleId=<ruid|moc:Level N> — F7: resolved approver NAMES for the
 // admin read-only "View configured approvers" panel. Office-only (same audience as the builder).
-router.get('/approvals/role-approvers', requireRole(['Office', 'PMS Admin', 'Sail Admin']), asyncHandler(async (req, res) => {
+router.get('/approvals/role-approvers', requireRole(['PMS Admin', 'Sail Admin', 'Super Admin']), asyncHandler(async (req, res) => {
   const roleId = String(req.query.roleId ?? '');
   if (!roleId) return void res.status(400).json({ error: 'roleId required' });
   res.json(await resolveApproverNames(roleId));

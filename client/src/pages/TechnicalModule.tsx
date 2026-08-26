@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { TopMenuBar } from "@/components/TopMenuBar";
 import { SideMenuBar } from "@/components/SideMenuBar";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { ShieldX } from "lucide-react";
 import Dashboard from "./pms/Dashboard";
@@ -57,6 +58,9 @@ export const TechnicalModule = () => {
   const [location, setLocation] = useLocation();
   const params = useParams();
   const { isSailAdmin, isVessel } = useUIRole();
+  const { currentUser } = useAuth();
+  // F6 (Q2): the Approval Engine builder is ADMIN-only — same role set as the menu + API guard.
+  const isApprovalEngineAdmin = ["PMS Admin", "Sail Admin", "Super Admin"].includes(currentUser?.role ?? "");
   const { canViewSidebarItem, status: permissionStatus } = usePermissions();
   
   // Derive state from URL
@@ -176,7 +180,9 @@ export const TechnicalModule = () => {
         
         {/* Main Content Area */}
         <div className={`flex-1 min-h-0 overflow-auto ${selectedMenuItem === "fleet-component-editor" ? "" : "p-6"}`}>
-          {(permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && !(selectedMenuItem === "approval-engine" && !isVessel) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem) ? (
+          {/* F6 (Q2): Approval Engine builder is admin-only — deny non-admins unconditionally
+              (independent of permission status), so a plain Office "User" hitting the URL is refused. */}
+          {(selectedMenuItem === "approval-engine" && !isApprovalEngineAdmin) || ((permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && !(selectedMenuItem === "approval-engine" && isApprovalEngineAdmin) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem)) ? (
             <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
               <div className="text-center">
                 <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
