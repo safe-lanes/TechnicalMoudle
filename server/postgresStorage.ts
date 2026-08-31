@@ -7347,7 +7347,10 @@ export class PostgresStorage {
 
   async getSuperintendentNotifications(vesselName?: string): Promise<SuperintendentNotification[]> {
     const db = await getDb();
-    const conditions = [eq(superintendentNotifications.isAcknowledged, false)];
+    const conditions = [
+      eq(superintendentNotifications.isAcknowledged, false),
+      or(eq(superintendentNotifications.isDeleted, false), isNull(superintendentNotifications.isDeleted))!,
+    ];
     if (vesselName) {
       conditions.push(eq(superintendentNotifications.vesselName, vesselName));
     }
@@ -7358,8 +7361,14 @@ export class PostgresStorage {
 
   async getAllSuperintendentNotifications(vesselName?: string): Promise<SuperintendentNotification[]> {
     const db = await getDb();
+    const activeCondition = or(
+      eq(superintendentNotifications.isDeleted, false),
+      isNull(superintendentNotifications.isDeleted),
+    );
     return await db.select().from(superintendentNotifications)
-      .where(vesselName ? eq(superintendentNotifications.vesselName, vesselName) : undefined)
+      .where(vesselName
+        ? and(activeCondition, eq(superintendentNotifications.vesselName, vesselName))
+        : activeCondition)
       .orderBy(desc(superintendentNotifications.createdAt));
   }
 

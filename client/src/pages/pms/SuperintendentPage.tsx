@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { ExternalLink, Check, ArrowLeft, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,9 @@ import { useLocation } from "wouter";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import { effectiveApprovalTier, useApprovalPolicy } from "@/hooks/useApprovalPolicy";
+import { useVessel } from "@/contexts/VesselContext";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { SuperintendentNotificationCategory } from "@shared/utils/superintendentNotifications";
 
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return "—";
@@ -44,24 +47,52 @@ export default function SuperintendentPage() {
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; notification: any | null }>({ open: false, notification: null });
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<SuperintendentNotificationCategory>("pending");
+  const {
+    vesselId,
+    applyVesselScope,
+    isMyVessels,
+    myVesselsEmpty,
+  } = useVessel();
   const { isSuperintendentLockEnabled } = useApprovalPolicy();
   const getEffectiveTier = useCallback(
-    (notification: any) => effectiveApprovalTier(
-      notification?.approvalTier,
-      isSuperintendentLockEnabled(notification?.vesselId),
-    ),
+    (notification: any) => notification?.effectiveApprovalTier || effectiveApprovalTier(
+        notification?.approvalTier,
+        isSuperintendentLockEnabled(notification?.vesselId),
+      ),
     [isSuperintendentLockEnabled],
   );
 
-  const { data: allNotifications = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/technical/api/superintendent/notifications/all"],
-  });
+  const buildNotificationsUrl = useCallback((category: SuperintendentNotificationCategory) => {
+    const params = new URLSearchParams({ category });
+    applyVesselScope(params);
+    return `/technical/api/superintendent/notifications?${params.toString()}`;
+  }, [applyVesselScope]);
+  const pendingUrl = buildNotificationsUrl("pending");
+  const acknowledgedUrl = buildNotificationsUrl("acknowledged");
+  const informationUrl = buildNotificationsUrl("information");
+  const pendingQuery = useQuery<any[]>({ queryKey: [pendingUrl], enabled: !!vesselId });
+  const acknowledgedQuery = useQuery<any[]>({ queryKey: [acknowledgedUrl], enabled: !!vesselId });
+  const informationQuery = useQuery<any[]>({ queryKey: [informationUrl], enabled: !!vesselId });
+  const pendingNotifications = pendingQuery.data || [];
+  const tabNotifications =
+    activeTab === "pending"
+      ? pendingNotifications
+      : activeTab === "acknowledged"
+        ? acknowledgedQuery.data || []
+        : informationQuery.data || [];
+  const isLoading =
+    activeTab === "pending"
+      ? pendingQuery.isLoading
+      : activeTab === "acknowledged"
+        ? acknowledgedQuery.isLoading
+        : informationQuery.isLoading;
 
   const invalidateNotifications = () => {
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/all"] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications"] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/summary"] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/work-orders"] });
+    invalidateByUrlPrefix([
+      "/technical/api/superintendent/notifications",
+      "/technical/api/work-orders",
+    ]);
   };
 
   const acknowledgeMutation = useMutation({
@@ -87,12 +118,7 @@ export default function SuperintendentPage() {
     },
   });
 
-  const pendingCount = allNotifications.filter((n: any) => !n.isAcknowledged).length;
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const acknowledgedThisMonth = allNotifications.filter(
-    (n: any) => n.isAcknowledged && n.acknowledgedAt && new Date(n.acknowledgedAt) >= startOfMonth
-  ).length;
+  const pendingCount = pendingNotifications.length;
 
   const isRowSelectable = useCallback((params: any) => {
     const n = params.data;
@@ -103,12 +129,12 @@ export default function SuperintendentPage() {
     setSelectedRows(event.api.getSelectedRows());
   }, []);
 
-  const eligibleSelected = selectedRows.filter(
+  const eligibleSelected = activeTab === "pending" ? selectedRows.filter(
     (n) => getEffectiveTier(n) === 'superintendent_locked' && !n.isAcknowledged
-  );
+  ) : [];
 
   const columnDefs: ColDef[] = useMemo(() => [
-    {
+    ...(activeTab === "pending" ? [{
       headerName: "",
       field: "__select__",
       headerCheckboxSelection: true,
@@ -121,7 +147,7 @@ export default function SuperintendentPage() {
       sortable: false,
       resizable: false,
       cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-    } as ColDef,
+    } as ColDef] : []),
     {
       headerName: "Work Order Code",
       field: "workOrderCode",
@@ -247,14 +273,14 @@ export default function SuperintendentPage() {
       cellRenderer: (params: any) => {
         const n = params.data;
         if (!n) return null;
-        if (n.isAcknowledged) {
+        if (activeTab === "acknowledged") {
           return (
             <span className="text-green-600 text-xs font-medium" data-testid={`status-acknowledged-${n.id}`}>
               Acknowledged ({formatDate(n.acknowledgedAt)})
             </span>
           );
         }
-        const requiresAcknowledgment = getEffectiveTier(n) === 'superintendent_locked';
+        const requiresAcknowledgment = activeTab === "pending";
         return (
           <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700" data-testid={`status-awaiting-${n.id}`}>
             {requiresAcknowledgment ? 'Awaiting Acknowledgment' : 'Notification Sent'}
@@ -280,7 +306,7 @@ export default function SuperintendentPage() {
       cellRenderer: (params: any) => {
         const n = params.data;
         if (!n) return null;
-        if (n.isAcknowledged) {
+        if (activeTab === "acknowledged") {
           return (
             <Button variant="outline" size="sm" disabled className="text-xs" data-testid={`button-acknowledged-${n.id}`}>
               <Check className="h-3 w-3 mr-1" />
@@ -288,7 +314,7 @@ export default function SuperintendentPage() {
             </Button>
           );
         }
-        if (getEffectiveTier(n) === 'superintendent_locked') {
+        if (activeTab === "pending" && getEffectiveTier(n) === 'superintendent_locked') {
           return (
             <Button
               size="sm"
@@ -308,33 +334,60 @@ export default function SuperintendentPage() {
         );
       },
     },
-  ], [acknowledgeMutation.isPending, getEffectiveTier, setLocation]);
+  ], [acknowledgeMutation.isPending, activeTab, getEffectiveTier, setLocation]);
+
+  const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+  const safeReturnTo = returnTo?.split("?")[0] === "/pms/dashboard"
+    ? returnTo
+    : "/pms/dashboard";
 
   return (
     <div className="space-y-6" data-testid="superintendent-page">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => setLocation("/pms/dashboard")} data-testid="button-back-dashboard">
+        <Button variant="ghost" onClick={() => setLocation(safeReturnTo)} data-testid="button-back-dashboard">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
         </Button>
         <div>
           <h1 className="text-2xl font-semibold text-gray-900" data-testid="text-page-title">Superintendent Notifications</h1>
-          <p className="text-sm text-gray-500 mt-1" data-testid="text-page-subtitle">Work orders requiring shore-side acknowledgment before the Head of Department can approve</p>
+          <p className="text-sm text-gray-500 mt-1" data-testid="text-page-subtitle">Review pending acknowledgments and current-month Superintendent notices</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          setActiveTab(value as SuperintendentNotificationCategory);
+          setSelectedRows([]);
+        }}
+      >
+        <TabsList data-testid="tabs-superintendent-notifications">
+          <TabsTrigger value="pending" data-testid="tab-pending-acknowledgment">
+            Pending Acknowledgment
+          </TabsTrigger>
+          <TabsTrigger value="acknowledged" data-testid="tab-acknowledged">
+            Acknowledged
+          </TabsTrigger>
+          <TabsTrigger value="information" data-testid="tab-information-only">
+            Information only
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {activeTab === "pending" && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4" data-testid="card-pending-count">
           <div className="text-sm text-red-600 font-medium">Total Pending Acknowledgment</div>
           <div className="text-3xl font-bold text-red-700 mt-1">{pendingCount}</div>
         </div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4" data-testid="card-acknowledged-count">
-          <div className="text-sm text-green-600 font-medium">Acknowledged This Month</div>
-          <div className="text-3xl font-bold text-green-700 mt-1">{acknowledgedThisMonth}</div>
+      )}
+
+      {isMyVessels && myVesselsEmpty && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" data-testid="banner-no-assigned-vessels">
+          No vessels are assigned to you yet.
         </div>
-      </div>
+      )}
 
       <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50">
+        {activeTab === "pending" && <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50">
           <span className="text-sm text-gray-500">
             {eligibleSelected.length > 0
               ? `${eligibleSelected.length} WO${eligibleSelected.length !== 1 ? 's' : ''} selected`
@@ -352,7 +405,7 @@ export default function SuperintendentPage() {
               ? `Bulk Acknowledge (${eligibleSelected.length})`
               : "Bulk Acknowledge"}
           </Button>
-        </div>
+        </div>}
 
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading notifications...</div>
@@ -360,13 +413,19 @@ export default function SuperintendentPage() {
           <div style={{ height: 'calc(100vh - 360px)', minHeight: '400px' }} data-testid="table-notifications">
             <WOAgGridTable
               columnDefs={columnDefs}
-              rowData={allNotifications}
+              rowData={tabNotifications}
               height="100%"
               suppressRowClickSelection
-              rowSelection="multiple"
+              rowSelection={activeTab === "pending" ? "multiple" : undefined}
               onSelectionChanged={onSelectionChanged}
               isRowSelectable={isRowSelectable}
-              noRowsMessage="No superintendent notifications found."
+              noRowsMessage={
+                activeTab === "pending"
+                  ? "No notifications are awaiting acknowledgment."
+                  : activeTab === "acknowledged"
+                    ? "No notifications were acknowledged this month."
+                    : "No information-only notifications were created this month."
+              }
               testId="ag-grid-superintendent-notifications"
               getRowClass={(params) => params.data?.id ? `row-notification-${params.data.id}` : undefined}
             />

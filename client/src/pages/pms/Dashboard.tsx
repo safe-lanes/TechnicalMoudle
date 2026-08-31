@@ -467,7 +467,10 @@ const Dashboard = () => {
   const crListModalOpenRef = useRef(false);
   crListModalOpenRef.current = crListModal.open;
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    const restored = new URLSearchParams(window.location.search).get('dashboardTab');
+    return restored === 'management' ? 'management' : 'overview';
+  });
   const [showFilters, setShowFilters] = useState(false);
   type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
   const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
@@ -529,13 +532,17 @@ const Dashboard = () => {
 
   const adminDefaultsToAll = isSailAdmin || isClientAdmin;
   const isAdminScope = isSailAdmin || isClientAdmin || isTechSuperintendent;
-  const [mgmtVesselId, setMgmtVesselId] = useState<string>('');
+  const [mgmtVesselId, setMgmtVesselId] = useState<string>(
+    () => new URLSearchParams(window.location.search).get('dashboardVesselId') || '',
+  );
   // Task #224: Scope is an EXPLICIT mode ('all' = entire fleet, 'my' = assigned
   // mini-fleet), NOT derived from which vessel is selected. Vessel selection
   // narrows *within* the active scope. Everyone (incl. admins) defaults to
   // 'all'. Keeping scope explicit prevents picking an assigned vessel while in
   // All-Vessel scope from silently flipping the Scope selector to My Vessel.
-  const [mgmtScope, setMgmtScope] = useState<'all' | 'my'>('all');
+  const [mgmtScope, setMgmtScope] = useState<'all' | 'my'>(
+    () => new URLSearchParams(window.location.search).get('dashboardScope') === 'my' ? 'my' : 'all',
+  );
   useEffect(() => {
     // Task #226: the global scope is now the source of truth for 'my'. When the
     // global VesselContext is in the 'my' aggregate scope (e.g. restored from a
@@ -871,19 +878,23 @@ const Dashboard = () => {
         : !!postponeActiveStep && postponeUserApproverLevels.includes(postponeActiveStep.approvalLevel)
   );
 
+  const superintendentSummaryParams = new URLSearchParams();
+  if (isMyVessels) {
+    superintendentSummaryParams.set('vesselId', 'all');
+    superintendentSummaryParams.set(
+      'vesselIds',
+      assignedVesselIds.length
+        ? assignedVesselIds.join(',')
+        : '00000000-0000-0000-0000-000000000000',
+    );
+  } else {
+    superintendentSummaryParams.set('vesselId', effectiveVesselId || 'all');
+  }
+  const superintendentSummaryUrl =
+    `/technical/api/superintendent/notifications/summary?${superintendentSummaryParams.toString()}`;
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
-    queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
-    queryFn: async () => {
-      const url = isAllVessels
-        ? '/technical/api/superintendent/notifications/summary'
-        : `/technical/api/superintendent/notifications/summary?vesselId=${effectiveVesselId}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch superintendent summary');
-      return response.json();
-    },
-    // Object-returning endpoint without a vesselIds allow-list; skip it for the
-    // 'my' aggregate (it only renders on the management tab anyway).
-    enabled: !!effectiveVesselId && !isMyVessels,
+    queryKey: [superintendentSummaryUrl],
+    enabled: !!effectiveVesselId,
   });
 
   const { data: complianceAnomalies } = useQuery<{
@@ -3179,7 +3190,15 @@ const Dashboard = () => {
                       <ComplianceAnomalyPanel
                         vesselId={effectiveVesselId}
                         superintendentSummary={superintendentSummary}
-                        onNavigateToSuperintendent={() => setLocation('/pms/superintendent')}
+                        onNavigateToSuperintendent={() => {
+                          const returnParams = new URLSearchParams({
+                            dashboardTab: activeTab,
+                            dashboardVesselId: effectiveVesselId,
+                            dashboardScope: mgmtScope,
+                          });
+                          const returnTo = `/pms/dashboard?${returnParams.toString()}`;
+                          setLocation(`/pms/superintendent?returnTo=${encodeURIComponent(returnTo)}`);
+                        }}
                       />
                     </div>
                   ) : selectedOpCard === 'pending-approvals' ? (
