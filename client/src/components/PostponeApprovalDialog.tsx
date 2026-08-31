@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ApprovalChainProgress, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
+import { anyLevelMatches } from '@shared/approvals/level';
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -113,11 +114,13 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
   const engineChain = chainPost.hasChain ? chainPost : chainRePost;
 
   const legacyUserCanAct = vesselIsAssigned && (
-    (approversLoading || stepsLoading || approversError || stepsError)
+    // AE-21: hydration race guard + normalized level match (see @shared/approvals/level) —
+    // WO-postponement steps historically store 'Level1'/'Level2' vs an imported 'Level 1'.
+    (!currentUser?.userUuid || approversLoading || stepsLoading || approversError || stepsError)
       ? false
       : (noStepsYet || noApproversConfigured)
         ? (!isVessel && !isHeadOfDept)
-        : !!activeStep && userApproverLevels.includes(activeStep.approvalLevel)
+        : !!activeStep && anyLevelMatches(userApproverLevels, activeStep.approvalLevel)
   );
   const userCanAct = resolveCanAct(engineChain, legacyUserCanAct);
   const engineScreenId = chainPost.hasChain ? 'pms-wo-postponement' : chainRePost.hasChain ? 'pms-wo-re-postponement' : null;

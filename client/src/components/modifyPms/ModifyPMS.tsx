@@ -26,6 +26,7 @@ import { useVessels } from '@/hooks/useVessels';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalApprovers } from '@/hooks/useExternalMasterData';
 import { ApprovalChainProgress, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
+import { anyLevelMatches } from '@shared/approvals/level';
 import {
   Select,
   SelectContent,
@@ -155,7 +156,9 @@ export function ModifyPMS() {
     )
     .map((a: any) => a.approverLevel as string);
   const activeStep = approvalSteps.find((s: any) => s.status === 'Pending');
-  const userIsApproverForActiveStep = !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
+  // AE-21: compare on the normalized level (see @shared/approvals/level) — an imported
+  // 'Level1' / 'level 1' must still match a step's 'Level 1'.
+  const userIsApproverForActiveStep = !!activeStep && anyLevelMatches(userApproverLevels, activeStep.approvalLevel);
   // Legacy CRs with no steps, or no approvers configured at all: fall back to role-based guard
   const noStepsYet = viewingRequest?.status === 'submitted' && approvalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
@@ -180,7 +183,9 @@ export function ModifyPMS() {
   const engineChain = useApprovalChain(engineScreenId ?? 'none', engineScreenId && viewingRequest?.status === 'submitted' ? (viewingRequest as any)?.cruuid : null);
 
   const legacyUserCanAct = crVesselIsAssigned && (
-    (approversLoading || stepsLoading || approversError || stepsError)
+    // AE-21: treat "auth not yet hydrated" as loading, never as a final "not an approver"
+    // — otherwise a genuine approver's button is hidden by the hydration race (cf. F1).
+    (!currentUser?.userUuid || approversLoading || stepsLoading || approversError || stepsError)
       ? false
       : (noStepsYet || noApproversConfigured)
         ? (!isVessel && !isHeadOfDept)

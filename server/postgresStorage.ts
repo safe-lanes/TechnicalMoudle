@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
+import { levelsMatch } from '@shared/approvals/level';
 import { getDb } from './db';
 import {
   users,
@@ -5467,7 +5468,10 @@ export class PostgresStorage {
 
     // Filter to CRs where this user is the active approver at the pending level
     if (filters?.pendingForApprover) {
-      const userId = filters.pendingForApprover;
+      // AE-21: standardise the identity key on user_uuid (was user_id) and compare the
+      // level on its normalized form (see @shared/approvals/level) — consistent with the
+      // client gate and verifyApproverForLevel.
+      const approverUuid = filters.pendingForApprover;
       const submittedRequests = allRequests.filter(cr => cr.status === 'submitted');
       const filtered: ChangeRequest[] = [];
       for (const cr of submittedRequests) {
@@ -5478,15 +5482,14 @@ export class PostgresStorage {
           ));
         const activeStep = steps.find(s => s.status === 'Pending');
         if (!activeStep) continue;
-        const isApprover = await db.select().from(mocApprovers)
+        const rows = await db.select({ level: mocApprovers.approverLevel }).from(mocApprovers)
           .where(and(
-            eq(mocApprovers.approverLevel, activeStep.approvalLevel),
             eq(mocApprovers.isActive, 1),
             eq(mocApprovers.isDeleted, false),
             eq(mocApprovers.modulename, 'Technical'),
-            eq(mocApprovers.userId, userId)
+            eq(mocApprovers.userUuid, approverUuid)
           ));
-        if (isApprover.length > 0) filtered.push(cr);
+        if (rows.some(r => levelsMatch(r.level, activeStep.approvalLevel))) filtered.push(cr);
       }
       return filtered;
     }
@@ -5643,15 +5646,17 @@ export class PostgresStorage {
 
   private async verifyApproverForLevel_internal(reviewerId: string, approvalLevel: string): Promise<boolean> {
     const db = await getDb();
-    const found = await db.select().from(mocApprovers)
+    // AE-21: match on the normalized level (see @shared/approvals/level) so an imported
+    // 'Level1' still authorises a 'Level 1' step; identity key = user_uuid (consistent with
+    // the client gate and the pending-for-approver filter).
+    const rows = await db.select({ level: mocApprovers.approverLevel }).from(mocApprovers)
       .where(and(
-        eq(mocApprovers.approverLevel, approvalLevel),
         eq(mocApprovers.isActive, 1),
         eq(mocApprovers.isDeleted, false),
         eq(mocApprovers.modulename, 'Technical'),
         eq(mocApprovers.userUuid, reviewerId)
       ));
-    return found.length > 0;
+    return rows.some(r => levelsMatch(r.level, approvalLevel));
   }
 
   // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──

@@ -84,6 +84,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useApprovalChain, resolveCanAct } from "@/components/approvals/ApprovalChainProgress";
+import { anyLevelMatches } from "@shared/approvals/level";
 
 interface Spare {
   id: number;
@@ -793,7 +794,9 @@ const Dashboard = () => {
   });
 
   // Approver-scoped CR query: only CRs where the current user is the pending approver
-  const currentUserIdForApprover = currentUser?.username || (currentUser as any)?.userId || null;
+  // AE-21: standardise on user_uuid — the server "pending for me" filter matches
+  // moc_approvers.user_uuid (postgresStorage.getChangeRequests). username/userId drifted from it.
+  const currentUserIdForApprover = currentUser?.userUuid || null;
   const { data: pendingApproverCRs = [] } = useQuery<ChangeRequest[]>({
     queryKey: ['/technical/api/change-requests', 'pending-approver', currentUserIdForApprover],
     queryFn: async () => {
@@ -837,10 +840,11 @@ const Dashboard = () => {
     )
     .map((a: any) => a.approverLevel as string);
   const crActiveStep = opCrApprovalSteps.find((s: any) => s.status === 'Pending');
-  const crUserIsApproverForActiveStep = !!crActiveStep && crUserApproverLevels.includes(crActiveStep.approvalLevel);
+  // AE-21: normalized level match (see @shared/approvals/level).
+  const crUserIsApproverForActiveStep = !!crActiveStep && anyLevelMatches(crUserApproverLevels, crActiveStep.approvalLevel);
   const crNoStepsYet = opDetailChangeRequest?.status?.toLowerCase() === 'submitted' && opCrApprovalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
-  const crUserCanAct = (approversLoading || crStepsLoading || approversError || crStepsError)
+  const crUserCanAct = (!currentUser?.userUuid || approversLoading || crStepsLoading || approversError || crStepsError)
     ? false
     : (crNoStepsYet || noApproversConfigured)
       ? (!isVessel && !isHeadOfDept)
@@ -879,11 +883,12 @@ const Dashboard = () => {
     || (!!postponeWoVesselId && vcAssignedVesselIds.includes(postponeWoVesselId));
 
   const postponeUserCanAct = postponeVesselIsAssigned && (
-    (approversLoading || postponeStepsLoading || approversError || postponeStepsError)
+    // AE-21: hydration guard + normalized level match.
+    (!currentUser?.userUuid || approversLoading || postponeStepsLoading || approversError || postponeStepsError)
       ? false
       : (postponeNoStepsYet || noApproversConfigured)
         ? (!isVessel && !isHeadOfDept)
-        : !!postponeActiveStep && postponeUserApproverLevels.includes(postponeActiveStep.approvalLevel)
+        : !!postponeActiveStep && anyLevelMatches(postponeUserApproverLevels, postponeActiveStep.approvalLevel)
   );
   // F2 (bonus, undiscovered by QA): the dashboard postponement decision dialog is a second
   // render path for the postpone approve/reject buttons and, like the CR one, was legacy-only.
