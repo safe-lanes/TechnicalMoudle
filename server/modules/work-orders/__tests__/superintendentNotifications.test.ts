@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifySuperintendentNotification,
+  formatSuperintendentNotificationReason,
   isInCurrentCalendarMonth,
 } from "@shared/utils/superintendentNotifications";
 import {
@@ -99,5 +100,35 @@ describe("Superintendent notification classification", () => {
     expect(groups.pending.map((row) => row.id)).toEqual([1]);
     expect(groups.information.map((row) => row.id)).toEqual([2]);
     expect(groups.acknowledged).toEqual([]);
+  });
+});
+
+describe("Superintendent information notification reasons", () => {
+  it("formats each supported notification condition", () => {
+    expect(formatSuperintendentNotificationReason({ daysLate: 21 }))
+      .toBe("21 days late");
+    expect(formatSuperintendentNotificationReason({ missedCycles: 1 }))
+      .toBe("1 missed cycle");
+    expect(formatSuperintendentNotificationReason({ backdatingDays: 7 }))
+      .toBe("7 days backdated");
+  });
+
+  it("preserves all reasons for a combined-condition notification", () => {
+    expect(formatSuperintendentNotificationReason({
+      daysLate: 22,
+      missedCycles: 3,
+      backdatingDays: 8,
+    })).toBe("22 days late; 3 missed cycles; 8 days backdated");
+  });
+
+  it("uses a safe fallback for legacy or invalid reason data", () => {
+    expect(formatSuperintendentNotificationReason({})).toBe(
+      "Reason unavailable for this notification",
+    );
+    expect(formatSuperintendentNotificationReason({
+      daysLate: null,
+      missedCycles: 0,
+      backdatingDays: -1,
+    })).toBe("Reason unavailable for this notification");
   });
 });

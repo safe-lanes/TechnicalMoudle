@@ -17,7 +17,10 @@ import WOAgGridTable from "@/components/WOAgGridTable";
 import { effectiveApprovalTier, useApprovalPolicy } from "@/hooks/useApprovalPolicy";
 import { useVessel } from "@/contexts/VesselContext";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { SuperintendentNotificationCategory } from "@shared/utils/superintendentNotifications";
+import {
+  formatSuperintendentNotificationReason,
+  type SuperintendentNotificationCategory,
+} from "@shared/utils/superintendentNotifications";
 
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return "—";
@@ -153,7 +156,7 @@ export default function SuperintendentPage() {
       field: "workOrderCode",
       minWidth: 200,
       flex: 1.2,
-      filter: "agTextColumnFilter",
+      filter: activeTab === "information" ? "agTextColumnFilter" : "agSetColumnFilter",
       cellRenderer: (params: any) => {
         const n = params.data;
         if (!n) return null;
@@ -289,14 +292,17 @@ export default function SuperintendentPage() {
       },
     },
     {
-      headerName: "Action",
-      field: "action",
-      minWidth: 150,
-      flex: 0.8,
-      filter: "agSetColumnFilter",
+      headerName: activeTab === "information" ? "Reason" : "Action",
+      field: activeTab === "information" ? "reason" : "action",
+      minWidth: activeTab === "information" ? 240 : 150,
+      flex: activeTab === "information" ? 1.4 : 0.8,
+      filter: "agTextColumnFilter",
       valueGetter: (p: any) => {
         const n = p.data;
         if (!n) return "";
+        if (activeTab === "information") {
+          return formatSuperintendentNotificationReason(n);
+        }
         if (n.isAcknowledged) return "Acknowledged";
         if (getEffectiveTier(n) === "superintendent_locked") return "Acknowledge";
         return "Info Only";
@@ -306,6 +312,16 @@ export default function SuperintendentPage() {
       cellRenderer: (params: any) => {
         const n = params.data;
         if (!n) return null;
+        if (activeTab === "information") {
+          return (
+            <span
+              className="text-sm text-gray-700 whitespace-normal leading-5"
+              data-testid={`text-information-reason-${n.id}`}
+            >
+              {formatSuperintendentNotificationReason(n)}
+            </span>
+          );
+        }
         if (activeTab === "acknowledged") {
           return (
             <Button variant="outline" size="sm" disabled className="text-xs" data-testid={`button-acknowledged-${n.id}`}>
