@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocalApprovers } from '@/hooks/useExternalMasterData';
 import { ApprovalChainProgress, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
 import { anyLevelMatches } from '@shared/approvals/level';
+import { useApprovalScopeConfig } from '@/hooks/useApprovalScopeConfig';
 import {
   Select,
   SelectContent,
@@ -106,6 +107,7 @@ export function ModifyPMS() {
   const { data: vessels = [] } = useVessels();
   const { currentUser } = useAuth();
   const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
+  const { vesselScopeStrict } = useApprovalScopeConfig();
 
   const periodDateRange = useMemo(() => periodFilter ? periodFilterToDateRange(periodFilter) : null, [periodFilter]);
 
@@ -163,12 +165,13 @@ export function ModifyPMS() {
   const noStepsYet = viewingRequest?.status === 'submitted' && approvalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
 
-  // Vessel gate: approver must be assigned to the request's vessel (from profile).
-  // Sail Admin bypasses. Empty assignedVesselIds = no profile assignments = global scope (safe fallback).
+  // Vessel gate: approver must be assigned to the request's vessel (SAILERP profile → myVessels).
+  // Sail Admin bypasses. With strict vessel-scope ON (default), out-of-scope = read-only; the
+  // empty=fleet-wide fallback applies ONLY when the flag is off (legacy rollback path).
   const crVesselId = viewingRequest?.vesselId ?? null;
   const crVesselIsAssigned =
     isSailAdmin
-    || assignedVesselIds.length === 0
+    || (!vesselScopeStrict && assignedVesselIds.length === 0)
     || (!!crVesselId && assignedVesselIds.includes(crVesselId));
 
   // Phase 2 / W3 — approval-engine gate. When the engine owns a pending chain for this CR,

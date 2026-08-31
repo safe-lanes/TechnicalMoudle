@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ApprovalChainProgress, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
 import { anyLevelMatches } from '@shared/approvals/level';
+import { useApprovalScopeConfig } from '@/hooks/useApprovalScopeConfig';
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -76,6 +77,7 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
   const { isVessel, isHeadOfDept, isSailAdmin } = useUIRole();
   const { assignedVesselIds } = useVessel();
   const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
+  const { vesselScopeStrict } = useApprovalScopeConfig();
 
   const { data: approvalSteps = [], isError: stepsError, isLoading: stepsLoading } = useQuery({
     queryKey: ['/technical/api/work-orders', workOrder?.id, 'postpone-approval-steps'],
@@ -104,7 +106,7 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
   const requestVesselId = workOrder?.vesselId ?? null;
   const vesselIsAssigned =
     isSailAdmin
-    || assignedVesselIds.length === 0
+    || (!vesselScopeStrict && assignedVesselIds.length === 0)
     || (!!requestVesselId && assignedVesselIds.includes(requestVesselId));
 
   // Phase 2 / W3 — approval-engine gate (fail-soft: no chain → legacy gating unchanged).

@@ -21,6 +21,7 @@ import type { ApprovalCard, DecisionNotice, Scope } from '../approval-engine';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { admnRoleMaster, masterUsers, masterUserVessels, mocApprovers, changeRequest, workOrders } from '@shared/schema';
+import { isVesselScopeStrict } from './vesselScopeFlag';
 import { classifyChangeRequestScope } from '../change-requests/services/changeRequestsService';
 import { classifyWoForPostponement, classifyWoForRePostponement } from '../work-orders/services/workOrderService';
 import { AppError } from '../shared/errors';
@@ -118,7 +119,11 @@ export const technicalApprovalCard: ApprovalCard = {
       .where(and(eq(masterUsers.role, role.assignedRole), eq(masterUsers.isDeleted, false)));
     const ids = users.map((u) => u.id);
     if (ids.length === 0) return [];
-    if (role.roletype !== 'Ship') return ids; // office roles resolve fleet-wide (D-1)
+    // Office roles resolve fleet-wide ONLY when strict vessel-scope is off (legacy). With the
+    // flag on (default), every role — office and ship alike — is scoped to the subject's vessel
+    // via the user's SAILERP-assigned vessels (master_user_vessels). A role with no assigned
+    // user for the vessel resolves to zero → the F3 safety net flags it.
+    if (role.roletype !== 'Ship' && !isVesselScopeStrict()) return ids;
     const vesselId = await subjectVesselId(scope, subjectRef);
     if (!vesselId) return [];
     const assigned = await db().select({ u: masterUserVessels.userUuid }).from(masterUserVessels)
@@ -189,5 +194,8 @@ export async function resolveApproverNames(roleId: string): Promise<{ roleLabel:
   if (!role) return { roleLabel: null, names: [], vesselScoped: false };
   const users = await db().select({ name: masterUsers.fullName }).from(masterUsers)
     .where(and(eq(masterUsers.role, role.assignedRole), eq(masterUsers.isDeleted, false)));
-  return { roleLabel: role.assignedRole, names: users.map((u) => u.name).filter((n): n is string => !!n), vesselScoped: role.roletype === 'Ship' };
+  // Under strict vessel-scope, office roles are ALSO scoped to the subject's vessel at runtime
+  // (not just ship roles) — so the admin panel flags them "vessel-scoped at runtime" too.
+  const vesselScoped = role.roletype === 'Ship' || isVesselScopeStrict();
+  return { roleLabel: role.assignedRole, names: users.map((u) => u.name).filter((n): n is string => !!n), vesselScoped };
 }

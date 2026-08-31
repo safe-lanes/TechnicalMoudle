@@ -103,11 +103,11 @@ export function ApprovalChainProgress({ screenId, subjectRef }: { screenId: stri
               // F3 safety-net: an active slot with no resolved approver would stall silently.
               const unresolved = s.status === "active" && (s.resolvedApproverIds ?? []).length === 0;
               return (
-                <span key={s.slotOrdinal} title={s.decidedBy ? `${s.status} by ${s.decidedBy}${s.remarks ? ` — ${s.remarks}` : ""}` : unresolved ? `No approver resolved for ${s.roleLabel} on this vessel` : s.status}
+                <span key={s.slotOrdinal} title={s.decidedBy ? `${s.status} by ${s.decidedBy}${s.remarks ? ` — ${s.remarks}` : ""}` : unresolved ? `No approver assigned for this vessel — assign the vessel to an approver (${s.roleLabel}) in SAILERP` : s.status}
                   data-testid={unresolved ? "approval-slot-unresolved" : undefined}
                   style={{ display: "inline-flex", alignItems: "center", gap: 4, background: unresolved ? "#fef3f2" : "#f9fafb", border: unresolved ? "1px solid #fda29b" : undefined, color: unresolved ? "#b42318" : undefined, borderRadius: 10, padding: "1px 8px" }}>
                   <span style={{ width: 8, height: 8, borderRadius: 4, background: DOT[s.status] ?? "#98a2b3", display: "inline-block" }} />
-                  {s.roleLabel}{unresolved ? " — ⚠ no approver resolved" : ""}
+                  {s.roleLabel}{unresolved ? " — ⚠ no approver assigned for this vessel" : ""}
                 </span>
               );
             })}

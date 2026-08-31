@@ -15,6 +15,7 @@ import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { approvalNotifications } from './notificationSchema';
 import { emailConfigStatus } from './approvalNotifier';
 import { resolveApproverNames } from './approvalCard';
+import { isVesselScopeStrict } from './vesselScopeFlag';
 
 const db = () => {
   const ctx = getCurrentTenantContext();
@@ -23,6 +24,13 @@ const db = () => {
 const me = (req: AuthenticatedRequest): string => req.user?.userUuid ?? 'anonymous';
 
 const router = Router();
+
+// GET /approvals/config — client-readable runtime flags for the approval gates.
+// vesselScopeStrict drives the client read-only gate (and mirrors the server resolver);
+// read on every surface so "flag off restores current behaviour" holds end to end.
+router.get('/approvals/config', asyncHandler(async (_req, res) => {
+  res.json({ vesselScopeStrict: isVesselScopeStrict() });
+}));
 
 // GET /approvals/notifications?unread=1 — newest first, capped
 router.get('/approvals/notifications', asyncHandler(async (req, res) => {

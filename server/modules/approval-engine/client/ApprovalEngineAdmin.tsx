@@ -234,7 +234,7 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: P
                           {!r ? <span style={{ color: '#667085' }}> — resolving…</span>
                             : empty
                               ? <span data-testid="configured-approver-unresolved" style={{ color: '#b42318' }}> — ⚠ no approver resolved for this role</span>
-                              : <span style={{ color: '#475467' }}> — {r.names.join(', ')}{r.vesselScoped ? ' (vessel-scoped at runtime)' : ''}</span>}
+                              : <span style={{ color: '#475467' }}> — {r.names.join(', ')}{r.vesselScoped ? ' (vessel-scoped at runtime — the approvers for a given request are those assigned that vessel in SAILERP)' : ''}</span>}
                         </div>
                       );
                     })}

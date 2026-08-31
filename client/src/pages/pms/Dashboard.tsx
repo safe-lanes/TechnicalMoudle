@@ -85,6 +85,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useApprovalChain, resolveCanAct } from "@/components/approvals/ApprovalChainProgress";
 import { anyLevelMatches } from "@shared/approvals/level";
+import { useApprovalScopeConfig } from "@/hooks/useApprovalScopeConfig";
 
 interface Spare {
   id: number;
@@ -584,6 +585,7 @@ const Dashboard = () => {
   const { resolvedUserName } = useResolvedUserName();
   const userRankName = currentUser?.rank_name ?? '';
   const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
+  const { vesselScopeStrict } = useApprovalScopeConfig();
 
   // Task #224: "My Vessel" scope = the set of vessels assigned to the logged-in
   // user (from AuthContext.myVessels). The 'my' sentinel in mgmtVesselId means
@@ -844,11 +846,19 @@ const Dashboard = () => {
   const crUserIsApproverForActiveStep = !!crActiveStep && anyLevelMatches(crUserApproverLevels, crActiveStep.approvalLevel);
   const crNoStepsYet = opDetailChangeRequest?.status?.toLowerCase() === 'submitted' && opCrApprovalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
-  const crUserCanAct = (!currentUser?.userUuid || approversLoading || crStepsLoading || approversError || crStepsError)
-    ? false
-    : (crNoStepsYet || noApproversConfigured)
-      ? (!isVessel && !isHeadOfDept)
-      : crUserIsApproverForActiveStep;
+  // Vessel gate (parity with Modify PMS): out-of-scope = read-only. Sail Admin bypasses;
+  // empty=fleet-wide applies only when strict vessel-scope is off (legacy rollback path).
+  const crVesselId = (opDetailChangeRequest as any)?.vesselId ?? null;
+  const crVesselIsAssigned =
+    isSailAdmin
+    || (!vesselScopeStrict && vcAssignedVesselIds.length === 0)
+    || (!!crVesselId && vcAssignedVesselIds.includes(crVesselId));
+  const crUserCanAct = crVesselIsAssigned && (
+    (!currentUser?.userUuid || approversLoading || crStepsLoading || approversError || crStepsError)
+      ? false
+      : (crNoStepsYet || noApproversConfigured)
+        ? (!isVessel && !isHeadOfDept)
+        : crUserIsApproverForActiveStep);
   // F2 (AE-10) fix: this dashboard popup is a SECOND render path for the CR approve/reject
   // buttons and was gated on the legacy check only. Apply the SAME engine gate the Modify PMS
   // dialog uses (resolveCanAct): when the engine owns a pending chain, canDecide is authoritative.
@@ -879,7 +889,7 @@ const Dashboard = () => {
   const postponeWoVesselId = (postponeDecisionDialog.wo as any)?.vesselId ?? null;
   const postponeVesselIsAssigned =
     isSailAdmin
-    || vcAssignedVesselIds.length === 0
+    || (!vesselScopeStrict && vcAssignedVesselIds.length === 0)
     || (!!postponeWoVesselId && vcAssignedVesselIds.includes(postponeWoVesselId));
 
   const postponeUserCanAct = postponeVesselIsAssigned && (
