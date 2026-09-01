@@ -1,4 +1,5 @@
 import { getDb } from '../../../db';
+import { isUnplannedWorkOrderNo } from '../../../utils/workOrderStatus';
 import { monthlySnapshots } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import * as repo from '../repositories/reportRepository';
@@ -95,7 +96,7 @@ function isUnplannedWO(wo: WorkOrderRecord, hasLinkedJob: boolean): boolean {
     wo.taskType.toLowerCase().includes('unplanned') ||
     wo.taskType.toLowerCase().includes('breakdown')
   )) return true;
-  if (wo.workOrderNo && wo.workOrderNo.startsWith('UWO')) return true;
+  if (isUnplannedWorkOrderNo(wo.workOrderNo)) return true;
   return false;
 }
 

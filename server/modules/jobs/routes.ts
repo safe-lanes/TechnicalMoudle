@@ -31,7 +31,7 @@ router.patch('/jobs/:id', requirePermission('pms-modify-pms', 'edit'), asyncHand
 // DELETE /jobs/:id — delete job
 router.delete('/jobs/:id', requirePermission('pms-modify-pms', 'delete'), asyncHandler(jobCtrl.deleteJob));
 
-// POST /jobs/:id/inactivate — soft delete (deactivate) job
+// POST /jobs/:id/inactivate — deactivate a Job while retaining it for Office users
 router.post('/jobs/:id/inactivate', requirePermission('pms-modify-pms', 'edit'), asyncHandler(jobCtrl.inactivateJob));
 
 // ── Generate Work Order ──

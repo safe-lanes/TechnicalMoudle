@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
 import { levelsMatch } from '@shared/approvals/level';
 import { getDb } from './db';
+import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
 import {
   users,
   fleets,
@@ -468,34 +469,43 @@ export class PostgresStorage {
 
   // ============= VESSELS (Module 1) =============
 
-  async getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string, imoNumber: string | null, vesselType: string | null}>> {
+  async getVessels(options: { includeDeleted?: boolean } = {}): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>> {
     const db = await getDb();
-    const result = await db.select().from(vessels);
+    const result = options.includeDeleted
+      ? await db.select().from(vessels)
+      : await db.select().from(vessels).where(or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted)));
     return result.map(v => ({
       id: v.id,
       vuuid: v.vuuid,
       name: v.name,
       code: v.code,
+      vCode: v.vCode ?? null,
       imoNumber: v.imoNumber ?? null,
       vesselType: v.vesselType ?? null,
     }));
   }
 
-  async getVessel(id: string): Promise<Vessel | undefined> {
+  async getVessel(id: string, options: { includeDeleted?: boolean } = {}): Promise<Vessel | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.vuuid, id));
+    const result = await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.vuuid, id)
+      : and(eq(vessels.vuuid, id), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
     return result[0];
   }
 
-  async getVesselByCode(code: string): Promise<Vessel | undefined> {
+  async getVesselByCode(code: string, options: { includeDeleted?: boolean } = {}): Promise<Vessel | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.code, code));
+    const result = await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.code, code)
+      : and(eq(vessels.code, code), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
     return result[0];
   }
 
-  async getVesselIdByName(vesselName: string): Promise<string | undefined> {
+  async getVesselIdByName(vesselName: string, options: { includeDeleted?: boolean } = {}): Promise<string | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.name, vesselName));
+    const result = await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.name, vesselName)
+      : and(eq(vessels.name, vesselName), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
     return result[0]?.vuuid;
   }
 
@@ -1113,24 +1123,32 @@ export class PostgresStorage {
       return await db.select().from(components)
         .where(and(
           inArray(components.vesselId, vesselIds),
-          eq(components.dataScope, 'vessel')
+          eq(components.dataScope, 'vessel'),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
         ));
     }
     if (!vesselId || vesselId === 'all') {
       return await db.select().from(components)
-        .where(eq(components.dataScope, 'vessel'));
+        .where(and(
+          eq(components.dataScope, 'vessel'),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
+        ));
     }
     return await db.select().from(components)
       .where(and(
         eq(components.vesselId, vesselId),
-        eq(components.dataScope, 'vessel')
+        eq(components.dataScope, 'vessel'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
   }
 
   async getComponent(id: string): Promise<Component | undefined> {
     const db = await getDb();
     const result = await db.select().from(components).where(
-      or(eq(components.cuuid, id), eq(components.id, id))
+      and(
+        or(eq(components.cuuid, id), eq(components.id, id)),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
+      )
     );
     return result[0];
   }
@@ -1140,7 +1158,8 @@ export class PostgresStorage {
     const result = await db.select().from(components)
       .where(and(
         eq(components.componentCode, componentCode),
-        eq(components.vesselId, vesselId)
+        eq(components.vesselId, vesselId),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
     return result[0];
   }
@@ -1161,7 +1180,10 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(components)
       .set({ ...data, updatedAt: new Date() })
-      .where(or(eq(components.cuuid, id), eq(components.id, id)))
+      .where(and(
+        or(eq(components.cuuid, id), eq(components.id, id)),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
+      ))
       .returning();
     if (!result[0]) {
       throw new Error(`Component ${id} not found`);
@@ -1169,12 +1191,68 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async deleteComponent(id: string): Promise<void> {
+  async deleteComponent(id: string, userId?: string): Promise<void> {
     const db = await getDb();
-    await db.delete(components).where(or(eq(components.cuuid, id), eq(components.id, id)));
+    await db.transaction(async (tx) => {
+      const existing = await tx.select().from(components)
+        .where(and(
+          or(eq(components.cuuid, id), eq(components.id, id)),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
+        ))
+        .limit(1);
+      const component = existing[0];
+      if (!component) {
+        throw new Error(`Component ${id} not found`);
+      }
+
+      // The installed link is derived from the Component's current stamp. Release
+      // the matching registry row in the same transaction as the retained delete
+      // so the position cannot be deleted while its physical item stays installed.
+      const currentStamp = (component as any).currentStamp;
+      if (component.vesselId && currentStamp) {
+        const installed = await tx.select().from(rotationalItems)
+          .where(and(
+            eq(rotationalItems.vesselId, component.vesselId),
+            eq(rotationalItems.stamp, currentStamp),
+            eq(rotationalItems.status, 'Installed'),
+            eq(rotationalItems.isDeleted, false)
+          ))
+          .limit(1);
+        if (installed[0]) {
+          const released = await tx.update(rotationalItems)
+            .set({ status: 'Spare', updatedAt: new Date(), updatedByUuid: userId })
+            .where(eq(rotationalItems.riuuid, installed[0].riuuid))
+            .returning();
+          if (!released[0]) {
+            throw new Error(`Unable to release rotational item for component ${id}`);
+          }
+          await logFieldChanges(
+            'rotational_items',
+            installed[0].riuuid,
+            component.vesselId,
+            installed[0],
+            released[0],
+            userId || 'system',
+            tx
+          );
+        }
+      }
+
+      const result = await tx.update(components)
+        .set({ isDeleted: true, isActive: false, updatedAt: new Date() })
+        .where(eq(components.cuuid, component.cuuid))
+        .returning();
+      if (!result[0]) {
+        throw new Error(`Component ${id} not found`);
+      }
+    });
+
+    // Components are shore-to-ship full-row synchronized records. The updated
+    // lifecycle flags are picked up by the regular one-way snapshot; no field
+    // log is needed because components are not BOTH_EDITABLE.
   }
 
-  async inactivateComponent(id: string, vesselId: string, userId?: string): Promise<{
+  async inactivateComponent(id: string, vesselId: string, userId?: string, apply = true): Promise<{
     success: boolean;
     message: string;
     code?: string;
@@ -1189,7 +1267,8 @@ export class PostgresStorage {
     const componentResult = await db.select().from(components)
       .where(and(
         or(eq(components.cuuid, id), eq(components.id, id)),
-        eq(components.vesselId, vesselId)
+        eq(components.vesselId, vesselId),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ))
       .limit(1);
     
@@ -1207,7 +1286,8 @@ export class PostgresStorage {
       .where(and(
         or(eq(components.parentId, component.cuuid), eq(components.parentId, component.id)),
         eq(components.isActive, true),
-        eq(components.vesselId, vesselId)
+        eq(components.vesselId, vesselId),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
     
     if (activeChildren.length > 0) {
@@ -1230,7 +1310,8 @@ export class PostgresStorage {
           ...(componentCode ? [eq(jobs.componentCode, componentCode)] : [])
         ),
         eq(jobs.isActive, true),
-        eq(jobs.vesselId, vesselId)
+        eq(jobs.vesselId, vesselId),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
       ));
     for (const job of directJobs) {
       activeJobIds.add(job.juuid);
@@ -1244,7 +1325,12 @@ export class PostgresStorage {
     const linkedJobs = Array.from(linkedJobsMap.values());
     for (const link of linkedJobs) {
       const jobResult = await db.select().from(jobs)
-        .where(and(eq(jobs.juuid, link.jobId), eq(jobs.isActive, true), eq(jobs.vesselId, vesselId)))
+        .where(and(
+          eq(jobs.juuid, link.jobId),
+          eq(jobs.isActive, true),
+          eq(jobs.vesselId, vesselId),
+          or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+        ))
         .limit(1);
       if (jobResult.length > 0) {
         activeJobIds.add(link.jobId);
@@ -1270,7 +1356,8 @@ export class PostgresStorage {
           ...(componentCode ? [eq(spares.componentCode, componentCode)] : [])
         ),
         eq(spares.isActive, true),
-        eq(spares.vesselId, vesselId)
+        eq(spares.vesselId, vesselId),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ));
     for (const s of directSpares) {
       activeSpareIds.add(s.id);
@@ -1283,7 +1370,8 @@ export class PostgresStorage {
           eq(spares.id, spareComponentLinks.spareId)
         ),
         eq(spares.isActive, true),
-        eq(spares.vesselId, vesselId)
+        eq(spares.vesselId, vesselId),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ))
       .where(or(
         eq(spareComponentLinks.componentId, component.cuuid),
@@ -1313,9 +1401,20 @@ export class PostgresStorage {
       const { isBlockingStatus } = await import('./utils/workOrderStatus');
       activeWorkOrdersCount = woResults.filter(wo => isBlockingStatus(wo.status)).length;
     }
+
+    // Delete Component uses this preflight to apply the same dependency policy
+    // without changing the record before its rotational-item release succeeds.
+    if (!apply) {
+      return {
+        success: true,
+        message: 'Component passed lifecycle dependency checks.',
+        componentsInactivated: 0,
+        activeWorkOrdersCount,
+      };
+    }
     
     await db.update(components)
-      .set({ isActive: false })
+      .set({ isActive: false, updatedAt: new Date() })
       .where(and(
         eq(components.cuuid, component.cuuid),
         eq(components.vesselId, vesselId)
@@ -1335,7 +1434,10 @@ export class PostgresStorage {
   async getFleetScopedComponents(): Promise<Component[]> {
     const db = await getDb();
     return await db.select().from(components)
-      .where(eq(components.dataScope, 'fleet'));
+      .where(and(
+        eq(components.dataScope, 'fleet'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
+      ));
   }
 
   async getFleetScopedComponent(id: string): Promise<Component | undefined> {
@@ -1343,7 +1445,8 @@ export class PostgresStorage {
     const result = await db.select().from(components)
       .where(and(
         or(eq(components.cuuid, id), eq(components.id, id)),
-        eq(components.dataScope, 'fleet')
+        eq(components.dataScope, 'fleet'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
     return result[0];
   }
@@ -1376,7 +1479,8 @@ export class PostgresStorage {
       .where(and(
         eq(components.vesselId, vesselId),
         eq(components.rhCounterType, 'MASTER'),
-        eq(components.dataScope, 'vessel')
+        eq(components.dataScope, 'vessel'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
   }
 
@@ -1392,7 +1496,10 @@ export class PostgresStorage {
     // If not found by ID, try finding by component code
     if (!masterComponent) {
       const byCode = await db.select().from(components)
-        .where(eq(components.componentCode, masterComponentId))
+        .where(and(
+          eq(components.componentCode, masterComponentId),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
+        ))
         .limit(1);
       masterComponent = byCode[0] || null;
     }
@@ -1424,7 +1531,8 @@ export class PostgresStorage {
           eq(components.rhMasterComponentId, masterComponentCode),
           eq(components.rhMasterComponentId, masterComponentId),
           eq(components.rhCounterSource, masterComponentCode)
-        )
+        ),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
   }
 
@@ -2304,12 +2412,14 @@ export class PostgresStorage {
 
   async getJobs(vesselId?: string, componentId?: string, vesselIds?: string[]): Promise<Job[]> {
     const db = await getDb();
+    const notDeleted = or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted));
 
     if (vesselIds && vesselIds.length > 0) {
       return await db.select().from(jobs)
         .where(and(
           inArray(jobs.vesselId, vesselIds),
-          eq(jobs.dataScope, 'vessel')
+          eq(jobs.dataScope, 'vessel'),
+          notDeleted
         ))
         .orderBy(asc(jobs.jobNo));
     }
@@ -2321,7 +2431,8 @@ export class PostgresStorage {
         .where(and(
           eq(jobs.vesselId, vesselId),
           eq(jobs.componentId, componentId),
-          eq(jobs.dataScope, 'vessel')
+          eq(jobs.dataScope, 'vessel'),
+          notDeleted
         ))
         .orderBy(asc(jobs.jobNo));
       
@@ -2357,27 +2468,34 @@ export class PostgresStorage {
       return await db.select().from(jobs)
         .where(and(
           eq(jobs.vesselId, vesselId),
-          eq(jobs.dataScope, 'vessel')
+          eq(jobs.dataScope, 'vessel'),
+          notDeleted
         ))
         .orderBy(asc(jobs.jobNo));
     }
     
     return await db.select().from(jobs)
-      .where(eq(jobs.dataScope, 'vessel'))
+      .where(and(eq(jobs.dataScope, 'vessel'), notDeleted))
       .orderBy(asc(jobs.jobNo));
   }
 
   async getJob(id: string): Promise<Job | undefined> {
     const db = await getDb();
     const result = await db.select().from(jobs).where(
-      or(eq(jobs.juuid, id), eq(jobs.id, id))
+      and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+      )
     );
     return result[0];
   }
 
   async getJobByJobNo(jobNo: string): Promise<Job | undefined> {
     const db = await getDb();
-    const result = await db.select().from(jobs).where(eq(jobs.jobNo, jobNo));
+    const result = await db.select().from(jobs).where(and(
+      eq(jobs.jobNo, jobNo),
+      or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+    ));
     return result[0];
   }
 
@@ -2397,7 +2515,10 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(jobs)
       .set({ ...data, updatedAt: new Date() })
-      .where(or(eq(jobs.juuid, id), eq(jobs.id, id)))
+      .where(and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+      ))
       .returning();
     if (!result[0]) {
       throw new Error(`Job ${id} not found`);
@@ -2407,7 +2528,27 @@ export class PostgresStorage {
 
   async deleteJob(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(jobs).where(or(eq(jobs.juuid, id), eq(jobs.id, id)));
+    const existing = await db.select().from(jobs).where(
+      and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+      )
+    );
+    if (!existing[0]) {
+      throw new Error(`Job ${id} not found`);
+    }
+
+    const result = await db.update(jobs)
+      .set({ isDeleted: true, isActive: false, updatedAt: new Date() })
+      .where(eq(jobs.juuid, existing[0].juuid))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Job ${id} not found`);
+    }
+
+    // Jobs are shore-to-ship full-row synchronized records. Updating updatedAt
+    // makes this lifecycle marker eligible for the next one-way sync snapshot;
+    // field logs intentionally apply only to BOTH_EDITABLE tables.
   }
 
   async bulkCreateJobs(jobList: InsertJob[]): Promise<Job[]> {
@@ -2483,11 +2624,15 @@ export class PostgresStorage {
       result = await db.select().from(jobs)
         .where(and(
           inArray(jobs.jobNo, jobNos),
-          eq(jobs.vesselId, vesselId)
+          eq(jobs.vesselId, vesselId),
+          or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
         ));
     } else {
       result = await db.select().from(jobs)
-        .where(inArray(jobs.jobNo, jobNos));
+        .where(and(
+          inArray(jobs.jobNo, jobNos),
+          or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+        ));
     }
     
     const map = new Map<string, Job>();
@@ -2691,7 +2836,10 @@ export class PostgresStorage {
   async getAllSpares(): Promise<Spare[]> {
     const db = await getDb();
     return await db.select().from(spares)
-      .where(eq(spares.deleted, false));
+      .where(and(
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
+      ));
   }
 
   async getSpares(vesselId: string, vesselIds?: string[]): Promise<Spare[]> {
@@ -2701,21 +2849,24 @@ export class PostgresStorage {
         .where(and(
           inArray(spares.vesselId, vesselIds),
           eq(spares.dataScope, 'vessel'),
-          eq(spares.deleted, false)
+          eq(spares.deleted, false),
+          or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
         ));
     }
     if (!vesselId || vesselId === 'all') {
       return await db.select().from(spares)
         .where(and(
           eq(spares.dataScope, 'vessel'),
-          eq(spares.deleted, false)
+          eq(spares.deleted, false),
+          or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
         ));
     }
     return await db.select().from(spares)
       .where(and(
         eq(spares.vesselId, vesselId),
         eq(spares.dataScope, 'vessel'),
-        eq(spares.deleted, false)
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ));
   }
 
@@ -2726,6 +2877,14 @@ export class PostgresStorage {
       or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : []))
     );
     return result[0];
+  }
+
+  private async getOperationalSpare(id: string): Promise<Spare> {
+    const spare = await this.getSpare(id);
+    if (!spare || spare.deleted || spare.isDeleted) {
+      throw Object.assign(new Error(`Spare ${id} not found`), { statusCode: 404 });
+    }
+    return spare;
   }
 
   async createSpare(spare: InsertSpare, skipSiblingSync: boolean = false): Promise<Spare> {
@@ -2925,20 +3084,23 @@ export class PostgresStorage {
     return updatedSpare;
   }
 
-  async deleteSpare(id: string): Promise<void> {
+  async deleteSpare(id: string, userId = 'system'): Promise<void> {
     const db = await getDb();
     // Fetch-before-delete for sync field logging
     const existingSpare = await this.getSpare(id);
+    if (!existingSpare || existingSpare.deleted || existingSpare.isDeleted) {
+      throw new Error(`Spare ${id} not found`);
+    }
 
     const numId = Number(id);
     await db.update(spares)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ deleted: true, isDeleted: true, isActive: false, updatedAt: new Date() })
       .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])));
 
     // Sync field logging — spare soft-delete
     if (existingSpare) {
       try {
-        await logSoftDelete('spares', existingSpare.suuid, existingSpare.vesselId || null, 'system');
+        await logSoftDelete('spares', existingSpare.suuid, existingSpare.vesselId || null, userId);
       } catch (err) { console.error('[FieldLogger] Spare delete:', err); }
     }
   }
@@ -3015,11 +3177,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const newRob = (spare.rob ?? 0) - quantity;
     const newRobA = (spare.robLocationA ?? 0) - quantity;
@@ -3084,11 +3243,8 @@ export class PostgresStorage {
     workOrderRef?: string,
     dateLocal?: string
   ): Promise<{ spare: Spare; deducted: number; requested: number; shortageQty: number }> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const currentRobA = spare.robLocationA ?? 0;
     const currentRobB = spare.robLocationB ?? 0;
@@ -3172,11 +3328,8 @@ export class PostgresStorage {
     supplierPO?: string,
     dateLocal?: string
   ): Promise<{ spare: Spare; received: number }> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const currentRobA = spare.robLocationA ?? 0;
     const currentRobB = spare.robLocationB ?? 0;
@@ -3255,11 +3408,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     if (isNaN(newRob) || newRob < 0) {
       throw new Error('newRob must be a valid non-negative number');
@@ -3345,11 +3495,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<{ spare: Spare; isTransfer: boolean }> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const oldLocA = spare.robLocationA ?? 0;
     const oldLocB = spare.robLocationB ?? 0;
@@ -3481,11 +3628,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const newRob = (spare.rob ?? 0) + quantity;
     const newRobA = (spare.robLocationA ?? 0) + quantity;
@@ -3545,11 +3689,8 @@ export class PostgresStorage {
     reference?: string,
     notes?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(spareId);
     const db = await getDb();
-    const spare = await this.getSpare(spareId);
-    if (!spare) {
-      throw new Error(`Spare ${spareId} not found`);
-    }
     
     const currentRob = spare.rob ?? 0;
     const currentRobA = spare.robLocationA ?? 0;
@@ -5242,7 +5383,8 @@ export class PostgresStorage {
     return await db.select().from(spares)
       .where(and(
         eq(spares.dataScope, 'vessel'),
-        eq(spares.deleted, false)
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ));
   }
 
@@ -7831,9 +7973,12 @@ export class PostgresStorage {
     renewalReason?: string;
     renewalReference?: string;
     renewalEvidenceUrls?: string[];
+    // Internal service flag: set only after the authenticated Sail Admin role
+    // has authorized a normal (non-meter-replacement) validation bypass.
+    rhValidationBypassed?: boolean;
   }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
-    const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+    const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls, rhValidationBypassed } = params;
     const now = new Date();
     // Reading date: when the hours were actually observed (user-entered date), not when
     // the row is written. Falls back to "now" only when omitted or unparseable.
@@ -7886,6 +8031,10 @@ export class PostgresStorage {
         newRH = mode === 'addDelta' ? currentRH + value : value;
       }
 
+      if (!Number.isFinite(newRH) || newRH < 0) {
+        throw new Error('Invalid Running Hours. Resulting reading cannot be negative.');
+      }
+
       updateData = {
         currentCumulativeRH: newRH.toString(),
         lastUpdated: dateUpdated,
@@ -7921,6 +8070,8 @@ export class PostgresStorage {
         source: 'cascade',
         notes: meterReplaced
           ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ''}`
+          : rhValidationBypassed
+            ? `RH validation bypassed by Sail Admin. ${comments || ''}`.trim()
           : comments,
         meterReplaced: meterReplaced || false,
         isRenewalReset: isRenewalReset || false,
@@ -7945,41 +8096,32 @@ export class PostgresStorage {
       const parent = parentResult[0];
       currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || '0');
 
-      // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
-      const latestAudit = await db.select()
-        .from(runningHoursAudit)
-        .where(or(eq(runningHoursAudit.componentId, resolvedParentId), eq(runningHoursAudit.componentId, parentComponentId)))
-        .orderBy(desc(runningHoursAudit.enteredAtUTC))
-        .limit(1);
-
-      // Task #427: the date guard uses the SAME winner selection as every other
-      // RH consumer (shared calendar-day parser + latest-reading-wins ranking) —
-      // no more ad-hoc DD-MMM-YYYY parsing that disagreed with the comparator.
-      {
-        const { selectWinningRhEvent } = await import('./modules/running-hours/rhEventComparator');
-        // Tenant-aware pool seam (server/db.ts contract) — NOT the deprecated
-        // eager `pool` export: winner selection must run against the SAME
-        // tenant database as the rest of this writer. Guard failures propagate:
-        // silently skipping the date guard would let a backdated entry through.
-        const { getPool } = await import('./db');
-        const rhPool = await getPool();
-        const winner = await selectWinningRhEvent(rhPool, resolvedParentId);
-        if (winner) {
-          const newDay = parseReadingDayStrict(dateUpdated);
-          if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
-            throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
+      if (!rhValidationBypassed) {
+        // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
+        // Task #427: the date guard uses the SAME winner selection as every other
+        // RH consumer (shared calendar-day parser + latest-reading-wins ranking).
+        {
+          const { selectWinningRhEvent } = await import('./modules/running-hours/rhEventComparator');
+          const { getPool } = await import('./db');
+          const rhPool = await getPool();
+          const winner = await selectWinningRhEvent(rhPool, resolvedParentId);
+          if (winner) {
+            const newDay = parseReadingDayStrict(dateUpdated);
+            if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
+              throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
+            }
           }
         }
-      }
 
-      // VALIDATION 2: Value Rule - RH must never go backwards (except when isRenewalReset is true for 0)
-      if (mode === 'setTotal' && value < currentRH && !isRenewalReset) {
-        throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
-      }
+        // VALIDATION 2: Value Rule - RH must never go backwards (except when isRenewalReset is true for 0)
+        if (mode === 'setTotal' && value < currentRH && !isRenewalReset) {
+          throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
+        }
 
-      // VALIDATION 3: When value is 0, isRenewalReset must be true
-      if (mode === 'setTotal' && value === 0 && !isRenewalReset) {
-        throw new Error('Running Hours cannot be set to 0 without confirming renewal/replacement.');
+        // VALIDATION 3: When value is 0, isRenewalReset must be true
+        if (mode === 'setTotal' && value === 0 && !isRenewalReset) {
+          throw new Error('Running Hours cannot be set to 0 without confirming renewal/replacement.');
+        }
       }
 
       // Compute all derived values from the Phase-1 read (recomputed inside the tx
@@ -8121,6 +8263,21 @@ export class PostgresStorage {
         ? await tx.select().from(components)
             .where(inArray(components.cuuid, children.map((c: any) => c.cuuid)))
         : [];
+
+      // Preserve the existing parent/child cascade invariant: every structural
+      // child receives the parent's exact delta. An authorized downward
+      // correction must therefore fail atomically when that delta would make a
+      // child negative, rather than clamping only that child and causing it to
+      // diverge from its parent.
+      for (const child of freshChildren) {
+        if (inheritedCuuidSet.has(child.cuuid)) continue;
+        const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
+        if (!Number.isFinite(childCurrentRH) || childCurrentRH + structuralDelta < 0) {
+          throw new Error(
+            `Running Hours correction would make structural child "${child.componentCode || child.name || child.cuuid}" negative.`
+          );
+        }
+      }
 
       // Update all structural children (by parentId hierarchy)
       for (const child of freshChildren) {
@@ -8384,15 +8541,18 @@ export class PostgresStorage {
     return { jobsDeleted: jobResult.length, workOrdersDeleted };
   }
 
-  async getVesselsByFleet(fleetId: string): Promise<Vessel[]> {
+  async getVesselsByFleet(fleetId: string, options: { includeDeleted?: boolean } = {}): Promise<Vessel[]> {
     const db = await getDb();
-    return await db.select().from(vessels)
-      .where(eq(vessels.fleetId, fleetId));
+    return await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.fleetId, fleetId)
+      : and(eq(vessels.fleetId, fleetId), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
   }
 
-  async getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>> {
+  async getVesselsWithFleets(options: { includeDeleted?: boolean } = {}): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>> {
     const db = await getDb();
-    const allVessels = await db.select().from(vessels);
+    const allVessels = options.includeDeleted
+      ? await db.select().from(vessels)
+      : await db.select().from(vessels).where(or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted)));
     const allFleets = await db.select().from(fleets);
     
     const fleetMap = new Map(allFleets.map(f => [f.id, f]));
@@ -9009,19 +9169,21 @@ export class PostgresStorage {
     if (job.length === 0 || !job[0].jobNo) return [];
     
     const jobNo = job[0].jobNo;
+    const vessel = job[0].vesselId
+      ? await db.select({ vCode: vessels.vCode }).from(vessels).where(eq(vessels.vuuid, job[0].vesselId)).limit(1)
+      : [];
+    const vesselCode = vessel[0]?.vCode;
     
     // Get all maintenance history for this component, then filter by jobNo match
     const allRecords = await db.select().from(componentMaintenanceHistory)
       .where(eq(componentMaintenanceHistory.componentCode, componentCode))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     
-    // Filter records where work_order_no starts with the jobNo
+    // Legacy and vessel-prefixed work order numbers both resolve to the
+    // underlying job number before comparison.
     return allRecords.filter(record => {
       if (!record.workOrderNo) return false;
-      // Work order format: "JOBNO-COMPCODE-YEAR-SEQ" 
-      // e.g., "MKR-IN-00063-601.004.03-2026-001"
-      // JobNo is at the start, before the component code
-      return record.workOrderNo.startsWith(jobNo + '-');
+      return extractJobNoFromWorkOrderNo(record.workOrderNo, vesselCode) === jobNo;
     });
   }
 
@@ -9285,7 +9447,11 @@ export class PostgresStorage {
     })
     .from(spareLocationStock)
     .innerJoin(spares, eq(spareLocationStock.spareUuid, spares.suuid))
-    .where(eq(spareLocationStock.locationId, locationId));
+    .where(and(
+      eq(spareLocationStock.locationId, locationId),
+      eq(spares.deleted, false),
+      or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
+    ));
     
     return result;
   }
@@ -9328,6 +9494,8 @@ export class PostgresStorage {
     .where(and(
       eq(spareLocationStock.locationId, locationId),
       eq(spares.vesselId, vesselId),
+      eq(spares.deleted, false),
+      or(eq(spares.isDeleted, false), isNull(spares.isDeleted)),
       gt(spareLocationStock.qty, 0)
     ));
     
@@ -9346,6 +9514,8 @@ export class PostgresStorage {
     .innerJoin(spares, eq(spareLocationStock.spareUuid, spares.suuid))
     .where(and(
       eq(spares.vesselId, vesselId),
+      eq(spares.deleted, false),
+      or(eq(spares.isDeleted, false), isNull(spares.isDeleted)),
       gt(spareLocationStock.qty, 0)
     ))
     .groupBy(locations.id, locations.locationName)
@@ -9427,6 +9597,7 @@ export class PostgresStorage {
     referenceNote?: string;
     userId: string;
   }): Promise<{ transaction: InventoryTransaction; newLocationQty: number; newTotalRob: number }> {
+    await this.getOperationalSpare(String(input.spareId));
     const db = await getDb();
     
     // Validate location exists
@@ -9695,7 +9866,7 @@ export class PostgresStorage {
 
   async getSpareWithInventory(spareId: string): Promise<SpareWithInventory | null> {
     const spare = await this.getSpare(spareId);
-    if (!spare) return null;
+    if (!spare || spare.deleted || spare.isDeleted) return null;
     
     // Include ALL stock rows (no name filtering) so no location stock is silently dropped
     const locationsWithQty = await this.getSpareLocationsWithQty(spare.id);
@@ -9738,6 +9909,7 @@ export class PostgresStorage {
       LEFT JOIN components c ON scl.component_id = c.cuuid
       WHERE ${vesselId === 'all' ? sql`TRUE` : sql`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
+        AND (s.is_deleted IS NULL OR s.is_deleted = false)
         AND s.data_scope = 'vessel'
       GROUP BY s.id
     `);
@@ -9856,6 +10028,7 @@ export class PostgresStorage {
     // filter and return spares across every vessel (still paginated).
     const filters: any[] = [
       sql`s.deleted = false`,
+      sql`(s.is_deleted IS NULL OR s.is_deleted = false)`,
       sql`s.data_scope = 'vessel'`,
     ];
     if (vesselId !== 'all') {
@@ -10068,7 +10241,11 @@ export class PostgresStorage {
     // MANY-TO-MANY SUPPORT: Get spares directly assigned to component
     // AND spares linked via spare_component_links table
     const directSpares = await db.select().from(spares)
-      .where(eq(spares.componentId, componentId));
+      .where(and(
+        eq(spares.componentId, componentId),
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
+      ));
     
     // Get spares linked via spare_component_links
     const links = await this.getSpareComponentLinksByComponent(componentId);

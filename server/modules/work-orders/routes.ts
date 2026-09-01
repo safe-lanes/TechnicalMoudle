@@ -65,13 +65,11 @@ router.get('/work-orders/planner/export', asyncHandler(woCtrl.exportPlanner));
 // POST /work-orders/planner/export — export planner as Excel from client-provided items
 router.post('/work-orders/planner/export', asyncHandler(woCtrl.exportPlannerFromItems));
 
-// ── Company Approval Policy (superintendent lock toggle) ──
-// Distinct top-level path — no /work-orders/:id param collision.
-
-// GET /approval-policy — current policy (used by WO form/list for effective tier)
+// ── Retired Company Approval Policy ──
+// Kept only as a compatibility response; live policy is in PMS vessel settings.
 router.get('/approval-policy', asyncHandler(woCtrl.getApprovalPolicy));
 
-// PUT /approval-policy — shore-only (403 on ship), Sail Admin / Super Admin only
+// PUT /approval-policy — retired; responds 410 and cannot alter live policy.
 router.put('/approval-policy', asyncHandler(woCtrl.updateApprovalPolicy));
 
 // ── Core Work Order CRUD ──
@@ -140,6 +138,7 @@ router.post('/work-orders/:id/reopen-completion',
 // Phase 0 / P0.4 (defect D4): releasing the compliance lock is an office action — the same
 // guard as reviewer-approve. (The 12-Jun-2026 "How to Acknowledge the Locked WO" note called
 // the vessel-side option a testing-phase allowance to be removed in production.)
+// Merge note (21-Aug): kept the P0.4 role list over Jeevan's ['PMS Admin','Sail Admin','Super Admin'].
 router.post('/work-orders/bulk-superintendent-acknowledge',
   requireRole(['Office', 'PMS Admin', 'Sail Admin']),
   asyncHandler(woCtrl.bulkSuperintendentAcknowledge)

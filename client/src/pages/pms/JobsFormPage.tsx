@@ -163,7 +163,7 @@ const JobsFormPage: React.FC = () => {
   // This is crucial for multi-linked jobs where the same job can be accessed from different components
   const activeComponentCode = urlParams.get('activeComponentCode') || '';
 
-  const { data: jobContext, isLoading } = useQuery({
+  const { data: jobContext, isLoading, isError } = useQuery({
     queryKey: [`/technical/api/jobs/${jobId}/context`],
     enabled: !!jobId
   });
@@ -173,13 +173,12 @@ const JobsFormPage: React.FC = () => {
 
   const [, setLocation] = useLocation();
 
-  const inactivateMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/technical/api/jobs/${jobId}/inactivate`, { vesselId });
-      return response.json();
+      await apiRequest('DELETE', `/technical/api/jobs/${jobId}`);
     },
-    onSuccess: (data: any) => {
-      toast({ title: "Job Deactivated", description: data.message });
+    onSuccess: () => {
+      toast({ title: "Job Deleted", description: "The Job has been removed from normal Job views." });
       queryClient.invalidateQueries({ predicate: (query) =>
         typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/technical/api/jobs')
       });
@@ -187,7 +186,7 @@ const JobsFormPage: React.FC = () => {
       setLocation('/pms/components');
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to deactivate job", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to delete job", variant: "destructive" });
       setShowDeleteConfirm(false);
     }
   });
@@ -879,6 +878,23 @@ const JobsFormPage: React.FC = () => {
     );
   }
 
+  if (isError || !jobContext) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm" data-testid="job-unavailable">
+          <h1 className="text-xl font-semibold text-gray-900">Job unavailable</h1>
+          <p className="mt-3 text-sm text-gray-600">
+            This Job does not exist, has been deleted, or is not available in the current view.
+          </p>
+          <Button className="mt-6" onClick={() => setLocation('/pms/components')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Component Register
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Modification Mode Banner */}
@@ -986,7 +1002,7 @@ const JobsFormPage: React.FC = () => {
                   Rebaseline &amp; Push to Ship
                 </Button>
               )}
-              {!isModifyMode && !isEditMode && (isSailAdmin || isClientAdmin) && templateData.isActive !== 'No' && templateData.isActive !== false && (
+              {!isModifyMode && !isEditMode && (isSailAdmin || isClientAdmin) && (
                 <Button
                   variant="outline"
                   size="icon"
@@ -1917,17 +1933,17 @@ const JobsFormPage: React.FC = () => {
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Deactivate Job</DialogTitle>
+            <DialogTitle>Delete Job</DialogTitle>
             <DialogDescription>
-              Are you sure you want to deactivate this job? The job will be soft-deleted and no new work orders will be generated for it. Existing work orders will continue to completion.
+              Are you sure you want to delete this job? It will be hidden from normal Office and Vessel Job views and cannot be restored through normal editing. Existing work orders and maintenance history will be retained.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={inactivateMutation.isPending} data-testid="button-cancel-delete-job">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleteMutation.isPending} data-testid="button-cancel-delete-job">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={() => inactivateMutation.mutate()} disabled={inactivateMutation.isPending} data-testid="button-confirm-delete-job">
-              {inactivateMutation.isPending ? 'Deactivating...' : 'Deactivate'}
+            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} data-testid="button-confirm-delete-job">
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

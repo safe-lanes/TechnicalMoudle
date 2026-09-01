@@ -41,6 +41,13 @@ export interface ColumnMeta {
   requiredCols: Set<string>;
 }
 
+/** SQL assignment for a received soft-delete marker. Lifecycle-managed records are inactive once deleted. */
+export function getSoftDeleteSetClause(tableName: string): string {
+  return tableName === 'jobs' || tableName === 'components' || tableName === 'spares'
+    ? 'is_deleted = true, is_active = false, updated_at = NOW()'
+    : 'is_deleted = true, updated_at = NOW()';
+}
+
 const columnMetaCache = new Map<string, ColumnMeta>();
 
 /**
@@ -383,9 +390,10 @@ export async function applyOneWayRows(
 
       if (existCheck.rows.length > 0) {
         if (isDeleted) {
-          // Soft-delete: set is_deleted = true
+          // Soft-delete: Jobs must also be inactive so the receiving instance
+          // preserves the same lifecycle invariant as the shore-side delete.
           await pool.query(
-            `UPDATE "${tableName}" SET is_deleted = true, updated_at = NOW() WHERE ${whereClause}`,
+            `UPDATE "${tableName}" SET ${getSoftDeleteSetClause(tableName)} WHERE ${whereClause}`,
             whereValues
           );
           result.softDeleted++;

@@ -440,6 +440,11 @@ export async function create(data: any): Promise<Component> {
 export async function update(id: string, data: any, userId: string): Promise<Component> {
   console.log(`🔧 PATCH /api/components/${id} with:`, JSON.stringify(data, null, 2).substring(0, 500));
 
+  if (Object.prototype.hasOwnProperty.call(data, 'isDeleted') ||
+      Object.prototype.hasOwnProperty.call(data, 'is_deleted')) {
+    throw new ValidationError('Component deletion status can only be changed through the Delete Component action');
+  }
+
   const existingComponent = await repo.findById(id);
   if (!existingComponent) {
     throw new NotFoundError('Component not found');
@@ -670,25 +675,55 @@ export async function updateSortOrder(body: any) {
   return repo.updateSortOrder(updates);
 }
 
-export async function remove(id: string): Promise<void> {
-  // Detach any installed rotational item first so the registry never keeps an
-  // "Installed" link to a deleted component (item becomes Spare, keeps its RH).
+export async function remove(id: string, userId = 'system') {
   const existing = await repo.findById(id);
-  if (existing?.cuuid) {
-    const installed = await rotationalItemService.getInstalledForComponent(existing.cuuid);
-    if (installed) {
-      await rotationalItemService.detachFromComponent(installed.riuuid, {
-        currentRh: componentRhSnapshot(existing),
-        rhLastUpdated: (existing as any).lastUpdated ?? null,
-      });
-    }
+  if (!existing) {
+    throw new NotFoundError('Component not found');
   }
-  return repo.remove(id);
+
+  if (!existing.vesselId) {
+    throw new ValidationError('Only vessel components can be deleted through the Component Register');
+  }
+
+  // Deletion retains the same safety checks as inactivation, but this is a
+  // preflight only. The Component must stay untouched until the rotational
+  // item is safely released, otherwise a failed release could leave it
+  // inactivated without being deleted.
+  const lifecycleCheck = await repo.inactivate(id, existing.vesselId, userId, false);
+  if (!lifecycleCheck.success) {
+    const error: any = new ValidationError(lifecycleCheck.message);
+    error.code = lifecycleCheck.code;
+    error.activeChildrenCount = lifecycleCheck.activeChildrenCount;
+    error.activeJobsCount = lifecycleCheck.activeJobsCount;
+    error.linkedSparesCount = lifecycleCheck.linkedSparesCount;
+    throw error;
+  }
+
+  // The retained-delete marker and any installed rotational-item release are
+  // committed together by the repository's storage transaction.
+  await repo.remove(id, userId);
+
+  // The audit is intentionally recorded after the retained-delete marker is
+  // stored, so it never claims a successful deletion for a failed mutation.
+  await auditComponent({
+    actionType: 'delete',
+    component: existing,
+    payload: {
+      componentCode: existing.componentCode,
+      isDeleted: { old: false, new: true },
+      isActive: { old: existing.isActive, new: false },
+    },
+  });
+
+  return {
+    ...lifecycleCheck,
+    message: 'Component deleted successfully. Existing Work Orders and maintenance history have been retained.',
+  };
 }
 
 export async function inactivate(id: string, vesselId: string, userId: string) {
   const result = await repo.inactivate(id, vesselId, userId);
-  // Audit Phase 1 — deactivate (the user-facing "Delete" in the register). Only on success.
+  // Audit Phase 1 — explicit inactivation. Only on success.
   if ((result as any)?.success) {
     const comp = await repo.findById(id).catch(() => undefined);
     await auditComponent({

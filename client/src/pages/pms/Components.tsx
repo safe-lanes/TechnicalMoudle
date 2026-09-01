@@ -67,6 +67,46 @@ interface ComponentNode {
   [key: string]: any; // Allow additional properties from component data
 }
 
+const COMPONENT_VIEW_STATE_VERSION = 1;
+const COMPONENT_VIEW_STATE_KEY_PREFIX = "pms-components-view-state:";
+const DEFAULT_COMPONENT_SECTIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+interface ComponentViewState {
+  version: number;
+  selectedComponentCode: string | null;
+  selectedComponentId: string | null;
+  expandedNodeIds: string[];
+  expandedSectionIds: string[];
+  searchTerm: string;
+  criticalFilter: string;
+  treeScrollTop?: number;
+}
+
+const getComponentViewStateKey = (vesselId: string) =>
+  `${COMPONENT_VIEW_STATE_KEY_PREFIX}${vesselId}`;
+
+const findComponentNode = (
+  nodes: ComponentNode[],
+  predicate: (node: ComponentNode) => boolean,
+): ComponentNode | null => {
+  for (const node of nodes) {
+    if (predicate(node)) return node;
+    if (node.children) {
+      const found = findComponentNode(node.children, predicate);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+const collectComponentNodeIds = (nodes: ComponentNode[], ids = new Set<string>()) => {
+  nodes.forEach(node => {
+    ids.add(node.id);
+    if (node.children) collectComponentNodeIds(node.children, ids);
+  });
+  return ids;
+};
+
 
 const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedComponent: ComponentNode | null; isModifyMode?: boolean; onDataChange?: (data: any) => void; previewChanges?: any[]; isPreviewMode?: boolean }> = ({ isExpanded, selectedComponent, isModifyMode = false, onDataChange, previewChanges = [], isPreviewMode = false }) => {
   const { isChangeRequestMode } = useChangeRequest();
@@ -2439,15 +2479,24 @@ const Components: React.FC = () => {
   const [validationErrorDialogOpen, setValidationErrorDialogOpen] = useState(false);
   const [validationErrorMessage, setValidationErrorMessage] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const componentTreeScrollRef = useRef<HTMLDivElement>(null);
+  const hydratedViewStateVesselRef = useRef<string | null>(null);
+  const pendingTreeScrollTopRef = useRef<number | null>(null);
   
   const prevVesselIdRef = React.useRef(vesselId);
   React.useEffect(() => {
     if (prevVesselIdRef.current !== vesselId) {
       setSelectedComponent(null);
+      setExpandedNodes(new Set());
+      setExpandedSections(new Set(DEFAULT_COMPONENT_SECTIONS));
+      setSearchTerm("");
+      setCriticalFilter("all");
       setEditingComponentId(null);
       setEditingComponentCode(null);
       setShowAddEditFullPage(false);
       setShowReviewDrawer(false);
+      hydratedViewStateVesselRef.current = null;
+      pendingTreeScrollTopRef.current = null;
       prevVesselIdRef.current = vesselId;
     }
   }, [vesselId]);
@@ -2458,16 +2507,14 @@ const Components: React.FC = () => {
     enabled: !!vesselId && vesselId !== 'all' && vesselId !== 'my',
   });
   
-  const inactivateMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: async ({ componentId }: { componentId: string }) => {
-      const response = await fetch(`/technical/api/components/${componentId}/inactivate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vesselId, userId: 'User' }),
+      const response = await fetch(`/technical/api/components/${componentId}`, {
+        method: 'DELETE',
       });
       const data = await response.json();
       if (!response.ok) {
-        const error: any = new Error(data.error || 'Failed to deactivate component');
+        const error: any = new Error(data.error || 'Failed to delete component');
         error.code = data.code;
         error.activeChildrenCount = data.activeChildrenCount;
         error.activeJobsCount = data.activeJobsCount;
@@ -2482,19 +2529,19 @@ const Components: React.FC = () => {
       setPendingDeleteId(null);
       setSelectedComponent(null);
       toast({
-        title: "Component deactivated",
-        description: data.message || "The component has been successfully deactivated.",
+        title: "Component deleted",
+        description: data.message || "The component has been deleted and retained for audit history.",
       });
     },
     onError: (error: any) => {
       setDeleteDialogOpen(false);
       let message = error.message;
       if (error.code === 'ACTIVE_CHILDREN') {
-        message = `This component has ${error.activeChildrenCount || ''} active child component(s). Please deactivate the child components first before deactivating this component.`;
+        message = `This component has ${error.activeChildrenCount || ''} active child component(s). Please deactivate the child components first before deleting this component.`;
       } else if (error.code === 'ACTIVE_JOBS') {
-        message = `This component cannot be deactivated because it has ${error.activeJobsCount || ''} active Job(s) linked to it. Please deactivate or delete all linked Jobs first.`;
+        message = `This component cannot be deleted because it has ${error.activeJobsCount || ''} active Job(s) linked to it. Please deactivate or delete all linked Jobs first.`;
       } else if (error.code === 'ACTIVE_SPARES' || error.code === 'LINKED_SPARES') {
-        message = `This component cannot be deactivated because it has ${error.linkedSparesCount || ''} active Spare(s) linked to it. Please deactivate or delete all linked Spares first.`;
+        message = `This component cannot be deleted because it has ${error.linkedSparesCount || ''} active Spare(s) linked to it. Please deactivate or delete all linked Spares first.`;
       }
       setValidationErrorMessage(message);
       setValidationErrorDialogOpen(true);
@@ -2509,7 +2556,7 @@ const Components: React.FC = () => {
 
   const confirmDelete = () => {
     if (!pendingDeleteId) return;
-    inactivateMutation.mutate({ componentId: pendingDeleteId });
+    deleteMutation.mutate({ componentId: pendingDeleteId });
   };
 
   const handleExportComponents = useCallback(() => {
@@ -2771,6 +2818,149 @@ const Components: React.FC = () => {
     
     return filterTree(componentTreeData);
   }, [componentTreeData, searchTerm, criticalFilter, isVessel, isHeadOfDept, isExternal]);
+
+  const persistComponentViewState = useCallback(() => {
+    if (
+      !vesselId ||
+      vesselId === "all" ||
+      vesselId === "my" ||
+      hydratedViewStateVesselRef.current !== vesselId
+    ) {
+      return;
+    }
+
+    const viewState: ComponentViewState = {
+      version: COMPONENT_VIEW_STATE_VERSION,
+      selectedComponentCode: selectedComponent?.code || null,
+      selectedComponentId: selectedComponent?.actualId || selectedComponent?.id || null,
+      expandedNodeIds: Array.from(expandedNodes),
+      expandedSectionIds: Array.from(expandedSections),
+      searchTerm,
+      criticalFilter,
+      treeScrollTop: componentTreeScrollRef.current?.scrollTop || 0,
+    };
+
+    try {
+      sessionStorage.setItem(
+        getComponentViewStateKey(vesselId),
+        JSON.stringify(viewState),
+      );
+    } catch {
+      // Browser storage can be unavailable or full; the page should still work.
+    }
+  }, [
+    vesselId,
+    selectedComponent,
+    expandedNodes,
+    expandedSections,
+    searchTerm,
+    criticalFilter,
+  ]);
+
+  // Restore the last Component Register view after fresh vessel data is available.
+  // Targeted navigation (for example, from a dashboard drill-down) intentionally wins.
+  useEffect(() => {
+    if (
+      !vesselId ||
+      vesselId === "all" ||
+      vesselId === "my" ||
+      isLoadingComponents ||
+      componentTreeData.length === 0 ||
+      hydratedViewStateVesselRef.current === vesselId
+    ) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    let hasExplicitTarget = false;
+    try {
+      hasExplicitTarget =
+        !!sessionStorage.getItem("targetComponentCode") ||
+        (params.get("previewChanges") === "1" && !!params.get("targetId"));
+    } catch {
+      // Treat unavailable storage as having no target flag.
+    }
+
+    if (hasExplicitTarget) {
+      hydratedViewStateVesselRef.current = vesselId;
+      return;
+    }
+
+    let savedState: ComponentViewState | null = null;
+    try {
+      const raw = sessionStorage.getItem(getComponentViewStateKey(vesselId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          parsed.version === COMPONENT_VIEW_STATE_VERSION &&
+          Array.isArray(parsed.expandedNodeIds) &&
+          Array.isArray(parsed.expandedSectionIds) &&
+          typeof parsed.searchTerm === "string" &&
+          typeof parsed.criticalFilter === "string"
+        ) {
+          savedState = parsed as ComponentViewState;
+        }
+      }
+    } catch {
+      savedState = null;
+    }
+
+    if (!savedState) {
+      hydratedViewStateVesselRef.current = vesselId;
+      return;
+    }
+
+    const validNodeIds = collectComponentNodeIds(componentTreeData);
+    const validExpandedNodeIds = savedState.expandedNodeIds.filter(id =>
+      typeof id === "string" && validNodeIds.has(id),
+    );
+    const selectedNode = findComponentNode(componentTreeData, node =>
+      (!!savedState?.selectedComponentCode &&
+        node.code === savedState.selectedComponentCode) ||
+      (!!savedState?.selectedComponentId &&
+        (node.actualId === savedState.selectedComponentId ||
+          node.id === savedState.selectedComponentId)),
+    );
+
+    setSearchTerm(savedState.searchTerm);
+    setCriticalFilter(savedState.criticalFilter);
+    setExpandedNodes(new Set(validExpandedNodeIds));
+    setExpandedSections(new Set(savedState.expandedSectionIds.filter(section =>
+      typeof section === "string" && /^[A-H]$/.test(section),
+    )));
+    setSelectedComponent(selectedNode);
+
+    if (typeof savedState.treeScrollTop === "number" && savedState.treeScrollTop >= 0) {
+      pendingTreeScrollTopRef.current = savedState.treeScrollTop;
+    }
+    hydratedViewStateVesselRef.current = vesselId;
+  }, [vesselId, isLoadingComponents, componentTreeData]);
+
+  // Persist after each view change, once the current vessel has been hydrated.
+  useEffect(() => {
+    persistComponentViewState();
+  }, [persistComponentViewState]);
+
+  // Apply the saved tree scroll position after restored filters/expansion state render.
+  useEffect(() => {
+    if (
+      !vesselId ||
+      pendingTreeScrollTopRef.current === null ||
+      hydratedViewStateVesselRef.current !== vesselId
+    ) {
+      return;
+    }
+
+    const scrollTop = pendingTreeScrollTopRef.current;
+    pendingTreeScrollTopRef.current = null;
+    const frame = window.requestAnimationFrame(() => {
+      if (componentTreeScrollRef.current) {
+        componentTreeScrollRef.current.scrollTop = scrollTop;
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [vesselId, searchTerm, criticalFilter, expandedNodes, selectedComponent, filteredComponentTree]);
 
   // Helper function to find component by ID
   const findComponentById = (id: string): ComponentNode | null => {
@@ -3797,7 +3987,11 @@ const Components: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div
+              ref={componentTreeScrollRef}
+              className="flex-1 overflow-auto"
+              onScroll={persistComponentViewState}
+            >
               <div>
                 {renderComponentTree(isEditMode ? editTreeData : filteredComponentTree)}
               </div>
@@ -3833,13 +4027,13 @@ const Components: React.FC = () => {
                         Edit Component
                       </Button>
                       )}
-                      {canDeleteComponent && selectedComponent.actualId && (selectedComponent as any).isActive !== false && (
+                      {canDeleteComponent && selectedComponent.actualId && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="text-red-500 border-red-300 hover:bg-red-50 hover:text-red-700"
                           onClick={handleDeleteComponent}
-                          disabled={inactivateMutation.isPending}
+                          disabled={deleteMutation.isPending}
                           data-testid="btn-delete-component"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -4084,10 +4278,10 @@ const Components: React.FC = () => {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Deactivate Component</DialogTitle>
+            <DialogTitle>Delete Component</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600" data-testid="text-delete-confirm-message">
-            Are you sure you want to deactivate this component? It will no longer appear for vessel and department users.
+            Are you sure you want to delete this component? It will be hidden from normal Office and Vessel Component views and cannot be restored through normal editing. Existing Work Orders and maintenance history will be retained.
           </p>
           <div className="flex justify-end gap-2 mt-4">
             <Button
@@ -4100,10 +4294,10 @@ const Components: React.FC = () => {
             <Button
               variant="destructive"
               onClick={() => confirmDelete()}
-              disabled={inactivateMutation.isPending}
+              disabled={deleteMutation.isPending}
               data-testid="btn-delete-confirm"
             >
-              {inactivateMutation.isPending ? "Deactivating..." : "Deactivate"}
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </div>
         </DialogContent>
@@ -4114,7 +4308,7 @@ const Components: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertCircle className="h-5 w-5" />
-              Cannot Deactivate Component
+              Cannot Delete Component
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600" data-testid="text-validation-error-message">

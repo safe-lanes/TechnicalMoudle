@@ -78,7 +78,7 @@ export async function getVesselsByFleet(fleetId: string): Promise<Vessel[]> {
 
 // ── Vessel operations ──
 
-export async function getVessels(): Promise<Array<{ id: string; vuuid: string; name: string; code: string; imoNumber: string | null; vesselType: string | null }>> {
+export async function getVessels(): Promise<Array<{ id: string; vuuid: string; name: string; code: string; vCode: string | null; imoNumber: string | null; vesselType: string | null }>> {
   return repo.getVessels();
 }
 
@@ -217,17 +217,27 @@ export async function createPmsVesselSettings(data: {
   updatedBy?: string;
   [key: string]: any;
 }, username: string): Promise<PmsVesselSettings> {
+  // Policy switches can only be changed through their dedicated, authorized
+  // endpoints. Generic settings creation uses their explicit defaults.
+  const {
+    rhValidationEnabled: _ignoredRhValidationEnabled,
+    superintendentLockEnabled: _ignoredSuperintendentLockEnabled,
+    ...safeData
+  } = data;
+
   // Check if settings already exist
-  const existing = await repo.getPmsVesselSettings(data.vesselId);
+  const existing = await repo.getPmsVesselSettings(safeData.vesselId);
   if (existing) {
     throw new ConflictError('PMS vessel settings already exist for this vessel. Use PUT to update.');
   }
 
-  const updatedBy = data.updatedBy || username || 'test';
+  const updatedBy = safeData.updatedBy || username || 'test';
   return repo.createOrUpdatePmsVesselSettings({
-    ...data,
+    ...safeData,
+    rhValidationEnabled: true,
+    superintendentLockEnabled: false,
     updatedBy,
-  });
+  } as InsertPmsVesselSettings);
 }
 
 /**
@@ -259,7 +269,44 @@ export async function setOfficeRhEntryEnabled(vesselId: string, enabled: boolean
   } as any);
 }
 
+/**
+ * Per-vessel RH validation policy (migration 163). Default is ON and the
+ * settings row is upserted so a vessel can be configured before any other PMS
+ * settings are saved. Role/instance enforcement lives in the controller.
+ */
+export async function setRhValidationEnabled(vesselId: string, enabled: boolean, username: string): Promise<PmsVesselSettings> {
+  const existing = await repo.getPmsVesselSettings(vesselId);
+  return repo.createOrUpdatePmsVesselSettings({
+    ...(existing ?? { vesselId }),
+    vesselId,
+    rhValidationEnabled: enabled,
+    updatedBy: username || 'unknown',
+  } as any);
+}
+
+/**
+ * Per-vessel Superintendent approval lock (migration 168). Default OFF means
+ * notify-only; only this dedicated path may enable or disable the policy.
+ */
+export async function setSuperintendentLockEnabled(vesselId: string, enabled: boolean, username: string): Promise<PmsVesselSettings> {
+  const existing = await repo.getPmsVesselSettings(vesselId);
+  return repo.createOrUpdatePmsVesselSettings({
+    ...(existing ?? { vesselId }),
+    vesselId,
+    superintendentLockEnabled: enabled,
+    updatedBy: username || 'unknown',
+  } as any);
+}
+
 export async function updatePmsVesselSettings(vesselId: string, data: Record<string, any>, username: string): Promise<{ settings: PmsVesselSettings; recalcResult?: { statusesUpdated: number } }> {
+  // Defense in depth for non-HTTP callers: policy switches have dedicated
+  // authorized setter paths and must never be changed by a generic settings save.
+  const {
+    rhValidationEnabled: _ignoredRhValidationEnabled,
+    superintendentLockEnabled: _ignoredSuperintendentLockEnabled,
+    ...safeData
+  } = data;
+  data = safeData;
   const updatedBy = data.updatedBy || username || 'test';
 
   const settingsMode = data.settingsMode || 'COMPANY_STANDARD';

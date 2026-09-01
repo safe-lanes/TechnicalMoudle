@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import * as repo from '../repositories/reportRepository';
+import { isUnplannedWorkOrderNo } from '../../../utils/workOrderStatus';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import type { VesselGraceSettings } from '@shared/workOrders/status';
 import { storage } from '../../../storage';
@@ -1127,7 +1128,7 @@ export async function exportUnplannedJobs(vesselId: string, dateFrom?: string, d
   const unplannedWorkOrders = workOrders.filter(wo =>
     wo.workOrderType === 'Unplanned' ||
     (wo as any).type === 'Unplanned' ||
-    ((wo as any).workOrderNumber && (wo as any).workOrderNumber.startsWith('UWO'))
+    isUnplannedWorkOrderNo((wo as any).workOrderNumber || (wo as any).workOrderNo)
   );
 
   let filteredJobs = unplannedWorkOrders;

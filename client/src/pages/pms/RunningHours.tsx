@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { Search, FileSpreadsheet, Users, Settings, Pencil, AlertTriangle, Download, Clock, History, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
@@ -30,6 +31,7 @@ import ZeroRHConfirmationDialog from "@/components/ZeroRHConfirmationDialog";
 import MeterReplacedConfirmationDialog from "@/components/MeterReplacedConfirmationDialog";
 import { RENEWAL_ACTION_TYPES } from "@shared/schema";
 import { formatLocalDateTimeDDMMMYYYY } from "@shared/dateUtils";
+import { isRhValidationEnabledForComponent } from "./rhValidationPolicy";
 
 interface ChildRHData {
   id: string;
@@ -49,6 +51,7 @@ interface ChildRHData {
 interface RunningHoursData {
   id: string;
   cuuid: string;
+  vesselId?: string | null;
   component: string;
   componentCode?: string;
   sfiCode?: string;
@@ -80,6 +83,9 @@ const RunningHours = () => {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<RunningHoursData | null>(null);
+  // Derived from the selected vessel's synced PMS settings. Default ON keeps
+  // validation safe if the vessel has not yet received a settings record.
+  const [rhValidationEnabled, setRhValidationEnabled] = useState(true);
   
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
@@ -138,6 +144,7 @@ const RunningHours = () => {
     dateUpdated: string;
     dateLocal: string;
     comments: string;
+    rhValidationEnabled: boolean;
   } | null>(null);
   
   // Meter Replaced Confirmation Dialog state
@@ -160,6 +167,29 @@ const RunningHours = () => {
   const { canEdit: canEditPerm } = usePermissions();
   const canEditRH = canEditPerm("pms-running-hrs");
   const { data: vessels = [] } = useVessels();
+  const { data: pmsVesselSettings = [] } = useQuery<Array<{ vesselId: string; rhValidationEnabled?: boolean }>>({
+    queryKey: ['/technical/api/pms-vessel-settings'],
+  });
+  const isRhValidationEnabledForVessel = useCallback((componentVesselId?: string | null) => {
+    // A missing vessel/settings row must fail closed. In My Vessels mode this
+    // resolves from each component's own vessel instead of applying one page
+    // switch to a mixed-policy aggregate.
+    return isRhValidationEnabledForComponent(componentVesselId, vesselId, pmsVesselSettings);
+  }, [pmsVesselSettings, vesselId]);
+
+  const vesselRhValidationEnabled = useMemo(
+    () => isMyVessels ? true : isRhValidationEnabledForVessel(vesselId),
+    [isMyVessels, isRhValidationEnabledForVessel, vesselId],
+  );
+  const selectedComponentRhValidationEnabled = useMemo(
+    () => isRhValidationEnabledForVessel(selectedComponent?.vesselId),
+    [isRhValidationEnabledForVessel, selectedComponent?.vesselId],
+  );
+
+  useEffect(() => {
+    setRhValidationEnabled(vesselRhValidationEnabled);
+    setBulkUpdateErrors({});
+  }, [vesselRhValidationEnabled]);
   
   // Fetch children RH data when popup is open
   const { data: childrenRHData, isLoading: isLoadingChildren } = useQuery<{
@@ -803,6 +833,7 @@ const RunningHours = () => {
           comments: update.comments || '',
           userId: currentUser?.fullName || currentUser?.username || 'system',
           userUuid: currentUser?.userUuid || undefined,
+          rhValidationEnabled: update.rhValidationEnabled,
           meterReplaced: update.meterReplaced,
           oldMeterFinal: update.oldMeterFinal,
           newMeterStart: update.newMeterStart
@@ -835,12 +866,13 @@ const RunningHours = () => {
 
   // Mutation for updating individual child component RH
   const updateChildRHMutation = useMutation({
-    mutationFn: async (data: { componentId: string; newRHValue: number; comments?: string }) => {
+    mutationFn: async (data: { componentId: string; newRHValue: number; comments?: string; rhValidationEnabled: boolean }) => {
       return await apiRequest('PUT', `/technical/api/running-hours/child/${data.componentId}`, {
         newRHValue: data.newRHValue,
         comments: data.comments || '',
         userId: currentUser?.fullName || currentUser?.username || 'system',
-        userUuid: currentUser?.userUuid || undefined
+        userUuid: currentUser?.userUuid || undefined,
+        rhValidationEnabled: data.rhValidationEnabled,
       });
     },
     onSuccess: () => {
@@ -895,7 +927,9 @@ const RunningHours = () => {
     updateChildRHMutation.mutate({
       componentId: editingChildId,
       newRHValue: newValue,
-      comments: editingChildComments
+      comments: editingChildComments,
+      // Children share the selected master's vessel policy.
+      rhValidationEnabled: isRhValidationEnabledForVessel(selectedParentForChildRH?.vesselId),
     });
   };
 
@@ -1061,7 +1095,7 @@ const RunningHours = () => {
     }
     
     // Check if user is trying to set RH to 0 - require confirmation (skip if meter replaced, already confirmed)
-    if (updateMode === 'setTotal' && newValue === 0 && !meterReplaced) {
+    if (updateMode === 'setTotal' && newValue === 0 && !meterReplaced && selectedComponentRhValidationEnabled) {
       setPendingZeroRHUpdate({
         componentId: selectedComponent.id,
         componentName: selectedComponent.component,
@@ -1070,6 +1104,7 @@ const RunningHours = () => {
         dateUpdated: updateForm.dateUpdated,
         dateLocal: dateLocal,
         comments: updateForm.comments,
+        rhValidationEnabled: selectedComponentRhValidationEnabled,
       });
       setIsZeroRHDialogOpen(true);
       return;
@@ -1083,6 +1118,7 @@ const RunningHours = () => {
       comments: updateForm.comments,
       userId: currentUser?.fullName || currentUser?.username || 'system',
       userUuid: currentUser?.userUuid || undefined,
+      rhValidationEnabled: selectedComponentRhValidationEnabled,
       meterReplaced,
       oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
       newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined,
@@ -1111,6 +1147,7 @@ const RunningHours = () => {
       comments: pendingZeroRHUpdate.comments,
       userId: currentUser?.fullName || currentUser?.username || 'system',
       userUuid: currentUser?.userUuid || undefined,
+      rhValidationEnabled: pendingZeroRHUpdate.rhValidationEnabled,
       meterReplaced: true,
       isRenewalReset: true,
       renewalActionType: renewalData.renewalActionType,
@@ -1272,14 +1309,17 @@ const RunningHours = () => {
     const newVal = parseFloat(updateForm.newValue);
     if (isNaN(newVal)) return null;
     if (updateMode === "setTotal") {
+      if (newVal < 0) {
+        return "New value cannot be negative.";
+      }
       if (!meterReplaced) {
         const currentRH = parseFloat(updateForm.oldValue.replace(/,/g, ''));
-        if (!isNaN(currentRH) && newVal < currentRH) {
+        if (selectedComponentRhValidationEnabled && !isNaN(currentRH) && newVal < currentRH) {
           return `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs). Use 'Meter Replaced' if the meter was reset.`;
         }
       }
     } else if (updateMode === "addDelta") {
-      if (newVal <= 0) {
+      if (selectedComponentRhValidationEnabled && newVal <= 0) {
         return "Delta value must be a positive number. Running hours can only increase.";
       }
     }
@@ -1292,17 +1332,21 @@ const RunningHours = () => {
     const inputValue = parseFloat(updateData.value.replace(/,/g, ''));
     if (isNaN(inputValue)) return null;
     if (bulkUpdateMode === "setTotal") {
+      if (inputValue < 0) {
+        return "New value cannot be negative.";
+      }
       if (!updateData.meterReplaced) {
         const component = runningHoursData.find(c => c.id === componentId);
         if (component) {
           const currentRH = parseFloat(component.runningHours.replace(" hrs", "").replace(/,/g, ""));
-          if (!isNaN(currentRH) && inputValue < currentRH) {
+          if (isRhValidationEnabledForVessel(component.vesselId) && !isNaN(currentRH) && inputValue < currentRH) {
             return `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs). Use 'Meter Replaced' if the meter was reset.`;
           }
         }
       }
     } else if (bulkUpdateMode === "addDelta") {
-      if (inputValue <= 0) {
+      const component = runningHoursData.find(c => c.id === componentId);
+      if (isRhValidationEnabledForVessel(component?.vesselId) && inputValue <= 0) {
         return "Delta value must be a positive number. Running hours can only increase.";
       }
     }
@@ -1349,12 +1393,13 @@ const RunningHours = () => {
       }
       
       // Block zero values in bulk update - must use individual update with renewal confirmation
-      if (bulkUpdateMode === 'setTotal' && inputValue === 0) {
+      const componentRhValidationEnabled = isRhValidationEnabledForVessel(component.vesselId);
+      if (bulkUpdateMode === 'setTotal' && inputValue === 0 && componentRhValidationEnabled) {
         errors[component.id] = "Cannot set RH to 0 in bulk update. Use individual update for renewal/replacement.";
         continue;
       }
       
-      if (bulkUpdateMode === 'setTotal' && !updateData.meterReplaced) {
+      if (bulkUpdateMode === 'setTotal' && !updateData.meterReplaced && componentRhValidationEnabled) {
         const currentRH = parseFloat(component.runningHours.replace(" hrs", "").replace(/,/g, ""));
         if (!isNaN(currentRH) && inputValue < currentRH) {
           errors[component.id] = `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs).`;
@@ -1362,7 +1407,7 @@ const RunningHours = () => {
         }
       }
       
-      if (bulkUpdateMode === 'addDelta' && inputValue <= 0) {
+      if (bulkUpdateMode === 'addDelta' && inputValue <= 0 && componentRhValidationEnabled) {
         errors[component.id] = "Delta value must be a positive number.";
         continue;
       }
@@ -1373,6 +1418,7 @@ const RunningHours = () => {
         value: inputValue,
         dateUpdated: dateLocal,
         comments: bulkUpdateGlobal.comments,
+        rhValidationEnabled: componentRhValidationEnabled,
         meterReplaced: updateData.meterReplaced || false,
         oldMeterFinal: updateData.meterReplaced ? updateData.oldMeterFinal : undefined,
         newMeterStart: updateData.meterReplaced ? updateData.newMeterStart : undefined
@@ -1420,6 +1466,20 @@ const RunningHours = () => {
           </div>
           {activeTab === 'main' && (
             <div className="flex gap-2 items-center">
+              <div
+                className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                  isMyVessels
+                    ? 'border-sky-200 bg-sky-50 text-sky-800'
+                    : rhValidationEnabled
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-300 bg-amber-50 text-amber-900'
+                }`}
+                title="Configured per vessel in PMS Settings"
+                data-testid="rh-validation-status"
+              >
+                <span className="font-medium">RH Validation</span>
+                <span className="font-semibold">{isMyVessels ? 'PER VESSEL' : rhValidationEnabled ? 'ON' : 'OFF'}</span>
+              </div>
               <Button 
                 variant="outline" 
                 size="sm"

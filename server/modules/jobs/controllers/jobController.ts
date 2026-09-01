@@ -6,7 +6,15 @@ import type { AuthenticatedRequest } from '../../../middleware/auth';
 
 // ── Job CRUD ──
 
-export async function listJobs(req: Request, res: Response) {
+function isShipUser(req: AuthenticatedRequest): boolean {
+  return req.user?.userType === 'Ship' || req.rbac?.userType === 'Ship';
+}
+
+function isInactive(job: { isActive?: boolean | null }): boolean {
+  return job.isActive === false;
+}
+
+export async function listJobs(req: AuthenticatedRequest, res: Response) {
   const vesselId = req.query.vesselId as string | undefined;
   const componentId = req.query.componentId as string | undefined;
   // 'my' scope arrives as vesselId=all + vesselIds=<assigned csv> allow-list.
@@ -15,18 +23,24 @@ export async function listJobs(req: Request, res: Response) {
     ? vesselIdsParam.split(',').map(v => v.trim()).filter(Boolean)
     : undefined;
   const jobs = await jobService.listJobs(vesselId, componentId, vesselIds);
-  res.json(jobs);
+  // Inactive Jobs are an Office-only record. Enforce this at the API boundary so
+  // a Ship user cannot retrieve them through a direct URL or API request.
+  res.json(isShipUser(req) ? jobs.filter(job => !isInactive(job)) : jobs);
 }
 
-export async function getJob(req: Request, res: Response) {
+export async function getJob(req: AuthenticatedRequest, res: Response) {
   const job = await jobService.getJob(req.params.id);
-  if (!job) {
+  if (!job || (isShipUser(req) && isInactive(job))) {
     return res.status(404).json({ error: 'Job not found' });
   }
   res.json(job);
 }
 
-export async function getJobContext(req: Request, res: Response) {
+export async function getJobContext(req: AuthenticatedRequest, res: Response) {
+  const job = await jobService.getJob(req.params.id);
+  if (!job || (isShipUser(req) && isInactive(job))) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
   const context = await jobContextService.getJobContext(req.params.id);
   res.json(context);
 }

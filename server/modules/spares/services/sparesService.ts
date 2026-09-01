@@ -29,7 +29,8 @@ export async function getSparesByVessel(vesselId: string): Promise<Spare[]> {
 }
 
 export async function getSpare(id: string): Promise<Spare | undefined> {
-  return repo.getSpare(id);
+  const spare = await repo.getSpare(id);
+  return spare && !spare.deleted && !spare.isDeleted ? spare : undefined;
 }
 
 export async function createSpare(vesselId: string, body: any): Promise<Spare> {
@@ -44,6 +45,19 @@ export async function updateSpare(
   body: any,
   userId: string
 ): Promise<Spare> {
+  if (
+    Object.prototype.hasOwnProperty.call(body, 'isDeleted') ||
+    Object.prototype.hasOwnProperty.call(body, 'is_deleted') ||
+    Object.prototype.hasOwnProperty.call(body, 'deleted')
+  ) {
+    throw Object.assign(new Error('Spare deletion status can only be changed through Delete Spare.'), { statusCode: 400 });
+  }
+
+  const existingSpare = await repo.getSpare(spareId);
+  if (!existingSpare || existingSpare.deleted || existingSpare.isDeleted) {
+    throw Object.assign(new Error('Spare not found'), { statusCode: 404 });
+  }
+
   const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = body;
 
   // Check if location ROB values are being changed - route to transfer/adjustment method
@@ -57,10 +71,7 @@ export async function updateSpare(
     }
 
     // Get current spare to determine location values
-    const currentSpare = await repo.getSpare(spareId);
-    if (!currentSpare) {
-      throw Object.assign(new Error("Spare not found"), { statusCode: 404 });
-    }
+    const currentSpare = existingSpare;
 
     const newLocA = robLocationA !== undefined ? Number(robLocationA) : (currentSpare.robLocationA ?? 0);
     const newLocB = robLocationB !== undefined ? Number(robLocationB) : (currentSpare.robLocationB ?? 0);
@@ -82,13 +93,29 @@ export async function updateSpare(
   return repo.updateSpare(spareId, otherUpdates);
 }
 
-export async function deleteSpare(id: string): Promise<void> {
-  return repo.deleteSpare(id);
+export async function deleteSpare(
+  id: string,
+  vesselId: string,
+  userId: string
+): Promise<{ success: boolean; message: string }> {
+  const spare = await repo.getSpare(id);
+  if (!spare || spare.deleted || spare.isDeleted) {
+    throw Object.assign(new Error(`Spare with ID ${id} not found`), { statusCode: 404 });
+  }
+  if (spare.vesselId !== vesselId) {
+    throw Object.assign(new Error('Access denied: Spare does not belong to this vessel'), { statusCode: 403 });
+  }
+
+  await repo.deleteSpare(id, userId);
+  return {
+    success: true,
+    message: `Spare "${spare.partName}" (${spare.partCode}) was deleted. Inventory and transaction history have been retained.`,
+  };
 }
 
 export async function inactivateSpare(id: string, vesselId: string): Promise<{ success: boolean; message: string }> {
   const spare = await repo.getSpare(id);
-  if (!spare) {
+  if (!spare || spare.deleted || spare.isDeleted) {
     throw Object.assign(new Error(`Spare with ID ${id} not found`), { statusCode: 404 });
   }
   if (spare.vesselId !== vesselId) {

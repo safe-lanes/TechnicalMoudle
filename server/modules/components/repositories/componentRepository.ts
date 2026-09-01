@@ -96,8 +96,8 @@ export async function update(id: string, data: Partial<Component>): Promise<Comp
   return storage.updateComponent(id, data);
 }
 
-export async function remove(id: string): Promise<void> {
-  return storage.deleteComponent(id);
+export async function remove(id: string, userId?: string): Promise<void> {
+  return storage.deleteComponent(id, userId);
 }
 
 // Audit Phase 1 — thin passthrough so the service can record register-change audits
@@ -107,8 +107,8 @@ export async function createAuditLog(data: any): Promise<any> {
   return storage.createAuditLog(data);
 }
 
-export async function inactivate(id: string, vesselId: string, userId: string) {
-  return storage.inactivateComponent(id, vesselId, userId);
+export async function inactivate(id: string, vesselId: string, userId: string, apply = true) {
+  return storage.inactivateComponent(id, vesselId, userId, apply);
 }
 
 export async function bulkUpsert(components: InsertComponent[]): Promise<{ created: number; updated: number }> {

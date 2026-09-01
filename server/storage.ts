@@ -260,8 +260,8 @@ export interface IStorage {
   getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined>;
   createComponent(component: InsertComponent): Promise<Component>;
   updateComponent(id: string, data: Partial<Component>): Promise<Component>;
-  deleteComponent(id: string): Promise<void>;
-  inactivateComponent(id: string, vesselId: string, userId?: string): Promise<{
+  deleteComponent(id: string, userId?: string): Promise<void>;
+  inactivateComponent(id: string, vesselId: string, userId?: string, apply?: boolean): Promise<{
     success: boolean;
     message: string;
     code?: string;
@@ -378,7 +378,7 @@ export interface IStorage {
   getSpare(id: string): Promise<Spare | undefined>;
   createSpare(spare: InsertSpare, skipSiblingSync?: boolean): Promise<Spare>;
   updateSpare(id: string, data: Partial<Spare>, skipSiblingSync?: boolean): Promise<Spare>;
-  deleteSpare(id: string): Promise<void>;
+  deleteSpare(id: string, userId?: string): Promise<void>;
   consumeSpare(id: string, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
   consumeSpareFromLocation(id: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, workOrderRef?: string, dateLocal?: string): Promise<{
     spare: Spare;
@@ -680,7 +680,7 @@ export interface IStorage {
   
   // Seed helper methods
   getDefectBySeedId(seedId: string): Promise<Defect | undefined>;
-  getVesselIdByName(vesselName: string): Promise<string | undefined>;
+  getVesselIdByName(vesselName: string, options?: { includeDeleted?: boolean }): Promise<string | undefined>;
   createVessel(vessel: InsertVessel): Promise<Vessel>;
   
   // Import History methods
@@ -753,8 +753,8 @@ export interface IStorage {
     mappedBy: string;
   }): Promise<any[]>;
   deleteFleetVesselMapping(id: string): Promise<void>;
-  getVessel(id: string): Promise<Vessel | undefined>;
-  getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string, imoNumber: string | null, vesselType: string | null}>>;
+  getVessel(id: string, options?: { includeDeleted?: boolean }): Promise<Vessel | undefined>;
+  getVessels(options?: { includeDeleted?: boolean }): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>>;
   
   // On-Demand Work Order Generation (Rule #4)
   // activeComponentCode: optional override for multi-linked jobs to bind WO to specific component context
@@ -886,9 +886,9 @@ export interface IStorage {
   createFleet(fleet: InsertFleet): Promise<Fleet>;
   updateFleet(id: string, data: Partial<Fleet>): Promise<Fleet>;
   deleteFleet(id: string): Promise<void>;
-  getVesselsByFleet(fleetId: string): Promise<Vessel[]>;
+  getVesselsByFleet(fleetId: string, options?: { includeDeleted?: boolean }): Promise<Vessel[]>;
   assignVesselToFleet(vesselId: string, fleetId: string | null): Promise<Vessel>;
-  getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>>;
+  getVesselsWithFleets(options?: { includeDeleted?: boolean }): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>>;
   updateVessel(id: string, data: Partial<Vessel>): Promise<Vessel>;
 
   getFleetClasses(fleetId: string): Promise<FleetClass[]>;

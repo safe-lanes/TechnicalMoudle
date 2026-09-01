@@ -9,6 +9,17 @@ import type {
   SpareWithInventory
 } from '@shared/schema';
 
+async function requireOperationalSpare(spareId: number, vesselId?: string) {
+  const spare = await repo.getSpare(String(spareId));
+  if (!spare || spare.deleted || spare.isDeleted) {
+    throw Object.assign(new Error(`Spare ${spareId} not found`), { statusCode: 404 });
+  }
+  if (vesselId && spare.vesselId !== vesselId) {
+    throw Object.assign(new Error('Access denied: Spare does not belong to this vessel'), { statusCode: 403 });
+  }
+  return spare;
+}
+
 // ── Locations ──
 
 export async function getLocations(vesselId: string): Promise<Location[]> {
@@ -71,12 +82,9 @@ export async function createSpareComponentLink(body: any): Promise<SpareComponen
     );
   }
 
-  const spare = await storage.getSpare(String(spareId));
-  if (!spare) {
-    throw Object.assign(
-      new Error(`Spare ${spareId} not found`),
-      { statusCode: 404 }
-    );
+  const spare = await requireOperationalSpare(parseInt(spareId));
+  if (spare.vesselId !== vesselId) {
+    throw Object.assign(new Error('Access denied: Spare does not belong to this vessel'), { statusCode: 403 });
   }
 
   return repo.createSpareComponentLink({
@@ -95,6 +103,7 @@ export async function deleteSpareComponentLink(spareId: number, componentId: str
 // ── Spare Location Stock ──
 
 export async function getSpareStock(spareId: number) {
+  await requireOperationalSpare(spareId);
   const stockRecords = await repo.getSpareLocationStock(spareId);
   const locationsWithQty = await repo.getSpareLocationsWithQty(spareId);
   const robTotal = await repo.getSpareRobTotal(spareId);
@@ -129,6 +138,7 @@ export async function upsertStock(spareId: number, locationId: number, body: any
     throw Object.assign(new Error("vesselId is required"), { statusCode: 400 });
   }
 
+  await requireOperationalSpare(spareId, vesselId);
   return repo.upsertSpareLocationStock({
     vesselId,
     spareId,
@@ -152,6 +162,7 @@ export async function createTransaction(body: any) {
     };
   }
 
+  await requireOperationalSpare(parsed.data.spareId, parsed.data.vesselId);
   const result = await repo.performInventoryTransaction(parsed.data);
   return { validationError: false, response: { success: true, data: result } };
 }

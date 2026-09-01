@@ -135,11 +135,21 @@ export async function updateSpare(req: Request, res: Response) {
 
 export async function deleteSpare(req: Request, res: Response) {
   try {
-    await sparesService.deleteSpare(req.params.id);
-    res.json({ success: true, message: "Spare has been deactivated successfully" });
+    const result = await sparesService.deleteSpare(
+      req.params.id,
+      req.params.vesselId,
+      (req as AuthenticatedRequest).user?.username || 'system'
+    );
+    res.json(result);
   } catch (error: any) {
-    if (error.message?.includes('not found')) {
+    if (error.statusCode === 404 || error.message?.includes('not found')) {
       return res.status(404).json({ error: error.message });
+    }
+    if (error.statusCode === 403) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
     }
     res.status(500).json({ error: "Failed to delete spare" });
   }
@@ -250,6 +260,9 @@ export async function batchConsume(req: Request, res: Response) {
     const results = await sparesService.batchConsume(items, workOrderId, consumedBy);
     res.json({ success: true, results });
   } catch (error: any) {
+    if (error.statusCode === 404 || error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message || "Failed to consume spares" });
   }
 }
@@ -267,6 +280,9 @@ export async function batchReceive(req: Request, res: Response) {
     const results = await sparesService.batchReceive(items, purchaseOrderRef, receivedBy);
     res.json({ success: true, results });
   } catch (error: any) {
+    if (error.statusCode === 404 || error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message || "Failed to receive spares" });
   }
 }
@@ -284,6 +300,9 @@ export async function consumeSimple(req: Request, res: Response) {
   } catch (error: any) {
     if (error.statusCode === 400) {
       return res.status(400).json({ error: error.message });
+    }
+    if (error.statusCode === 404 || error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
     }
     console.error("Error consuming spare:", error);
     res.status(500).json({ error: error.message || "Failed to consume spare" });

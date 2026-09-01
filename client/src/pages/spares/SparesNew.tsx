@@ -209,9 +209,10 @@ const Spares: React.FC = () => {
   }, []); // Run only on mount
   
   // Dialog states
-  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
-  const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleteSelectionMode, setIsDeleteSelectionMode] = useState(false);
   const [selectedSpareIds, setSelectedSpareIds] = useState<Set<number>>(new Set());
+  const [selectedSpareVesselIds, setSelectedSpareVesselIds] = useState<Map<number, string>>(new Map());
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
   const [componentCodePopoverOpen, setComponentCodePopoverOpen] = useState(false);
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
@@ -1065,57 +1066,120 @@ const Spares: React.FC = () => {
   };
 
   const handleDeleteSpare = (spare: Spare) => {
-    setIsBulkDeleteMode(true);
-    setSelectedSpareIds(new Set([spare.id]));
-  };
+    if (!isDeleteSelectionMode) {
+      setIsDeleteSelectionMode(true);
+      setSelectedSpareIds(new Set([spare.id]));
+      setSelectedSpareVesselIds(new Map([[spare.id, spare.vesselId]]));
+      return;
+    }
 
-  const toggleSpareSelection = (spareId: number) => {
+    const isSelected = selectedSpareIds.has(spare.id);
     setSelectedSpareIds(prev => {
       const next = new Set(prev);
-      if (next.has(spareId)) {
-        next.delete(spareId);
+      if (isSelected) {
+        next.delete(spare.id);
       } else {
-        next.add(spareId);
+        next.add(spare.id);
       }
+      return next;
+    });
+    setSelectedSpareVesselIds(prev => {
+      const next = new Map(prev);
+      if (isSelected) {
+        next.delete(spare.id);
+      } else {
+        next.set(spare.id, spare.vesselId);
+      }
+      return next;
+    });
+    if (isSelected && selectedSpareIds.size === 1) {
+      setIsDeleteSelectionMode(false);
+    }
+  };
+
+  const toggleSpareSelection = (spare: Spare) => {
+    const isSelected = selectedSpareIds.has(spare.id);
+    setSelectedSpareIds(prev => {
+      const next = new Set(prev);
+      if (isSelected) {
+        next.delete(spare.id);
+      } else {
+        next.add(spare.id);
+      }
+      return next;
+    });
+    setSelectedSpareVesselIds(prev => {
+      const next = new Map(prev);
+      if (isSelected) {
+        next.delete(spare.id);
+      } else {
+        next.set(spare.id, spare.vesselId);
+      }
+      return next;
+    });
+    if (isSelected && selectedSpareIds.size === 1) {
+      setIsDeleteSelectionMode(false);
+    }
+  };
+
+  const toggleSelectAllVisibleSpares = () => {
+    const allVisibleSelected = paginatedSpares.length > 0
+      && paginatedSpares.every((spare: Spare) => selectedSpareIds.has(spare.id));
+
+    if (allVisibleSelected) {
+      const visibleIds = new Set(paginatedSpares.map((spare: Spare) => spare.id));
+      setSelectedSpareIds(prev => new Set(Array.from(prev).filter(id => !visibleIds.has(id))));
+      setSelectedSpareVesselIds(prev => {
+        const next = new Map(prev);
+        visibleIds.forEach(id => next.delete(id));
+        return next;
+      });
+      if (selectedSpareIds.size === paginatedSpares.length) {
+        setIsDeleteSelectionMode(false);
+      }
+      return;
+    }
+
+    setSelectedSpareIds(prev => {
+      const next = new Set(prev);
+      paginatedSpares.forEach((spare: Spare) => next.add(spare.id));
+      return next;
+    });
+    setSelectedSpareVesselIds(prev => {
+      const next = new Map(prev);
+      paginatedSpares.forEach((spare: Spare) => next.set(spare.id, spare.vesselId));
       return next;
     });
   };
 
-  const toggleSelectAll = () => {
-    const selectableOnPage = paginatedSpares.filter((s: Spare) => s.isActive !== false);
-    const allOnPageSelected = selectableOnPage.length > 0 && selectableOnPage.every((s: Spare) => selectedSpareIds.has(s.id));
-    if (allOnPageSelected) {
-      const newSet = new Set(selectedSpareIds);
-      selectableOnPage.forEach((s: Spare) => newSet.delete(s.id));
-      setSelectedSpareIds(newSet);
-    } else {
-      const newSet = new Set(selectedSpareIds);
-      selectableOnPage.forEach((s: Spare) => newSet.add(s.id));
-      setSelectedSpareIds(newSet);
+  const clearSpareSelection = () => {
+    setIsDeleteSelectionMode(false);
+    setSelectedSpareIds(new Set());
+    setSelectedSpareVesselIds(new Map());
+    setShowDeleteDialog(false);
+  };
+
+  const openBulkDeleteDialog = () => {
+    if (selectedSpareIds.size > 0) {
+      setShowDeleteDialog(true);
     }
   };
 
   useEffect(() => {
-    setIsBulkDeleteMode(false);
+    setIsDeleteSelectionMode(false);
     setSelectedSpareIds(new Set());
-  }, [vesselId]);
+    setSelectedSpareVesselIds(new Map());
+    setShowDeleteDialog(false);
+  }, [sparesScopeKey]);
 
-  const exitBulkDeleteMode = () => {
-    setIsBulkDeleteMode(false);
-    setSelectedSpareIds(new Set());
-  };
-
-  const confirmBulkDeactivate = () => {
-    if (selectedSpareIds.size > 0) {
-      setShowDeactivateDialog(true);
+  useEffect(() => {
+    if (activeTab !== 'inventory') {
+      setIsDeleteSelectionMode(false);
+      setSelectedSpareIds(new Set());
+      setSelectedSpareVesselIds(new Map());
+      setShowDeleteDialog(false);
     }
-  };
-
-  const executeBulkDeactivate = () => {
-    if (selectedSpareIds.size > 0) {
-      bulkDeactivateMutation.mutate(Array.from(selectedSpareIds));
-    }
-  };
+  }, [activeTab]);
 
   const handleReactivateSpare = (spare: Spare) => {
     reactivateSpareMutation.mutate(spare.id);
@@ -1786,47 +1850,60 @@ const Spares: React.FC = () => {
     }
   });
 
-  const bulkDeactivateMutation = useMutation({
-    mutationFn: async (spareIds: number[]) => {
-      const results: { id: number; success: boolean; message?: string }[] = [];
-      for (const spareId of spareIds) {
+  const bulkDeleteSpareMutation = useMutation({
+    mutationFn: async (targets: Array<{ id: number; vesselId: string }>) => {
+      return Promise.all(targets.map(async ({ id, vesselId: targetVesselId }) => {
         try {
-          const response = await fetch(`/technical/api/spares/${vesselId}/${spareId}/inactivate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          });
-          if (!response.ok) {
-            const error = await response.json();
-            results.push({ id: spareId, success: false, message: error.error });
-          } else {
-            results.push({ id: spareId, success: true });
-          }
-        } catch (e: any) {
-          results.push({ id: spareId, success: false, message: e.message });
+          await apiRequest('DELETE', `/technical/api/spares/${targetVesselId}/${id}`);
+          return { id, success: true };
+        } catch (error: any) {
+          return {
+            id,
+            success: false,
+            message: error?.message || 'The Spare could not be deleted.',
+          };
         }
-      }
-      return results;
+      }));
     },
-    onSuccess: (results) => {
-      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
-      invalidateByUrlPrefix('/technical/api/spares/history');
-      const successCount = results.filter(r => r.success).length;
-      const failCount = results.filter(r => !r.success).length;
-      setShowDeactivateDialog(false);
-      if (failCount === 0) {
-        toast({ title: "Success", description: `${successCount} spare(s) deactivated successfully` });
-        exitBulkDeleteMode();
-      } else if (successCount > 0) {
-        const failedIds = new Set(results.filter(r => !r.success).map(r => r.id));
-        setSelectedSpareIds(failedIds);
-        toast({ title: "Partial Success", description: `${successCount} deactivated, ${failCount} failed. Failed items remain selected.`, variant: "destructive" });
+    onSuccess: async (results) => {
+      const successfulIds = new Set(results.filter(result => result.success).map(result => result.id));
+      const failedResults = results.filter(result => !result.success);
+
+      await invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      await invalidateByUrlPrefix('/technical/api/spares');
+
+      setShowDeleteDialog(false);
+      setSelectedSpareIds(prev => new Set(Array.from(prev).filter(id => !successfulIds.has(id))));
+      setSelectedSpareVesselIds(prev => {
+        const next = new Map(prev);
+        successfulIds.forEach(id => next.delete(id));
+        return next;
+      });
+
+      if (failedResults.length === 0) {
+        setIsDeleteSelectionMode(false);
+        setSelectedSpareIds(new Set());
+        setSelectedSpareVesselIds(new Map());
+        toast({
+          title: 'Spares deleted',
+          description: `${results.length} Spare${results.length === 1 ? '' : 's'} removed from inventory views. Stock and transaction history were retained.`,
+        });
       } else {
-        toast({ title: "Error", description: `All ${failCount} deactivation(s) failed. Please try again.`, variant: "destructive" });
+        setIsDeleteSelectionMode(true);
+        toast({
+          title: results.length === failedResults.length ? 'Unable to delete Spares' : 'Partial deletion',
+          description: `${results.length - failedResults.length} deleted, ${failedResults.length} failed. Failed Spares remain selected.`,
+          variant: 'destructive',
+        });
       }
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to deactivate spares", variant: "destructive" });
-    }
+      toast({
+        title: 'Unable to delete Spares',
+        description: error.message || 'The selected Spares could not be deleted.',
+        variant: 'destructive',
+      });
+    },
   });
 
   const reactivateSpareMutation = useMutation({
@@ -2786,41 +2863,42 @@ const Spares: React.FC = () => {
   const inventoryColumnDefs: ColDef[] = useMemo(() => {
     const cols: ColDef[] = [];
 
-    if (isBulkDeleteMode) {
+    if (isDeleteSelectionMode) {
+      const allVisibleSelected = paginatedSpares.length > 0
+        && paginatedSpares.every((spare: Spare) => selectedSpareIds.has(spare.id));
+
       cols.push({
-        headerName: '',
-        colId: 'bulkSelect',
-        width: 48,
-        minWidth: 48,
-        maxWidth: 48,
+        headerName: 'Select',
+        colId: 'deleteSelection',
+        width: 72,
+        minWidth: 72,
+        maxWidth: 72,
+        pinned: 'right',
         sortable: false,
         filter: false,
         resizable: false,
         suppressMovable: true,
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-        headerComponent: () => {
-          const selectableOnPage = paginatedSpares.filter((s: Spare) => s.isActive !== false);
-          const allChecked = selectableOnPage.length > 0 && selectableOnPage.every((s: Spare) => selectedSpareIds.has(s.id));
-          return (
-            <input
-              type="checkbox"
-              checked={allChecked}
-              onChange={toggleSelectAll}
-              className="h-4 w-4 rounded border-white accent-white cursor-pointer"
-              data-testid="checkbox-select-all"
-            />
-          );
-        },
+        headerComponent: () => (
+          <input
+            type="checkbox"
+            checked={allVisibleSelected}
+            onChange={toggleSelectAllVisibleSpares}
+            aria-label="Select all visible spares"
+            className="h-4 w-4 rounded border-gray-300 accent-red-600 cursor-pointer"
+            data-testid="checkbox-select-all-spares"
+          />
+        ),
         cellRenderer: (params: ICellRendererParams) => {
           const spare = params.data as Spare;
-          const isInactive = spare.isActive === false;
-          if (isInactive) return <span className="h-4 w-4" />;
           return (
             <input
               type="checkbox"
               checked={selectedSpareIds.has(spare.id)}
-              onChange={() => toggleSpareSelection(spare.id)}
-              className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+              onChange={() => toggleSpareSelection(spare)}
+              onClick={(event) => event.stopPropagation()}
+              aria-label={`Select ${spare.partName || spare.partCode} for deletion`}
+              className="h-4 w-4 rounded border-gray-300 accent-red-600 cursor-pointer"
               data-testid={`checkbox-spare-${spare.id}`}
             />
           );
@@ -3026,8 +3104,7 @@ const Spares: React.FC = () => {
       });
     }
 
-    if (!isBulkDeleteMode) {
-      cols.push({
+    cols.push({
         headerName: 'Actions',
         colId: 'actions',
         width: 160,
@@ -3074,13 +3151,13 @@ const Spares: React.FC = () => {
                   <Settings2 className="h-4 w-4 text-orange-500" />
                 </Button>
               )}
-              {(isOfficeUser || isChangeMode) && !isInactive && canDeleteSpare && (
+              {(isOfficeUser || isChangeMode) && canDeleteSpare && (
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => handleDeleteSpare(spare)}
-                  title="Deactivate"
-                  data-testid={isFirstRow ? 'E36' : `button-delete-${spare.id}`}
+                  title={isDeleteSelectionMode ? 'Toggle deletion selection' : 'Delete Spare'}
+                  data-testid={isFirstRow ? 'E36' : `button-delete-spare-${spare.id}`}
                 >
                   {isFirstRow && <Marker id="E36" />}
                   <Trash2 className="h-4 w-4 text-red-500" />
@@ -3102,13 +3179,13 @@ const Spares: React.FC = () => {
           );
         },
       });
-    }
 
     return cols;
   }, [
-    isBulkDeleteMode,
+    isDeleteSelectionMode,
     paginatedSpares,
     selectedSpareIds,
+    selectedSpareVesselIds,
     isSailAdmin,
     isClientAdmin,
     isExternal,
@@ -3435,13 +3512,12 @@ const Spares: React.FC = () => {
     },
   ], []);
 
-  // Row class helpers for Inventory grid (inactive / bulk-selected styling)
+  // Row class helper for Inventory grid
   const inventoryGetRowClass = (params: any): string | undefined => {
     const spare = params.data as Spare | undefined;
     if (!spare) return undefined;
     const classes: string[] = [];
     if (spare.isActive === false) classes.push('spare-row-inactive');
-    if (isBulkDeleteMode && selectedSpareIds.has(spare.id)) classes.push('spare-row-bulk-selected');
     return classes.length ? classes.join(' ') : undefined;
   };
 
@@ -3502,19 +3578,25 @@ const Spares: React.FC = () => {
             <Download className="h-4 w-4" />
             Export
           </Button>
-          {isBulkDeleteMode ? (
+          {activeTab === 'inventory' && isDeleteSelectionMode ? (
             <>
               <Button
                 size="sm"
                 variant="destructive"
-                onClick={confirmBulkDeactivate}
-                disabled={selectedSpareIds.size === 0 || bulkDeactivateMutation.isPending}
-                data-testid="button-bulk-delete-confirm"
+                onClick={openBulkDeleteDialog}
+                disabled={selectedSpareIds.size === 0 || bulkDeleteSpareMutation.isPending}
+                data-testid="button-delete-selected-spares"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                Delete{selectedSpareIds.size > 0 ? ` (${selectedSpareIds.size})` : ''}
+                Delete Selected Spares ({selectedSpareIds.size})
               </Button>
-              <Button size="sm" variant="outline" onClick={exitBulkDeleteMode} data-testid="button-bulk-delete-cancel">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={clearSpareSelection}
+                disabled={bulkDeleteSpareMutation.isPending}
+                data-testid="button-cancel-spare-selection"
+              >
                 Cancel
               </Button>
             </>
@@ -3527,10 +3609,10 @@ const Spares: React.FC = () => {
                 </Button>
               )}
               {canEditSpare && (
-              <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
-                <Marker id="E11" />
-                Bulk Update Spares
-              </Button>
+                <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
+                  <Marker id="E11" />
+                  Bulk Update Spares
+                </Button>
               )}
             </>
           )}
@@ -3802,7 +3884,7 @@ const Spares: React.FC = () => {
                 <span data-testid="E20"><Marker id="E20" />Stock</span>
                 <span data-testid="E21"><Marker id="E21" />Location</span>
                 {FEATURES.IHM && <span data-testid="E22"><Marker id="E22" />IHM</span>}
-                {!isBulkDeleteMode && <span data-testid="E23"><Marker id="E23" />Actions</span>}
+                <span data-testid="E23"><Marker id="E23" />Actions</span>
               </div>
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex-1 min-h-0">
@@ -5927,33 +6009,43 @@ const Spares: React.FC = () => {
       </Dialog>
       
 
-      {/* Deactivate Spare Confirmation Dialog */}
-      <Dialog open={showDeactivateDialog} onOpenChange={(open) => { setShowDeactivateDialog(open); }}>
+      {/* Delete Spare Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+        if (!bulkDeleteSpareMutation.isPending) {
+          setShowDeleteDialog(open);
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Deactivate Spare{selectedSpareIds.size > 1 ? 's' : ''}</DialogTitle>
+            <DialogTitle>Delete Selected Spares</DialogTitle>
             <DialogDescription>
-              {selectedSpareIds.size === 1 ? (
-                <>
-                  Are you sure you want to deactivate the selected spare?
-                  The spare will be marked as inactive and hidden from Vessel and Head of Department views.
-                  This action can be reversed by reactivating the spare.
-                </>
-              ) : (
-                <>
-                  Are you sure you want to deactivate <strong>{selectedSpareIds.size}</strong> selected spares?
-                  They will be marked as inactive and hidden from Vessel and Head of Department views.
-                  This action can be reversed by reactivating the spares.
-                </>
-              )}
+              Are you sure you want to delete <strong>{selectedSpareIds.size} Spare{selectedSpareIds.size === 1 ? '' : 's'}</strong>?
+              They will be removed from normal inventory views and cannot be reactivated. Their stock, component links, transaction history, and audit records will be retained.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => { setShowDeactivateDialog(false); }} data-testid="button-cancel-deactivate">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+              }}
+              disabled={bulkDeleteSpareMutation.isPending}
+              data-testid="button-cancel-delete-selected-spares"
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={executeBulkDeactivate} disabled={bulkDeactivateMutation.isPending} data-testid="button-confirm-deactivate">
-              {bulkDeactivateMutation.isPending ? 'Deactivating...' : `Deactivate${selectedSpareIds.size > 1 ? ` (${selectedSpareIds.size})` : ''}`}
+            <Button
+              variant="destructive"
+              onClick={() => bulkDeleteSpareMutation.mutate(
+                Array.from(selectedSpareIds).map(id => ({
+                  id,
+                  vesselId: selectedSpareVesselIds.get(id) || vesselId,
+                }))
+              )}
+              disabled={selectedSpareIds.size === 0 || bulkDeleteSpareMutation.isPending}
+              data-testid="button-confirm-delete-selected-spares"
+            >
+              {bulkDeleteSpareMutation.isPending ? 'Deleting...' : 'Delete Selected Spares'}
             </Button>
           </DialogFooter>
         </DialogContent>

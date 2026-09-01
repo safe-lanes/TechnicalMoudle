@@ -1,33 +1,35 @@
 import { useQuery } from "@tanstack/react-query";
 
-interface ApprovalPolicy {
-  superintendentLockEnabled: boolean;
-  updatedBy: string | null;
-  updatedAt: string | null;
+interface VesselApprovalPolicy {
+  vesselId: string;
+  superintendentLockEnabled?: boolean | null;
 }
 
 /**
- * Company approval policy (migration 137) — currently the Superintendent lock
- * toggle. Shore-configured, synced to ships; both sides READ it to render the
- * effective approval tier. Fail-safe default: lock ENABLED (matches the
- * server's fail-safe), so a fetch error never visually unlocks anything.
+ * Vessel-specific Superintendent approval lock (migration 168). Missing
+ * settings deliberately resolve to OFF, matching the requested default and
+ * the server's authoritative policy resolution.
  */
 export function useApprovalPolicy() {
-  const { data, isLoading } = useQuery<ApprovalPolicy>({
-    queryKey: ["/technical/api/approval-policy"],
+  const { data: settings = [], isLoading } = useQuery<VesselApprovalPolicy[]>({
+    queryKey: ["/technical/api/pms-vessel-settings"],
     staleTime: 60_000,
   });
+
+  const isSuperintendentLockEnabled = (vesselId: string | null | undefined) =>
+    !!vesselId && settings.find((setting) => setting.vesselId === vesselId)?.superintendentLockEnabled === true;
+
   return {
-    superintendentLockEnabled: data?.superintendentLockEnabled ?? true,
+    isSuperintendentLockEnabled,
     isLoading,
-    policy: data,
+    settings,
   };
 }
 
 /**
  * The tier to RENDER (and gate buttons on): a stamped 'superintendent_locked'
- * behaves as 'superintendent_notification' while the company lock toggle is
- * OFF — mirrors the server's live enforcement downgrade exactly.
+ * behaves as 'superintendent_notification' while its vessel lock is OFF —
+ * mirrors the server's live enforcement downgrade exactly.
  */
 export function effectiveApprovalTier(
   storedTier: string | null | undefined,

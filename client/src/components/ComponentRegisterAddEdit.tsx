@@ -2177,16 +2177,6 @@ export default function ComponentRegisterAddEdit({
                 )}
               </Card>
 
-              <div className="flex justify-end pt-4">
-                <Button
-                  onClick={handleSave}
-                  disabled={isSaving || (isEditMode ? !canEditPerm("pms-components") : !canCreatePerm("pms-components"))}
-                  className="bg-green-600 hover:bg-green-700 text-white px-8"
-                  data-testid="button-submit"
-                >
-                  {isSaving ? "Saving..." : "Submit"}
-                </Button>
-              </div>
           </div>
         </div>
       </div>
