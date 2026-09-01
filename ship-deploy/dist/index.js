@@ -757,6 +757,8 @@ var init_schema = __esm({
       // Vessel display name
       code: text2("code").notNull(),
       // Same as id for compatibility
+      vCode: text2("v_code"),
+      // External vessel code; stored as text to preserve leading zeros
       fleetId: text2("fleet_id"),
       // Optional reference to fleet
       imoNumber: text2("imo_number"),
@@ -883,8 +885,9 @@ var init_schema = __esm({
     cascadeRunningHoursSchema = z.object({
       parentComponentId: z.string(),
       mode: z.enum(["setTotal", "addDelta"]),
-      value: z.number().nonnegative(),
-      // Allow zero for setTotal (meter replacement), but addDelta will be validated separately
+      // Set Total remains non-negative. Add Delta may be negative only when the
+      // Sail Admin-authorized validation bypass is requested and approved server-side.
+      value: z.number().finite(),
       dateUpdated: z.string(),
       // DD-MMM-YYYY HH:mm format
       dateUpdatedTZ: z.string().default("UTC"),
@@ -896,23 +899,18 @@ var init_schema = __esm({
       userUuid: z.string().optional(),
       userRole: z.string().optional().default("Ship"),
       adminOverride: z.boolean().optional().default(false),
+      // Request preference only. The running-hours service authorizes a false value
+      // using the authenticated server session; never trust this flag by itself.
+      rhValidationEnabled: z.boolean().optional().default(true),
       // Renewal/Replacement fields (required when value = 0)
       isRenewalReset: z.boolean().optional().default(false),
       renewalActionType: z.enum(RENEWAL_ACTION_TYPES).optional(),
       renewalReason: z.string().optional(),
       renewalReference: z.string().optional(),
       renewalEvidenceUrls: z.array(z.string()).optional()
-    }).refine((data) => data.mode === "setTotal" || data.value > 0, {
-      message: "addDelta mode requires value > 0",
+    }).refine((data) => data.mode !== "setTotal" || data.value >= 0, {
+      message: "setTotal mode requires value >= 0",
       path: ["value"]
-    }).refine((data) => {
-      if (data.mode === "setTotal" && data.value === 0) {
-        return data.isRenewalReset === true && !!data.renewalActionType && !!data.renewalReason && data.renewalReason.trim().length > 0;
-      }
-      return true;
-    }, {
-      message: "When setting RH to 0, renewal confirmation with action type and reason is required",
-      path: ["renewalReason"]
     }).refine((data) => {
       if (data.meterReplaced === true) {
         return !!data.oldMeterFinal && data.oldMeterFinal.trim().length > 0;
@@ -3073,6 +3071,12 @@ var init_schema = __esm({
       // Office RH entry kill switch (migration 162, Task #394): per-vessel opt-in for
       // office-side running-hours entry via WO completion. Default OFF (fail closed).
       officeRhEntryEnabled: boolean2("office_rh_entry_enabled").notNull().default(false),
+      // Running Hours validation policy (migration 163): per-vessel opt-out for
+      // normal RH correction validation. Default ON (fail closed).
+      rhValidationEnabled: boolean2("rh_validation_enabled").notNull().default(true),
+      // Superintendent approval lock (migration 168): per-vessel control of
+      // high-severity work-order approval. Default OFF = notify-only path.
+      superintendentLockEnabled: boolean2("superintendent_lock_enabled").notNull().default(false),
       updatedBy: text2("updated_by").notNull(),
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
@@ -5246,7 +5250,195 @@ var init_db = __esm({
   }
 });
 
+// server/utils/workOrderStatus.ts
+var workOrderStatus_exports = {};
+__export(workOrderStatus_exports, {
+  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
+  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
+  buildRhCycleWOMap: () => buildRhCycleWOMap,
+  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
+  findBlockingWOForJob: () => findBlockingWOForJob,
+  isBlockingStatus: () => isBlockingStatus,
+  isCompletedStatus: () => isCompletedStatus,
+  isUnplannedWorkOrderNo: () => isUnplannedWorkOrderNo
+});
+function isBlockingStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
+}
+function isCompletedStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
+}
+function extractJobNoFromWorkOrderNo(workOrderNo, vesselCode) {
+  if (!workOrderNo) return null;
+  if (isUnplannedWorkOrderNo(workOrderNo)) return null;
+  const knownVesselCode = vesselCode?.trim();
+  const numberWithoutKnownVesselPrefix = knownVesselCode && workOrderNo.startsWith(`${knownVesselCode}-`) ? workOrderNo.slice(knownVesselCode.length + 1) : workOrderNo;
+  const vesselPrefixedMkrMatch = numberWithoutKnownVesselPrefix.match(
+    /^(?:.+-)?(MKR-[^-]+-\d+)-\d+\.\d+.*-\d{4}-\d+$/
+  );
+  if (vesselPrefixedMkrMatch) {
+    return vesselPrefixedMkrMatch[1];
+  }
+  const newFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+  if (newFormatMatch) {
+    return newFormatMatch[1];
+  }
+  const woSuffixMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)\.WO-\d{4}-\d+$/);
+  if (woSuffixMatch) {
+    return woSuffixMatch[1];
+  }
+  const oldFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+)-\d{4}-\d+$/);
+  if (oldFormatMatch) {
+    return oldFormatMatch[1];
+  }
+  return null;
+}
+function isUnplannedWorkOrderNo(workOrderNo) {
+  if (!workOrderNo) return false;
+  return /(?:^|-)UWO-[^-]+-\d{4}-\d+$/.test(workOrderNo.trim());
+}
+function buildJobsWithActiveWOSet(workOrders2, vesselId) {
+  const byJobId = /* @__PURE__ */ new Set();
+  const byJobNo = /* @__PURE__ */ new Set();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (isBlockingStatus(wo.status)) {
+      if (wo.jobId) {
+        byJobId.add(wo.jobId);
+      }
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        byJobNo.add(`${woVesselId}|${jobNo}`);
+      }
+    }
+  });
+  return { byJobId, byJobNo };
+}
+function buildRhCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
+    }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (wo.cycleDueRhSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
+      }
+    }
+  });
+  return cycleMap;
+}
+function buildCalendarCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
+    }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (wo.cycleDueDateSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
+      }
+    }
+  });
+  return cycleMap;
+}
+function findBlockingWOForJob(workOrders2, jobId, jobNo) {
+  return workOrders2.find((wo) => {
+    if (wo.isDeleted === true) return false;
+    if (!isBlockingStatus(wo.status)) return false;
+    if (wo.jobId === jobId) return true;
+    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+    return woJobNo === jobNo;
+  });
+}
+var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
+var init_workOrderStatus = __esm({
+  "server/utils/workOrderStatus.ts"() {
+    "use strict";
+    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "active",
+      "due",
+      "due (grace p)",
+      "due (grace)",
+      "overdue",
+      "pending approval",
+      "pending_approval",
+      "pendingapproval",
+      "postponed",
+      "in progress",
+      "in_progress",
+      "inprogress",
+      "open",
+      "rejected",
+      // Rejected WOs block new generation - work needs rework before cycle can advance
+      "awaiting office approval",
+      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
+      "postponement approved"
+      // Postponement approved — WO is still active, scanner must not re-generate
+    ]);
+    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "completed",
+      "closed",
+      "approved",
+      "cancelled",
+      "canceled"
+    ]);
+  }
+});
+
 // shared/syncConfig.ts
+var syncConfig_exports = {};
+__export(syncConfig_exports, {
+  SYNC_CONFIG: () => SYNC_CONFIG,
+  getConfigurableTables: () => getConfigurableTables,
+  getIdentityColumn: () => getIdentityColumn,
+  getProvisioningTables: () => getProvisioningTables,
+  getSyncPhaseOrder: () => getSyncPhaseOrder,
+  getTableSyncConfig: () => getTableSyncConfig,
+  getTablesByCategory: () => getTablesByCategory,
+  getTablesWithBusinessRules: () => getTablesWithBusinessRules,
+  requiresFieldLogging: () => requiresFieldLogging
+});
 function getTablesByCategory(category) {
   return Object.values(SYNC_CONFIG).filter((t) => t.category === category);
 }
@@ -5259,6 +5451,15 @@ function requiresFieldLogging(tableName) {
 }
 function getIdentityColumn(tableName) {
   return SYNC_CONFIG[tableName]?.identityColumn ?? null;
+}
+function getConfigurableTables() {
+  return Object.values(SYNC_CONFIG).filter((t) => t.isConfigurable);
+}
+function getProvisioningTables() {
+  return Object.values(SYNC_CONFIG).filter((t) => t.category !== "NO_SYNC");
+}
+function getTablesWithBusinessRules() {
+  return Object.values(SYNC_CONFIG).filter((t) => t.businessRules !== null);
 }
 function getSyncPhaseOrder() {
   return [
@@ -5763,7 +5964,7 @@ var init_syncConfig = __esm({
         isGlobal: true,
         isConfigurable: false,
         businessRules: null,
-        notes: "Company approval policy (superintendent lock toggle, migration 137). Single-row global config, shore-configured. Integer PK, no UUID."
+        notes: "Legacy company approval policy (migration 137). Retained for history; vessel-specific PMS settings supersede it for active lock enforcement."
       },
       pms_vessel_settings: {
         tableName: "pms_vessel_settings",
@@ -5775,7 +5976,7 @@ var init_syncConfig = __esm({
         isGlobal: false,
         isConfigurable: false,
         businessRules: null,
-        notes: "Per-vessel PMS settings (lead times, grace periods). Integer PK, no UUID."
+        notes: "Per-vessel PMS settings (lead times, grace periods, office controls, RH validation, and Superintendent approval lock). Integer PK, no UUID."
       },
       // ── Certificates & Surveys (Master / Config) ──
       ship_certificates_master: {
@@ -7415,6 +7616,9 @@ var init_rhEventComparator = __esm({
 });
 
 // server/modules/sync/oneWayApplier.ts
+function getSoftDeleteSetClause(tableName) {
+  return tableName === "jobs" || tableName === "components" || tableName === "spares" ? "is_deleted = true, is_active = false, updated_at = NOW()" : "is_deleted = true, updated_at = NOW()";
+}
 async function getColumnMeta(pool4, tableName) {
   if (columnMetaCache.has(tableName)) return columnMetaCache.get(tableName);
   let identityAlwaysCols = /* @__PURE__ */ new Set();
@@ -7648,7 +7852,7 @@ async function applyOneWayRows(tableName, rows) {
       if (existCheck.rows.length > 0) {
         if (isDeleted) {
           await pool4.query(
-            `UPDATE "${tableName}" SET is_deleted = true, updated_at = NOW() WHERE ${whereClause}`,
+            `UPDATE "${tableName}" SET ${getSoftDeleteSetClause(tableName)} WHERE ${whereClause}`,
             whereValues
           );
           result.softDeleted++;
@@ -10475,168 +10679,6 @@ var init_alertsRepository = __esm({
   "server/modules/alerts/repositories/alertsRepository.ts"() {
     "use strict";
     init_storage();
-  }
-});
-
-// server/utils/workOrderStatus.ts
-var workOrderStatus_exports = {};
-__export(workOrderStatus_exports, {
-  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
-  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
-  buildRhCycleWOMap: () => buildRhCycleWOMap,
-  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
-  findBlockingWOForJob: () => findBlockingWOForJob,
-  isBlockingStatus: () => isBlockingStatus,
-  isCompletedStatus: () => isCompletedStatus
-});
-function isBlockingStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
-}
-function isCompletedStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
-}
-function extractJobNoFromWorkOrderNo(workOrderNo) {
-  if (!workOrderNo) return null;
-  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-  if (newFormatMatch) {
-    return newFormatMatch[1];
-  }
-  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
-  if (woSuffixMatch) {
-    return woSuffixMatch[1];
-  }
-  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-  if (oldFormatMatch) {
-    return oldFormatMatch[1];
-  }
-  return null;
-}
-function buildJobsWithActiveWOSet(workOrders2, vesselId) {
-  const byJobId = /* @__PURE__ */ new Set();
-  const byJobNo = /* @__PURE__ */ new Set();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (isBlockingStatus(wo.status)) {
-      if (wo.jobId) {
-        byJobId.add(wo.jobId);
-      }
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        byJobNo.add(`${woVesselId}|${jobNo}`);
-      }
-    }
-  });
-  return { byJobId, byJobNo };
-}
-function buildRhCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueRhSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function buildCalendarCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueDateSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function findBlockingWOForJob(workOrders2, jobId, jobNo) {
-  return workOrders2.find((wo) => {
-    if (wo.isDeleted === true) return false;
-    if (!isBlockingStatus(wo.status)) return false;
-    if (wo.jobId === jobId) return true;
-    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-    return woJobNo === jobNo;
-  });
-}
-var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
-var init_workOrderStatus = __esm({
-  "server/utils/workOrderStatus.ts"() {
-    "use strict";
-    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "active",
-      "due",
-      "due (grace p)",
-      "due (grace)",
-      "overdue",
-      "pending approval",
-      "pending_approval",
-      "pendingapproval",
-      "postponed",
-      "in progress",
-      "in_progress",
-      "inprogress",
-      "open",
-      "rejected",
-      // Rejected WOs block new generation - work needs rework before cycle can advance
-      "awaiting office approval",
-      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
-      "postponement approved"
-      // Postponement approved — WO is still active, scanner must not re-generate
-    ]);
-    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "completed",
-      "closed",
-      "approved",
-      "cancelled",
-      "canceled"
-    ]);
   }
 });
 
@@ -21535,12 +21577,118 @@ var init_syncTenantGuard = __esm({
   }
 });
 
+// server/middleware/auth.ts
+function isMockRbacEnabled() {
+  const v = (process.env.PMS_AUTH_MOCK_RBAC ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+function getRbacIdentity(req) {
+  return req.rbac ?? { role: null, userType: null, source: "none" };
+}
+function rbacMatches(identity, allowed) {
+  if (identity.role && allowed.includes(identity.role)) return true;
+  if (identity.userType === "Office" && allowed.includes("Office")) return true;
+  if (identity.userType === "Ship" && allowed.includes("Ship")) return true;
+  return false;
+}
+async function initMockAuthRankId() {
+  console.log(
+    `\u2705 Mock auth resolves rank_name per-request (x-rank header \u2192 body.rank \u2192 "${DEFAULT_MOCK_RANK_NAME}")`
+  );
+}
+function readForwardedHeader(req, name) {
+  const raw = req.headers[name];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== "string" || !value.trim()) return void 0;
+  try {
+    const decoded = decodeURIComponent(value).trim();
+    return decoded || void 0;
+  } catch {
+    return value.trim();
+  }
+}
+var DEFAULT_MOCK_RANK_NAME, RBAC_BYPASS_ROLES, requireAuth, requireRole, legacyPassThrough, requirePMSAdmin, requireOfficeOrAdmin, requireShipUser, mockAuthMiddleware;
+var init_auth = __esm({
+  "server/middleware/auth.ts"() {
+    "use strict";
+    DEFAULT_MOCK_RANK_NAME = "Chief Engineer";
+    RBAC_BYPASS_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "PMS Admin"]);
+    requireAuth = (req, res, next) => {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized - Authentication required" });
+      }
+      next();
+    };
+    requireRole = (roles) => {
+      return (req, res, next) => {
+        if (!req.user) {
+          return res.status(401).json({ error: "Unauthorized - Authentication required" });
+        }
+        const allowedRoles = Array.isArray(roles) ? roles : [roles];
+        const identity = getRbacIdentity(req);
+        if (!rbacMatches(identity, allowedRoles)) {
+          return res.status(403).json({
+            error: "Forbidden - Insufficient permissions",
+            required: allowedRoles,
+            current: identity.role ?? "anonymous"
+          });
+        }
+        next();
+      };
+    };
+    legacyPassThrough = (_req, _res, next) => next();
+    requirePMSAdmin = legacyPassThrough;
+    requireOfficeOrAdmin = legacyPassThrough;
+    requireShipUser = requireRole("Ship");
+    mockAuthMiddleware = (req, res, next) => {
+      const headerRankRaw = req.headers["x-rank"];
+      const headerRank = Array.isArray(headerRankRaw) ? headerRankRaw[0] : headerRankRaw;
+      const body = req.body && typeof req.body === "object" ? req.body : null;
+      const bodyRank = body && typeof body.rank === "string" ? body.rank : void 0;
+      const resolvedRank = typeof headerRank === "string" && headerRank.trim() || bodyRank && bodyRank.trim() || DEFAULT_MOCK_RANK_NAME;
+      const fwdId = readForwardedHeader(req, "x-user-id");
+      const fwdName = readForwardedHeader(req, "x-user-name");
+      const fwdEmail = readForwardedHeader(req, "x-user-email");
+      const fwdType = readForwardedHeader(req, "x-user-type");
+      const fwdRole = readForwardedHeader(req, "x-user-role");
+      req.user = {
+        id: 1,
+        username: "sail_admin",
+        fullName: fwdName || "Sail Administrator",
+        firstname: "Sail",
+        lastname: "Administrator",
+        email: fwdEmail || "admin@seafarer.com",
+        role: "Sail Admin",
+        // RBAC mock — unchanged in Phase 0 (frontend reads the real role independently)
+        vesselId: null,
+        isActive: true,
+        userUuid: fwdId || "00000000-0000-0000-0000-000000000001",
+        crewDesignation: "Marine Manager",
+        rank_name: resolvedRank,
+        userType: fwdType || "Office",
+        createdAt: /* @__PURE__ */ new Date(),
+        updatedAt: /* @__PURE__ */ new Date()
+      };
+      if (fwdRole) req.user.forwardedRole = fwdRole;
+      if (isMockRbacEnabled()) {
+        req.rbac = { role: "Sail Admin", userType: "Office", source: "mock" };
+      } else if (fwdRole || fwdType) {
+        const userType = fwdType === "Office" || fwdType === "Ship" ? fwdType : null;
+        req.rbac = { role: fwdRole ?? null, userType, source: "forwarded" };
+      } else {
+        req.rbac = { role: null, userType: null, source: "none" };
+      }
+      next();
+    };
+  }
+});
+
 // server/middleware/permissions.ts
 async function getPermState(req) {
   const cached2 = req[REQ_CACHE_KEY];
   if (cached2) return cached2;
   let state;
-  const roleName = req.user?.role ?? "";
+  const roleName = getRbacIdentity(req).role ?? "";
   const role = roleName ? await storage.getRoleByName(roleName) : null;
   if (!role) {
     state = { status: "unconfigured", menuByName: /* @__PURE__ */ new Map(), permsByMuid: /* @__PURE__ */ new Map() };
@@ -21560,16 +21708,29 @@ async function getPermState(req) {
   req[REQ_CACHE_KEY] = state;
   return state;
 }
-function requirePermission(resource, action) {
+function requirePermission(resource, action, options = {}) {
   const actions = Array.isArray(action) ? action : [action];
+  const denyUnconfigured = options.unconfigured === "deny";
+  const enforce = options.enforce === true;
   return async (req, res, next) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: "Unauthorized - Authentication required" });
       }
-      if (BYPASS_ROLES.has(req.user.role)) return next();
+      if (!enforce) return next();
+      const identity = getRbacIdentity(req);
+      if (identity.role && RBAC_BYPASS_ROLES.has(identity.role)) return next();
       const state = await getPermState(req);
-      if (state.status === "unconfigured") return next();
+      if (state.status === "unconfigured") {
+        if (!denyUnconfigured) return next();
+        return res.status(403).json({
+          error: "Forbidden - Insufficient permissions",
+          reason: "ROLE_UNCONFIGURED",
+          resource,
+          action: actions.join("|"),
+          current: identity.role ?? "anonymous"
+        });
+      }
       const muid = state.menuByName.get(resource);
       const perm = muid ? state.permsByMuid.get(muid) : void 0;
       const allowed = !!perm && actions.some((a) => perm[ACTION_FLAG[a]] === true);
@@ -21586,12 +21747,12 @@ function requirePermission(resource, action) {
     }
   };
 }
-var BYPASS_ROLES, ACTION_FLAG, REQ_CACHE_KEY;
+var ACTION_FLAG, REQ_CACHE_KEY;
 var init_permissions = __esm({
   "server/middleware/permissions.ts"() {
     "use strict";
+    init_auth();
     init_storage();
-    BYPASS_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "PMS Admin"]);
     ACTION_FLAG = {
       create: "canCreate",
       edit: "canEdit",
@@ -22231,14 +22392,14 @@ async function findByNameAndVessel(name, vesselId, excludeId) {
 async function update2(id, data) {
   return storage.updateComponent(id, data);
 }
-async function remove(id) {
-  return storage.deleteComponent(id);
+async function remove(id, userId) {
+  return storage.deleteComponent(id, userId);
 }
 async function createAuditLog(data) {
   return storage.createAuditLog(data);
 }
-async function inactivate(id, vesselId, userId) {
-  return storage.inactivateComponent(id, vesselId, userId);
+async function inactivate(id, vesselId, userId, apply = true) {
+  return storage.inactivateComponent(id, vesselId, userId, apply);
 }
 async function bulkUpsert(components2) {
   return storage.bulkUpsertComponents(components2);
@@ -22763,6 +22924,9 @@ async function create3(data) {
 }
 async function update3(id, data, userId) {
   console.log(`\u{1F527} PATCH /api/components/${id} with:`, JSON.stringify(data, null, 2).substring(0, 500));
+  if (Object.prototype.hasOwnProperty.call(data, "isDeleted") || Object.prototype.hasOwnProperty.call(data, "is_deleted")) {
+    throw new ValidationError("Component deletion status can only be changed through the Delete Component action");
+  }
   const existingComponent = await findById(id);
   if (!existingComponent) {
     throw new NotFoundError("Component not found");
@@ -22931,15 +23095,15 @@ async function update3(id, data, userId) {
   return component;
 }
 async function updateSortOrder2(body) {
-  const { z: z7 } = await import("zod");
-  const sortOrderSchema = z7.object({
-    updates: z7.array(z7.object({
-      id: z7.string(),
-      sortOrder: z7.number()
+  const { z: z8 } = await import("zod");
+  const sortOrderSchema = z8.object({
+    updates: z8.array(z8.object({
+      id: z8.string(),
+      sortOrder: z8.number()
     })),
-    reparents: z7.array(z7.object({
-      id: z7.string(),
-      newParentCode: z7.string()
+    reparents: z8.array(z8.object({
+      id: z8.string(),
+      newParentCode: z8.string()
     })).optional().default([])
   });
   const { updates, reparents } = sortOrderSchema.parse(body);
@@ -22948,18 +23112,37 @@ async function updateSortOrder2(body) {
   }
   return updateSortOrder(updates);
 }
-async function remove2(id) {
+async function remove2(id, userId = "system") {
   const existing = await findById(id);
-  if (existing?.cuuid) {
-    const installed = await getInstalledForComponent(existing.cuuid);
-    if (installed) {
-      await detachFromComponent(installed.riuuid, {
-        currentRh: componentRhSnapshot(existing),
-        rhLastUpdated: existing.lastUpdated ?? null
-      });
-    }
+  if (!existing) {
+    throw new NotFoundError("Component not found");
   }
-  return remove(id);
+  if (!existing.vesselId) {
+    throw new ValidationError("Only vessel components can be deleted through the Component Register");
+  }
+  const lifecycleCheck = await inactivate(id, existing.vesselId, userId, false);
+  if (!lifecycleCheck.success) {
+    const error = new ValidationError(lifecycleCheck.message);
+    error.code = lifecycleCheck.code;
+    error.activeChildrenCount = lifecycleCheck.activeChildrenCount;
+    error.activeJobsCount = lifecycleCheck.activeJobsCount;
+    error.linkedSparesCount = lifecycleCheck.linkedSparesCount;
+    throw error;
+  }
+  await remove(id, userId);
+  await auditComponent({
+    actionType: "delete",
+    component: existing,
+    payload: {
+      componentCode: existing.componentCode,
+      isDeleted: { old: false, new: true },
+      isActive: { old: existing.isActive, new: false }
+    }
+  });
+  return {
+    ...lifecycleCheck,
+    message: "Component deleted successfully. Existing Work Orders and maintenance history have been retained."
+  };
 }
 async function inactivate2(id, vesselId, userId) {
   const result = await inactivate(id, vesselId, userId);
@@ -23030,6 +23213,7 @@ var init_postgresStorage = __esm({
   "server/postgresStorage.ts"() {
     "use strict";
     init_db();
+    init_workOrderStatus();
     init_schema();
     init_sync();
     init_dateUpdatedLocalSql();
@@ -23182,31 +23366,32 @@ var init_postgresStorage = __esm({
         return result[0];
       }
       // ============= VESSELS (Module 1) =============
-      async getVessels() {
+      async getVessels(options = {}) {
         const db2 = await getDb();
-        const result = await db2.select().from(vessels);
+        const result = options.includeDeleted ? await db2.select().from(vessels) : await db2.select().from(vessels).where(or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted)));
         return result.map((v) => ({
           id: v.id,
           vuuid: v.vuuid,
           name: v.name,
           code: v.code,
+          vCode: v.vCode ?? null,
           imoNumber: v.imoNumber ?? null,
           vesselType: v.vesselType ?? null
         }));
       }
-      async getVessel(id) {
+      async getVessel(id, options = {}) {
         const db2 = await getDb();
-        const result = await db2.select().from(vessels).where(eq7(vessels.vuuid, id));
+        const result = await db2.select().from(vessels).where(options.includeDeleted ? eq7(vessels.vuuid, id) : and6(eq7(vessels.vuuid, id), or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted))));
         return result[0];
       }
-      async getVesselByCode(code) {
+      async getVesselByCode(code, options = {}) {
         const db2 = await getDb();
-        const result = await db2.select().from(vessels).where(eq7(vessels.code, code));
+        const result = await db2.select().from(vessels).where(options.includeDeleted ? eq7(vessels.code, code) : and6(eq7(vessels.code, code), or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted))));
         return result[0];
       }
-      async getVesselIdByName(vesselName) {
+      async getVesselIdByName(vesselName, options = {}) {
         const db2 = await getDb();
-        const result = await db2.select().from(vessels).where(eq7(vessels.name, vesselName));
+        const result = await db2.select().from(vessels).where(options.includeDeleted ? eq7(vessels.name, vesselName) : and6(eq7(vessels.name, vesselName), or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted))));
         return result[0]?.vuuid;
       }
       async createVessel(vessel) {
@@ -23678,21 +23863,29 @@ var init_postgresStorage = __esm({
         if (vesselIds && vesselIds.length > 0) {
           return await db2.select().from(components).where(and6(
             inArray2(components.vesselId, vesselIds),
-            eq7(components.dataScope, "vessel")
+            eq7(components.dataScope, "vessel"),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
           ));
         }
         if (!vesselId || vesselId === "all") {
-          return await db2.select().from(components).where(eq7(components.dataScope, "vessel"));
+          return await db2.select().from(components).where(and6(
+            eq7(components.dataScope, "vessel"),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+          ));
         }
         return await db2.select().from(components).where(and6(
           eq7(components.vesselId, vesselId),
-          eq7(components.dataScope, "vessel")
+          eq7(components.dataScope, "vessel"),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
       }
       async getComponent(id) {
         const db2 = await getDb();
         const result = await db2.select().from(components).where(
-          or(eq7(components.cuuid, id), eq7(components.id, id))
+          and6(
+            or(eq7(components.cuuid, id), eq7(components.id, id)),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+          )
         );
         return result[0];
       }
@@ -23700,7 +23893,8 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const result = await db2.select().from(components).where(and6(
           eq7(components.componentCode, componentCode),
-          eq7(components.vesselId, vesselId)
+          eq7(components.vesselId, vesselId),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
         return result[0];
       }
@@ -23717,21 +23911,62 @@ var init_postgresStorage = __esm({
       }
       async updateComponent(id, data) {
         const db2 = await getDb();
-        const result = await db2.update(components).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(or(eq7(components.cuuid, id), eq7(components.id, id))).returning();
+        const result = await db2.update(components).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and6(
+          or(eq7(components.cuuid, id), eq7(components.id, id)),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+        )).returning();
         if (!result[0]) {
           throw new Error(`Component ${id} not found`);
         }
         return result[0];
       }
-      async deleteComponent(id) {
+      async deleteComponent(id, userId) {
         const db2 = await getDb();
-        await db2.delete(components).where(or(eq7(components.cuuid, id), eq7(components.id, id)));
+        await db2.transaction(async (tx) => {
+          const existing = await tx.select().from(components).where(and6(
+            or(eq7(components.cuuid, id), eq7(components.id, id)),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+          )).limit(1);
+          const component = existing[0];
+          if (!component) {
+            throw new Error(`Component ${id} not found`);
+          }
+          const currentStamp = component.currentStamp;
+          if (component.vesselId && currentStamp) {
+            const installed = await tx.select().from(rotationalItems).where(and6(
+              eq7(rotationalItems.vesselId, component.vesselId),
+              eq7(rotationalItems.stamp, currentStamp),
+              eq7(rotationalItems.status, "Installed"),
+              eq7(rotationalItems.isDeleted, false)
+            )).limit(1);
+            if (installed[0]) {
+              const released = await tx.update(rotationalItems).set({ status: "Spare", updatedAt: /* @__PURE__ */ new Date(), updatedByUuid: userId }).where(eq7(rotationalItems.riuuid, installed[0].riuuid)).returning();
+              if (!released[0]) {
+                throw new Error(`Unable to release rotational item for component ${id}`);
+              }
+              await logFieldChanges(
+                "rotational_items",
+                installed[0].riuuid,
+                component.vesselId,
+                installed[0],
+                released[0],
+                userId || "system",
+                tx
+              );
+            }
+          }
+          const result = await tx.update(components).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(components.cuuid, component.cuuid)).returning();
+          if (!result[0]) {
+            throw new Error(`Component ${id} not found`);
+          }
+        });
       }
-      async inactivateComponent(id, vesselId, userId) {
+      async inactivateComponent(id, vesselId, userId, apply = true) {
         const db2 = await getDb();
         const componentResult = await db2.select().from(components).where(and6(
           or(eq7(components.cuuid, id), eq7(components.id, id)),
-          eq7(components.vesselId, vesselId)
+          eq7(components.vesselId, vesselId),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         )).limit(1);
         if (componentResult.length === 0) {
           return {
@@ -23744,7 +23979,8 @@ var init_postgresStorage = __esm({
         const activeChildren = await db2.select().from(components).where(and6(
           or(eq7(components.parentId, component.cuuid), eq7(components.parentId, component.id)),
           eq7(components.isActive, true),
-          eq7(components.vesselId, vesselId)
+          eq7(components.vesselId, vesselId),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
         if (activeChildren.length > 0) {
           return {
@@ -23764,7 +24000,8 @@ var init_postgresStorage = __esm({
             ...componentCode ? [eq7(jobs.componentCode, componentCode)] : []
           ),
           eq7(jobs.isActive, true),
-          eq7(jobs.vesselId, vesselId)
+          eq7(jobs.vesselId, vesselId),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
         ));
         for (const job of directJobs) {
           activeJobIds.add(job.juuid);
@@ -23777,7 +24014,12 @@ var init_postgresStorage = __esm({
         }
         const linkedJobs = Array.from(linkedJobsMap.values());
         for (const link of linkedJobs) {
-          const jobResult = await db2.select().from(jobs).where(and6(eq7(jobs.juuid, link.jobId), eq7(jobs.isActive, true), eq7(jobs.vesselId, vesselId))).limit(1);
+          const jobResult = await db2.select().from(jobs).where(and6(
+            eq7(jobs.juuid, link.jobId),
+            eq7(jobs.isActive, true),
+            eq7(jobs.vesselId, vesselId),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+          )).limit(1);
           if (jobResult.length > 0) {
             activeJobIds.add(link.jobId);
           }
@@ -23798,7 +24040,8 @@ var init_postgresStorage = __esm({
             ...componentCode ? [eq7(spares.componentCode, componentCode)] : []
           ),
           eq7(spares.isActive, true),
-          eq7(spares.vesselId, vesselId)
+          eq7(spares.vesselId, vesselId),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
         ));
         for (const s of directSpares) {
           activeSpareIds.add(s.id);
@@ -23809,7 +24052,8 @@ var init_postgresStorage = __esm({
             eq7(spares.id, spareComponentLinks.spareId)
           ),
           eq7(spares.isActive, true),
-          eq7(spares.vesselId, vesselId)
+          eq7(spares.vesselId, vesselId),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
         )).where(or(
           eq7(spareComponentLinks.componentId, component.cuuid),
           ...component.id !== component.cuuid ? [eq7(spareComponentLinks.componentId, component.id)] : []
@@ -23835,7 +24079,15 @@ var init_postgresStorage = __esm({
           const { isBlockingStatus: isBlockingStatus2 } = await Promise.resolve().then(() => (init_workOrderStatus(), workOrderStatus_exports));
           activeWorkOrdersCount = woResults.filter((wo) => isBlockingStatus2(wo.status)).length;
         }
-        await db2.update(components).set({ isActive: false }).where(and6(
+        if (!apply) {
+          return {
+            success: true,
+            message: "Component passed lifecycle dependency checks.",
+            componentsInactivated: 0,
+            activeWorkOrdersCount
+          };
+        }
+        await db2.update(components).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(and6(
           eq7(components.cuuid, component.cuuid),
           eq7(components.vesselId, vesselId)
         ));
@@ -23849,13 +24101,17 @@ var init_postgresStorage = __esm({
       // Fleet-Scoped Components (legacy - queries components table with dataScope='fleet')
       async getFleetScopedComponents() {
         const db2 = await getDb();
-        return await db2.select().from(components).where(eq7(components.dataScope, "fleet"));
+        return await db2.select().from(components).where(and6(
+          eq7(components.dataScope, "fleet"),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+        ));
       }
       async getFleetScopedComponent(id) {
         const db2 = await getDb();
         const result = await db2.select().from(components).where(and6(
           or(eq7(components.cuuid, id), eq7(components.id, id)),
-          eq7(components.dataScope, "fleet")
+          eq7(components.dataScope, "fleet"),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
         return result[0];
       }
@@ -23882,7 +24138,8 @@ var init_postgresStorage = __esm({
         return await db2.select().from(components).where(and6(
           eq7(components.vesselId, vesselId),
           eq7(components.rhCounterType, "MASTER"),
-          eq7(components.dataScope, "vessel")
+          eq7(components.dataScope, "vessel"),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
       }
       // Get all INHERITED components linked to a specific MASTER
@@ -23892,7 +24149,10 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         let masterComponent = await this.getComponent(masterComponentId);
         if (!masterComponent) {
-          const byCode = await db2.select().from(components).where(eq7(components.componentCode, masterComponentId)).limit(1);
+          const byCode = await db2.select().from(components).where(and6(
+            eq7(components.componentCode, masterComponentId),
+            or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+          )).limit(1);
           masterComponent = byCode[0] || null;
         }
         const masterComponentCode = masterComponent?.componentCode || masterComponentId;
@@ -23910,7 +24170,8 @@ var init_postgresStorage = __esm({
             eq7(components.rhMasterComponentId, masterComponentCode),
             eq7(components.rhMasterComponentId, masterComponentId),
             eq7(components.rhCounterSource, masterComponentCode)
-          )
+          ),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
         ));
       }
       // Update RH counter type configuration for a component
@@ -24509,17 +24770,20 @@ var init_postgresStorage = __esm({
       // ============= MODULE 4: JOBS =============
       async getJobs(vesselId, componentId, vesselIds) {
         const db2 = await getDb();
+        const notDeleted2 = or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted));
         if (vesselIds && vesselIds.length > 0) {
           return await db2.select().from(jobs).where(and6(
             inArray2(jobs.vesselId, vesselIds),
-            eq7(jobs.dataScope, "vessel")
+            eq7(jobs.dataScope, "vessel"),
+            notDeleted2
           )).orderBy(asc2(jobs.jobNo));
         }
         if (vesselId && vesselId !== "all" && componentId) {
           const directJobs = await db2.select().from(jobs).where(and6(
             eq7(jobs.vesselId, vesselId),
             eq7(jobs.componentId, componentId),
-            eq7(jobs.dataScope, "vessel")
+            eq7(jobs.dataScope, "vessel"),
+            notDeleted2
           )).orderBy(asc2(jobs.jobNo));
           const linkedJobIds = await this.getJobComponentLinksByComponent(componentId);
           const linkedJobs = [];
@@ -24545,21 +24809,28 @@ var init_postgresStorage = __esm({
         if (vesselId && vesselId !== "all") {
           return await db2.select().from(jobs).where(and6(
             eq7(jobs.vesselId, vesselId),
-            eq7(jobs.dataScope, "vessel")
+            eq7(jobs.dataScope, "vessel"),
+            notDeleted2
           )).orderBy(asc2(jobs.jobNo));
         }
-        return await db2.select().from(jobs).where(eq7(jobs.dataScope, "vessel")).orderBy(asc2(jobs.jobNo));
+        return await db2.select().from(jobs).where(and6(eq7(jobs.dataScope, "vessel"), notDeleted2)).orderBy(asc2(jobs.jobNo));
       }
       async getJob(id) {
         const db2 = await getDb();
         const result = await db2.select().from(jobs).where(
-          or(eq7(jobs.juuid, id), eq7(jobs.id, id))
+          and6(
+            or(eq7(jobs.juuid, id), eq7(jobs.id, id)),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+          )
         );
         return result[0];
       }
       async getJobByJobNo(jobNo) {
         const db2 = await getDb();
-        const result = await db2.select().from(jobs).where(eq7(jobs.jobNo, jobNo));
+        const result = await db2.select().from(jobs).where(and6(
+          eq7(jobs.jobNo, jobNo),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+        ));
         return result[0];
       }
       async createJob(job) {
@@ -24575,7 +24846,10 @@ var init_postgresStorage = __esm({
       }
       async updateJob(id, data) {
         const db2 = await getDb();
-        const result = await db2.update(jobs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(or(eq7(jobs.juuid, id), eq7(jobs.id, id))).returning();
+        const result = await db2.update(jobs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and6(
+          or(eq7(jobs.juuid, id), eq7(jobs.id, id)),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+        )).returning();
         if (!result[0]) {
           throw new Error(`Job ${id} not found`);
         }
@@ -24583,7 +24857,19 @@ var init_postgresStorage = __esm({
       }
       async deleteJob(id) {
         const db2 = await getDb();
-        await db2.delete(jobs).where(or(eq7(jobs.juuid, id), eq7(jobs.id, id)));
+        const existing = await db2.select().from(jobs).where(
+          and6(
+            or(eq7(jobs.juuid, id), eq7(jobs.id, id)),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+          )
+        );
+        if (!existing[0]) {
+          throw new Error(`Job ${id} not found`);
+        }
+        const result = await db2.update(jobs).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(jobs.juuid, existing[0].juuid)).returning();
+        if (!result[0]) {
+          throw new Error(`Job ${id} not found`);
+        }
       }
       async bulkCreateJobs(jobList) {
         if (jobList.length === 0) return [];
@@ -24641,10 +24927,14 @@ var init_postgresStorage = __esm({
         if (vesselId) {
           result = await db2.select().from(jobs).where(and6(
             inArray2(jobs.jobNo, jobNos),
-            eq7(jobs.vesselId, vesselId)
+            eq7(jobs.vesselId, vesselId),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
           ));
         } else {
-          result = await db2.select().from(jobs).where(inArray2(jobs.jobNo, jobNos));
+          result = await db2.select().from(jobs).where(and6(
+            inArray2(jobs.jobNo, jobNos),
+            or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted))
+          ));
         }
         const map = /* @__PURE__ */ new Map();
         for (const job of result) {
@@ -24788,7 +25078,10 @@ var init_postgresStorage = __esm({
       // ============= MODULE 7: SPARES =============
       async getAllSpares() {
         const db2 = await getDb();
-        return await db2.select().from(spares).where(eq7(spares.deleted, false));
+        return await db2.select().from(spares).where(and6(
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
+        ));
       }
       async getSpares(vesselId, vesselIds) {
         const db2 = await getDb();
@@ -24796,19 +25089,22 @@ var init_postgresStorage = __esm({
           return await db2.select().from(spares).where(and6(
             inArray2(spares.vesselId, vesselIds),
             eq7(spares.dataScope, "vessel"),
-            eq7(spares.deleted, false)
+            eq7(spares.deleted, false),
+            or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
           ));
         }
         if (!vesselId || vesselId === "all") {
           return await db2.select().from(spares).where(and6(
             eq7(spares.dataScope, "vessel"),
-            eq7(spares.deleted, false)
+            eq7(spares.deleted, false),
+            or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
           ));
         }
         return await db2.select().from(spares).where(and6(
           eq7(spares.vesselId, vesselId),
           eq7(spares.dataScope, "vessel"),
-          eq7(spares.deleted, false)
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
         ));
       }
       async getSpare(id) {
@@ -24818,6 +25114,13 @@ var init_postgresStorage = __esm({
           or(eq7(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq7(spares.id, numId)] : [])
         );
         return result[0];
+      }
+      async getOperationalSpare(id) {
+        const spare = await this.getSpare(id);
+        if (!spare || spare.deleted || spare.isDeleted) {
+          throw Object.assign(new Error(`Spare ${id} not found`), { statusCode: 404 });
+        }
+        return spare;
       }
       async createSpare(spare, skipSiblingSync = false) {
         const db2 = await getDb();
@@ -24972,14 +25275,17 @@ var init_postgresStorage = __esm({
         }
         return updatedSpare;
       }
-      async deleteSpare(id) {
+      async deleteSpare(id, userId = "system") {
         const db2 = await getDb();
         const existingSpare = await this.getSpare(id);
+        if (!existingSpare || existingSpare.deleted || existingSpare.isDeleted) {
+          throw new Error(`Spare ${id} not found`);
+        }
         const numId = Number(id);
-        await db2.update(spares).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(or(eq7(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq7(spares.id, numId)] : []));
+        await db2.update(spares).set({ deleted: true, isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(or(eq7(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq7(spares.id, numId)] : []));
         if (existingSpare) {
           try {
-            await logSoftDelete("spares", existingSpare.suuid, existingSpare.vesselId || null, "system");
+            await logSoftDelete("spares", existingSpare.suuid, existingSpare.vesselId || null, userId);
           } catch (err) {
             console.error("[FieldLogger] Spare delete:", err);
           }
@@ -25033,11 +25339,8 @@ var init_postgresStorage = __esm({
         }
       }
       async consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const newRob = (spare.rob ?? 0) - quantity;
         const newRobA = (spare.robLocationA ?? 0) - quantity;
         const stockTargets = await this.resolveLegacyStockTargets(spare);
@@ -25085,11 +25388,8 @@ var init_postgresStorage = __esm({
         return updated;
       }
       async consumeSpareFromLocation(id, quantity, location, userId, remarks, workOrderRef, dateLocal) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const currentRobA = spare.robLocationA ?? 0;
         const currentRobB = spare.robLocationB ?? 0;
         const currentRob = spare.rob ?? 0;
@@ -25149,11 +25449,8 @@ var init_postgresStorage = __esm({
         };
       }
       async receiveSpareToLocation(id, quantity, location, userId, remarks, supplierPO, dateLocal) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const currentRobA = spare.robLocationA ?? 0;
         const currentRobB = spare.robLocationB ?? 0;
         const currentRob = spare.rob ?? 0;
@@ -25209,11 +25506,8 @@ var init_postgresStorage = __esm({
         };
       }
       async adjustSpareAtLocation(id, newRob, location, userId, remarks, place, dateLocal, tz) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         if (isNaN(newRob) || newRob < 0) {
           throw new Error("newRob must be a valid non-negative number");
         }
@@ -25273,11 +25567,8 @@ var init_postgresStorage = __esm({
         return updated;
       }
       async transferSpareLocation(id, newRobLocationA, newRobLocationB, userId, remarks, place, dateLocal, tz) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const oldLocA = spare.robLocationA ?? 0;
         const oldLocB = spare.robLocationB ?? 0;
         const newLocA = Number(newRobLocationA) || 0;
@@ -25377,11 +25668,8 @@ var init_postgresStorage = __esm({
         return { spare: txResult, isTransfer: isTrueTransfer };
       }
       async receiveSpare(id, quantity, userId, remarks, supplierPO, place, dateLocal, tz) {
+        const spare = await this.getOperationalSpare(id);
         const db2 = await getDb();
-        const spare = await this.getSpare(id);
-        if (!spare) {
-          throw new Error(`Spare ${id} not found`);
-        }
         const newRob = (spare.rob ?? 0) + quantity;
         const newRobA = (spare.robLocationA ?? 0) + quantity;
         const stockTargets = await this.resolveLegacyStockTargets(spare);
@@ -25424,11 +25712,8 @@ var init_postgresStorage = __esm({
         return updated;
       }
       async adjustSpareQuantity(spareId, qtyChange, eventType, reference, notes) {
+        const spare = await this.getOperationalSpare(spareId);
         const db2 = await getDb();
-        const spare = await this.getSpare(spareId);
-        if (!spare) {
-          throw new Error(`Spare ${spareId} not found`);
-        }
         const currentRob = spare.rob ?? 0;
         const currentRobA = spare.robLocationA ?? 0;
         const newRob = Math.max(0, currentRob + qtyChange);
@@ -26735,7 +27020,8 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         return await db2.select().from(spares).where(and6(
           eq7(spares.dataScope, "vessel"),
-          eq7(spares.deleted, false)
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
         ));
       }
       async getUnacknowledgedAlertEventsForRole(userRole, vesselId) {
@@ -27376,6 +27662,7 @@ var init_postgresStorage = __esm({
             console.warn(`[CR_APPLY] WARNING: Field ${field} was not updated correctly`);
           }
         }
+        await logFieldChanges("components", resolvedCuuid, beforeState.vesselId || null, beforeState, afterState, "system", tx);
       }
       /**
        * Apply changes to a Job record within a transaction
@@ -27471,6 +27758,7 @@ var init_postgresStorage = __esm({
           const success = String(applied) === String(expected);
           console.log(`  - ${field}: "${applied}" (${success ? "OK" : "MISMATCH - expected: " + expected})`);
         }
+        await logFieldChanges("jobs", resolvedJuuid, beforeState.vesselId || null, beforeState, afterState, "system", tx);
       }
       /**
        * Apply changes to a Work Order record within a transaction
@@ -28562,6 +28850,34 @@ var init_postgresStorage = __esm({
         }
         return result[0];
       }
+      /**
+       * Phase 0 / P0.3d (defect D3): the postponement-approval finalize as ONE transaction.
+       * Previously approvePostponement issued four sequential writes on the global pool (WO update,
+       * WO field log, decision-row insert, its field log) and never touched the 'Awaiting Approval'
+       * request row — a dangling row per approval that getLatestAwaitingPostponement kept matching
+       * (DEFECT-REPRODUCTION-REPORT.md §3). Here: WO update + log, request row → 'Approved' + log,
+       * decision row insert + log — all tx-joined, so a failure rolls every write back.
+       * The caller still decides the business values; this method only owns atomicity.
+       */
+      async finalizePostponementApproval(params) {
+        const db2 = await getDb();
+        return db2.transaction(async (tx) => {
+          const before = (await tx.select().from(workOrders).where(or(eq7(workOrders.wouuid, params.workOrderId), eq7(workOrders.id, params.workOrderId))).limit(1))[0];
+          if (!before) throw new Error(`Work order ${params.workOrderId} not found`);
+          const updated = (await tx.update(workOrders).set({ ...params.woUpdates, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(workOrders.wouuid, before.wouuid)).returning())[0];
+          await logFieldChanges("work_orders", before.wouuid, before.vesselId || null, before, updated, params.actor, tx);
+          if (params.awaitingPostponementId) {
+            const reqBefore = (await tx.select().from(workOrderPostponements).where(eq7(workOrderPostponements.id, params.awaitingPostponementId)).limit(1))[0];
+            if (reqBefore) {
+              const reqAfter = (await tx.update(workOrderPostponements).set({ ...params.awaitingUpdates, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(workOrderPostponements.id, params.awaitingPostponementId)).returning())[0];
+              await logFieldChanges("work_order_postponements", params.awaitingPostponementId, reqBefore.vesselId || null, reqBefore, reqAfter, params.actor, tx);
+            }
+          }
+          const decision = (await tx.insert(workOrderPostponements).values(params.decisionRow).returning())[0];
+          await logFieldChanges("work_order_postponements", decision.id, decision.vesselId || null, null, decision, params.actor, tx);
+          return updated;
+        });
+      }
       async getLatestAwaitingPostponement(workOrderId) {
         const db2 = await getDb();
         const rows = await db2.select().from(workOrderPostponements).where(and6(
@@ -28594,7 +28910,7 @@ var init_postgresStorage = __esm({
       }
       async cascadeRunningHoursUpdate(params) {
         const db2 = await getDb();
-        const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+        const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls, rhValidationBypassed } = params;
         const now = /* @__PURE__ */ new Date();
         const dateUpdated = requireReadingDayInput(params.dateUpdated ?? null) ?? formatReadingDay(now);
         const readingDate = parseReadingDayStrict(dateUpdated);
@@ -28618,6 +28934,9 @@ var init_postgresStorage = __esm({
             newRH = value;
           } else {
             newRH = mode === "addDelta" ? currentRH + value : value;
+          }
+          if (!Number.isFinite(newRH) || newRH < 0) {
+            throw new Error("Invalid Running Hours. Resulting reading cannot be negative.");
           }
           updateData = {
             currentCumulativeRH: newRH.toString(),
@@ -28649,7 +28968,7 @@ var init_postgresStorage = __esm({
             // Audit Phase 0: frozen human actor at write time
             updatedByUuid: userUuid || null,
             source: "cascade",
-            notes: meterReplaced ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ""}` : comments,
+            notes: meterReplaced ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ""}` : rhValidationBypassed ? `RH validation bypassed by Sail Admin. ${comments || ""}`.trim() : comments,
             meterReplaced: meterReplaced || false,
             isRenewalReset: isRenewalReset || false,
             renewalActionType: renewalActionType || null,
@@ -28665,24 +28984,25 @@ var init_postgresStorage = __esm({
         if (parentResult.length > 0) {
           const parent = parentResult[0];
           currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || "0");
-          const latestAudit = await db2.select().from(runningHoursAudit).where(or(eq7(runningHoursAudit.componentId, resolvedParentId), eq7(runningHoursAudit.componentId, parentComponentId))).orderBy(desc2(runningHoursAudit.enteredAtUTC)).limit(1);
-          {
-            const { selectWinningRhEvent: selectWinningRhEvent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-            const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-            const rhPool = await getPool2();
-            const winner = await selectWinningRhEvent2(rhPool, resolvedParentId);
-            if (winner) {
-              const newDay = parseReadingDayStrict(dateUpdated);
-              if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
-                throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
+          if (!rhValidationBypassed) {
+            {
+              const { selectWinningRhEvent: selectWinningRhEvent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+              const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+              const rhPool = await getPool2();
+              const winner = await selectWinningRhEvent2(rhPool, resolvedParentId);
+              if (winner) {
+                const newDay = parseReadingDayStrict(dateUpdated);
+                if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
+                  throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
+                }
               }
             }
-          }
-          if (mode === "setTotal" && value < currentRH && !isRenewalReset) {
-            throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
-          }
-          if (mode === "setTotal" && value === 0 && !isRenewalReset) {
-            throw new Error("Running Hours cannot be set to 0 without confirming renewal/replacement.");
+            if (mode === "setTotal" && value < currentRH && !isRenewalReset) {
+              throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
+            }
+            if (mode === "setTotal" && value === 0 && !isRenewalReset) {
+              throw new Error("Running Hours cannot be set to 0 without confirming renewal/replacement.");
+            }
           }
           computeDerived(parent);
           if (parent.rhCounterType === "MASTER") {
@@ -28773,6 +29093,15 @@ var init_postgresStorage = __esm({
           }
           const inheritedCuuidSet = new Set(inheritedComponents.map((i) => i.cuuid));
           const freshChildren = children.length > 0 ? await tx.select().from(components).where(inArray2(components.cuuid, children.map((c) => c.cuuid))) : [];
+          for (const child of freshChildren) {
+            if (inheritedCuuidSet.has(child.cuuid)) continue;
+            const childCurrentRH = parseFloat(child.currentCumulativeRH || "0");
+            if (!Number.isFinite(childCurrentRH) || childCurrentRH + structuralDelta < 0) {
+              throw new Error(
+                `Running Hours correction would make structural child "${child.componentCode || child.name || child.cuuid}" negative.`
+              );
+            }
+          }
           for (const child of freshChildren) {
             if (inheritedCuuidSet.has(child.cuuid)) continue;
             const childCurrentRH = parseFloat(child.currentCumulativeRH || "0");
@@ -28964,13 +29293,13 @@ var init_postgresStorage = __esm({
         const jobResult = await db2.delete(jobs).where(eq7(jobs.vesselId, vesselId)).returning();
         return { jobsDeleted: jobResult.length, workOrdersDeleted };
       }
-      async getVesselsByFleet(fleetId) {
+      async getVesselsByFleet(fleetId, options = {}) {
         const db2 = await getDb();
-        return await db2.select().from(vessels).where(eq7(vessels.fleetId, fleetId));
+        return await db2.select().from(vessels).where(options.includeDeleted ? eq7(vessels.fleetId, fleetId) : and6(eq7(vessels.fleetId, fleetId), or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted))));
       }
-      async getVesselsWithFleets() {
+      async getVesselsWithFleets(options = {}) {
         const db2 = await getDb();
-        const allVessels = await db2.select().from(vessels);
+        const allVessels = options.includeDeleted ? await db2.select().from(vessels) : await db2.select().from(vessels).where(or(eq7(vessels.isDeleted, false), isNull2(vessels.isDeleted)));
         const allFleets = await db2.select().from(fleets);
         const fleetMap = new Map(allFleets.map((f) => [f.id, f]));
         return allVessels.map((vessel) => {
@@ -29414,10 +29743,12 @@ var init_postgresStorage = __esm({
         const job = await db2.select().from(jobs).where(eq7(jobs.juuid, jobId)).limit(1);
         if (job.length === 0 || !job[0].jobNo) return [];
         const jobNo = job[0].jobNo;
+        const vessel = job[0].vesselId ? await db2.select({ vCode: vessels.vCode }).from(vessels).where(eq7(vessels.vuuid, job[0].vesselId)).limit(1) : [];
+        const vesselCode = vessel[0]?.vCode;
         const allRecords = await db2.select().from(componentMaintenanceHistory).where(eq7(componentMaintenanceHistory.componentCode, componentCode)).orderBy(desc2(componentMaintenanceHistory.dateCompleted));
         return allRecords.filter((record) => {
           if (!record.workOrderNo) return false;
-          return record.workOrderNo.startsWith(jobNo + "-");
+          return extractJobNoFromWorkOrderNo(record.workOrderNo, vesselCode) === jobNo;
         });
       }
       async getJobComponentLinksByJob(jobId) {
@@ -29621,7 +29952,11 @@ var init_postgresStorage = __esm({
           partCode: spares.partCode,
           partName: spares.partName,
           qty: spareLocationStock.qty
-        }).from(spareLocationStock).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(eq7(spareLocationStock.locationId, locationId));
+        }).from(spareLocationStock).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(and6(
+          eq7(spareLocationStock.locationId, locationId),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
+        ));
         return result;
       }
       async getFullSparesAtLocation(locationId, vesselId) {
@@ -29659,6 +29994,8 @@ var init_postgresStorage = __esm({
         }).from(spareLocationStock).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(and6(
           eq7(spareLocationStock.locationId, locationId),
           eq7(spares.vesselId, vesselId),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted)),
           gt2(spareLocationStock.qty, 0)
         ));
         return result;
@@ -29671,6 +30008,8 @@ var init_postgresStorage = __esm({
           sparesCount: sql9`count(distinct ${spareLocationStock.spareId})`.as("spares_count")
         }).from(spareLocationStock).innerJoin(locations, eq7(spareLocationStock.locationId, locations.id)).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(and6(
           eq7(spares.vesselId, vesselId),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted)),
           gt2(spareLocationStock.qty, 0)
         )).groupBy(locations.id, locations.locationName).orderBy(asc2(locations.locationName));
         return result;
@@ -29724,6 +30063,7 @@ var init_postgresStorage = __esm({
         return await query;
       }
       async performInventoryTransaction(input) {
+        await this.getOperationalSpare(String(input.spareId));
         const db2 = await getDb();
         const location = await this.getLocationById(input.locationId);
         if (!location) {
@@ -29913,7 +30253,7 @@ var init_postgresStorage = __esm({
       }
       async getSpareWithInventory(spareId) {
         const spare = await this.getSpare(spareId);
-        if (!spare) return null;
+        if (!spare || spare.deleted || spare.isDeleted) return null;
         const locationsWithQty = await this.getSpareLocationsWithQty(spare.id);
         const robTotal = locationsWithQty.reduce((sum2, l) => sum2 + l.qty, 0);
         const linkedComponents = await this.getLinkedComponentsForSpare(spare.id, spare.vesselId || void 0);
@@ -29947,6 +30287,7 @@ var init_postgresStorage = __esm({
       LEFT JOIN components c ON scl.component_id = c.cuuid
       WHERE ${vesselId === "all" ? sql9`TRUE` : sql9`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
+        AND (s.is_deleted IS NULL OR s.is_deleted = false)
         AND s.data_scope = 'vessel'
       GROUP BY s.id
     `);
@@ -30036,6 +30377,7 @@ var init_postgresStorage = __esm({
         const dir = (opts.sortDir || "asc").toLowerCase() === "desc" ? sql9.raw("DESC") : sql9.raw("ASC");
         const filters = [
           sql9`s.deleted = false`,
+          sql9`(s.is_deleted IS NULL OR s.is_deleted = false)`,
           sql9`s.data_scope = 'vessel'`
         ];
         if (vesselId !== "all") {
@@ -30216,7 +30558,11 @@ var init_postgresStorage = __esm({
       }
       async getSparesWithInventoryByComponent(componentId) {
         const db2 = await getDb();
-        const directSpares = await db2.select().from(spares).where(eq7(spares.componentId, componentId));
+        const directSpares = await db2.select().from(spares).where(and6(
+          eq7(spares.componentId, componentId),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted))
+        ));
         const links = await this.getSpareComponentLinksByComponent(componentId);
         const spareIdSet = /* @__PURE__ */ new Set();
         const results = [];
@@ -31172,7 +31518,8 @@ __export(workOrderNumbering_exports, {
   generateJobNumber: () => generateJobNumber,
   generatePlannedWorkOrderNumber: () => generatePlannedWorkOrderNumber,
   generateUnplannedWorkOrderNumber: () => generateUnplannedWorkOrderNumber,
-  isValidJobNumber: () => isValidJobNumber
+  isValidJobNumber: () => isValidJobNumber,
+  resolveVesselCode: () => resolveVesselCode
 });
 async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, vesselId) {
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
@@ -31181,24 +31528,22 @@ async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, 
   }
   const safeJobCode = jobCode && jobCode.trim() ? jobCode.trim() : "UNKNOWN-JOB";
   const safeComponentCode = componentCode.trim();
+  const vesselCode = await resolveVesselCode(storage2, vesselId);
+  const prefix = vesselCode ? `${vesselCode}-` : "";
   const allWorkOrders = await storage2.getWorkOrders(vesselId);
-  const existingWOsForJobComponent = allWorkOrders.filter((wo) => {
-    const plannedPattern = new RegExp(`^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`);
-    return plannedPattern.test(wo.workOrderNo);
-  });
-  let maxRunningNumber = 0;
-  existingWOsForJobComponent.forEach((wo) => {
-    const match = wo.workOrderNo.match(/-(\d+)$/);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxRunningNumber) {
-        maxRunningNumber = num;
-      }
-    }
-  });
+  const legacyPattern = new RegExp(
+    `^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const vesselPrefixedPattern = new RegExp(
+    vesselCode ? `^${escapeRegex(vesselCode)}-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$` : `^.+-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const maxRunningNumber = findMaxSequence(
+    allWorkOrders.map((wo) => wo.workOrderNo),
+    [legacyPattern, vesselPrefixedPattern]
+  );
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, "0");
-  return `${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${prefix}${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCode) {
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
@@ -31206,24 +31551,62 @@ async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCod
     throw new Error("Component code is required for unplanned work order numbering");
   }
   const safeComponentCode = componentCode.trim();
+  const vesselCode = await resolveVesselCode(storage2, vesselId);
+  const prefix = vesselCode ? `${vesselCode}-` : "";
   const allWorkOrders = await storage2.getWorkOrders(vesselId);
-  const existingUnplannedWOs = allWorkOrders.filter((wo) => {
-    const unplannedPattern = new RegExp(`^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`);
-    return unplannedPattern.test(wo.workOrderNo);
-  });
-  let maxRunningNumber = 0;
-  existingUnplannedWOs.forEach((wo) => {
-    const match = wo.workOrderNo.match(/-(\d+)$/);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxRunningNumber) {
-        maxRunningNumber = num;
-      }
-    }
-  });
+  const legacyPattern = new RegExp(
+    `^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const vesselPrefixedPattern = new RegExp(
+    vesselCode ? `^${escapeRegex(vesselCode)}-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$` : `^.+-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
+  );
+  const maxRunningNumber = findMaxSequence(
+    allWorkOrders.map((wo) => wo.workOrderNo),
+    [legacyPattern, vesselPrefixedPattern]
+  );
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, "0");
-  return `UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+  return `${prefix}UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
+}
+async function resolveVesselCode(storage2, vesselId) {
+  const normalizedVesselId = vesselId?.trim();
+  if (!normalizedVesselId) {
+    throw new ValidationError(
+      "Vessel ID is required to generate a work order number.",
+      { code: "VESSEL_ID_REQUIRED_FOR_WO_NUMBER" }
+    );
+  }
+  const vessel = await storage2.getVessel(normalizedVesselId);
+  if (!vessel) {
+    throw new ValidationError(
+      `Vessel ${normalizedVesselId} was not found.`,
+      { code: "VESSEL_NOT_FOUND_FOR_WO_NUMBER", vesselId: normalizedVesselId }
+    );
+  }
+  const vesselCode = vessel?.vCode?.trim();
+  if (!vesselCode) {
+    console.warn(
+      `\u26A0\uFE0F [WO#] vessel ${normalizedVesselId} has no v_code \u2014 using legacy (non-prefixed) work order number.`
+    );
+    return null;
+  }
+  return vesselCode;
+}
+function findMaxSequence(workOrderNumbers, patterns) {
+  let maxRunningNumber = 0;
+  for (const workOrderNo of workOrderNumbers) {
+    if (!workOrderNo) continue;
+    for (const pattern of patterns) {
+      const match = workOrderNo.match(pattern);
+      if (!match) continue;
+      const sequence = parseInt(match[1], 10);
+      if (!isNaN(sequence) && sequence > maxRunningNumber) {
+        maxRunningNumber = sequence;
+      }
+      break;
+    }
+  }
+  return maxRunningNumber;
 }
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -31258,6 +31641,7 @@ var TASK_TYPE_CODES;
 var init_workOrderNumbering = __esm({
   "server/utils/workOrderNumbering.ts"() {
     "use strict";
+    init_errors();
     TASK_TYPE_CODES = {
       "Inspection": "IN",
       "Service": "SE",
@@ -31586,6 +31970,9 @@ async function getComponents(vesselId, vesselIds) {
 }
 async function getComponent(id) {
   return storage.getComponent(id);
+}
+async function getPmsVesselSettings4(vesselId) {
+  return storage.getPmsVesselSettings(vesselId);
 }
 async function updateChildRhWithStampAccrual(params) {
   return storage.updateChildRhWithStampAccrual(params);
@@ -33620,7 +34007,7 @@ async function create6(data) {
 async function update6(id, data) {
   return storage.updateWorkOrder(id, data);
 }
-async function remove4(id) {
+async function remove5(id) {
   return storage.deleteWorkOrder(id);
 }
 async function findExecutions(componentId) {
@@ -33747,6 +34134,9 @@ async function updateWoPostponementApprovalStep(id, data) {
 }
 async function getLatestAwaitingPostponement(workOrderId) {
   return storage.getLatestAwaitingPostponement(workOrderId);
+}
+async function finalizePostponementApproval(params) {
+  return storage.finalizePostponementApproval(params);
 }
 async function verifyApproverForLevel(reviewerId, approvalLevel) {
   return storage.verifyApproverForLevel(reviewerId, approvalLevel);
@@ -35099,6 +35489,7 @@ __export(runningHoursService_exports, {
   getMeterReplacementHistory: () => getMeterReplacementHistory2,
   getRHConfig: () => getRHConfig,
   getRunningHoursHistory: () => getRunningHoursHistory2,
+  isRhValidationEnabledForVessel: () => isRhValidationEnabledForVessel,
   listChildren: () => listChildren,
   listInheritedComponents: () => listInheritedComponents,
   listMasterComponents: () => listMasterComponents,
@@ -35107,9 +35498,21 @@ __export(runningHoursService_exports, {
   resetChildRH: () => resetChildRH,
   updateChildRH: () => updateChildRH,
   updateMasterRH: () => updateMasterRH,
-  updateRHConfig: () => updateRHConfig2
+  updateRHConfig: () => updateRHConfig2,
+  validateCascadePolicyRules: () => validateCascadePolicyRules
 });
 import { z as z2 } from "zod";
+function isRhValidationEnabledForVessel(settings) {
+  return settings?.rhValidationEnabled !== false;
+}
+function validateCascadePolicyRules(data, vesselValidationEnabled, validationBypassAuthorized) {
+  if (data.mode === "addDelta" && data.value <= 0 && (!validationBypassAuthorized || data.meterReplaced)) {
+    throw new ValidationError("addDelta mode requires value > 0");
+  }
+  if (data.mode === "setTotal" && data.value === 0 && (vesselValidationEnabled || data.meterReplaced) && !(data.isRenewalReset === true && !!data.renewalActionType && !!data.renewalReason && data.renewalReason.trim().length > 0)) {
+    throw new ValidationError("When setting RH to 0, renewal confirmation with action type and reason is required");
+  }
+}
 function resolveLastUpdated(component) {
   const own = canonicalizeReadingDateInput(component.lastUpdated ?? null);
   if (own) return own;
@@ -35140,25 +35543,37 @@ async function createAudit(body) {
   }
   return createRunningHoursAudit(data);
 }
-async function cascadeUpdate(body) {
+async function cascadeUpdate(body, authenticatedRole) {
   const parseResult = cascadeRunningHoursSchema.safeParse(body);
   if (!parseResult.success) {
     throw new ValidationError("Invalid cascade data", { details: parseResult.error.errors });
   }
   const validatedData = parseResult.data;
+  const validationBypassRequested = validatedData.rhValidationEnabled === false;
   validatedData.dateUpdated = requireReadingDayInput(validatedData.dateUpdated ?? null) ?? todayReadingDay();
   const parentComponent = await getComponent(validatedData.parentComponentId);
   if (!parentComponent) {
     throw new NotFoundError("Parent component not found");
   }
+  const vesselSettings = parentComponent.vesselId ? await getPmsVesselSettings4(parentComponent.vesselId) : void 0;
+  const vesselValidationEnabled = isRhValidationEnabledForVessel(vesselSettings);
+  if (validationBypassRequested && vesselValidationEnabled && authenticatedRole !== "Sail Admin") {
+    throw new ForbiddenError("Running Hours validation is enabled for this vessel.");
+  }
+  const validationBypassAuthorized = !vesselValidationEnabled && !validatedData.meterReplaced;
+  validateCascadePolicyRules(validatedData, vesselValidationEnabled, validationBypassAuthorized);
   const currentRH = parseFloat(parentComponent.currentCumulativeRH || "0");
+  const effectiveUserRole = authenticatedRole || "Ship";
   let targetRH;
   if (validatedData.mode === "setTotal") {
     targetRH = validatedData.value;
   } else {
     targetRH = currentRH + validatedData.value;
   }
-  if (!validatedData.meterReplaced) {
+  if (!Number.isFinite(targetRH) || targetRH < 0) {
+    throw new ValidationError("Resulting Running Hours cannot be negative.");
+  }
+  if (!validatedData.meterReplaced && !validationBypassAuthorized) {
     const componentLastUpdated = resolveLastUpdated(parentComponent);
     console.log("[RH Validation Debug] componentLastUpdated:", componentLastUpdated);
     console.log("[RH Validation Debug] newUpdateDate:", validatedData.dateUpdated);
@@ -35168,7 +35583,7 @@ async function cascadeUpdate(body) {
       newRH: targetRH,
       componentLastUpdated,
       newUpdateDate: validatedData.dateUpdated,
-      userRole: validatedData.userRole || "Ship",
+      userRole: effectiveUserRole,
       adminOverride: validatedData.adminOverride || false
     });
     console.log("[RH Validation Debug] result:", validation);
@@ -35180,11 +35595,14 @@ async function cascadeUpdate(body) {
           daysSinceLastUpdate: validation.daysSinceLastUpdate,
           lastUpdateDate: validation.lastUpdateDate,
           requiresAdminOverride: validation.requiresAdminOverride,
-          canOverride: canAdminOverride(validatedData.userRole || "Ship")
+          canOverride: canAdminOverride(effectiveUserRole)
         }
       });
     }
-    const result2 = await cascadeRunningHoursUpdate(validatedData);
+    const result2 = await cascadeRunningHoursUpdate({
+      ...validatedData,
+      rhValidationBypassed: false
+    });
     return {
       ...result2,
       validation: {
@@ -35193,7 +35611,15 @@ async function cascadeUpdate(body) {
       }
     };
   }
-  const result = await cascadeRunningHoursUpdate(validatedData);
+  if (validationBypassAuthorized) {
+    console.warn(
+      `[RH Validation Bypass] Vessel RH policy allowed correction for component ${validatedData.parentComponentId} (mode=${validatedData.mode}, value=${validatedData.value}, date=${validatedData.dateUpdated}).`
+    );
+  }
+  const result = await cascadeRunningHoursUpdate({
+    ...validatedData,
+    rhValidationBypassed: validationBypassAuthorized
+  });
   return {
     ...result,
     validation: {
@@ -35362,8 +35788,10 @@ async function listChildren(parentCode, vesselId) {
     children: childrenWithRH
   };
 }
-async function updateChildRH(componentId, body) {
-  const { newRHValue, comments, userId, userUuid, userRole, adminOverride, dateUpdated } = body;
+async function updateChildRH(componentId, body, authenticatedRole) {
+  const { newRHValue, comments, userId, userUuid, adminOverride, dateUpdated, rhValidationEnabled = true } = body;
+  const validationBypassRequested = rhValidationEnabled === false;
+  const effectiveUserRole = authenticatedRole || "Ship";
   if (typeof newRHValue !== "number" || newRHValue < 0) {
     throw new ValidationError("newRHValue must be a non-negative number");
   }
@@ -35371,6 +35799,12 @@ async function updateChildRH(componentId, body) {
   if (!component) {
     throw new NotFoundError("Component not found");
   }
+  const vesselSettings = component.vesselId ? await getPmsVesselSettings4(component.vesselId) : void 0;
+  const vesselValidationEnabled = isRhValidationEnabledForVessel(vesselSettings);
+  if (validationBypassRequested && vesselValidationEnabled && authenticatedRole !== "Sail Admin") {
+    throw new ForbiddenError("Running Hours validation is enabled for this vessel.");
+  }
+  const validationBypassAuthorized = !vesselValidationEnabled;
   if (component.rhCounterType === "MASTER") {
     throw new ValidationError("Cannot update MASTER component via this endpoint. Use the Update RH button instead.");
   }
@@ -35378,25 +35812,32 @@ async function updateChildRH(componentId, body) {
   const currentRHValue = parseFloat(previousRH);
   const componentLastUpdated = resolveLastUpdated(component);
   const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
-  const validation = validateRunningHoursIncrease({
-    currentRH: currentRHValue,
-    newRH: newRHValue,
-    componentLastUpdated,
-    newUpdateDate: canonicalDay,
-    userRole: userRole || "Ship",
-    adminOverride: adminOverride || false
-  });
-  if (!validation.allowed) {
-    throw new ValidationError(validation.message, {
-      validation: {
-        maxAllowedIncrease: validation.maxAllowedIncrease,
-        requestedIncrease: validation.requestedIncrease,
-        daysSinceLastUpdate: validation.daysSinceLastUpdate,
-        lastUpdateDate: validation.lastUpdateDate,
-        requiresAdminOverride: validation.requiresAdminOverride,
-        canOverride: canAdminOverride(userRole || "Ship")
-      }
+  let validation = null;
+  if (!validationBypassAuthorized) {
+    validation = validateRunningHoursIncrease({
+      currentRH: currentRHValue,
+      newRH: newRHValue,
+      componentLastUpdated,
+      newUpdateDate: canonicalDay,
+      userRole: effectiveUserRole,
+      adminOverride: adminOverride || false
     });
+    if (!validation.allowed) {
+      throw new ValidationError(validation.message, {
+        validation: {
+          maxAllowedIncrease: validation.maxAllowedIncrease,
+          requestedIncrease: validation.requestedIncrease,
+          daysSinceLastUpdate: validation.daysSinceLastUpdate,
+          lastUpdateDate: validation.lastUpdateDate,
+          requiresAdminOverride: validation.requiresAdminOverride,
+          canOverride: canAdminOverride(effectiveUserRole)
+        }
+      });
+    }
+  } else {
+    console.warn(
+      `[RH Validation Bypass] Vessel RH policy allowed inherited-child RH correction for component ${componentId} (value=${newRHValue}, date=${canonicalDay}).`
+    );
   }
   const newRHFormatted = newRHValue.toFixed(2);
   const atomicResult = await updateChildRhWithStampAccrual({
@@ -35420,7 +35861,7 @@ async function updateChildRH(componentId, body) {
     userId: userId || "system",
     updatedByUuid: userUuid || null,
     source: "manual",
-    notes: comments || "Manual update of child component RH",
+    notes: validationBypassAuthorized ? `RH validation bypassed by vessel policy. ${comments || ""}`.trim() : comments || "Manual update of child component RH",
     // (previousRH above reflects the committed in-tx read)
     meterReplaced: false,
     version: 1
@@ -35431,8 +35872,8 @@ async function updateChildRH(componentId, body) {
     previousRH,
     newRH: newRHFormatted,
     validation: {
-      maxAllowedIncrease: validation.maxAllowedIncrease,
-      actualIncrease: validation.requestedIncrease
+      maxAllowedIncrease: validation?.maxAllowedIncrease ?? null,
+      actualIncrease: validation?.requestedIncrease ?? null
     }
   };
 }
@@ -35976,16 +36417,17 @@ function calculateBackdatingDaysForApproval(completionDate, submittedDate) {
   const diffMs = reference.getTime() - comp.getTime();
   return Math.max(0, Math.floor(diffMs / (1e3 * 60 * 60 * 24)));
 }
-async function isSuperintendentLockEnabled() {
+async function isSuperintendentLockEnabled(vesselId) {
+  if (!vesselId) return false;
   try {
-    const settings = await storage.getCompanyApprovalSettings();
-    return settings?.superintendentLockEnabled ?? true;
+    const settings = await storage.getPmsVesselSettings(vesselId);
+    return settings?.superintendentLockEnabled === true;
   } catch (err) {
-    console.warn(`[ApprovalPolicy] Could not read company approval settings (defaulting to lock ENABLED): ${err.message}`);
-    return true;
+    console.warn(`[ApprovalPolicy] Could not read vessel settings for ${vesselId} (defaulting to lock OFF): ${err.message}`);
+    return false;
   }
 }
-function calculateApprovalTier(dueDate, completionDate, missedCycles, backdatingDays = 0, superintendentLockEnabled = true) {
+function calculateApprovalTier(dueDate, completionDate, missedCycles, backdatingDays = 0, superintendentLockEnabled = false) {
   let daysLate = 0;
   const due = parseWorkOrderDate(dueDate);
   const comp = parseWorkOrderDate(completionDate);
@@ -36251,6 +36693,15 @@ async function getWorkOrdersWithComputedStatus(vesselId, vesselIds) {
   const enriched = await listWorkOrders(vesselId, vesselIds);
   return enriched.map((wo) => ({ ...wo, status: wo.computedStatus ?? wo.status }));
 }
+async function computeVesselAwareApprovalTierCounts(workOrders2) {
+  const vesselSettings = await findAllPmsVesselSettings();
+  const lockByVessel = new Map(
+    vesselSettings.map((settings) => [settings.vesselId, settings.superintendentLockEnabled === true])
+  );
+  return computeApprovalTierCounts(
+    workOrders2.map((workOrder) => workOrder.approvalTier === "superintendent_locked" && !lockByVessel.get(workOrder.vesselId) ? { ...workOrder, approvalTier: "superintendent_notification" } : workOrder)
+  );
+}
 async function listWorkOrdersPaged(vesselId, vesselIds, params) {
   const enriched = await listWorkOrders(vesselId, vesselIds);
   const statusCounts = computeWorkOrderTabCounts(enriched);
@@ -36260,7 +36711,7 @@ async function listWorkOrdersPaged(vesselId, vesselIds, params) {
     )
   ).sort((a, b) => a.localeCompare(b));
   const filtered = filterAndSortWorkOrders(enriched, params);
-  const approvalTierCounts = computeApprovalTierCounts(filtered);
+  const approvalTierCounts = await computeVesselAwareApprovalTierCounts(filtered);
   const total = filtered.length;
   const pageSize = params.pageSize;
   const page = params.page;
@@ -36393,6 +36844,11 @@ async function getWorkOrder(id) {
 async function createWorkOrder(body) {
   const { insertWorkOrderSchema: insertWorkOrderSchema2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
   let workOrderData = insertWorkOrderSchema2.parse(body);
+  if (!workOrderData.vesselId) {
+    throw new ValidationError("Vessel ID is required to generate a work order number", {
+      code: "VESSEL_ID_REQUIRED_FOR_WO_NUMBER"
+    });
+  }
   if (workOrderData.vesselId && (workOrderData.component || workOrderData.componentCode)) {
     let resolvedComponent = null;
     if (workOrderData.component) {
@@ -36474,7 +36930,7 @@ async function createWorkOrder(body) {
         workOrderData.vesselId || void 0
       );
     } else {
-      const vesselId = workOrderData.vesselId || "V001";
+      const vesselId = workOrderData.vesselId;
       let unplannedComponentCode = workOrderData.componentCode || "";
       if (!unplannedComponentCode && workOrderData.component) {
         const components2 = await findComponents2(vesselId);
@@ -36564,6 +37020,85 @@ async function updateWorkOrder(id, body) {
   if (!existingWO2) {
     throw new NotFoundError("Work order not found");
   }
+  if (body.partBOfficeEdit === true) {
+    if (existingWO2.status !== "Pending Approval") {
+      throw new ValidationError("Part B office edit is only permitted when the work order is in Pending Approval status.");
+    }
+    const PART_B_EDIT_ALLOWED_ROLES = ["Office", "PMS Admin", "Sail Admin"];
+    if (!PART_B_EDIT_ALLOWED_ROLES.includes(body.userRole)) {
+      throw new ValidationError("Only Office, PMS Admin, or Sail Admin users can edit Part B on a Pending Approval work order.");
+    }
+    if (existingWO2.approvalTier === "superintendent_locked" && await isSuperintendentLockEnabled(existingWO2.vesselId)) {
+      throw new ValidationError("This work order is superintendent-locked. The superintendent must act on it before Part B can be edited.");
+    }
+    const B3_FIELDS = ["runningHours", "previousReading", "runningHoursDifference", "readingDate", "currentReadingDate", "currentReading"];
+    const PROTECTED_FIELDS = ["status", "approvalAction", "approvalDate", "submittedDate", "rhSyncedAt", "wasRejected", "approvalTier", "rejectionComments", "missedCycles", "dateCompleted", "isDeleted"];
+    const attempted = Object.keys(body);
+    const blockedB3 = attempted.filter((f) => B3_FIELDS.includes(f));
+    const blockedProtected = attempted.filter((f) => PROTECTED_FIELDS.includes(f));
+    if (blockedB3.length > 0 || blockedProtected.length > 0) {
+      throw new ValidationError(
+        `Part B office edit cannot modify: ${[...blockedB3, ...blockedProtected].join(", ")}. Running Hours and approval fields are protected.`
+      );
+    }
+    const ALLOWED_FIELDS = /* @__PURE__ */ new Set([
+      // B1 — Risk Assessment, Checklists & Records
+      "riskAssessmentStatus",
+      "safetyChecklistsStatus",
+      "operationalFormsStatus",
+      "uploadedDocuments",
+      // B2 — Work Execution Details
+      "startDateTime",
+      "completionDateTime",
+      "executionAssignedTo",
+      "performedBy",
+      "noOfPersons",
+      "totalTimeHours",
+      "manhours",
+      "workCarriedOut",
+      "jobExperienceNotes",
+      "remarks",
+      "completionRemarks",
+      // controller-injected fields (safe, set server-side)
+      "userId",
+      "userRole",
+      "userUuid"
+    ]);
+    const updateData2 = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (key === "partBOfficeEdit") continue;
+      if (ALLOWED_FIELDS.has(key)) updateData2[key] = value;
+    }
+    console.log(`\u{1F4DD} Part B office edit \u2014 WO ${existingWO2.workOrderNo}: updating [${Object.keys(updateData2).filter((k) => !["userId", "userRole", "userUuid"].includes(k)).join(", ")}]`);
+    const workOrder2 = await update6(id, updateData2);
+    return workOrder2;
+  }
+  if (existingWO2.status === "Pending Approval" && !body.approvalAction && !body.partBOfficeEdit && !body.superintendentAck) {
+    const PENDING_APPROVAL_BLOCKED_FIELDS = [
+      // B3 Running Hours — drive the delta cascade at approval; immutable post-submission
+      "runningHours",
+      "previousReading",
+      "runningHoursDifference",
+      "readingDate",
+      "currentReadingDate",
+      "currentReading",
+      "woCompletionRh",
+      // B4 Consumed Spare Parts — inventory already applied; reversal requires reject/resubmit
+      "consumedSpareParts",
+      // Status transitions must use explicit approval actions, not raw field writes
+      "status",
+      "approvalDate",
+      "submittedDate",
+      "approvalTier"
+    ];
+    const attempted = Object.keys(body).filter((k) => PENDING_APPROVAL_BLOCKED_FIELDS.includes(k));
+    if (attempted.length > 0) {
+      console.warn(`\u26A0\uFE0F Blocked attempt to modify protected fields on Pending Approval WO ${existingWO2.workOrderNo}: ${attempted.join(", ")}`);
+      throw new ValidationError(
+        `Cannot modify [${attempted.join(", ")}] on a Pending Approval work order. Running Hours and consumed spare parts are locked until the work order is approved or rejected.`
+      );
+    }
+  }
   const { isCompletedStatus: isCompletedStatus3 } = await Promise.resolve().then(() => (init_workOrderStatus(), workOrderStatus_exports));
   const woIsCompleted = isCompletedStatus3(existingWO2.status);
   if (woIsCompleted) {
@@ -36593,6 +37128,7 @@ async function updateWorkOrder(id, body) {
     }
   }
   let updateData = { ...body };
+  delete updateData.superintendentAck;
   if ("assignedTo" in updateData || "assignedToRankId" in updateData) {
     await applyAssignmentSync(updateData);
   }
@@ -36834,7 +37370,7 @@ async function updateWorkOrder(id, body) {
       tierCompDate,
       updateData.submittedDate || existingWO2.submittedDate
     );
-    const lockEnabledAtSubmit = await isSuperintendentLockEnabled();
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled(existingWO2.vesselId);
     const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
@@ -36863,20 +37399,7 @@ async function updateWorkOrder(id, body) {
   console.log("\u{1F4DD} Cleaned update data keys:", Object.keys(updateData));
   const isApprovalTransition = updateData.approvalAction === "approved" && updateData.status === "Completed" || updateData.status === "Completed" && existingWO2.status === "Pending Approval";
   let interceptedForL2Review = false;
-  if (isApprovalTransition && existingWO2.jobId) {
-    try {
-      const linkedJob = await findJob(existingWO2.jobId);
-      if (linkedJob && linkedJob.level2ReviewerRankId) {
-        interceptedForL2Review = true;
-        updateData.status = "Pending Office Review";
-        updateData.approvalDate = (/* @__PURE__ */ new Date()).toISOString();
-        console.log(`\u{1F512} [L2 Review] WO ${existingWO2.workOrderNo} intercepted \u2014 job requires Level 2 reviewer rank "${linkedJob.level2ReviewerRankId}"`);
-      }
-    } catch (err) {
-      console.warn(`[L2 Review] Could not load linked job ${existingWO2.jobId} for L2 check \u2014 proceeding without interception:`, err);
-    }
-  }
-  if (isApprovalTransition && !interceptedForL2Review) {
+  if (isApprovalTransition) {
     const { resolveHodForDepartment: resolveHodForDepartment2, getHodShortLabel: getHodShortLabel2 } = await Promise.resolve().then(() => (init_hodResolutionService(), hodResolutionService_exports));
     const hodResolution = await resolveHodForDepartment2(
       existingWO2.vesselId,
@@ -36916,7 +37439,7 @@ async function updateWorkOrder(id, body) {
     const currentTier = existingWO2.approvalTier || "standard";
     const ceRemarks = (updateData.ceApprovalRemarks || "").trim();
     if (currentTier === "superintendent_locked") {
-      const lockEnabled = await isSuperintendentLockEnabled();
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO2.vesselId);
       if (lockEnabled) {
         throw new ValidationError(
           `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
@@ -36925,7 +37448,7 @@ async function updateWorkOrder(id, body) {
       }
       if (!ceRemarks || ceRemarks.length < 20) {
         throw new ValidationError(
-          `This work order has high severity issues and the Superintendent lock is disabled by company policy. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
+          `This work order has high severity issues and the Superintendent lock is disabled for this vessel. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
           { code: "CE_REMARKS_REQUIRED", minLength: 20 }
         );
       }
@@ -36945,6 +37468,19 @@ async function updateWorkOrder(id, body) {
           { code: "CE_REMARKS_REQUIRED", minLength: 10 }
         );
       }
+    }
+  }
+  if (isApprovalTransition && existingWO2.jobId) {
+    try {
+      const linkedJob = await findJob(existingWO2.jobId);
+      if (linkedJob && linkedJob.level2ReviewerRankId) {
+        interceptedForL2Review = true;
+        updateData.status = "Pending Office Review";
+        updateData.approvalDate = (/* @__PURE__ */ new Date()).toISOString();
+        console.log(`\u{1F512} [L2 Review] WO ${existingWO2.workOrderNo} intercepted \u2014 job requires Level 2 reviewer rank "${linkedJob.level2ReviewerRankId}"`);
+      }
+    } catch (err) {
+      console.warn(`[L2 Review] Could not load linked job ${existingWO2.jobId} for L2 check \u2014 proceeding without interception:`, err);
     }
   }
   const isBeingPostponed = updateData.status === "Postponed";
@@ -37321,6 +37857,7 @@ async function updateWorkOrder(id, body) {
     if (!freshWorkOrder) {
       console.error("Failed to get work order for completion processing");
     } else {
+      const freshVesselCode = freshWorkOrder.vesselId ? (await storage.getVessel(freshWorkOrder.vesselId))?.vCode : void 0;
       let component = await findComponent2(freshWorkOrder.component);
       if (!component && freshWorkOrder.componentCode && freshWorkOrder.vesselId) {
         const componentByCode = await findComponentByCode2(freshWorkOrder.componentCode, freshWorkOrder.vesselId);
@@ -37402,7 +37939,7 @@ async function updateWorkOrder(id, body) {
                   componentCode: freshWorkOrder.componentCode || component.componentCode,
                   vesselCode: freshWorkOrder.vesselId,
                   jobId: freshWorkOrder.jobId || null,
-                  jobCode: freshWorkOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+                  jobCode: extractJobNoFromWorkOrderNo(freshWorkOrder.workOrderNo, freshVesselCode) || null,
                   workOrderId: freshWorkOrder.wouuid,
                   workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
                   jobTitle: freshWorkOrder.jobTitle,
@@ -37434,14 +37971,7 @@ async function updateWorkOrder(id, body) {
             job = await findJob(freshWorkOrder.jobId);
           }
           if (!job && freshWorkOrder.workOrderNo) {
-            const woNumber = freshWorkOrder.workOrderNo;
-            let extractedJobNo = null;
-            const newFormatMatch = woNumber.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-            if (newFormatMatch) extractedJobNo = newFormatMatch[1];
-            if (!extractedJobNo) {
-              const oldFormatMatch = woNumber.match(/^(.+)-\d{4}-\d+$/);
-              if (oldFormatMatch) extractedJobNo = oldFormatMatch[1];
-            }
+            const extractedJobNo = extractJobNoFromWorkOrderNo(freshWorkOrder.workOrderNo, freshVesselCode);
             if (extractedJobNo && freshWorkOrder.vesselId) {
               const jobs2 = await findJobs2(freshWorkOrder.vesselId);
               job = jobs2.find((j) => j.jobNo === extractedJobNo);
@@ -37699,7 +38229,7 @@ async function updateWorkOrder(id, body) {
 }
 async function deleteWorkOrder(id) {
   const existingWO2 = await findById3(id);
-  await remove4(id);
+  await remove5(id);
   if (existingWO2) {
     try {
       await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, { is_deleted: false }, { is_deleted: true }, "system");
@@ -38051,19 +38581,6 @@ async function approvePostponement(id, body) {
   }
   const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
   const newDueDate = wo.postponeRequestedDate || body.newDueDate;
-  const updatedWO = await update6(id, {
-    status: "Postponement Approved",
-    dueDate: newDueDate,
-    postponementEndDate: newDueDate,
-    postponeApprover: body.approvedBy || "Office",
-    postponementApprovalDate: today,
-    postponementApprovalRemarks: body.approvalRemarks || null
-  });
-  try {
-    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || "system");
-  } catch (err) {
-    console.error("[FieldLogger] WO postpone-approve:", err);
-  }
   const existingRows = await findPostponementsByWorkOrderId(wo.wouuid);
   const prevMaxApprove = existingRows?.length ? existingRows.reduce(
     (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
@@ -38071,24 +38588,44 @@ async function approvePostponement(id, body) {
   const latestApprove = existingRows?.length ? existingRows.reduce(
     (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
   ) : null;
-  await createPostponement({
-    id: crypto.randomUUID(),
-    workOrderId: wo.wouuid,
-    vesselId: wo.vesselId,
-    postponementNumber: prevMaxApprove + 1,
-    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
-    newDueDate,
-    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
-    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
-    authorizedBy: body.approvedBy || "Office",
-    approvedBy: body.approvedBy || "Office",
-    approvedDate: today,
-    approvalRemarks: body.approvalRemarks || null,
-    approver: body.approvedBy || "Office",
-    durationDays: latestApprove?.durationDays || null,
-    submittedDate: today,
-    status: "Approved",
-    informOffice: true
+  const actor = body.approvedBy || body.userId || "system";
+  const updatedWO = await finalizePostponementApproval({
+    workOrderId: id,
+    woUpdates: {
+      status: "Postponement Approved",
+      dueDate: newDueDate,
+      postponementEndDate: newDueDate,
+      postponeApprover: body.approvedBy || "Office",
+      postponementApprovalDate: today,
+      postponementApprovalRemarks: body.approvalRemarks || null
+    },
+    awaitingPostponementId: awaitingPostponement?.id ?? null,
+    awaitingUpdates: {
+      status: "Approved",
+      approvedBy: body.approvedBy || "Office",
+      approvedDate: today,
+      approvalRemarks: body.approvalRemarks || null
+    },
+    decisionRow: {
+      id: crypto.randomUUID(),
+      workOrderId: wo.wouuid,
+      vesselId: wo.vesselId,
+      postponementNumber: prevMaxApprove + 1,
+      originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+      newDueDate,
+      postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+      postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+      authorizedBy: body.approvedBy || "Office",
+      approvedBy: body.approvedBy || "Office",
+      approvedDate: today,
+      approvalRemarks: body.approvalRemarks || null,
+      approver: body.approvedBy || "Office",
+      durationDays: latestApprove?.durationDays || null,
+      submittedDate: today,
+      status: "Approved",
+      informOffice: true
+    },
+    actor
   });
   return updatedWO;
 }
@@ -38587,6 +39124,7 @@ var init_workOrderService2 = __esm({
     init_schema();
     init_sync();
     init_workOrderFilters();
+    init_workOrderStatus();
   }
 });
 
@@ -38867,7 +39405,7 @@ async function getStoresItem2(storesItemId) {
 async function getWorkOrderPostponements(vesselId, filters, vesselIds) {
   return storage.getWorkOrderPostponements(vesselId, filters, vesselIds);
 }
-async function getPmsVesselSettings4(vesselId) {
+async function getPmsVesselSettings5(vesselId) {
   return storage.getPmsVesselSettings(vesselId);
 }
 var init_reportRepository = __esm({
@@ -38915,7 +39453,7 @@ function isUnplannedWO(wo, hasLinkedJob) {
   if (!hasLinkedJob) return true;
   if (wo.workOrderType === "Unplanned") return true;
   if (wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown"))) return true;
-  if (wo.workOrderNo && wo.workOrderNo.startsWith("UWO")) return true;
+  if (isUnplannedWorkOrderNo(wo.workOrderNo)) return true;
   return false;
 }
 function isPendingApprovalExecution(wo) {
@@ -38980,7 +39518,7 @@ async function computeSnapshotAtTimestamp(vesselId, snapshotDate) {
   const componentsMap = new Map(components2.map((c) => [c.cuuid, c]));
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
-  const vesselSettings = await getPmsVesselSettings4(vesselId);
+  const vesselSettings = await getPmsVesselSettings5(vesselId);
   const vesselGraceSettings = buildVesselGraceSettings2(vesselSettings);
   const categoryCounts = {
     "Planned": { count: 0, woIds: [] },
@@ -39097,7 +39635,7 @@ async function computeMonthlyMovement(vesselId, year, month) {
   const vesselWOs = allWorkOrders.filter((wo) => wo.dataScope === "vessel");
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
-  const vesselSettings = await getPmsVesselSettings4(vesselId);
+  const vesselSettings = await getPmsVesselSettings5(vesselId);
   const vesselGraceSettings = buildVesselGraceSettings2(vesselSettings);
   const isInMonth = (d) => {
     if (!d) return false;
@@ -39316,6 +39854,7 @@ var init_monthlySnapshotService = __esm({
   "server/modules/reports/services/monthlySnapshotService.ts"() {
     "use strict";
     init_db();
+    init_workOrderStatus();
     init_schema();
     init_reportRepository();
     init_status();
@@ -43170,13 +43709,20 @@ async function getPmsVesselSettings2(vesselId) {
   return settings;
 }
 async function createPmsVesselSettings(data, username) {
-  const existing = await getPmsVesselSettings(data.vesselId);
+  const {
+    rhValidationEnabled: _ignoredRhValidationEnabled,
+    superintendentLockEnabled: _ignoredSuperintendentLockEnabled,
+    ...safeData
+  } = data;
+  const existing = await getPmsVesselSettings(safeData.vesselId);
   if (existing) {
     throw new ConflictError("PMS vessel settings already exist for this vessel. Use PUT to update.");
   }
-  const updatedBy = data.updatedBy || username || "test";
+  const updatedBy = safeData.updatedBy || username || "test";
   return createOrUpdatePmsVesselSettings({
-    ...data,
+    ...safeData,
+    rhValidationEnabled: true,
+    superintendentLockEnabled: false,
     updatedBy
   });
 }
@@ -43198,7 +43744,31 @@ async function setOfficeRhEntryEnabled(vesselId, enabled, username) {
     updatedBy: username || "unknown"
   });
 }
+async function setRhValidationEnabled(vesselId, enabled, username) {
+  const existing = await getPmsVesselSettings(vesselId);
+  return createOrUpdatePmsVesselSettings({
+    ...existing ?? { vesselId },
+    vesselId,
+    rhValidationEnabled: enabled,
+    updatedBy: username || "unknown"
+  });
+}
+async function setSuperintendentLockEnabled(vesselId, enabled, username) {
+  const existing = await getPmsVesselSettings(vesselId);
+  return createOrUpdatePmsVesselSettings({
+    ...existing ?? { vesselId },
+    vesselId,
+    superintendentLockEnabled: enabled,
+    updatedBy: username || "unknown"
+  });
+}
 async function updatePmsVesselSettings(vesselId, data, username) {
+  const {
+    rhValidationEnabled: _ignoredRhValidationEnabled,
+    superintendentLockEnabled: _ignoredSuperintendentLockEnabled,
+    ...safeData
+  } = data;
+  data = safeData;
   const updatedBy = data.updatedBy || username || "test";
   const settingsMode = data.settingsMode || "COMPANY_STANDARD";
   if (settingsMode !== "COMPANY_STANDARD" && settingsMode !== "CUSTOM") {
@@ -43549,6 +44119,12 @@ async function getAllPmsVesselSettings3(_req, res) {
   res.json(settings);
 }
 async function createPmsVesselSettings2(req, res) {
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "rhValidationEnabled")) {
+    return res.status(400).json({ error: "Use the dedicated RH validation endpoint to change this setting." });
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "superintendentLockEnabled")) {
+    return res.status(400).json({ error: "Use the dedicated Superintendent lock endpoint to change this setting." });
+  }
   const username = req.user?.username || "test";
   const settings = await createPmsVesselSettings(req.body, username);
   res.status(201).json(settings);
@@ -43558,11 +44134,25 @@ async function getPmsVesselSettings3(req, res) {
   res.json(settings);
 }
 async function updatePmsVesselSettings2(req, res) {
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "rhValidationEnabled")) {
+    return res.status(400).json({ error: "Use the dedicated RH validation endpoint to change this setting." });
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "superintendentLockEnabled")) {
+    return res.status(400).json({ error: "Use the dedicated Superintendent lock endpoint to change this setting." });
+  }
   const username = req.user?.username || "test";
   const { settings } = await updatePmsVesselSettings(req.params.vesselId, req.body, username);
   res.json(settings);
 }
 async function deletePmsVesselSettings3(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "PMS vessel settings are configured on the shore server." });
+  }
+  const userRole = (req.user?.role || "").trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may delete PMS vessel settings." });
+  }
   await deletePmsVesselSettings2(req.params.vesselId);
   res.json({ success: true });
 }
@@ -43602,6 +44192,42 @@ async function updateOfficeRhEntrySwitch(req, res) {
   const settings = await setOfficeRhEntryEnabled(req.params.vesselId, enabled, username);
   console.log(`[OfficeRhSwitch] vessel=${req.params.vesselId} office_rh_entry_enabled=${enabled} by ${username}`);
   res.json({ vesselId: req.params.vesselId, officeRhEntryEnabled: settings.officeRhEntryEnabled, updatedBy: settings.updatedBy });
+}
+async function updateRhValidationSwitch(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "RH validation is configured on the shore server." });
+  }
+  const userRole = (req.user?.forwardedRole || req.user?.role || "").trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may change RH validation." });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled (boolean) is required" });
+  }
+  const username = req.user?.username || "unknown";
+  const settings = await setRhValidationEnabled(req.params.vesselId, enabled, username);
+  console.log(`[RhValidationSwitch] vessel=${req.params.vesselId} rh_validation_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, rhValidationEnabled: settings.rhValidationEnabled, updatedBy: settings.updatedBy });
+}
+async function updateSuperintendentLockSwitch(req, res) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "shore_only", message: "Superintendent approval lock is configured on the shore server." });
+  }
+  const userRole = (req.user?.role || "").trim();
+  if (!OFFICE_WO_SWITCH_EDITOR_ROLES.has(userRole)) {
+    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may change the Superintendent approval lock." });
+  }
+  const { enabled } = req.body ?? {};
+  if (typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled (boolean) is required" });
+  }
+  const username = req.user?.username || "unknown";
+  const settings = await setSuperintendentLockEnabled(req.params.vesselId, enabled, username);
+  console.log(`[SuperintendentLock] vessel=${req.params.vesselId} superintendent_lock_enabled=${enabled} by ${username}`);
+  res.json({ vesselId: req.params.vesselId, superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy });
 }
 async function getCompanyStandardGraceSettings3(_req, res) {
   const settings = await getCompanyStandardGraceSettings2();
@@ -43648,6 +44274,8 @@ router2.post("/pms-vessel-settings", requirePermission("pms-admin", ["create", "
 router2.get("/pms-vessel-settings/:vesselId", asyncHandler(getPmsVesselSettings3));
 router2.put("/pms-vessel-settings/:vesselId/office-wo-generation", requirePermission("pms-admin", "edit"), asyncHandler(updateOfficeWoGenerationSwitch));
 router2.put("/pms-vessel-settings/:vesselId/office-rh-entry", requirePermission("pms-admin", "edit"), asyncHandler(updateOfficeRhEntrySwitch));
+router2.put("/pms-vessel-settings/:vesselId/rh-validation", requirePermission("pms-admin", "edit"), asyncHandler(updateRhValidationSwitch));
+router2.put("/pms-vessel-settings/:vesselId/superintendent-lock", requirePermission("pms-admin", "edit"), asyncHandler(updateSuperintendentLockSwitch));
 router2.put("/pms-vessel-settings/:vesselId", requirePermission("pms-admin", "edit"), asyncHandler(updatePmsVesselSettings2));
 router2.delete("/pms-vessel-settings/:vesselId", requirePermission("pms-admin", "delete"), asyncHandler(deletePmsVesselSettings3));
 router2.get("/company-standard-grace-settings", asyncHandler(getCompanyStandardGraceSettings3));
@@ -43658,88 +44286,22 @@ var routes_default2 = router2;
 
 // server/modules/components/routes.ts
 init_middleware();
+init_auth();
+init_permissions();
 import { Router as Router3 } from "express";
 import multer from "multer";
-
-// server/middleware/auth.ts
-var DEFAULT_MOCK_RANK_NAME = "Chief Engineer";
-var requireAuth = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ error: "Unauthorized - Authentication required" });
-  }
-  next();
-};
-var requireRole = (roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized - Authentication required" });
-    }
-    const allowedRoles = Array.isArray(roles) ? roles : [roles];
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({
-        error: "Forbidden - Insufficient permissions",
-        required: allowedRoles,
-        current: req.user.role
-      });
-    }
-    next();
-  };
-};
-var requirePMSAdmin = requireRole(["PMS Admin", "Sail Admin"]);
-var requireOfficeOrAdmin = requireRole(["Office", "PMS Admin", "Sail Admin"]);
-var requireShipUser = requireRole("Ship");
-async function initMockAuthRankId() {
-  console.log(
-    `\u2705 Mock auth resolves rank_name per-request (x-rank header \u2192 body.rank \u2192 "${DEFAULT_MOCK_RANK_NAME}")`
-  );
-}
-function readForwardedHeader(req, name) {
-  const raw = req.headers[name];
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (typeof value !== "string" || !value.trim()) return void 0;
-  try {
-    const decoded = decodeURIComponent(value).trim();
-    return decoded || void 0;
-  } catch {
-    return value.trim();
-  }
-}
-var mockAuthMiddleware = (req, res, next) => {
-  const headerRankRaw = req.headers["x-rank"];
-  const headerRank = Array.isArray(headerRankRaw) ? headerRankRaw[0] : headerRankRaw;
-  const body = req.body && typeof req.body === "object" ? req.body : null;
-  const bodyRank = body && typeof body.rank === "string" ? body.rank : void 0;
-  const resolvedRank = typeof headerRank === "string" && headerRank.trim() || bodyRank && bodyRank.trim() || DEFAULT_MOCK_RANK_NAME;
-  const fwdId = readForwardedHeader(req, "x-user-id");
-  const fwdName = readForwardedHeader(req, "x-user-name");
-  const fwdEmail = readForwardedHeader(req, "x-user-email");
-  const fwdType = readForwardedHeader(req, "x-user-type");
-  const fwdRole = readForwardedHeader(req, "x-user-role");
-  req.user = {
-    id: 1,
-    username: "sail_admin",
-    fullName: fwdName || "Sail Administrator",
-    firstname: "Sail",
-    lastname: "Administrator",
-    email: fwdEmail || "admin@seafarer.com",
-    role: "Sail Admin",
-    // RBAC mock — unchanged in Phase 0 (frontend reads the real role independently)
-    vesselId: null,
-    isActive: true,
-    userUuid: fwdId || "00000000-0000-0000-0000-000000000001",
-    crewDesignation: "Marine Manager",
-    rank_name: resolvedRank,
-    userType: fwdType || "Office",
-    createdAt: /* @__PURE__ */ new Date(),
-    updatedAt: /* @__PURE__ */ new Date()
-  };
-  if (fwdRole) req.user.forwardedRole = fwdRole;
-  next();
-};
 
 // server/modules/components/controllers/componentController.ts
 init_componentService();
 init_errors();
+init_auth();
+function isShipViewer(req) {
+  const identity = getRbacIdentity(req);
+  return identity.userType === "Ship" || req.user?.userType === "Ship";
+}
+function visibleToViewer(component, req) {
+  return !isShipViewer(req) || component?.isActive !== false;
+}
 async function updateSortOrder3(req, res) {
   try {
     const result = await updateSortOrder2(req.body);
@@ -43756,7 +44318,7 @@ async function updateSortOrder3(req, res) {
   }
 }
 async function listByVessel4(req, res) {
-  const components2 = await listByVessel3(req.params.vesselId);
+  const components2 = (await listByVessel3(req.params.vesselId)).filter((component) => visibleToViewer(component, req));
   console.log(`\u{1F4CB} GET /technical/api/components/${req.params.vesselId} returning ${components2.length} components`);
   components2.slice(0, 5).forEach((c) => {
     console.log(`  - code: ${c.componentCode}, name: ${c.name?.substring(0, 30)}, parentId: ${c.parentId || "none"}`);
@@ -43765,7 +44327,7 @@ async function listByVessel4(req, res) {
 }
 async function getDetails(req, res) {
   const component = await getById(req.params.id);
-  if (!component) {
+  if (!component || !visibleToViewer(component, req)) {
     return res.status(404).json({ error: "Component not found" });
   }
   res.json(component);
@@ -43774,7 +44336,7 @@ async function listAll2(req, res) {
   const vesselId = req.query.vesselId;
   const vesselIdsRaw = req.query.vesselIds;
   const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0;
-  const components2 = await listAll(vesselId, vesselIds);
+  const components2 = (await listAll(vesselId, vesselIds)).filter((component) => visibleToViewer(component, req));
   res.json(components2);
 }
 async function create4(req, res) {
@@ -43810,6 +44372,31 @@ async function update4(req, res) {
       return res.status(400).json({ error: "Component Code already exists for this vessel. Please use a unique code." });
     }
     res.status(500).json({ error: "Failed to update component" });
+  }
+}
+async function remove3(req, res) {
+  try {
+    await remove2(req.params.id, req.user?.username || "system");
+    res.json({
+      success: true,
+      message: "Component deleted successfully. Existing Work Orders and maintenance history have been retained."
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      const lifecycleError = error;
+      return res.status(400).json({
+        success: false,
+        error: lifecycleError.message,
+        code: lifecycleError.code,
+        activeChildrenCount: lifecycleError.activeChildrenCount,
+        activeJobsCount: lifecycleError.activeJobsCount,
+        linkedSparesCount: lifecycleError.linkedSparesCount
+      });
+    }
+    if (error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: "Failed to delete component" });
   }
 }
 async function inactivate3(req, res) {
@@ -45057,6 +45644,11 @@ router3.post("/components/upload", upload2.single("file"), asyncHandler(upload))
 router3.get("/components", asyncHandler(listAll2));
 router3.post("/components", asyncHandler(create4));
 router3.patch("/components/:id", asyncHandler(update4));
+router3.delete(
+  "/components/:id",
+  requirePermission("pms-components", "delete", { enforce: true, unconfigured: "deny" }),
+  asyncHandler(remove3)
+);
 router3.post("/components/:id/inactivate", asyncHandler(inactivate3));
 router3.get("/component-documents/:componentId", requireAuth, asyncHandler(listDocuments2));
 router3.post("/component-documents", requirePMSAdmin, upload2.single("file"), asyncHandler(createDocument3));
@@ -45086,8 +45678,9 @@ var routes_default3 = router3;
 
 // server/modules/jobs/routes.ts
 init_middleware();
-import { Router as Router4 } from "express";
+init_auth();
 init_permissions();
+import { Router as Router4 } from "express";
 
 // server/modules/jobs/repositories/jobRepository.ts
 init_storage();
@@ -45103,7 +45696,7 @@ async function create5(data) {
 async function update5(id, data) {
   return storage.updateJob(id, data);
 }
-async function remove3(id) {
+async function remove4(id) {
   return storage.deleteJob(id);
 }
 async function findJobComponentLinks(vesselId) {
@@ -45250,8 +45843,8 @@ async function getJob(id) {
 async function createJob(body) {
   const { insertJobSchema: insertJobSchema2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
   const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-  const { z: z7 } = await import("zod");
-  const jobCreateSchema = insertJobSchema2.extend({ juuid: z7.string().optional() });
+  const { z: z8 } = await import("zod");
+  const jobCreateSchema = insertJobSchema2.extend({ juuid: z8.string().optional() });
   let jobData = jobCreateSchema.parse(body);
   let component = null;
   if (jobData.componentId) {
@@ -45391,6 +45984,9 @@ async function createJob(body) {
 async function updateJob(id, body) {
   const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
   let updateData = { ...body };
+  if (Object.prototype.hasOwnProperty.call(updateData, "isDeleted") || Object.prototype.hasOwnProperty.call(updateData, "is_deleted")) {
+    throw new ValidationError("Job deletion status can only be changed through the Delete Job action");
+  }
   if (updateData.isActive === "Yes") updateData.isActive = true;
   if (updateData.isActive === "No") updateData.isActive = false;
   let component = null;
@@ -45502,7 +46098,7 @@ async function updateJob(id, body) {
   return job;
 }
 async function deleteJob(id) {
-  await remove3(id);
+  await remove4(id);
 }
 async function inactivateJob(id, vesselId) {
   const job = await findById2(id);
@@ -45566,7 +46162,7 @@ async function generateWorkOrder(jobId, reason, activeComponentCode) {
   if (!job) {
     throw new NotFoundError("Job not found");
   }
-  if (job.isActive === false) {
+  if (job.isDeleted === true || job.isActive === false) {
     throw new ValidationError("Cannot generate work orders for an inactive job");
   }
   const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
@@ -46131,22 +46727,32 @@ async function exportMaintenancePlanner(filters, format3) {
 }
 
 // server/modules/jobs/controllers/jobController.ts
+function isShipUser(req) {
+  return req.user?.userType === "Ship" || req.rbac?.userType === "Ship";
+}
+function isInactive(job) {
+  return job.isActive === false;
+}
 async function listJobs2(req, res) {
   const vesselId = req.query.vesselId;
   const componentId = req.query.componentId;
   const vesselIdsParam = req.query.vesselIds;
   const vesselIds = vesselIdsParam ? vesselIdsParam.split(",").map((v) => v.trim()).filter(Boolean) : void 0;
   const jobs2 = await listJobs(vesselId, componentId, vesselIds);
-  res.json(jobs2);
+  res.json(isShipUser(req) ? jobs2.filter((job) => !isInactive(job)) : jobs2);
 }
 async function getJob2(req, res) {
   const job = await getJob(req.params.id);
-  if (!job) {
+  if (!job || isShipUser(req) && isInactive(job)) {
     return res.status(404).json({ error: "Job not found" });
   }
   res.json(job);
 }
 async function getJobContext2(req, res) {
+  const job = await getJob(req.params.id);
+  if (!job || isShipUser(req) && isInactive(job)) {
+    return res.status(404).json({ error: "Job not found" });
+  }
   const context = await getJobContext(req.params.id);
   res.json(context);
 }
@@ -46262,6 +46868,7 @@ var routes_default4 = router4;
 
 // server/modules/work-orders/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router5 } from "express";
 import multer2 from "multer";
 
@@ -46858,6 +47465,7 @@ init_complianceAnomalyService();
 init_rhTimelineValidationService();
 init_sync();
 init_syncRole();
+init_workOrderStatus();
 async function completeWorkOrder(workOrderId, body) {
   const {
     runningHours,
@@ -46879,6 +47487,7 @@ async function completeWorkOrder(workOrderId, body) {
   if (!workOrder) {
     throw new NotFoundError("Work order not found");
   }
+  const vesselCode = workOrder.vesselId ? (await getStorage2().getVessel(workOrder.vesselId))?.vCode : void 0;
   let component = await findComponent2(workOrder.component);
   if (!component && workOrder.componentCode && workOrder.vesselId) {
     const componentByCode = await findComponentByCode2(workOrder.componentCode, workOrder.vesselId);
@@ -47543,6 +48152,7 @@ async function finalizeWorkOrderCompletion(workOrderId) {
     console.error(`[Finalize] Work order ${workOrderId} not found`);
     return;
   }
+  const vesselCode = workOrder.vesselId ? (await getStorage2().getVessel(workOrder.vesselId))?.vCode : void 0;
   let component = await findComponent2(workOrder.component);
   if (!component && workOrder.componentCode && workOrder.vesselId) {
     const byCode = await findComponentByCode2(workOrder.componentCode, workOrder.vesselId);
@@ -47578,7 +48188,7 @@ async function finalizeWorkOrderCompletion(workOrderId) {
           componentCode: workOrder.componentCode || component.componentCode,
           vesselCode: workOrder.vesselId,
           jobId: workOrder.jobId || null,
-          jobCode: workOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+          jobCode: extractJobNoFromWorkOrderNo(workOrder.workOrderNo, vesselCode) || null,
           workOrderId: workOrder.wouuid,
           workOrderNo: workOrder.workOrderNo || `WO-${workOrder.id}`,
           jobTitle: workOrder.jobTitle,
@@ -47606,9 +48216,7 @@ async function finalizeWorkOrderCompletion(workOrderId) {
     let job = null;
     if (workOrder.jobId) job = await findJob(workOrder.jobId);
     if (!job && workOrder.workOrderNo) {
-      const m1 = workOrder.workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-      const m2 = workOrder.workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-      const extractedJobNo = m1 ? m1[1] : m2 ? m2[1] : null;
+      const extractedJobNo = extractJobNoFromWorkOrderNo(workOrder.workOrderNo, vesselCode);
       if (extractedJobNo && workOrder.vesselId) {
         const jobs2 = await findJobs2(workOrder.vesselId);
         job = jobs2.find((j) => j.jobNo === extractedJobNo) || null;
@@ -47731,7 +48339,6 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
     success: [],
     failed: []
   };
-  const lockEnabled = await isSuperintendentLockEnabled();
   const remarks = (approverRemarks || "").trim();
   for (const workOrderId of workOrderIds) {
     try {
@@ -47797,6 +48404,7 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         console.log(`\u26A0\uFE0F Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
       }
       const currentTier = existingWO2.approvalTier || "standard";
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO2.vesselId);
       if (currentTier === "superintendent_locked" && lockEnabled) {
         results.failed.push({
           id: workOrderId,
@@ -47904,6 +48512,14 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
   }
   if (existingWO2.status !== "Pending Office Review") {
     throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
+  }
+  if (existingWO2.approvalTier === "superintendent_locked" && !existingWO2.superintendentAcknowledged) {
+    if (await isSuperintendentLockEnabled(existingWO2.vesselId)) {
+      throw new ValidationError(
+        "This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The office reviewer cannot complete it until the Superintendent has acknowledged.",
+        { code: "SUPERINTENDENT_LOCKED" }
+      );
+    }
   }
   const actualCompletionDate = existingWO2.completionDateTime || existingWO2.dateCompleted;
   const originalDueDate = existingWO2.nextDueDate || existingWO2.dueDate || null;
@@ -49144,6 +49760,7 @@ async function exportPlannerExcelFromItems(items) {
 // server/modules/work-orders/controllers/workOrderController.ts
 init_errors();
 init_storage();
+init_auth();
 function resolveActorIdentity(req) {
   const { user } = req;
   if (!user) return void 0;
@@ -49160,35 +49777,19 @@ function resolveActorIdentity(req) {
   }
   return void 0;
 }
-var APPROVAL_POLICY_EDITOR_ROLES = /* @__PURE__ */ new Set(["Sail Admin", "Super Admin"]);
 async function getApprovalPolicy(_req, res) {
-  const settings = await storage.getCompanyApprovalSettings();
   res.json({
-    superintendentLockEnabled: settings?.superintendentLockEnabled ?? true,
-    updatedBy: settings?.updatedBy ?? null,
-    updatedAt: settings?.updatedAt ?? null
+    superintendentLockEnabled: false,
+    deprecated: true,
+    message: "The Superintendent approval lock is now configured per vessel in PMS Vessel Settings.",
+    updatedBy: null,
+    updatedAt: null
   });
 }
 async function updateApprovalPolicy(req, res) {
-  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
-  if (await isShipInstance2()) {
-    return res.status(403).json({ error: "shore_only", message: "The approval policy is configured on the shore server and synced to ships." });
-  }
-  const userRole = req.user?.role || "";
-  if (!APPROVAL_POLICY_EDITOR_ROLES.has(userRole)) {
-    return res.status(403).json({ error: "forbidden", message: "Only Sail Admin / Super Admin may edit the approval policy." });
-  }
-  const { superintendentLockEnabled } = req.body ?? {};
-  if (typeof superintendentLockEnabled !== "boolean") {
-    return res.status(400).json({ error: "superintendentLockEnabled (boolean) is required" });
-  }
-  const username = req.user?.username || null;
-  const saved = await storage.upsertCompanyApprovalSettings({ superintendentLockEnabled, updatedBy: username });
-  console.log(`[ApprovalPolicy] superintendent_lock_enabled set to ${superintendentLockEnabled} by ${username || "unknown"}`);
-  res.json({
-    superintendentLockEnabled: saved.superintendentLockEnabled,
-    updatedBy: saved.updatedBy,
-    updatedAt: saved.updatedAt
+  return res.status(410).json({
+    error: "deprecated",
+    message: "The company-wide Superintendent approval lock is retired. Configure the lock for an individual vessel in PMS Vessel Settings."
   });
 }
 async function listWorkOrders2(req, res) {
@@ -49634,8 +50235,15 @@ async function updateExecution3(req, res) {
     throw error;
   }
 }
+var SUPERINTENDENT_ACKNOWLEDGER_ROLES = ["Office", "PMS Admin", "Sail Admin", "Super Admin"];
+function canAcknowledgeAsSuperintendent(req) {
+  return rbacMatches(getRbacIdentity(req), SUPERINTENDENT_ACKNOWLEDGER_ROLES);
+}
 async function bulkSuperintendentAcknowledge(req, res) {
   try {
+    if (!canAcknowledgeAsSuperintendent(req)) {
+      return res.status(403).json({ error: "forbidden", message: "Only authorized shore administrators may acknowledge Superintendent-locked work orders." });
+    }
     const { workOrderIds } = req.body;
     if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
       return res.status(400).json({ error: "workOrderIds must be a non-empty array" });
@@ -49652,7 +50260,13 @@ async function bulkSuperintendentAcknowledge(req, res) {
           results.push({ id, success: false, error: "Not locked" });
           continue;
         }
+        if (!await isSuperintendentLockEnabled(wo.vesselId)) {
+          results.push({ id, success: false, error: "Superintendent lock is disabled for this vessel" });
+          continue;
+        }
         await updateWorkOrder(id, {
+          superintendentAck: true,
+          // authorized ack — exempt from the Pending-Approval field guard
           superintendentAcknowledged: true,
           superintendentAcknowledgedAt: (/* @__PURE__ */ new Date()).toISOString(),
           approvalTier: "ce_with_justification",
@@ -49680,6 +50294,9 @@ async function bulkSuperintendentAcknowledge(req, res) {
 }
 async function superintendentAcknowledge(req, res) {
   try {
+    if (!canAcknowledgeAsSuperintendent(req)) {
+      return res.status(403).json({ error: "forbidden", message: "Only authorized shore administrators may acknowledge Superintendent-locked work orders." });
+    }
     const wo = await getWorkOrder(req.params.id);
     if (!wo) {
       return res.status(404).json({ error: "Work order not found" });
@@ -49687,7 +50304,14 @@ async function superintendentAcknowledge(req, res) {
     if (wo.approvalTier !== "superintendent_locked") {
       return res.status(400).json({ error: "This WO does not require Superintendent acknowledgment" });
     }
+    if (!await isSuperintendentLockEnabled(wo.vesselId)) {
+      return res.status(400).json({
+        error: "This vessel has the Superintendent lock disabled; this work order follows the notify-only approval path."
+      });
+    }
     await updateWorkOrder(req.params.id, {
+      superintendentAck: true,
+      // authorized ack — exempt from the Pending-Approval field guard
       superintendentAcknowledged: true,
       superintendentAcknowledgedAt: (/* @__PURE__ */ new Date()).toISOString(),
       approvalTier: "ce_with_justification",
@@ -50078,8 +50702,16 @@ router5.post(
   requireRole(["Office", "PMS Admin", "Sail Admin"]),
   asyncHandler(reopenCompletion)
 );
-router5.post("/work-orders/bulk-superintendent-acknowledge", asyncHandler(bulkSuperintendentAcknowledge));
-router5.post("/work-orders/:id/superintendent-acknowledge", asyncHandler(superintendentAcknowledge));
+router5.post(
+  "/work-orders/bulk-superintendent-acknowledge",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(bulkSuperintendentAcknowledge)
+);
+router5.post(
+  "/work-orders/:id/superintendent-acknowledge",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(superintendentAcknowledge)
+);
 router5.get("/superintendent/notifications", asyncHandler(getSuperintendentNotifications));
 router5.get("/superintendent/notifications/all", asyncHandler(getAllSuperintendentNotifications));
 router5.get("/superintendent/notifications/summary", asyncHandler(getSuperintendentNotificationsSummary));
@@ -50130,11 +50762,13 @@ var routes_default5 = router5;
 
 // server/modules/running-hours/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router6 } from "express";
 
 // server/modules/running-hours/controllers/runningHoursController.ts
 init_runningHoursService();
 init_rhTimelineValidationService();
+init_errors();
 init_errors();
 var PLACEHOLDER_USER_IDS = ["admin", "system", "User", "user", ""];
 function resolveUserId(req) {
@@ -50173,11 +50807,12 @@ async function cascadeUpdate2(req, res) {
   try {
     req.body.userId = resolveUserId(req);
     req.body.userUuid = resolveUserUuid(req);
-    const result = await cascadeUpdate(req.body);
+    const authenticatedRole = req.user?.role;
+    const result = await cascadeUpdate(req.body, authenticatedRole);
     res.json(result);
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ error: error.message, ...error.details });
+    if (error instanceof ValidationError || error instanceof ForbiddenError) {
+      return res.status(error.statusCode).json({ error: error.message, ...error.details });
     }
     console.error("Error cascading running hours update:", error);
     res.status(500).json({ error: error.message || "Failed to cascade running hours update" });
@@ -50222,11 +50857,12 @@ async function updateChildRH2(req, res) {
   try {
     req.body.userId = resolveUserId(req);
     req.body.userUuid = resolveUserUuid(req);
-    const result = await updateChildRH(req.params.componentId, req.body);
+    const authenticatedRole = req.user?.role;
+    const result = await updateChildRH(req.params.componentId, req.body, authenticatedRole);
     res.json(result);
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ error: error.message, ...error.details });
+    if (error instanceof ValidationError || error instanceof ForbiddenError) {
+      return res.status(error.statusCode).json({ error: error.message, ...error.details });
     }
     console.error("Error updating child RH:", error);
     res.status(500).json({ error: "Failed to update child running hours" });
@@ -50511,8 +51147,8 @@ async function createSpare(spare) {
 async function updateSpare(id, data) {
   return storage.updateSpare(id, data);
 }
-async function deleteSpare(id) {
-  return storage.deleteSpare(id);
+async function deleteSpare(id, userId) {
+  return storage.deleteSpare(id, userId);
 }
 async function consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz) {
   return storage.consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz);
@@ -50608,7 +51244,8 @@ async function getSparesByVessel(vesselId) {
   return getSpares(vesselId);
 }
 async function getSpare2(id) {
-  return getSpare(id);
+  const spare = await getSpare(id);
+  return spare && !spare.deleted && !spare.isDeleted ? spare : void 0;
 }
 async function createSpare2(vesselId, body) {
   return createSpare({
@@ -50617,6 +51254,13 @@ async function createSpare2(vesselId, body) {
   });
 }
 async function updateSpare2(spareId, body, userId) {
+  if (Object.prototype.hasOwnProperty.call(body, "isDeleted") || Object.prototype.hasOwnProperty.call(body, "is_deleted") || Object.prototype.hasOwnProperty.call(body, "deleted")) {
+    throw Object.assign(new Error("Spare deletion status can only be changed through Delete Spare."), { statusCode: 400 });
+  }
+  const existingSpare = await getSpare(spareId);
+  if (!existingSpare || existingSpare.deleted || existingSpare.isDeleted) {
+    throw Object.assign(new Error("Spare not found"), { statusCode: 404 });
+  }
   const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = body;
   if (robLocationA !== void 0 || robLocationB !== void 0) {
     if (robLocationA !== void 0 && (isNaN(Number(robLocationA)) || Number(robLocationA) < 0)) {
@@ -50625,10 +51269,7 @@ async function updateSpare2(spareId, body, userId) {
     if (robLocationB !== void 0 && (isNaN(Number(robLocationB)) || Number(robLocationB) < 0)) {
       throw Object.assign(new Error("robLocationB must be a valid non-negative number"), { statusCode: 400 });
     }
-    const currentSpare = await getSpare(spareId);
-    if (!currentSpare) {
-      throw Object.assign(new Error("Spare not found"), { statusCode: 404 });
-    }
+    const currentSpare = existingSpare;
     const newLocA = robLocationA !== void 0 ? Number(robLocationA) : currentSpare.robLocationA ?? 0;
     const newLocB = robLocationB !== void 0 ? Number(robLocationB) : currentSpare.robLocationB ?? 0;
     const result = await transferSpareLocation(
@@ -50648,12 +51289,23 @@ async function updateSpare2(spareId, body, userId) {
   }
   return updateSpare(spareId, otherUpdates);
 }
-async function deleteSpare2(id) {
-  return deleteSpare(id);
+async function deleteSpare2(id, vesselId, userId) {
+  const spare = await getSpare(id);
+  if (!spare || spare.deleted || spare.isDeleted) {
+    throw Object.assign(new Error(`Spare with ID ${id} not found`), { statusCode: 404 });
+  }
+  if (spare.vesselId !== vesselId) {
+    throw Object.assign(new Error("Access denied: Spare does not belong to this vessel"), { statusCode: 403 });
+  }
+  await deleteSpare(id, userId);
+  return {
+    success: true,
+    message: `Spare "${spare.partName}" (${spare.partCode}) was deleted. Inventory and transaction history have been retained.`
+  };
 }
 async function inactivateSpare(id, vesselId) {
   const spare = await getSpare(id);
-  if (!spare) {
+  if (!spare || spare.deleted || spare.isDeleted) {
     throw Object.assign(new Error(`Spare with ID ${id} not found`), { statusCode: 404 });
   }
   if (spare.vesselId !== vesselId) {
@@ -51094,11 +51746,21 @@ async function updateSpare3(req, res) {
 }
 async function deleteSpare3(req, res) {
   try {
-    await deleteSpare2(req.params.id);
-    res.json({ success: true, message: "Spare has been deactivated successfully" });
+    const result = await deleteSpare2(
+      req.params.id,
+      req.params.vesselId,
+      req.user?.username || "system"
+    );
+    res.json(result);
   } catch (error) {
-    if (error.message?.includes("not found")) {
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
       return res.status(404).json({ error: error.message });
+    }
+    if (error.statusCode === 403) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
     }
     res.status(500).json({ error: "Failed to delete spare" });
   }
@@ -51189,6 +51851,9 @@ async function batchConsume2(req, res) {
     const results = await batchConsume(items, workOrderId, consumedBy);
     res.json({ success: true, results });
   } catch (error) {
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message || "Failed to consume spares" });
   }
 }
@@ -51201,6 +51866,9 @@ async function batchReceive2(req, res) {
     const results = await batchReceive(items, purchaseOrderRef, receivedBy);
     res.json({ success: true, results });
   } catch (error) {
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message || "Failed to receive spares" });
   }
 }
@@ -51215,6 +51883,9 @@ async function consumeSimple2(req, res) {
   } catch (error) {
     if (error.statusCode === 400) {
       return res.status(400).json({ error: error.message });
+    }
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
     }
     console.error("Error consuming spare:", error);
     res.status(500).json({ error: error.message || "Failed to consume spare" });
@@ -51379,7 +52050,16 @@ async function getSpare3(id) {
 }
 
 // server/modules/spares/services/inventoryService.ts
-init_storage();
+async function requireOperationalSpare(spareId, vesselId) {
+  const spare = await getSpare3(String(spareId));
+  if (!spare || spare.deleted || spare.isDeleted) {
+    throw Object.assign(new Error(`Spare ${spareId} not found`), { statusCode: 404 });
+  }
+  if (vesselId && spare.vesselId !== vesselId) {
+    throw Object.assign(new Error("Access denied: Spare does not belong to this vessel"), { statusCode: 403 });
+  }
+  return spare;
+}
 async function getLocations2(vesselId) {
   return getLocations(vesselId);
 }
@@ -51426,12 +52106,9 @@ async function createSpareComponentLink2(body) {
       { statusCode: 400 }
     );
   }
-  const spare = await storage.getSpare(String(spareId));
-  if (!spare) {
-    throw Object.assign(
-      new Error(`Spare ${spareId} not found`),
-      { statusCode: 404 }
-    );
+  const spare = await requireOperationalSpare(parseInt(spareId));
+  if (spare.vesselId !== vesselId) {
+    throw Object.assign(new Error("Access denied: Spare does not belong to this vessel"), { statusCode: 403 });
   }
   return createSpareComponentLink({
     vesselId,
@@ -51445,6 +52122,7 @@ async function deleteSpareComponentLink2(spareId, componentId) {
   return deleteSpareComponentLink(spareId, componentId);
 }
 async function getSpareStock(spareId) {
+  await requireOperationalSpare(spareId);
   const stockRecords = await getSpareLocationStock(spareId);
   const locationsWithQty = await getSpareLocationsWithQty(spareId);
   const robTotal = await getSpareRobTotal(spareId);
@@ -51472,6 +52150,7 @@ async function upsertStock(spareId, locationId, body) {
   if (!vesselId) {
     throw Object.assign(new Error("vesselId is required"), { statusCode: 400 });
   }
+  await requireOperationalSpare(spareId, vesselId);
   return upsertSpareLocationStock2({
     vesselId,
     spareId,
@@ -51491,6 +52170,7 @@ async function createTransaction(body) {
       }
     };
   }
+  await requireOperationalSpare(parsed.data.spareId, parsed.data.vesselId);
   const result = await performInventoryTransaction2(parsed.data);
   return { validationError: false, response: { success: true, data: result } };
 }
@@ -51640,6 +52320,9 @@ async function getSpareStock2(req, res) {
     res.json({ success: true, data });
   } catch (error) {
     console.error("Error fetching spare stock:", error);
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -51682,6 +52365,12 @@ async function upsertStock2(req, res) {
   } catch (error) {
     if (error.statusCode === 400) {
       return res.status(400).json({ success: false, error: error.message });
+    }
+    if (error.statusCode === 404 || error.message?.includes("not found")) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    if (error.statusCode === 403) {
+      return res.status(403).json({ success: false, error: error.message });
     }
     console.error("Error setting spare stock:", error);
     res.status(500).json({ success: false, error: error.message });
@@ -51832,6 +52521,8 @@ async function getSparesByComponentCode(req, res) {
 }
 
 // server/modules/spares/routes.ts
+init_auth();
+init_permissions();
 var router7 = Router7();
 router7.get("/spares", requireAuth, asyncHandler(getAllSpares3));
 router7.get("/spares/history/:vesselId", requireAuth, asyncHandler(getSpareHistoryByVessel));
@@ -51850,7 +52541,11 @@ router7.post("/spares/:vesselId/:id/adjust", requirePMSAdmin, asyncHandler(adjus
 router7.get("/spares/:vesselId/:id", requireAuth, asyncHandler(getSpareById));
 router7.post("/spares/:vesselId", requirePMSAdmin, asyncHandler(createSpare3));
 router7.patch("/spares/:vesselId/:id", requirePMSAdmin, asyncHandler(updateSpare3));
-router7.delete("/spares/:vesselId/:id", requirePMSAdmin, asyncHandler(deleteSpare3));
+router7.delete(
+  "/spares/:vesselId/:id",
+  requirePermission("pms-spares", "delete", { enforce: true, unconfigured: "deny" }),
+  asyncHandler(deleteSpare3)
+);
 router7.get("/spares/:vesselId", requireAuth, asyncHandler(getSparesByVessel2));
 router7.get("/inventory/locations/:vesselId", requireAuth, asyncHandler(getLocations3));
 router7.get("/inventory/locations/:vesselId/:id", requireAuth, asyncHandler(getLocationById4));
@@ -52249,6 +52944,7 @@ async function batchReceive4(req, res) {
 }
 
 // server/modules/stores/routes.ts
+init_auth();
 var router8 = Router8();
 router8.get("/stores", requireAuth, asyncHandler(getAllStores2));
 router8.get("/stores/item/:id/history", requireAuth, asyncHandler(getItemHistory2));
@@ -55388,8 +56084,9 @@ var routes_default10 = router10;
 
 // server/modules/fleet/routes.ts
 init_middleware();
-import { Router as Router11 } from "express";
+init_auth();
 init_permissions();
+import { Router as Router11 } from "express";
 
 // server/modules/fleet/services/fleetService.ts
 init_schema();
@@ -61925,6 +62622,7 @@ async function exportStoresLowStockAlertExcel2(req, res) {
 
 // server/modules/reports/services/equipmentReportService.ts
 init_reportRepository();
+init_workOrderStatus();
 import ExcelJS3 from "exceljs";
 async function getWorkOrdersComputed(vesselId, vesselIds) {
   const { getWorkOrdersWithComputedStatus: getWorkOrdersWithComputedStatus2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
@@ -62172,7 +62870,7 @@ async function getUnplannedBreakdownJobs(vesselId, startDate, endDate, vesselIds
   const endDateObj = new Date(endDate);
   endDateObj.setHours(23, 59, 59, 999);
   const unplannedBreakdownJobs = allWorkOrders.filter((wo) => {
-    const isUnplanned = wo.workOrderType === "Unplanned" || wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown")) || wo.workOrderNo && wo.workOrderNo.startsWith("UWO");
+    const isUnplanned = wo.workOrderType === "Unplanned" || wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown")) || isUnplannedWorkOrderNo(wo.workOrderNo);
     if (!isUnplanned) return false;
     if (wo.status !== "Completed") return false;
     const completedDateStr = wo.dateCompleted ? wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted) : null;
@@ -62263,7 +62961,7 @@ async function exportUnplannedBreakdownJobsExcel(vesselId, startDate, endDate, c
   const endDateObj = new Date(endDate);
   endDateObj.setHours(23, 59, 59, 999);
   const unplannedBreakdownJobs = allWorkOrders.filter((wo) => {
-    const isUnplanned = wo.workOrderType === "Unplanned" || wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown")) || wo.workOrderNo && wo.workOrderNo.startsWith("UWO");
+    const isUnplanned = wo.workOrderType === "Unplanned" || wo.taskType && (wo.taskType.toLowerCase().includes("unplanned") || wo.taskType.toLowerCase().includes("breakdown")) || isUnplannedWorkOrderNo(wo.workOrderNo);
     if (!isUnplanned) return false;
     if (wo.status !== "Completed") return false;
     const completedDateStr = wo.dateCompleted ? wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted) : null;
@@ -63487,6 +64185,7 @@ async function getCriticalEquipmentSchedule2(req, res) {
 
 // server/modules/reports/services/maintenanceReportService.ts
 init_reportRepository();
+init_workOrderStatus();
 init_status();
 init_storage();
 import ExcelJS4 from "exceljs";
@@ -64449,7 +65148,7 @@ async function exportUnplannedJobs(vesselId, dateFrom, dateTo, componentFilter) 
   const jobsMap = new Map(jobs2.map((job) => [job.juuid, job]));
   const componentsByCodeMap = new Map(components2.map((comp) => [comp.componentCode, comp]));
   const unplannedWorkOrders = workOrders2.filter(
-    (wo) => wo.workOrderType === "Unplanned" || wo.type === "Unplanned" || wo.workOrderNumber && wo.workOrderNumber.startsWith("UWO")
+    (wo) => wo.workOrderType === "Unplanned" || wo.type === "Unplanned" || isUnplannedWorkOrderNo(wo.workOrderNumber || wo.workOrderNo)
   );
   let filteredJobs = unplannedWorkOrders;
   if (dateFrom || dateTo) {
@@ -64935,7 +65634,7 @@ async function getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesse
     workOrders2.map((wo) => wo.vesselId).filter((id) => typeof id === "string" && id.length > 0)
   ));
   for (const vid of uniqueVesselIds) {
-    const vs = await getPmsVesselSettings4(vid);
+    const vs = await getPmsVesselSettings5(vid);
     vesselGraceCache.set(vid, buildVesselGraceSettings3(vs));
   }
   const eligibleWorkOrders = workOrders2.filter((wo) => {
@@ -67856,6 +68555,7 @@ var routes_default12 = router12;
 // server/modules/change-requests/routes.ts
 init_middleware();
 init_permissions();
+init_auth();
 import { Router as Router13 } from "express";
 
 // server/modules/change-requests/repositories/changeRequestsRepository.ts
@@ -68336,12 +69036,39 @@ async function submitChangeRequestWorkflow(id, userId) {
   console.log(`[CR_WORKFLOW] CR ${id} (${cr.targetType}) submitted \u2014 classification: ${classLabel}, L1: ${level1Enabled}, L2: ${level2Enabled}`);
   return updated;
 }
+var CR_TARGET_TABLE = {
+  component: "components",
+  job: "jobs",
+  work_order: "work_orders",
+  spare: "spares",
+  store: "stores_items"
+};
+async function assertTargetApplicableOnThisInstance(targetType, crId) {
+  const table = targetType ? CR_TARGET_TABLE[targetType] : void 0;
+  if (!table) return;
+  const { getTableSyncConfig: getTableSyncConfig2 } = await Promise.resolve().then(() => (init_syncConfig(), syncConfig_exports));
+  if (getTableSyncConfig2(table)?.category !== "ONE_WAY_SHORE_TO_SHIP") return;
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (!await isShipInstance2()) return;
+  throw new ForbiddenError(
+    `Change request ${crId} targets ${table}, which is managed by the office and synced to ships one-way. It must be approved on the shore server; the approval will reach this vessel through sync.`,
+    { code: "SHORE_OWNED_TARGET", targetType, table }
+  );
+}
 async function approveChangeRequest2(id, body) {
   const { comment, reviewerId, role, overriddenChanges } = body;
   if (!comment) {
     throw new ValidationError("Comment is required for approval");
   }
   const existing = await getChangeRequest(id);
+  if (!existing) throw new NotFoundError("Change request not found");
+  if (existing.status === "approved" || existing.status === "rejected") {
+    throw new ConflictError(
+      `Change request ${id} is already ${existing.status} (revision ${existing.revisionNumber ?? 0}); it cannot be approved again.`,
+      { code: "CR_ALREADY_DECIDED", status: existing.status, revisionNumber: existing.revisionNumber ?? 0 }
+    );
+  }
+  await assertTargetApplicableOnThisInstance(existing.targetType, id);
   console.log(`[CR_SERVICE] Approving change request ${id}`, {
     id: existing?.id,
     targetType: existing?.targetType,
@@ -68357,6 +69084,14 @@ async function rejectChangeRequest2(id, body) {
   const { comment, reviewerId, role } = body;
   if (!comment) {
     throw new ValidationError("Comment is required for rejection");
+  }
+  const existing = await getChangeRequest(id);
+  if (!existing) throw new NotFoundError("Change request not found");
+  if (existing.status === "approved" || existing.status === "rejected") {
+    throw new ConflictError(
+      `Change request ${id} is already ${existing.status}; it cannot be rejected again.`,
+      { code: "CR_ALREADY_DECIDED", status: existing.status, revisionNumber: existing.revisionNumber ?? 0 }
+    );
   }
   console.log("Rejecting change request:", id, "with comment:", comment);
   const updated = await rejectChangeRequest(id, reviewerId || "reviewer", comment, role);
@@ -68519,8 +69254,8 @@ router13.get("/change-requests/:id/comments", asyncHandler(getComments2));
 router13.post("/change-requests/:id/comments", requirePermission("change-requests", "edit"), asyncHandler(createComment2));
 router13.get("/change-requests/:id/attachments", asyncHandler(getAttachments2));
 router13.post("/change-requests/:id/attachments", requirePermission("change-requests", "edit"), asyncHandler(createAttachment2));
-router13.put("/change-requests/:id/approve", requirePermission("change-requests", "edit"), asyncHandler(approveChangeRequest3));
-router13.put("/change-requests/:id/reject", requirePermission("change-requests", "edit"), asyncHandler(rejectChangeRequest3));
+router13.put("/change-requests/:id/approve", requireRole(["Office", "PMS Admin", "Sail Admin"]), requirePermission("change-requests", "edit"), asyncHandler(approveChangeRequest3));
+router13.put("/change-requests/:id/reject", requireRole(["Office", "PMS Admin", "Sail Admin"]), requirePermission("change-requests", "edit"), asyncHandler(rejectChangeRequest3));
 router13.get("/change-requests/:id/rejection-history", asyncHandler(getRejectionHistory4));
 router13.get("/change-requests/:id", asyncHandler(getChangeRequest3));
 var routes_default13 = router13;
@@ -75083,12 +75818,15 @@ async function updateComponentFromRow(componentCode, row, vesselId, existingComp
   return await storage.updateComponent(component.cuuid, updateData);
 }
 async function createWorkOrderFromRow(row, templateCode, vesselId) {
+  if (!vesselId?.trim()) {
+    throw new Error("Vessel ID is required for bulk-import work order generation");
+  }
   const componentCode = String(row["Generated_Component_Code"]).trim();
   const component = await storage.getComponent(componentCode);
   let jobId = null;
   let matchingJob = null;
   const jobTitle = row["Job_Title"] || "";
-  const effectiveVesselId = vesselId || "V001";
+  const effectiveVesselId = vesselId;
   if (component && jobTitle) {
     try {
       const jobs2 = await storage.getJobs(effectiveVesselId);
@@ -78035,8 +78773,9 @@ router16.get("/forms/runtime/:name", asyncHandler(getRuntimeSchema2));
 var routes_default16 = router16;
 
 // server/modules/chatbot/routes.ts
-import { Router as Router17 } from "express";
+init_auth();
 init_middleware();
+import { Router as Router17 } from "express";
 
 // server/services/chatbotService.ts
 init_db();
@@ -80623,6 +81362,7 @@ var routes_default17 = router17;
 
 // server/modules/misc/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router18 } from "express";
 import multer4 from "multer";
 
@@ -80685,6 +81425,35 @@ init_externalApi();
 init_sync();
 init_schema();
 import { sql as sql21, eq as eq28, and as and25 } from "drizzle-orm";
+function normalizeSourceDeletionState(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1";
+  }
+  return false;
+}
+function getSourceDeletionState(entry) {
+  if (entry && entry.isDeleted !== void 0 && entry.isDeleted !== null) {
+    return normalizeSourceDeletionState(entry.isDeleted);
+  }
+  return normalizeSourceDeletionState(entry?.is_deleted);
+}
+async function upsertMasterRecord(db2, table, id, insertValues, updateValues, isDeleted, stats) {
+  const existing = await db2.select({ id: table.id }).from(table).where(eq28(table.id, id)).limit(1);
+  await db2.insert(table).values(insertValues).onConflictDoUpdate({
+    target: table.id,
+    set: updateValues
+  });
+  if (isDeleted) {
+    stats.deleted++;
+  } else if (existing.length > 0) {
+    stats.updated++;
+  } else {
+    stats.inserted++;
+  }
+}
 async function jobDueScan(req, res) {
   const { jobDueScanner: jobDueScanner2 } = await Promise.resolve().then(() => (init_jobDueScanner(), jobDueScanner_exports));
   const vesselId = req.body?.vesselId;
@@ -80958,13 +81727,13 @@ async function syncMasters(req, res) {
     return res.status(400).json({ error: 'Missing required "domain" parameter in request body.' });
   }
   const stats = {
-    vessels: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    vesselTypes: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    additionalGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    ports: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    users: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    fleetGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] },
-    approvers: { inserted: 0, updated: 0, skipped: 0, errors: [] }
+    vessels: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    vesselTypes: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    additionalGroups: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    ports: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    users: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    fleetGroups: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] },
+    approvers: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] }
   };
   const fetchExternal = async (endpoint, key) => {
     const url = buildExternalMasterDataUrl(endpoint, domain);
@@ -81018,29 +81787,33 @@ async function syncMasters(req, res) {
       const name = getFieldValue(v, ["vessel", "vesselName", "name"]) || "Unknown";
       const imoNumber = getFieldValue(v, ["imo_number", "imoNumber", "imo_no", "imo"]);
       const vesselType = getFieldValue(v, ["vessel_type_name", "vesselTypeName", "vessel_type", "vesselType", "type"]);
-      await db2.insert(vessels).values({
+      const isDeleted = getSourceDeletionState(v);
+      const externalVCode = getFieldValue(v, ["v_code"]);
+      const vCodeValue = externalVCode && externalVCode.trim().length > 0 ? externalVCode.trim() : null;
+      const vCodeFields = vCodeValue === null ? {} : { vCode: vCodeValue };
+      await upsertMasterRecord(db2, vessels, entryId, {
         id: entryId,
         vuuid: entryId,
         name,
         code: entryId,
         imoNumber,
         vesselType,
-        isActive: true,
+        isActive: !isDeleted,
+        isDeleted,
         createdAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: vessels.id,
-        set: {
-          name,
-          code: entryId,
-          imoNumber,
-          vesselType,
-          isActive: true,
-          updatedAt: now,
-          vuuid: sql21`COALESCE(${vessels.vuuid}, EXCLUDED.vuuid)`
-        }
-      });
-      stats.vessels.updated++;
+        updatedAt: now,
+        ...vCodeFields
+      }, {
+        name,
+        code: entryId,
+        imoNumber,
+        vesselType,
+        isActive: !isDeleted,
+        isDeleted,
+        updatedAt: now,
+        vuuid: sql21`COALESCE(${vessels.vuuid}, EXCLUDED.vuuid)`,
+        ...vCodeFields
+      }, isDeleted, stats.vessels);
     } catch (e) {
       stats.vessels.errors.push(`Vessel ${v.vuid || v.vesselId}: ${e.message}`);
     }
@@ -81061,6 +81834,7 @@ async function syncMasters(req, res) {
         continue;
       }
       const name = getFieldValue(vt, ["vesselType", "vesselTypeName", "name", "type_name"]) || "Unknown";
+      const isDeleted = getSourceDeletionState(vt);
       const classifications = [];
       if (vt.tanker === 1) classifications.push("Tanker");
       if (vt.oilTanker === 1) classifications.push("Oil");
@@ -81069,17 +81843,14 @@ async function syncMasters(req, res) {
       if (vt.dry === 1) classifications.push("Dry");
       if (vt.container === 1) classifications.push("Container");
       const classification = classifications.length > 0 ? classifications.join(", ") : null;
-      await db2.insert(vesselTypes).values({
+      await upsertMasterRecord(db2, vesselTypes, entryId, {
         id: entryId,
         name,
         classification,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: vesselTypes.id,
-        set: { name, classification, syncedAt: now, updatedAt: now }
-      });
-      stats.vesselTypes.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { name, classification, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.vesselTypes);
     } catch (e) {
       stats.vesselTypes.errors.push(`VesselType ${vt.vtuid}: ${e.message}`);
     }
@@ -81101,17 +81872,15 @@ async function syncMasters(req, res) {
       }
       const name = getFieldValue(ag, ["group_name", "groupName", "name", "additional_group_name"]) || "Unknown";
       const description = getFieldValue(ag, ["vessels", "group_description", "desc"]);
-      await db2.insert(additionalGroups).values({
+      const isDeleted = getSourceDeletionState(ag);
+      await upsertMasterRecord(db2, additionalGroups, entryId, {
         id: entryId,
         name,
         description,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: additionalGroups.id,
-        set: { name, description, syncedAt: now, updatedAt: now }
-      });
-      stats.additionalGroups.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { name, description, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.additionalGroups);
     } catch (e) {
       stats.additionalGroups.errors.push(`AdditionalGroup ${ag.id}: ${e.message}`);
     }
@@ -81133,17 +81902,15 @@ async function syncMasters(req, res) {
       }
       const name = getFieldValue(p, ["port_name", "portName", "name"]) || "Unknown";
       const country = getFieldValue(p, ["country_name", "countryName", "country"]);
-      await db2.insert(ports).values({
+      const isDeleted = getSourceDeletionState(p);
+      await upsertMasterRecord(db2, ports, entryId, {
         id: entryId,
         name,
         country,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: ports.id,
-        set: { name, country, syncedAt: now, updatedAt: now }
-      });
-      stats.ports.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { name, country, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.ports);
     } catch (e) {
       stats.ports.errors.push(`Port ${p.puid}: ${e.message}`);
     }
@@ -81169,7 +81936,8 @@ async function syncMasters(req, res) {
       const userType = getFieldValue(u, ["user_type", "userType", "type"]);
       const department = getFieldValue(u, ["department", "department_name", "dept"]);
       const email = getFieldValue(u, ["email", "email_address", "user_email"]);
-      await db2.insert(masterUsers).values({
+      const isDeleted = getSourceDeletionState(u);
+      await upsertMasterRecord(db2, masterUsers, entryId, {
         id: entryId,
         fullName,
         role,
@@ -81178,12 +81946,9 @@ async function syncMasters(req, res) {
         department,
         email,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: masterUsers.id,
-        set: { fullName, role, designation, userType, department, email, syncedAt: now, updatedAt: now }
-      });
-      stats.users.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { fullName, role, designation, userType, department, email, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.users);
     } catch (e) {
       stats.users.errors.push(`User ${u.uuid}: ${e.message}`);
     }
@@ -81205,17 +81970,15 @@ async function syncMasters(req, res) {
       }
       const name = getFieldValue(fg, ["fleet_group_name", "fleetGroupName", "name", "group_name"]) || "Unknown";
       const description = getFieldValue(fg, ["vessels", "fleet_group_description", "desc"]);
-      await db2.insert(fleetGroups).values({
+      const isDeleted = getSourceDeletionState(fg);
+      await upsertMasterRecord(db2, fleetGroups, entryId, {
         id: entryId,
         name,
         description,
         syncedAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: fleetGroups.id,
-        set: { name, description, syncedAt: now, updatedAt: now }
-      });
-      stats.fleetGroups.updated++;
+        updatedAt: now,
+        isDeleted
+      }, { name, description, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.fleetGroups);
     } catch (e) {
       stats.fleetGroups.errors.push(`FleetGroup ${fg.fleet_group_id}: ${e.message}`);
     }
@@ -81275,6 +82038,7 @@ async function reconcileApprovers(fetchedApprovers, now, stats) {
       continue;
     }
     const isActiveRaw = a.isActive ?? a.is_active;
+    const isDeleted = getSourceDeletionState(a);
     rows.push({
       name: getFieldValue(a, ["name", "fullname", "fullName", "userName"]) || null,
       userId,
@@ -81282,39 +82046,66 @@ async function reconcileApprovers(fetchedApprovers, now, stats) {
       approverLevel,
       emailId: getFieldValue(a, ["emailId", "email_id", "email"]) || null,
       modulename: getFieldValue(a, ["modulename", "moduleName"]) || "Technical",
-      isActive: isActiveRaw === 1 || isActiveRaw === true ? 1 : 0
+      isActive: isDeleted ? 0 : normalizeSourceDeletionState(isActiveRaw) ? 1 : 0,
+      isDeleted
     });
   }
+  rows.sort((left, right) => `${left.userId}\0${left.approverLevel}\0${left.modulename}`.localeCompare(`${right.userId}\0${right.approverLevel}\0${right.modulename}`));
   try {
     await client.query("BEGIN");
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('moc_approvers:Technical:reconcile'))`);
     for (const r of rows) {
-      const res = await client.query(
-        `INSERT INTO moc_approvers
-           (name, user_id, user_uuid, approver_level, email_id, modulename, is_active, is_sync, is_deleted, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,true,false,$8)
-         ON CONFLICT (user_id, approver_level, modulename) WHERE is_deleted = false
-         DO UPDATE SET
-           name = EXCLUDED.name,
-           user_uuid = EXCLUDED.user_uuid,
-           email_id = EXCLUDED.email_id,
-           is_active = EXCLUDED.is_active,
-           is_sync = true,
-           updated_at = EXCLUDED.updated_at
-         RETURNING (xmax = 0) AS inserted`,
-        [r.name, r.userId, r.userUuid, r.approverLevel, r.emailId, r.modulename, r.isActive, now]
+      const existing = await client.query(
+        `SELECT id
+           FROM moc_approvers
+          WHERE user_id = $1 AND approver_level = $2 AND modulename = $3
+          ORDER BY
+            CASE WHEN COALESCE(is_deleted, false) THEN 1 ELSE 0 END,
+            updated_at DESC NULLS LAST,
+            id DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [r.userId, r.approverLevel, r.modulename]
       );
-      if (res.rows[0]?.inserted) stats.inserted++;
-      else stats.updated++;
+      if (existing.rows[0]) {
+        await client.query(
+          `UPDATE moc_approvers
+              SET name = $1,
+                  user_uuid = $2,
+                  email_id = $3,
+                  is_active = $4,
+                  is_sync = true,
+                  is_deleted = $5,
+                  updated_at = $6
+            WHERE id = $7`,
+          [r.name, r.userUuid, r.emailId, r.isActive, r.isDeleted, now, existing.rows[0].id]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO moc_approvers
+             (name, user_id, user_uuid, approver_level, email_id, modulename, is_active, is_sync, is_deleted, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8,$9)`,
+          [r.name, r.userId, r.userUuid, r.approverLevel, r.emailId, r.modulename, r.isActive, r.isDeleted, now]
+        );
+      }
+      if (r.isDeleted) {
+        stats.deleted = (stats.deleted ?? 0) + 1;
+      } else if (existing.rows[0]) {
+        stats.updated++;
+      } else {
+        stats.inserted++;
+      }
     }
-    let evictSql = `UPDATE moc_approvers SET is_deleted = true, updated_at = $1
-        WHERE is_sync = true AND is_deleted = false AND modulename = 'Technical'`;
+    let evictSql = `UPDATE moc_approvers SET is_deleted = true, is_active = 0, updated_at = $1
+        WHERE is_sync = true AND COALESCE(is_deleted, false) = false AND modulename = 'Technical'`;
     const evictParams = [now];
     if (rows.length > 0) {
       const keyPlaceholders = rows.map((_, i) => `($${i * 2 + 2}, $${i * 2 + 3})`).join(", ");
       evictSql += ` AND (user_id, approver_level) NOT IN (${keyPlaceholders})`;
       rows.forEach((r) => evictParams.push(r.userId, r.approverLevel));
     }
-    await client.query(evictSql, evictParams);
+    const evicted = await client.query(`${evictSql} RETURNING id`, evictParams);
+    stats.deleted = (stats.deleted ?? 0) + (evicted.rowCount ?? 0);
     await client.query("COMMIT");
   } catch (err) {
     try {
@@ -81706,6 +82497,7 @@ var routes_default18 = router18;
 
 // server/modules/access-control/routes.ts
 init_storage();
+init_auth();
 import { Router as Router19 } from "express";
 
 // server/modules/access-control/controllers/viewModeController.ts
@@ -82039,6 +82831,7 @@ var routes_default19 = router19;
 
 // server/modules/audit/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router20 } from "express";
 
 // server/modules/audit/service.ts
@@ -82412,6 +83205,7 @@ var routes_default20 = router20;
 
 // server/modules/retention/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router21 } from "express";
 
 // server/modules/retention/service.ts
@@ -84107,6 +84901,7 @@ var routes_default24 = router24;
 
 // server/modules/rotational-items/routes.ts
 init_middleware();
+init_auth();
 import { Router as Router25 } from "express";
 
 // server/modules/rotational-items/controllers/rotationalItemController.ts
@@ -84193,6 +84988,7 @@ var NOON_MODULE_ENABLED = false;
 
 // server/modules/noon-report/routes.ts
 init_middleware();
+init_auth();
 init_permissions();
 
 // server/modules/noon-report/repositories/noonReportRepository.ts
@@ -85335,6 +86131,10 @@ moduleRouter.use(routes_default25);
 moduleRouter.use(routes_default26);
 var modules_default = moduleRouter;
 
+// server/routes.ts
+init_auth();
+import { z as z7 } from "zod";
+
 // server/middleware/tenantMiddleware.ts
 init_tenantConnectionManager();
 import jwt from "jsonwebtoken";
@@ -86043,19 +86843,37 @@ async function registerRoutes(app2) {
       res.status(500).json({ success: false, error: "Failed to fetch approval workflow config" });
     }
   });
-  app2.put("/technical/api/admin/approval-workflow-config", async (req, res) => {
-    try {
-      const { rows } = req.body;
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return res.status(400).json({ success: false, error: "rows array required" });
+  const awcRowSchema = z7.object({
+    moduleId: z7.string().min(1),
+    subModuleId: z7.string().min(1),
+    functionId: z7.string().min(1),
+    variableName: z7.string().min(1),
+    level1Enabled: z7.boolean(),
+    level2Enabled: z7.boolean()
+  }).passthrough();
+  const awcPutSchema = z7.object({ rows: z7.array(awcRowSchema).min(1) });
+  app2.put(
+    "/technical/api/admin/approval-workflow-config",
+    requireRole(["Office", "PMS Admin", "Sail Admin"]),
+    async (req, res) => {
+      try {
+        const { isShipInstance: isShipInstance3 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+        if (await isShipInstance3()) {
+          return res.status(403).json({ success: false, error: "shore_only", message: "The approval workflow matrix is configured on the shore server and synced to ships." });
+        }
+        const parsed = awcPutSchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: "Invalid approval workflow config payload", details: parsed.error.errors });
+        }
+        const actor = req.user?.userUuid || req.user?.username || "system";
+        const updated = await storage.upsertApprovalWorkflowConfig(parsed.data.rows, actor);
+        res.json({ success: true, data: updated });
+      } catch (err) {
+        console.error("[ApprovalWorkflowConfig] PUT error:", err);
+        res.status(500).json({ success: false, error: "Failed to save approval workflow config" });
       }
-      const updated = await storage.upsertApprovalWorkflowConfig(rows);
-      res.json({ success: true, data: updated });
-    } catch (err) {
-      console.error("[ApprovalWorkflowConfig] PUT error:", err);
-      res.status(500).json({ success: false, error: "Failed to save approval workflow config" });
     }
-  });
+  );
   const httpServer = createServer(app2);
   (async () => {
     const RH_SELF_HEAL_LOCK_KEY = 427167001;
@@ -86319,7 +87137,12 @@ var vite_config_default = defineConfig({
     alias: {
       "@": path11.resolve(import.meta.dirname, "client", "src"),
       "@shared": path11.resolve(import.meta.dirname, "shared"),
-      "@assets": path11.resolve(import.meta.dirname, "attached_assets")
+      "@assets": path11.resolve(import.meta.dirname, "attached_assets"),
+      // jspdf is blanket-blocked by the workspace security policy (CVE).
+      // These stubs let the build resolve; PDF export shows a graceful message.
+      // Restore by removing these two lines once the block is lifted.
+      "jspdf": path11.resolve(import.meta.dirname, "client", "src", "lib", "stubs", "jspdf.ts"),
+      "jspdf-autotable": path11.resolve(import.meta.dirname, "client", "src", "lib", "stubs", "jspdf-autotable.ts")
     }
   },
   root: path11.resolve(import.meta.dirname, "client"),
