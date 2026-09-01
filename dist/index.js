@@ -87234,8 +87234,8 @@ init_migrations();
 init_buildInfo();
 init_tenantConnectionManager();
 var app = express2();
-app.use(express2.json({ limit: "50mb" }));
-app.use(express2.urlencoded({ extended: false, limit: "50mb" }));
+app.use(express2.json({ limit: "100mb" }));
+app.use(express2.urlencoded({ extended: false, limit: "100mb" }));
 app.use((req, res, next) => {
   const start = Date.now();
   const path14 = req.path;
