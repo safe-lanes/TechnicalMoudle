@@ -11,7 +11,7 @@
  * THE FIX: when shore receives a ship push whose work_orders changes land a COMPLETED
  * status (field log or self-heal full row), recompute the linked job's cycle from the
  * received WO snapshot — using the SAME shared calculation the ship used
- * (computeJobCycleUpdates) — and advance shore's job/link tracking columns.
+ * (computeJobCycleUpdates) — and advance shore's Job tracking columns.
  *
  * INVARIANTS:
  *  - Source of truth is the received WO snapshot's completion date + completion RH
@@ -34,7 +34,6 @@ import { syncDiag } from './syncDiagLogger';
 export interface LearnResult {
   candidates: number;
   jobsAdvanced: number;
-  linksAdvanced: number;
   skipped: number;
   errors: number;
 }
@@ -90,10 +89,8 @@ function toNum(v: any): number | null {
 export function filterAdvanceOnly(
   localJob: { last_done_date?: any; last_done_rh?: any },
   jobUpdates: Record<string, any>,
-  linkUpdates: Record<string, any>,
-): { jobUpdates: Record<string, any>; linkUpdates: Record<string, any> } | null {
+): Record<string, any> | null {
   const ju = { ...jobUpdates };
-  const lu = { ...linkUpdates };
 
   // Calendar leg — advance only when incoming lastDoneDate is strictly newer (or local unset).
   if (ju.lastDoneDate !== undefined) {
@@ -102,7 +99,6 @@ export function filterAdvanceOnly(
     const advance = incoming !== null && (local === null || incoming > local);
     if (!advance) {
       delete ju.lastDoneDate; delete ju.nextDueDate;
-      delete lu.lastDoneDate; delete lu.nextDueDate;
     }
   }
   // RH leg — advance only when incoming lastDoneRH is strictly higher (or local unset).
@@ -112,10 +108,9 @@ export function filterAdvanceOnly(
     const advance = incoming !== null && (local === null || incoming > local);
     if (!advance) {
       delete ju.lastDoneRH; delete ju.nextDueRH;
-      delete lu.lastDoneRH; delete lu.nextDueRH;
     }
   }
-  return Object.keys(ju).length > 0 ? { jobUpdates: ju, linkUpdates: lu } : null;
+  return Object.keys(ju).length > 0 ? ju : null;
 }
 
 const COL_MAP: Record<string, string> = {
@@ -140,25 +135,46 @@ function buildSet(updates: Record<string, any>, startIdx: number): { sql: string
 }
 
 /**
- * Advance shore job/link tracking for the given completed WO uuids.
+ * Advance shore Job tracking for the given completed WO uuids.
  * MUST be called with the same client/transaction as the field-log apply.
  */
 export async function learnFromShipCompletions(client: PoolClient, wouuids: string[]): Promise<LearnResult> {
-  const result: LearnResult = { candidates: wouuids.length, jobsAdvanced: 0, linksAdvanced: 0, skipped: 0, errors: 0 };
+  const result: LearnResult = { candidates: wouuids.length, jobsAdvanced: 0, skipped: 0, errors: 0 };
+  // Every caller owns the surrounding transaction, but keep this guard local to the
+  // learner as well so a future caller cannot field-log the derived Job projection
+  // back to the vessel and create a sync loop.
+  await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
   for (let i = 0; i < wouuids.length; i++) {
     const wouuid = wouuids[i];
     const sp = `learn_wo_${i}`;
     try {
       await client.query(`SAVEPOINT ${sp}`);
       const woRes = await client.query(
-        `SELECT wouuid, status, job_id, component_id, vessel_id, maintenance_basis,
+        `SELECT wouuid, status, job_id, vessel_id, maintenance_basis,
                 date_completed, wo_completion_rh, completion_rh, current_reading,
                 next_due_date, due_date, work_order_no
            FROM work_orders WHERE wouuid = $1 LIMIT 1`,
         [wouuid],
       );
       const wo = woRes.rows[0];
-      if (!wo || !isCompletedStatus(wo.status) || !wo.job_id) { result.skipped++; await client.query(`RELEASE SAVEPOINT ${sp}`); continue; }
+      if (!wo) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wouuid} is missing on shore`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+      if (!isCompletedStatus(wo.status)) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} is not completed (status=${wo.status || 'NULL'})`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+      if (!wo.job_id) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: completed WO ${wo.work_order_no || wouuid} has no job_id`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
 
       // Row-lock the job against concurrent shore edits within this transaction.
       const jobRes = await client.query(
@@ -168,11 +184,22 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
         [wo.job_id],
       );
       const job = jobRes.rows[0];
-      if (!job) { result.skipped++; await client.query(`RELEASE SAVEPOINT ${sp}`); continue; }
+      if (!job) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: completed WO ${wo.work_order_no || wouuid} references missing Job ${wo.job_id}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+      if (wo.vessel_id && job.vessel_id && wo.vessel_id !== job.vessel_id) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} vessel ${wo.vessel_id} does not match Job ${job.job_no} vessel ${job.vessel_id}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
 
       // Completion RH source chain mirrors the completion service (R1).
       const completionRH = wo.wo_completion_rh ?? wo.completion_rh ?? wo.current_reading;
-      const { jobUpdates, linkUpdates } = computeJobCycleUpdates({
+      const { jobUpdates } = computeJobCycleUpdates({
         maintenanceBasis: wo.maintenance_basis,
         dateOfCompletion: wo.date_completed,
         completionRH: completionRH != null ? String(completionRH) : null,
@@ -184,34 +211,31 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
         },
       });
 
-      const filtered = filterAdvanceOnly(job, jobUpdates, linkUpdates);
-      if (!filtered) { result.skipped++; await client.query(`RELEASE SAVEPOINT ${sp}`); continue; }
+      const filtered = filterAdvanceOnly(job, jobUpdates);
+      if (!filtered) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} does not advance shore Job ${job.job_no}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
 
-      const jobSet = buildSet(filtered.jobUpdates, 2);
+      const jobSet = buildSet(filtered, 2);
       await client.query(`UPDATE jobs SET ${jobSet.sql} WHERE juuid = $1`, [job.juuid, ...jobSet.values]);
       result.jobsAdvanced++;
 
-      const vesselId = wo.vessel_id || job.vessel_id;
-      if (wo.component_id && vesselId && Object.keys(filtered.linkUpdates).length > 0) {
-        const linkSet = buildSet(filtered.linkUpdates, 4);
-        const linkRes = await client.query(
-          `UPDATE job_component_links SET ${linkSet.sql}
-            WHERE vessel_id = $1 AND job_id = $2 AND component_id = $3`,
-          [vesselId, job.juuid, wo.component_id, ...linkSet.values],
-        );
-        if ((linkRes.rowCount ?? 0) > 0) result.linksAdvanced++;
-      }
-
-      syncDiag(`COMPLETION-LEARN: WO ${wo.work_order_no || wouuid} advanced shore job ${job.job_no} → ${JSON.stringify(filtered.jobUpdates)}`);
+      syncDiag(`COMPLETION-LEARN: WO ${wo.work_order_no || wouuid} advanced shore job ${job.job_no} → ${JSON.stringify(filtered)}`);
       await client.query(`RELEASE SAVEPOINT ${sp}`);
     } catch (err: any) {
       result.errors++;
-      try { await client.query(`ROLLBACK TO SAVEPOINT ${sp}`); } catch { /* non-fatal */ }
+      try {
+        await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+      } catch { /* non-fatal */ }
       syncDiag(`COMPLETION-LEARN ERROR: WO ${wouuid}: ${String(err?.message || err).substring(0, 160)}`);
     }
   }
   if (wouuids.length > 0) {
-    syncDiag(`COMPLETION-LEARN SUMMARY: candidates=${result.candidates} jobsAdvanced=${result.jobsAdvanced} linksAdvanced=${result.linksAdvanced} skipped=${result.skipped} errors=${result.errors}`);
+    syncDiag(`COMPLETION-LEARN SUMMARY: candidates=${result.candidates} jobsAdvanced=${result.jobsAdvanced} skipped=${result.skipped} errors=${result.errors}`);
   }
   return result;
 }

@@ -15,6 +15,7 @@ import {
   WO_COMPLETION_FIELDS_SNAKE,
   RESOLUTION_ACTOR,
   DUAL_COMPLETION_KIND,
+  findWouuidsWithOpenDualConflicts,
 } from '../dualCompletionResolver';
 
 describe('chooseInterimSide — deterministic interim winner', () => {
@@ -119,5 +120,31 @@ describe('completion-field membership', () => {
     expect(RESOLUTION_ACTOR).toBe('sync-conflict-resolution');
     expect(DUAL_COMPLETION_KIND).toBe('dual_completion');
     expect(WO_COMPLETION_FIELDS_SNAKE.has('status')).toBe(true);
+  });
+});
+
+describe('completion-learning conflict hold', () => {
+  it('returns every Work Order that still has an open dual-completion conflict', async () => {
+    const queries: Array<{ sql: string; params?: any[] }> = [];
+    const client = {
+      async query(sql: string, params?: any[]) {
+        queries.push({ sql, params });
+        return { rows: [{ row_uuid: 'wo-open-1' }, { row_uuid: 'wo-open-2' }] };
+      },
+    };
+
+    const open = await findWouuidsWithOpenDualConflicts(
+      client,
+      ['wo-open-1', 'wo-resolved', 'wo-open-2'],
+    );
+
+    expect(Array.from(open).sort()).toEqual(['wo-open-1', 'wo-open-2']);
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toContain(`conflict_kind = $1`);
+    expect(queries[0].sql).toContain(`is_resolved = false`);
+    expect(queries[0].params).toEqual([
+      DUAL_COMPLETION_KIND,
+      ['wo-open-1', 'wo-resolved', 'wo-open-2'],
+    ]);
   });
 });
