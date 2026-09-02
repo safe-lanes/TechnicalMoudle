@@ -238,8 +238,11 @@ export async function createSuperintendentNotificationForWO(wo: any, daysLate: n
 
 // ── List Work Orders with Enrichment ──
 
-export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
-  const allRows = await repo.findWorkOrders(vesselId, vesselIds);
+export async function listWorkOrders(vesselId?: string, vesselIds?: string[], preloadedRows?: any[]) {
+  // preloadedRows: a caller that already holds (a subset of) WO rows — e.g. the
+  // alert engine's SQL-prefiltered candidates — reuses this function's enrichment
+  // and status computation unchanged instead of duplicating it.
+  const allRows = preloadedRows ?? await repo.findWorkOrders(vesselId, vesselIds);
 
   // ARCHIVED ROWS ARE NOT LISTED (2026-08-04). The storage layer deliberately returns
   // soft-deleted rows (numbering must see them so archived numbers are never reused),
@@ -527,6 +530,24 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
 export async function getWorkOrdersWithComputedStatus(vesselId?: string, vesselIds?: string[]) {
   const enriched = await listWorkOrders(vesselId, vesselIds);
   return enriched.map((wo: any) => ({ ...wo, status: wo.computedStatus ?? wo.status }));
+}
+
+/**
+ * Overdue vessel WOs for the 5-minute alert scan — CONTRACT-compliant (status is
+ * computed by the same listWorkOrders enrichment), but fed from an SQL-prefiltered
+ * candidate set instead of the entire fleet's WO history. The prefilter drops only
+ * rows whose authored status computeWorkOrderStatus passes through unchanged
+ * (Completed/Cancelled/Pending Approval/Postponed/… can never compute to Overdue),
+ * which on a mature fleet is the vast majority of the table. Perf: the unscoped
+ * getWorkOrdersWithComputedStatus() here loaded ALL WOs + jobs + components of
+ * every vessel every 5 minutes per tenant (prod CPU finding, 02-Sep-2026).
+ */
+export async function getOverdueVesselWorkOrdersForAlerts() {
+  const candidates = await repo.findAlertCandidateWorkOrders();
+  const enriched = await listWorkOrders(undefined, undefined, candidates);
+  return enriched
+    .map((wo: any) => ({ ...wo, status: wo.computedStatus ?? wo.status }))
+    .filter((wo: any) => wo.status === 'Overdue' && wo.dataScope === 'vessel');
 }
 
 export interface ListWorkOrdersPagedParams extends WorkOrderFilterParams {

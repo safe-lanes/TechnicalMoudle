@@ -6,6 +6,12 @@ export async function findWorkOrders(vesselId?: string, vesselIds?: string[]) {
   return storage.getWorkOrders(vesselId, vesselIds);
 }
 
+// Alert-scan candidates: vessel-scoped rows whose authored status can still compute
+// to a derived band (see getOverdueVesselWorkOrdersForAlerts in the service).
+export async function findAlertCandidateWorkOrders() {
+  return storage.getAlertCandidateWorkOrders();
+}
+
 export async function findById(id: string) {
   return storage.getWorkOrder(id);
 }

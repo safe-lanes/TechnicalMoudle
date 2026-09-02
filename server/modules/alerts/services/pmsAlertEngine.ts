@@ -136,11 +136,12 @@ export class PmsAlertEngine {
       if (overduePolicy) {
         try {
           // Status is computed on read (no persisted 'Overdue' band to query).
-          // Source from the enriched work-order list, which sets `status` to the
-          // computed band, then keep the overdue vessel-scoped rows.
-          const { getWorkOrdersWithComputedStatus } = await import('../../work-orders/services/workOrderService');
-          const allComputed = await getWorkOrdersWithComputedStatus();
-          const overdueWOs = allComputed.filter((wo: any) => wo.status === 'Overdue' && wo.dataScope === 'vessel');
+          // CONTRACT-compliant lean read: same enrichment/compute as
+          // getWorkOrdersWithComputedStatus, fed from SQL-prefiltered candidates
+          // instead of the whole fleet's WO history every 5 minutes (prod CPU
+          // finding, 02-Sep-2026 — this scan was two full-fleet loads per tick).
+          const { getOverdueVesselWorkOrdersForAlerts } = await import('../../work-orders/services/workOrderService');
+          const overdueWOs = await getOverdueVesselWorkOrdersForAlerts();
           const alerts = evaluateOverdueJobs(overdueWOs, overduePolicy, existingDedupeKeys);
           for (const alert of alerts) {
             await this.createAlertEvent(overduePolicy, alert);
@@ -156,8 +157,11 @@ export class PmsAlertEngine {
       const lowSparesPolicy = policyMap.get('low_critical_spares');
       if (lowSparesPolicy) {
         try {
-          const allSpares = await alertsRepo.getAllVesselSpares();
-          const alerts = evaluateLowSpares(allSpares, lowSparesPolicy, existingDedupeKeys);
+          // SQL-prefiltered: only critical spares already below minimum (columns the
+          // evaluator reads) — was every spare of the fleet, full rows, every 5 min.
+          // evaluateLowSpares re-applies the same predicate in JS; unchanged on purpose.
+          const candidateSpares = await alertsRepo.getLowCriticalSpareCandidates();
+          const alerts = evaluateLowSpares(candidateSpares, lowSparesPolicy, existingDedupeKeys);
           for (const alert of alerts) {
             await this.createAlertEvent(lowSparesPolicy, alert);
             existingDedupeKeys.add(alert.dedupeKey);

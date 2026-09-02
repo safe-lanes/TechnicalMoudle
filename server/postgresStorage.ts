@@ -5387,6 +5387,52 @@ export class PostgresStorage {
       ));
   }
 
+  // Alert-scan candidate WOs: only rows whose authored status can still compute to a
+  // derived band. Excludes exactly the statuses computeWorkOrderStatus passes through
+  // unchanged (shared/workOrders/status.ts): the FINALIZED set (lowercased/trimmed
+  // compare) and the exact-match workflow statuses. On a mature fleet this drops the
+  // completed history — the bulk of the table — before the 5-minute alert scan
+  // enriches anything. NULL status = candidate.
+  async getAlertCandidateWorkOrders(): Promise<any[]> {
+    const db = await getDb();
+    return await db.select().from(workOrders)
+      .where(and(
+        eq(workOrders.dataScope, 'vessel'),
+        sql`${workOrders.isDeleted} IS NOT TRUE`,
+        sql`(${workOrders.status} IS NULL OR (
+          lower(trim(${workOrders.status})) NOT IN ('completed','approved','closed','cancelled','canceled')
+          AND ${workOrders.status} NOT IN ('Pending Approval','Pending Office Review','Postponed','Awaiting Office Approval','Postponement Approved','Postponement Rejected','Rejected')
+        ))`,
+      ));
+  }
+
+  // Alert-scan candidate spares: SQL mirror of evaluateLowSpares' preconditions
+  // (lowSparesEvaluator.ts) with only the columns it reads — instead of loading
+  // every spare of the fleet, full rows, every 5 minutes.
+  async getLowCriticalSpareCandidates(): Promise<any[]> {
+    const db = await getDb();
+    return await db.select({
+      suuid: spares.suuid,
+      partCode: spares.partCode,
+      partName: spares.partName,
+      rob: spares.rob,
+      min: spares.min,
+      critical: spares.critical,
+      componentCode: spares.componentCode,
+      componentName: spares.componentName,
+      vesselId: spares.vesselId,
+    }).from(spares)
+      .where(and(
+        eq(spares.dataScope, 'vessel'),
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted)),
+        sql`${spares.vesselId} IS NOT NULL`,
+        sql`lower(${spares.critical}) IN ('critical','yes')`,
+        sql`${spares.min} > 0`,
+        sql`${spares.rob} < ${spares.min}`,
+      ));
+  }
+
   async getAllVesselSpares(): Promise<any[]> {
     const db = await getDb();
     return await db.select().from(spares)
