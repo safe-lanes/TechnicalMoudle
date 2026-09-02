@@ -47,7 +47,9 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export class MaintenanceOrchestrator {
   private tasks: MaintTask[] = [
-    { name: "alerts", intervalMs: 5 * 60_000, timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
+    // Interval env-tunable like the sweep's SHORE_WO_SWEEP_INTERVAL_MS (ops ask,
+    // 02-Sep-2026: run alerts every 12h → MAINT_ALERTS_INTERVAL_MS=43200000).
+    { name: "alerts", intervalMs: Math.max(60_000, envInt("MAINT_ALERTS_INTERVAL_MS", 5 * 60_000)), timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
     { name: "health", intervalMs: 6 * 60 * 60_000, timeoutMs: TIMEOUT_HEALTH_MS, run: () => runHealthCheck() },
     { name: "pruning", intervalMs: 24 * 60 * 60_000, timeoutMs: TIMEOUT_PRUNING_MS, run: () => runPruning() },
     // Drift = row value vs its OWN newest field log (local only; ship and shore both).
