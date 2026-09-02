@@ -2644,6 +2644,16 @@ export class PostgresStorage {
 
   // ============= MODULE 5: WORK ORDERS =============
 
+  // Light projection for WO numbering — one indexed column instead of full rows.
+  // Full-row getWorkOrders here cost ~930 rows read per WO generated (perf probe 02-Sep-2026).
+  async getWorkOrderNumbers(vesselId?: string): Promise<string[]> {
+    const db = await getDb();
+    const rows = vesselId
+      ? await db.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders).where(eq(workOrders.vesselId, vesselId))
+      : await db.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders);
+    return rows.map(r => r.workOrderNo).filter((n): n is string => !!n);
+  }
+
   async getWorkOrders(vesselId?: string, vesselIds?: string[]): Promise<WorkOrder[]> {
     const db = await getDb();
 

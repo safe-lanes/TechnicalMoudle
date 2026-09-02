@@ -579,6 +579,8 @@ export interface IStorage {
   
   // Work Order methods
   getWorkOrders(vesselId?: string, vesselIds?: string[]): Promise<WorkOrder[]>;
+  /** Light projection for numbering: just work_order_no strings (optional — feature-detected by workOrderNumbering). */
+  getWorkOrderNumbers?(vesselId?: string): Promise<string[]>;
   getWorkOrder(id: string): Promise<WorkOrder | undefined>;
   getWorkOrderByCode(code: string): Promise<WorkOrder | undefined>;
   getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]>;

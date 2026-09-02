@@ -20,6 +20,26 @@ import { ValidationError } from '../modules/shared/errors';
  */
 
 /**
+ * Numbering needs only the work_order_no strings, never full WO rows. Callers in a
+ * generation loop pass the numbers they already hold (preloaded); otherwise use the
+ * storage's light projection when it exists, falling back to the legacy full fetch.
+ * (Perf probe 02-Sep-2026: the full-row fetch here cost ~930 DB rows read per WO
+ * generated and grew with the WO table — the quadratic core of generation cost.)
+ */
+async function getWorkOrderNos(
+  storage: IStorage,
+  vesselId?: string,
+  preloaded?: string[]
+): Promise<string[]> {
+  if (preloaded) return preloaded;
+  if (typeof storage.getWorkOrderNumbers === 'function') {
+    return storage.getWorkOrderNumbers(vesselId);
+  }
+  const allWorkOrders = await storage.getWorkOrders(vesselId);
+  return allWorkOrders.map(wo => wo.workOrderNo).filter((n): n is string => !!n);
+}
+
+/**
  * Generate next work order number for a planned WO
  * Format: <V_CODE>-<JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
  */
@@ -27,24 +47,25 @@ export async function generatePlannedWorkOrderNumber(
   storage: IStorage,
   jobCode: string,
   componentCode: string,
-  vesselId?: string
+  vesselId?: string,
+  preloadedWorkOrderNos?: string[]
 ): Promise<string> {
   const currentYear = new Date().getFullYear();
-  
+
   // Validate required parameters - throw if component code is empty
   if (!componentCode || !componentCode.trim()) {
     throw new Error('Component code is required for planned work order numbering');
   }
-  
+
   // Ensure job code is never empty - fallback to UNKNOWN-JOB if needed
   const safeJobCode = jobCode && jobCode.trim() ? jobCode.trim() : 'UNKNOWN-JOB';
   const safeComponentCode = componentCode.trim();
   const vesselCode = await resolveVesselCode(storage, vesselId);
   const prefix = vesselCode ? `${vesselCode}-` : '';
-  
+
   // Do not reset a sequence when a vessel begins using the v_code-prefixed
   // format. Existing legacy work orders remain part of the no-reuse sequence.
-  const allWorkOrders = await storage.getWorkOrders(vesselId);
+  const workOrderNos = await getWorkOrderNos(storage, vesselId, preloadedWorkOrderNos);
   const legacyPattern = new RegExp(
     `^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
@@ -55,7 +76,7 @@ export async function generatePlannedWorkOrderNumber(
   );
 
   const maxRunningNumber = findMaxSequence(
-    allWorkOrders.map(wo => wo.workOrderNo),
+    workOrderNos,
     [legacyPattern, vesselPrefixedPattern]
   );
   
@@ -90,7 +111,7 @@ export async function generateUnplannedWorkOrderNumber(
   
   // Count the legacy format as well as the vessel-prefixed format so a
   // vessel's component/year sequence never restarts during the rollout.
-  const allWorkOrders = await storage.getWorkOrders(vesselId);
+  const unplannedWorkOrderNos = await getWorkOrderNos(storage, vesselId);
   const legacyPattern = new RegExp(
     `^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
@@ -100,13 +121,13 @@ export async function generateUnplannedWorkOrderNumber(
       : `^.+-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const maxRunningNumber = findMaxSequence(
-    allWorkOrders.map(wo => wo.workOrderNo),
+    unplannedWorkOrderNos,
     [legacyPattern, vesselPrefixedPattern]
   );
-  
+
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, '0');
-  
+
   return `${prefix}UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 

@@ -25,6 +25,46 @@ async function resolveOriginInstance(): Promise<string | null> {
   try { return (await getEffectiveInstanceId()) || null; } catch { return null; }
 }
 
+/** Per-WO detail log lines during generation — off by default (thousands of lines per
+ *  sweep cost real CPU through the PM2 pipe). WO_GEN_VERBOSE_LOGS=true restores them. */
+const WO_GEN_VERBOSE = process.env.WO_GEN_VERBOSE_LOGS === 'true';
+
+/**
+ * One pass over the WO list building the legacy-blocking lookup (active WO with NO
+ * componentCode blocks its whole job). Replaces a per-job allWorkOrders.find() —
+ * that was O(jobs × WOs) with a regex per WO, a measured hot spot of generation.
+ * Same predicate as the find() it replaces; newly created WOs always carry a
+ * componentCode so a set built before the loop stays correct during the run.
+ */
+function buildLegacyBlockingSets(allWorkOrders: any[]): { byJobId: Set<string>; byVesselJobNo: Set<string> } {
+  const byJobId = new Set<string>();
+  const byVesselJobNo = new Set<string>();
+  for (const wo of allWorkOrders) {
+    if ((wo as any).isDeleted === true) continue; // archived rows never block (corpse fix)
+    if (!isBlockingStatus(wo.status)) continue;
+    if (wo.componentCode && wo.componentCode !== '') continue; // not a legacy WO
+    if (wo.jobId) byJobId.add(wo.jobId);
+    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+    if (woJobNo) byVesselJobNo.add(`${wo.vesselId}|${woJobNo}`);
+  }
+  return { byJobId, byVesselJobNo };
+}
+
+/**
+ * One pass building the job+component blocking lookup (an active WO for the same
+ * job + componentCode blocks that pair). Replaces a per-component find(); the
+ * caller adds `${jobId}|${componentCode}` when it creates a WO mid-run.
+ */
+function buildJobComponentBlockingSet(allWorkOrders: any[]): Set<string> {
+  const set = new Set<string>();
+  for (const wo of allWorkOrders) {
+    if ((wo as any).isDeleted === true) continue;
+    if (!isBlockingStatus(wo.status)) continue;
+    if (wo.jobId && wo.componentCode) set.add(`${wo.jobId}|${wo.componentCode}`);
+  }
+  return set;
+}
+
 /**
  * Determine if a job is "critical" based on its jobPriority
  * Critical and High priority jobs are considered critical for lead time purposes
@@ -204,18 +244,28 @@ export class JobDueScannerService {
     };
 
     try {
+      // Fetch jobs + WOs ONCE for the whole scan and share across the three legs
+      // (previously each leg refetched both, full rows — 3× the DB load per scan).
+      // The legs push the WOs they create into the shared array, so later legs see
+      // earlier legs' creations exactly as they did when each leg refetched.
+      const allJobs = await storage.getJobs(scopeVesselId);
+      const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
+
       // Process Calendar-based jobs using existing method
-      const calendarResults = await workOrderService.autoGenerateWorkOrdersFromJobs(scopeVesselId);
+      const calendarResults = await workOrderService.autoGenerateWorkOrdersFromJobs(scopeVesselId, { jobs: allJobs, workOrders: allWorkOrders });
       results.calendarJobsChecked = calendarResults.checked;
       results.calendarWOsGenerated = calendarResults.generated;
+      // Calendar leg tracks its creations in its own results — fold them into the shared
+      // array so the RH/Dual duplicate checks see them (same as their old refetch did).
+      allWorkOrders.push(...calendarResults.workOrders);
 
       // Process Running Hours-based jobs
-      const rhResults = await this.processRunningHoursJobs(scopeVesselId);
+      const rhResults = await this.processRunningHoursJobs(scopeVesselId, allJobs, allWorkOrders);
       results.rhJobsChecked = rhResults.checked;
       results.rhWOsGenerated = rhResults.generated;
 
       // Process Dual Frequency jobs (whichever-first: Calendar OR RH)
-      const dualResults = await this.processDualFrequencyJobs(scopeVesselId);
+      const dualResults = await this.processDualFrequencyJobs(scopeVesselId, allJobs, allWorkOrders);
       results.dualJobsChecked = dualResults.checked;
       results.dualWOsGenerated = dualResults.generated;
 
@@ -251,7 +301,7 @@ export class JobDueScannerService {
    * - RH_effective_current >= RH_generate
    * - AND no DUE/OVERDUE/PENDING APPROVAL/POSTPONED WO exists for same job + same RH_due cycle
    */
-  private async processRunningHoursJobs(scopeVesselId?: string): Promise<{ checked: number; generated: number }> {
+  private async processRunningHoursJobs(scopeVesselId?: string, preloadedJobs?: Job[], preloadedWorkOrders?: any[]): Promise<{ checked: number; generated: number }> {
     const skipReasons = {
       noComponentId: 0,
       componentNotFound: 0,
@@ -263,18 +313,24 @@ export class JobDueScannerService {
       cycleExists: 0,
     };
 
-    // Get only active RH-based jobs (vessel-scoped when an on-demand scope is given)
-    const allJobs = await storage.getJobs(scopeVesselId);
-    const rhJobs = allJobs.filter(job => 
-      job.maintenanceBasis === 'Running Hours' && 
+    // Get only active RH-based jobs (vessel-scoped when an on-demand scope is given;
+    // runScan passes the lists it already fetched so a scan hits the DB once, not per leg)
+    const allJobs = preloadedJobs ?? await storage.getJobs(scopeVesselId);
+    const rhJobs = allJobs.filter(job =>
+      job.maintenanceBasis === 'Running Hours' &&
       job.isActive !== false && // Job must be active
       job.intervalRunningHour && job.intervalRunningHour > 0 // Must have valid frequency
     );
 
     // Get work orders to check for duplicates (scoped to the same vessel when on-demand).
     // Cross-vessel uniqueness is preserved via vessel-scoped keys regardless.
-    const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
-    
+    const allWorkOrders = preloadedWorkOrders ?? await storage.getWorkOrders(scopeVesselId);
+    // Numbering needs only the number strings — maintained across creations in this run.
+    const workOrderNos = allWorkOrders.map((wo: any) => wo.workOrderNo).filter((n: any): n is string => !!n);
+    // One-pass blocking lookups replacing per-job/per-component full scans.
+    const legacyBlocking = buildLegacyBlockingSets(allWorkOrders);
+    const jobComponentBlocking = buildJobComponentBlockingSet(allWorkOrders);
+
     // JOB-LEVEL LOCK: Build sets of jobs that already have an active WO
     // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
     // Uses both jobId (primary) and jobNo (fallback) for comprehensive blocking
@@ -354,21 +410,12 @@ export class JobDueScannerService {
 
       // LEGACY FALLBACK: Check if job has any active WO with NULL/empty componentCode
       // If so, block ALL generation for this job to protect legacy data
-      const legacyBlockingWO = allWorkOrders.find(wo => {
-        if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
-        if (!isBlockingStatus(wo.status)) return false;
-        if (wo.componentCode && wo.componentCode !== '') return false;
-        if (wo.jobId === job.juuid) return true;
-        const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-        if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
-        return false;
-      });
-
-      if (legacyBlockingWO) {
+      // (set lookup — built once before the loop; same predicate as the old find())
+      if (legacyBlocking.byJobId.has(job.juuid) || legacyBlocking.byVesselJobNo.has(`${job.vesselId}|${job.jobNo}`)) {
         skipReasons.legacyBlocking++;
         continue;
       }
-      
+
       // Get ALL linked components for this job from the prefetched batch map
       // (copy so the per-job fallback push below never mutates the shared array).
       const linkedComponents = [...(rhLinksMap.get(job.juuid) ?? [])];
@@ -430,26 +477,20 @@ export class JobDueScannerService {
         }
         
         // COMPONENT-LEVEL CHECK: Check if WO already exists for this job + component combination
-        const existingWOForComponent = allWorkOrders.find(wo =>
-          (wo as any).isDeleted !== true && // archived rows never block (corpse fix)
-          wo.jobId === job.juuid &&
-          wo.componentCode === componentCode &&
-          isBlockingStatus(wo.status)
-        );
-        
-        if (existingWOForComponent) {
+        // (set lookup — maintained on every creation in this run)
+        if (jobComponentBlocking.has(`${job.juuid}|${componentCode}`)) {
           skipReasons.existingWO++;
           continue;
         }
-        
+
         // Component-specific cycle key for RH: `${vesselId}|${jobNo}|${componentCode}|${rhDue}`
         const componentCycleKey = `${job.vesselId || 'unknown'}|${job.jobNo}|${componentCode}|${rhDue}`;
         if (existingCycleWOs.has(componentCycleKey)) {
           skipReasons.cycleExists++;
           continue;
         }
-        
-        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
+
+        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined, workOrderNos);
         
         const workOrderData: InsertWorkOrder = {
           generatedByInstance: await resolveOriginInstance(),
@@ -493,15 +534,19 @@ export class JobDueScannerService {
         try {
           const createdWO = await workOrderService.createWorkOrder(workOrderData);
           generated++;
-          
+
           // Add to maps AND allWorkOrders to prevent duplicate generation in same run
           existingCycleWOs.set(componentCycleKey, createdWO as any);
           allWorkOrders.push(createdWO); // Keep in-memory array in sync for subsequent checks
-          
+          workOrderNos.push(workOrderNo); // later numbering in this run must see it
+          jobComponentBlocking.add(`${job.juuid}|${componentCode}`); // new WO blocks its pair
+
           const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
           console.log(`✅ [RH Trigger 1] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (status: Active/Planned)`);
-          console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${generationAdvanceRH}hrs`);
-          console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
+          if (WO_GEN_VERBOSE) {
+            console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${generationAdvanceRH}hrs`);
+            console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
+          }
         } catch (error: any) {
           console.warn(`⚠️ Failed to create WO for RH job ${job.jobNo} + component ${componentCode}: ${error.message}`);
         }
@@ -529,7 +574,7 @@ export class JobDueScannerService {
    * - job.isActive = true
    * - job.intervalRunningHour > 0 AND job.nextDueDate set
    */
-  private async processDualFrequencyJobs(scopeVesselId?: string): Promise<{ checked: number; generated: number }> {
+  private async processDualFrequencyJobs(scopeVesselId?: string, preloadedJobs?: Job[], preloadedWorkOrders?: any[]): Promise<{ checked: number; generated: number }> {
     const skipReasons = {
       noComponentId: 0,
       componentNotFound: 0,
@@ -542,8 +587,9 @@ export class JobDueScannerService {
       missingRHData: 0,
     };
 
-    // Get only active Dual Frequency jobs (vessel-scoped when an on-demand scope is given)
-    const allJobs = await storage.getJobs(scopeVesselId);
+    // Get only active Dual Frequency jobs (vessel-scoped when an on-demand scope is given;
+    // runScan passes the lists it already fetched so a scan hits the DB once, not per leg)
+    const allJobs = preloadedJobs ?? await storage.getJobs(scopeVesselId);
     const dualJobs = allJobs.filter(job =>
       job.maintenanceBasis === 'Dual Frequency' &&
       job.isActive !== false &&
@@ -555,7 +601,12 @@ export class JobDueScannerService {
       return { checked: 0, generated: 0 };
     }
 
-    const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
+    const allWorkOrders = preloadedWorkOrders ?? await storage.getWorkOrders(scopeVesselId);
+    // Numbering needs only the number strings — maintained across creations in this run.
+    const workOrderNos = allWorkOrders.map((wo: any) => wo.workOrderNo).filter((n: any): n is string => !!n);
+    // One-pass blocking lookups replacing per-job/per-component full scans.
+    const legacyBlocking = buildLegacyBlockingSets(allWorkOrders);
+    const jobComponentBlocking = buildJobComponentBlockingSet(allWorkOrders);
 
     // JOB-LEVEL LOCK: one active WO per job
     const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
@@ -644,17 +695,8 @@ export class JobDueScannerService {
       const triggerLeg = calendarDue ? 'CALENDAR' : 'RH';
 
       // LEGACY FALLBACK: Check for legacy WO without componentCode
-      const legacyBlockingWO = allWorkOrders.find(wo => {
-        if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
-        if (!isBlockingStatus(wo.status)) return false;
-        if (wo.componentCode && wo.componentCode !== '') return false;
-        if (wo.jobId === job.juuid) return true;
-        const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-        if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
-        return false;
-      });
-
-      if (legacyBlockingWO) {
+      // (set lookup — built once before the loop; same predicate as the old find())
+      if (legacyBlocking.byJobId.has(job.juuid) || legacyBlocking.byVesselJobNo.has(`${job.vesselId}|${job.jobNo}`)) {
         skipReasons.legacyBlocking++;
         continue;
       }
@@ -685,19 +727,13 @@ export class JobDueScannerService {
         if (!componentCode) continue;
 
         // COMPONENT-LEVEL CHECK: active WO for this job + component
-        const existingWOForComponent = allWorkOrders.find(wo =>
-          (wo as any).isDeleted !== true && // archived rows never block (corpse fix)
-          wo.jobId === job.juuid &&
-          wo.componentCode === componentCode &&
-          isBlockingStatus(wo.status)
-        );
-
-        if (existingWOForComponent) {
+        // (set lookup — maintained on every creation in this run)
+        if (jobComponentBlocking.has(`${job.juuid}|${componentCode}`)) {
           skipReasons.existingWO++;
           continue;
         }
 
-        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
+        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined, workOrderNos);
 
         // D6: Record BOTH calendar and RH snapshots
         const workOrderData: InsertWorkOrder = {
@@ -751,11 +787,15 @@ export class JobDueScannerService {
           generated++;
 
           allWorkOrders.push(createdWO);
+          workOrderNos.push(workOrderNo); // later numbering in this run must see it
+          jobComponentBlocking.add(`${job.juuid}|${componentCode}`); // new WO blocks its pair
 
           const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
           console.log(`✅ [Dual Trigger] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (trigger: ${triggerLeg})`);
-          console.log(`   Calendar: due=${dueDateStr}, generate=${generateDateStr}, calendarDue=${calendarDue}`);
-          console.log(`   RH: last_done=${rhLastDone}, F=${frequencyRH}, due=${rhDue}, generate=${rhGenerate}, current=${rhEffectiveCurrent}, rhDue=${rhLegDue}`);
+          if (WO_GEN_VERBOSE) {
+            console.log(`   Calendar: due=${dueDateStr}, generate=${generateDateStr}, calendarDue=${calendarDue}`);
+            console.log(`   RH: last_done=${rhLastDone}, F=${frequencyRH}, due=${rhDue}, generate=${rhGenerate}, current=${rhEffectiveCurrent}, rhDue=${rhLegDue}`);
+          }
         } catch (error: any) {
           console.warn(`⚠️ Failed to create WO for Dual job ${job.jobNo} + component ${componentCode}: ${error.message}`);
         }
@@ -1146,8 +1186,11 @@ export class JobDueScannerService {
     
     console.log(`   Computed status: ${computedStatusResult} → DB status: ${dbStatus}`);
     
-    // Generate WO number with correct format
-    const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, effectiveComponentCode, job.vesselId || undefined);
+    // Generate WO number with correct format (reuse the WO list fetched above — no refetch)
+    const workOrderNo = await generatePlannedWorkOrderNumber(
+      storage, job.jobNo, effectiveComponentCode, job.vesselId || undefined,
+      allWorkOrders.map(wo => wo.workOrderNo).filter((n): n is string => !!n),
+    );
     
     const workOrderData: InsertWorkOrder = {
       generatedByInstance: await resolveOriginInstance(),

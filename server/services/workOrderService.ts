@@ -20,6 +20,11 @@ import {
  * Determine if a job is "critical" based on its jobPriority
  * Critical and High priority jobs are considered critical for lead time purposes
  */
+/** Per-WO detail log lines during generation — off by default (thousands of lines
+ *  per fleet sweep cost real CPU through the PM2 pipe). Set WO_GEN_VERBOSE_LOGS=true
+ *  to restore them while debugging. The one-line ✅ per WO and summaries stay. */
+const WO_GEN_VERBOSE = process.env.WO_GEN_VERBOSE_LOGS === 'true';
+
 function isJobCritical(job: Job): boolean {
   const priority = job.jobPriority?.toLowerCase() || '';
   return priority === 'critical' || priority === 'high';
@@ -210,12 +215,17 @@ export class WorkOrderService {
     // FIX: Check by jobId + componentCode to allow one WO per linked component (not just per job)
     // NOTE: If componentCode is null/undefined, fall back to job-level check for backwards compatibility
     if (workOrderData.jobId) {
-      const existingWOs = await storage.getWorkOrders(workOrderData.vesselId);
+      // Fetch only THIS job's WOs (a handful) instead of every WO on the vessel —
+      // the full-row vessel fetch here cost ~400 rows read per WO created
+      // (perf probe 02-Sep-2026). Same predicate as before on the smaller set;
+      // the vessel check preserves the old vessel-scoped fetch's semantics.
+      const existingWOs = await storage.getWorkOrdersByJobId(workOrderData.jobId);
       const newComponentCode = workOrderData.componentCode || null;
-      
+
       const existingActiveWO = existingWOs.find(wo => {
         if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
         if (wo.jobId !== workOrderData.jobId) return false;
+        if (workOrderData.vesselId && wo.vesselId !== workOrderData.vesselId) return false;
         if (!isBlockingStatus(wo.status)) return false;
         
         // Normalize componentCode: treat null, undefined, and empty string as equivalent
@@ -428,22 +438,29 @@ export class WorkOrderService {
    * - Today >= GENERATE_DATE
    * - AND no DUE/OVERDUE/PENDING APPROVAL/POSTPONED WO exists for same job + same DUE_DATE cycle
    */
-  async autoGenerateWorkOrdersFromJobs(vesselId?: string): Promise<{
+  async autoGenerateWorkOrdersFromJobs(vesselId?: string, preloaded?: {
+    jobs?: Job[];
+    workOrders?: WorkOrder[];
+  }): Promise<{
     checked: number;
     generated: number;
     workOrders: WorkOrder[];
   }> {
-    // Get only active Calendar-based jobs
-    const allJobs = await jobService.getJobs(vesselId);
-    const calendarJobs = allJobs.filter(job => 
-      job.maintenanceBasis === 'Calendar' && 
+    // Get only active Calendar-based jobs. A caller running a full scan (jobDueScanner)
+    // passes the jobs/WOs it already fetched so one scan hits the DB once, not per leg.
+    const allJobs = preloaded?.jobs ?? await jobService.getJobs(vesselId);
+    const calendarJobs = allJobs.filter(job =>
+      job.maintenanceBasis === 'Calendar' &&
       job.isActive !== false && // Job must be active
       job.nextDueDate // Must have valid due date
     );
-    
+
     // Get all work orders to check for duplicates
     // Note: We fetch WOs for the specified vessel (or all) but use vessel-scoped keys
-    const allWorkOrders = await this.getWorkOrders(vesselId);
+    const allWorkOrders = preloaded?.workOrders ?? await this.getWorkOrders(vesselId);
+    // Numbering needs only the number strings — maintained across creations in this run
+    // so each new WO sees the numbers minted before it (no per-WO DB refetch).
+    const workOrderNos = allWorkOrders.map(wo => wo.workOrderNo).filter((n): n is string => !!n);
     
     // JOB-LEVEL LOCK: Build sets of jobs that already have an active WO
     // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
@@ -455,7 +472,30 @@ export class WorkOrderService {
     // Uses case-insensitive status matching via isBlockingStatus()
     // Key format is now: `${vesselId}|${jobNo}|${cycleDueDate}` for vessel-scoped uniqueness
     const existingCycleWOs = buildCalendarCycleWOMap(allWorkOrders, vesselId);
-    
+
+    // Prefetch ALL job→component links for the candidate calendar jobs in ONE query
+    // (same batch pattern as the RH/Dual legs in jobDueScanner).
+    const calendarLinksMap = await storage.getLinkedComponentsForJobs(calendarJobs.map(j => j.juuid));
+
+    // Per-vessel component cache for the primary-component fallback (one fetch per
+    // vessel instead of a single-row query per job).
+    const componentCache = new Map<string, Component>();
+    const vesselComponentsFetched = new Set<string>();
+    const getComponentFromCache = async (componentId: string, jobVesselId: string | null): Promise<Component | undefined> => {
+      if (jobVesselId && !vesselComponentsFetched.has(jobVesselId)) {
+        const vesselComponents = await storage.getComponents(jobVesselId);
+        vesselComponents.forEach(c => {
+          componentCache.set(c.id, c);
+          if (c.cuuid) componentCache.set(c.cuuid, c);
+        });
+        vesselComponentsFetched.add(jobVesselId);
+      }
+      const cached = componentCache.get(componentId);
+      if (cached) return cached;
+      // Cache miss (or unscoped job): same single-row lookup as before the cache existed.
+      return storage.getComponent(componentId);
+    };
+
     const results = {
       checked: calendarJobs.length,
       generated: 0,
@@ -496,11 +536,13 @@ export class WorkOrderService {
       
       // FIX: Get ALL linked components for this job (many-to-many relationship)
       // Each linked component should get its own work order
-      const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
-      
+      // (batch map prefetched before the loop — kills the per-job N+1)
+      const linkedComponents = [...(calendarLinksMap.get(job.juuid) ?? [])];
+
       // If no linked components found, fall back to job's primary component
+      // (per-vessel component cache — one fetch per vessel instead of one query per job)
       if (linkedComponents.length === 0 && job.componentId) {
-        const primaryComponent = await storage.getComponent(job.componentId);
+        const primaryComponent = await getComponentFromCache(job.componentId, job.vesselId);
         if (primaryComponent) {
           linkedComponents.push({
             componentId: primaryComponent.cuuid,
@@ -547,8 +589,8 @@ export class WorkOrderService {
           continue; // WO already exists for this component's cycle - skip
         }
         
-        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
-        
+        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined, workOrderNos);
+
         const workOrderData: InsertWorkOrder = {
           vesselId: job.vesselId,
           component: componentName,
@@ -586,14 +628,17 @@ export class WorkOrderService {
           const createdWO = await this.createWorkOrder(workOrderData);
           results.generated++;
           results.workOrders.push(createdWO);
-          
+          workOrderNos.push(workOrderNo); // later numbering in this run must see it
+
           // Add to map to prevent duplicate generation in same run
           existingCycleWOs.set(componentCycleKey, workOrderData as any);
-          
+
           const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
           console.log(`✅ [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (status: Active/Planned)`);
-          console.log(`   last_done=${job.lastDoneDate || 'N/A'}, Generation advance=${WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS} days`);
-          console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split('T')[0]}`);
+          if (WO_GEN_VERBOSE) {
+            console.log(`   last_done=${job.lastDoneDate || 'N/A'}, Generation advance=${WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS} days`);
+            console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split('T')[0]}`);
+          }
         } catch (error: any) {
           console.warn(`⚠️ Failed to create WO for job ${job.jobNo} + component ${componentCode}: ${error.message}`);
         }
