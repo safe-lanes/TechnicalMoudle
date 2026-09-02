@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, Trash2, FileText, Image as ImageIcon, X, Eye } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 export interface FileAttachment {
   id: string;
@@ -161,7 +160,7 @@ export function FileAttachmentDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-[500px] min-w-0 overflow-hidden">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
@@ -169,7 +168,7 @@ export function FileAttachmentDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <input
               ref={fileInputRef}
               type="file"
@@ -184,7 +183,7 @@ export function FileAttachmentDialog({
               type="button"
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full border-dashed border-2 h-20 hover:bg-gray-50"
+              className="w-full min-w-0 border-dashed border-2 h-20 hover:bg-gray-50"
               data-testid="button-upload-file"
             >
               <div className="flex flex-col items-center gap-1">
@@ -195,12 +194,12 @@ export function FileAttachmentDialog({
             </Button>
 
             {attachments.length > 0 && (
-              <ScrollArea className="h-[200px] border rounded-md p-2">
-                <div className="space-y-2">
+              <div className="h-[200px] w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto rounded-md border p-2">
+                <div className="w-full min-w-0 max-w-full space-y-2">
                   {attachments.map((attachment) => (
                     <div
                       key={attachment.id}
-                      className="flex items-center gap-3 p-2 border rounded-md bg-gray-50 hover:bg-gray-100"
+                      className="grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-gray-50 p-2 hover:bg-gray-100"
                       data-testid={`attachment-item-${attachment.id}`}
                     >
                       <div className="flex-shrink-0">
@@ -215,8 +214,12 @@ export function FileAttachmentDialog({
                         )}
                       </div>
                       
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <p
+                          className="max-w-full truncate text-sm font-medium text-gray-900"
+                          title={attachment.name}
+                          aria-label={`Attachment filename: ${attachment.name}`}
+                        >
                           {attachment.name}
                         </p>
                         <p className="text-xs text-gray-500">
@@ -224,7 +227,7 @@ export function FileAttachmentDialog({
                         </p>
                       </div>
 
-                      <div className="flex gap-1">
+                      <div className="flex shrink-0 gap-1">
                         <Button
                           type="button"
                           variant="ghost"
@@ -249,7 +252,7 @@ export function FileAttachmentDialog({
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             )}
 
             {attachments.length === 0 && (
