@@ -261,14 +261,11 @@ const JobsFormPage: React.FC = () => {
           normalizedFrequencyUnit = 'Months';
         }
 
-        // For RH-only jobs, map intervalRunningHour into frequencyValue
-        // For Dual Frequency, keep them separate (calendar leg in frequencyValue, RH leg in intervalRunningHour)
-        const frequencyValue = isRunningHours
-          ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
-          : (context.templateData.frequencyValue || '');
-
-        const intervalRunningHour = isDualFrequency
-          ? (context.templateData.intervalRunningHour || '')
+        // Keep the calendar and RH legs in their canonical fields.
+        // The frequencyValue fallback supports legacy RH jobs that predate intervalRunningHour.
+        const frequencyValue = context.templateData.frequencyValue || '';
+        const intervalRunningHour = (isRunningHours || isDualFrequency)
+          ? (context.templateData.intervalRunningHour || (isRunningHours ? context.templateData.frequencyValue : '') || '')
           : '';
         
         // IMPORTANT: Use activeComponentCode from URL if provided (for multi-linked jobs),
@@ -321,6 +318,18 @@ const JobsFormPage: React.FC = () => {
   };
 
   const handleSaveForApproval = async () => {
+    if (templateData.maintenanceBasis === 'Running Hours') {
+      const intervalRH = Number(templateData.intervalRunningHour);
+      if (!Number.isInteger(intervalRH) || intervalRH <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Frequency (Hours) must be a whole number greater than 0.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     const changedFields = getChangedFields();
     
     if (changedFields.length === 0) {
@@ -425,6 +434,18 @@ const JobsFormPage: React.FC = () => {
       }
     }
 
+    if (templateData.maintenanceBasis === 'Running Hours') {
+      const intervalRH = Number(templateData.intervalRunningHour);
+      if (!Number.isInteger(intervalRH) || intervalRH <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Frequency (Hours) must be a whole number greater than 0.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const updatePayload: Record<string, any> = {};
@@ -511,16 +532,19 @@ const JobsFormPage: React.FC = () => {
       }
       
       await apiRequest('PATCH', `/technical/api/jobs/${jobId}`, updatePayload);
-      
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/jobs/${jobId}/context`] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs'] });
+
+      // Wait for the active job context to reload so the form reflects persisted values,
+      // including the recalculated nextDueRH, rather than a local display alias.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [`/technical/api/jobs/${jobId}/context`] }),
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs'] })
+      ]);
       
       toast({
         title: "Changes saved",
         description: "Job details have been updated successfully.",
       });
       
-      setOriginalData({ ...templateData });
       setIsEditMode(false);
     } catch (error) {
       console.error('Error saving job changes:', error);
@@ -535,9 +559,12 @@ const JobsFormPage: React.FC = () => {
   };
 
   const formatFrequency = () => {
-    if (!templateData.frequencyValue) return '-';
+    const value = templateData.maintenanceBasis === 'Running Hours'
+      ? templateData.intervalRunningHour
+      : templateData.frequencyValue;
+    if (!value) return '-';
     const unit = templateData.maintenanceBasis === 'Running Hours' ? 'Hours' : templateData.frequencyUnit;
-    return `${templateData.frequencyValue} ${unit}`;
+    return `${value} ${unit}`;
   };
 
   const [isExportingHistoryExcel, setIsExportingHistoryExcel] = useState(false);
@@ -1193,8 +1220,11 @@ const JobsFormPage: React.FC = () => {
                   {(() => {
                     const showCalendarFields = templateData.maintenanceBasis === 'Calendar' || templateData.maintenanceBasis === 'Dual Frequency';
                     const showRhOnlyField = templateData.maintenanceBasis === 'Running Hours';
-                    const freqValueChanged = isModifyMode && templateData.frequencyValue !== originalData.frequencyValue;
-                    const freqUnitChanged = isModifyMode && templateData.frequencyUnit !== originalData.frequencyUnit;
+                    const frequencyField = showRhOnlyField ? 'intervalRunningHour' : 'frequencyValue';
+                    const displayedFrequencyValue = showRhOnlyField ? templateData.intervalRunningHour : templateData.frequencyValue;
+                    const originalFrequencyValue = showRhOnlyField ? originalData.intervalRunningHour : originalData.frequencyValue;
+                    const freqValueChanged = isModifyMode && displayedFrequencyValue !== originalFrequencyValue;
+                    const freqUnitChanged = !showRhOnlyField && isModifyMode && templateData.frequencyUnit !== originalData.frequencyUnit;
                     const isFreqModified = freqValueChanged || freqUnitChanged;
                     if (!showCalendarFields && !showRhOnlyField) return null;
                     return (
@@ -1207,13 +1237,16 @@ const JobsFormPage: React.FC = () => {
                         <div className="flex gap-2">
                           {(isModifyMode || isEditMode) ? (
                             <Input
-                              value={templateData.frequencyValue || ''}
-                              onChange={(e) => handleFieldChange('frequencyValue', e.target.value)}
+                              type={showRhOnlyField ? "number" : "text"}
+                              min={showRhOnlyField ? 1 : undefined}
+                              step={showRhOnlyField ? 1 : undefined}
+                              value={displayedFrequencyValue || ''}
+                              onChange={(e) => handleFieldChange(frequencyField, e.target.value)}
                               className={`text-sm flex-1 ${freqValueChanged ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
                               data-testid="JF.A1.14"
                             />
                           ) : (
-                            <Input disabled value={templateData.frequencyValue || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default flex-1" data-testid="JF.A1.14" />
+                            <Input disabled value={displayedFrequencyValue || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default flex-1" data-testid="JF.A1.14" />
                           )}
                           {showRhOnlyField ? (
                             <Input disabled value="Hours" className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
@@ -1233,7 +1266,9 @@ const JobsFormPage: React.FC = () => {
                           )}
                         </div>
                         {isFreqModified && (
-                          <p className="text-xs text-gray-500">Original: {originalData.frequencyValue || '-'} {originalData.frequencyUnit || 'Months'}</p>
+                          <p className="text-xs text-gray-500">
+                            Original: {originalFrequencyValue || '-'} {showRhOnlyField ? 'Hours' : (originalData.frequencyUnit || 'Months')}
+                          </p>
                         )}
                       </div>
                     );

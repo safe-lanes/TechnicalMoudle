@@ -7,6 +7,7 @@ import * as woAutoService from '../services/workOrderAutoService';
 import * as executionService from '../services/executionService';
 import * as complianceAnomalyService from '../services/complianceAnomalyService';
 import * as plannerService from '../services/workOrderPlannerService';
+import * as superintendentNotificationService from '../services/superintendentNotificationService';
 import { ValidationError } from '../../shared/errors';
 import { storage } from '../../../storage';
 import { getRbacIdentity, rbacMatches, type AuthenticatedRequest } from '../../../middleware/auth';
@@ -724,12 +725,30 @@ export async function superintendentAcknowledge(req: Request, res: Response) {
 }
 
 export async function getSuperintendentNotifications(req: Request, res: Response) {
-  const notifications = await storage.getSuperintendentNotifications();
+  const categoryRaw = req.query.category as string | undefined;
+  const category =
+    categoryRaw === 'acknowledged' || categoryRaw === 'information' || categoryRaw === 'pending'
+      ? categoryRaw
+      : 'pending';
+  const vesselIdsRaw = req.query.vesselIds as string | undefined;
+  const notifications = await superintendentNotificationService.listSuperintendentNotifications(
+    category,
+    {
+      vesselId: req.query.vesselId as string | undefined,
+      vesselIds: vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined,
+    },
+  );
   res.json(notifications);
 }
 
 export async function getAllSuperintendentNotifications(req: Request, res: Response) {
-  const notifications = await storage.getAllSuperintendentNotifications();
+  const vesselIdsRaw = req.query.vesselIds as string | undefined;
+  const scope = {
+    vesselId: req.query.vesselId as string | undefined,
+    vesselIds: vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined,
+  };
+  const notifications =
+    await superintendentNotificationService.listAllActiveSuperintendentNotifications(scope);
   res.json(notifications);
 }
 
@@ -820,34 +839,12 @@ export async function getAnomalyForWorkOrder(req: Request, res: Response) {
 }
 
 export async function getSuperintendentNotificationsSummary(req: Request, res: Response) {
-  const vesselId = req.query.vesselId as string | undefined;
-  let vesselName: string | undefined;
-  if (vesselId && vesselId !== 'all') {
-    const vessels = await storage.getVessels();
-    const vessel = vessels.find(v => v.id === vesselId || v.vuuid === vesselId);
-    if (!vessel) {
-      return res.json({ pendingCount: 0, acknowledgedThisMonthCount: 0 });
-    }
-    vesselName = vessel.name;
-  }
-
-  const [unacknowledged, all] = await Promise.all([
-    storage.getSuperintendentNotifications(vesselName),
-    storage.getAllSuperintendentNotifications(vesselName),
-  ]);
-
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-
-  const pendingCount = unacknowledged.length;
-  const acknowledgedThisMonthCount = all.filter((n: any) => {
-    if (!n.isAcknowledged || !n.acknowledgedAt) return false;
-    const ackDate = new Date(n.acknowledgedAt);
-    return ackDate.getMonth() === currentMonth && ackDate.getFullYear() === currentYear;
-  }).length;
-
-  res.json({ pendingCount, acknowledgedThisMonthCount });
+  const vesselIdsRaw = req.query.vesselIds as string | undefined;
+  const summary = await superintendentNotificationService.getSuperintendentNotificationSummary({
+    vesselId: req.query.vesselId as string | undefined,
+    vesselIds: vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined,
+  });
+  res.json(summary);
 }
 
 // ── Work Order Planner ──

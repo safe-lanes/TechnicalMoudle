@@ -374,6 +374,24 @@ export async function updateJob(id: string, body: any) {
   const basisChangingToDual = updateData.maintenanceBasis === 'Dual Frequency' && existingJob.maintenanceBasis !== 'Dual Frequency';
   const componentChangingOnDual = effectiveBasis === 'Dual Frequency' && updateData.componentId !== undefined && updateData.componentId !== existingJob.componentId;
 
+  // Running Hours has one canonical persisted interval. Accept frequencyValue from
+  // legacy/direct callers, but normalize it to intervalRunningHour and do not
+  // overwrite the calendar-frequency column on an RH-only job.
+  if (effectiveBasis === 'Running Hours' && Object.prototype.hasOwnProperty.call(updateData, 'frequencyValue')) {
+    if (!Object.prototype.hasOwnProperty.call(updateData, 'intervalRunningHour')) {
+      updateData.intervalRunningHour = updateData.frequencyValue;
+    }
+    delete updateData.frequencyValue;
+  }
+
+  if (effectiveBasis === 'Running Hours' && Object.prototype.hasOwnProperty.call(updateData, 'intervalRunningHour')) {
+    const normalizedIntervalRH = Number(updateData.intervalRunningHour);
+    if (!Number.isInteger(normalizedIntervalRH) || normalizedIntervalRH <= 0) {
+      throw new ValidationError('Running Hours jobs require Frequency (Hours) to be a whole number greater than 0');
+    }
+    updateData.intervalRunningHour = normalizedIntervalRH;
+  }
+
   if (basisChangingToDual || componentChangingOnDual) {
     // Ensure we have the component for D3 check
     if (!component && effectiveComponentId) {
@@ -426,8 +444,8 @@ export async function updateJob(id: string, body: any) {
 
   if (mergedData.maintenanceBasis === 'Running Hours') {
     const intervalRH = Number(mergedData.intervalRunningHour);
-    if (isNaN(intervalRH) || intervalRH <= 0) {
-      throw new ValidationError('Running Hours jobs require a valid numeric intervalRunningHour greater than 0');
+    if (!Number.isInteger(intervalRH) || intervalRH <= 0) {
+      throw new ValidationError('Running Hours jobs require Frequency (Hours) to be a whole number greater than 0');
     }
 
     if (!component && mergedData.componentId) {

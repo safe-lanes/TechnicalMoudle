@@ -2227,21 +2227,13 @@ export async function updateWorkOrder(id: string, body: any) {
             if (freshWorkOrder.maintenanceBasis === 'Calendar' && dateOfCompletionNorm) {
               const { calculateNextDueDate } = await import('@shared/dateUtils');
               const calendarUpdates: any = { lastDoneDate: dateOfCompletionNorm };
-              const linkUpdates: any = { lastDoneDate: dateOfCompletionNorm, updatedAt: new Date() };
 
               if (job.frequencyValue && job.frequencyUnit) {
                 const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
                 if (nextDue) {
                   calendarUpdates.nextDueDate = nextDue;
-                  linkUpdates.nextDueDate = nextDue;
                   console.log(`✅ Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
                 }
-              }
-
-              const updateVesselId = freshWorkOrder.vesselId || job.vesselId;
-              if (component.cuuid && updateVesselId) {
-                await repo.updateJobComponentLinkTracking(updateVesselId, job.juuid, component.cuuid, linkUpdates);
-                console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneDate: ${dateOfCompletionNorm}`);
               }
 
               await repo.updateJob(job.juuid, calendarUpdates);
@@ -2252,18 +2244,10 @@ export async function updateWorkOrder(id: string, body: any) {
               const currentRH = parseInt(runningHours);
               if (!isNaN(currentRH)) {
                 const rhUpdates: any = { lastDoneRH: currentRH };
-                const rhLinkUpdates: any = { lastDoneRH: currentRH.toString(), updatedAt: new Date() };
                 const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                 if (rhInterval && !isNaN(rhInterval)) {
                   rhUpdates.nextDueRH = currentRH + rhInterval;
-                  rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
                   console.log(`✅ Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
-                }
-
-                const rhUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
-                if (component.cuuid && rhUpdateVesselId) {
-                  await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, component.cuuid, rhLinkUpdates);
-                  console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneRH: ${currentRH}`);
                 }
 
                 await repo.updateJob(job.juuid, rhUpdates);
@@ -2278,14 +2262,12 @@ export async function updateWorkOrder(id: string, body: any) {
             if (freshWorkOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletionNorm) {
               const { calculateNextDueDate } = await import('@shared/dateUtils');
               const dualUpdates: any = { lastDoneDate: dateOfCompletionNorm };
-              const dualLinkUpdates: any = { lastDoneDate: dateOfCompletionNorm, updatedAt: new Date() };
 
               // Calendar leg: ALWAYS update
               if (job.frequencyValue && job.frequencyUnit) {
                 const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
                 if (nextDue) {
                   dualUpdates.nextDueDate = nextDue;
-                  dualLinkUpdates.nextDueDate = nextDue;
                   console.log(`✅ [Dual] Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
                 }
               }
@@ -2295,23 +2277,15 @@ export async function updateWorkOrder(id: string, body: any) {
                 const dualCurrentRH = parseInt(runningHours);
                 if (!isNaN(dualCurrentRH)) {
                   dualUpdates.lastDoneRH = dualCurrentRH;
-                  dualLinkUpdates.lastDoneRH = dualCurrentRH.toString();
 
                   const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                   if (dualRhInterval && !isNaN(dualRhInterval)) {
                     dualUpdates.nextDueRH = dualCurrentRH + dualRhInterval;
-                    dualLinkUpdates.nextDueRH = (dualCurrentRH + dualRhInterval).toString();
                     console.log(`✅ [Dual] Updated job ${job.jobNo} nextDueRH: ${dualUpdates.nextDueRH}`);
                   }
                 }
               } else {
                 console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
-              }
-
-              const dualUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
-              if (component.cuuid && dualUpdateVesselId) {
-                await repo.updateJobComponentLinkTracking(dualUpdateVesselId, job.juuid, component.cuuid, dualLinkUpdates);
-                console.log(`✅ [Dual] Updated component tracking for vessel ${dualUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid}`);
               }
 
               await repo.updateJob(job.juuid, dualUpdates);

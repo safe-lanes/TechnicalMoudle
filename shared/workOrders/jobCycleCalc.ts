@@ -13,8 +13,8 @@
  *    completion RH was entered (D2 rule — untouched otherwise).
  *  - Running Hours: requires completionRH; interval = intervalRunningHour, falling back
  *    to parseInt(frequencyValue).
- *  - jobUpdates carries lastDoneRH/nextDueRH as NUMBERS, linkUpdates as STRINGS —
- *    exactly as the original code wrote them.
+ *  - jobUpdates carries lastDoneRH/nextDueRH as NUMBERS, matching the jobs table's
+ *    existing write contract.
  */
 import { calculateNextDueDate } from '../dateUtils';
 
@@ -38,18 +38,14 @@ export interface JobCycleInput {
 export interface JobCycleResult {
   /** Column updates for the jobs row (lastDoneRH/nextDueRH numeric). */
   jobUpdates: Record<string, any>;
-  /** Column updates for the job_component_links row (RH values as strings). */
-  linkUpdates: Record<string, any>;
 }
 
 export function computeJobCycleUpdates(input: JobCycleInput): JobCycleResult {
   const { maintenanceBasis, dateOfCompletion, completionRH, originalDueDate, job } = input;
   const jobUpdates: Record<string, any> = {};
-  const linkUpdates: Record<string, any> = {};
 
   const applyCalendarLeg = () => {
     if (!dateOfCompletion) return;
-    linkUpdates.lastDoneDate = dateOfCompletion;
     jobUpdates.lastDoneDate = dateOfCompletion;
     if (job.frequencyValue && job.frequencyUnit) {
       const nextDue = calculateNextDueDate(
@@ -59,7 +55,6 @@ export function computeJobCycleUpdates(input: JobCycleInput): JobCycleResult {
         originalDueDate ?? undefined,
       );
       if (nextDue) {
-        linkUpdates.nextDueDate = nextDue;
         jobUpdates.nextDueDate = nextDue;
       }
     }
@@ -69,14 +64,12 @@ export function computeJobCycleUpdates(input: JobCycleInput): JobCycleResult {
     if (!completionRH) return;
     const currentRH = parseInt(completionRH);
     if (isNaN(currentRH)) return;
-    linkUpdates.lastDoneRH = currentRH.toString();
     jobUpdates.lastDoneRH = currentRH;
     const rhInterval =
       job.intervalRunningHour ||
       (job.frequencyValue ? parseInt(String(job.frequencyValue)) : null);
     if (rhInterval && !isNaN(rhInterval)) {
       const nextDueRH = currentRH + rhInterval;
-      linkUpdates.nextDueRH = nextDueRH.toString();
       jobUpdates.nextDueRH = nextDueRH;
     }
   };
@@ -94,5 +87,5 @@ export function computeJobCycleUpdates(input: JobCycleInput): JobCycleResult {
     applyRhLeg();
   }
 
-  return { jobUpdates, linkUpdates };
+  return { jobUpdates };
 }

@@ -742,27 +742,19 @@ export async function completeWorkOrder(
       // completions. Semantics unchanged: Calendar/Dual/RH legs, D2 RH
       // conditionality, R1 completion-RH source — see the helper's header.
       const { computeJobCycleUpdates } = await import('@shared/workOrders/jobCycleCalc');
-      const { jobUpdates, linkUpdates: calcLinkUpdates } = computeJobCycleUpdates({
+      const { jobUpdates } = computeJobCycleUpdates({
         maintenanceBasis: workOrder.maintenanceBasis,
         dateOfCompletion,
         completionRH: cycleRH,
         originalDueDate,
         job,
       });
-      const linkUpdates: any = { updatedAt: new Date(), ...calcLinkUpdates };
-
-      const woComponentId = (workOrder as any).componentId || component.cuuid;
 
       if (workOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletion && !cycleRH) {
         console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
       }
 
       if (Object.keys(jobUpdates).length > 0) {
-        const updateVesselId = workOrder.vesselId || job.vesselId;
-        if (woComponentId && updateVesselId) {
-          await repo.updateJobComponentLinkTracking(updateVesselId, job.juuid, woComponentId, linkUpdates);
-          console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${woComponentId}`);
-        }
         await repo.updateJob(job.juuid, jobUpdates);
         console.log(`✅ Updated ${workOrder.maintenanceBasis} job ${job.jobNo} cycle fields: ${JSON.stringify(jobUpdates)}`);
       }
@@ -990,14 +982,9 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
       if ((basis === 'Calendar' || basis === 'Dual Frequency') && dateOfCompletionNorm) {
         const { calculateNextDueDate } = await import('@shared/dateUtils');
         const updates: any = { lastDoneDate: dateOfCompletionNorm };
-        const linkUpdates: any = { lastDoneDate: dateOfCompletionNorm, updatedAt: new Date() };
         if (job.frequencyValue && job.frequencyUnit) {
           const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) { updates.nextDueDate = nextDue; linkUpdates.nextDueDate = nextDue; }
-        }
-        const vId = workOrder.vesselId || job.vesselId;
-        if (component.cuuid && vId) {
-          await repo.updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, linkUpdates);
+          if (nextDue) updates.nextDueDate = nextDue;
         }
         await repo.updateJob(job.juuid, updates);
         console.log(`✅ [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
@@ -1010,15 +997,9 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
         const currentRH = parseInt(String(finalizeCycleRH));
         if (!isNaN(currentRH)) {
           const rhUpdates: any = { lastDoneRH: currentRH };
-          const rhLinkUpdates: any = { lastDoneRH: currentRH.toString(), updatedAt: new Date() };
           const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
           if (rhInterval && !isNaN(rhInterval)) {
             rhUpdates.nextDueRH = currentRH + rhInterval;
-            rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
-          }
-          const vId = workOrder.vesselId || job.vesselId;
-          if (component.cuuid && vId) {
-            await repo.updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, rhLinkUpdates);
           }
           await repo.updateJob(job.juuid, rhUpdates);
           console.log(`✅ [Finalize] Updated RH job ${job.jobNo} lastDoneRH: ${currentRH}`);

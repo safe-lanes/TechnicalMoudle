@@ -33,7 +33,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useVessels } from "@/hooks/useVessels";
-import { formatProfessionalDate } from "@/lib/dateUtils";
+import { formatProfessionalDate, parseDate } from "@/lib/dateUtils";
 import { downloadAuthedFile } from "@/lib/authedDownload";
 import {
   Select,
@@ -53,6 +53,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkOrderViewerSheet } from "@/components/WorkOrderViewerSheet";
+import { addDays } from "date-fns";
 
 interface ComponentNode {
   id: string;
@@ -957,6 +958,33 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   );
 };
 
+const hasTrackingValue = (value: unknown): boolean =>
+  value !== null && value !== undefined && value !== '';
+
+const formatRunningHours = (value: unknown): string => {
+  if (!hasTrackingValue(value)) return '—';
+
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return '—';
+
+  return `${Number.isInteger(numericValue) ? numericValue : numericValue.toFixed(2)} RH`;
+};
+
+const getExpectedRunningHoursDueDate = (
+  lastDoneDate: string | null | undefined,
+  intervalRunningHour: unknown,
+): string => {
+  const interval = Number(intervalRunningHour);
+  const parsedLastDoneDate = parseDate(lastDoneDate);
+
+  if (!Number.isFinite(interval) || interval <= 0 || !parsedLastDoneDate) {
+    return '—';
+  }
+
+  const expectedDays = Math.ceil(interval / 24);
+  return formatProfessionalDate(addDays(parsedLastDoneDate, expectedDays));
+};
+
 const JobRow: React.FC<{
   job: any;
   onRowClick: (job: any) => void;
@@ -968,10 +996,43 @@ const JobRow: React.FC<{
 
   // Get component-specific tracking data for THIS component (prevents data mixing between components)
   const componentTracking = job.componentTracking?.[activeComponentCode] || {};
-  const effectiveLastDoneDate = componentTracking.lastDoneDate || job.lastDoneDate;
-  const effectiveNextDueDate = componentTracking.nextDueDate || job.nextDueDate;
-  const effectiveLastDoneRH = componentTracking.lastDoneRH || job.lastDoneRH;
-  const effectiveNextDueRH = componentTracking.nextDueRH || job.nextDueRH;
+  const effectiveLastDoneDate = hasTrackingValue(componentTracking.lastDoneDate)
+    ? componentTracking.lastDoneDate
+    : job.lastDoneDate;
+  const effectiveNextDueDate = hasTrackingValue(componentTracking.nextDueDate)
+    ? componentTracking.nextDueDate
+    : job.nextDueDate;
+  const effectiveLastDoneRH = hasTrackingValue(componentTracking.lastDoneRH)
+    ? componentTracking.lastDoneRH
+    : job.lastDoneRH;
+  const effectiveNextDueRH = hasTrackingValue(componentTracking.nextDueRH)
+    ? componentTracking.nextDueRH
+    : job.nextDueRH;
+  const isRunningHoursBased =
+    job.maintenanceBasis === 'Running Hours' ||
+    job.maintenanceBasis === 'Dual Frequency';
+  const expectedNextDueDate = isRunningHoursBased
+    ? getExpectedRunningHoursDueDate(
+        effectiveLastDoneDate,
+        job.intervalRunningHour,
+      )
+    : formatProfessionalDate(effectiveNextDueDate);
+  const nextDueHour = (() => {
+    if (!isRunningHoursBased) return '—';
+    if (hasTrackingValue(effectiveNextDueRH)) {
+      return formatRunningHours(effectiveNextDueRH);
+    }
+
+    if (!hasTrackingValue(effectiveLastDoneRH) || !hasTrackingValue(job.intervalRunningHour)) {
+      return '—';
+    }
+
+    const lastDoneRH = Number(effectiveLastDoneRH);
+    const intervalRunningHour = Number(job.intervalRunningHour);
+    return Number.isFinite(lastDoneRH) && Number.isFinite(intervalRunningHour)
+      ? formatRunningHours(lastDoneRH + intervalRunningHour)
+      : '—';
+  })();
 
   const generateWOMutation = useMutation({
     mutationFn: async (reason: 'Planning' | 'Breakdown' | 'Other') => {
@@ -1048,27 +1109,24 @@ const JobRow: React.FC<{
               ? `${job.frequencyValue} ${job.frequencyUnit} / ${job.intervalRunningHour || 0} RH`
               : `${job.frequencyValue} ${job.frequencyUnit}`}
         </td>
-        <td className={`py-3 px-3 ${inactiveClass}`}>{formatProfessionalDate(effectiveLastDoneDate) || '-'}</td>
         <td className={`py-3 px-3 ${inactiveClass}`}>
           {job.maintenanceBasis === 'Running Hours'
-            ? (() => {
-                const frequency = parseFloat(job.intervalRunningHour || '0');
-                const currentRH = parseFloat(job.componentCurrentRH || '0');
-                const lastDoneRH = parseFloat(effectiveLastDoneRH || '0');
-                const remainingRH = frequency - (currentRH - lastDoneRH);
-                return remainingRH > 0 ? `${remainingRH.toFixed(0)} RH` : 'Due';
-              })()
+            ? formatRunningHours(effectiveLastDoneRH)
             : job.maintenanceBasis === 'Dual Frequency'
-              ? (() => {
-                  const datePart = formatProfessionalDate(effectiveNextDueDate) || '-';
-                  const frequency = parseFloat(job.intervalRunningHour || '0');
-                  const currentRH = parseFloat(job.componentCurrentRH || '0');
-                  const lastDoneRH = parseFloat(effectiveLastDoneRH || '0');
-                  const remainingRH = frequency > 0 ? frequency - (currentRH - lastDoneRH) : 0;
-                  const rhPart = remainingRH > 0 ? `${remainingRH.toFixed(0)} RH` : 'Due';
-                  return `${datePart} / ${rhPart}`;
-                })()
-              : formatProfessionalDate(effectiveNextDueDate) || '-'}
+              ? `${formatProfessionalDate(effectiveLastDoneDate)} / ${formatRunningHours(effectiveLastDoneRH)}`
+              : formatProfessionalDate(effectiveLastDoneDate)}
+        </td>
+        <td
+          className={`py-3 px-3 ${inactiveClass}`}
+          title={isRunningHoursBased ? 'Expected Next Due Date (RH-based estimate)' : undefined}
+        >
+          {expectedNextDueDate}
+          {isRunningHoursBased && expectedNextDueDate !== '—' && (
+            <span className="block text-[10px] text-gray-500">Expected</span>
+          )}
+        </td>
+        <td className={`py-3 px-3 ${inactiveClass}`}>
+          {nextDueHour}
         </td>
         <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
           {!isInactive && (
@@ -1242,21 +1300,22 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
               <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.4"><Marker id="B7.C.4" /> Job Title</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.5"><Marker id="B7.C.5" /> Task Type</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.6"><Marker id="B7.C.6" /> Frequency</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.7"><Marker id="B7.C.7" /> Last Done Date</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.7"><Marker id="B7.C.7" /> Last Done</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.8"><Marker id="B7.C.8" /> Next Due Date</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.C.9"><Marker id="B7.C.9" /> Actions</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.9"><Marker id="B7.C.9" /> Next Due Hour</th>
+              <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.C.10"><Marker id="B7.C.10" /> Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-gray-500">
+                <td colSpan={8} className="py-8 text-center text-gray-500">
                   Loading jobs...
                 </td>
               </tr>
             ) : jobs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-gray-500">
+                <td colSpan={8} className="py-8 text-center text-gray-500">
                   No jobs found for this component
                 </td>
               </tr>

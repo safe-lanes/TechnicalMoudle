@@ -6,7 +6,7 @@ const rhJob = { frequencyValue: null, frequencyUnit: null, intervalRunningHour: 
 
 describe('computeJobCycleUpdates', () => {
   it('Calendar: sets lastDoneDate and computes nextDueDate', () => {
-    const { jobUpdates, linkUpdates } = computeJobCycleUpdates({
+    const { jobUpdates } = computeJobCycleUpdates({
       maintenanceBasis: 'Calendar',
       dateOfCompletion: '01-Aug-2026',
       originalDueDate: '01-Aug-2026',
@@ -14,7 +14,6 @@ describe('computeJobCycleUpdates', () => {
     });
     expect(jobUpdates.lastDoneDate).toBe('01-Aug-2026');
     expect(jobUpdates.nextDueDate).toBeTruthy();
-    expect(linkUpdates.lastDoneDate).toBe('01-Aug-2026');
   });
 
   it('Calendar without completion date: no updates', () => {
@@ -24,14 +23,12 @@ describe('computeJobCycleUpdates', () => {
     expect(Object.keys(jobUpdates)).toHaveLength(0);
   });
 
-  it('Running Hours: numeric jobUpdates, string linkUpdates, interval from intervalRunningHour', () => {
-    const { jobUpdates, linkUpdates } = computeJobCycleUpdates({
+  it('Running Hours: numeric Job updates, interval from intervalRunningHour', () => {
+    const { jobUpdates } = computeJobCycleUpdates({
       maintenanceBasis: 'Running Hours', completionRH: '12000', job: rhJob,
     });
     expect(jobUpdates.lastDoneRH).toBe(12000);
     expect(jobUpdates.nextDueRH).toBe(12500);
-    expect(linkUpdates.lastDoneRH).toBe('12000');
-    expect(linkUpdates.nextDueRH).toBe('12500');
   });
 
   it('Running Hours: interval falls back to parseInt(frequencyValue)', () => {
