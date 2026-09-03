@@ -1,25 +1,25 @@
 /**
- * Phase 2 follow-up (Sahil, 21-Aug-2026: notifications = BOTH in-app + email via AWS SES).
+ * Phase 2 follow-up (Sahil, 21-Aug-2026: notifications = BOTH in-app + email).
  *
  * On engine events this notifier now:
  *   1. writes per-user IN-APP rows (approval_notifications, migration 171) — approvers whose
  *      turn it is on step-activated; the submitter on completed/returned,
- *   2. sends EMAIL through the same SES SMTP transport pattern Technical already uses
- *      (noon-report mailer): APPROVAL_SMTP_HOST/PORT/USER/PASS/FROM, falling back to the
- *      existing NR_SMTP_* values so ops configures SES once. Not configured → email_status
- *      'skipped' (in-app still delivered). APPROVAL_SMTP_JSON=1 = nodemailer jsonTransport
- *      (pilot/test proof of the send path without real SES credentials),
+ *   2. sends EMAIL via AWS SES (04-Sep-2026 — sesEmailTransport.ts, the Audit module's
+ *      proven approach; the old SMTP/noon-report path was never configured anywhere).
+ *      Env not configured → email_status 'skipped' (in-app still delivered).
+ *      APPROVAL_SMTP_JSON=1 keeps the pilot/test mode (send path runs, logs JSON, no AWS),
  *   3. still logs structured lines + writes the audit_log event rows (unchanged).
- * Everything is fire-and-forget: a notification failure never breaks an approval.
+ * Everything is fire-and-forget: a notification or email failure never breaks or blocks
+ * an approval — in-app delivery happens regardless of email state.
  */
 import { eq, inArray } from 'drizzle-orm';
-import nodemailer from 'nodemailer';
 import type { EngineEvent, Scope } from '../approval-engine';
 import { storage } from '../../storage';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { approvalNotifications } from './notificationSchema';
 import { masterUsers, vessels, changeRequest, workOrders } from '@shared/schema';
+import { sesEmailConfig, sendApprovalEmail, type SesEmailConfig } from './sesEmailTransport';
 
 const db = () => {
   const ctx = getCurrentTenantContext();
@@ -33,37 +33,20 @@ const SCREEN_LABEL: Record<string, string> = {
   'pms-stores-cr': 'Store Change Request',
   'pms-wo-postponement': 'Work Order Postponement',
   'pms-wo-re-postponement': 'Work Order Re-Postponement',
+  'defects-extension': 'Defect Target Date Extension',
+  'defects-verification': 'Defect Verification',
 };
 const label = (s: Scope) => SCREEN_LABEL[s.screenId] ?? `${s.moduleId}/${s.screenId}`;
 
-// ── email transport (SES SMTP — same pattern/envs family as the noon-report mailer) ─────────
-function createTransport(): { t: nodemailer.Transporter; from: string } | 'skipped' {
-  if (process.env.APPROVAL_SMTP_JSON === '1') {
-    return { t: nodemailer.createTransport({ jsonTransport: true }), from: process.env.APPROVAL_SMTP_FROM || 'approvals@test.local' };
-  }
-  const host = process.env.APPROVAL_SMTP_HOST || process.env.NR_SMTP_HOST;
-  const port = parseInt(process.env.APPROVAL_SMTP_PORT || process.env.NR_SMTP_PORT || '587');
-  const user = process.env.APPROVAL_SMTP_USER || process.env.NR_SMTP_USER;
-  const pass = process.env.APPROVAL_SMTP_PASS || process.env.NR_SMTP_PASS;
-  const from = process.env.APPROVAL_SMTP_FROM || process.env.NR_SMTP_FROM || user;
-  if (!host || !user || !pass || !from) return 'skipped';
-  return { t: nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } }), from };
-}
-
 /**
  * F4: reports whether approval EMAIL is configured, so an admin can see when approvers are
- * getting in-app notifications only. Mirrors createTransport()'s guard exactly (does not send).
+ * getting in-app notifications only (the admin-page banner). Mirrors sesEmailConfig()'s
+ * guard exactly (does not send).
  */
 export function emailConfigStatus(): { configured: boolean; mode: 'live' | 'json-test' | 'unconfigured'; from: string | null } {
-  if (process.env.APPROVAL_SMTP_JSON === '1') {
-    return { configured: true, mode: 'json-test', from: process.env.APPROVAL_SMTP_FROM || 'approvals@test.local' };
-  }
-  const host = process.env.APPROVAL_SMTP_HOST || process.env.NR_SMTP_HOST;
-  const user = process.env.APPROVAL_SMTP_USER || process.env.NR_SMTP_USER;
-  const pass = process.env.APPROVAL_SMTP_PASS || process.env.NR_SMTP_PASS;
-  const from = process.env.APPROVAL_SMTP_FROM || process.env.NR_SMTP_FROM || user || null;
-  const configured = !!(host && user && pass && from);
-  return { configured, mode: configured ? 'live' : 'unconfigured', from: configured ? from : null };
+  const cfg = sesEmailConfig();
+  if (!cfg) return { configured: false, mode: 'unconfigured', from: null };
+  return { configured: true, mode: cfg.mode, from: cfg.from };
 }
 
 async function subjectLine(scope: Scope, subjectRef: string, vesselId: string | null): Promise<string> {
@@ -72,6 +55,10 @@ async function subjectLine(scope: Scope, subjectRef: string, vesselId: string | 
     if (scope.screenId.endsWith('-cr')) {
       const r = (await db().select({ t: changeRequest.title }).from(changeRequest).where(eq(changeRequest.cruuid, subjectRef)).limit(1))[0];
       name = r?.t ?? subjectRef;
+    } else if (scope.moduleId === 'defects') {
+      const { defects } = await import('@shared/schema');
+      const r = (await db().select({ id: defects.id, d: defects.description }).from(defects).where(eq(defects.duuid, subjectRef)).limit(1))[0];
+      name = r ? `${r.id} — ${String(r.d ?? '').slice(0, 80)}` : subjectRef;
     } else {
       const r = (await db().select({ no: workOrders.workOrderNo, jt: workOrders.jobTitle }).from(workOrders).where(eq(workOrders.wouuid, subjectRef)).limit(1))[0];
       name = r ? `${r.no} — ${r.jt}` : subjectRef;
@@ -91,7 +78,7 @@ async function notifyUsers(userIds: string[], base: {
 }): Promise<void> {
   const unique = Array.from(new Set(userIds.filter(Boolean)));
   if (unique.length === 0) return;
-  const transport = createTransport();
+  const sesCfg: SesEmailConfig | null = sesEmailConfig();
   const emails = await db().select({ id: masterUsers.id, email: masterUsers.email, name: masterUsers.fullName })
     .from(masterUsers).where(inArray(masterUsers.id, unique));
   const emailByUser = new Map(emails.map((e) => [e.id, e.email]));
@@ -100,13 +87,16 @@ async function notifyUsers(userIds: string[], base: {
     let emailStatus: string | null = null;
     let emailError: string | null = null;
     const to = emailByUser.get(userUuid);
-    if (transport === 'skipped') {
-      emailStatus = 'skipped';
+    if (!sesCfg) {
+      emailStatus = 'skipped'; // SES env not configured — in-app only (admin banner shows this)
     } else if (!to) {
       emailStatus = 'skipped'; emailError = 'no email on master_users';
     } else {
       try {
-        await transport.t.sendMail({ from: transport.from, to, subject: base.title, text: base.message });
+        // Sequential + paced + retried inside the transport; permanent SES errors
+        // surface immediately. A failure lands here and ONLY here — the in-app row
+        // below is written regardless.
+        await sendApprovalEmail(sesCfg, to, base.title, base.message);
         emailStatus = 'sent';
       } catch (e: any) {
         emailStatus = 'error'; emailError = String(e?.message ?? e).slice(0, 300);
@@ -121,7 +111,7 @@ async function notifyUsers(userIds: string[], base: {
       emailStatus, emailError,
     });
   }
-  console.log(`[approvals] NOTIFY ${base.kind} → ${unique.length} user(s) [email: ${transport === 'skipped' ? 'skipped (SMTP not configured)' : 'attempted'}] ${base.title}`);
+  console.log(`[approvals] NOTIFY ${base.kind} → ${unique.length} user(s) [email: ${!sesCfg ? 'skipped (SES not configured)' : `attempted via SES (${sesCfg.mode})`}] ${base.title}`);
 }
 
 async function auditRow(actionType: string, evt: { requuid: string; subjectRef: string; scope: Scope }, payload: Record<string, unknown>): Promise<void> {
