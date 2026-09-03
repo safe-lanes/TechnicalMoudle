@@ -1,5 +1,5 @@
 import * as alertsRepo from '../repositories/alertsRepository';
-import { NotFoundError } from '../../shared/errors';
+import { AppError, NotFoundError } from '../../shared/errors';
 
 // ── Policies ──
 
@@ -189,6 +189,13 @@ export async function getConfig(vesselId: string) {
 }
 
 export async function updateConfig(data: any) {
+  // Belt to the client-side vessel pinning (04-Sep-2026): alert_config is keyed by a real
+  // vessel — a missing/aggregate id would either FK-fail confusingly or write a phantom
+  // row nothing reads back. Refuse it plainly instead.
+  const vesselId = typeof data?.vesselId === 'string' ? data.vesselId.trim() : '';
+  if (!vesselId || vesselId === 'all' || vesselId === 'my') {
+    throw new AppError(400, 'Alert configuration is saved per vessel — a specific vesselId is required.', { code: 'VESSEL_REQUIRED' });
+  }
   return alertsRepo.createOrUpdateAlertConfig({
     ...data,
     updatedBy: data.userId || 'user1'

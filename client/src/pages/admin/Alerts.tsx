@@ -131,62 +131,141 @@ const priorityBadgeColors: Record<string, string> = {
   low: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 
+// MODULE-LEVEL draft cache (bug fix 04-Sep-2026, part 2): the Admin tabs UNMOUNT this
+// screen on every tab switch, so component state alone cannot protect an unsaved draft —
+// exactly the wipe the bug report described. Unsaved edits are mirrored here and restored
+// on remount; cleared on successful save or explicit discard. Session-scoped by design.
+const policyDraft: { policies: AlertPolicy[] | null; dirty: boolean } = { policies: null, dirty: false };
+const configDraft: { config: AlertConfig | null; vesselId: string | null; dirty: boolean } = { config: null, vesselId: null, dirty: false };
+
 export default function Alerts() {
   const { toast } = useToast();
   const { canEdit } = usePermissions();
   const canEditAlerts = canEdit('admin-alerts');
-  const { vesselId: selectedVesselId = 'V001' } = useVessel();
+  // No 'V001' phantom default (bug fix 04-Sep-2026): '' = no vessel selected. The
+  // context can also hold 'all'/'my' for admins — the per-vessel config section only
+  // operates on a SPECIFIC vessel (alert_config is keyed by vessel_id).
+  const { vesselId: selectedVesselId = '', vessels } = useVessel();
+  const vesselSpecific = !!selectedVesselId && selectedVesselId !== 'all' && selectedVesselId !== 'my';
+  const selectedVesselName = vessels.find((v: any) => v.id === selectedVesselId)?.name ?? selectedVesselId;
   const [selectedPolicy, setSelectedPolicy] = useState<AlertPolicy | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [localPolicies, setLocalPolicies] = useState<AlertPolicy[]>([]);
-  const [localConfig, setLocalConfig] = useState<AlertConfig | null>(null);
+  // DIRTY DRAFTS (bug fix 04-Sep-2026): localPolicies/localConfig are the user's unsaved
+  // DRAFT. The old code re-seeded them from the server inside every queryFn — any refetch
+  // OR a tab switch (which unmounts this screen) silently WIPED unsaved toggles, so Save
+  // then wrote the original values back: green toast, nothing changed. Drafts now survive
+  // both: refetches via the dirty flag, unmounts via the module-level draft cache.
+  const [localPolicies, setLocalPoliciesState] = useState<AlertPolicy[]>(() => policyDraft.dirty && policyDraft.policies ? policyDraft.policies : []);
+  const [policiesDirty, setPoliciesDirtyState] = useState(() => policyDraft.dirty);
+  const [localConfig, setLocalConfigState] = useState<AlertConfig | null>(() =>
+    configDraft.dirty && configDraft.config ? configDraft.config : null);
+  const [configDirty, setConfigDirtyState] = useState(() => configDraft.dirty);
+  const setLocalPolicies: typeof setLocalPoliciesState = (v) => {
+    setLocalPoliciesState((prev) => {
+      const next = typeof v === 'function' ? (v as (p: AlertPolicy[]) => AlertPolicy[])(prev) : v;
+      policyDraft.policies = next;
+      return next;
+    });
+  };
+  const setPoliciesDirty = (d: boolean) => { policyDraft.dirty = d; if (!d) policyDraft.policies = null; setPoliciesDirtyState(d); };
+  const setLocalConfig: typeof setLocalConfigState = (v) => {
+    setLocalConfigState((prev) => {
+      const next = typeof v === 'function' ? (v as (p: AlertConfig | null) => AlertConfig | null)(prev) : v;
+      configDraft.config = next;
+      return next;
+    });
+  };
+  const setConfigDirty = (d: boolean) => {
+    configDraft.dirty = d;
+    if (d) configDraft.vesselId = selectedVesselId; // remember WHICH vessel the draft belongs to
+    else { configDraft.config = null; configDraft.vesselId = null; }
+    setConfigDirtyState(d);
+  };
 
-  // Fetch alert policies
-  const { data: policies, isLoading: policiesLoading } = useQuery({
+  // Fetch alert policies (no draft-wiping side effect in the queryFn)
+  const { data: policies, isLoading: policiesLoading } = useQuery<AlertPolicy[]>({
     queryKey: ['/technical/api/alerts/policies'],
     queryFn: async () => {
       const response = await fetch('/technical/api/alerts/policies');
       if (!response.ok) throw new Error('Failed to fetch policies');
-      const data = await response.json();
-      setLocalPolicies(data);
-      return data;
+      return response.json();
     }
   });
+  React.useEffect(() => {
+    if (policies && !policiesDirty) setLocalPolicies(policies);
+  }, [policies, policiesDirty]);
 
-  // Fetch alert configuration
-  const { data: config, isLoading: configLoading } = useQuery({
+  // Fetch alert configuration — only for a SPECIFIC vessel. An empty id used to build
+  // GET /alerts/config/ (trailing slash) → 404 noise in the console; 'all'/'my' have no
+  // per-vessel config row to edit.
+  const { data: config, isLoading: configLoading } = useQuery<AlertConfig>({
     queryKey: ['/technical/api/alerts/config', selectedVesselId],
+    enabled: vesselSpecific,
     queryFn: async () => {
       const response = await fetch(`/technical/api/alerts/config/${selectedVesselId}`);
       if (!response.ok) throw new Error('Failed to fetch config');
-      const data = await response.json();
-      setLocalConfig(data);
-      return data;
+      return response.json();
     }
   });
+  React.useEffect(() => {
+    if (config && !configDirty) setLocalConfig(config);
+  }, [config, configDirty]);
+  React.useEffect(() => {
+    // Vessel switched: a draft belongs to the vessel it was loaded for — discard it so a
+    // save can never land under a different vessel than the screen shows. (Guarded so a
+    // REMOUNT with an intact same-vessel draft does not wipe it — that was the tab-switch
+    // bug all over again.)
+    if (configDraft.dirty && configDraft.vesselId !== selectedVesselId) {
+      setLocalConfig(null); setConfigDirty(false);
+    } else if (!configDraft.dirty) {
+      setLocalConfigState(null); // clean slate while the new vessel's config loads
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVesselId]);
 
-  // Batch update policies mutation
+  // The fields a user can edit on this screen (toggles + drawer) — the change diff and
+  // the post-save verification both key on exactly these.
+  const EDITABLE_POLICY_FIELDS: (keyof AlertPolicy)[] = ['enabled', 'emailEnabled', 'inAppEnabled', 'priority', 'thresholds', 'scopeFilters', 'recipients'];
+  const policyDiffers = (a: AlertPolicy, b: AlertPolicy) =>
+    EDITABLE_POLICY_FIELDS.some((k) => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null));
+
+  // Batch update policies mutation — sends ONLY changed policies; verifies the server's
+  // echo actually contains the requested values (item 4: a mismatch is said plainly).
   const updatePoliciesMutation = useMutation({
-    mutationFn: async (policies: AlertPolicy[]) => {
+    mutationFn: async (changed: AlertPolicy[]) => {
       const response = await fetch('/technical/api/alerts/policies/batch-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ policies })
+        body: JSON.stringify({ policies: changed })
       });
-      if (!response.ok) throw new Error('Failed to update policies');
-      return response.json();
+      if (!response.ok) throw new Error(`Failed to update policies (HTTP ${response.status})`);
+      return response.json() as Promise<{ success: boolean; policies: AlertPolicy[] }>;
     },
-    onSuccess: () => {
+    onSuccess: (data, submitted) => {
+      const echoed = new Map((data.policies ?? []).map((p) => [p.apuuid, p]));
+      const mismatched = submitted.filter((s) => {
+        const e = s.apuuid ? echoed.get(s.apuuid) : undefined;
+        return !e || policyDiffers(s, e);
+      });
+      if (mismatched.length > 0) {
+        toast({
+          title: 'Save verification failed',
+          description: `The server did not confirm the requested values for: ${mismatched.map((m) => m.alertType).join(', ')}. Please reload and check the switches.`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Alert switches saved',
+          description: `${submitted.length} alert ${submitted.length === 1 ? 'switch' : 'switches'} updated and confirmed by the server.`
+        });
+      }
+      setPoliciesDirty(false);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/alerts/policies'] });
-      toast({
-        title: 'Alert Configuration Saved',
-        description: 'Alert policies have been updated successfully.'
-      });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: 'Update Failed',
-        description: 'Failed to update alert policies. Please try again.',
+        description: error.message || 'Failed to update alert policies. Please try again.',
         variant: 'destructive'
       });
     }
@@ -204,10 +283,11 @@ export default function Alerts() {
       return response.json();
     },
     onSuccess: () => {
+      setConfigDirty(false);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/alerts/config', selectedVesselId] });
       toast({
         title: 'Configuration Saved',
-        description: 'Alert configuration has been updated successfully.'
+        description: `Alert configuration updated for ${selectedVesselName}.`
       });
     },
     onError: () => {
@@ -220,19 +300,35 @@ export default function Alerts() {
   });
 
   const handlePolicyToggle = (policyId: number, field: 'enabled' | 'emailEnabled' | 'inAppEnabled', value: boolean) => {
-    setLocalPolicies(prev => prev.map(p => 
+    setLocalPolicies(prev => prev.map(p =>
       p.id === policyId ? { ...p, [field]: value } : p
     ));
+    setPoliciesDirty(true);
   };
 
   const handlePriorityChange = (policyId: number, priority: string) => {
-    setLocalPolicies(prev => prev.map(p => 
+    setLocalPolicies(prev => prev.map(p =>
       p.id === policyId ? { ...p, priority } : p
     ));
+    setPoliciesDirty(true);
   };
 
   const handleSaveConfiguration = () => {
-    updatePoliciesMutation.mutate(localPolicies);
+    // Diff against the SERVER copy — only real changes are sent. A save that would
+    // write nothing is a distinct, visible state, never a green success (item 2).
+    const serverByUuid = new Map((policies ?? []).map((p) => [p.apuuid, p]));
+    const changed = localPolicies.filter((lp) => {
+      const sp = lp.apuuid ? serverByUuid.get(lp.apuuid) : undefined;
+      return !sp || policyDiffers(lp, sp);
+    });
+    if (changed.length === 0) {
+      toast({
+        title: 'No changes to save',
+        description: 'The alert switches already match what is saved. Flip a switch first, then save.'
+      });
+      return;
+    }
+    updatePoliciesMutation.mutate(changed);
   };
 
   const handlePolicyClick = (policy: AlertPolicy) => {
@@ -241,19 +337,33 @@ export default function Alerts() {
   };
 
   const handlePolicyUpdate = (updatedPolicy: AlertPolicy) => {
-    setLocalPolicies(prev => prev.map(p => 
+    setLocalPolicies(prev => prev.map(p =>
       p.id === updatedPolicy.id ? updatedPolicy : p
     ));
+    setPoliciesDirty(true);
     setDrawerOpen(false);
   };
 
   const handleConfigUpdate = () => {
-    if (localConfig) {
-      updateConfigMutation.mutate(localConfig);
+    if (!vesselSpecific) {
+      toast({ title: 'Select a specific vessel', description: 'Alert configuration is saved per vessel — pick one vessel first.', variant: 'destructive' });
+      return;
     }
+    if (!localConfig) {
+      toast({ title: 'Configuration not loaded', description: 'The vessel configuration has not loaded yet — try again in a moment.', variant: 'destructive' });
+      return;
+    }
+    // Pin the save to the vessel the draft was LOADED for — a context change between
+    // load and save must refuse, never save under a different vessel.
+    if (localConfig.vesselId && localConfig.vesselId !== selectedVesselId) {
+      toast({ title: 'Vessel changed since loading', description: 'The selected vessel changed while editing — the draft was discarded. Re-check the values and save again.', variant: 'destructive' });
+      setLocalConfig(null); setConfigDirty(false);
+      return;
+    }
+    updateConfigMutation.mutate({ ...localConfig, vesselId: selectedVesselId });
   };
 
-  if (policiesLoading || configLoading) {
+  if (policiesLoading || (vesselSpecific && configLoading)) {
     return <div className="p-6">Loading alert configuration...</div>;
   }
 
@@ -376,7 +486,19 @@ export default function Alerts() {
               </CardContent>
             </Card>
 
-            {/* Quiet Hours & Escalation */}
+            {/* Quiet Hours & Escalation — saved PER VESSEL. The vessel is stated
+                explicitly (bug fix 04-Sep-2026): this section used to follow the hidden
+                global vessel selection silently, so a save could land under a different
+                vessel than the user later read back. */}
+            {vesselSpecific ? (
+              <p className="text-sm text-gray-600" data-testid="alert-config-vessel-label">
+                Vessel configuration for: <span className="font-semibold text-gray-900">{selectedVesselName}</span>
+              </p>
+            ) : (
+              <p className="text-sm text-amber-600" data-testid="alert-config-no-vessel">
+                Quiet Hours and Escalation are saved per vessel — select a specific vessel (not "All"/"My") to view and edit them.
+              </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -389,9 +511,9 @@ export default function Alerts() {
                     <Switch
                       id="quiet-hours"
                       checked={localConfig?.quietHoursEnabled || false}
-                      onCheckedChange={(checked) => 
-                        setLocalConfig(prev => prev ? { ...prev, quietHoursEnabled: checked } : null)
-                      }
+                      onCheckedChange={(checked) => {
+                        setLocalConfig(prev => prev ? { ...prev, quietHoursEnabled: checked } : null); setConfigDirty(true);
+                      }}
                     />
                   </div>
                   
@@ -403,9 +525,9 @@ export default function Alerts() {
                           id="quiet-start"
                           type="time"
                           value={localConfig?.quietHoursStart || '22:00'}
-                          onChange={(e) => 
-                            setLocalConfig(prev => prev ? { ...prev, quietHoursStart: e.target.value } : null)
-                          }
+                          onChange={(e) => {
+                            setLocalConfig(prev => prev ? { ...prev, quietHoursStart: e.target.value } : null); setConfigDirty(true);
+                          }}
                           className="mt-1"
                         />
                       </div>
@@ -415,9 +537,9 @@ export default function Alerts() {
                           id="quiet-end"
                           type="time"
                           value={localConfig?.quietHoursEnd || '06:00'}
-                          onChange={(e) => 
-                            setLocalConfig(prev => prev ? { ...prev, quietHoursEnd: e.target.value } : null)
-                          }
+                          onChange={(e) => {
+                            setLocalConfig(prev => prev ? { ...prev, quietHoursEnd: e.target.value } : null); setConfigDirty(true);
+                          }}
                           className="mt-1"
                         />
                       </div>
@@ -441,9 +563,9 @@ export default function Alerts() {
                     <Switch
                       id="escalation"
                       checked={localConfig?.escalationEnabled || false}
-                      onCheckedChange={(checked) => 
-                        setLocalConfig(prev => prev ? { ...prev, escalationEnabled: checked } : null)
-                      }
+                      onCheckedChange={(checked) => {
+                        setLocalConfig(prev => prev ? { ...prev, escalationEnabled: checked } : null); setConfigDirty(true);
+                      }}
                     />
                   </div>
                   
@@ -456,9 +578,9 @@ export default function Alerts() {
                         min={1}
                         max={24}
                         value={localConfig?.escalationHours || 4}
-                        onChange={(e) => 
-                          setLocalConfig(prev => prev ? { ...prev, escalationHours: parseInt(e.target.value) } : null)
-                        }
+                        onChange={(e) => {
+                          setLocalConfig(prev => prev ? { ...prev, escalationHours: parseInt(e.target.value) } : null); setConfigDirty(true);
+                        }}
                         className="mt-1 w-24"
                       />
                     </div>
@@ -468,12 +590,13 @@ export default function Alerts() {
                     If High alerts are not acknowledged within specified hours, escalate to Tech Superintendent & Office via email.
                   </p>
                   
-                  <Button 
+                  <Button
                     onClick={handleConfigUpdate}
-                    disabled={updateConfigMutation.isPending}
+                    disabled={updateConfigMutation.isPending || !vesselSpecific || !localConfig}
+                    title={!vesselSpecific ? 'Select a specific vessel first — this configuration is saved per vessel.' : undefined}
                     className="w-full"
                   >
-                    {updateConfigMutation.isPending ? 'Saving...' : 'Save Configuration'}
+                    {updateConfigMutation.isPending ? 'Saving...' : vesselSpecific ? `Save Vessel Configuration (${selectedVesselName})` : 'Select a vessel to save'}
                   </Button>
                 </CardContent>
               </Card>
