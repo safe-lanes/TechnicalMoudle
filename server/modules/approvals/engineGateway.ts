@@ -24,6 +24,10 @@ export function setTechnicalEngine(e: ApprovalEngine | null): void { engine = e;
 export function getTechnicalEngine(): ApprovalEngine | null { return engine; }
 
 export const techScope = (screenId: string): Scope => ({ moduleId: TECHNICAL_MODULE_ID, screenId, actionId: '' });
+/** Scope for any registered card — the engine handle is shared, not Technical-only.
+ *  (Second integration, Defects, 03-Sep-2026: the gateway generalizes; the Technical-named
+ *  exports below stay as thin aliases so W3 callers don't churn.) */
+export const scopeFor = (moduleId: string, screenId: string): Scope => ({ moduleId, screenId, actionId: '' });
 
 export function engineCtx(actorUserId: string | null | undefined): EngineCtx {
   const rbacRole = getRequestContext()?.rbacRole ?? null;
@@ -50,26 +54,52 @@ function translate(e: unknown): never {
  * for fallback reasons; classification errors are logged and swallowed (legacy continues).
  */
 export async function maybeEngineSubmit(screenId: string, subjectRef: string, subject: TechnicalSubject, vesselId: string | null, actorUserId?: string | null): Promise<string | null> {
+  return maybeEngineSubmitScoped(techScope(screenId), subjectRef, subject, vesselId, actorUserId);
+}
+
+/** Scope-generic submit — same fallback contract as maybeEngineSubmit, any card. */
+export async function maybeEngineSubmitScoped(scope: Scope, subjectRef: string, subject: unknown, vesselId: string | null, actorUserId?: string | null): Promise<string | null> {
   if (!engine) return null;
   try {
-    const r = await engine.submit(engineCtx(actorUserId), { scope: techScope(screenId), subjectRef, subject, vesselId });
+    const r = await engine.submit(engineCtx(actorUserId), { scope, subjectRef, subject, vesselId });
     if (r.outcome === 'STARTED') {
-      console.log(`[approvals] chain STARTED ${screenId} ${subjectRef} (${r.requuid})`);
+      console.log(`[approvals] chain STARTED ${scope.moduleId}/${scope.screenId} ${subjectRef} (${r.requuid})`);
       return r.requuid;
     }
     if (r.outcome === 'ALREADY_PENDING') return null;
     return null; // NO_WORKFLOW / DISABLED → legacy
   } catch (e) {
     // A submit failure must never break the module's own flow — the legacy path still runs.
-    console.error(`[approvals] engine submit failed for ${screenId} ${subjectRef} (legacy path continues):`, e);
+    console.error(`[approvals] engine submit failed for ${scope.moduleId}/${scope.screenId} ${subjectRef} (legacy path continues):`, e);
     return null;
+  }
+}
+
+/** Like maybeEngineSubmitScoped but returns the raw outcome — for gates that must
+ *  distinguish "a chain now governs this subject" (STARTED/ALREADY_PENDING) from the
+ *  fallback outcomes (engine off / NO_WORKFLOW / DISABLED → legacy). Submit errors
+ *  report as 'ERROR' and, per the fallback contract, the caller treats them as legacy. */
+export async function engineSubmitOutcome(scope: Scope, subjectRef: string, subject: unknown, vesselId: string | null, actorUserId?: string | null): Promise<'STARTED' | 'ALREADY_PENDING' | 'NO_WORKFLOW' | 'DISABLED' | 'OFF' | 'ERROR'> {
+  if (!engine) return 'OFF';
+  try {
+    const r = await engine.submit(engineCtx(actorUserId), { scope, subjectRef, subject, vesselId });
+    if (r.outcome === 'STARTED') console.log(`[approvals] chain STARTED ${scope.moduleId}/${scope.screenId} ${subjectRef} (${r.requuid})`);
+    return r.outcome;
+  } catch (e) {
+    console.error(`[approvals] engine submit failed for ${scope.moduleId}/${scope.screenId} ${subjectRef} (legacy path continues):`, e);
+    return 'ERROR';
   }
 }
 
 /** The pending engine request for a subject, or null. */
 export async function pendingEngineRequest(screenId: string, subjectRef: string) {
+  return pendingEngineRequestScoped(techScope(screenId), subjectRef);
+}
+
+/** Scope-generic pending lookup. */
+export async function pendingEngineRequestScoped(scope: Scope, subjectRef: string) {
   if (!engine) return null;
-  const rows = await engine.status(engineCtx(null), techScope(screenId), subjectRef).catch(() => []);
+  const rows = await engine.status(engineCtx(null), scope, subjectRef).catch(() => []);
   return rows.find((r) => r.status === 'pending') ?? null;
 }
 
@@ -85,8 +115,16 @@ export async function maybeEngineDecide(
   screenId: string, subjectRef: string, decision: 'approve' | 'reject',
   actorUserId: string, remarks?: string | null,
 ): Promise<{ requestStatus: string; nodeSatisfied: boolean; activatedNodeKey: string | null } | null> {
+  return maybeEngineDecideScoped(techScope(screenId), subjectRef, decision, actorUserId, remarks);
+}
+
+/** Scope-generic decide — same contract as maybeEngineDecide, any card. */
+export async function maybeEngineDecideScoped(
+  scope: Scope, subjectRef: string, decision: 'approve' | 'reject',
+  actorUserId: string, remarks?: string | null,
+): Promise<{ requestStatus: string; nodeSatisfied: boolean; activatedNodeKey: string | null } | null> {
   if (!engine) return null;
-  const pending = await pendingEngineRequest(screenId, subjectRef);
+  const pending = await pendingEngineRequestScoped(scope, subjectRef);
   if (!pending) return null;
   try {
     const r = await engine.decide(engineCtx(actorUserId), pending.requuid, { decision, remarks: remarks ?? undefined });
@@ -135,6 +173,19 @@ export async function approvalArrivalSweep(vesselId: string): Promise<{ submitte
     const screenId = isRe ? 'pms-wo-re-postponement' : 'pms-wo-postponement';
     const requuid = await maybeEngineSubmit(screenId, wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId, wo.postponeApprover ?? null);
     if (requuid) submitted++;
+  }
+
+  // ── Defects leg (second integration, 03-Sep-2026) ─────────────────────────────
+  // Ship-created subjects arrive by sync, so the create/PATCH hooks never fire on shore:
+  //   - extension: any defect holding a targetDateExtensions entry still 'Requested'
+  //   - verification: C1 closeout confirmed but not yet verified
+  // Both submits are idempotent (ALREADY_PENDING / NO_WORKFLOW no-ops). The defects
+  // module owns the actual queries + scopes — the gateway just fires its sweep.
+  try {
+    const { sweepDefectsForApproval } = await import('../defects/services/defectsApprovalHooks');
+    submitted += await sweepDefectsForApproval(vesselId);
+  } catch (e) {
+    console.error(`[approvals] defects arrival sweep failed for vessel ${vesselId} (non-fatal):`, e);
   }
 
   if (submitted > 0) console.log(`[approvals] arrival sweep vessel ${vesselId}: ${submitted} chain(s) started`);

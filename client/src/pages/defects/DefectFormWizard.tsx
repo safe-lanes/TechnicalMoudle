@@ -30,6 +30,8 @@ import { getSireReferencesByVersion } from "@/data/sireReferences";
 import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
 import { VesselComponentCombobox, type VesselComponentSelection } from "@/components/VesselComponentCombobox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
+import { getActiveRank } from "@/lib/activeRank";
 import { useUIRole } from "@/contexts/UIRoleContext";
 
 const defectFormSchema = insertDefectSchema.extend({
@@ -75,6 +77,11 @@ export default function DefectFormWizard({
   const { toast } = useToast();
   const { currentUser } = useAuth();
   const { isSailAdmin, isClientAdmin, isTechSuperintendent } = useUIRole();
+  // Approval workflow (03-Sep-2026): extension approvals are decided ASHORE — on ship the
+  // B5 "Approved?" controls are not rendered (submit-only; product-approved deviation).
+  // Part C1 Closeout is a Master-only action, mirrored client-side (server enforces too).
+  const { isShore } = useSyncInstanceInfo();
+  const isMasterRank = (getActiveRank() || '').trim() === 'Master';
   const { data: vessels = [] } = useVessels();
   
   // Fetch equipment categories from database
@@ -527,7 +534,10 @@ export default function DefectFormWizard({
       }
       return true;
     } catch (error) {
-      toast({ title: "Error saving defect", variant: "destructive" });
+      // Approval-gate refusals (403 Master-only, 409 pending approval) carry the reason —
+      // surface it instead of a blind generic message.
+      const message = error instanceof Error ? error.message : undefined;
+      toast({ title: "Error saving defect", description: message, variant: "destructive" });
       return false;
     } finally {
       setIsSaving(false);
@@ -1871,6 +1881,8 @@ export default function DefectFormWizard({
                           </div>
                         </div>
 
+                        {/* Approval decision — decided ASHORE (03-Sep-2026): ship = submit-only (product-approved); server enforces regardless */}
+                        {isShore && (<>
                         <div className="grid grid-cols-2 gap-6">
                           <div className="flex items-center gap-6">
                             <span className="text-sm text-gray-600">Approved?</span>
@@ -1938,6 +1950,7 @@ export default function DefectFormWizard({
                             placeholder="Enter approver comments..."
                           />
                         </div>
+                        </>)}
 
                         {targetDateExtensions.length > 0 && targetDateExtensions[targetDateExtensions.length - 1]?.electronicConfirmation && (
                           <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -2004,12 +2017,14 @@ export default function DefectFormWizard({
                                     reasonForExtension: currentExtension.reasonForExtension,
                                     submitForApprovalTo: currentExtension.submitForApprovalTo,
                                     submitForApprovalToName: approverUser?.fullName || '',
-                                    status: (currentExtension.approved === true ? 'Approved' : currentExtension.approved === false ? 'Rejected' : 'Requested') as 'Requested' | 'Approved' | 'Rejected',
-                                    approved: currentExtension.approved,
-                                    approvalDate: currentExtension.approvalDate,
-                                    approverComments: currentExtension.approverComments,
-                                    electronicConfirmation: currentExtension.approved !== undefined 
-                                      ? `Approved by System User on ${new Date().toLocaleDateString()}` 
+                                    // Ship = submit-only (03-Sep-2026): the decision is made ashore, so a ship
+                                    // submission is always 'Requested' (server enforces this regardless).
+                                    status: (isShore && currentExtension.approved === true ? 'Approved' : isShore && currentExtension.approved === false ? 'Rejected' : 'Requested') as 'Requested' | 'Approved' | 'Rejected',
+                                    approved: isShore ? currentExtension.approved : undefined,
+                                    approvalDate: isShore ? currentExtension.approvalDate : '',
+                                    approverComments: isShore ? currentExtension.approverComments : '',
+                                    electronicConfirmation: isShore && currentExtension.approved !== undefined
+                                      ? `Approved by System User on ${new Date().toLocaleDateString()}`
                                       : undefined,
                                     requestedAt: new Date().toISOString(),
                                   };
@@ -2093,7 +2108,12 @@ export default function DefectFormWizard({
                   {/* C1. Closeout Section */}
                   <div className="space-y-6">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C1. Closeout</h3>
-                    
+                    {!isMasterRank && !isViewMode && (
+                      <p className="text-sm text-amber-600" data-testid="note-closeout-master-only">
+                        Only the Master may complete Part C1 Closeout.
+                      </p>
+                    )}
+
                     <div className="grid grid-cols-2 gap-6">
                       <div className="flex items-center gap-3">
                         <Controller
@@ -2104,7 +2124,7 @@ export default function DefectFormWizard({
                               id="confirm-completed"
                               checked={field.value || false}
                               onCheckedChange={field.onChange}
-                              disabled={isViewMode}
+                              disabled={isViewMode || !isMasterRank}
                               data-testid="checkbox-confirm-completed"
                             />
                           )}
@@ -2118,7 +2138,7 @@ export default function DefectFormWizard({
                           type="date"
                           data-testid="input-date-completed"
                           className="h-10 text-sm border-gray-300"
-                          disabled={isViewMode}
+                          disabled={isViewMode || !isMasterRank}
                           min={dateRegisteredInSystemValue || ""}
                         />
                       </div>
@@ -2132,7 +2152,7 @@ export default function DefectFormWizard({
                           data-testid="input-closed-by-name"
                           className="h-10 text-sm border-gray-300"
                           placeholder="Enter name"
-                          disabled={isViewMode}
+                          disabled={isViewMode || !isMasterRank}
                         />
                       </div>
                       <div className="flex flex-col">
@@ -2142,13 +2162,13 @@ export default function DefectFormWizard({
                           data-testid="input-closed-by-rank"
                           className="h-10 text-sm border-gray-300"
                           placeholder="Enter rank"
-                          disabled={isViewMode}
+                          disabled={isViewMode || !isMasterRank}
                         />
                       </div>
                     </div>
 
                     {/* Submit Button for C1 */}
-                    {!isViewMode && (
+                    {!isViewMode && isMasterRank && (
                       <div className="flex justify-end pt-4">
                         <Button
                           type="button"

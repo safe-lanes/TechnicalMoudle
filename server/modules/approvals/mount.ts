@@ -7,6 +7,7 @@ import type { Express, NextFunction, Request, Response } from 'express';
 import { startEmbedded } from '../approval-engine';
 import { requireRole, getRbacIdentity, type AuthenticatedRequest } from '../../middleware/auth';
 import { technicalApprovalCard } from './approvalCard';
+import { defectsApprovalCard } from '../defects/approvalCard';
 import { approvalEventNotifier } from './approvalNotifier';
 import { AlsTenantRepositoryProvider, currentEngineTenantId } from './tenantProvider';
 import { setTechnicalEngine } from './engineGateway';
@@ -26,7 +27,7 @@ export async function mountTechnicalApprovals(app: Express): Promise<void> {
   // (not any Office-typed user). Same role set as the menu + page guard (no three-way divergence).
   const configGuard = requireRole([...APPROVAL_ADMIN_ROLES]);
   const engine = startEmbedded(app, {
-    cards: [technicalApprovalCard],                       // broken card = refuse to start (fail-loud)
+    cards: [technicalApprovalCard, defectsApprovalCard],  // broken card = refuse to start (fail-loud)
     provider: new AlsTenantRepositoryProvider(),
     basePath: '/technical/api/approval-engine',
     resolveTenantId: () => currentEngineTenantId(),       // same ALS source as the provider
@@ -42,5 +43,5 @@ export async function mountTechnicalApprovals(app: Express): Promise<void> {
     onEvent: approvalEventNotifier,
   });
   setTechnicalEngine(engine);
-  console.log('🔏 Approval engine mounted at /technical/api/approval-engine (Technical card registered)');
+  console.log('🔏 Approval engine mounted at /technical/api/approval-engine (Technical + Defects cards registered)');
 }

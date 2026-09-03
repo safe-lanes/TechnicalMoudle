@@ -1,4 +1,4 @@
-# Approval Engine — Integration Guide (v1, Phase 1)
+# Approval Engine — Integration Guide (v2 — updated after the second integration, Defects, 03-Sep-2026)
 
 For any module team (Technical, Crewing, …) wiring a product onto the engine. You should not
 need to read the engine source; the demo card (`server/approval-demo/demoCard.ts`) is the
@@ -117,6 +117,51 @@ enabled old-config levels would double-gate. The rule is **workflow XOR old leve
 enable the generated workflow and disable the old level flags in the same support action (the
 Technical submit hooks log a loud warning when both are active). Keep the old config table —
 read-only in practice — until the module's step-creation code is retired.
+
+### 3e. Modules with ONE generic write path (learned wiring Defects — no approve route to intercept)
+
+§3b assumes your module has dedicated approve/reject services to hook. Some modules don't:
+Defects' extension approvals, verification and closeout all arrive as FIELD DIFFS inside one
+generic `PATCH /defects/:id`. For that shape:
+
+- **The gate lives inside the PATCH service** — diff the incoming body against the stored
+  row, classify each diff (new request / decision attempt / unrelated edit), and route
+  decision attempts engine-first. Do NOT add parallel dedicated endpoints unless you also
+  guard the raw PATCH — a gate the raw PATCH bypasses is not a gate.
+- **Gate every OTHER reachable route too.** A dead-on-the-live-path route that still
+  answers HTTP (Defects had a dormant `/close`) is a side door; give it the same rule.
+- **Probing "does a chain govern this subject?" costs one submit.** There is no
+  is-configured query; call submit and branch on the outcome (`engineSubmitOutcome` in
+  modules/approvals/engineGateway.ts): STARTED / ALREADY_PENDING ⇒ governed — refuse or
+  downgrade the direct write; NO_WORKFLOW / DISABLED / engine-off ⇒ legacy passthrough,
+  byte-identical. The probe IS the fallback contract check.
+- **A decision click can be a decide.** When the actor writes the "approved" field and a
+  request is pending, translate the write into `engine.decide` (the engine 403s
+  non-approvers); on success DROP the client's approval fields from the update — the
+  card's `onDecision` already wrote them through the module's synced tables.
+- Worked example: `server/modules/defects/services/defectsApprovalHooks.ts`.
+
+### 3f. What a second card actually needs (corrections from the Defects integration)
+
+- **`onPending` is optional.** The host's engine-level `onEvent` notifier
+  (mount.ts → approvalNotifier) already fans out pending/decided events for EVERY card —
+  a per-card onPending is only for module-specific extras. The card template below
+  over-sold it as standard.
+- **Registration is one line**: add your card to the `cards: [...]` array in
+  modules/approvals/mount.ts. The gateway is card-agnostic — use `scopeFor(moduleId,
+  screenId)` + the `*Scoped` submit/pending/decide helpers; the arrival sweep hosts
+  per-module legs (add yours there).
+- **First-time-approval modules**: when the module never had server-side approvals (the
+  old config was decorative), the "legacy path" the fallback contract preserves is the
+  UNGATED behaviour — including things like self-approval. That is correct: the engine
+  only adds control once a workflow is configured. The §3d cutover XOR rule is N/A
+  (there is no old step-creation code to race), and migrating decorative config rows
+  (below) produces chains nobody ever enforced — prefer configuring fresh workflows.
+- **Role resolution is shared**: `resolveRoleApproverUserIds` (modules/approvals/
+  approvalCard.ts) gives any card the D-1 role→users rules + strict vessel scoping.
+  Classification predicates stay PER CARD — do not force cards to agree (product may
+  define "critical" differently per module; Technical = critical||classItem, Defects =
+  component Criticality only, by explicit decision).
 
 ## Writing a card (the demo is the template)
 

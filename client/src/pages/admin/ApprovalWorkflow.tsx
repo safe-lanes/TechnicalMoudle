@@ -102,12 +102,10 @@ const APPROVAL_MODULES: ModuleNode[] = [
         icon: AlertTriangle,
         functions: [{ id: "defects-extension", name: "Extension" }],
       },
-      {
-        id: "defects-closure",
-        title: "Closure",
-        icon: Shield,
-        functions: [{ id: "defects-closure", name: "Closure" }],
-      },
+      // Closure (Part C1) was REMOVED from the approval workflow (product decision,
+      // 03-Sep-2026): it is a plain Master-only permission rule, not an approval chain.
+      // The old defects-closure awc rows (and the old 3-variable rows below) remain in
+      // approval_workflow_config as unread orphans — nothing consumes them.
       {
         id: "defects-verification",
         title: "Verification",
@@ -125,9 +123,10 @@ const CONFIG_ROWS: Record<string, string[]> = {
   "pms-stores-cr":        ["Store Items"],
   "pms-wo-postponement":     ["Critical WO", "Normal WO", "Critical Equipment WO"],
   "pms-wo-re-postponement":  ["Critical WO", "Normal WO", "Critical Equipment WO"],
-  "defects-extension":    ["Critical Equipment Related", "COC Related", "Normal Defects"],
-  "defects-closure":      ["Critical Equipment Related", "COC Related", "Normal Defects"],
-  "defects-verification": ["Critical Equipment Related", "COC Related", "Normal Defects"],
+  // Two-bucket model (product decision, 03-Sep-2026) — ids match the Defects card's
+  // classification ids exactly (component Criticality OR defect COC flag → first bucket).
+  "defects-extension":    ["Critical Equipment / COC Related", "Normal"],
+  "defects-verification": ["Critical Equipment / COC Related", "Normal"],
 };
 
 interface SelectedLeaf {

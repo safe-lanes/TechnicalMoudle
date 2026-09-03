@@ -54,6 +54,34 @@ async function subjectVesselId(scope: Scope, subjectRef: string): Promise<string
   return rows[0]?.v ?? null;
 }
 
+/**
+ * D-1 role → approver user ids, shared by every card (Technical, Defects, …).
+ * Chains store stable role ids (admn_role_master.ruid); membership = name join to
+ * master_users; vessel scoping via LOGIN-CAPTURED master_user_vessels assignments
+ * exactly as documented in the header (staleness caveat included). This helper is
+ * classification-free on purpose — each card keeps its OWN classify predicate
+ * (product decision 03-Sep-2026: Technical uses critical||classItem, Defects uses
+ * component Criticality only — do not force them to agree).
+ */
+export async function resolveRoleApproverUserIds(roleId: string, vesselId: string | null): Promise<string[]> {
+  const role = (await db().select().from(admnRoleMaster)
+    .where(and(eq(admnRoleMaster.ruid, roleId), eq(admnRoleMaster.isDeleted, false))).limit(1))[0];
+  if (!role) return [];
+  const users = await db().select({ id: masterUsers.id }).from(masterUsers)
+    .where(and(eq(masterUsers.role, role.assignedRole), eq(masterUsers.isDeleted, false)));
+  const ids = users.map((u) => u.id);
+  if (ids.length === 0) return [];
+  // Office roles resolve fleet-wide ONLY when strict vessel-scope is off (legacy). With the
+  // flag on (default), every role — office and ship alike — is scoped to the subject's vessel
+  // via the user's SAILERP-assigned vessels (master_user_vessels). A role with no assigned
+  // user for the vessel resolves to zero → the F3 safety net flags it.
+  if (role.roletype !== 'Ship' && !isVesselScopeStrict()) return ids;
+  if (!vesselId) return [];
+  const assigned = await db().select({ u: masterUserVessels.userUuid }).from(masterUserVessels)
+    .where(and(eq(masterUserVessels.vesselId, vesselId), eq(masterUserVessels.isActive, true), inArray(masterUserVessels.userUuid, ids)));
+  return assigned.map((r) => r.u);
+}
+
 export const technicalApprovalCard: ApprovalCard = {
   moduleId: TECHNICAL_MODULE_ID,
   label: 'Technical',
@@ -111,24 +139,7 @@ export const technicalApprovalCard: ApprovalCard = {
           eq(mocApprovers.isDeleted, false), eq(mocApprovers.modulename, 'Technical')));
       return rows.map((r) => r.u).filter((u): u is string => !!u);
     }
-    // real role (ruid → name join, D-1)
-    const role = (await db().select().from(admnRoleMaster)
-      .where(and(eq(admnRoleMaster.ruid, roleId), eq(admnRoleMaster.isDeleted, false))).limit(1))[0];
-    if (!role) return [];
-    const users = await db().select({ id: masterUsers.id }).from(masterUsers)
-      .where(and(eq(masterUsers.role, role.assignedRole), eq(masterUsers.isDeleted, false)));
-    const ids = users.map((u) => u.id);
-    if (ids.length === 0) return [];
-    // Office roles resolve fleet-wide ONLY when strict vessel-scope is off (legacy). With the
-    // flag on (default), every role — office and ship alike — is scoped to the subject's vessel
-    // via the user's SAILERP-assigned vessels (master_user_vessels). A role with no assigned
-    // user for the vessel resolves to zero → the F3 safety net flags it.
-    if (role.roletype !== 'Ship' && !isVesselScopeStrict()) return ids;
-    const vesselId = await subjectVesselId(scope, subjectRef);
-    if (!vesselId) return [];
-    const assigned = await db().select({ u: masterUserVessels.userUuid }).from(masterUserVessels)
-      .where(and(eq(masterUserVessels.vesselId, vesselId), eq(masterUserVessels.isActive, true), inArray(masterUserVessels.userUuid, ids)));
-    return assigned.map((r) => r.u);
+    return resolveRoleApproverUserIds(roleId, await subjectVesselId(scope, subjectRef));
   },
 
   async onDecision(_ctx, notice: DecisionNotice) {

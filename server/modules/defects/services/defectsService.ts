@@ -46,10 +46,28 @@ export async function createDefect(body: any) {
   return defectsRepo.createDefect(defectWithId);
 }
 
-export async function updateDefect(id: string, body: any) {
+export async function updateDefect(id: string, body: any, actor?: import('./defectsApprovalHooks').DefectActor) {
+  // Approval gate (B2a, 03-Sep-2026): the generic PATCH is Defects' ONLY live write path,
+  // so extension/verification approval writes are detected and routed engine-first HERE,
+  // and Part C1 closeout writes enforce the Master-only rule. With no chain configured the
+  // gate passes everything through byte-identically (sacred fallback) — see
+  // defectsApprovalHooks.ts for the one product-approved ship-side deviation.
+  const current = await defectsRepo.getDefect(id);
+  if (!current) {
+    throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
+  }
+  const { gateDefectUpdate, afterDefectUpdate } = await import('./defectsApprovalHooks');
+  const gated = await gateDefectUpdate(current, body, actor ?? {});
   const partialDefectSchema = insertDefectSchema.partial();
-  const validatedData = partialDefectSchema.parse(body);
-  return defectsRepo.updateDefect(id, validatedData);
+  const validatedData = partialDefectSchema.parse(gated.body);
+  const updated = await defectsRepo.updateDefect(id, validatedData);
+  for (const task of gated.postSave) {
+    try { await task(); } catch (e) { console.error('[approvals] defects post-save submit failed (legacy continues):', e); }
+  }
+  try { await afterDefectUpdate(current, updated, actor ?? {}); } catch (e) {
+    console.error('[approvals] defects post-update hook failed (non-fatal):', e);
+  }
+  return updated;
 }
 
 export async function deleteDefect(id: string) {
@@ -130,7 +148,13 @@ export async function linkDefects(defectId: string, body: any) {
   return defectsRepo.linkDefects(defectId, linkedDefects);
 }
 
-export async function closeDefect(defectId: string, body: any) {
+export async function closeDefect(defectId: string, body: any, actor?: import('./defectsApprovalHooks').DefectActor) {
+  // Master-only closure rule (03-Sep-2026). This route has no live UI caller (Phase A:
+  // DefectsActive/DefectsLog are not rendered) but stays HTTP-reachable — an ungated
+  // side door around the PATCH gate is not acceptable, so the same rule applies here.
+  if ((actor?.rankName || '').trim() !== 'Master') {
+    throw Object.assign(new Error('Only the Master may perform defect closure (Part C1 Closeout).'), { statusCode: 403, code: 'CLOSURE_MASTER_ONLY' });
+  }
   const { closedBy, closureComment, closureFiles, actionTakenRequested, targetCloseDate, dateCompleted } = body;
 
   // Validate all required fields

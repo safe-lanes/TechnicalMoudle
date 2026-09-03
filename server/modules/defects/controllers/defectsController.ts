@@ -1,5 +1,34 @@
 import { Request, Response } from 'express';
 import * as defectsService from '../services/defectsService';
+import type { DefectActor } from '../services/defectsApprovalHooks';
+
+/** Actor identity for the approval gate + Master-only closure rule (03-Sep-2026).
+ *  rank_name comes from the SAILERP-forwarded x-rank header (middleware/auth.ts) —
+ *  the platform's only server-visible rank source. */
+function defectActor(req: Request): DefectActor {
+  const user = (req as any).user;
+  return {
+    userUuid: user?.userUuid ?? null,
+    rankName: user?.rank_name ?? null,
+    role: (req as any).rbac?.role ?? user?.role ?? null,
+  };
+}
+
+/** Gate refusals (403 Master-only / engine not-your-turn, 409 pending) must surface with
+ *  their own status + message, not collapse into a generic 500. */
+function sendDefectError(res: Response, error: any, fallback: string) {
+  if (error?.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+    return res.status(error.statusCode).json({ error: error.message, code: error.code });
+  }
+  if (error.name === 'ZodError') {
+    return res.status(400).json({ error: 'Invalid defect data', details: error.errors });
+  }
+  if (error.message?.includes('not found')) {
+    return res.status(404).json({ error: error.message });
+  }
+  console.error(fallback, error);
+  return res.status(500).json({ error: fallback });
+}
 
 // ── GET /defects ──
 
@@ -144,16 +173,10 @@ export async function createDefect(req: Request, res: Response) {
 
 export async function updateDefect(req: Request, res: Response) {
   try {
-    const defect = await defectsService.updateDefect(req.params.id, req.body);
+    const defect = await defectsService.updateDefect(req.params.id, req.body, defectActor(req));
     res.json(defect);
   } catch (error: any) {
-    if (error.name === 'ZodError') {
-      return res.status(400).json({ error: "Invalid defect data", details: error.errors });
-    }
-    if (error.message?.includes('not found')) {
-      return res.status(404).json({ error: error.message });
-    }
-    res.status(500).json({ error: "Failed to update defect" });
+    return sendDefectError(res, error, 'Failed to update defect');
   }
 }
 
@@ -328,13 +351,10 @@ export async function linkDefects(req: Request, res: Response) {
 
 export async function closeDefect(req: Request, res: Response) {
   try {
-    const defect = await defectsService.closeDefect(req.params.id, req.body);
+    const defect = await defectsService.closeDefect(req.params.id, req.body, defectActor(req));
     res.json(defect);
   } catch (error: any) {
-    if (error.statusCode === 400) {
-      return res.status(400).json({ error: error.message });
-    }
-    res.status(500).json({ error: error.message || "Failed to close defect" });
+    return sendDefectError(res, error, 'Failed to close defect');
   }
 }
 
