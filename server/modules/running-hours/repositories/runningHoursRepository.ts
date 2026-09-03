@@ -39,7 +39,7 @@ export async function updateChildRhWithStampAccrual(params: {
   lastUpdated: string;
   readingDateIso: string;
   userId: string | null;
-}): Promise<{ previousRH: number }> {
+}): Promise<{ previousRH: number; changed: boolean }> {
   return storage.updateChildRhWithStampAccrual(params);
 }
 

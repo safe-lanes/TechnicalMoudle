@@ -20,7 +20,7 @@ describe('Running Hours validation toggle contract', () => {
     expect(() => validateCascadePolicyRules(result.data, true, false)).toThrow('addDelta mode requires value > 0');
   });
 
-  it('allows a negative Add Delta value when the resolved vessel policy is off', () => {
+  it('rejects a negative Add Delta even when the vessel rate-validation policy is off', () => {
     const result = cascadeRunningHoursSchema.safeParse({
       ...baseRequest,
       mode: 'addDelta',
@@ -28,7 +28,7 @@ describe('Running Hours validation toggle contract', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(() => validateCascadePolicyRules(result.data, false, true)).not.toThrow();
+    expect(() => validateCascadePolicyRules(result.data, false, true)).toThrow('addDelta mode requires value > 0');
   });
 
   it('keeps Set Total readings non-negative regardless of toggle state', () => {

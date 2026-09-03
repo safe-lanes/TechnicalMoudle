@@ -273,7 +273,7 @@ export async function completeWorkOrder(
           try {
             await updateMasterRH(component.cuuid, {
               newRHValue: newRH,
-              updateSource: 'MANUAL',
+              updateSource: 'WORKORDER',
               userId: bodyUserId || executionData.performedBy || 'system',
               userUuid: bodyUserUuid,
               userRole: userRole || 'Ship',
@@ -289,6 +289,15 @@ export async function completeWorkOrder(
             // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
             if (masterErr instanceof ValidationError) {
               const det: any = masterErr.details || {};
+              if (det.code === 'LOWER_THAN_CURRENT_RH') {
+                throw new ValidationError(masterErr.message, {
+                  ...det,
+                  componentId: component.cuuid,
+                  componentCode: component.componentCode || workOrder.componentCode,
+                  workOrderNo: workOrder.workOrderNo,
+                  rhCounterType: 'MASTER',
+                });
+              }
               throw new ValidationError(masterErr.message, {
                 code: 'RH_OVERRIDE_REQUIRED',
                 ...det,
@@ -379,6 +388,15 @@ export async function completeWorkOrder(
             await releaseInh(claimPoolInh, workOrder.wouuid);
             if (masterErr instanceof ValidationError) {
               const det: any = masterErr.details || {};
+              if (det.code === 'LOWER_THAN_CURRENT_RH') {
+                throw new ValidationError(masterErr.message, {
+                  ...det,
+                  componentId: masterComp.cuuid,
+                  componentCode: masterComp.componentCode || workOrder.componentCode,
+                  workOrderNo: workOrder.workOrderNo,
+                  rhCounterType: 'INHERITED',
+                });
+              }
               throw new ValidationError(masterErr.message, {
                 code: 'RH_OVERRIDE_REQUIRED',
                 ...det,

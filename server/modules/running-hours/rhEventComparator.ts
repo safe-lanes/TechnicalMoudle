@@ -194,6 +194,19 @@ export interface WinningRhEvent {
   readingDay: Date;         // effective observed reading day
   dateUpdatedLocal: string | null;
   originSide: string | null;
+  approvedReset?: boolean;
+}
+
+export function canApplyWinningRHToCurrent(
+  currentRH: number | null | undefined,
+  winnerRH: number,
+  approvedReset = false,
+): boolean {
+  return approvedReset ||
+    currentRH === null ||
+    currentRH === undefined ||
+    !Number.isFinite(currentRH) ||
+    winnerRH >= currentRH;
 }
 
 /**
@@ -213,7 +226,8 @@ export async function selectWinningRhEvent(conn: any, componentId: string): Prom
   // first (entered_at_utc is NOT NULL in practice, so the COALESCE is non-null,
   // but the ordering stays safe even for degenerate rows).
   const r = await conn.query(
-    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side
+    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side,
+            meter_replaced, is_renewal_reset
        FROM running_hours_audit
       WHERE component_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
         AND (cumulative_rh IS NOT NULL OR new_rh IS NOT NULL)${rotClause}
@@ -235,7 +249,14 @@ export async function selectWinningRhEvent(conn: any, componentId: string): Prom
     enteredAtUTC: row.entered_at_utc, originSide: row.origin_side,
   });
   if (!day) return null;
-  return { rhauuid: row.rhauuid, rh, readingDay: day, dateUpdatedLocal: row.date_updated_local, originSide: row.origin_side ?? null };
+  return {
+    rhauuid: row.rhauuid,
+    rh,
+    readingDay: day,
+    dateUpdatedLocal: row.date_updated_local,
+    originSide: row.origin_side ?? null,
+    approvedReset: row.meter_replaced === true || row.is_renewal_reset === true,
+  };
 }
 
 /**
@@ -278,6 +299,19 @@ export async function applyWinningRhToComponent(conn: any, componentId: string, 
   // Legacy data may express the master relationship via rh_counter_source
   // instead of rh_master_component_id (same rule as getInheritedComponents).
   const masterRef = comp?.rh_master_component_id || comp?.rh_counter_source || null;
+  const currentLiveRH = parseFloat(String(
+    counterType === 'MASTER'
+      ? (comp?.rh_current_master ?? comp?.current_cumulative_rh ?? '0')
+      : (comp?.current_cumulative_rh ?? '0')
+  ));
+  if (comp && !canApplyWinningRHToCurrent(currentLiveRH, winner.rh, winner.approvedReset)) {
+    console.warn(
+      `[RH-Derive:${context}] rejected lower non-reset winner for component=${componentId}: ` +
+      `current=${currentLiveRH}, incoming=${winner.rh}, event=${winner.rhauuid}, ` +
+      `reading=${winner.readingDay.toISOString().split('T')[0]}`
+    );
+    return 'unchanged';
+  }
 
   if (counterType === 'INHERITED' && masterRef) {
     // Child's own winning event drives its individual hours (current_cumulative_rh).
@@ -292,7 +326,7 @@ export async function applyWinningRhToComponent(conn: any, componentId: string, 
       // runningHoursService). Non-cuuid matches are vessel-scoped: the same
       // code exists on every vessel.
       const m = await conn.query(
-        `SELECT cuuid, meter_replaced_last_rh FROM components
+        `SELECT cuuid, meter_replaced_last_rh, rh_current_master, current_cumulative_rh FROM components
           WHERE (cuuid = $1 OR ((component_code = $1 OR id = $1) AND vessel_id = $2))
             AND (is_deleted = false OR is_deleted IS NULL)
           ORDER BY (cuuid = $1) DESC LIMIT 1`,
@@ -302,9 +336,15 @@ export async function applyWinningRhToComponent(conn: any, componentId: string, 
       if (master) {
         const baseline = parseFloat(master.meter_replaced_last_rh || '0') || 0;
         const masterWinner = await selectWinningRhEvent(conn, master.cuuid);
-        if (masterWinner) {
+          const currentMasterRH = parseFloat(master.rh_current_master ?? master.current_cumulative_rh ?? '0');
+          if (masterWinner && canApplyWinningRHToCurrent(currentMasterRH, masterWinner.rh, masterWinner.approvedReset)) {
           cache = (baseline + masterWinner.rh).toFixed(2);
           cacheDay = masterWinner.readingDay;
+          } else if (masterWinner) {
+            console.warn(
+              `[RH-Derive:${context}] preserved INHERITED cache because master winner would roll back ` +
+              `master=${master.cuuid}: current=${currentMasterRH}, incoming=${masterWinner.rh}`
+            );
         }
       }
     } catch (e: any) {

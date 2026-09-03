@@ -1,3 +1,5 @@
+import { parseReadingDayStrict, canonicalizeReadingDateInput } from './readingDate';
+
 export interface RHValidationResult {
   allowed: boolean;
   maxAllowedIncrease: number;
@@ -18,7 +20,80 @@ export interface RHValidationInput {
   adminOverride?: boolean;
 }
 
-import { parseReadingDayStrict, canonicalizeReadingDateInput } from './readingDate';
+export type RHMonotonicityReason =
+  | 'VALID_INCREASE'
+  | 'EQUAL_CURRENT_RH'
+  | 'LOWER_THAN_CURRENT_RH'
+  | 'APPROVED_RESET';
+
+export interface RHMonotonicityResult {
+  allowed: boolean;
+  reason: RHMonotonicityReason;
+  currentRH: number;
+  submittedRH: number;
+  delta: number;
+  currentRHDate: string | null;
+  submittedRHDate: string | null;
+  message: string;
+}
+
+/**
+ * Running-hour counters are monotonic during normal operation. Rate validation
+ * and the vessel validation toggle are deliberately separate from this
+ * integrity rule: a newer reading still cannot move a physical counter
+ * backwards. Meter replacement / renewal resets use their explicit workflows.
+ */
+export function validateRHMonotonicity(input: {
+  currentRH: number;
+  submittedRH: number;
+  currentRHDate?: string | null;
+  submittedRHDate?: string | null;
+  approvedReset?: boolean;
+}): RHMonotonicityResult {
+  const currentRHDate = input.currentRHDate ?? null;
+  const submittedRHDate = input.submittedRHDate ?? null;
+  const delta = input.submittedRH - input.currentRH;
+
+  if (input.approvedReset) {
+    return {
+      allowed: true,
+      reason: 'APPROVED_RESET',
+      currentRH: input.currentRH,
+      submittedRH: input.submittedRH,
+      delta,
+      currentRHDate,
+      submittedRHDate,
+      message: 'Approved running-hours reset or meter replacement.',
+    };
+  }
+
+  if (delta < 0) {
+    const dateContext = currentRHDate ? ` recorded on ${currentRHDate}` : '';
+    return {
+      allowed: false,
+      reason: 'LOWER_THAN_CURRENT_RH',
+      currentRH: input.currentRH,
+      submittedRH: input.submittedRH,
+      delta,
+      currentRHDate,
+      submittedRHDate,
+      message: `Current Reading (${input.submittedRH} RH) cannot be lower than the latest Running Hours value (${input.currentRH} RH${dateContext}). Correct the reading before continuing.`,
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: delta === 0 ? 'EQUAL_CURRENT_RH' : 'VALID_INCREASE',
+    currentRH: input.currentRH,
+    submittedRH: input.submittedRH,
+    delta,
+    currentRHDate,
+    submittedRHDate,
+    message: delta === 0
+      ? `Running Hours is already ${input.currentRH} RH; no update is required.`
+      : `Running Hours increases by ${delta} RH.`,
+  };
+}
 
 const MAX_HOURS_PER_DAY = 25;
 

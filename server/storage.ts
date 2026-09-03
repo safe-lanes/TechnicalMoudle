@@ -332,7 +332,7 @@ export interface IStorage {
     lastUpdated: string;
     readingDateIso: string;
     userId: string | null;
-  }): Promise<{ previousRH: number }>;
+  }): Promise<{ previousRH: number; changed: boolean }>;
 
   updateMasterRunningHours(params: {
     componentId: string;

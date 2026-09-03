@@ -213,8 +213,8 @@ export type RenewalActionType = typeof RENEWAL_ACTION_TYPES[number];
 export const cascadeRunningHoursSchema = z.object({
   parentComponentId: z.string(),
   mode: z.enum(['setTotal', 'addDelta']),
-  // Set Total remains non-negative. Add Delta may be negative only when the
-  // Sail Admin-authorized validation bypass is requested and approved server-side.
+  // Set Total remains non-negative. Add Delta represents accumulated operating
+  // time and must be positive; counter reductions use explicit reset/correction flows.
   value: z.number().finite(),
   dateUpdated: z.string(), // DD-MMM-YYYY HH:mm format
   dateUpdatedTZ: z.string().default('UTC'),

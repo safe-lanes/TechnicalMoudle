@@ -223,7 +223,31 @@ import {
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
 import { readingDayLocalExpr, targetReadingDay } from './modules/running-hours/repositories/dateUpdatedLocalSql';
 import { canonicalizeReadingDateInput, requireReadingDayInput, parseReadingDayStrict, formatReadingDay } from './modules/running-hours/utils/readingDate';
+import { validateRHMonotonicity } from './modules/running-hours/utils/rhValidation';
+import { ValidationError } from './modules/shared/errors';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
+
+function enforceFreshRHMonotonicity(input: {
+  currentRH: number;
+  submittedRH: number;
+  currentRHDate?: string | null;
+  submittedRHDate?: string | null;
+  approvedReset?: boolean;
+}) {
+  const result = validateRHMonotonicity(input);
+  if (!result.allowed) {
+    throw new ValidationError(result.message, {
+      code: 'LOWER_THAN_CURRENT_RH',
+      currentRH: result.currentRH,
+      submittedRH: result.submittedRH,
+      delta: result.delta,
+      currentRHDate: result.currentRHDate,
+      submittedRHDate: result.submittedRHDate,
+      monotonicity: result,
+    });
+  }
+  return result;
+}
 
 // Task #394: which side observed/entered an RH reading — feeds running_hours_audit.origin_side
 // for the canonical latest-reading-wins comparator (ship wins exact-date ties). Cached after
@@ -1660,7 +1684,7 @@ export class PostgresStorage {
     lastUpdated: string;
     readingDateIso: string;
     userId: string | null;
-  }): Promise<{ previousRH: number }> {
+  }): Promise<{ previousRH: number; changed: boolean }> {
     const db = await getDb();
     const component = await this.getComponent(params.componentId);
     if (!component) {
@@ -1674,6 +1698,15 @@ export class PostgresStorage {
         .limit(1);
       const fresh = freshRows[0] || component;
       const previousRH = parseFloat(fresh.currentCumulativeRH || '0');
+      const monotonicity = enforceFreshRHMonotonicity({
+        currentRH: previousRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: fresh.lastUpdated || null,
+        submittedRHDate: params.readingDateIso,
+      });
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { previousRH, changed: false };
+      }
       await tx.update(components)
         .set({
           currentCumulativeRH: rhStr,
@@ -1683,7 +1716,7 @@ export class PostgresStorage {
         })
         .where(eq(components.cuuid, component.cuuid));
       await this.accrueStampRhDelta(tx, fresh.vesselId, fresh.currentStamp, params.newRHValue - previousRH, params.readingDateIso, params.userId);
-      return { previousRH };
+      return { previousRH, changed: true };
     });
   }
 
@@ -1741,6 +1774,15 @@ export class PostgresStorage {
       const freshComponent = freshMaster[0] || component;
       const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || '0');
       const delta = params.newRHValue - previousMasterRH;
+      const monotonicity = enforceFreshRHMonotonicity({
+        currentRH: previousMasterRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: freshComponent.lastUpdated || null,
+        submittedRHDate: readingDateLocal,
+      });
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { masterUpdated: freshComponent, inheritedUpdated: 0 };
+      }
 
       // Re-read inherited children's values inside the locked tx (Task #374): stale
       // pre-lock reads must not drive the per-child delta math.
@@ -1920,6 +1962,15 @@ export class PostgresStorage {
       // Calculate delta: difference between new and old master RH value
       const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || '0');
       const delta = params.newRHValue - previousMasterRH;
+      const monotonicity = enforceFreshRHMonotonicity({
+        currentRH: previousMasterRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: freshComponent.lastUpdated || null,
+        submittedRHDate: lastUpdatedValue,
+      });
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { component: freshComponent, inheritedUpdated: 0 };
+      }
 
       // For MASTER components: update rhCurrentMaster AND currentCumulativeRH, then cascade
       const result = await tx.update(components)
@@ -1980,6 +2031,16 @@ export class PostgresStorage {
       // For INHERITED components: only update currentCumulativeRH (child's actual hours)
       // Do NOT update rhCurrentInheritedCached as it stores the master's value
       // This is typically used for component replacement scenarios (reset to 0) or manual adjustments
+      const previousInheritedRH = parseFloat(freshComponent.currentCumulativeRH || '0');
+      const monotonicity = enforceFreshRHMonotonicity({
+        currentRH: previousInheritedRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: freshComponent.lastUpdated || null,
+        submittedRHDate: lastUpdatedValue,
+      });
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { component: freshComponent, inheritedUpdated: 0 };
+      }
       const result = await tx.update(components)
         .set({
           currentCumulativeRH: rhValueStr,
@@ -1995,12 +2056,22 @@ export class PostgresStorage {
       }
       // RH follows the Stamp: accrue the DELTA of the child's own cumulative hours (Task #369)
       // Delta computed from the fresh locked in-tx read (Task #374 duplicate guard).
-      const inheritedDelta = params.newRHValue - parseFloat(freshComponent.currentCumulativeRH || '0');
+      const inheritedDelta = params.newRHValue - previousInheritedRH;
       await this.accrueStampRhDelta(tx, freshComponent.vesselId, freshComponent.currentStamp, inheritedDelta, readingIso, params.userId);
       return { component: result[0], inheritedUpdated: 0 };
 
     } else {
       // For NOT_RH_DRIVEN or unknown: just update currentCumulativeRH for backward compatibility
+      const previousFallbackRH = parseFloat(freshComponent.currentCumulativeRH || '0');
+      const monotonicity = enforceFreshRHMonotonicity({
+        currentRH: previousFallbackRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: freshComponent.lastUpdated || null,
+        submittedRHDate: lastUpdatedValue,
+      });
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { component: freshComponent, inheritedUpdated: 0 };
+      }
       const result = await tx.update(components)
         .set({
           currentCumulativeRH: rhValueStr,
@@ -2014,7 +2085,7 @@ export class PostgresStorage {
         throw new Error(`Failed to update component ${params.componentId}`);
       }
       // RH follows the Stamp: accrue the DELTA onto the Installed item (Task #369)
-      const fallbackDelta = params.newRHValue - parseFloat(component.currentCumulativeRH || '0');
+      const fallbackDelta = params.newRHValue - previousFallbackRH;
       await this.accrueStampRhDelta(tx, component.vesselId, component.currentStamp, fallbackDelta, readingIso, params.userId);
       return { component: result[0], inheritedUpdated: 0 };
     }
@@ -8155,6 +8226,18 @@ export class PostgresStorage {
     if (parentResult.length > 0) {
       const parent = parentResult[0];
       currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || '0');
+      const requestedRH = meterReplaced
+        ? value
+        : mode === 'addDelta'
+          ? currentRH + value
+          : value;
+      enforceFreshRHMonotonicity({
+        currentRH,
+        submittedRH: requestedRH,
+        currentRHDate: parent.lastUpdated || null,
+        submittedRHDate: dateUpdated,
+        approvedReset: !!meterReplaced || !!isRenewalReset,
+      });
 
       if (!rhValidationBypassed) {
         // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
@@ -8174,7 +8257,7 @@ export class PostgresStorage {
         }
 
         // VALIDATION 2: Value Rule - RH must never go backwards (except when isRenewalReset is true for 0)
-        if (mode === 'setTotal' && value < currentRH && !isRenewalReset) {
+        if (mode === 'setTotal' && value < currentRH && !meterReplaced && !isRenewalReset) {
           throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
         }
 
@@ -8234,6 +8317,16 @@ export class PostgresStorage {
           computeDerived(freshParentResult[0]);
         }
         const freshParent = freshParentResult[0] || parentResult[0];
+        const monotonicity = enforceFreshRHMonotonicity({
+          currentRH,
+          submittedRH: newRH,
+          currentRHDate: freshParent.lastUpdated || null,
+          submittedRHDate: dateUpdated,
+          approvedReset: !!meterReplaced || !!isRenewalReset,
+        });
+        if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+          return { updatedComponents: 0, auditsCreated: 0 };
+        }
 
         // Re-read the inherited children's VALUES inside the locked tx too: their
         // per-child current RH must not come from the stale pre-lock read, or a

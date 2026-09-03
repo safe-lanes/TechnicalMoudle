@@ -3064,6 +3064,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
+        if (result.code === 'LOWER_THAN_CURRENT_RH') {
+          const currentDate = result.currentRHDate ? ` recorded on ${result.currentRHDate}` : '';
+          throw new Error(
+            `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
+            `(${result.currentRH} RH${currentDate}). Correct the Current Reading before completing this Work Order.`
+          );
+        }
         if (result.code === 'INVALID_RUNNING_HOURS') {
           throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
         }
@@ -3806,6 +3813,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
+        if (result.code === 'LOWER_THAN_CURRENT_RH') {
+          const currentDate = result.currentRHDate ? ` recorded on ${result.currentRHDate}` : '';
+          throw new Error(
+            `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
+            `(${result.currentRH} RH${currentDate}). Correct the Current Reading before approving this Work Order.`
+          );
+        }
         // Task #240: MASTER component over the per-day RH rate cap — surface the Sail Admin override
         // affordance instead of a dead-end error toast.
         if (result.code === 'RH_OVERRIDE_REQUIRED' && !adminOverride) {
