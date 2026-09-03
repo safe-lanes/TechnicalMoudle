@@ -511,7 +511,7 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isGlobal: true,
     isConfigurable: false,
     businessRules: null,
-    notes: 'Legacy company approval policy (migration 137). Retained for history; vessel-specific PMS settings supersede it for active lock enforcement.',
+    notes: 'IN ACTIVE USE (do not clean up): per-tenant approval-settings singleton — carries the approval-email admin toggle (approval_email_enabled, mig 172). Its ORIGINAL column (superintendent lock, mig 137) is retired: vessel-specific PMS settings supersede it for lock enforcement.',
   },
   pms_vessel_settings: {
     tableName: 'pms_vessel_settings',

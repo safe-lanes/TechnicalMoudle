@@ -18,7 +18,7 @@ import { storage } from '../../storage';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { approvalNotifications } from './notificationSchema';
-import { masterUsers, vessels, changeRequest, workOrders } from '@shared/schema';
+import { masterUsers, vessels, changeRequest, workOrders, companyApprovalSettings } from '@shared/schema';
 import { sesEmailConfig, sendApprovalEmail, type SesEmailConfig } from './sesEmailTransport';
 
 const db = () => {
@@ -37,6 +37,22 @@ const SCREEN_LABEL: Record<string, string> = {
   'defects-verification': 'Defect Verification',
 };
 const label = (s: Scope) => SCREEN_LABEL[s.screenId] ?? `${s.moduleId}/${s.screenId}`;
+
+/**
+ * Per-tenant admin toggle for approval EMAIL (mig 172, company_approval_settings.
+ * approval_email_enabled — that table is IN ACTIVE USE for this flag even though its
+ * legacy superintendent-lock column is retired). Missing row/column reads as ON, and any
+ * read failure defaults ON — the toggle can never block or delay an approval.
+ */
+export async function approvalEmailToggleEnabled(): Promise<boolean> {
+  try {
+    const row = (await db().select({ enabled: companyApprovalSettings.approvalEmailEnabled })
+      .from(companyApprovalSettings).limit(1))[0];
+    return row?.enabled !== false; // missing row = ON (default)
+  } catch {
+    return true; // pre-migration DB or transient error — default ON, never break notify
+  }
+}
 
 /**
  * F4: reports whether approval EMAIL is configured, so an admin can see when approvers are
@@ -79,6 +95,9 @@ async function notifyUsers(userIds: string[], base: {
   const unique = Array.from(new Set(userIds.filter(Boolean)));
   if (unique.length === 0) return;
   const sesCfg: SesEmailConfig | null = sesEmailConfig();
+  // Admin toggle (per tenant). Only consulted when SES is configured — unconfigured stays
+  // 'skipped' so the two states are never confused. OFF → no SES call is made at all.
+  const toggleOn = sesCfg ? await approvalEmailToggleEnabled() : true;
   const emails = await db().select({ id: masterUsers.id, email: masterUsers.email, name: masterUsers.fullName })
     .from(masterUsers).where(inArray(masterUsers.id, unique));
   const emailByUser = new Map(emails.map((e) => [e.id, e.email]));
@@ -89,6 +108,8 @@ async function notifyUsers(userIds: string[], base: {
     const to = emailByUser.get(userUuid);
     if (!sesCfg) {
       emailStatus = 'skipped'; // SES env not configured — in-app only (admin banner shows this)
+    } else if (!toggleOn) {
+      emailStatus = 'disabled'; // admin switched email off — distinct from skipped/error
     } else if (!to) {
       emailStatus = 'skipped'; emailError = 'no email on master_users';
     } else {
@@ -111,7 +132,7 @@ async function notifyUsers(userIds: string[], base: {
       emailStatus, emailError,
     });
   }
-  console.log(`[approvals] NOTIFY ${base.kind} → ${unique.length} user(s) [email: ${!sesCfg ? 'skipped (SES not configured)' : `attempted via SES (${sesCfg.mode})`}] ${base.title}`);
+  console.log(`[approvals] NOTIFY ${base.kind} → ${unique.length} user(s) [email: ${!sesCfg ? 'skipped (SES not configured)' : !toggleOn ? 'disabled by admin toggle' : `attempted via SES (${sesCfg.mode})`}] ${base.title}`);
 }
 
 async function auditRow(actionType: string, evt: { requuid: string; subjectRef: string; scope: Scope }, payload: Record<string, unknown>): Promise<void> {

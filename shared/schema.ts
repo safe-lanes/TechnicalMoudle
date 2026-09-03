@@ -2450,10 +2450,18 @@ export type CompanyGraceScope = 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH';
 // Legacy company approval-policy settings (migration 137). Kept for historical
 // compatibility only; active Superintendent lock enforcement is vessel-specific
 // in pms_vessel_settings as of migration 168.
+// ⚠️ IN ACTIVE USE — do not clean up. superintendent_lock_enabled is RETIRED (the lock
+// moved per-vessel: pms_vessel_settings, migs 163/168, /approval-policy PUT answers 410),
+// but this table remains the per-tenant approval-settings SINGLETON and now carries the
+// approval-email admin toggle (approval_email_enabled, mig 172 — read by the approval
+// notifier; settable via PUT /approvals/email-config without a restart).
 export const companyApprovalSettings = pgTable("company_approval_settings", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   singletonKey: text("singleton_key").notNull().unique().default("ACTIVE"),
-  superintendentLockEnabled: boolean("superintendent_lock_enabled").notNull().default(true),
+  superintendentLockEnabled: boolean("superintendent_lock_enabled").notNull().default(true), // RETIRED — per-vessel lock supersedes
+  // Approval EMAIL on/off (mig 172, 04-Sep-2026). In-app notifications unaffected; a
+  // missing row reads as TRUE (ON) so no seed is needed. Default TRUE = unchanged behaviour.
+  approvalEmailEnabled: boolean("approval_email_enabled").notNull().default(true),
   updatedBy: text("updated_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: updatedAtColumn(),

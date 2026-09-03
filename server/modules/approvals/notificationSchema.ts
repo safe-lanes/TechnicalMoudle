@@ -21,7 +21,7 @@ export const approvalNotifications = pgTable('approval_notifications', {
   title: text('title').notNull(),
   message: text('message').notNull().default(''),
   readAt: timestamp('read_at', { withTimezone: true }),
-  emailStatus: text('email_status'),            // 'sent' | 'skipped' | 'error' | null
+  emailStatus: text('email_status'),            // 'sent' | 'skipped' (unconfigured/no address) | 'disabled' (admin toggle off, mig 172) | 'error' | null
   emailError: text('email_error'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
