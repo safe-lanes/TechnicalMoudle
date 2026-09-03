@@ -19,7 +19,7 @@ import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { approvalNotifications } from './notificationSchema';
 import { masterUsers, vessels, changeRequest, workOrders, companyApprovalSettings } from '@shared/schema';
-import { sesEmailConfig, sendApprovalEmail, type SesEmailConfig } from './sesEmailTransport';
+import { sesEmailConfig, sendApprovalEmail, isValidEmailAddress, type SesEmailConfig } from './sesEmailTransport';
 
 const db = () => {
   const ctx = getCurrentTenantContext();
@@ -103,34 +103,57 @@ async function notifyUsers(userIds: string[], base: {
   const emailByUser = new Map(emails.map((e) => [e.id, e.email]));
 
   for (const userUuid of unique) {
-    let emailStatus: string | null = null;
-    let emailError: string | null = null;
+    // ── IN-APP FIRST (audit fix 1a, 04-Sep-2026) ────────────────────────────────
+    // The in-app row is the guaranteed delivery and must never wait on an SES round
+    // trip. Rows that WILL attempt email are inserted as 'queued' and updated to
+    // sent/error right after the attempt — so a crash mid-batch leaves a durable
+    // 'queued' row the hourly retry sweep picks up (nothing is silently lost).
     const to = emailByUser.get(userUuid);
+    let emailStatus: string;
+    let emailError: string | null = null;
     if (!sesCfg) {
       emailStatus = 'skipped'; // SES env not configured — in-app only (admin banner shows this)
     } else if (!toggleOn) {
       emailStatus = 'disabled'; // admin switched email off — distinct from skipped/error
     } else if (!to) {
       emailStatus = 'skipped'; emailError = 'no email on master_users';
+    } else if (!isValidEmailAddress(to)) {
+      emailStatus = 'invalid-address'; emailError = 'address failed syntax validation — never sent'; // never reaches SES
     } else {
-      try {
-        // Sequential + paced + retried inside the transport; permanent SES errors
-        // surface immediately. A failure lands here and ONLY here — the in-app row
-        // below is written regardless.
-        await sendApprovalEmail(sesCfg, to, base.title, base.message);
-        emailStatus = 'sent';
-      } catch (e: any) {
-        emailStatus = 'error'; emailError = String(e?.message ?? e).slice(0, 300);
-        console.error(`[approvals] email to ${to} failed:`, e?.message ?? e);
-      }
+      emailStatus = 'queued';
     }
-    await db().insert(approvalNotifications).values({
-      userUuid, requuid: base.requuid,
-      moduleId: base.scope.moduleId, screenId: base.scope.screenId, actionId: base.scope.actionId,
-      subjectRef: base.subjectRef, vesselId: base.vesselId,
-      kind: base.kind, title: base.title, message: base.message,
-      emailStatus, emailError,
-    });
+    let anuuid: string | null = null;
+    try {
+      const inserted = await db().insert(approvalNotifications).values({
+        userUuid, requuid: base.requuid,
+        moduleId: base.scope.moduleId, screenId: base.scope.screenId, actionId: base.scope.actionId,
+        subjectRef: base.subjectRef, vesselId: base.vesselId,
+        kind: base.kind, title: base.title, message: base.message,
+        emailStatus, emailError,
+      }).returning({ anuuid: approvalNotifications.anuuid });
+      anuuid = inserted[0]?.anuuid ?? null;
+    } catch (e) {
+      console.error('[approvals] in-app notification insert failed:', e);
+      continue; // no row → nothing to email either
+    }
+
+    if (emailStatus !== 'queued' || !sesCfg || !to) continue;
+    try {
+      // Sequential + paced + retried inside the transport; permanent SES errors
+      // surface immediately. Failures land HERE only — the in-app row already exists.
+      const messageId = await sendApprovalEmail(sesCfg, to, base.title, base.message);
+      await db().update(approvalNotifications)
+        .set({ emailStatus: 'sent', emailError: null })
+        .where(eq(approvalNotifications.anuuid, anuuid!));
+      console.log(`[approvals] email sent anuuid=${anuuid} sesMessageId=${messageId}`);
+    } catch (e: any) {
+      const msg = String(e?.message ?? e).slice(0, 300);
+      await db().update(approvalNotifications)
+        .set({ emailStatus: 'error', emailError: msg })
+        .where(eq(approvalNotifications.anuuid, anuuid!))
+        .catch((u: unknown) => console.error('[approvals] email status update failed:', u));
+      console.error(`[approvals] email failed anuuid=${anuuid} to=${to}: ${msg}`);
+    }
   }
   console.log(`[approvals] NOTIFY ${base.kind} → ${unique.length} user(s) [email: ${!sesCfg ? 'skipped (SES not configured)' : !toggleOn ? 'disabled by admin toggle' : `attempted via SES (${sesCfg.mode})`}] ${base.title}`);
 }

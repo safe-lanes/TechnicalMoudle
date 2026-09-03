@@ -218,6 +218,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { shipskartReconcilerScheduler } = await import("./modules/shipskart/services/shipskartReconcilerScheduler");
   await shipskartReconcilerScheduler.start();
 
+  // Approval email retry sweep — SHORE-ONLY (audit hardening, 04-Sep-2026). Hourly,
+  // re-drives transiently-failed approval emails from their approval_notifications
+  // rows within a 24h window, then finalises 'failed'. Same discipline as the
+  // reconciler: env-tunable, re-entrancy guarded, stopped in stopAllSchedulers.
+  const { approvalEmailRetryScheduler } = await import("./modules/approvals/approvalEmailRetryScheduler");
+  await approvalEmailRetryScheduler.start();
+
   // Role watchdog — the boot-time isShip decision above can be WRONG (stale DB
   // instance_id at boot) and used to stay wrong until the next restart, leaving
   // auto-sync + WO generation silently dead on a ship. The watchdog re-resolves
@@ -715,6 +722,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     maintenanceOrchestrator.stop(); // stops alerts + sync-health + sync-pruning timers
     syncAutoScheduler.stop();
     shipskartReconcilerScheduler.stop();
+    approvalEmailRetryScheduler.stop();
   };
   process.on('SIGTERM', stopAllSchedulers);
   process.on('SIGINT', stopAllSchedulers);

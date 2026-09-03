@@ -21,7 +21,12 @@ export const approvalNotifications = pgTable('approval_notifications', {
   title: text('title').notNull(),
   message: text('message').notNull().default(''),
   readAt: timestamp('read_at', { withTimezone: true }),
-  emailStatus: text('email_status'),            // 'sent' | 'skipped' (unconfigured/no address) | 'disabled' (admin toggle off, mig 172) | 'error' | null
+  // 'queued' (attempt in flight; stale queued = crash, retried by the hourly sweep) |
+  // 'sent' | 'skipped' (unconfigured / no address) | 'disabled' (admin toggle off, mig 172) |
+  // 'invalid-address' (failed syntax validation — never sent, never retried) |
+  // 'error' (transient failure — retried by the sweep for 24h) | 'failed' (retry window
+  // expired — final) | null
+  emailStatus: text('email_status'),
   emailError: text('email_error'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

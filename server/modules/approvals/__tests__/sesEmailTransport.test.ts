@@ -13,7 +13,7 @@ vi.mock('@aws-sdk/client-sesv2', () => ({
 }));
 
 import {
-  sesEmailConfig, sendApprovalEmail, PermanentEmailError,
+  sesEmailConfig, sendApprovalEmail, PermanentEmailError, isValidEmailAddress,
   __setWaitForTests, __resetSesClientForTests,
 } from '../sesEmailTransport';
 
@@ -62,6 +62,19 @@ describe('sesEmailConfig (unconfigured behaviour)', () => {
     expect(cfg.mode).toBe('json-test');
     expect(await sendApprovalEmail(cfg, 'a@b.c', 's', 't')).toBe('json-test');
     expect(sendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('isValidEmailAddress (hardening: invalid addresses never reach SES)', () => {
+  it('accepts normal addresses', () => {
+    for (const v of ['a@b.co', 'first.last@sl-sail.com', 'x+tag@sub.domain.org', '  padded@ok.com  ']) {
+      expect(isValidEmailAddress(v)).toBe(true);
+    }
+  });
+  it('rejects null/empty/malformed/oversized', () => {
+    for (const v of [null, undefined, '', '   ', 'no-at-sign', 'two@@ats.com', 'spaces in@addr.com', 'nodomain@', '@nolocal.com', 'tld@dot.', 'a@b.c', `${'x'.repeat(320)}@too.long`]) {
+      expect(isValidEmailAddress(v as any)).toBe(false);
+    }
   });
 });
 

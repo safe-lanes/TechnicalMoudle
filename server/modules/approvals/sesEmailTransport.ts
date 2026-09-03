@@ -77,6 +77,18 @@ function sesClient(region: string): SESv2Client {
 /** Test seam: reset the cached client between vitest cases. */
 export function __resetSesClientForTests(): void { client = null; clientRegion = null; }
 
+/**
+ * Syntactic address check BEFORE any SES call (hardening, 04-Sep-2026): repeatedly
+ * sending to malformed addresses damages SES sending reputation, and a malformed
+ * address can never succeed. Pragmatic RFC-lite: one @, no spaces, dotted domain,
+ * sane length. Anything failing this is recorded 'invalid-address' and never sent.
+ */
+export function isValidEmailAddress(raw: string | null | undefined): boolean {
+  const v = (raw ?? '').trim();
+  if (!v || v.length > 320) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+}
+
 let lastSendAt = 0;
 
 export class PermanentEmailError extends Error {
