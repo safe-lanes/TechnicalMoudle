@@ -10663,8 +10663,8 @@ async function getExistingAlertDedupeKeys() {
 async function getWorkOrdersWithMissedCycles() {
   return storage.getWorkOrdersWithMissedCycles();
 }
-async function getAllVesselSpares() {
-  return storage.getAllVesselSpares();
+async function getLowCriticalSpareCandidates() {
+  return storage.getLowCriticalSpareCandidates();
 }
 async function getUnacknowledgedAlertEventsForRole(userRole, vesselId) {
   return storage.getUnacknowledgedAlertEventsForRole(userRole, vesselId);
@@ -11141,10 +11141,8 @@ __export(jobCycleCalc_exports, {
 function computeJobCycleUpdates(input) {
   const { maintenanceBasis, dateOfCompletion, completionRH, originalDueDate, job } = input;
   const jobUpdates = {};
-  const linkUpdates = {};
   const applyCalendarLeg = () => {
     if (!dateOfCompletion) return;
-    linkUpdates.lastDoneDate = dateOfCompletion;
     jobUpdates.lastDoneDate = dateOfCompletion;
     if (job.frequencyValue && job.frequencyUnit) {
       const nextDue = calculateNextDueDate(
@@ -11154,7 +11152,6 @@ function computeJobCycleUpdates(input) {
         originalDueDate ?? void 0
       );
       if (nextDue) {
-        linkUpdates.nextDueDate = nextDue;
         jobUpdates.nextDueDate = nextDue;
       }
     }
@@ -11163,12 +11160,10 @@ function computeJobCycleUpdates(input) {
     if (!completionRH) return;
     const currentRH = parseInt(completionRH);
     if (isNaN(currentRH)) return;
-    linkUpdates.lastDoneRH = currentRH.toString();
     jobUpdates.lastDoneRH = currentRH;
     const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(String(job.frequencyValue)) : null);
     if (rhInterval && !isNaN(rhInterval)) {
       const nextDueRH = currentRH + rhInterval;
-      linkUpdates.nextDueRH = nextDueRH.toString();
       jobUpdates.nextDueRH = nextDueRH;
     }
   };
@@ -11182,7 +11177,7 @@ function computeJobCycleUpdates(input) {
   if (maintenanceBasis === "Running Hours" && completionRH) {
     applyRhLeg();
   }
-  return { jobUpdates, linkUpdates };
+  return { jobUpdates };
 }
 var init_jobCycleCalc = __esm({
   "shared/workOrders/jobCycleCalc.ts"() {
@@ -11225,9 +11220,8 @@ function toNum(v) {
   const n = parseInt(String(v));
   return isNaN(n) ? null : n;
 }
-function filterAdvanceOnly(localJob, jobUpdates, linkUpdates) {
+function filterAdvanceOnly(localJob, jobUpdates) {
   const ju = { ...jobUpdates };
-  const lu = { ...linkUpdates };
   if (ju.lastDoneDate !== void 0) {
     const incoming = toDateMs(ju.lastDoneDate);
     const local = toDateMs(localJob.last_done_date);
@@ -11235,8 +11229,6 @@ function filterAdvanceOnly(localJob, jobUpdates, linkUpdates) {
     if (!advance) {
       delete ju.lastDoneDate;
       delete ju.nextDueDate;
-      delete lu.lastDoneDate;
-      delete lu.nextDueDate;
     }
   }
   if (ju.lastDoneRH !== void 0) {
@@ -11246,11 +11238,9 @@ function filterAdvanceOnly(localJob, jobUpdates, linkUpdates) {
     if (!advance) {
       delete ju.lastDoneRH;
       delete ju.nextDueRH;
-      delete lu.lastDoneRH;
-      delete lu.nextDueRH;
     }
   }
-  return Object.keys(ju).length > 0 ? { jobUpdates: ju, linkUpdates: lu } : null;
+  return Object.keys(ju).length > 0 ? ju : null;
 }
 function buildSet(updates, startIdx) {
   const parts = [];
@@ -11266,22 +11256,36 @@ function buildSet(updates, startIdx) {
   return { sql: parts.join(", "), values };
 }
 async function learnFromShipCompletions(client, wouuids) {
-  const result = { candidates: wouuids.length, jobsAdvanced: 0, linksAdvanced: 0, skipped: 0, errors: 0 };
+  const result = { candidates: wouuids.length, jobsAdvanced: 0, skipped: 0, errors: 0 };
+  await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
   for (let i = 0; i < wouuids.length; i++) {
     const wouuid = wouuids[i];
     const sp = `learn_wo_${i}`;
     try {
       await client.query(`SAVEPOINT ${sp}`);
       const woRes = await client.query(
-        `SELECT wouuid, status, job_id, component_id, vessel_id, maintenance_basis,
+        `SELECT wouuid, status, job_id, vessel_id, maintenance_basis,
                 date_completed, wo_completion_rh, completion_rh, current_reading,
                 next_due_date, due_date, work_order_no
            FROM work_orders WHERE wouuid = $1 LIMIT 1`,
         [wouuid]
       );
       const wo = woRes.rows[0];
-      if (!wo || !isCompletedStatus(wo.status) || !wo.job_id) {
+      if (!wo) {
         result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wouuid} is missing on shore`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+      if (!isCompletedStatus(wo.status)) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} is not completed (status=${wo.status || "NULL"})`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+      if (!wo.job_id) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: completed WO ${wo.work_order_no || wouuid} has no job_id`);
         await client.query(`RELEASE SAVEPOINT ${sp}`);
         continue;
       }
@@ -11294,11 +11298,18 @@ async function learnFromShipCompletions(client, wouuids) {
       const job = jobRes.rows[0];
       if (!job) {
         result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: completed WO ${wo.work_order_no || wouuid} references missing Job ${wo.job_id}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+      if (wo.vessel_id && job.vessel_id && wo.vessel_id !== job.vessel_id) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} vessel ${wo.vessel_id} does not match Job ${job.job_no} vessel ${job.vessel_id}`);
         await client.query(`RELEASE SAVEPOINT ${sp}`);
         continue;
       }
       const completionRH = wo.wo_completion_rh ?? wo.completion_rh ?? wo.current_reading;
-      const { jobUpdates, linkUpdates } = computeJobCycleUpdates({
+      const { jobUpdates } = computeJobCycleUpdates({
         maintenanceBasis: wo.maintenance_basis,
         dateOfCompletion: wo.date_completed,
         completionRH: completionRH != null ? String(completionRH) : null,
@@ -11309,38 +11320,30 @@ async function learnFromShipCompletions(client, wouuids) {
           intervalRunningHour: job.interval_running_hour
         }
       });
-      const filtered = filterAdvanceOnly(job, jobUpdates, linkUpdates);
+      const filtered = filterAdvanceOnly(job, jobUpdates);
       if (!filtered) {
         result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} does not advance shore Job ${job.job_no}`);
         await client.query(`RELEASE SAVEPOINT ${sp}`);
         continue;
       }
-      const jobSet = buildSet(filtered.jobUpdates, 2);
+      const jobSet = buildSet(filtered, 2);
       await client.query(`UPDATE jobs SET ${jobSet.sql} WHERE juuid = $1`, [job.juuid, ...jobSet.values]);
       result.jobsAdvanced++;
-      const vesselId = wo.vessel_id || job.vessel_id;
-      if (wo.component_id && vesselId && Object.keys(filtered.linkUpdates).length > 0) {
-        const linkSet = buildSet(filtered.linkUpdates, 4);
-        const linkRes = await client.query(
-          `UPDATE job_component_links SET ${linkSet.sql}
-            WHERE vessel_id = $1 AND job_id = $2 AND component_id = $3`,
-          [vesselId, job.juuid, wo.component_id, ...linkSet.values]
-        );
-        if ((linkRes.rowCount ?? 0) > 0) result.linksAdvanced++;
-      }
-      syncDiag(`COMPLETION-LEARN: WO ${wo.work_order_no || wouuid} advanced shore job ${job.job_no} \u2192 ${JSON.stringify(filtered.jobUpdates)}`);
+      syncDiag(`COMPLETION-LEARN: WO ${wo.work_order_no || wouuid} advanced shore job ${job.job_no} \u2192 ${JSON.stringify(filtered)}`);
       await client.query(`RELEASE SAVEPOINT ${sp}`);
     } catch (err) {
       result.errors++;
       try {
         await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
       } catch {
       }
       syncDiag(`COMPLETION-LEARN ERROR: WO ${wouuid}: ${String(err?.message || err).substring(0, 160)}`);
     }
   }
   if (wouuids.length > 0) {
-    syncDiag(`COMPLETION-LEARN SUMMARY: candidates=${result.candidates} jobsAdvanced=${result.jobsAdvanced} linksAdvanced=${result.linksAdvanced} skipped=${result.skipped} errors=${result.errors}`);
+    syncDiag(`COMPLETION-LEARN SUMMARY: candidates=${result.candidates} jobsAdvanced=${result.jobsAdvanced} skipped=${result.skipped} errors=${result.errors}`);
   }
   return result;
 }
@@ -24943,6 +24946,13 @@ var init_postgresStorage = __esm({
         return map;
       }
       // ============= MODULE 5: WORK ORDERS =============
+      // Light projection for WO numbering — one indexed column instead of full rows.
+      // Full-row getWorkOrders here cost ~930 rows read per WO generated (perf probe 02-Sep-2026).
+      async getWorkOrderNumbers(vesselId) {
+        const db2 = await getDb();
+        const rows = vesselId ? await db2.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders).where(eq7(workOrders.vesselId, vesselId)) : await db2.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders);
+        return rows.map((r) => r.workOrderNo).filter((n) => !!n);
+      }
       async getWorkOrders(vesselId, vesselIds) {
         const db2 = await getDb();
         if (vesselIds && vesselIds.length > 0) {
@@ -27016,6 +27026,48 @@ var init_postgresStorage = __esm({
           eq7(workOrders.dataScope, "vessel")
         ));
       }
+      // Alert-scan candidate WOs: only rows whose authored status can still compute to a
+      // derived band. Excludes exactly the statuses computeWorkOrderStatus passes through
+      // unchanged (shared/workOrders/status.ts): the FINALIZED set (lowercased/trimmed
+      // compare) and the exact-match workflow statuses. On a mature fleet this drops the
+      // completed history — the bulk of the table — before the 5-minute alert scan
+      // enriches anything. NULL status = candidate.
+      async getAlertCandidateWorkOrders() {
+        const db2 = await getDb();
+        return await db2.select().from(workOrders).where(and6(
+          eq7(workOrders.dataScope, "vessel"),
+          sql9`${workOrders.isDeleted} IS NOT TRUE`,
+          sql9`(${workOrders.status} IS NULL OR (
+          lower(trim(${workOrders.status})) NOT IN ('completed','approved','closed','cancelled','canceled')
+          AND ${workOrders.status} NOT IN ('Pending Approval','Pending Office Review','Postponed','Awaiting Office Approval','Postponement Approved','Postponement Rejected','Rejected')
+        ))`
+        ));
+      }
+      // Alert-scan candidate spares: SQL mirror of evaluateLowSpares' preconditions
+      // (lowSparesEvaluator.ts) with only the columns it reads — instead of loading
+      // every spare of the fleet, full rows, every 5 minutes.
+      async getLowCriticalSpareCandidates() {
+        const db2 = await getDb();
+        return await db2.select({
+          suuid: spares.suuid,
+          partCode: spares.partCode,
+          partName: spares.partName,
+          rob: spares.rob,
+          min: spares.min,
+          critical: spares.critical,
+          componentCode: spares.componentCode,
+          componentName: spares.componentName,
+          vesselId: spares.vesselId
+        }).from(spares).where(and6(
+          eq7(spares.dataScope, "vessel"),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted)),
+          sql9`${spares.vesselId} IS NOT NULL`,
+          sql9`lower(${spares.critical}) IN ('critical','yes')`,
+          sql9`${spares.min} > 0`,
+          sql9`${spares.rob} < ${spares.min}`
+        ));
+      }
       async getAllVesselSpares() {
         const db2 = await getDb();
         return await db2.select().from(spares).where(and6(
@@ -28484,7 +28536,10 @@ var init_postgresStorage = __esm({
       }
       async getSuperintendentNotifications(vesselName) {
         const db2 = await getDb();
-        const conditions = [eq7(superintendentNotifications.isAcknowledged, false)];
+        const conditions = [
+          eq7(superintendentNotifications.isAcknowledged, false),
+          or(eq7(superintendentNotifications.isDeleted, false), isNull2(superintendentNotifications.isDeleted))
+        ];
         if (vesselName) {
           conditions.push(eq7(superintendentNotifications.vesselName, vesselName));
         }
@@ -28492,7 +28547,11 @@ var init_postgresStorage = __esm({
       }
       async getAllSuperintendentNotifications(vesselName) {
         const db2 = await getDb();
-        return await db2.select().from(superintendentNotifications).where(vesselName ? eq7(superintendentNotifications.vesselName, vesselName) : void 0).orderBy(desc2(superintendentNotifications.createdAt));
+        const activeCondition = or(
+          eq7(superintendentNotifications.isDeleted, false),
+          isNull2(superintendentNotifications.isDeleted)
+        );
+        return await db2.select().from(superintendentNotifications).where(vesselName ? and6(activeCondition, eq7(superintendentNotifications.vesselName, vesselName)) : activeCondition).orderBy(desc2(superintendentNotifications.createdAt));
       }
       async acknowledgeSuperintendentNotification(id) {
         const db2 = await getDb();
@@ -31521,7 +31580,15 @@ __export(workOrderNumbering_exports, {
   isValidJobNumber: () => isValidJobNumber,
   resolveVesselCode: () => resolveVesselCode
 });
-async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, vesselId) {
+async function getWorkOrderNos(storage2, vesselId, preloaded) {
+  if (preloaded) return preloaded;
+  if (typeof storage2.getWorkOrderNumbers === "function") {
+    return storage2.getWorkOrderNumbers(vesselId);
+  }
+  const allWorkOrders = await storage2.getWorkOrders(vesselId);
+  return allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n);
+}
+async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, vesselId, preloadedWorkOrderNos) {
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
   if (!componentCode || !componentCode.trim()) {
     throw new Error("Component code is required for planned work order numbering");
@@ -31530,7 +31597,7 @@ async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, 
   const safeComponentCode = componentCode.trim();
   const vesselCode = await resolveVesselCode(storage2, vesselId);
   const prefix = vesselCode ? `${vesselCode}-` : "";
-  const allWorkOrders = await storage2.getWorkOrders(vesselId);
+  const workOrderNos = await getWorkOrderNos(storage2, vesselId, preloadedWorkOrderNos);
   const legacyPattern = new RegExp(
     `^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
@@ -31538,7 +31605,7 @@ async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, 
     vesselCode ? `^${escapeRegex(vesselCode)}-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$` : `^.+-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const maxRunningNumber = findMaxSequence(
-    allWorkOrders.map((wo) => wo.workOrderNo),
+    workOrderNos,
     [legacyPattern, vesselPrefixedPattern]
   );
   const nextRunningNumber = maxRunningNumber + 1;
@@ -31553,7 +31620,7 @@ async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCod
   const safeComponentCode = componentCode.trim();
   const vesselCode = await resolveVesselCode(storage2, vesselId);
   const prefix = vesselCode ? `${vesselCode}-` : "";
-  const allWorkOrders = await storage2.getWorkOrders(vesselId);
+  const unplannedWorkOrderNos = await getWorkOrderNos(storage2, vesselId);
   const legacyPattern = new RegExp(
     `^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
@@ -31561,7 +31628,7 @@ async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCod
     vesselCode ? `^${escapeRegex(vesselCode)}-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$` : `^.+-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const maxRunningNumber = findMaxSequence(
-    allWorkOrders.map((wo) => wo.workOrderNo),
+    unplannedWorkOrderNos,
     [legacyPattern, vesselPrefixedPattern]
   );
   const nextRunningNumber = maxRunningNumber + 1;
@@ -32642,7 +32709,7 @@ function isJobCritical(job) {
   const priority = job.jobPriority?.toLowerCase() || "";
   return priority === "critical" || priority === "high";
 }
-var WorkOrderService, workOrderService;
+var WO_GEN_VERBOSE, WorkOrderService, workOrderService;
 var init_workOrderService = __esm({
   "server/services/workOrderService.ts"() {
     "use strict";
@@ -32655,6 +32722,7 @@ var init_workOrderService = __esm({
     init_sync();
     init_dateParse();
     init_workOrderStatus();
+    WO_GEN_VERBOSE = process.env.WO_GEN_VERBOSE_LOGS === "true";
     WorkOrderService = class {
       /**
        * Get all work orders with optional vessel filter and computed status
@@ -32760,11 +32828,12 @@ var init_workOrderService = __esm({
           throw new Error("Job title is required");
         }
         if (workOrderData.jobId) {
-          const existingWOs = await storage.getWorkOrders(workOrderData.vesselId);
+          const existingWOs = await storage.getWorkOrdersByJobId(workOrderData.jobId);
           const newComponentCode = workOrderData.componentCode || null;
           const existingActiveWO = existingWOs.find((wo) => {
             if (wo.isDeleted === true) return false;
             if (wo.jobId !== workOrderData.jobId) return false;
+            if (workOrderData.vesselId && wo.vesselId !== workOrderData.vesselId) return false;
             if (!isBlockingStatus(wo.status)) return false;
             const existingComponentCode = wo.componentCode || null;
             return existingComponentCode === newComponentCode;
@@ -32915,16 +32984,33 @@ var init_workOrderService = __esm({
        * - Today >= GENERATE_DATE
        * - AND no DUE/OVERDUE/PENDING APPROVAL/POSTPONED WO exists for same job + same DUE_DATE cycle
        */
-      async autoGenerateWorkOrdersFromJobs(vesselId) {
-        const allJobs = await jobService.getJobs(vesselId);
+      async autoGenerateWorkOrdersFromJobs(vesselId, preloaded) {
+        const allJobs = preloaded?.jobs ?? await jobService.getJobs(vesselId);
         const calendarJobs = allJobs.filter(
           (job) => job.maintenanceBasis === "Calendar" && job.isActive !== false && // Job must be active
           job.nextDueDate
           // Must have valid due date
         );
-        const allWorkOrders = await this.getWorkOrders(vesselId);
+        const allWorkOrders = preloaded?.workOrders ?? await this.getWorkOrders(vesselId);
+        const workOrderNos = allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n);
         const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders, vesselId);
         const existingCycleWOs = buildCalendarCycleWOMap(allWorkOrders, vesselId);
+        const calendarLinksMap = await storage.getLinkedComponentsForJobs(calendarJobs.map((j) => j.juuid));
+        const componentCache = /* @__PURE__ */ new Map();
+        const vesselComponentsFetched = /* @__PURE__ */ new Set();
+        const getComponentFromCache = async (componentId, jobVesselId) => {
+          if (jobVesselId && !vesselComponentsFetched.has(jobVesselId)) {
+            const vesselComponents = await storage.getComponents(jobVesselId);
+            vesselComponents.forEach((c) => {
+              componentCache.set(c.id, c);
+              if (c.cuuid) componentCache.set(c.cuuid, c);
+            });
+            vesselComponentsFetched.add(jobVesselId);
+          }
+          const cached2 = componentCache.get(componentId);
+          if (cached2) return cached2;
+          return storage.getComponent(componentId);
+        };
         const results = {
           checked: calendarJobs.length,
           generated: 0,
@@ -32946,9 +33032,9 @@ var init_workOrderService = __esm({
           }
           const dueDateStr = dueDate.toISOString().split("T")[0];
           const generateDateStr = generateDate.toISOString().split("T")[0];
-          const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
+          const linkedComponents = [...calendarLinksMap.get(job.juuid) ?? []];
           if (linkedComponents.length === 0 && job.componentId) {
-            const primaryComponent = await storage.getComponent(job.componentId);
+            const primaryComponent = await getComponentFromCache(job.componentId, job.vesselId);
             if (primaryComponent) {
               linkedComponents.push({
                 componentId: primaryComponent.cuuid,
@@ -32980,7 +33066,7 @@ var init_workOrderService = __esm({
             if (existingCycleWOs.has(componentCycleKey)) {
               continue;
             }
-            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0);
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0, workOrderNos);
             const workOrderData = {
               vesselId: job.vesselId,
               component: componentName,
@@ -33017,11 +33103,14 @@ var init_workOrderService = __esm({
               const createdWO = await this.createWorkOrder(workOrderData);
               results.generated++;
               results.workOrders.push(createdWO);
+              workOrderNos.push(workOrderNo);
               existingCycleWOs.set(componentCycleKey, workOrderData);
               const priorityLabel = isJobCritical(job) ? "Critical" : "Non-Critical";
               console.log(`\u2705 [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (status: Active/Planned)`);
-              console.log(`   last_done=${job.lastDoneDate || "N/A"}, Generation advance=${WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS} days`);
-              console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split("T")[0]}`);
+              if (WO_GEN_VERBOSE) {
+                console.log(`   last_done=${job.lastDoneDate || "N/A"}, Generation advance=${WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS} days`);
+                console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split("T")[0]}`);
+              }
             } catch (error) {
               console.warn(`\u26A0\uFE0F Failed to create WO for job ${job.jobNo} + component ${componentCode}: ${error.message}`);
             }
@@ -33054,6 +33143,28 @@ async function resolveOriginInstance() {
     return null;
   }
 }
+function buildLegacyBlockingSets(allWorkOrders) {
+  const byJobId = /* @__PURE__ */ new Set();
+  const byVesselJobNo = /* @__PURE__ */ new Set();
+  for (const wo of allWorkOrders) {
+    if (wo.isDeleted === true) continue;
+    if (!isBlockingStatus(wo.status)) continue;
+    if (wo.componentCode && wo.componentCode !== "") continue;
+    if (wo.jobId) byJobId.add(wo.jobId);
+    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+    if (woJobNo) byVesselJobNo.add(`${wo.vesselId}|${woJobNo}`);
+  }
+  return { byJobId, byVesselJobNo };
+}
+function buildJobComponentBlockingSet(allWorkOrders) {
+  const set = /* @__PURE__ */ new Set();
+  for (const wo of allWorkOrders) {
+    if (wo.isDeleted === true) continue;
+    if (!isBlockingStatus(wo.status)) continue;
+    if (wo.jobId && wo.componentCode) set.add(`${wo.jobId}|${wo.componentCode}`);
+  }
+  return set;
+}
 function isJobCritical2(job) {
   const priority = job.jobPriority?.toLowerCase() || "";
   return priority === "critical" || priority === "high";
@@ -33064,7 +33175,7 @@ function getRhLeadHours(job, settings) {
   }
   return isJobCritical2(job) ? settings.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL : settings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL;
 }
-var JobDueScannerService, jobDueScanner;
+var WO_GEN_VERBOSE2, JobDueScannerService, jobDueScanner;
 var init_jobDueScanner = __esm({
   "server/services/jobDueScanner.ts"() {
     "use strict";
@@ -33076,6 +33187,7 @@ var init_jobDueScanner = __esm({
     init_workOrderStatus();
     init_dateParse();
     init_syncRole();
+    WO_GEN_VERBOSE2 = process.env.WO_GEN_VERBOSE_LOGS === "true";
     JobDueScannerService = class {
       isRunning = false;
       // guards double-start() of the scheduler
@@ -33201,13 +33313,16 @@ var init_jobDueScanner = __esm({
           dualWOsGenerated: 0
         };
         try {
-          const calendarResults = await workOrderService.autoGenerateWorkOrdersFromJobs(scopeVesselId);
+          const allJobs = await storage.getJobs(scopeVesselId);
+          const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
+          const calendarResults = await workOrderService.autoGenerateWorkOrdersFromJobs(scopeVesselId, { jobs: allJobs, workOrders: allWorkOrders });
           results.calendarJobsChecked = calendarResults.checked;
           results.calendarWOsGenerated = calendarResults.generated;
-          const rhResults = await this.processRunningHoursJobs(scopeVesselId);
+          allWorkOrders.push(...calendarResults.workOrders);
+          const rhResults = await this.processRunningHoursJobs(scopeVesselId, allJobs, allWorkOrders);
           results.rhJobsChecked = rhResults.checked;
           results.rhWOsGenerated = rhResults.generated;
-          const dualResults = await this.processDualFrequencyJobs(scopeVesselId);
+          const dualResults = await this.processDualFrequencyJobs(scopeVesselId, allJobs, allWorkOrders);
           results.dualJobsChecked = dualResults.checked;
           results.dualWOsGenerated = dualResults.generated;
           console.log(`[JobDueScanner] Scan complete (${scopeLabel}): Calendar (${results.calendarWOsGenerated}/${results.calendarJobsChecked} WOs), RH (${results.rhWOsGenerated}/${results.rhJobsChecked} WOs), Dual (${results.dualWOsGenerated}/${results.dualJobsChecked} WOs)`);
@@ -33240,7 +33355,7 @@ var init_jobDueScanner = __esm({
        * - RH_effective_current >= RH_generate
        * - AND no DUE/OVERDUE/PENDING APPROVAL/POSTPONED WO exists for same job + same RH_due cycle
        */
-      async processRunningHoursJobs(scopeVesselId) {
+      async processRunningHoursJobs(scopeVesselId, preloadedJobs, preloadedWorkOrders) {
         const skipReasons = {
           noComponentId: 0,
           componentNotFound: 0,
@@ -33251,13 +33366,16 @@ var init_jobDueScanner = __esm({
           existingWO: 0,
           cycleExists: 0
         };
-        const allJobs = await storage.getJobs(scopeVesselId);
+        const allJobs = preloadedJobs ?? await storage.getJobs(scopeVesselId);
         const rhJobs = allJobs.filter(
           (job) => job.maintenanceBasis === "Running Hours" && job.isActive !== false && // Job must be active
           job.intervalRunningHour && job.intervalRunningHour > 0
           // Must have valid frequency
         );
-        const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
+        const allWorkOrders = preloadedWorkOrders ?? await storage.getWorkOrders(scopeVesselId);
+        const workOrderNos = allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n);
+        const legacyBlocking = buildLegacyBlockingSets(allWorkOrders);
+        const jobComponentBlocking = buildJobComponentBlockingSet(allWorkOrders);
         const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
         const existingCycleWOs = buildRhCycleWOMap(allWorkOrders);
         const componentCache = /* @__PURE__ */ new Map();
@@ -33304,16 +33422,7 @@ var init_jobDueScanner = __esm({
           const frequencyRH = job.intervalRunningHour || 0;
           if (frequencyRH <= 0) continue;
           const generationAdvanceRH = WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS;
-          const legacyBlockingWO = allWorkOrders.find((wo) => {
-            if (wo.isDeleted === true) return false;
-            if (!isBlockingStatus(wo.status)) return false;
-            if (wo.componentCode && wo.componentCode !== "") return false;
-            if (wo.jobId === job.juuid) return true;
-            const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-            if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
-            return false;
-          });
-          if (legacyBlockingWO) {
+          if (legacyBlocking.byJobId.has(job.juuid) || legacyBlocking.byVesselJobNo.has(`${job.vesselId}|${job.jobNo}`)) {
             skipReasons.legacyBlocking++;
             continue;
           }
@@ -33358,11 +33467,7 @@ var init_jobDueScanner = __esm({
               skipReasons.belowThreshold++;
               continue;
             }
-            const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
-              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
-            );
-            if (existingWOForComponent) {
+            if (jobComponentBlocking.has(`${job.juuid}|${componentCode}`)) {
               skipReasons.existingWO++;
               continue;
             }
@@ -33371,7 +33476,7 @@ var init_jobDueScanner = __esm({
               skipReasons.cycleExists++;
               continue;
             }
-            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0);
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0, workOrderNos);
             const workOrderData = {
               generatedByInstance: await resolveOriginInstance(),
               vesselId: job.vesselId,
@@ -33421,10 +33526,14 @@ var init_jobDueScanner = __esm({
               generated++;
               existingCycleWOs.set(componentCycleKey, createdWO);
               allWorkOrders.push(createdWO);
+              workOrderNos.push(workOrderNo);
+              jobComponentBlocking.add(`${job.juuid}|${componentCode}`);
               const priorityLabel = isJobCritical2(job) ? "Critical" : "Non-Critical";
               console.log(`\u2705 [RH Trigger 1] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (status: Active/Planned)`);
-              console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${generationAdvanceRH}hrs`);
-              console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
+              if (WO_GEN_VERBOSE2) {
+                console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${generationAdvanceRH}hrs`);
+                console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
+              }
             } catch (error) {
               console.warn(`\u26A0\uFE0F Failed to create WO for RH job ${job.jobNo} + component ${componentCode}: ${error.message}`);
             }
@@ -33448,7 +33557,7 @@ var init_jobDueScanner = __esm({
        * - job.isActive = true
        * - job.intervalRunningHour > 0 AND job.nextDueDate set
        */
-      async processDualFrequencyJobs(scopeVesselId) {
+      async processDualFrequencyJobs(scopeVesselId, preloadedJobs, preloadedWorkOrders) {
         const skipReasons = {
           noComponentId: 0,
           componentNotFound: 0,
@@ -33460,14 +33569,17 @@ var init_jobDueScanner = __esm({
           missingCalendarData: 0,
           missingRHData: 0
         };
-        const allJobs = await storage.getJobs(scopeVesselId);
+        const allJobs = preloadedJobs ?? await storage.getJobs(scopeVesselId);
         const dualJobs = allJobs.filter(
           (job) => job.maintenanceBasis === "Dual Frequency" && job.isActive !== false && job.intervalRunningHour && job.intervalRunningHour > 0 && job.nextDueDate
         );
         if (dualJobs.length === 0) {
           return { checked: 0, generated: 0 };
         }
-        const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
+        const allWorkOrders = preloadedWorkOrders ?? await storage.getWorkOrders(scopeVesselId);
+        const workOrderNos = allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n);
+        const legacyBlocking = buildLegacyBlockingSets(allWorkOrders);
+        const jobComponentBlocking = buildJobComponentBlockingSet(allWorkOrders);
         const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
         const componentCache = /* @__PURE__ */ new Map();
         const vesselComponentsFetched = /* @__PURE__ */ new Set();
@@ -33531,16 +33643,7 @@ var init_jobDueScanner = __esm({
             continue;
           }
           const triggerLeg = calendarDue ? "CALENDAR" : "RH";
-          const legacyBlockingWO = allWorkOrders.find((wo) => {
-            if (wo.isDeleted === true) return false;
-            if (!isBlockingStatus(wo.status)) return false;
-            if (wo.componentCode && wo.componentCode !== "") return false;
-            if (wo.jobId === job.juuid) return true;
-            const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-            if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
-            return false;
-          });
-          if (legacyBlockingWO) {
+          if (legacyBlocking.byJobId.has(job.juuid) || legacyBlocking.byVesselJobNo.has(`${job.vesselId}|${job.jobNo}`)) {
             skipReasons.legacyBlocking++;
             continue;
           }
@@ -33562,15 +33665,11 @@ var init_jobDueScanner = __esm({
             const componentCode = linkedComponent.componentCode;
             const componentName = linkedComponent.componentName;
             if (!componentCode) continue;
-            const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
-              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
-            );
-            if (existingWOForComponent) {
+            if (jobComponentBlocking.has(`${job.juuid}|${componentCode}`)) {
               skipReasons.existingWO++;
               continue;
             }
-            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0);
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0, workOrderNos);
             const workOrderData = {
               generatedByInstance: await resolveOriginInstance(),
               vesselId: job.vesselId,
@@ -33623,10 +33722,14 @@ var init_jobDueScanner = __esm({
               const createdWO = await workOrderService.createWorkOrder(workOrderData);
               generated++;
               allWorkOrders.push(createdWO);
+              workOrderNos.push(workOrderNo);
+              jobComponentBlocking.add(`${job.juuid}|${componentCode}`);
               const priorityLabel = isJobCritical2(job) ? "Critical" : "Non-Critical";
               console.log(`\u2705 [Dual Trigger] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (trigger: ${triggerLeg})`);
-              console.log(`   Calendar: due=${dueDateStr}, generate=${generateDateStr}, calendarDue=${calendarDue}`);
-              console.log(`   RH: last_done=${rhLastDone}, F=${frequencyRH}, due=${rhDue}, generate=${rhGenerate}, current=${rhEffectiveCurrent}, rhDue=${rhLegDue}`);
+              if (WO_GEN_VERBOSE2) {
+                console.log(`   Calendar: due=${dueDateStr}, generate=${generateDateStr}, calendarDue=${calendarDue}`);
+                console.log(`   RH: last_done=${rhLastDone}, F=${frequencyRH}, due=${rhDue}, generate=${rhGenerate}, current=${rhEffectiveCurrent}, rhDue=${rhLegDue}`);
+              }
             } catch (error) {
               console.warn(`\u26A0\uFE0F Failed to create WO for Dual job ${job.jobNo} + component ${componentCode}: ${error.message}`);
             }
@@ -33913,7 +34016,13 @@ var init_jobDueScanner = __esm({
           dbStatus = computedStatusResult;
         }
         console.log(`   Computed status: ${computedStatusResult} \u2192 DB status: ${dbStatus}`);
-        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, effectiveComponentCode, job.vesselId || void 0);
+        const workOrderNo = await generatePlannedWorkOrderNumber(
+          storage,
+          job.jobNo,
+          effectiveComponentCode,
+          job.vesselId || void 0,
+          allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n)
+        );
         const workOrderData = {
           generatedByInstance: await resolveOriginInstance(),
           vesselId: job.vesselId,
@@ -33994,6 +34103,9 @@ var init_jsonHelpers = __esm({
 // server/modules/work-orders/repositories/workOrderRepository.ts
 async function findWorkOrders2(vesselId, vesselIds) {
   return storage.getWorkOrders(vesselId, vesselIds);
+}
+async function findAlertCandidateWorkOrders() {
+  return storage.getAlertCandidateWorkOrders();
 }
 async function findById3(id) {
   return storage.getWorkOrder(id);
@@ -34099,9 +34211,6 @@ async function findMaintenanceHistoryByWorkOrderId(woId) {
 }
 async function findMaintenanceHistoryByJobId2(jobId) {
   return storage.getMaintenanceHistoryByJobId(jobId);
-}
-async function updateJobComponentLinkTracking(vesselId, jobId, componentId, data) {
-  return storage.updateJobComponentLinkTracking(vesselId, jobId, componentId, data);
 }
 async function findAllJobComponentLinks() {
   return storage.getAllJobComponentLinks();
@@ -36336,6 +36445,7 @@ __export(workOrderService_exports, {
   deleteWorkOrder: () => deleteWorkOrder,
   editPostponeRequest: () => editPostponeRequest,
   editRePostponeRequest: () => editRePostponeRequest,
+  getOverdueVesselWorkOrdersForAlerts: () => getOverdueVesselWorkOrdersForAlerts,
   getRejectionHistory: () => getRejectionHistory,
   getScopedOperationData: () => getScopedOperationData,
   getWorkOrder: () => getWorkOrder,
@@ -36499,8 +36609,8 @@ async function createSuperintendentNotificationForWO(wo, daysLate, missedCycles,
     console.error(`\u26A0\uFE0F Failed to create superintendent notification: ${err.message}`);
   }
 }
-async function listWorkOrders(vesselId, vesselIds) {
-  const allRows = await findWorkOrders2(vesselId, vesselIds);
+async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
+  const allRows = preloadedRows ?? await findWorkOrders2(vesselId, vesselIds);
   const workOrders2 = allRows.filter((wo) => wo.isDeleted !== true);
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
@@ -36692,6 +36802,11 @@ async function listWorkOrders(vesselId, vesselIds) {
 async function getWorkOrdersWithComputedStatus(vesselId, vesselIds) {
   const enriched = await listWorkOrders(vesselId, vesselIds);
   return enriched.map((wo) => ({ ...wo, status: wo.computedStatus ?? wo.status }));
+}
+async function getOverdueVesselWorkOrdersForAlerts() {
+  const candidates = await findAlertCandidateWorkOrders();
+  const enriched = await listWorkOrders(void 0, void 0, candidates);
+  return enriched.map((wo) => ({ ...wo, status: wo.computedStatus ?? wo.status })).filter((wo) => wo.status === "Overdue" && wo.dataScope === "vessel");
 }
 async function computeVesselAwareApprovalTierCounts(workOrders2) {
   const vesselSettings = await findAllPmsVesselSettings();
@@ -37993,19 +38108,12 @@ async function updateWorkOrder(id, body) {
             if (freshWorkOrder.maintenanceBasis === "Calendar" && dateOfCompletionNorm) {
               const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
               const calendarUpdates = { lastDoneDate: dateOfCompletionNorm };
-              const linkUpdates = { lastDoneDate: dateOfCompletionNorm, updatedAt: /* @__PURE__ */ new Date() };
               if (job.frequencyValue && job.frequencyUnit) {
                 const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
                 if (nextDue) {
                   calendarUpdates.nextDueDate = nextDue;
-                  linkUpdates.nextDueDate = nextDue;
                   console.log(`\u2705 Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
                 }
-              }
-              const updateVesselId = freshWorkOrder.vesselId || job.vesselId;
-              if (component.cuuid && updateVesselId) {
-                await updateJobComponentLinkTracking(updateVesselId, job.juuid, component.cuuid, linkUpdates);
-                console.log(`\u2705 Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneDate: ${dateOfCompletionNorm}`);
               }
               await updateJob3(job.juuid, calendarUpdates);
             }
@@ -38013,17 +38121,10 @@ async function updateWorkOrder(id, body) {
               const currentRH = parseInt(runningHours);
               if (!isNaN(currentRH)) {
                 const rhUpdates = { lastDoneRH: currentRH };
-                const rhLinkUpdates = { lastDoneRH: currentRH.toString(), updatedAt: /* @__PURE__ */ new Date() };
                 const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                 if (rhInterval && !isNaN(rhInterval)) {
                   rhUpdates.nextDueRH = currentRH + rhInterval;
-                  rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
                   console.log(`\u2705 Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
-                }
-                const rhUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
-                if (component.cuuid && rhUpdateVesselId) {
-                  await updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, component.cuuid, rhLinkUpdates);
-                  console.log(`\u2705 Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneRH: ${currentRH}`);
                 }
                 await updateJob3(job.juuid, rhUpdates);
                 console.log(`\u{1F4CB} [Layer 7] RH snapshot ${currentRH} recorded for WO ${freshWorkOrder.workOrderNo || freshWorkOrder.id}. Component RH NOT modified (isolation).`);
@@ -38032,12 +38133,10 @@ async function updateWorkOrder(id, body) {
             if (freshWorkOrder.maintenanceBasis === "Dual Frequency" && dateOfCompletionNorm) {
               const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
               const dualUpdates = { lastDoneDate: dateOfCompletionNorm };
-              const dualLinkUpdates = { lastDoneDate: dateOfCompletionNorm, updatedAt: /* @__PURE__ */ new Date() };
               if (job.frequencyValue && job.frequencyUnit) {
                 const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
                 if (nextDue) {
                   dualUpdates.nextDueDate = nextDue;
-                  dualLinkUpdates.nextDueDate = nextDue;
                   console.log(`\u2705 [Dual] Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
                 }
               }
@@ -38045,21 +38144,14 @@ async function updateWorkOrder(id, body) {
                 const dualCurrentRH = parseInt(runningHours);
                 if (!isNaN(dualCurrentRH)) {
                   dualUpdates.lastDoneRH = dualCurrentRH;
-                  dualLinkUpdates.lastDoneRH = dualCurrentRH.toString();
                   const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                   if (dualRhInterval && !isNaN(dualRhInterval)) {
                     dualUpdates.nextDueRH = dualCurrentRH + dualRhInterval;
-                    dualLinkUpdates.nextDueRH = (dualCurrentRH + dualRhInterval).toString();
                     console.log(`\u2705 [Dual] Updated job ${job.jobNo} nextDueRH: ${dualUpdates.nextDueRH}`);
                   }
                 }
               } else {
                 console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
-              }
-              const dualUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
-              if (component.cuuid && dualUpdateVesselId) {
-                await updateJobComponentLinkTracking(dualUpdateVesselId, job.juuid, component.cuuid, dualLinkUpdates);
-                console.log(`\u2705 [Dual] Updated component tracking for vessel ${dualUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid}`);
               }
               await updateJob3(job.juuid, dualUpdates);
               console.log(`\u2705 [Dual] Updated job ${job.jobNo} with lastDoneDate: ${dateOfCompletionNorm}${runningHours ? ", lastDoneRH: " + runningHours : " (RH unchanged)"}`);
@@ -40381,9 +40473,8 @@ var init_pmsAlertEngine = __esm({
           const overduePolicy = policyMap.get("critical_job_overdue");
           if (overduePolicy) {
             try {
-              const { getWorkOrdersWithComputedStatus: getWorkOrdersWithComputedStatus2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
-              const allComputed = await getWorkOrdersWithComputedStatus2();
-              const overdueWOs = allComputed.filter((wo) => wo.status === "Overdue" && wo.dataScope === "vessel");
+              const { getOverdueVesselWorkOrdersForAlerts: getOverdueVesselWorkOrdersForAlerts2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
+              const overdueWOs = await getOverdueVesselWorkOrdersForAlerts2();
               const alerts = evaluateOverdueJobs(overdueWOs, overduePolicy, existingDedupeKeys);
               for (const alert of alerts) {
                 await this.createAlertEvent(overduePolicy, alert);
@@ -40397,8 +40488,8 @@ var init_pmsAlertEngine = __esm({
           const lowSparesPolicy = policyMap.get("low_critical_spares");
           if (lowSparesPolicy) {
             try {
-              const allSpares = await getAllVesselSpares();
-              const alerts = evaluateLowSpares(allSpares, lowSparesPolicy, existingDedupeKeys);
+              const candidateSpares = await getLowCriticalSpareCandidates();
+              const alerts = evaluateLowSpares(candidateSpares, lowSparesPolicy, existingDedupeKeys);
               for (const alert of alerts) {
                 await this.createAlertEvent(lowSparesPolicy, alert);
                 existingDedupeKeys.add(alert.dedupeKey);
@@ -43181,7 +43272,9 @@ var init_maintenanceOrchestrator = __esm({
     sleep3 = (ms) => new Promise((r) => setTimeout(r, ms));
     MaintenanceOrchestrator = class {
       tasks = [
-        { name: "alerts", intervalMs: 5 * 6e4, timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
+        // Interval env-tunable like the sweep's SHORE_WO_SWEEP_INTERVAL_MS (ops ask,
+        // 02-Sep-2026: run alerts every 12h → MAINT_ALERTS_INTERVAL_MS=43200000).
+        { name: "alerts", intervalMs: Math.max(6e4, envInt("MAINT_ALERTS_INTERVAL_MS", 5 * 6e4)), timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
         { name: "health", intervalMs: 6 * 60 * 6e4, timeoutMs: TIMEOUT_HEALTH_MS, run: () => runHealthCheck() },
         { name: "pruning", intervalMs: 24 * 60 * 6e4, timeoutMs: TIMEOUT_PRUNING_MS, run: () => runPruning() },
         // Drift = row value vs its OWN newest field log (local only; ship and shore both).
@@ -46036,6 +46129,19 @@ async function updateJob(id, body) {
   const effectiveComponentId = updateData.componentId ?? existingJob.componentId;
   const basisChangingToDual = updateData.maintenanceBasis === "Dual Frequency" && existingJob.maintenanceBasis !== "Dual Frequency";
   const componentChangingOnDual = effectiveBasis === "Dual Frequency" && updateData.componentId !== void 0 && updateData.componentId !== existingJob.componentId;
+  if (effectiveBasis === "Running Hours" && Object.prototype.hasOwnProperty.call(updateData, "frequencyValue")) {
+    if (!Object.prototype.hasOwnProperty.call(updateData, "intervalRunningHour")) {
+      updateData.intervalRunningHour = updateData.frequencyValue;
+    }
+    delete updateData.frequencyValue;
+  }
+  if (effectiveBasis === "Running Hours" && Object.prototype.hasOwnProperty.call(updateData, "intervalRunningHour")) {
+    const normalizedIntervalRH = Number(updateData.intervalRunningHour);
+    if (!Number.isInteger(normalizedIntervalRH) || normalizedIntervalRH <= 0) {
+      throw new ValidationError("Running Hours jobs require Frequency (Hours) to be a whole number greater than 0");
+    }
+    updateData.intervalRunningHour = normalizedIntervalRH;
+  }
   if (basisChangingToDual || componentChangingOnDual) {
     if (!component && effectiveComponentId) {
       component = await findComponent(effectiveComponentId);
@@ -46071,8 +46177,8 @@ async function updateJob(id, body) {
   const rhFieldsChanged = updateData.lastDoneRH !== void 0 || updateData.intervalRunningHour !== void 0 || updateData.maintenanceBasis !== void 0;
   if (mergedData.maintenanceBasis === "Running Hours") {
     const intervalRH = Number(mergedData.intervalRunningHour);
-    if (isNaN(intervalRH) || intervalRH <= 0) {
-      throw new ValidationError("Running Hours jobs require a valid numeric intervalRunningHour greater than 0");
+    if (!Number.isInteger(intervalRH) || intervalRH <= 0) {
+      throw new ValidationError("Running Hours jobs require Frequency (Hours) to be a whole number greater than 0");
     }
     if (!component && mergedData.componentId) {
       component = await findComponent(mergedData.componentId);
@@ -48034,24 +48140,17 @@ async function completeWorkOrder(workOrderId, body) {
     }
     if (job) {
       const { computeJobCycleUpdates: computeJobCycleUpdates2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
-      const { jobUpdates, linkUpdates: calcLinkUpdates } = computeJobCycleUpdates2({
+      const { jobUpdates } = computeJobCycleUpdates2({
         maintenanceBasis: workOrder.maintenanceBasis,
         dateOfCompletion,
         completionRH: cycleRH,
         originalDueDate,
         job
       });
-      const linkUpdates = { updatedAt: /* @__PURE__ */ new Date(), ...calcLinkUpdates };
-      const woComponentId = workOrder.componentId || component.cuuid;
       if (workOrder.maintenanceBasis === "Dual Frequency" && dateOfCompletion && !cycleRH) {
         console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
       }
       if (Object.keys(jobUpdates).length > 0) {
-        const updateVesselId = workOrder.vesselId || job.vesselId;
-        if (woComponentId && updateVesselId) {
-          await updateJobComponentLinkTracking(updateVesselId, job.juuid, woComponentId, linkUpdates);
-          console.log(`\u2705 Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${woComponentId}`);
-        }
         await updateJob3(job.juuid, jobUpdates);
         console.log(`\u2705 Updated ${workOrder.maintenanceBasis} job ${job.jobNo} cycle fields: ${JSON.stringify(jobUpdates)}`);
       }
@@ -48228,17 +48327,9 @@ async function finalizeWorkOrderCompletion(workOrderId) {
       if ((basis === "Calendar" || basis === "Dual Frequency") && dateOfCompletionNorm) {
         const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
         const updates = { lastDoneDate: dateOfCompletionNorm };
-        const linkUpdates = { lastDoneDate: dateOfCompletionNorm, updatedAt: /* @__PURE__ */ new Date() };
         if (job.frequencyValue && job.frequencyUnit) {
           const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) {
-            updates.nextDueDate = nextDue;
-            linkUpdates.nextDueDate = nextDue;
-          }
-        }
-        const vId = workOrder.vesselId || job.vesselId;
-        if (component.cuuid && vId) {
-          await updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, linkUpdates);
+          if (nextDue) updates.nextDueDate = nextDue;
         }
         await updateJob3(job.juuid, updates);
         console.log(`\u2705 [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
@@ -48248,15 +48339,9 @@ async function finalizeWorkOrderCompletion(workOrderId) {
         const currentRH = parseInt(String(finalizeCycleRH));
         if (!isNaN(currentRH)) {
           const rhUpdates = { lastDoneRH: currentRH };
-          const rhLinkUpdates = { lastDoneRH: currentRH.toString(), updatedAt: /* @__PURE__ */ new Date() };
           const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
           if (rhInterval && !isNaN(rhInterval)) {
             rhUpdates.nextDueRH = currentRH + rhInterval;
-            rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
-          }
-          const vId = workOrder.vesselId || job.vesselId;
-          if (component.cuuid && vId) {
-            await updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, rhLinkUpdates);
           }
           await updateJob3(job.juuid, rhUpdates);
           console.log(`\u2705 [Finalize] Updated RH job ${job.jobNo} lastDoneRH: ${currentRH}`);
@@ -49757,6 +49842,119 @@ async function exportPlannerExcelFromItems(items) {
   return buffer;
 }
 
+// shared/utils/superintendentNotifications.ts
+function toValidDate(value) {
+  if (!value) return null;
+  const date2 = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date2.getTime()) ? null : date2;
+}
+function isInCurrentCalendarMonth(value, now = /* @__PURE__ */ new Date()) {
+  const date2 = toValidDate(value);
+  return !!date2 && date2.getFullYear() === now.getFullYear() && date2.getMonth() === now.getMonth();
+}
+function classifySuperintendentNotification(notification, effectiveApprovalTier, now = /* @__PURE__ */ new Date()) {
+  if (notification.isAcknowledged) {
+    return isInCurrentCalendarMonth(notification.acknowledgedAt, now) ? "acknowledged" : null;
+  }
+  if (effectiveApprovalTier === "superintendent_locked") {
+    return "pending";
+  }
+  return isInCurrentCalendarMonth(notification.createdAt, now) ? "information" : null;
+}
+
+// server/modules/work-orders/services/superintendentNotificationService.ts
+init_storage();
+function resolveAllowedVessels(scope, vessels2) {
+  const requestedIds = scope.vesselIds?.length ? scope.vesselIds : scope.vesselId && scope.vesselId !== "all" ? [scope.vesselId] : null;
+  if (!requestedIds) return null;
+  const requested = new Set(requestedIds);
+  return vessels2.filter(
+    (vessel) => requested.has(vessel.id) || requested.has(vessel.vuuid)
+  );
+}
+function notificationMatchesVesselScope(notification, allowedVessels) {
+  if (allowedVessels === null) return true;
+  return allowedVessels.some((vessel) => {
+    if (notification.vesselId) {
+      return notification.vesselId === vessel.vuuid || notification.vesselId === vessel.id;
+    }
+    return !!notification.vesselName && notification.vesselName === vessel.name;
+  });
+}
+function isLockEnabled(notification, vessels2, settings) {
+  const vessel = vessels2.find((candidate) => {
+    if (notification.vesselId) {
+      return notification.vesselId === candidate.vuuid || notification.vesselId === candidate.id;
+    }
+    return !!notification.vesselName && notification.vesselName === candidate.name;
+  });
+  if (!vessel) return false;
+  return settings.some(
+    (setting) => (setting.vesselId === vessel.vuuid || setting.vesselId === vessel.id) && setting.superintendentLockEnabled === true
+  );
+}
+function classifySuperintendentNotifications(notifications, vessels2, settings, scope, now = /* @__PURE__ */ new Date()) {
+  const allowedVessels = resolveAllowedVessels(scope, vessels2);
+  const groups = {
+    pending: [],
+    acknowledged: [],
+    information: []
+  };
+  for (const notification of notifications) {
+    if (notification.isDeleted || !notificationMatchesVesselScope(notification, allowedVessels)) {
+      continue;
+    }
+    const effectiveApprovalTier = notification.approvalTier === "superintendent_locked" && !isLockEnabled(notification, vessels2, settings) ? "superintendent_notification" : notification.approvalTier || "standard";
+    const notificationCategory = classifySuperintendentNotification(
+      notification,
+      effectiveApprovalTier,
+      now
+    );
+    if (notificationCategory) {
+      groups[notificationCategory].push({
+        ...notification,
+        effectiveApprovalTier,
+        notificationCategory
+      });
+    }
+  }
+  return groups;
+}
+async function loadClassifiedNotifications(scope, now) {
+  const [notifications, vessels2, settings] = await Promise.all([
+    storage.getAllSuperintendentNotifications(),
+    storage.getVessels(),
+    storage.getAllPmsVesselSettings()
+  ]);
+  return classifySuperintendentNotifications(
+    notifications,
+    vessels2,
+    settings,
+    scope,
+    now
+  );
+}
+async function listSuperintendentNotifications(category, scope, now = /* @__PURE__ */ new Date()) {
+  return (await loadClassifiedNotifications(scope, now))[category];
+}
+async function listAllActiveSuperintendentNotifications(scope) {
+  const [notifications, vessels2] = await Promise.all([
+    storage.getAllSuperintendentNotifications(),
+    storage.getVessels()
+  ]);
+  const allowedVessels = resolveAllowedVessels(scope, vessels2);
+  return notifications.filter(
+    (notification) => !notification.isDeleted && notificationMatchesVesselScope(notification, allowedVessels)
+  );
+}
+async function getSuperintendentNotificationSummary(scope, now = /* @__PURE__ */ new Date()) {
+  const groups = await loadClassifiedNotifications(scope, now);
+  return {
+    pendingCount: groups.pending.length,
+    acknowledgedThisMonthCount: groups.acknowledged.length
+  };
+}
+
 // server/modules/work-orders/controllers/workOrderController.ts
 init_errors();
 init_storage();
@@ -50334,11 +50532,25 @@ async function superintendentAcknowledge(req, res) {
   }
 }
 async function getSuperintendentNotifications(req, res) {
-  const notifications = await storage.getSuperintendentNotifications();
+  const categoryRaw = req.query.category;
+  const category = categoryRaw === "acknowledged" || categoryRaw === "information" || categoryRaw === "pending" ? categoryRaw : "pending";
+  const vesselIdsRaw = req.query.vesselIds;
+  const notifications = await listSuperintendentNotifications(
+    category,
+    {
+      vesselId: req.query.vesselId,
+      vesselIds: vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0
+    }
+  );
   res.json(notifications);
 }
 async function getAllSuperintendentNotifications(req, res) {
-  const notifications = await storage.getAllSuperintendentNotifications();
+  const vesselIdsRaw = req.query.vesselIds;
+  const scope = {
+    vesselId: req.query.vesselId,
+    vesselIds: vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0
+  };
+  const notifications = await listAllActiveSuperintendentNotifications(scope);
   res.json(notifications);
 }
 async function getComplianceAnomalies2(req, res) {
@@ -50423,30 +50635,12 @@ async function getAnomalyForWorkOrder(req, res) {
   }
 }
 async function getSuperintendentNotificationsSummary(req, res) {
-  const vesselId = req.query.vesselId;
-  let vesselName;
-  if (vesselId && vesselId !== "all") {
-    const vessels2 = await storage.getVessels();
-    const vessel = vessels2.find((v) => v.id === vesselId || v.vuuid === vesselId);
-    if (!vessel) {
-      return res.json({ pendingCount: 0, acknowledgedThisMonthCount: 0 });
-    }
-    vesselName = vessel.name;
-  }
-  const [unacknowledged, all] = await Promise.all([
-    storage.getSuperintendentNotifications(vesselName),
-    storage.getAllSuperintendentNotifications(vesselName)
-  ]);
-  const now = /* @__PURE__ */ new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const pendingCount = unacknowledged.length;
-  const acknowledgedThisMonthCount = all.filter((n) => {
-    if (!n.isAcknowledged || !n.acknowledgedAt) return false;
-    const ackDate = new Date(n.acknowledgedAt);
-    return ackDate.getMonth() === currentMonth && ackDate.getFullYear() === currentYear;
-  }).length;
-  res.json({ pendingCount, acknowledgedThisMonthCount });
+  const vesselIdsRaw = req.query.vesselIds;
+  const summary = await getSuperintendentNotificationSummary({
+    vesselId: req.query.vesselId,
+    vesselIds: vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0
+  });
+  res.json(summary);
 }
 async function getPlannerData(req, res) {
   try {
