@@ -101,6 +101,115 @@ describe('RH service boundaries', () => {
     expect(repo.updateMasterRunningHours).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['same-day', '2026-08-07'],
+    ['back-dated', '2026-07-30'],
+    ['later-date', '2026-08-08'],
+  ])('allows an internal approval-only %s lower reading to return a skipped outcome', async (_label, submittedDate) => {
+    repo.getComponent.mockResolvedValue({
+      cuuid: 'master-1',
+      id: 'master-1',
+      vesselId: null,
+      name: 'Main Engine',
+      componentCode: '601001001',
+      rhCounterType: 'MASTER',
+      rhCurrentMaster: '1840',
+      currentCumulativeRH: '1840',
+      lastUpdated: '2026-08-07',
+    });
+    repo.updateMasterRunningHours.mockResolvedValue({
+      masterUpdated: { cuuid: 'master-1' },
+      inheritedUpdated: 0,
+      rhSkipped: {
+        reason: 'LOWER_THAN_LIVE_RH',
+        submittedRH: 1800,
+        currentRH: 1840,
+        currentRHDate: '2026-08-07',
+        submittedRHDate: submittedDate,
+      },
+    });
+
+    const result = await updateMasterRH('master-1', {
+      newRHValue: 1800,
+      updateSource: 'WORKORDER',
+      userId: 'Chief Engineer',
+      dateUpdated: submittedDate,
+    }, {
+      allowLowerWorkOrderApprovalSkip: true,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      rhSkipped: true,
+      rhSkipReason: 'LOWER_THAN_LIVE_RH',
+      submittedRH: 1800,
+      currentRH: 1840,
+      currentRHDate: '2026-08-07',
+    });
+    expect(repo.updateMasterRunningHours).toHaveBeenCalledWith(expect.objectContaining({
+      updateSource: 'WORKORDER',
+      allowLowerWorkOrderApprovalSkip: true,
+    }));
+  });
+
+  it('does not allow a request-body field to bypass the normal lower-RH guard', async () => {
+    repo.getComponent.mockResolvedValue({
+      cuuid: 'master-1',
+      id: 'master-1',
+      vesselId: null,
+      name: 'Main Engine',
+      componentCode: '601001001',
+      rhCounterType: 'MASTER',
+      rhCurrentMaster: '1840',
+      currentCumulativeRH: '1840',
+      lastUpdated: '2026-08-07',
+    });
+
+    await expect(updateMasterRH('master-1', {
+      newRHValue: 1800,
+      updateSource: 'WORKORDER',
+      userId: 'Chief Engineer',
+      dateUpdated: '2026-08-08',
+      allowLowerWorkOrderApprovalSkip: true,
+    })).rejects.toMatchObject({
+      details: { code: 'LOWER_THAN_CURRENT_RH' },
+    });
+
+    expect(repo.updateMasterRunningHours).not.toHaveBeenCalled();
+  });
+
+  it('re-checks an equal approval reading through locked persistence', async () => {
+    const component = {
+      cuuid: 'master-1',
+      id: 'master-1',
+      vesselId: null,
+      name: 'Main Engine',
+      componentCode: '601001001',
+      rhCounterType: 'MASTER',
+      rhCurrentMaster: '1840',
+      currentCumulativeRH: '1840',
+      lastUpdated: '2026-08-07',
+    };
+    repo.getComponent.mockResolvedValue(component);
+    repo.updateMasterRunningHours.mockResolvedValue({
+      masterUpdated: component,
+      inheritedUpdated: 0,
+      noChange: true,
+    });
+
+    const result = await updateMasterRH('master-1', {
+      newRHValue: 1840,
+      updateSource: 'WORKORDER',
+      userId: 'Chief Engineer',
+      dateUpdated: '2026-08-07',
+    }, {
+      allowLowerWorkOrderApprovalSkip: true,
+    });
+
+    expect(result).toMatchObject({ success: true, noChange: true });
+    expect(repo.updateMasterRunningHours).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks a lower inherited reading even when vessel rate validation is off', async () => {
     repo.getComponent.mockResolvedValue({
       cuuid: 'child-1',

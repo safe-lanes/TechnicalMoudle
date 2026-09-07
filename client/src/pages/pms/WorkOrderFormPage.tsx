@@ -63,6 +63,8 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { generateSuggestions, extractContextFromWorkOrder, type WorkOrderContext } from "@/utils/suggestionEngine";
 import { FEATURES, IHM_ACTIONS } from '@/config/features';
 import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
+import { stripServerManagedWorkOrderRhFields } from '@shared/workOrderPayload';
+import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
 import { SectionBlock } from '@/components/SectionBlock';
 import { PartHeader } from '@/components/PartHeader';
 import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
@@ -957,10 +959,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Unknown ('') and NOT_RH_DRIVEN are treated as non-blocking so a slow/failed
   // /running-hours/current call can never wrongly block a NOT_RH_DRIVEN work order.
   const isRhDrivenCounter = componentRhCounterType === 'MASTER' || componentRhCounterType === 'INHERITED';
+  const isWoCompletionRhRequired = requiresWoCompletionRh(
+    templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis,
+    componentRhCounterType,
+  );
   const [rhJustificationModalOpen, setRhJustificationModalOpen] = useState(false);
   const [rhJustificationText, setRhJustificationText] = useState('');
   const [rhJustificationConfirmed, setRhJustificationConfirmed] = useState(false);
   const [rhBackdatedBanner, setRhBackdatedBanner] = useState(false);
+  const [rhLowerApprovalNotice, setRhLowerApprovalNotice] = useState<{
+    submittedRH: number;
+    latestRH: number;
+    latestRHDate: string | null;
+  } | null>(null);
   const [rhErrorModalOpen, setRhErrorModalOpen] = useState(false);
   const [rhErrorDetails, setRhErrorDetails] = useState<any>(null);
   const [rhTimelineOpen, setRhTimelineOpen] = useState(false);
@@ -2811,13 +2822,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && !currentRHValue) {
         missingFields.push("Current Reading");
       }
+      if (isWoCompletionRhRequired && String(executionData.woCompletionRh ?? '').trim() === '') {
+        missingFields.push("WO Completion RH");
+      }
 
       const isReadyForSubmission = missingFields.length === 0;
       const isDraftSave = hasAnyPartBData && !isReadyForSubmission;
 
       if (draftIntent) {
         const saveExecutionData = {
-          ...executionData,
+          ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
           runningHours: currentRHValue || executionData.runningHours,
           riskAssessmentStatus: executionData.riskAssessment,
           safetyChecklistsStatus: executionData.safetyChecklists,
@@ -2870,7 +2884,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       } else {
         if (isDraftSave && !hasCompletionData) {
           const saveExecutionData = {
-            ...executionData,
+            ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
             runningHours: currentRHValue || executionData.runningHours,
             riskAssessmentStatus: executionData.riskAssessment,
             safetyChecklistsStatus: executionData.safetyChecklists,
@@ -2978,6 +2992,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       if (hasCompletionData) {
+        if (isWoCompletionRhRequired && String(executionData.woCompletionRh ?? '').trim() === '') {
+          toast({
+            title: "Validation Error",
+            description: "WO Completion RH is required for Running Hours-based Work Orders",
+            variant: "destructive",
+          });
+          return;
+        }
         if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && !currentRHValue) {
           toast({
             title: "Validation Error",
@@ -3028,7 +3050,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       const saveExecutionData = {
-        ...executionData,
+        ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
         runningHours: currentRHValue || executionData.runningHours,
         // RH accuracy (migration 139): materialize the DISPLAYED defaults so what the
         // user sees is what is stored — reading date defaults to today in the UI.
@@ -3043,7 +3065,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
+        body: JSON.stringify(stripServerManagedWorkOrderRhFields({
           ...templateData,
           ...saveExecutionData,
           nextDueDate: recalculatedNextDueDate,
@@ -3053,7 +3075,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             rhJustification: rhJustificationText,
             completionRHSource: 'MANUAL_ENTRY'
           } : {})
-        })
+        }))
       });
 
       // Reset justification state after save attempt
@@ -3773,6 +3795,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   // Approver actions
+  const advanceAfterApproval = () => {
+    if (!workOrderId) return;
+    const advance = advanceApprovalQueue(workOrderId);
+    if (advance.queueWasActive && advance.nextId) {
+      navigate(`/pms/work-order/${advance.nextId}`);
+    } else {
+      if (advance.queueWasActive) {
+        toast({ title: "Review queue complete", description: "All work orders in the queue have been processed." });
+      }
+      navigate("/pms/work-orders");
+    }
+  };
+
   const handleApprove = async (adminOverride = false) => {
     if (embedded) return;
     if (!workOrderId) return;
@@ -3832,28 +3867,28 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         throw new Error(result.error || 'Failed to approve work order');
       }
 
-      if (result.rhBackdated || result.rhBackdatedEntry) {
+      const lowerRhSkipped = result.rhUpdateSkipped || result.rhUpdateOutcome === 'skipped_lower';
+      if (result.rhBackdated || result.rhBackdatedEntry || lowerRhSkipped) {
         setRhBackdatedBanner(true);
       }
       setCurrentWorkOrderStatus('Completed');
       toast({
         title: "Approved",
-        description: result.rhBackdated
+        description: lowerRhSkipped
+          ? "Work order approved. Running Hours were not updated because the submitted reading is lower than the latest live value."
+          : result.rhBackdated
           ? "Work order approved. Note: Running hours were not updated (back-dated entry — see the Running Hours section below)."
           : "Work order has been approved and marked as completed",
       });
-      if (!result.rhBackdated) {
-        // Phase 2 — approval queue: auto-advance to the next pending WO instead
-        // of returning to the list. Queue exhausted → back to the list.
-        const advance = advanceApprovalQueue(workOrderId);
-        if (advance.queueWasActive && advance.nextId) {
-          navigate(`/pms/work-order/${advance.nextId}`);
-        } else {
-          if (advance.queueWasActive) {
-            toast({ title: "Review queue complete", description: "All work orders in the queue have been processed." });
-          }
-          navigate("/pms/work-orders");
-        }
+      if (lowerRhSkipped) {
+        setRhLowerApprovalNotice({
+          submittedRH: Number(result.submittedRH),
+          latestRH: Number(result.latestRH),
+          latestRHDate: result.latestRHDate || null,
+        });
+        await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      } else if (!result.rhBackdated) {
+        advanceAfterApproval();
       } else {
         // Stay on page so the amber banner is visible; refresh the WO context.
         // An active queue stays intact — the officer advances via the queue bar.
@@ -5951,11 +5986,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     />
                   </div>
 
-                  {/* RH accuracy (migration 139): completion-time RH — the NEXT RH cycle
-                      calculates from THIS value; Section B3's Current Reading only updates
-                      the equipment's RH record. Prefilled from Current Reading (display
-                      fallback — empty field submits nothing and the backend falls back to
-                      the reading, same value). Editable down (warn-only server-side). */}
+                  {/* Completion-time RH drives the next RH cycle. It is mandatory for
+                      Running Hours WOs on RH-driven components; Section B3's Current
+                      Reading independently updates the equipment's live RH record. */}
                   {(() => {
                     const b21Basis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
                     if (b21Basis !== 'Running Hours' && b21Basis !== 'Dual Frequency') return null;
@@ -5963,7 +5996,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     return (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <Label className="text-sm text-[#8798ad]" data-testid="label-wo-completion-rh">WO Completion RH</Label>
+                          <Label className="text-sm text-[#8798ad]" data-testid="label-wo-completion-rh">
+                            WO Completion RH
+                            {isWoCompletionRhRequired && <span className="text-red-500"> *</span>}
+                          </Label>
                           {isB3EditLocked && (
                             <TooltipProvider>
                               <Tooltip>
@@ -6398,7 +6434,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </p>
                   </div>
                 )}
-                {(rhBackdatedBanner || !!(workOrderContext as any)?.executionData?.rhBackdatedEntry) && (() => {
+                {(rhBackdatedBanner ||
+                  !!(workOrderContext as any)?.executionData?.rhBackdatedEntry ||
+                  (workOrderContext as any)?.executionData?.rhUpdateOutcome === 'skipped_lower') && (() => {
                   const fmt = (s: string) => {
                     if (!s) return '';
                     const d = new Date(s);
@@ -6408,21 +6446,27 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   // The server's back-dated-lower skip is keyed on readingDateForRH, so this
                   // banner must report the reading date it actually compared.
                   const enteredDate = rhReadingDateAnchor;
-                  const latestRH = rhValidation.componentActualRH;
-                  const latestRHDate = componentActualRHLastUpdated || '';
+                  const persistedSkip = (workOrderContext as any)?.executionData;
+                  const latestRH = persistedSkip?.rhSkipLatestRh
+                    ? Number(persistedSkip.rhSkipLatestRh)
+                    : rhValidation.componentActualRH;
+                  const latestRHDate = persistedSkip?.rhSkipLatestRhDate || componentActualRHLastUpdated || '';
+                  const submittedRH = persistedSkip?.rhSkipSubmittedRh || enteredRH;
                   return (
                     <div className="mt-2 p-3 bg-amber-50 border border-amber-300 rounded-md" data-testid="text-rh-backdated-banner">
                       <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-800 mb-1">
                         <AlertTriangle className="h-4 w-4 text-amber-600" /> Running Hours Not Updated
                       </div>
                       <p className="text-xs text-amber-700">
-                        {enteredDate && enteredRH
-                          ? `The Current Reading Date (${fmt(enteredDate)}) and RH reading (${enteredRH} hrs) are older and lower than the component's current RH state`
-                          : "The entered Current Reading Date and RH reading are older and lower than the component's current RH state"}
+                        {submittedRH
+                          ? `The submitted RH reading (${submittedRH} hrs) is lower than the latest live component RH`
+                          : "The submitted RH reading is lower than the latest live component RH"}
                         {latestRH !== null && latestRHDate
                           ? ` (${latestRH} hrs as of ${fmt(latestRHDate)}).`
+                          : latestRH !== null
+                            ? ` (${latestRH} hrs).`
                           : '.'}
-                        {' '}The RH module has <strong>not</strong> been updated — this reading is saved to the work order for scheduling continuity only. To correct the RH module, use the Running Hours page directly.
+                        {' '}The RH module has <strong>not</strong> been updated. This reading remains saved on the approved Work Order for completion history.
                       </p>
                     </div>
                   );
@@ -7528,6 +7572,40 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 Override &amp; Approve
               </AlertDialogAction>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!rhLowerApprovalNotice}>
+        <AlertDialogContent data-testid="dialog-rh-lower-approval">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Work Order Approved — Running Hours Unchanged</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  The Work Order was approved, but its lower reading was not applied to the live Running Hours counter.
+                </p>
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <div><strong>Submitted reading:</strong> {rhLowerApprovalNotice?.submittedRH} RH</div>
+                  <div>
+                    <strong>Latest live reading:</strong> {rhLowerApprovalNotice?.latestRH} RH
+                    {rhLowerApprovalNotice?.latestRHDate ? ` (${rhLowerApprovalNotice.latestRHDate})` : ''}
+                  </div>
+                </div>
+                <p>The submitted value remains recorded on this Work Order for completion history.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              data-testid="button-rh-lower-acknowledge"
+              onClick={() => {
+                setRhLowerApprovalNotice(null);
+                advanceAfterApproval();
+              }}
+            >
+              OK
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

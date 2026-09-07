@@ -1728,7 +1728,19 @@ export class PostgresStorage {
     userUuid?: string;
     comments?: string;
     dateUpdated?: string;
-  }): Promise<{ masterUpdated: Component; inheritedUpdated: number }> {
+    allowLowerWorkOrderApprovalSkip?: boolean;
+  }): Promise<{
+    masterUpdated: Component;
+    inheritedUpdated: number;
+    noChange?: boolean;
+    rhSkipped?: {
+      reason: 'LOWER_THAN_LIVE_RH';
+      submittedRH: number;
+      currentRH: number;
+      currentRHDate: string | null;
+      submittedRHDate: string;
+    };
+  }> {
     const db = await getDb();
     const now = new Date();
     // Reading date: the date the running hours were actually observed (WO completion date or the
@@ -1774,14 +1786,35 @@ export class PostgresStorage {
       const freshComponent = freshMaster[0] || component;
       const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || '0');
       const delta = params.newRHValue - previousMasterRH;
-      const monotonicity = enforceFreshRHMonotonicity({
+      const monotonicity = validateRHMonotonicity({
         currentRH: previousMasterRH,
         submittedRH: params.newRHValue,
         currentRHDate: freshComponent.lastUpdated || null,
         submittedRHDate: readingDateLocal,
       });
+      if (!monotonicity.allowed) {
+        if (params.allowLowerWorkOrderApprovalSkip && params.updateSource === 'WORKORDER') {
+          return {
+            masterUpdated: freshComponent,
+            inheritedUpdated: 0,
+            rhSkipped: {
+              reason: 'LOWER_THAN_LIVE_RH' as const,
+              submittedRH: params.newRHValue,
+              currentRH: previousMasterRH,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: readingDateLocal,
+            },
+          };
+        }
+        enforceFreshRHMonotonicity({
+          currentRH: previousMasterRH,
+          submittedRH: params.newRHValue,
+          currentRHDate: freshComponent.lastUpdated || null,
+          submittedRHDate: readingDateLocal,
+        });
+      }
       if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
-        return { masterUpdated: freshComponent, inheritedUpdated: 0 };
+        return { masterUpdated: freshComponent, inheritedUpdated: 0, noChange: true };
       }
 
       // Re-read inherited children's values inside the locked tx (Task #374): stale

@@ -8,6 +8,7 @@ import { validateRHEntry } from '../../running-hours/services/rhTimelineValidati
 import { logFieldChanges } from '../../sync';
 import { isShipInstance } from '../../sync/syncRole';
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
+import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
 
 // ── Complete Work Order ──
 
@@ -132,6 +133,12 @@ export async function completeWorkOrder(
   const counterType = (component.rhCounterType || 'MASTER').toUpperCase();
   if (workOrder.maintenanceBasis === 'Running Hours' && counterType !== 'NOT_RH_DRIVEN' && !runningHours) {
     throw new ValidationError('Running hours is required for RH-based maintenance work orders');
+  }
+  if (requiresWoCompletionRh(workOrder.maintenanceBasis, counterType) && woCompletionRh === null) {
+    throw new ValidationError(
+      'WO Completion RH is required for Running Hours-based Work Orders',
+      { code: 'WO_COMPLETION_RH_REQUIRED' }
+    );
   }
 
   // ── RH accuracy validations (migration 139) ──

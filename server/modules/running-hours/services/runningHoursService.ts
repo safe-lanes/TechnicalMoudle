@@ -888,7 +888,11 @@ export async function updateRHConfig(componentId: string, body: unknown) {
 // RH Config: Update Master RH with Cascade (from runningHoursRoutes.ts)
 // ══════════════════════════════════════════════════════════
 
-export async function updateMasterRH(componentId: string, body: unknown) {
+export async function updateMasterRH(
+  componentId: string,
+  body: unknown,
+  internalOptions?: { allowLowerWorkOrderApprovalSkip?: boolean },
+) {
   // Validate request body with Zod
   const parseResult = updateMasterRHSchema.safeParse(body);
   if (!parseResult.success) {
@@ -915,13 +919,27 @@ export async function updateMasterRH(componentId: string, body: unknown) {
 
   const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
   const lastUpdate = resolveLastUpdated(component);
-  const monotonicity = enforceRHMonotonicity({
+  const monotonicity = validateRHMonotonicity({
     currentRH: currentRHValue,
     submittedRH: newRHValue,
     currentRHDate: lastUpdate,
     submittedRHDate: canonicalDay,
   });
-  if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+  const lowerApprovalSkipAllowed =
+    internalOptions?.allowLowerWorkOrderApprovalSkip === true &&
+    updateSource === 'WORKORDER';
+  if (!monotonicity.allowed && !lowerApprovalSkipAllowed) {
+    enforceRHMonotonicity({
+      currentRH: currentRHValue,
+      submittedRH: newRHValue,
+      currentRHDate: lastUpdate,
+      submittedRHDate: canonicalDay,
+    });
+  }
+  // Approval calls continue into the locked repository transaction even when
+  // this pre-flight read is equal/lower. A concurrent RH update may have
+  // advanced the live value after this read.
+  if (monotonicity.reason === 'EQUAL_CURRENT_RH' && !lowerApprovalSkipAllowed) {
     return {
       success: true,
       noChange: true,
@@ -934,7 +952,10 @@ export async function updateMasterRH(componentId: string, body: unknown) {
 
   // Validate running hours increase against daily limits (MANUAL and WORKORDER updates).
   // IMPORT and AUTOMATION bypass this check — they carry pre-validated bulk data.
-  if (updateSource === 'MANUAL' || updateSource === 'WORKORDER') {
+  if (
+    (updateSource === 'MANUAL' || updateSource === 'WORKORDER') &&
+    !(lowerApprovalSkipAllowed && !monotonicity.allowed)
+  ) {
     const validation = validateRunningHoursIncrease({
       currentRH: currentRHValue,
       newRH: newRHValue,
@@ -968,8 +989,25 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     // Persist the reading date (WO completion date / RH Section "Date Updated") so the stored
     // reading and the component's last-updated reflect when the hours were observed, not "now".
     // Task #427: canonical YYYY-MM-DD only.
-    dateUpdated: canonicalDay
+    dateUpdated: canonicalDay,
+    allowLowerWorkOrderApprovalSkip: lowerApprovalSkipAllowed,
   });
+
+  if (result.rhSkipped) {
+    return {
+      success: true,
+      rhSkipped: true,
+      rhSkipReason: result.rhSkipped.reason,
+      submittedRH: result.rhSkipped.submittedRH,
+      currentRH: result.rhSkipped.currentRH,
+      currentRHDate: result.rhSkipped.currentRHDate,
+      submittedRHDate: result.rhSkipped.submittedRHDate,
+      message: `Work Order approved without updating Running Hours because ${result.rhSkipped.submittedRH} RH is lower than the latest live value of ${result.rhSkipped.currentRH} RH.`,
+      masterUpdated: result.masterUpdated,
+      inheritedUpdated: 0,
+      woGeneration: { rhJobsChecked: 0, rhWOsGenerated: 0 },
+    };
+  }
 
   // TRIGGER 1 HOOK: After MASTER RH is updated, scan for RH-based WO generation
   let woGenerationResult = { rhJobsChecked: 0, rhWOsGenerated: 0 };
@@ -998,6 +1036,7 @@ export async function updateMasterRH(componentId: string, body: unknown) {
 
   return {
     success: true,
+    noChange: result.noChange === true,
     message: `Master RH updated to ${newRHValue}. Cascaded to ${result.inheritedUpdated} inherited components.`,
     masterUpdated: result.masterUpdated,
     inheritedUpdated: result.inheritedUpdated,

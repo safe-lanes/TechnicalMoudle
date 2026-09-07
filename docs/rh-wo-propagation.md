@@ -42,7 +42,7 @@ absolute number".
 | # | Question | Answer | Resulting behavior |
 |---|----------|--------|--------------------|
 | 1 | Renewed/reset child: force to master value, or keep own count? | Reset to 0; record replacement date + RH-at-replacement; show "Last meter reset at…" + history in Update RH popup; child keeps own count via delta | Keep delta cascade; persist + surface replacement event |
-| 2 | RH entry lower than current? | Reject | RH can only increase or stay equal |
+| 2 | RH entry lower than current? | Direct RH entry rejects it. A genuine WO approval succeeds but skips RH application and records the outcome. | Live RH can only increase or stay equal; the lower completion reading remains on the approved WO |
 | 3 | Last-Updated date on linked components? | Yes — WO completion date | All linked components stamp the completion date, not the system clock |
 | 4 | Per-component history granularity? | One entry, WO number in remark | Single RH-history entry per WO update, tagged with WO number |
 | 5 | Validation for inherited WOs? | Same as master | 25 hrs/day cap + Sail-Admin override applies to inherited WOs too |
@@ -209,7 +209,9 @@ audit `isRenewalReset` = true, `renewalActionType` = Replaced, `oldMeterFinal` /
 - The family now shares one timeline → backdated inherited completions can be rejected
   against a sibling's later reading (by design).
 - Completing one WO can legitimately generate WOs on siblings now due (expected).
-- A wrong/low entry cannot corrupt the family because decreases are rejected.
+- A wrong/low entry cannot corrupt the family: direct decreases are rejected, while a
+  genuine WO approval keeps the submitted completion history but skips all live RH,
+  inherited-child, audit, provenance-stamp, and rotational-item updates.
 
 ---
 

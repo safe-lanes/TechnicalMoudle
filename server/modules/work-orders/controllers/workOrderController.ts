@@ -237,6 +237,10 @@ export async function updateWorkOrder(req: Request, res: Response) {
     const actor = resolveActorIdentity(req);
     const authReq = req as AuthenticatedRequest;
     const body = { ...req.body };
+    // This marker is reserved for the dedicated, RBAC-protected
+    // superintendent-acknowledgment controllers, which call the service
+    // directly. Generic PATCH callers cannot opt into that internal path.
+    delete body.superintendentAck;
     if (actor) {
       // Prefer caller-supplied userId, but fall back to the authenticated user
       // so audit entries (e.g. rejections) capture a real identity.
@@ -252,9 +256,24 @@ export async function updateWorkOrder(req: Request, res: Response) {
     const result = await woService.updateWorkOrder(req.params.id, body);
     const workOrder = (result as any).workOrder ?? result;
     const rhBackdated = (result as any).rhBackdated ?? !!workOrder.rhBackdatedEntry;
-    const latestRH = (result as any).latestRH ?? null;
-    const latestRHDate = (result as any).latestRHDate ?? null;
-    res.json({ ...workOrder, rhBackdated, latestRH, latestRHDate });
+    const rhUpdateOutcome = (result as any).rhUpdateOutcome ?? workOrder.rhUpdateOutcome ?? null;
+    const rhUpdateSkipped =
+      (result as any).rhUpdateSkipped ??
+      (workOrder.rhUpdateOutcome === 'skipped_lower');
+    const rhSkipReason = (result as any).rhSkipReason ?? workOrder.rhSkipReason ?? null;
+    const submittedRH = (result as any).submittedRH ?? workOrder.rhSkipSubmittedRh ?? null;
+    const latestRH = (result as any).latestRH ?? workOrder.rhSkipLatestRh ?? null;
+    const latestRHDate = (result as any).latestRHDate ?? workOrder.rhSkipLatestRhDate ?? null;
+    res.json({
+      ...workOrder,
+      rhBackdated,
+      rhUpdateOutcome,
+      rhUpdateSkipped,
+      rhSkipReason,
+      submittedRH,
+      latestRH,
+      latestRHDate,
+    });
   } catch (error: any) {
     console.error('❌ Work order update error:', error);
     if (error.name === 'ZodError') {

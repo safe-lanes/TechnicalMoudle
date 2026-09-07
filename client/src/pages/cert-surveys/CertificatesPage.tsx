@@ -218,7 +218,9 @@ interface CertificateData {
   issueDate: string;
   expiryDate: string;
   lastAnnual: string;
+  nextAnnual: string;
   lastInterm: string;
+  nextInterm: string;
   endorsementDate: string;
   lastEditUpload: string;
   attachments?: FileAttachment[];
@@ -232,7 +234,7 @@ interface CertificatesApiResponse {
   totalPages?: number;
 }
 
-const EDITABLE_DATE_FIELDS = ['issueDate', 'expiryDate', 'lastAnnual', 'lastInterm', 'endorsementDate'];
+const EDITABLE_DATE_FIELDS = ['issueDate', 'expiryDate', 'lastAnnual', 'nextAnnual', 'lastInterm', 'nextInterm', 'endorsementDate'];
 
 interface ApplicableCellRendererProps extends ICellRendererParams {
   onToggleApplicable?: (id: string, newValue: boolean) => void;
@@ -734,6 +736,25 @@ export default function CertificatesPage() {
       },
     },
     {
+      headerName: 'Next Annual',
+      field: 'nextAnnual',
+      width: 120,
+      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      filter: 'agDateColumnFilter',
+      sortable: true,
+      resizable: true,
+      editable: canEditCert,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
+      valueSetter: (params: any) => {
+        if (params.newValue !== params.oldValue) {
+          params.data.nextAnnual = params.newValue;
+          return true;
+        }
+        return false;
+      },
+    },
+    {
       headerName: 'Last Interm',
       field: 'lastInterm',
       width: 120,
@@ -747,6 +768,25 @@ export default function CertificatesPage() {
       valueSetter: (params: any) => {
         if (params.newValue !== params.oldValue) {
           params.data.lastInterm = params.newValue;
+          return true;
+        }
+        return false;
+      },
+    },
+    {
+      headerName: 'Next Interim',
+      field: 'nextInterm',
+      width: 120,
+      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      filter: 'agDateColumnFilter',
+      sortable: true,
+      resizable: true,
+      editable: canEditCert,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
+      valueSetter: (params: any) => {
+        if (params.newValue !== params.oldValue) {
+          params.data.nextInterm = params.newValue;
           return true;
         }
         return false;
@@ -825,7 +865,9 @@ export default function CertificatesPage() {
         'issueDate': 'issueDate',
         'expiryDate': 'expiryDate',
         'lastAnnual': 'lastAnnual',
+        'nextAnnual': 'nextAnnual',
         'lastInterm': 'lastInterm',
+        'nextInterm': 'nextInterm',
         'endorsementDate': 'endorsementDate',
       };
       
@@ -901,7 +943,9 @@ export default function CertificatesPage() {
       { header: 'Issue Date', field: 'issueDate', width: 20 },
       { header: 'Expiry Date', field: 'expiryDate', width: 20 },
       { header: 'Last Annual', field: 'lastAnnual', width: 20 },
+      { header: 'Next Annual', field: 'nextAnnual', width: 20 },
       { header: 'Last Interm', field: 'lastInterm', width: 20 },
+      { header: 'Next Interim', field: 'nextInterm', width: 20 },
       { header: 'Endorsement Date', field: 'endorsementDate', width: 22 },
       { header: 'Last Edit/ Upload', field: 'lastEditUpload', width: 18 },
     ];
@@ -916,7 +960,9 @@ export default function CertificatesPage() {
         issueDate: cert.issueDate || '-',
         expiryDate: cert.expiryDate || '-',
         lastAnnual: cert.lastAnnual || '-',
+        nextAnnual: cert.nextAnnual || '-',
         lastInterm: cert.lastInterm || '-',
+        nextInterm: cert.nextInterm || '-',
         endorsementDate: cert.endorsementDate || '-',
         lastEditUpload: cert.lastEditUpload || '-',
       }));
@@ -938,11 +984,12 @@ export default function CertificatesPage() {
   const handleExportCsv = useCallback(async () => {
     try {
       const allCerts = await fetchAllCertificates();
-      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Issue Date', 'Expiry Date', 'Last Annual', 'Last Interm', 'Endorsement Date', 'Last Edit/ Upload'];
+      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Issue Date', 'Expiry Date', 'Last Annual', 'Next Annual', 'Last Interm', 'Next Interim', 'Endorsement Date', 'Last Edit/ Upload'];
       const rows = allCerts.map((cert: any) => [
         cert.id || '', cert.certificateName || '', cert.type || '', cert.vessel || '',
         cert.issueDate || '', cert.expiryDate || '', cert.lastAnnual || '',
-        cert.lastInterm || '', cert.endorsementDate || '', cert.lastEditUpload || '',
+        cert.nextAnnual || '', cert.lastInterm || '', cert.nextInterm || '',
+        cert.endorsementDate || '', cert.lastEditUpload || '',
       ]);
       const csvContent = [headers, ...rows].map(row => row.map((cell: string) => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -959,11 +1006,12 @@ export default function CertificatesPage() {
   const handleExportExcel = useCallback(async () => {
     try {
       const allCerts = await fetchAllCertificates();
-      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Issue Date', 'Expiry Date', 'Last Annual', 'Last Interm', 'Endorsement Date', 'Last Edit/ Upload'];
+      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Issue Date', 'Expiry Date', 'Last Annual', 'Next Annual', 'Last Interm', 'Next Interim', 'Endorsement Date', 'Last Edit/ Upload'];
       const rows = allCerts.map((cert: any) => [
         cert.id || '', cert.certificateName || '', cert.type || '', cert.vessel || '',
         cert.issueDate || '', cert.expiryDate || '', cert.lastAnnual || '',
-        cert.lastInterm || '', cert.endorsementDate || '', cert.lastEditUpload || '',
+        cert.nextAnnual || '', cert.lastInterm || '', cert.nextInterm || '',
+        cert.endorsementDate || '', cert.lastEditUpload || '',
       ]);
       const csvContent = [headers, ...rows].map(row => row.map((cell: string) => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });

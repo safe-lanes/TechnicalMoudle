@@ -429,9 +429,18 @@ export async function updateMasterRunningHours(params: {
   userUuid?: string;
   comments?: string;
   dateUpdated?: string;
+  allowLowerWorkOrderApprovalSkip?: boolean;
 }): Promise<{
   masterUpdated: Component;
   inheritedUpdated: number;
+  noChange?: boolean;
+  rhSkipped?: {
+    reason: 'LOWER_THAN_LIVE_RH';
+    submittedRH: number;
+    currentRH: number;
+    currentRHDate: string | null;
+    submittedRHDate: string;
+  };
 }> {
   return storage.updateMasterRunningHours(params);
 }
