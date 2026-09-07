@@ -885,8 +885,8 @@ var init_schema = __esm({
     cascadeRunningHoursSchema = z.object({
       parentComponentId: z.string(),
       mode: z.enum(["setTotal", "addDelta"]),
-      // Set Total remains non-negative. Add Delta may be negative only when the
-      // Sail Admin-authorized validation bypass is requested and approved server-side.
+      // Set Total remains non-negative. Add Delta represents accumulated operating
+      // time and must be positive; counter reductions use explicit reset/correction flows.
       value: z.number().finite(),
       dateUpdated: z.string(),
       // DD-MMM-YYYY HH:mm format
@@ -2117,6 +2117,13 @@ var init_schema = __esm({
       // master RH. In this case the RH module is NOT updated; the reading is saved to the
       // WO only for job scheduling / next-due calculation.
       rhBackdatedEntry: boolean2("rh_backdated_entry"),
+      // Approval-time RH application outcome. A lower submitted reading can be
+      // retained on the WO while the authoritative live RH counter stays unchanged.
+      rhUpdateOutcome: text2("rh_update_outcome"),
+      rhSkipReason: text2("rh_skip_reason"),
+      rhSkipSubmittedRh: decimal2("rh_skip_submitted_rh", { precision: 10, scale: 2 }),
+      rhSkipLatestRh: decimal2("rh_skip_latest_rh", { precision: 10, scale: 2 }),
+      rhSkipLatestRhDate: text2("rh_skip_latest_rh_date"),
       // === Save as Draft (migration 165, Task #402) ===
       // In-progress Part-B edits stashed as a JSON document. Draft saves write ONLY
       // this column (no status/completion/RH/due writes) so the computed tab never
@@ -4065,8 +4072,12 @@ var init_schema = __esm({
       // Date certificate expires
       lastAnnual: text2("last_annual"),
       // Date of last annual survey
+      nextAnnual: text2("next_annual"),
+      // Date of next annual survey
       lastInterm: text2("last_interm"),
       // Date of last intermediate survey
+      nextInterm: text2("next_interm"),
+      // Date of next intermediate survey
       endorsementDate: text2("endorsement_date"),
       // Date of endorsement
       lastEditUpload: text2("last_edit_upload"),
@@ -7258,6 +7269,7 @@ var rhEventComparator_exports = {};
 __export(rhEventComparator_exports, {
   RH_GUARD_STRIP_COLUMNS: () => RH_GUARD_STRIP_COLUMNS,
   applyWinningRhToComponent: () => applyWinningRhToComponent,
+  canApplyWinningRHToCurrent: () => canApplyWinningRHToCurrent,
   claimWoRhSync: () => claimWoRhSync,
   compareRhEvents: () => compareRhEvents,
   effectiveReadingDay: () => effectiveReadingDay,
@@ -7336,6 +7348,9 @@ async function latestRotationDay(conn, componentId) {
     return null;
   }
 }
+function canApplyWinningRHToCurrent(currentRH, winnerRH, approvedReset = false) {
+  return approvedReset || currentRH === null || currentRH === void 0 || !Number.isFinite(currentRH) || winnerRH >= currentRH;
+}
 async function selectWinningRhEvent(conn, componentId) {
   const rotDay = await latestRotationDay(conn, componentId);
   const params = [componentId];
@@ -7345,7 +7360,8 @@ async function selectWinningRhEvent(conn, componentId) {
     params.push(rotDay.toISOString().split("T")[0]);
   }
   const r = await conn.query(
-    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side
+    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side,
+            meter_replaced, is_renewal_reset
        FROM running_hours_audit
       WHERE component_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
         AND (cumulative_rh IS NOT NULL OR new_rh IS NOT NULL)${rotClause}
@@ -7369,7 +7385,14 @@ async function selectWinningRhEvent(conn, componentId) {
     originSide: row.origin_side
   });
   if (!day) return null;
-  return { rhauuid: row.rhauuid, rh, readingDay: day, dateUpdatedLocal: row.date_updated_local, originSide: row.origin_side ?? null };
+  return {
+    rhauuid: row.rhauuid,
+    rh,
+    readingDay: day,
+    dateUpdatedLocal: row.date_updated_local,
+    originSide: row.origin_side ?? null,
+    approvedReset: row.meter_replaced === true || row.is_renewal_reset === true
+  };
 }
 async function applyWinningRhToComponent(conn, componentId, context) {
   const winner = await selectWinningRhEvent(conn, componentId);
@@ -7390,12 +7413,21 @@ async function applyWinningRhToComponent(conn, componentId, context) {
   }
   const counterType = String(comp?.rh_counter_type || "").toUpperCase();
   const masterRef = comp?.rh_master_component_id || comp?.rh_counter_source || null;
+  const currentLiveRH = parseFloat(String(
+    counterType === "MASTER" ? comp?.rh_current_master ?? comp?.current_cumulative_rh ?? "0" : comp?.current_cumulative_rh ?? "0"
+  ));
+  if (comp && !canApplyWinningRHToCurrent(currentLiveRH, winner.rh, winner.approvedReset)) {
+    console.warn(
+      `[RH-Derive:${context}] rejected lower non-reset winner for component=${componentId}: current=${currentLiveRH}, incoming=${winner.rh}, event=${winner.rhauuid}, reading=${winner.readingDay.toISOString().split("T")[0]}`
+    );
+    return "unchanged";
+  }
   if (counterType === "INHERITED" && masterRef) {
     let cache3 = null;
     let cacheDay = null;
     try {
       const m = await conn.query(
-        `SELECT cuuid, meter_replaced_last_rh FROM components
+        `SELECT cuuid, meter_replaced_last_rh, rh_current_master, current_cumulative_rh FROM components
           WHERE (cuuid = $1 OR ((component_code = $1 OR id = $1) AND vessel_id = $2))
             AND (is_deleted = false OR is_deleted IS NULL)
           ORDER BY (cuuid = $1) DESC LIMIT 1`,
@@ -7405,9 +7437,14 @@ async function applyWinningRhToComponent(conn, componentId, context) {
       if (master) {
         const baseline = parseFloat(master.meter_replaced_last_rh || "0") || 0;
         const masterWinner = await selectWinningRhEvent(conn, master.cuuid);
-        if (masterWinner) {
+        const currentMasterRH = parseFloat(master.rh_current_master ?? master.current_cumulative_rh ?? "0");
+        if (masterWinner && canApplyWinningRHToCurrent(currentMasterRH, masterWinner.rh, masterWinner.approvedReset)) {
           cache3 = (baseline + masterWinner.rh).toFixed(2);
           cacheDay = masterWinner.readingDay;
+        } else if (masterWinner) {
+          console.warn(
+            `[RH-Derive:${context}] preserved INHERITED cache because master winner would roll back master=${master.cuuid}: current=${currentMasterRH}, incoming=${masterWinner.rh}`
+          );
         }
       }
     } catch (e) {
@@ -21856,6 +21893,170 @@ var init_dateUpdatedLocalSql = __esm({
   }
 });
 
+// server/modules/running-hours/utils/rhValidation.ts
+function validateRHMonotonicity(input) {
+  const currentRHDate = input.currentRHDate ?? null;
+  const submittedRHDate = input.submittedRHDate ?? null;
+  const delta = input.submittedRH - input.currentRH;
+  if (input.approvedReset) {
+    return {
+      allowed: true,
+      reason: "APPROVED_RESET",
+      currentRH: input.currentRH,
+      submittedRH: input.submittedRH,
+      delta,
+      currentRHDate,
+      submittedRHDate,
+      message: "Approved running-hours reset or meter replacement."
+    };
+  }
+  if (delta < 0) {
+    const dateContext = currentRHDate ? ` recorded on ${currentRHDate}` : "";
+    return {
+      allowed: false,
+      reason: "LOWER_THAN_CURRENT_RH",
+      currentRH: input.currentRH,
+      submittedRH: input.submittedRH,
+      delta,
+      currentRHDate,
+      submittedRHDate,
+      message: `Current Reading (${input.submittedRH} RH) cannot be lower than the latest Running Hours value (${input.currentRH} RH${dateContext}). Correct the reading before continuing.`
+    };
+  }
+  return {
+    allowed: true,
+    reason: delta === 0 ? "EQUAL_CURRENT_RH" : "VALID_INCREASE",
+    currentRH: input.currentRH,
+    submittedRH: input.submittedRH,
+    delta,
+    currentRHDate,
+    submittedRHDate,
+    message: delta === 0 ? `Running Hours is already ${input.currentRH} RH; no update is required.` : `Running Hours increases by ${delta} RH.`
+  };
+}
+function getCalendarDate(dateStr) {
+  const strict = parseReadingDayStrict(dateStr);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(dateStr);
+  return canonical ? parseReadingDayStrict(canonical) : null;
+}
+function getDaysBetweenCalendarDates(date1, date2) {
+  const msPerDay = 24 * 60 * 60 * 1e3;
+  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
+}
+function formatDMY(dateStr) {
+  if (!dateStr) return dateStr;
+  const d = getCalendarDate(dateStr);
+  if (!d) return dateStr;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+}
+function validateRunningHoursIncrease(input) {
+  const { currentRH, newRH, componentLastUpdated, newUpdateDate, userRole, adminOverride } = input;
+  const requestedIncrease = newRH - currentRH;
+  let daysSinceLastUpdate = 0;
+  let sameDayUpdate = false;
+  const lastCalendarDate = componentLastUpdated ? getCalendarDate(componentLastUpdated) : null;
+  const newCalendarDate = getCalendarDate(newUpdateDate);
+  if (lastCalendarDate && newCalendarDate) {
+    daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
+    if (daysSinceLastUpdate < 0) {
+      const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
+      return {
+        allowed: canOverride2,
+        maxAllowedIncrease: 0,
+        requestedIncrease,
+        daysSinceLastUpdate,
+        lastUpdateDate: componentLastUpdated,
+        backdatedLower: requestedIncrease <= 0,
+        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated || "")}). Running hours can only be recorded on or after the latest reading.`,
+        requiresAdminOverride: !canOverride2
+      };
+    }
+    if (daysSinceLastUpdate === 0) {
+      sameDayUpdate = true;
+    }
+  } else {
+    daysSinceLastUpdate = 1;
+  }
+  if (requestedIncrease <= 0) {
+    return {
+      allowed: true,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: "No increase or decrease - no validation needed",
+      requiresAdminOverride: false
+    };
+  }
+  let maxAllowedIncrease;
+  if (sameDayUpdate) {
+    const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
+    return {
+      allowed: canOverride2,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: canOverride2 ? "Sail Admin override applied for same-day duplicate update" : "Same-day update already performed. Only one update of max 25 hours is allowed per day.",
+      requiresAdminOverride: !canOverride2
+    };
+  } else {
+    maxAllowedIncrease = daysSinceLastUpdate * MAX_HOURS_PER_DAY;
+  }
+  const isWithinLimit = requestedIncrease <= maxAllowedIncrease;
+  if (isWithinLimit) {
+    return {
+      allowed: true,
+      maxAllowedIncrease,
+      requestedIncrease,
+      daysSinceLastUpdate,
+      lastUpdateDate: componentLastUpdated,
+      message: `Increase of ${requestedIncrease} hours is within the allowed limit of ${maxAllowedIncrease} hours`,
+      requiresAdminOverride: false
+    };
+  }
+  const canOverride = userRole === "Sail Admin" && adminOverride === true;
+  return {
+    allowed: canOverride,
+    maxAllowedIncrease,
+    requestedIncrease,
+    daysSinceLastUpdate,
+    lastUpdateDate: componentLastUpdated,
+    message: canOverride ? `Sail Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days \xD7 25 hours/day).` : `Increase of ${requestedIncrease} hours exceeds maximum allowed of ${maxAllowedIncrease} hours. Maximum allowed is ${daysSinceLastUpdate} day(s) \xD7 25 hours/day = ${maxAllowedIncrease} hours.`,
+    requiresAdminOverride: !canOverride
+  };
+}
+function canAdminOverride(userRole) {
+  return userRole === "Sail Admin";
+}
+function safeParseDate(value) {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}/.test(trimmed)) {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return d;
+  }
+  const strict = parseReadingDayStrict(trimmed);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(trimmed);
+  return canonical ? parseReadingDayStrict(canonical) : null;
+}
+var MAX_HOURS_PER_DAY;
+var init_rhValidation = __esm({
+  "server/modules/running-hours/utils/rhValidation.ts"() {
+    "use strict";
+    init_readingDate();
+    MAX_HOURS_PER_DAY = 25;
+  }
+});
+
 // server/modules/rotational-items/repositories/rotationalItemRepository.ts
 var rotationalItemRepository_exports = {};
 __export(rotationalItemRepository_exports, {
@@ -23191,6 +23392,21 @@ var init_componentService = __esm({
 // server/postgresStorage.ts
 import { randomUUID as randomUUID2 } from "crypto";
 import { eq as eq7, and as and6, desc as desc2, sql as sql9, inArray as inArray2, or, ilike as ilike2, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
+function enforceFreshRHMonotonicity(input) {
+  const result = validateRHMonotonicity(input);
+  if (!result.allowed) {
+    throw new ValidationError(result.message, {
+      code: "LOWER_THAN_CURRENT_RH",
+      currentRH: result.currentRH,
+      submittedRH: result.submittedRH,
+      delta: result.delta,
+      currentRHDate: result.currentRHDate,
+      submittedRHDate: result.submittedRHDate,
+      monotonicity: result
+    });
+  }
+  return result;
+}
 async function getRhOriginSide() {
   if (cachedRhOriginSide !== void 0) return cachedRhOriginSide;
   try {
@@ -23221,6 +23437,8 @@ var init_postgresStorage = __esm({
     init_sync();
     init_dateUpdatedLocalSql();
     init_readingDate();
+    init_rhValidation();
+    init_errors();
     init_requestContext();
     _woNumericFields = null;
     PostgresStorage = class {
@@ -24270,6 +24488,15 @@ var init_postgresStorage = __esm({
           const freshRows = await tx.select().from(components).where(eq7(components.cuuid, component.cuuid)).limit(1);
           const fresh = freshRows[0] || component;
           const previousRH = parseFloat(fresh.currentCumulativeRH || "0");
+          const monotonicity = enforceFreshRHMonotonicity({
+            currentRH: previousRH,
+            submittedRH: params.newRHValue,
+            currentRHDate: fresh.lastUpdated || null,
+            submittedRHDate: params.readingDateIso
+          });
+          if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+            return { previousRH, changed: false };
+          }
           await tx.update(components).set({
             currentCumulativeRH: rhStr,
             runningHours: rhStr,
@@ -24277,7 +24504,7 @@ var init_postgresStorage = __esm({
             updatedAt: /* @__PURE__ */ new Date()
           }).where(eq7(components.cuuid, component.cuuid));
           await this.accrueStampRhDelta(tx, fresh.vesselId, fresh.currentStamp, params.newRHValue - previousRH, params.readingDateIso, params.userId);
-          return { previousRH };
+          return { previousRH, changed: true };
         });
       }
       async updateMasterRunningHours(params) {
@@ -24304,6 +24531,36 @@ var init_postgresStorage = __esm({
           const freshComponent = freshMaster[0] || component;
           const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || "0");
           const delta = params.newRHValue - previousMasterRH;
+          const monotonicity = validateRHMonotonicity({
+            currentRH: previousMasterRH,
+            submittedRH: params.newRHValue,
+            currentRHDate: freshComponent.lastUpdated || null,
+            submittedRHDate: readingDateLocal
+          });
+          if (!monotonicity.allowed) {
+            if (params.allowLowerWorkOrderApprovalSkip && params.updateSource === "WORKORDER") {
+              return {
+                masterUpdated: freshComponent,
+                inheritedUpdated: 0,
+                rhSkipped: {
+                  reason: "LOWER_THAN_LIVE_RH",
+                  submittedRH: params.newRHValue,
+                  currentRH: previousMasterRH,
+                  currentRHDate: freshComponent.lastUpdated || null,
+                  submittedRHDate: readingDateLocal
+                }
+              };
+            }
+            enforceFreshRHMonotonicity({
+              currentRH: previousMasterRH,
+              submittedRH: params.newRHValue,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: readingDateLocal
+            });
+          }
+          if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+            return { masterUpdated: freshComponent, inheritedUpdated: 0, noChange: true };
+          }
           if (inheritedComponents.length > 0) {
             inheritedComponents = await tx.select().from(components).where(inArray2(components.cuuid, inheritedComponents.map((i) => i.cuuid)));
           }
@@ -24429,6 +24686,15 @@ var init_postgresStorage = __esm({
           if (component.rhCounterType === "MASTER") {
             const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || "0");
             const delta = params.newRHValue - previousMasterRH;
+            const monotonicity = enforceFreshRHMonotonicity({
+              currentRH: previousMasterRH,
+              submittedRH: params.newRHValue,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: lastUpdatedValue
+            });
+            if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+              return { component: freshComponent, inheritedUpdated: 0 };
+            }
             const result = await tx.update(components).set({
               rhCurrentMaster: rhValueStr,
               currentCumulativeRH: rhValueStr,
@@ -24464,6 +24730,16 @@ var init_postgresStorage = __esm({
             }
             return { component: result[0], inheritedUpdated };
           } else if (component.rhCounterType === "INHERITED") {
+            const previousInheritedRH = parseFloat(freshComponent.currentCumulativeRH || "0");
+            const monotonicity = enforceFreshRHMonotonicity({
+              currentRH: previousInheritedRH,
+              submittedRH: params.newRHValue,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: lastUpdatedValue
+            });
+            if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+              return { component: freshComponent, inheritedUpdated: 0 };
+            }
             const result = await tx.update(components).set({
               currentCumulativeRH: rhValueStr,
               rhInheritedUpdatedAt: now,
@@ -24473,10 +24749,20 @@ var init_postgresStorage = __esm({
             if (!result[0]) {
               throw new Error(`Failed to update INHERITED component ${params.componentId}`);
             }
-            const inheritedDelta = params.newRHValue - parseFloat(freshComponent.currentCumulativeRH || "0");
+            const inheritedDelta = params.newRHValue - previousInheritedRH;
             await this.accrueStampRhDelta(tx, freshComponent.vesselId, freshComponent.currentStamp, inheritedDelta, readingIso, params.userId);
             return { component: result[0], inheritedUpdated: 0 };
           } else {
+            const previousFallbackRH = parseFloat(freshComponent.currentCumulativeRH || "0");
+            const monotonicity = enforceFreshRHMonotonicity({
+              currentRH: previousFallbackRH,
+              submittedRH: params.newRHValue,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: lastUpdatedValue
+            });
+            if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+              return { component: freshComponent, inheritedUpdated: 0 };
+            }
             const result = await tx.update(components).set({
               currentCumulativeRH: rhValueStr,
               lastUpdated: lastUpdatedValue,
@@ -24485,7 +24771,7 @@ var init_postgresStorage = __esm({
             if (!result[0]) {
               throw new Error(`Failed to update component ${params.componentId}`);
             }
-            const fallbackDelta = params.newRHValue - parseFloat(component.currentCumulativeRH || "0");
+            const fallbackDelta = params.newRHValue - previousFallbackRH;
             await this.accrueStampRhDelta(tx, component.vesselId, component.currentStamp, fallbackDelta, readingIso, params.userId);
             return { component: result[0], inheritedUpdated: 0 };
           }
@@ -29043,6 +29329,14 @@ var init_postgresStorage = __esm({
         if (parentResult.length > 0) {
           const parent = parentResult[0];
           currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || "0");
+          const requestedRH = meterReplaced ? value : mode === "addDelta" ? currentRH + value : value;
+          enforceFreshRHMonotonicity({
+            currentRH,
+            submittedRH: requestedRH,
+            currentRHDate: parent.lastUpdated || null,
+            submittedRHDate: dateUpdated,
+            approvedReset: !!meterReplaced || !!isRenewalReset
+          });
           if (!rhValidationBypassed) {
             {
               const { selectWinningRhEvent: selectWinningRhEvent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
@@ -29056,7 +29350,7 @@ var init_postgresStorage = __esm({
                 }
               }
             }
-            if (mode === "setTotal" && value < currentRH && !isRenewalReset) {
+            if (mode === "setTotal" && value < currentRH && !meterReplaced && !isRenewalReset) {
               throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
             }
             if (mode === "setTotal" && value === 0 && !isRenewalReset) {
@@ -29095,6 +29389,16 @@ var init_postgresStorage = __esm({
               computeDerived(freshParentResult[0]);
             }
             const freshParent = freshParentResult[0] || parentResult[0];
+            const monotonicity = enforceFreshRHMonotonicity({
+              currentRH,
+              submittedRH: newRH,
+              currentRHDate: freshParent.lastUpdated || null,
+              submittedRHDate: dateUpdated,
+              approvedReset: !!meterReplaced || !!isRenewalReset
+            });
+            if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+              return { updatedComponents: 0, auditsCreated: 0 };
+            }
             if (inheritedComponents.length > 0) {
               inheritedComponents = await tx.select().from(components).where(inArray2(components.cuuid, inheritedComponents.map((i) => i.cuuid)));
             }
@@ -32322,7 +32626,7 @@ function getDaysBetween(date1, date2) {
   const msPerDay = 24 * 60 * 60 * 1e3;
   return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
 }
-function formatDMY(isoDate) {
+function formatDMY2(isoDate) {
   if (!isoDate) return isoDate;
   const m = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return isoDate;
@@ -32430,10 +32734,10 @@ async function getValidRange(machineryId, completionDate) {
   }
   const daysToPrev = getDaysBetween(parseDate2(previousEntry.date), targetDate);
   let minRH = previousEntry.runningHours;
-  let maxRH = previousEntry.runningHours + daysToPrev * MAX_HOURS_PER_DAY;
+  let maxRH = previousEntry.runningHours + daysToPrev * MAX_HOURS_PER_DAY2;
   if (nextEntry) {
     const daysToNext = getDaysBetween(targetDate, parseDate2(nextEntry.date));
-    const minFromForward = nextEntry.runningHours - daysToNext * MAX_HOURS_PER_DAY;
+    const minFromForward = nextEntry.runningHours - daysToNext * MAX_HOURS_PER_DAY2;
     minRH = Math.max(minRH, minFromForward);
     maxRH = Math.min(maxRH, nextEntry.runningHours);
   }
@@ -32460,7 +32764,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
     return {
       isValid: false,
       validationStatus: "INVALID_BACKDATED",
-      errorMessage: `Completion Date ${formatDMY(completionDate)} is earlier than the component's last running-hours update (${formatDMY(range.baselineDate || "")}). There is no running-hours entry on or before this date, so running hours cannot be recorded here. Running hours can only be recorded on or after the latest reading.`,
+      errorMessage: `Completion Date ${formatDMY2(completionDate)} is earlier than the component's last running-hours update (${formatDMY2(range.baselineDate || "")}). There is no running-hours entry on or before this date, so running hours cannot be recorded here. Running hours can only be recorded on or after the latest reading.`,
       validRange: { min: range.minRH, max: range.maxRH },
       utilizationRate: 0,
       requiresJustification: false,
@@ -32482,7 +32786,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
   if (range.previousEntry) {
     daysBetweenPrevious = getDaysBetween(parseDate2(range.previousEntry.date), targetDate);
     actualIncrease = enteredRH - range.previousEntry.runningHours;
-    maxPossibleIncrease = daysBetweenPrevious * MAX_HOURS_PER_DAY;
+    maxPossibleIncrease = daysBetweenPrevious * MAX_HOURS_PER_DAY2;
   }
   if (range.nextEntry) {
     daysBetweenNext = getDaysBetween(targetDate, parseDate2(range.nextEntry.date));
@@ -32508,7 +32812,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
     return {
       isValid: false,
       validationStatus: "INVALID_BACKWARD",
-      errorMessage: `This is physically impossible because: Previous RH entry: ${range.previousEntry.runningHours} hours on ${range.previousEntry.date}. Days between: ${daysBetweenPrevious} days. Maximum possible increase: ${maxPossibleIncrease} hours (${daysBetweenPrevious} days \xD7 ${MAX_HOURS_PER_DAY} hrs/day). Your entered increase: ${actualIncrease} hours. Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours.`,
+      errorMessage: `This is physically impossible because: Previous RH entry: ${range.previousEntry.runningHours} hours on ${range.previousEntry.date}. Days between: ${daysBetweenPrevious} days. Maximum possible increase: ${maxPossibleIncrease} hours (${daysBetweenPrevious} days \xD7 ${MAX_HOURS_PER_DAY2} hrs/day). Your entered increase: ${actualIncrease} hours. Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours.`,
       validRange: { min: range.minRH, max: range.maxRH },
       utilizationRate: 0,
       requiresJustification: false,
@@ -32540,12 +32844,12 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
   }
   if (range.nextEntry) {
     const requiredIncrease = range.nextEntry.runningHours - enteredRH;
-    const maxForwardIncrease = daysBetweenNext * MAX_HOURS_PER_DAY;
+    const maxForwardIncrease = daysBetweenNext * MAX_HOURS_PER_DAY2;
     if (requiredIncrease > maxForwardIncrease && daysBetweenNext > 0) {
       return {
         isValid: false,
         validationStatus: "INVALID_FORWARD",
-        errorMessage: `This conflicts with future RH data: Next RH entry: ${range.nextEntry.runningHours} hours on ${range.nextEntry.date}. Days between: ${daysBetweenNext} days. Required increase from your entry: ${requiredIncrease.toFixed(0)} hours. Maximum possible in ${daysBetweenNext} days: ${maxForwardIncrease} hours (${daysBetweenNext} \xD7 ${MAX_HOURS_PER_DAY} hrs/day). Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours. Your entry would require the machinery to run more than ${MAX_HOURS_PER_DAY} hours per day to reach the next recorded value.`,
+        errorMessage: `This conflicts with future RH data: Next RH entry: ${range.nextEntry.runningHours} hours on ${range.nextEntry.date}. Days between: ${daysBetweenNext} days. Required increase from your entry: ${requiredIncrease.toFixed(0)} hours. Maximum possible in ${daysBetweenNext} days: ${maxForwardIncrease} hours (${daysBetweenNext} \xD7 ${MAX_HOURS_PER_DAY2} hrs/day). Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours. Your entry would require the machinery to run more than ${MAX_HOURS_PER_DAY2} hours per day to reach the next recorded value.`,
         validRange: { min: range.minRH, max: range.maxRH },
         utilizationRate: 0,
         requiresJustification: false,
@@ -32693,13 +32997,13 @@ async function getCurrentRH(machineryId) {
     rhCounterType: (component.rhCounterType || "MASTER").toUpperCase()
   };
 }
-var MAX_HOURS_PER_DAY, HIGH_UTILIZATION_THRESHOLD;
+var MAX_HOURS_PER_DAY2, HIGH_UTILIZATION_THRESHOLD;
 var init_rhTimelineValidationService = __esm({
   "server/modules/running-hours/services/rhTimelineValidationService.ts"() {
     "use strict";
     init_runningHoursRepository();
     init_readingDate();
-    MAX_HOURS_PER_DAY = 25;
+    MAX_HOURS_PER_DAY2 = 25;
     HIGH_UTILIZATION_THRESHOLD = 20;
   }
 });
@@ -34826,6 +35130,38 @@ var init_workOrderFilters = __esm({
   }
 });
 
+// server/modules/work-orders/utils/approvalTransition.ts
+function classifyApprovalTransition(input) {
+  const pendingToCompleted = input.existingStatus === "Pending Approval" && input.requestedStatus === "Completed";
+  const explicitApproval = pendingToCompleted && input.approvalAction === "approved";
+  const explicitRejection = input.existingStatus === "Pending Approval" && input.requestedStatus === "Rejected" && input.approvalAction === "rejected";
+  const recognizedActionStatus = input.approvalAction == null || input.approvalAction === "approved" && input.requestedStatus === "Completed" || input.approvalAction === "rejected" && input.requestedStatus === "Rejected" || (input.approvalAction === "submitted" || input.approvalAction === "submit") && input.requestedStatus === "Pending Approval";
+  return {
+    pendingToCompleted,
+    explicitApproval,
+    explicitRejection,
+    missingExplicitApproval: pendingToCompleted && !explicitApproval,
+    invalidActionStatus: !recognizedActionStatus
+  };
+}
+var init_approvalTransition = __esm({
+  "server/modules/work-orders/utils/approvalTransition.ts"() {
+    "use strict";
+  }
+});
+
+// shared/workOrders/woCompletionRhRequirement.ts
+function requiresWoCompletionRh(maintenanceBasis, rhCounterType) {
+  const normalizedBasis = String(maintenanceBasis || "").trim().toUpperCase();
+  const normalizedCounterType = String(rhCounterType || "").trim().toUpperCase();
+  return normalizedBasis === "RUNNING HOURS" && (normalizedCounterType === "MASTER" || normalizedCounterType === "INHERITED");
+}
+var init_woCompletionRhRequirement = __esm({
+  "shared/workOrders/woCompletionRhRequirement.ts"() {
+    "use strict";
+  }
+});
+
 // server/modules/ranks/repository.ts
 import { eq as eq9, and as and8 } from "drizzle-orm";
 function getDb2() {
@@ -35465,130 +35801,6 @@ var init_hodResolutionService = __esm({
   }
 });
 
-// server/modules/running-hours/utils/rhValidation.ts
-function getCalendarDate(dateStr) {
-  const strict = parseReadingDayStrict(dateStr);
-  if (strict) return strict;
-  const canonical = canonicalizeReadingDateInput(dateStr);
-  return canonical ? parseReadingDayStrict(canonical) : null;
-}
-function getDaysBetweenCalendarDates(date1, date2) {
-  const msPerDay = 24 * 60 * 60 * 1e3;
-  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
-}
-function formatDMY2(dateStr) {
-  if (!dateStr) return dateStr;
-  const d = getCalendarDate(dateStr);
-  if (!d) return dateStr;
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
-}
-function validateRunningHoursIncrease(input) {
-  const { currentRH, newRH, componentLastUpdated, newUpdateDate, userRole, adminOverride } = input;
-  const requestedIncrease = newRH - currentRH;
-  let daysSinceLastUpdate = 0;
-  let sameDayUpdate = false;
-  const lastCalendarDate = componentLastUpdated ? getCalendarDate(componentLastUpdated) : null;
-  const newCalendarDate = getCalendarDate(newUpdateDate);
-  if (lastCalendarDate && newCalendarDate) {
-    daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
-    if (daysSinceLastUpdate < 0) {
-      const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
-      return {
-        allowed: canOverride2,
-        maxAllowedIncrease: 0,
-        requestedIncrease,
-        daysSinceLastUpdate,
-        lastUpdateDate: componentLastUpdated,
-        backdatedLower: requestedIncrease <= 0,
-        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY2(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY2(componentLastUpdated || "")}). Running hours can only be recorded on or after the latest reading.`,
-        requiresAdminOverride: !canOverride2
-      };
-    }
-    if (daysSinceLastUpdate === 0) {
-      sameDayUpdate = true;
-    }
-  } else {
-    daysSinceLastUpdate = 1;
-  }
-  if (requestedIncrease <= 0) {
-    return {
-      allowed: true,
-      maxAllowedIncrease: 0,
-      requestedIncrease,
-      daysSinceLastUpdate: 0,
-      lastUpdateDate: componentLastUpdated,
-      message: "No increase or decrease - no validation needed",
-      requiresAdminOverride: false
-    };
-  }
-  let maxAllowedIncrease;
-  if (sameDayUpdate) {
-    const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
-    return {
-      allowed: canOverride2,
-      maxAllowedIncrease: 0,
-      requestedIncrease,
-      daysSinceLastUpdate: 0,
-      lastUpdateDate: componentLastUpdated,
-      message: canOverride2 ? "Sail Admin override applied for same-day duplicate update" : "Same-day update already performed. Only one update of max 25 hours is allowed per day.",
-      requiresAdminOverride: !canOverride2
-    };
-  } else {
-    maxAllowedIncrease = daysSinceLastUpdate * MAX_HOURS_PER_DAY2;
-  }
-  const isWithinLimit = requestedIncrease <= maxAllowedIncrease;
-  if (isWithinLimit) {
-    return {
-      allowed: true,
-      maxAllowedIncrease,
-      requestedIncrease,
-      daysSinceLastUpdate,
-      lastUpdateDate: componentLastUpdated,
-      message: `Increase of ${requestedIncrease} hours is within the allowed limit of ${maxAllowedIncrease} hours`,
-      requiresAdminOverride: false
-    };
-  }
-  const canOverride = userRole === "Sail Admin" && adminOverride === true;
-  return {
-    allowed: canOverride,
-    maxAllowedIncrease,
-    requestedIncrease,
-    daysSinceLastUpdate,
-    lastUpdateDate: componentLastUpdated,
-    message: canOverride ? `Sail Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days \xD7 25 hours/day).` : `Increase of ${requestedIncrease} hours exceeds maximum allowed of ${maxAllowedIncrease} hours. Maximum allowed is ${daysSinceLastUpdate} day(s) \xD7 25 hours/day = ${maxAllowedIncrease} hours.`,
-    requiresAdminOverride: !canOverride
-  };
-}
-function canAdminOverride(userRole) {
-  return userRole === "Sail Admin";
-}
-function safeParseDate(value) {
-  if (value == null) return null;
-  if (value instanceof Date) {
-    return isNaN(value.getTime()) ? null : value;
-  }
-  const trimmed = String(value).trim();
-  if (!trimmed) return null;
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}/.test(trimmed)) {
-    const d = new Date(trimmed);
-    if (!isNaN(d.getTime())) return d;
-  }
-  const strict = parseReadingDayStrict(trimmed);
-  if (strict) return strict;
-  const canonical = canonicalizeReadingDateInput(trimmed);
-  return canonical ? parseReadingDayStrict(canonical) : null;
-}
-var MAX_HOURS_PER_DAY2;
-var init_rhValidation = __esm({
-  "server/modules/running-hours/utils/rhValidation.ts"() {
-    "use strict";
-    init_readingDate();
-    MAX_HOURS_PER_DAY2 = 25;
-  }
-});
-
 // server/modules/running-hours/services/runningHoursService.ts
 var runningHoursService_exports = {};
 __export(runningHoursService_exports, {
@@ -35615,12 +35827,27 @@ function isRhValidationEnabledForVessel(settings) {
   return settings?.rhValidationEnabled !== false;
 }
 function validateCascadePolicyRules(data, vesselValidationEnabled, validationBypassAuthorized) {
-  if (data.mode === "addDelta" && data.value <= 0 && (!validationBypassAuthorized || data.meterReplaced)) {
+  if (data.mode === "addDelta" && data.value <= 0) {
     throw new ValidationError("addDelta mode requires value > 0");
   }
   if (data.mode === "setTotal" && data.value === 0 && (vesselValidationEnabled || data.meterReplaced) && !(data.isRenewalReset === true && !!data.renewalActionType && !!data.renewalReason && data.renewalReason.trim().length > 0)) {
     throw new ValidationError("When setting RH to 0, renewal confirmation with action type and reason is required");
   }
+}
+function enforceRHMonotonicity(input) {
+  const result = validateRHMonotonicity(input);
+  if (!result.allowed) {
+    throw new ValidationError(result.message, {
+      code: "LOWER_THAN_CURRENT_RH",
+      currentRH: result.currentRH,
+      submittedRH: result.submittedRH,
+      delta: result.delta,
+      currentRHDate: result.currentRHDate,
+      submittedRHDate: result.submittedRHDate,
+      monotonicity: result
+    });
+  }
+  return result;
 }
 function resolveLastUpdated(component) {
   const own = canonicalizeReadingDateInput(component.lastUpdated ?? null);
@@ -35681,6 +35908,26 @@ async function cascadeUpdate(body, authenticatedRole) {
   }
   if (!Number.isFinite(targetRH) || targetRH < 0) {
     throw new ValidationError("Resulting Running Hours cannot be negative.");
+  }
+  const monotonicity = enforceRHMonotonicity({
+    currentRH,
+    submittedRH: targetRH,
+    currentRHDate: resolveLastUpdated(parentComponent),
+    submittedRHDate: validatedData.dateUpdated,
+    approvedReset: validatedData.meterReplaced || validatedData.isRenewalReset
+  });
+  if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+    return {
+      updatedComponents: 0,
+      auditsCreated: 0,
+      workOrdersGenerated: 0,
+      workOrders: [],
+      noChange: true,
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0
+      }
+    };
   }
   if (!validatedData.meterReplaced && !validationBypassAuthorized) {
     const componentLastUpdated = resolveLastUpdated(parentComponent);
@@ -35921,6 +36168,25 @@ async function updateChildRH(componentId, body, authenticatedRole) {
   const currentRHValue = parseFloat(previousRH);
   const componentLastUpdated = resolveLastUpdated(component);
   const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
+  const monotonicity = enforceRHMonotonicity({
+    currentRH: currentRHValue,
+    submittedRH: newRHValue,
+    currentRHDate: componentLastUpdated,
+    submittedRHDate: canonicalDay
+  });
+  if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+    return {
+      success: true,
+      noChange: true,
+      message: monotonicity.message,
+      previousRH,
+      newRH: newRHValue.toFixed(2),
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0
+      }
+    };
+  }
   let validation = null;
   if (!validationBypassAuthorized) {
     validation = validateRunningHoursIncrease({
@@ -35956,6 +36222,19 @@ async function updateChildRH(componentId, body, authenticatedRole) {
     readingDateIso: canonicalDay,
     userId: userId || null
   });
+  if (!atomicResult.changed) {
+    return {
+      success: true,
+      noChange: true,
+      message: `Running Hours is already ${newRHFormatted} for ${component.name}`,
+      previousRH: atomicResult.previousRH.toFixed(2),
+      newRH: newRHFormatted,
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0
+      }
+    };
+  }
   const committedPreviousRH = atomicResult.previousRH.toFixed(2);
   const auditDateLocal = canonicalDay;
   await createRunningHoursAudit({
@@ -36119,7 +36398,7 @@ async function updateRHConfig2(componentId, body) {
     component: updatedComponent
   };
 }
-async function updateMasterRH(componentId, body) {
+async function updateMasterRH(componentId, body, internalOptions) {
   const parseResult = updateMasterRHSchema2.safeParse(body);
   if (!parseResult.success) {
     throw new ValidationError("Invalid request body", { details: parseResult.error.format() });
@@ -36133,9 +36412,34 @@ async function updateMasterRH(componentId, body) {
   if (component.rhCounterType !== "MASTER") {
     throw new ValidationError("Running hours can only be updated for MASTER counter type components");
   }
-  if (updateSource === "MANUAL" || updateSource === "WORKORDER") {
-    const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || "0");
-    const lastUpdate = resolveLastUpdated(component);
+  const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || "0");
+  const lastUpdate = resolveLastUpdated(component);
+  const monotonicity = validateRHMonotonicity({
+    currentRH: currentRHValue,
+    submittedRH: newRHValue,
+    currentRHDate: lastUpdate,
+    submittedRHDate: canonicalDay
+  });
+  const lowerApprovalSkipAllowed = internalOptions?.allowLowerWorkOrderApprovalSkip === true && updateSource === "WORKORDER";
+  if (!monotonicity.allowed && !lowerApprovalSkipAllowed) {
+    enforceRHMonotonicity({
+      currentRH: currentRHValue,
+      submittedRH: newRHValue,
+      currentRHDate: lastUpdate,
+      submittedRHDate: canonicalDay
+    });
+  }
+  if (monotonicity.reason === "EQUAL_CURRENT_RH" && !lowerApprovalSkipAllowed) {
+    return {
+      success: true,
+      noChange: true,
+      message: monotonicity.message,
+      masterUpdated: component,
+      inheritedUpdated: 0,
+      woGeneration: { rhJobsChecked: 0, rhWOsGenerated: 0 }
+    };
+  }
+  if ((updateSource === "MANUAL" || updateSource === "WORKORDER") && !(lowerApprovalSkipAllowed && !monotonicity.allowed)) {
     const validation = validateRunningHoursIncrease({
       currentRH: currentRHValue,
       newRH: newRHValue,
@@ -36167,8 +36471,24 @@ async function updateMasterRH(componentId, body) {
     // Persist the reading date (WO completion date / RH Section "Date Updated") so the stored
     // reading and the component's last-updated reflect when the hours were observed, not "now".
     // Task #427: canonical YYYY-MM-DD only.
-    dateUpdated: canonicalDay
+    dateUpdated: canonicalDay,
+    allowLowerWorkOrderApprovalSkip: lowerApprovalSkipAllowed
   });
+  if (result.rhSkipped) {
+    return {
+      success: true,
+      rhSkipped: true,
+      rhSkipReason: result.rhSkipped.reason,
+      submittedRH: result.rhSkipped.submittedRH,
+      currentRH: result.rhSkipped.currentRH,
+      currentRHDate: result.rhSkipped.currentRHDate,
+      submittedRHDate: result.rhSkipped.submittedRHDate,
+      message: `Work Order approved without updating Running Hours because ${result.rhSkipped.submittedRH} RH is lower than the latest live value of ${result.rhSkipped.currentRH} RH.`,
+      masterUpdated: result.masterUpdated,
+      inheritedUpdated: 0,
+      woGeneration: { rhJobsChecked: 0, rhWOsGenerated: 0 }
+    };
+  }
   let woGenerationResult = { rhJobsChecked: 0, rhWOsGenerated: 0 };
   try {
     if (component.vesselId) {
@@ -36187,6 +36507,7 @@ async function updateMasterRH(componentId, body) {
   }
   return {
     success: true,
+    noChange: result.noChange === true,
     message: `Master RH updated to ${newRHValue}. Cascaded to ${result.inheritedUpdated} inherited components.`,
     masterUpdated: result.masterUpdated,
     inheritedUpdated: result.inheritedUpdated,
@@ -37129,11 +37450,29 @@ async function createWorkOrder(body) {
 async function updateWorkOrder(id, body) {
   console.log("\u{1F4DD} PATCH work order request body keys:", Object.keys(body));
   let rhBackdatedApproval = false;
+  let rhUpdateOutcomeApproval = null;
+  let rhSkipReasonApproval = null;
+  let submittedRHApproval = null;
   let latestRHApproval = null;
   let latestRHDateApproval = null;
   const existingWO2 = await findById3(id);
   if (!existingWO2) {
     throw new NotFoundError("Work order not found");
+  }
+  const SERVER_OWNED_RH_FIELDS = [
+    "rhSyncedAt",
+    "rhUpdateOutcome",
+    "rhSkipReason",
+    "rhSkipSubmittedRh",
+    "rhSkipLatestRh",
+    "rhSkipLatestRhDate"
+  ];
+  const forgedRhFields = Object.keys(body).filter((key) => SERVER_OWNED_RH_FIELDS.includes(key));
+  if (forgedRhFields.length > 0) {
+    throw new ValidationError(
+      `Cannot modify server-managed Running Hours fields: ${forgedRhFields.join(", ")}`,
+      { code: "RH_OUTCOME_FIELDS_READ_ONLY", disallowedFields: forgedRhFields }
+    );
   }
   if (body.partBOfficeEdit === true) {
     if (existingWO2.status !== "Pending Approval") {
@@ -37147,7 +37486,24 @@ async function updateWorkOrder(id, body) {
       throw new ValidationError("This work order is superintendent-locked. The superintendent must act on it before Part B can be edited.");
     }
     const B3_FIELDS = ["runningHours", "previousReading", "runningHoursDifference", "readingDate", "currentReadingDate", "currentReading"];
-    const PROTECTED_FIELDS = ["status", "approvalAction", "approvalDate", "submittedDate", "rhSyncedAt", "wasRejected", "approvalTier", "rejectionComments", "missedCycles", "dateCompleted", "isDeleted"];
+    const PROTECTED_FIELDS = [
+      "status",
+      "approvalAction",
+      "approvalDate",
+      "submittedDate",
+      "rhSyncedAt",
+      "rhUpdateOutcome",
+      "rhSkipReason",
+      "rhSkipSubmittedRh",
+      "rhSkipLatestRh",
+      "rhSkipLatestRhDate",
+      "wasRejected",
+      "approvalTier",
+      "rejectionComments",
+      "missedCycles",
+      "dateCompleted",
+      "isDeleted"
+    ];
     const attempted = Object.keys(body);
     const blockedB3 = attempted.filter((f) => B3_FIELDS.includes(f));
     const blockedProtected = attempted.filter((f) => PROTECTED_FIELDS.includes(f));
@@ -37188,8 +37544,19 @@ async function updateWorkOrder(id, body) {
     const workOrder2 = await update6(id, updateData2);
     return workOrder2;
   }
-  if (existingWO2.status === "Pending Approval" && !body.approvalAction && !body.partBOfficeEdit && !body.superintendentAck) {
-    const PENDING_APPROVAL_BLOCKED_FIELDS = [
+  if (existingWO2.status === "Pending Approval" && !body.partBOfficeEdit) {
+    const actionClassification = classifyApprovalTransition({
+      existingStatus: existingWO2.status,
+      requestedStatus: body.status,
+      approvalAction: body.approvalAction
+    });
+    if (actionClassification.invalidActionStatus) {
+      throw new ValidationError(
+        "The approval action does not match the requested Work Order status.",
+        { code: "INVALID_APPROVAL_ACTION_STATUS" }
+      );
+    }
+    const PENDING_APPROVAL_IMMUTABLE_FIELDS = [
       // B3 Running Hours — drive the delta cascade at approval; immutable post-submission
       "runningHours",
       "previousReading",
@@ -37199,18 +37566,50 @@ async function updateWorkOrder(id, body) {
       "currentReading",
       "woCompletionRh",
       // B4 Consumed Spare Parts — inventory already applied; reversal requires reject/resubmit
-      "consumedSpareParts",
-      // Status transitions must use explicit approval actions, not raw field writes
-      "status",
-      "approvalDate",
-      "submittedDate",
-      "approvalTier"
+      "consumedSpareParts"
     ];
-    const attempted = Object.keys(body).filter((k) => PENDING_APPROVAL_BLOCKED_FIELDS.includes(k));
+    const attempted = Object.keys(body).filter((k) => PENDING_APPROVAL_IMMUTABLE_FIELDS.includes(k));
     if (attempted.length > 0) {
       console.warn(`\u26A0\uFE0F Blocked attempt to modify protected fields on Pending Approval WO ${existingWO2.workOrderNo}: ${attempted.join(", ")}`);
       throw new ValidationError(
         `Cannot modify [${attempted.join(", ")}] on a Pending Approval work order. Running Hours and consumed spare parts are locked until the work order is approved or rejected.`
+      );
+    }
+    if (body.superintendentAck) {
+      const ACK_ALLOWED_FIELDS = /* @__PURE__ */ new Set([
+        "superintendentAck",
+        "superintendentAcknowledged",
+        "superintendentAcknowledgedAt",
+        "approvalTier",
+        "approvalBlockReason"
+      ]);
+      const strayAckFields = Object.keys(body).filter((key) => !ACK_ALLOWED_FIELDS.has(key));
+      if (strayAckFields.length > 0) {
+        throw new ValidationError(
+          `Unexpected fields in Superintendent acknowledgment: ${strayAckFields.join(", ")}`,
+          { code: "INVALID_SUPERINTENDENT_ACK_PAYLOAD", disallowedFields: strayAckFields }
+        );
+      }
+    } else {
+      const SERVER_MANAGED_APPROVAL_FIELDS = [
+        "approvalTier",
+        "superintendentAcknowledged",
+        "superintendentAcknowledgedAt",
+        "approvalBlockReason"
+      ];
+      const forgedApprovalFields = Object.keys(body).filter((key) => SERVER_MANAGED_APPROVAL_FIELDS.includes(key));
+      if (forgedApprovalFields.length > 0) {
+        throw new ValidationError(
+          `Cannot modify server-managed approval fields: ${forgedApprovalFields.join(", ")}`,
+          { code: "APPROVAL_FIELDS_READ_ONLY", disallowedFields: forgedApprovalFields }
+        );
+      }
+    }
+    const hasRawStatusTransition = body.status !== void 0 && body.status !== "Pending Approval" && !actionClassification.explicitApproval && !actionClassification.explicitRejection;
+    if (hasRawStatusTransition) {
+      throw new ValidationError(
+        "Pending Approval status changes require an explicit approved or rejected action.",
+        { code: "APPROVAL_ACTION_REQUIRED" }
       );
     }
   }
@@ -37314,6 +37713,9 @@ async function updateWorkOrder(id, body) {
   if (updateData.currentReading !== void 0) {
     validateNumericField(updateData.currentReading, "Current Reading", { maxDecimals: 2 });
   }
+  if (updateData.woCompletionRh !== void 0) {
+    validateNumericField(updateData.woCompletionRh, "WO Completion RH", { maxDecimals: 2 });
+  }
   if (updateData.noOfPersons !== void 0) {
     validateNumericField(updateData.noOfPersons, "Number of Persons", { integerOnly: true });
   }
@@ -37335,8 +37737,8 @@ async function updateWorkOrder(id, body) {
   const componentRef = updateData.component || existingWO2.component;
   const componentCodeRef = updateData.componentCode || existingWO2.componentCode;
   const vesselId = updateData.vesselId || existingWO2.vesselId;
+  let resolvedComponent = null;
   if (vesselId && (componentRef || componentCodeRef)) {
-    let resolvedComponent = null;
     if (componentRef) {
       resolvedComponent = await findComponent2(componentRef);
     }
@@ -37397,6 +37799,15 @@ async function updateWorkOrder(id, body) {
       }
       console.log("\u{1F4DD} Auto-setting status to Pending Approval (completion data provided without explicit status)");
     }
+  }
+  const isSubmittingForApproval = updateData.status === "Pending Approval" && existingWO2.status !== "Pending Approval";
+  const effectiveCompletionRh = updateData.woCompletionRh ?? existingWO2.woCompletionRh;
+  const effectiveCounterType = resolvedComponent?.rhCounterType || "MASTER";
+  if (isSubmittingForApproval && requiresWoCompletionRh(existingWO2.maintenanceBasis, effectiveCounterType) && (effectiveCompletionRh === null || effectiveCompletionRh === void 0 || String(effectiveCompletionRh).trim() === "")) {
+    throw new ValidationError(
+      "WO Completion RH is required for Running Hours-based Work Orders",
+      { code: "WO_COMPLETION_RH_REQUIRED" }
+    );
   }
   if (updateData.woCompletionRh !== void 0 && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== "") {
     const woRhNum = parseFloat(String(updateData.woCompletionRh));
@@ -37512,7 +37923,27 @@ async function updateWorkOrder(id, body) {
     }
   }
   console.log("\u{1F4DD} Cleaned update data keys:", Object.keys(updateData));
-  const isApprovalTransition = updateData.approvalAction === "approved" && updateData.status === "Completed" || updateData.status === "Completed" && existingWO2.status === "Pending Approval";
+  const approvalTransition = classifyApprovalTransition({
+    existingStatus: existingWO2.status,
+    // Use the immutable request values. Rejection normalization above changes
+    // updateData.status from Rejected to Due for rework, but that must not make
+    // the original explicit rejection look like an invalid action/status pair.
+    requestedStatus: body.status,
+    approvalAction: body.approvalAction
+  });
+  if (approvalTransition.missingExplicitApproval) {
+    throw new ValidationError(
+      "Completing a Pending Approval Work Order requires an explicit approval action.",
+      { code: "APPROVAL_ACTION_REQUIRED" }
+    );
+  }
+  if (approvalTransition.invalidActionStatus) {
+    throw new ValidationError(
+      "The approval action does not match the requested Work Order status.",
+      { code: "INVALID_APPROVAL_ACTION_STATUS" }
+    );
+  }
+  const isApprovalTransition = approvalTransition.explicitApproval;
   let interceptedForL2Review = false;
   if (isApprovalTransition) {
     const { resolveHodForDepartment: resolveHodForDepartment2, getHodShortLabel: getHodShortLabel2 } = await Promise.resolve().then(() => (init_hodResolutionService(), hodResolutionService_exports));
@@ -37638,69 +38069,67 @@ async function updateWorkOrder(id, body) {
         );
       }
       if (rhComp && rhCounterType === "MASTER" && !isNaN(rhValue)) {
-        let rhBackdatedSkippedApproval = false;
-        const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || "0");
-        if (rhValue <= masterCurrentRHApproval && readingDateNorm) {
-          const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-          const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-          const stampFallbackApproval = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
-          const stampFallbackDateApproval = stampFallbackApproval instanceof Date ? stampFallbackApproval : stampFallbackApproval ? new Date(stampFallbackApproval) : null;
-          const masterUpdDateApproval = await resolveRhBaselineDay2(
-            await getPool2(),
-            rhComp.cuuid,
-            stampFallbackDateApproval && !isNaN(stampFallbackDateApproval.getTime()) ? stampFallbackDateApproval : null
-          );
-          if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
-            const approvalCompletionDate = new Date(readingDateNorm);
-            const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
-            const woDay = Date.UTC(approvalCompletionDate.getUTCFullYear(), approvalCompletionDate.getUTCMonth(), approvalCompletionDate.getUTCDate());
-            if (woDay < masterDay) {
-              rhBackdatedSkippedApproval = true;
-              updateData.rhBackdatedEntry = true;
-              rhBackdatedApproval = true;
-              latestRHApproval = masterCurrentRHApproval;
-              latestRHDateApproval = masterUpdDateApproval.toISOString().split("T")[0];
-              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
-            }
-          }
-        }
-        if (!rhBackdatedSkippedApproval) {
-          const { claimWoRhSync: claimWoRhSync2, releaseWoRhSync: releaseWoRhSync2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-          const { getPool: getPoolForClaim } = await Promise.resolve().then(() => (init_db(), db_exports));
-          const claimPool = await getPoolForClaim();
-          if (!await claimWoRhSync2(claimPool, existingWO2.wouuid)) {
-            console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
-          } else {
-            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-            try {
-              await updateMasterRH3(rhComp.cuuid, {
-                newRHValue: rhValue,
-                updateSource: "MANUAL",
-                userId: body.userId || existingWO2.performedBy || "system",
-                userUuid: body.userUuid,
-                userRole: body.userRole || "Ship",
-                adminOverride: body.adminOverride || false,
-                comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
-                dateUpdated: readingDateNorm
-              });
-              updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-              console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children)`);
-            } catch (masterErr) {
+        const { claimWoRhSync: claimWoRhSync2, releaseWoRhSync: releaseWoRhSync2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+        const { getPool: getPoolForClaim } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const claimPool = await getPoolForClaim();
+        if (!await claimWoRhSync2(claimPool, existingWO2.wouuid)) {
+          console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
+          rhUpdateOutcomeApproval = "already_processed";
+          updateData.rhUpdateOutcome = "already_processed";
+        } else {
+          const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+          try {
+            const rhResult = await updateMasterRH3(rhComp.cuuid, {
+              newRHValue: rhValue,
+              updateSource: "WORKORDER",
+              userId: body.userId || existingWO2.performedBy || "system",
+              userUuid: body.userUuid,
+              userRole: body.userRole || "Ship",
+              adminOverride: body.adminOverride || false,
+              comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
+              dateUpdated: readingDateNorm
+            }, {
+              allowLowerWorkOrderApprovalSkip: true
+            });
+            if (rhResult.rhSkipped) {
               await releaseWoRhSync2(claimPool, existingWO2.wouuid);
-              if (masterErr instanceof ValidationError) {
-                const det = masterErr.details || {};
-                throw new ValidationError(masterErr.message, {
-                  code: "RH_OVERRIDE_REQUIRED",
-                  ...det,
-                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                  canOverride: det.validation?.canOverride ?? false,
-                  componentId: rhComp.cuuid,
-                  componentCode: rhComp.componentCode || existingWO2.componentCode,
-                  rhCounterType: "MASTER"
-                });
-              }
-              throw masterErr;
+              rhBackdatedApproval = true;
+              rhUpdateOutcomeApproval = "skipped_lower";
+              rhSkipReasonApproval = "LOWER_THAN_LIVE_RH";
+              submittedRHApproval = rhResult.submittedRH;
+              latestRHApproval = rhResult.currentRH;
+              latestRHDateApproval = rhResult.currentRHDate;
+              updateData.rhUpdateOutcome = "skipped_lower";
+              updateData.rhSkipReason = "LOWER_THAN_LIVE_RH";
+              updateData.rhSkipSubmittedRh = rhResult.submittedRH.toString();
+              updateData.rhSkipLatestRh = rhResult.currentRH.toString();
+              updateData.rhSkipLatestRhDate = rhResult.currentRHDate;
+              console.warn(`\u26A0\uFE0F [RH Sync] Approval continued for WO ${existingWO2.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live ${rhResult.currentRH} RH. RH module was not updated.`);
+            } else {
+              updateData.rhSyncedAt = /* @__PURE__ */ new Date();
+              rhUpdateOutcomeApproval = rhResult.noChange ? "no_change" : "applied";
+              updateData.rhUpdateOutcome = rhUpdateOutcomeApproval;
+              updateData.rhSkipReason = null;
+              updateData.rhSkipSubmittedRh = null;
+              updateData.rhSkipLatestRh = null;
+              updateData.rhSkipLatestRhDate = null;
+              console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} processed ${rhValue} RH via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children when increased)`);
             }
+          } catch (masterErr) {
+            await releaseWoRhSync2(claimPool, existingWO2.wouuid);
+            if (masterErr instanceof ValidationError) {
+              const det = masterErr.details || {};
+              throw new ValidationError(masterErr.message, {
+                code: "RH_OVERRIDE_REQUIRED",
+                ...det,
+                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                canOverride: det.validation?.canOverride ?? false,
+                componentId: rhComp.cuuid,
+                componentCode: rhComp.componentCode || existingWO2.componentCode,
+                rhCounterType: "MASTER"
+              });
+            }
+            throw masterErr;
           }
         }
       } else if (rhComp && rhCounterType === "INHERITED" && !isNaN(rhValue)) {
@@ -37713,69 +38142,67 @@ async function updateWorkOrder(id, body) {
           ) ?? null;
         }
         if (masterComp) {
-          let rhBackdatedSkippedInherited = false;
-          const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || "0");
-          if (rhValue <= inhMasterCurrentRH && readingDateNorm) {
-            const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-            const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-            const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhStampFallback = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
-            const inhMasterUpdDate = await resolveRhBaselineDay2(
-              await getPool2(),
-              masterComp.cuuid,
-              inhStampFallback && !isNaN(inhStampFallback.getTime()) ? inhStampFallback : null
-            );
-            if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
-              const inhCompletionDate = new Date(readingDateNorm);
-              const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
-              const woDay = Date.UTC(inhCompletionDate.getUTCFullYear(), inhCompletionDate.getUTCMonth(), inhCompletionDate.getUTCDate());
-              if (woDay < masterDay) {
-                rhBackdatedSkippedInherited = true;
-                updateData.rhBackdatedEntry = true;
-                rhBackdatedApproval = true;
-                latestRHApproval = inhMasterCurrentRH;
-                latestRHDateApproval = inhMasterUpdDate.toISOString().split("T")[0];
-                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
-              }
-            }
-          }
-          if (!rhBackdatedSkippedInherited) {
-            const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-            const { getPool: getPoolInh } = await Promise.resolve().then(() => (init_db(), db_exports));
-            const claimPoolInh = await getPoolInh();
-            if (!await claimInh(claimPoolInh, existingWO2.wouuid)) {
-              console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
-            } else {
-              const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-              try {
-                await updateMasterRH3(masterComp.cuuid, {
-                  newRHValue: rhValue,
-                  updateSource: "WORKORDER",
-                  userId: body.userId || existingWO2.performedBy || "system",
-                  userUuid: body.userUuid,
-                  userRole: body.userRole || "Ship",
-                  adminOverride: body.adminOverride || false,
-                  comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                  dateUpdated: readingDateNorm
-                });
-                updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-                console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO2.workOrderNo}`);
-              } catch (masterErr) {
+          const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getPoolInh } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const claimPoolInh = await getPoolInh();
+          if (!await claimInh(claimPoolInh, existingWO2.wouuid)) {
+            console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
+            rhUpdateOutcomeApproval = "already_processed";
+            updateData.rhUpdateOutcome = "already_processed";
+          } else {
+            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+            try {
+              const rhResult = await updateMasterRH3(masterComp.cuuid, {
+                newRHValue: rhValue,
+                updateSource: "WORKORDER",
+                userId: body.userId || existingWO2.performedBy || "system",
+                userUuid: body.userUuid,
+                userRole: body.userRole || "Ship",
+                adminOverride: body.adminOverride || false,
+                comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+                dateUpdated: readingDateNorm
+              }, {
+                allowLowerWorkOrderApprovalSkip: true
+              });
+              if (rhResult.rhSkipped) {
                 await releaseInh(claimPoolInh, existingWO2.wouuid);
-                if (masterErr instanceof ValidationError) {
-                  const det = masterErr.details || {};
-                  throw new ValidationError(masterErr.message, {
-                    code: "RH_OVERRIDE_REQUIRED",
-                    ...det,
-                    requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                    canOverride: det.validation?.canOverride ?? false,
-                    componentId: masterComp.cuuid,
-                    componentCode: masterComp.componentCode || existingWO2.componentCode,
-                    rhCounterType: "INHERITED"
-                  });
-                }
-                throw masterErr;
+                rhBackdatedApproval = true;
+                rhUpdateOutcomeApproval = "skipped_lower";
+                rhSkipReasonApproval = "LOWER_THAN_LIVE_RH";
+                submittedRHApproval = rhResult.submittedRH;
+                latestRHApproval = rhResult.currentRH;
+                latestRHDateApproval = rhResult.currentRHDate;
+                updateData.rhUpdateOutcome = "skipped_lower";
+                updateData.rhSkipReason = "LOWER_THAN_LIVE_RH";
+                updateData.rhSkipSubmittedRh = rhResult.submittedRH.toString();
+                updateData.rhSkipLatestRh = rhResult.currentRH.toString();
+                updateData.rhSkipLatestRhDate = rhResult.currentRHDate;
+                console.warn(`\u26A0\uFE0F [RH Sync] Approval continued for INHERITED WO ${existingWO2.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live master ${rhResult.currentRH} RH. RH module was not updated.`);
+              } else {
+                updateData.rhSyncedAt = /* @__PURE__ */ new Date();
+                rhUpdateOutcomeApproval = rhResult.noChange ? "no_change" : "applied";
+                updateData.rhUpdateOutcome = rhUpdateOutcomeApproval;
+                updateData.rhSkipReason = null;
+                updateData.rhSkipSubmittedRh = null;
+                updateData.rhSkipLatestRh = null;
+                updateData.rhSkipLatestRhDate = null;
+                console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}; ${rhValue} RH processed via WO ${existingWO2.workOrderNo}`);
               }
+            } catch (masterErr) {
+              await releaseInh(claimPoolInh, existingWO2.wouuid);
+              if (masterErr instanceof ValidationError) {
+                const det = masterErr.details || {};
+                throw new ValidationError(masterErr.message, {
+                  code: "RH_OVERRIDE_REQUIRED",
+                  ...det,
+                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                  canOverride: det.validation?.canOverride ?? false,
+                  componentId: masterComp.cuuid,
+                  componentCode: masterComp.componentCode || existingWO2.componentCode,
+                  rhCounterType: "INHERITED"
+                });
+              }
+              throw masterErr;
             }
           }
         } else {
@@ -38315,6 +38742,10 @@ async function updateWorkOrder(id, body) {
   return {
     workOrder,
     rhBackdated: rhBackdatedApproval,
+    rhUpdateOutcome: rhUpdateOutcomeApproval,
+    rhUpdateSkipped: rhUpdateOutcomeApproval === "skipped_lower",
+    rhSkipReason: rhSkipReasonApproval,
+    submittedRH: submittedRHApproval,
     latestRH: latestRHApproval,
     latestRHDate: latestRHDateApproval
   };
@@ -39217,6 +39648,8 @@ var init_workOrderService2 = __esm({
     init_sync();
     init_workOrderFilters();
     init_workOrderStatus();
+    init_approvalTransition();
+    init_woCompletionRhRequirement();
   }
 });
 
@@ -47343,6 +47776,11 @@ async function getWorkOrderContext(workOrderId) {
     woCompletionRh: correctedWorkOrder.woCompletionRh?.toString() || "",
     currentReadingDate: correctedWorkOrder.currentReadingDate || "",
     rhBackdatedEntry: !!correctedWorkOrder.rhBackdatedEntry,
+    rhUpdateOutcome: correctedWorkOrder.rhUpdateOutcome || null,
+    rhSkipReason: correctedWorkOrder.rhSkipReason || null,
+    rhSkipSubmittedRh: correctedWorkOrder.rhSkipSubmittedRh?.toString() || null,
+    rhSkipLatestRh: correctedWorkOrder.rhSkipLatestRh?.toString() || null,
+    rhSkipLatestRhDate: correctedWorkOrder.rhSkipLatestRhDate || null,
     // B4 - Spare Parts Consumed
     consumedSpareParts: ensureArray(correctedWorkOrder.consumedSpareParts),
     // Metadata
@@ -47572,6 +48010,7 @@ init_rhTimelineValidationService();
 init_sync();
 init_syncRole();
 init_workOrderStatus();
+init_woCompletionRhRequirement();
 async function completeWorkOrder(workOrderId, body) {
   const {
     runningHours,
@@ -47640,6 +48079,12 @@ async function completeWorkOrder(workOrderId, body) {
   const counterType = (component.rhCounterType || "MASTER").toUpperCase();
   if (workOrder.maintenanceBasis === "Running Hours" && counterType !== "NOT_RH_DRIVEN" && !runningHours) {
     throw new ValidationError("Running hours is required for RH-based maintenance work orders");
+  }
+  if (requiresWoCompletionRh(workOrder.maintenanceBasis, counterType) && woCompletionRh === null) {
+    throw new ValidationError(
+      "WO Completion RH is required for Running Hours-based Work Orders",
+      { code: "WO_COMPLETION_RH_REQUIRED" }
+    );
   }
   if (woCompletionRh && runningHours) {
     const woRhNum = parseFloat(woCompletionRh);
@@ -47729,7 +48174,7 @@ async function completeWorkOrder(workOrderId, body) {
             try {
               await updateMasterRH3(component.cuuid, {
                 newRHValue: newRH,
-                updateSource: "MANUAL",
+                updateSource: "WORKORDER",
                 userId: bodyUserId || executionData.performedBy || "system",
                 userUuid: bodyUserUuid,
                 userRole: userRole || "Ship",
@@ -47743,6 +48188,15 @@ async function completeWorkOrder(workOrderId, body) {
               await releaseWoRhSync2(claimPool, workOrder.wouuid);
               if (masterErr instanceof ValidationError) {
                 const det = masterErr.details || {};
+                if (det.code === "LOWER_THAN_CURRENT_RH") {
+                  throw new ValidationError(masterErr.message, {
+                    ...det,
+                    componentId: component.cuuid,
+                    componentCode: component.componentCode || workOrder.componentCode,
+                    workOrderNo: workOrder.workOrderNo,
+                    rhCounterType: "MASTER"
+                  });
+                }
                 throw new ValidationError(masterErr.message, {
                   code: "RH_OVERRIDE_REQUIRED",
                   ...det,
@@ -47816,6 +48270,15 @@ async function completeWorkOrder(workOrderId, body) {
                 await releaseInh(claimPoolInh, workOrder.wouuid);
                 if (masterErr instanceof ValidationError) {
                   const det = masterErr.details || {};
+                  if (det.code === "LOWER_THAN_CURRENT_RH") {
+                    throw new ValidationError(masterErr.message, {
+                      ...det,
+                      componentId: masterComp.cuuid,
+                      componentCode: masterComp.componentCode || workOrder.componentCode,
+                      workOrderNo: workOrder.workOrderNo,
+                      rhCounterType: "INHERITED"
+                    });
+                  }
                   throw new ValidationError(masterErr.message, {
                     code: "RH_OVERRIDE_REQUIRED",
                     ...det,
@@ -50120,6 +50583,7 @@ async function updateWorkOrder2(req, res) {
     const actor = resolveActorIdentity(req);
     const authReq = req;
     const body = { ...req.body };
+    delete body.superintendentAck;
     if (actor) {
       if (!body.userId || body.userId === "system") body.userId = actor;
       if (!body.performedBy || body.performedBy === "system") body.performedBy = actor;
@@ -50129,9 +50593,22 @@ async function updateWorkOrder2(req, res) {
     const result = await updateWorkOrder(req.params.id, body);
     const workOrder = result.workOrder ?? result;
     const rhBackdated = result.rhBackdated ?? !!workOrder.rhBackdatedEntry;
-    const latestRH = result.latestRH ?? null;
-    const latestRHDate = result.latestRHDate ?? null;
-    res.json({ ...workOrder, rhBackdated, latestRH, latestRHDate });
+    const rhUpdateOutcome = result.rhUpdateOutcome ?? workOrder.rhUpdateOutcome ?? null;
+    const rhUpdateSkipped = result.rhUpdateSkipped ?? workOrder.rhUpdateOutcome === "skipped_lower";
+    const rhSkipReason = result.rhSkipReason ?? workOrder.rhSkipReason ?? null;
+    const submittedRH = result.submittedRH ?? workOrder.rhSkipSubmittedRh ?? null;
+    const latestRH = result.latestRH ?? workOrder.rhSkipLatestRh ?? null;
+    const latestRHDate = result.latestRHDate ?? workOrder.rhSkipLatestRhDate ?? null;
+    res.json({
+      ...workOrder,
+      rhBackdated,
+      rhUpdateOutcome,
+      rhUpdateSkipped,
+      rhSkipReason,
+      submittedRH,
+      latestRH,
+      latestRHDate
+    });
   } catch (error) {
     console.error("\u274C Work order update error:", error);
     if (error.name === "ZodError") {
@@ -54226,7 +54703,9 @@ async function getCertificates(filters) {
         issueDate: certData?.issueDate || "",
         expiryDate: certData?.expiryDate || "",
         lastAnnual: certData?.lastAnnual || "",
+        nextAnnual: certData?.nextAnnual || "",
         lastInterm: certData?.lastInterm || "",
+        nextInterm: certData?.nextInterm || "",
         endorsementDate: certData?.endorsementDate || "",
         lastEditUpload: certData?.lastEditUpload || "",
         attachments: certData?.attachments || []
@@ -54269,9 +54748,17 @@ async function getCertificates(filters) {
           valA = a.lastAnnual || "";
           valB = b.lastAnnual || "";
           break;
+        case "nextAnnual":
+          valA = a.nextAnnual || "";
+          valB = b.nextAnnual || "";
+          break;
         case "lastInterm":
           valA = a.lastInterm || "";
           valB = b.lastInterm || "";
+          break;
+        case "nextInterm":
+          valA = a.nextInterm || "";
+          valB = b.nextInterm || "";
           break;
         case "endorsementDate":
           valA = a.endorsementDate || "";
@@ -54335,7 +54822,9 @@ async function getCertificate(certId) {
     issueDate: certData?.issueDate || "",
     expiryDate: certData?.expiryDate || "",
     lastAnnual: certData?.lastAnnual || "",
+    nextAnnual: certData?.nextAnnual || "",
     lastInterm: certData?.lastInterm || "",
+    nextInterm: certData?.nextInterm || "",
     endorsementDate: certData?.endorsementDate || "",
     lastEditUpload: certData?.lastEditUpload || "",
     attachments: certData?.attachments || []
@@ -54444,7 +54933,9 @@ async function updateCertificate(certId, body) {
     issueDate: result[0]?.issueDate || "",
     expiryDate: result[0]?.expiryDate || "",
     lastAnnual: result[0]?.lastAnnual || "",
+    nextAnnual: result[0]?.nextAnnual || "",
     lastInterm: result[0]?.lastInterm || "",
+    nextInterm: result[0]?.nextInterm || "",
     endorsementDate: result[0]?.endorsementDate || "",
     lastEditUpload: result[0]?.lastEditUpload || "",
     attachments: result[0]?.attachments || []
