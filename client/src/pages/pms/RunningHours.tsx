@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { Search, FileSpreadsheet, Users, Settings, Pencil, AlertTriangle, Download, Clock, History, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
@@ -29,6 +30,8 @@ import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import ZeroRHConfirmationDialog from "@/components/ZeroRHConfirmationDialog";
 import MeterReplacedConfirmationDialog from "@/components/MeterReplacedConfirmationDialog";
 import { RENEWAL_ACTION_TYPES } from "@shared/schema";
+import { formatLocalDateTimeDDMMMYYYY } from "@shared/dateUtils";
+import { isRhValidationEnabledForComponent } from "./rhValidationPolicy";
 
 interface ChildRHData {
   id: string;
@@ -37,11 +40,18 @@ interface ChildRHData {
   currentCumulativeRH: string;
   rhCounterType?: string;
   lastUpdated: string;
+  stamp?: {
+    stamp: string;
+    stampName: string | null;
+    currentRh: string;
+    rhLastUpdated: string | null;
+  } | null;
 }
 
 interface RunningHoursData {
   id: string;
   cuuid: string;
+  vesselId?: string | null;
   component: string;
   componentCode?: string;
   sfiCode?: string;
@@ -68,11 +78,14 @@ interface RunningHoursData {
 
 const RunningHours = () => {
   const [, navigate] = useLocation();
-  const { currentUser } = useAuth();
+  const { currentUser, isOfficeUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<RunningHoursData | null>(null);
+  // Derived from the selected vessel's synced PMS settings. Default ON keeps
+  // validation safe if the vessel has not yet received a settings record.
+  const [rhValidationEnabled, setRhValidationEnabled] = useState(true);
   
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
@@ -131,6 +144,7 @@ const RunningHours = () => {
     dateUpdated: string;
     dateLocal: string;
     comments: string;
+    rhValidationEnabled: boolean;
   } | null>(null);
   
   // Meter Replaced Confirmation Dialog state
@@ -153,15 +167,40 @@ const RunningHours = () => {
   const { canEdit: canEditPerm } = usePermissions();
   const canEditRH = canEditPerm("pms-running-hrs");
   const { data: vessels = [] } = useVessels();
+  const { data: pmsVesselSettings = [] } = useQuery<Array<{ vesselId: string; rhValidationEnabled?: boolean }>>({
+    queryKey: ['/technical/api/pms-vessel-settings'],
+  });
+  const isRhValidationEnabledForVessel = useCallback((componentVesselId?: string | null) => {
+    // A missing vessel/settings row must fail closed. In My Vessels mode this
+    // resolves from each component's own vessel instead of applying one page
+    // switch to a mixed-policy aggregate.
+    return isRhValidationEnabledForComponent(componentVesselId, vesselId, pmsVesselSettings);
+  }, [pmsVesselSettings, vesselId]);
+
+  const vesselRhValidationEnabled = useMemo(
+    () => isMyVessels ? true : isRhValidationEnabledForVessel(vesselId),
+    [isMyVessels, isRhValidationEnabledForVessel, vesselId],
+  );
+  const selectedComponentRhValidationEnabled = useMemo(
+    () => isRhValidationEnabledForVessel(selectedComponent?.vesselId),
+    [isRhValidationEnabledForVessel, selectedComponent?.vesselId],
+  );
+
+  useEffect(() => {
+    setRhValidationEnabled(vesselRhValidationEnabled);
+    setBulkUpdateErrors({});
+  }, [vesselRhValidationEnabled]);
   
   // Fetch children RH data when popup is open
   const { data: childrenRHData, isLoading: isLoadingChildren } = useQuery<{
     parent: { componentCode: string; name: string; currentCumulativeRH: string };
     children: ChildRHData[];
   }>({
-    queryKey: ['/technical/api/running-hours/children', selectedParentForChildRH?.componentCode, vesselId],
+    queryKey: ['/technical/api/running-hours/children', selectedParentForChildRH?.componentCode, rhScopeKey],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/running-hours/children/${selectedParentForChildRH?.componentCode}?vesselId=${vesselId}`);
+      // Use the normalized scope segment ('all' under My Vessels) — the raw scope
+      // value is not a concrete vessel id and would resolve no components.
+      const response = await fetch(`/technical/api/running-hours/children/${selectedParentForChildRH?.componentCode}?vesselId=${rhScopeSegment}`);
       if (!response.ok) throw new Error('Failed to fetch children RH');
       return response.json();
     },
@@ -204,12 +243,9 @@ const RunningHours = () => {
     sfiCode: parent.sfiCode || '',
     componentCategory: parent.category || '',
     runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
-    // For MASTER counter components the "Last Updated" column shows the last
-    // completed date (most recent approved work-order completion); fall back to
-    // the counter's last-updated timestamp when there is no completion history.
-    lastUpdated: parent.lastCompletedDate
-      ? formatProfessionalDate(parent.lastCompletedDate)
-      : formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
+    // "Last Updated" shows the MAX of RH-specific sources (audit date, last_updated,
+    // rh_master_updated_at) — computed server-side and sent as latestUpdate.
+    lastUpdated: formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
     lastUpdatedRaw: parent.latestUpdate || parent.lastUpdated || null,
     utilizationRate: parent.utilizationRate ?? 0,
     periodRunningHours: parent.periodRunningHours ?? 0,
@@ -797,6 +833,7 @@ const RunningHours = () => {
           comments: update.comments || '',
           userId: currentUser?.fullName || currentUser?.username || 'system',
           userUuid: currentUser?.userUuid || undefined,
+          rhValidationEnabled: update.rhValidationEnabled,
           meterReplaced: update.meterReplaced,
           oldMeterFinal: update.oldMeterFinal,
           newMeterStart: update.newMeterStart
@@ -829,12 +866,13 @@ const RunningHours = () => {
 
   // Mutation for updating individual child component RH
   const updateChildRHMutation = useMutation({
-    mutationFn: async (data: { componentId: string; newRHValue: number; comments?: string }) => {
+    mutationFn: async (data: { componentId: string; newRHValue: number; comments?: string; rhValidationEnabled: boolean }) => {
       return await apiRequest('PUT', `/technical/api/running-hours/child/${data.componentId}`, {
         newRHValue: data.newRHValue,
         comments: data.comments || '',
         userId: currentUser?.fullName || currentUser?.username || 'system',
-        userUuid: currentUser?.userUuid || undefined
+        userUuid: currentUser?.userUuid || undefined,
+        rhValidationEnabled: data.rhValidationEnabled,
       });
     },
     onSuccess: () => {
@@ -889,7 +927,9 @@ const RunningHours = () => {
     updateChildRHMutation.mutate({
       componentId: editingChildId,
       newRHValue: newValue,
-      comments: editingChildComments
+      comments: editingChildComments,
+      // Children share the selected master's vessel policy.
+      rhValidationEnabled: isRhValidationEnabledForVessel(selectedParentForChildRH?.vesselId),
     });
   };
 
@@ -1034,16 +1074,10 @@ const RunningHours = () => {
       // Date is already validated above, but it's also mandatory for meter replacement
     }
     
-    // Format date in vessel local time
-    const dateLocal = selectedDate.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    }) + ' ' + selectedDate.toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
+    // Format date in vessel local time. Locale-independent formatter: en-GB
+    // toLocaleDateString abbreviates September as "Sept" (4 letters), which
+    // crashes the server-side TO_TIMESTAMP parse of date_updated_local.
+    const dateLocal = formatLocalDateTimeDDMMMYYYY(selectedDate);
     
     const effectiveNewValue = meterReplaced && (!updateForm.newValue || updateForm.newValue.trim() === "")
       ? updateForm.newMeterStart || "0"
@@ -1061,7 +1095,7 @@ const RunningHours = () => {
     }
     
     // Check if user is trying to set RH to 0 - require confirmation (skip if meter replaced, already confirmed)
-    if (updateMode === 'setTotal' && newValue === 0 && !meterReplaced) {
+    if (updateMode === 'setTotal' && newValue === 0 && !meterReplaced && selectedComponentRhValidationEnabled) {
       setPendingZeroRHUpdate({
         componentId: selectedComponent.id,
         componentName: selectedComponent.component,
@@ -1070,6 +1104,7 @@ const RunningHours = () => {
         dateUpdated: updateForm.dateUpdated,
         dateLocal: dateLocal,
         comments: updateForm.comments,
+        rhValidationEnabled: selectedComponentRhValidationEnabled,
       });
       setIsZeroRHDialogOpen(true);
       return;
@@ -1083,6 +1118,7 @@ const RunningHours = () => {
       comments: updateForm.comments,
       userId: currentUser?.fullName || currentUser?.username || 'system',
       userUuid: currentUser?.userUuid || undefined,
+      rhValidationEnabled: selectedComponentRhValidationEnabled,
       meterReplaced,
       oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
       newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined,
@@ -1111,6 +1147,7 @@ const RunningHours = () => {
       comments: pendingZeroRHUpdate.comments,
       userId: currentUser?.fullName || currentUser?.username || 'system',
       userUuid: currentUser?.userUuid || undefined,
+      rhValidationEnabled: pendingZeroRHUpdate.rhValidationEnabled,
       meterReplaced: true,
       isRenewalReset: true,
       renewalActionType: renewalData.renewalActionType,
@@ -1272,14 +1309,17 @@ const RunningHours = () => {
     const newVal = parseFloat(updateForm.newValue);
     if (isNaN(newVal)) return null;
     if (updateMode === "setTotal") {
+      if (newVal < 0) {
+        return "New value cannot be negative.";
+      }
       if (!meterReplaced) {
         const currentRH = parseFloat(updateForm.oldValue.replace(/,/g, ''));
-        if (!isNaN(currentRH) && newVal < currentRH) {
+        if (selectedComponentRhValidationEnabled && !isNaN(currentRH) && newVal < currentRH) {
           return `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs). Use 'Meter Replaced' if the meter was reset.`;
         }
       }
     } else if (updateMode === "addDelta") {
-      if (newVal <= 0) {
+      if (selectedComponentRhValidationEnabled && newVal <= 0) {
         return "Delta value must be a positive number. Running hours can only increase.";
       }
     }
@@ -1292,17 +1332,21 @@ const RunningHours = () => {
     const inputValue = parseFloat(updateData.value.replace(/,/g, ''));
     if (isNaN(inputValue)) return null;
     if (bulkUpdateMode === "setTotal") {
+      if (inputValue < 0) {
+        return "New value cannot be negative.";
+      }
       if (!updateData.meterReplaced) {
         const component = runningHoursData.find(c => c.id === componentId);
         if (component) {
           const currentRH = parseFloat(component.runningHours.replace(" hrs", "").replace(/,/g, ""));
-          if (!isNaN(currentRH) && inputValue < currentRH) {
+          if (isRhValidationEnabledForVessel(component.vesselId) && !isNaN(currentRH) && inputValue < currentRH) {
             return `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs). Use 'Meter Replaced' if the meter was reset.`;
           }
         }
       }
     } else if (bulkUpdateMode === "addDelta") {
-      if (inputValue <= 0) {
+      const component = runningHoursData.find(c => c.id === componentId);
+      if (isRhValidationEnabledForVessel(component?.vesselId) && inputValue <= 0) {
         return "Delta value must be a positive number. Running hours can only increase.";
       }
     }
@@ -1333,15 +1377,8 @@ const RunningHours = () => {
     const selectedDate = new Date(bulkUpdateGlobal.dateUpdated);
     selectedDate.setHours(23, 59, 59, 999);
     
-    const dateLocal = selectedDate.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    }) + ' ' + selectedDate.toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
+    // Locale-independent formatter (see individual-update handler note re "Sept").
+    const dateLocal = formatLocalDateTimeDDMMMYYYY(selectedDate);
     
     // Process each component with updates
     for (const component of runningHoursData) {
@@ -1356,12 +1393,13 @@ const RunningHours = () => {
       }
       
       // Block zero values in bulk update - must use individual update with renewal confirmation
-      if (bulkUpdateMode === 'setTotal' && inputValue === 0) {
+      const componentRhValidationEnabled = isRhValidationEnabledForVessel(component.vesselId);
+      if (bulkUpdateMode === 'setTotal' && inputValue === 0 && componentRhValidationEnabled) {
         errors[component.id] = "Cannot set RH to 0 in bulk update. Use individual update for renewal/replacement.";
         continue;
       }
       
-      if (bulkUpdateMode === 'setTotal' && !updateData.meterReplaced) {
+      if (bulkUpdateMode === 'setTotal' && !updateData.meterReplaced && componentRhValidationEnabled) {
         const currentRH = parseFloat(component.runningHours.replace(" hrs", "").replace(/,/g, ""));
         if (!isNaN(currentRH) && inputValue < currentRH) {
           errors[component.id] = `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs).`;
@@ -1369,7 +1407,7 @@ const RunningHours = () => {
         }
       }
       
-      if (bulkUpdateMode === 'addDelta' && inputValue <= 0) {
+      if (bulkUpdateMode === 'addDelta' && inputValue <= 0 && componentRhValidationEnabled) {
         errors[component.id] = "Delta value must be a positive number.";
         continue;
       }
@@ -1380,6 +1418,7 @@ const RunningHours = () => {
         value: inputValue,
         dateUpdated: dateLocal,
         comments: bulkUpdateGlobal.comments,
+        rhValidationEnabled: componentRhValidationEnabled,
         meterReplaced: updateData.meterReplaced || false,
         oldMeterFinal: updateData.meterReplaced ? updateData.oldMeterFinal : undefined,
         newMeterStart: updateData.meterReplaced ? updateData.newMeterStart : undefined
@@ -1427,6 +1466,20 @@ const RunningHours = () => {
           </div>
           {activeTab === 'main' && (
             <div className="flex gap-2 items-center">
+              <div
+                className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                  isMyVessels
+                    ? 'border-sky-200 bg-sky-50 text-sky-800'
+                    : rhValidationEnabled
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-300 bg-amber-50 text-amber-900'
+                }`}
+                title="Configured per vessel in PMS Settings"
+                data-testid="rh-validation-status"
+              >
+                <span className="font-medium">RH Validation</span>
+                <span className="font-semibold">{isMyVessels ? 'PER VESSEL' : rhValidationEnabled ? 'ON' : 'OFF'}</span>
+              </div>
               <Button 
                 variant="outline" 
                 size="sm"
@@ -1455,7 +1508,7 @@ const RunningHours = () => {
         {/* Filters - Single Row - Main Tab */}
         {activeTab === 'main' && (
           <div className="flex items-center gap-3 flex-wrap">
-            {(isSailAdmin || isClientAdmin || isExternal) && (
+            {isOfficeUser && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
                 <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
@@ -1879,9 +1932,9 @@ const RunningHours = () => {
             <Button 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white" 
               onClick={handleSaveUpdate}
-              disabled={!!individualValidationError || !canEditRH}
+              disabled={!!individualValidationError || !canEditRH || cascadeUpdateMutation.isPending}
             >
-              Save
+              {cascadeUpdateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </div>
         </DialogContent>
@@ -2030,9 +2083,9 @@ const RunningHours = () => {
             <Button 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white" 
               onClick={handleBulkSave}
-              disabled={hasBulkValidationErrors || !canEditRH}
+              disabled={hasBulkValidationErrors || !canEditRH || bulkUpdateRunningHours.isPending}
             >
-              Save
+              {bulkUpdateRunningHours.isPending ? "Saving..." : "Save"}
             </Button>
           </div>
         </DialogContent>
@@ -2160,6 +2213,7 @@ const RunningHours = () => {
                             </div>
                           </div>
                         ) : (
+                          <>
                           <div className={`grid ${isSailAdmin ? 'grid-cols-[1fr_auto_100px_120px_60px]' : 'grid-cols-[1fr_auto_100px_120px]'} gap-4 text-sm items-center`}>
                             <div className="text-gray-900">{child.name}</div>
                             <div className="text-gray-600">{child.componentCode}</div>
@@ -2186,6 +2240,23 @@ const RunningHours = () => {
                               </div>
                             )}
                           </div>
+                          {child.stamp && (
+                            <div className={`grid ${isSailAdmin ? 'grid-cols-[1fr_auto_100px_120px_60px]' : 'grid-cols-[1fr_auto_100px_120px]'} gap-4 text-xs items-center mt-1`} data-testid={`row-stamp-rh-${child.id}`}>
+                              <div className="text-amber-700">
+                                Stamp: <span className="font-medium">{child.stamp.stamp}</span>
+                                {child.stamp.stampName ? ` — ${child.stamp.stampName}` : ''}
+                              </div>
+                              <div></div>
+                              <div className="text-right font-medium text-amber-700">
+                                {parseFloat(child.stamp.currentRh || '0').toLocaleString()} hrs
+                              </div>
+                              <div className="text-amber-700">
+                                {child.stamp.rhLastUpdated ? formatProfessionalDateTime(child.stamp.rhLastUpdated) : '-'}
+                              </div>
+                              {isSailAdmin && <div></div>}
+                            </div>
+                          )}
+                          </>
                         )}
                       </div>
                     ))}

@@ -129,6 +129,7 @@ import {
   companyStandardGraceSettings,
   type CompanyStandardGraceSettings,
   type InsertCompanyStandardGraceSettings,
+  type CompanyApprovalSettings,
   makerList,
   type MakerList,
   type InsertMakerList,
@@ -259,8 +260,8 @@ export interface IStorage {
   getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined>;
   createComponent(component: InsertComponent): Promise<Component>;
   updateComponent(id: string, data: Partial<Component>): Promise<Component>;
-  deleteComponent(id: string): Promise<void>;
-  inactivateComponent(id: string, vesselId: string, userId?: string): Promise<{
+  deleteComponent(id: string, userId?: string): Promise<void>;
+  inactivateComponent(id: string, vesselId: string, userId?: string, apply?: boolean): Promise<{
     success: boolean;
     message: string;
     code?: string;
@@ -316,10 +317,27 @@ export interface IStorage {
   }): Promise<Component>;
   
   // Update MASTER running hours with automatic cascade to INHERITED components
+  accrueInstalledStampRh(params: {
+    vesselId: string | null;
+    currentStamp: string | null;
+    delta: number;
+    readingDateIso: string;
+    userId: string | null;
+  }): Promise<void>;
+
+  // Atomic child (INHERITED) RH update with per-component lock + in-tx delta (Task #374)
+  updateChildRhWithStampAccrual(params: {
+    componentId: string;
+    newRHValue: number;
+    lastUpdated: string;
+    readingDateIso: string;
+    userId: string | null;
+  }): Promise<{ previousRH: number; changed: boolean }>;
+
   updateMasterRunningHours(params: {
     componentId: string;
     newRHValue: number;
-    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
+    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'WORKORDER';
     userId: string;
     userUuid?: string;
     comments?: string;
@@ -360,7 +378,7 @@ export interface IStorage {
   getSpare(id: string): Promise<Spare | undefined>;
   createSpare(spare: InsertSpare, skipSiblingSync?: boolean): Promise<Spare>;
   updateSpare(id: string, data: Partial<Spare>, skipSiblingSync?: boolean): Promise<Spare>;
-  deleteSpare(id: string): Promise<void>;
+  deleteSpare(id: string, userId?: string): Promise<void>;
   consumeSpare(id: string, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
   consumeSpareFromLocation(id: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, workOrderRef?: string, dateLocal?: string): Promise<{
     spare: Spare;
@@ -432,7 +450,7 @@ export interface IStorage {
   updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<ChangeRequest>;
   deleteChangeRequest(id: number): Promise<void>;
   submitChangeRequest(id: number, userId: string): Promise<ChangeRequest>;
-  approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest>;
+  approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest>;
   rejectChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest>;
   returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
   applyApprovedChanges(changeRequest: ChangeRequest): Promise<{ appliedFieldCount: number }>;
@@ -561,6 +579,12 @@ export interface IStorage {
   
   // Work Order methods
   getWorkOrders(vesselId?: string, vesselIds?: string[]): Promise<WorkOrder[]>;
+  /** Light projection for numbering: just work_order_no strings (optional — feature-detected by workOrderNumbering). */
+  getWorkOrderNumbers?(vesselId?: string): Promise<string[]>;
+  /** Alert-scan candidates: vessel WOs whose authored status can still compute to a derived band. */
+  getAlertCandidateWorkOrders(): Promise<any[]>;
+  /** Alert-scan candidates: critical spares already below minimum (SQL mirror of evaluateLowSpares). */
+  getLowCriticalSpareCandidates(): Promise<any[]>;
   getWorkOrder(id: string): Promise<WorkOrder | undefined>;
   getWorkOrderByCode(code: string): Promise<WorkOrder | undefined>;
   getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]>;
@@ -662,7 +686,7 @@ export interface IStorage {
   
   // Seed helper methods
   getDefectBySeedId(seedId: string): Promise<Defect | undefined>;
-  getVesselIdByName(vesselName: string): Promise<string | undefined>;
+  getVesselIdByName(vesselName: string, options?: { includeDeleted?: boolean }): Promise<string | undefined>;
   createVessel(vessel: InsertVessel): Promise<Vessel>;
   
   // Import History methods
@@ -735,8 +759,8 @@ export interface IStorage {
     mappedBy: string;
   }): Promise<any[]>;
   deleteFleetVesselMapping(id: string): Promise<void>;
-  getVessel(id: string): Promise<Vessel | undefined>;
-  getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string, imoNumber: string | null, vesselType: string | null}>>;
+  getVessel(id: string, options?: { includeDeleted?: boolean }): Promise<Vessel | undefined>;
+  getVessels(options?: { includeDeleted?: boolean }): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>>;
   
   // On-Demand Work Order Generation (Rule #4)
   // activeComponentCode: optional override for multi-linked jobs to bind WO to specific component context
@@ -762,6 +786,10 @@ export interface IStorage {
   // Company Standard Grace Settings - Singleton company-wide grace rule
   getCompanyStandardGraceSettings(): Promise<CompanyStandardGraceSettings | undefined>;
   upsertCompanyStandardGraceSettings(settings: InsertCompanyStandardGraceSettings): Promise<CompanyStandardGraceSettings>;
+
+  // Company Approval Settings - Singleton approval policy (superintendent lock toggle)
+  getCompanyApprovalSettings(): Promise<CompanyApprovalSettings | undefined>;
+  upsertCompanyApprovalSettings(settings: { superintendentLockEnabled: boolean; updatedBy?: string | null }): Promise<CompanyApprovalSettings>;
   
   // Maker List - Master data for manufacturers
   getMakerList(): Promise<MakerList[]>;
@@ -864,9 +892,9 @@ export interface IStorage {
   createFleet(fleet: InsertFleet): Promise<Fleet>;
   updateFleet(id: string, data: Partial<Fleet>): Promise<Fleet>;
   deleteFleet(id: string): Promise<void>;
-  getVesselsByFleet(fleetId: string): Promise<Vessel[]>;
+  getVesselsByFleet(fleetId: string, options?: { includeDeleted?: boolean }): Promise<Vessel[]>;
   assignVesselToFleet(vesselId: string, fleetId: string | null): Promise<Vessel>;
-  getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>>;
+  getVesselsWithFleets(options?: { includeDeleted?: boolean }): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>>;
   updateVessel(id: string, data: Partial<Vessel>): Promise<Vessel>;
 
   getFleetClasses(fleetId: string): Promise<FleetClass[]>;
@@ -1045,6 +1073,15 @@ export interface IStorage {
   createWoPostponementApprovalStep(step: InsertWoPostponementApproval): Promise<WoPostponementApproval>;
   updateWoPostponementApprovalStep(id: number, data: Partial<WoPostponementApproval>): Promise<WoPostponementApproval>;
   getLatestAwaitingPostponement(workOrderId: string): Promise<WorkOrderPostponement | undefined>;
+  /** Phase 0 / P0.3d — transactional postponement-approval finalize (WO update + request row + decision row, tx-joined logs). */
+  finalizePostponementApproval(params: {
+    workOrderId: string;
+    woUpdates: Partial<InsertWorkOrder>;
+    awaitingPostponementId: string | null;
+    awaitingUpdates: Partial<InsertWorkOrderPostponement>;
+    decisionRow: InsertWorkOrderPostponement;
+    actor: string;
+  }): Promise<WorkOrder>;
   verifyApproverForLevel(reviewerId: string, approvalLevel: string): Promise<boolean>;
 }
 

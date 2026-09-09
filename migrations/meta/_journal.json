@@ -449,6 +449,13 @@
       "when": 1781681590179,
       "tag": "0063_cynical_lester",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1784633833170,
+      "tag": "0064_view_mode_migration",
+      "breakpoints": true
     }
   ]
 }

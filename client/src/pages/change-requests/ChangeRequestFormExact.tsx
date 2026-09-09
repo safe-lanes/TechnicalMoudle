@@ -19,6 +19,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useVessel } from "@/contexts/VesselContext";
 import { useVessels } from "@/hooks/useVessels";
 import { type FieldDefinition } from "@shared/changeRequestFields";
+import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 
 interface TargetEntityData {
   entity: any;
@@ -63,6 +65,9 @@ interface ChangeRequestFormExactProps {
 
 export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 'new' }: ChangeRequestFormExactProps) {
   const { toast } = useToast();
+  const { currentUser } = useAuth();
+  // Shared identity resolution (see useResolvedUserName for the session-validity rationale)
+  const { resolvedUserName } = useResolvedUserName();
   const { vesselId: selectedVessel } = useVessel();
   const [activeSection, setActiveSection] = useState<string>('basic');
   const [proposedChanges, setProposedChanges] = useState<ProposedChange[]>([]);
@@ -92,9 +97,19 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
       vesselId: defaultVesselId,
       category: 'components',
       status: 'draft',
-      requestedByUserId: 'Current User', // In real app, get from auth context
+      requestedByUserId: resolvedUserName,
     }
   });
+
+  // Auth hydrates asynchronously: currentUser starts as null, then resolves to the real
+  // user (or DEFAULT_USER). react-hook-form does not re-evaluate defaultValues after mount,
+  // so re-set the requester field once the real identity is known (new CRs only).
+  useEffect(() => {
+    if (!changeRequest && currentUser) {
+      const name = currentUser.fullName || currentUser.username || 'Unknown';
+      form.setValue('requestedByUserId', name, { shouldDirty: false });
+    }
+  }, [currentUser, changeRequest]);
 
   const isViewMode = mode === 'view';
   const isEditMode = mode === 'edit';
@@ -207,11 +222,15 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
   });
 
   // Submit change request mutation (change status to submitted)
+  // Uses PATCH /:id/status — the only registered submit/status route on the server.
+  // The service reads `reviewedByUserId` from the body when status === 'submitted'
+  // and passes it to submitChangeRequestWorkflow as the submitting user's identity.
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (!changeRequest) return;
-      return apiRequest('POST', `/technical/api/change-requests/${changeRequest.id}/submit`, {
-        userId: 'Current User' // In real app, get from auth context
+      return apiRequest('PATCH', `/technical/api/change-requests/${changeRequest.id}/status`, {
+        status: 'submitted',
+        reviewedByUserId: resolvedUserName
       });
     },
     onSuccess: (data) => {

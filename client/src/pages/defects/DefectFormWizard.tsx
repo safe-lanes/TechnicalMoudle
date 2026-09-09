@@ -30,6 +30,7 @@ import { getSireReferencesByVersion } from "@/data/sireReferences";
 import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
 import { VesselComponentCombobox, type VesselComponentSelection } from "@/components/VesselComponentCombobox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 const defectFormSchema = insertDefectSchema.extend({
   critical: z.boolean().optional(),
@@ -73,6 +74,7 @@ export default function DefectFormWizard({
   console.log('[DefectFormWizard] Rendering with mode:', mode, 'defect:', defect?.id);
   const { toast } = useToast();
   const { currentUser } = useAuth();
+  const { isSailAdmin, isClientAdmin, isTechSuperintendent } = useUIRole();
   const { data: vessels = [] } = useVessels();
   
   // Fetch equipment categories from database
@@ -604,7 +606,10 @@ export default function DefectFormWizard({
     setIsViewMode(!isViewMode);
   };
 
-  // C2 Verification auto-fill handler for Office and PMS Admin users
+  // Roles permitted to verify defects (must match DefectsLogWithTabs canVerify)
+  const canVerify = isSailAdmin || isClientAdmin || isTechSuperintendent;
+
+  // C2 Verification auto-fill handler for Office, PMS Admin, Sail Admin, Client Admin, and Superintendent users
   const handleVerifiedChange = (checked: boolean | "indeterminate", fieldOnChange: (value: boolean) => void) => {
     const isChecked = checked === true;
     fieldOnChange(isChecked);
@@ -616,8 +621,8 @@ export default function DefectFormWizard({
       crewDesignation: currentUser?.crewDesignation 
     });
     
-    // Auto-fill for Office and PMS Admin users when checkbox is checked
-    const canAutoFill = currentUser?.role === 'Office' || currentUser?.role === 'PMS Admin' || currentUser?.role === 'Sail Admin';
+    // Auto-fill for Sail Admin, Client Admin, and Superintendent users when checkbox is checked
+    const canAutoFill = isSailAdmin || isClientAdmin || isTechSuperintendent;
     if (isChecked && canAutoFill) {
       const today = new Date().toISOString().split('T')[0];
       console.log('[C2 Auto-fill] Applying auto-fill values:', { 
@@ -2171,7 +2176,7 @@ export default function DefectFormWizard({
                               id="verified"
                               checked={field.value || false}
                               onCheckedChange={(checked) => handleVerifiedChange(checked, field.onChange)}
-                              disabled={isViewMode}
+                              disabled={isViewMode || !canVerify}
                               data-testid="checkbox-verified"
                             />
                           )}

@@ -371,7 +371,13 @@ export async function getWorkOrderContext(workOrderId: string) {
     correctedWorkOrder.dateCompleted = null;
     correctedWorkOrder.approvalTier = null;
     wasStuckRejection = true;
-    // Fire-and-forget DB correction
+    // Fire-and-forget DB correction — DELIBERATELY NOT field-logged (plan §9.3, reviewed
+    // 2026-07-23): a read path causing a synced write stamped 'system' is the wrong shape
+    // (the recalculator false-conflict class), and making this propagate mid sync-integrity
+    // work invites surprises. KNOWN BOUNDED DIVERGENCE: a stuck-rejected WO corrected here
+    // stays corrected LOCALLY only, until the Phase-2 fix relocates this corrective out of
+    // the view path (scheduled or on-write) and logs it with a real actor. Do NOT "fix" by
+    // just adding logFieldChanges here.
     repo.update(workOrder.id || (workOrder as any).wouuid, {
       status: 'Due',
       completionDateTime: null,
@@ -383,7 +389,7 @@ export async function getWorkOrderContext(workOrderId: string) {
   }
 
   // Build executionData from work order (Part B - editable execution record)
-  const executionData = {
+  let executionData = {
     // B1 - Risk Assessment, Checklists & Records
     riskAssessmentStatus: correctedWorkOrder.riskAssessmentStatus || '',
     safetyChecklistsStatus: correctedWorkOrder.safetyChecklistsStatus || '',
@@ -405,7 +411,15 @@ export async function getWorkOrderContext(workOrderId: string) {
     runningHoursDifference: correctedWorkOrder.runningHoursDifference?.toString() || '',
     readingDate: correctedWorkOrder.readingDate || '',
     runningHours: correctedWorkOrder.runningHours || '',
+    // RH accuracy (migration 139): round-trip the completion-time RH + reading date.
+    woCompletionRh: (correctedWorkOrder as any).woCompletionRh?.toString() || '',
+    currentReadingDate: (correctedWorkOrder as any).currentReadingDate || '',
     rhBackdatedEntry: !!(correctedWorkOrder as any).rhBackdatedEntry,
+    rhUpdateOutcome: (correctedWorkOrder as any).rhUpdateOutcome || null,
+    rhSkipReason: (correctedWorkOrder as any).rhSkipReason || null,
+    rhSkipSubmittedRh: (correctedWorkOrder as any).rhSkipSubmittedRh?.toString() || null,
+    rhSkipLatestRh: (correctedWorkOrder as any).rhSkipLatestRh?.toString() || null,
+    rhSkipLatestRhDate: (correctedWorkOrder as any).rhSkipLatestRhDate || null,
     // B4 - Spare Parts Consumed
     consumedSpareParts: ensureArray(correctedWorkOrder.consumedSpareParts),
     // Metadata
@@ -415,6 +429,16 @@ export async function getWorkOrderContext(workOrderId: string) {
     completionRemarks: correctedWorkOrder.completionRemarks || ''
   };
 
+  // Save as Draft (migration 165, Task #402): if an unsubmitted draft exists,
+  // it holds the user's latest Part-B form state — overlay it so reopening the
+  // form restores drafted values. The draft is cleared at every submission
+  // entry point, so a present draft always means "in progress".
+  const draftDoc: any = (correctedWorkOrder as any).draftExecutionData;
+  const hasDraft = draftDoc != null && typeof draftDoc === 'object' && !Array.isArray(draftDoc);
+  if (hasDraft) {
+    executionData = { ...executionData, ...draftDoc };
+  }
+
   // Use actual database data - no dummy data overrides
   const finalTemplateData: any = { ...templateData };
 
@@ -422,6 +446,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     workOrder: correctedWorkOrder,
     templateData: finalTemplateData,
     executionData,
+    hasDraftExecutionData: hasDraft,
     job,
     component: {
       id: component.cuuid,

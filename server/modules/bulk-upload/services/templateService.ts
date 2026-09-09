@@ -151,7 +151,9 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'RH Counter Type', key: 'rhCounterType', width: 18 },
     { header: 'RH Counter Source', key: 'rhCounterSource', width: 18 },
     { header: 'Running Hours', key: 'runningHours', width: 15 },
-    { header: 'Last Updated', key: 'lastUpdated', width: 18 }
+    { header: 'Last Updated', key: 'lastUpdated', width: 18 },
+    { header: 'Rotational Item (Yes/No)', key: 'rotationalItem', width: 20 },
+    { header: 'Stamp', key: 'currentStamp', width: 18 }
   ];
   
   // Headers only - no sample data

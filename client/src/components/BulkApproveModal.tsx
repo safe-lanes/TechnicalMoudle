@@ -49,13 +49,27 @@ export function BulkApproveModal({
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
-  const pendingApprovalWOs = useMemo(() => {
+  // Bulk approve is scoped to ON-TIME completions only: standard tier, zero
+  // missed cycles. Tiered/locked WOs carry per-WO mandatory remarks or a
+  // Superintendent lock (Layer 5) and must be approved individually — the
+  // server enforces this too; this filter is the UX side of the same rule.
+  const allPendingWOs = useMemo(() => {
     return workOrders.filter(
       (wo) =>
         (wo as any).computedStatus === "Pending Approval" ||
         wo.status === "Pending Approval",
     );
   }, [workOrders]);
+
+  const pendingApprovalWOs = useMemo(() => {
+    return allPendingWOs.filter(
+      (wo) =>
+        (!wo.approvalTier || wo.approvalTier === "standard") &&
+        ((wo as any).missedCycles ?? 0) === 0,
+    );
+  }, [allPendingWOs]);
+
+  const excludedTieredCount = allPendingWOs.length - pendingApprovalWOs.length;
 
   const filteredWOs = useMemo(() => {
     if (!searchTerm.trim()) return pendingApprovalWOs;
@@ -305,7 +319,12 @@ export function BulkApproveModal({
           </DialogTitle>
           <DialogDescription>
             Select work orders to approve or reject.{" "}
-            {pendingApprovalWOs.length} work orders pending approval.
+            {pendingApprovalWOs.length} on-time work orders eligible for bulk approval.
+            {excludedTieredCount > 0 && (
+              <span className="block text-amber-700 mt-1" data-testid="text-bulk-excluded-tiered">
+                {excludedTieredCount} late/tiered work order{excludedTieredCount !== 1 ? "s" : ""} excluded — these require individual approval with remarks (open each from the Pending Approval tab).
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 

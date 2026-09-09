@@ -77,12 +77,27 @@ export async function findByCodeAndVessel(
   return results.find(c => c.componentCode === componentCode && c.isActive !== false);
 }
 
+export async function findByNameAndVessel(
+  name: string,
+  vesselId: string,
+  excludeId?: string
+): Promise<Component | undefined> {
+  const results = await storage.getComponents(vesselId);
+  const normalised = name.trim().toLowerCase();
+  return results.find(
+    c =>
+      c.name?.trim().toLowerCase() === normalised &&
+      c.isActive !== false &&
+      c.id !== excludeId
+  );
+}
+
 export async function update(id: string, data: Partial<Component>): Promise<Component> {
   return storage.updateComponent(id, data);
 }
 
-export async function remove(id: string): Promise<void> {
-  return storage.deleteComponent(id);
+export async function remove(id: string, userId?: string): Promise<void> {
+  return storage.deleteComponent(id, userId);
 }
 
 // Audit Phase 1 — thin passthrough so the service can record register-change audits
@@ -92,8 +107,8 @@ export async function createAuditLog(data: any): Promise<any> {
   return storage.createAuditLog(data);
 }
 
-export async function inactivate(id: string, vesselId: string, userId: string) {
-  return storage.inactivateComponent(id, vesselId, userId);
+export async function inactivate(id: string, vesselId: string, userId: string, apply = true) {
+  return storage.inactivateComponent(id, vesselId, userId, apply);
 }
 
 export async function bulkUpsert(components: InsertComponent[]): Promise<{ created: number; updated: number }> {

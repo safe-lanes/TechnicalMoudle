@@ -23,8 +23,8 @@ export async function updateSpare(id: string, data: Partial<Spare>): Promise<Spa
   return storage.updateSpare(id, data);
 }
 
-export async function deleteSpare(id: string): Promise<void> {
-  return storage.deleteSpare(id);
+export async function deleteSpare(id: string, userId?: string): Promise<void> {
+  return storage.deleteSpare(id, userId);
 }
 
 // ── Consume / Receive / Adjust ──

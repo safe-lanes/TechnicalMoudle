@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { storage } from '../../../storage';
-import { getDb } from '../../../db';
+import { getDb, getPool } from '../../../db';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { buildExternalMasterDataUrl, getExternalMasterDataBaseUrl } from '../../../config/externalApi';
@@ -20,6 +20,67 @@ import {
   mocApprovers,
 } from '@shared/schema';
 
+export interface MasterSyncStats {
+  inserted: number;
+  updated: number;
+  deleted: number;
+  skipped: number;
+  errors: string[];
+}
+
+/**
+ * Convert the deletion flag formats used by the external master-data feeds to
+ * one safe boolean. Unknown and missing values are treated as live records so
+ * a malformed payload cannot accidentally tombstone local data.
+ */
+export function normalizeSourceDeletionState(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1';
+  }
+  return false;
+}
+
+export function getSourceDeletionState(entry: any): boolean {
+  if (entry && entry.isDeleted !== undefined && entry.isDeleted !== null) {
+    return normalizeSourceDeletionState(entry.isDeleted);
+  }
+  return normalizeSourceDeletionState(entry?.is_deleted);
+}
+
+async function upsertMasterRecord(
+  db: any,
+  table: any,
+  id: string,
+  insertValues: Record<string, any>,
+  updateValues: Record<string, any>,
+  isDeleted: boolean,
+  stats: MasterSyncStats,
+): Promise<void> {
+  const existing = await db
+    .select({ id: table.id })
+    .from(table)
+    .where(eq(table.id, id))
+    .limit(1);
+
+  await db.insert(table).values(insertValues).onConflictDoUpdate({
+    target: table.id,
+    set: updateValues,
+  });
+
+  // Deletion is an outcome category of its own. This keeps the Sync All
+  // summary mutually exclusive and makes first-seen tombstones visible too.
+  if (isDeleted) {
+    stats.deleted++;
+  } else if (existing.length > 0) {
+    stats.updated++;
+  } else {
+    stats.inserted++;
+  }
+}
+
 // ── GET/POST /admin/job-due-scan ──
 
 export async function jobDueScan(req: Request, res: Response) {
@@ -28,7 +89,26 @@ export async function jobDueScan(req: Request, res: Response) {
   const vesselId = req.body?.vesselId;
   console.log(`🔍 Manual job due scan triggered${vesselId ? ` for vessel: ${vesselId}` : ' for ALL vessels'}`);
 
-  const results = await jobDueScanner.runScan();
+  // SHORE gating (migration 161): this admin endpoint used to invoke runScan() for ALL
+  // vessels and ignored the supplied vesselId entirely. On shore it now requires a
+  // specific vessel AND that vessel's office-generation switch to be ON. Ship instances
+  // keep the original ungated behavior (their scanner is the normal writer).
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (!(await isShipInstance())) {
+    if (!vesselId || typeof vesselId !== 'string') {
+      return res.status(400).json({ success: false, message: 'A specific vesselId is required to run a job due scan from the office.' });
+    }
+    const { isOfficeWoGenerationEnabled } = await import('../../work-orders/services/workOrderGenerationGate');
+    if (!(await isOfficeWoGenerationEnabled(vesselId))) {
+      return res.status(403).json({
+        success: false,
+        error: 'OFFICE_GENERATION_DISABLED',
+        message: 'Office work-order generation is not enabled for this vessel. A Sail Admin can enable it per vessel on the Lead Time & Grace Period Settings screen.',
+      });
+    }
+  }
+
+  const results = await jobDueScanner.runScan(typeof vesselId === 'string' ? vesselId : undefined);
   console.log('✅ Manual job due scan completed:', results);
 
   res.json({
@@ -328,13 +408,13 @@ export async function syncMasters(req: Request, res: Response) {
   }
 
   const stats = {
-    vessels: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
-    vesselTypes: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
-    additionalGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
-    ports: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
-    users: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
-    fleetGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
-    approvers: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
+    vessels: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] as string[] },
+    vesselTypes: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] as string[] },
+    additionalGroups: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] as string[] },
+    ports: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] as string[] },
+    users: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] as string[] },
+    fleetGroups: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] as string[] },
+    approvers: { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: [] as string[] },
   };
 
   const fetchExternal = async (endpoint: string, key: string) => {
@@ -391,29 +471,35 @@ export async function syncMasters(req: Request, res: Response) {
       const name = getFieldValue(v, ['vessel', 'vesselName', 'name']) || 'Unknown';
       const imoNumber = getFieldValue(v, ['imo_number', 'imoNumber', 'imo_no', 'imo']);
       const vesselType = getFieldValue(v, ['vessel_type_name', 'vesselTypeName', 'vessel_type', 'vesselType', 'type']);
-      await db.insert(vesselsTable).values({
-        id: entryId,
-        vuuid: entryId,
-        name,
-        code: entryId,
-        imoNumber,
-        vesselType,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      }).onConflictDoUpdate({
-        target: vesselsTable.id,
-        set: {
+      const isDeleted = getSourceDeletionState(v);
+      const externalVCode = getFieldValue(v, ['v_code']);
+      const vCodeValue = externalVCode && externalVCode.trim().length > 0
+        ? externalVCode.trim()
+        : null;
+      const vCodeFields = vCodeValue === null ? {} : { vCode: vCodeValue };
+      await upsertMasterRecord(db, vesselsTable, entryId, {
+          id: entryId,
+          vuuid: entryId,
           name,
           code: entryId,
           imoNumber,
           vesselType,
-          isActive: true,
+          isActive: !isDeleted,
+          isDeleted,
+          createdAt: now,
+          updatedAt: now,
+          ...vCodeFields,
+        }, {
+          name,
+          code: entryId,
+          imoNumber,
+          vesselType,
+          isActive: !isDeleted,
+          isDeleted,
           updatedAt: now,
           vuuid: sql`COALESCE(${vesselsTable.vuuid}, EXCLUDED.vuuid)`,
-        },
-      });
-      stats.vessels.updated++;
+          ...vCodeFields,
+        }, isDeleted, stats.vessels);
     } catch (e: any) { stats.vessels.errors.push(`Vessel ${v.vuid || v.vesselId}: ${e.message}`); }
   }
 
@@ -431,6 +517,7 @@ export async function syncMasters(req: Request, res: Response) {
       const entryId = getEntryId(vt, ['vtuid', 'id', 'vesselTypeId']);
       if (!entryId) { stats.vesselTypes.skipped++; continue; }
       const name = getFieldValue(vt, ['vesselType', 'vesselTypeName', 'name', 'type_name']) || 'Unknown';
+      const isDeleted = getSourceDeletionState(vt);
       const classifications: string[] = [];
       if (vt.tanker === 1) classifications.push('Tanker');
       if (vt.oilTanker === 1) classifications.push('Oil');
@@ -439,17 +526,14 @@ export async function syncMasters(req: Request, res: Response) {
       if (vt.dry === 1) classifications.push('Dry');
       if (vt.container === 1) classifications.push('Container');
       const classification = classifications.length > 0 ? classifications.join(', ') : null;
-      await db.insert(vesselTypesTable).values({
+      await upsertMasterRecord(db, vesselTypesTable, entryId, {
         id: entryId,
         name,
         classification,
         syncedAt: now,
         updatedAt: now,
-      }).onConflictDoUpdate({
-        target: vesselTypesTable.id,
-        set: { name, classification, syncedAt: now, updatedAt: now },
-      });
-      stats.vesselTypes.updated++;
+        isDeleted,
+      }, { name, classification, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.vesselTypes);
     } catch (e: any) { stats.vesselTypes.errors.push(`VesselType ${vt.vtuid}: ${e.message}`); }
   }
 
@@ -468,17 +552,15 @@ export async function syncMasters(req: Request, res: Response) {
       if (!entryId) { stats.additionalGroups.skipped++; continue; }
       const name = getFieldValue(ag, ['group_name', 'groupName', 'name', 'additional_group_name']) || 'Unknown';
       const description = getFieldValue(ag, ['vessels', 'group_description', 'desc']);
-      await db.insert(additionalGroupsTable).values({
+      const isDeleted = getSourceDeletionState(ag);
+      await upsertMasterRecord(db, additionalGroupsTable, entryId, {
         id: entryId,
         name,
         description,
         syncedAt: now,
         updatedAt: now,
-      }).onConflictDoUpdate({
-        target: additionalGroupsTable.id,
-        set: { name, description, syncedAt: now, updatedAt: now },
-      });
-      stats.additionalGroups.updated++;
+        isDeleted,
+      }, { name, description, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.additionalGroups);
     } catch (e: any) { stats.additionalGroups.errors.push(`AdditionalGroup ${ag.id}: ${e.message}`); }
   }
 
@@ -497,17 +579,15 @@ export async function syncMasters(req: Request, res: Response) {
       if (!entryId) { stats.ports.skipped++; continue; }
       const name = getFieldValue(p, ['port_name', 'portName', 'name']) || 'Unknown';
       const country = getFieldValue(p, ['country_name', 'countryName', 'country']);
-      await db.insert(portsTable).values({
+      const isDeleted = getSourceDeletionState(p);
+      await upsertMasterRecord(db, portsTable, entryId, {
         id: entryId,
         name,
         country,
         syncedAt: now,
         updatedAt: now,
-      }).onConflictDoUpdate({
-        target: portsTable.id,
-        set: { name, country, syncedAt: now, updatedAt: now },
-      });
-      stats.ports.updated++;
+        isDeleted,
+      }, { name, country, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.ports);
     } catch (e: any) { stats.ports.errors.push(`Port ${p.puid}: ${e.message}`); }
   }
 
@@ -530,7 +610,8 @@ export async function syncMasters(req: Request, res: Response) {
       const userType = getFieldValue(u, ['user_type', 'userType', 'type']);
       const department = getFieldValue(u, ['department', 'department_name', 'dept']);
       const email = getFieldValue(u, ['email', 'email_address', 'user_email']);
-      await db.insert(masterUsersTable).values({
+      const isDeleted = getSourceDeletionState(u);
+      await upsertMasterRecord(db, masterUsersTable, entryId, {
         id: entryId,
         fullName,
         role,
@@ -540,11 +621,8 @@ export async function syncMasters(req: Request, res: Response) {
         email,
         syncedAt: now,
         updatedAt: now,
-      }).onConflictDoUpdate({
-        target: masterUsersTable.id,
-        set: { fullName, role, designation, userType, department, email, syncedAt: now, updatedAt: now },
-      });
-      stats.users.updated++;
+        isDeleted,
+      }, { fullName, role, designation, userType, department, email, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.users);
     } catch (e: any) { stats.users.errors.push(`User ${u.uuid}: ${e.message}`); }
   }
 
@@ -563,17 +641,15 @@ export async function syncMasters(req: Request, res: Response) {
       if (!entryId) { stats.fleetGroups.skipped++; continue; }
       const name = getFieldValue(fg, ['fleet_group_name', 'fleetGroupName', 'name', 'group_name']) || 'Unknown';
       const description = getFieldValue(fg, ['vessels', 'fleet_group_description', 'desc']);
-      await db.insert(fleetGroupsTable).values({
+      const isDeleted = getSourceDeletionState(fg);
+      await upsertMasterRecord(db, fleetGroupsTable, entryId, {
         id: entryId,
         name,
         description,
         syncedAt: now,
         updatedAt: now,
-      }).onConflictDoUpdate({
-        target: fleetGroupsTable.id,
-        set: { name, description, syncedAt: now, updatedAt: now },
-      });
-      stats.fleetGroups.updated++;
+        isDeleted,
+      }, { name, description, syncedAt: now, updatedAt: now, isDeleted }, isDeleted, stats.fleetGroups);
     } catch (e: any) { stats.fleetGroups.errors.push(`FleetGroup ${fg.fleet_group_id}: ${e.message}`); }
   }
 
@@ -599,47 +675,16 @@ export async function syncMasters(req: Request, res: Response) {
     stats.approvers.errors.push(`Fetch failed: ${e.message}`);
   }
   if (approverFetchSucceeded) {
-    // Soft-delete all previously synced Technical approvers so stale records don't linger.
-    // This runs even when the API returns zero records — an empty result is still a valid
-    // response and should clear out any stale synced data.
+    // Atomic natural-key reconcile (replaces the old soft-delete-then-blind-insert,
+    // which minted a fresh mauuid per run, could stack duplicates when the cleanup
+    // failed or a manual row existed, and churned N tombstones + M inserts to every
+    // vessel through the ONE_WAY mirror each run). All-or-nothing: a failure leaves
+    // the previous approver state fully intact.
     try {
-      await db.update(mocApprovers)
-        .set({ isDeleted: true, updatedAt: now })
-        .where(and(eq(mocApprovers.isSync, true), eq(mocApprovers.isDeleted, false)));
+      await reconcileApprovers(fetchedApprovers, now, stats.approvers);
     } catch (e: any) {
-      console.error(`[syncMasters] Failed to soft-delete stale approvers: ${e.message}`);
-    }
-    // Filter to Technical module only (matches useLocalApprovers read filter)
-    const technicalApprovers = fetchedApprovers.filter(
-      (a: any) => (a.modulename || a.moduleName || '') === 'Technical'
-    );
-    for (const a of technicalApprovers) {
-      try {
-        const userId = getFieldValue(a, ['userId', 'user_id', 'uid']);
-        if (!userId) { stats.approvers.skipped++; continue; }
-        const name = getFieldValue(a, ['name', 'fullname', 'fullName', 'userName']) || null;
-        const userUuid = getFieldValue(a, ['userUuid', 'user_uuid', 'uuid']) || null;
-        const approverLevel = getFieldValue(a, ['approverLevel', 'approver_level', 'level']) || null;
-        const emailId = getFieldValue(a, ['emailId', 'email_id', 'email']) || null;
-        const modulename = getFieldValue(a, ['modulename', 'moduleName']) || 'Technical';
-        const isActiveRaw = a.isActive ?? a.is_active;
-        const isActive = isActiveRaw === 1 || isActiveRaw === true ? 1 : 0;
-        await db.insert(mocApprovers).values({
-          name,
-          userId,
-          userUuid,
-          approverLevel,
-          emailId,
-          isActive,
-          modulename,
-          isSync: true,
-          isDeleted: false,
-          updatedAt: now,
-        });
-        stats.approvers.inserted++;
-      } catch (e: any) {
-        stats.approvers.errors.push(`Approver ${a.userId || a.user_id}: ${e.message}`);
-      }
+      console.error(`[syncMasters] Approver reconcile failed (state unchanged): ${e.message}`);
+      stats.approvers.errors.push(`Reconcile failed (rolled back): ${e.message}`);
     }
   }
 
@@ -650,6 +695,162 @@ export async function syncMasters(req: Request, res: Response) {
     message: 'Master data sync completed successfully',
     statistics: stats
   });
+}
+
+/**
+ * Atomic natural-key reconcile of moc_approvers against a fetched SAILERP payload.
+ * Exported for the test harness; syncMasters step 7 is the production caller.
+ *
+ * Semantics (office is master; ONE_WAY mirror ships the result fleet-wide):
+ *  - Upsert each fetched Technical approver by the natural key
+ *    (user_id, approver_level, modulename), including tombstones. An existing
+ *    row (synced OR manual) is UPDATED in place, PRESERVING its mauuid — so
+ *    restored source records do not create a replacement identity. A matched
+ *    manual row is adopted (is_sync=true): manual and synced copies of the
+ *    same approver cannot coexist.
+ *  - Tombstone previously-synced ACTIVE Technical rows absent from the fetch
+ *    (updated_at stamped so the eviction mirrors). Manual-only rows the master
+ *    doesn't know about are left untouched.
+ *  - A fetched source tombstone is immediately marked deleted and inactive,
+ *    rather than being refreshed as an active approver.
+ *  - Approvers without a userId OR without an approverLevel are skipped (counted):
+ *    a level-less approver can never satisfy verifyApproverForLevel, and NULLs
+ *    bypass the unique index (NULLs are distinct) — inserting them would reopen
+ *    the duplicate hole.
+ *  - ONE transaction: any failure rolls back everything (no partial state).
+ */
+export async function reconcileApprovers(
+  fetchedApprovers: any[],
+  now: Date,
+  stats: Omit<MasterSyncStats, 'deleted'> & { deleted?: number },
+): Promise<void> {
+  // Self-contained field reader (the syncMasters getFieldValue is function-scoped).
+  const getFieldValue = (entry: any, fields: string[]): string | null => {
+    for (const field of fields) {
+      if (entry[field] !== undefined && entry[field] !== null) return String(entry[field]);
+    }
+    return null;
+  };
+
+  const pool = await getPool();
+  const client = await pool.connect();
+
+  // Normalize + filter OUTSIDE the transaction (no partial state on bad payload shapes).
+  const technical = fetchedApprovers.filter(
+    (a: any) => (a.modulename || a.moduleName || '') === 'Technical'
+  );
+  const rows: Array<{
+    name: string | null;
+    userId: string;
+    userUuid: string | null;
+    approverLevel: string;
+    emailId: string | null;
+    modulename: string;
+    isActive: number;
+    isDeleted: boolean;
+  }> = [];
+  for (const a of technical) {
+    const userId = getFieldValue(a, ['userId', 'user_id', 'uid']);
+    const approverLevel = getFieldValue(a, ['approverLevel', 'approver_level', 'level']) || null;
+    if (!userId || !approverLevel) { stats.skipped++; continue; }
+    const isActiveRaw = a.isActive ?? a.is_active;
+    const isDeleted = getSourceDeletionState(a);
+    rows.push({
+      name: getFieldValue(a, ['name', 'fullname', 'fullName', 'userName']) || null,
+      userId,
+      userUuid: getFieldValue(a, ['userUuid', 'user_uuid', 'uuid']) || null,
+      approverLevel,
+      emailId: getFieldValue(a, ['emailId', 'email_id', 'email']) || null,
+      modulename: getFieldValue(a, ['modulename', 'moduleName']) || 'Technical',
+      isActive: isDeleted ? 0 : (normalizeSourceDeletionState(isActiveRaw) ? 1 : 0),
+      isDeleted,
+    });
+  }
+  // A stable ordering keeps the per-row write path deterministic too. The
+  // transaction-level advisory lock below also serializes its final eviction.
+  rows.sort((left, right) => (
+    `${left.userId}\u0000${left.approverLevel}\u0000${left.modulename}`
+      .localeCompare(`${right.userId}\u0000${right.approverLevel}\u0000${right.modulename}`)
+  ));
+
+  try {
+    await client.query('BEGIN');
+    // The natural-key index deliberately excludes tombstones, so it cannot
+    // serialize two reconcilers inserting the same source-deleted record.
+    // Lock the authoritative Technical reconcile as a unit: that covers both
+    // its per-key upserts and the final "absent from source" eviction.
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('moc_approvers:Technical:reconcile'))`);
+
+    for (const r of rows) {
+      // The partial unique index only covers live rows. Look up the natural key
+      // first so a source restore updates its existing tombstone in place.
+      const existing = await client.query(
+        `SELECT id
+           FROM moc_approvers
+          WHERE user_id = $1 AND approver_level = $2 AND modulename = $3
+          ORDER BY
+            CASE WHEN COALESCE(is_deleted, false) THEN 1 ELSE 0 END,
+            updated_at DESC NULLS LAST,
+            id DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [r.userId, r.approverLevel, r.modulename],
+      );
+      if (existing.rows[0]) {
+        await client.query(
+          `UPDATE moc_approvers
+              SET name = $1,
+                  user_uuid = $2,
+                  email_id = $3,
+                  is_active = $4,
+                  is_sync = true,
+                  is_deleted = $5,
+                  updated_at = $6
+            WHERE id = $7`,
+          [r.name, r.userUuid, r.emailId, r.isActive, r.isDeleted, now, existing.rows[0].id],
+        );
+      } else {
+        await client.query(
+          `INSERT INTO moc_approvers
+             (name, user_id, user_uuid, approver_level, email_id, modulename, is_active, is_sync, is_deleted, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8,$9)`,
+          [r.name, r.userId, r.userUuid, r.approverLevel, r.emailId, r.modulename, r.isActive, r.isDeleted, now],
+        );
+      }
+
+      if (r.isDeleted) {
+        stats.deleted = (stats.deleted ?? 0) + 1;
+      } else if (existing.rows[0]) {
+        stats.updated++;
+      } else {
+        stats.inserted++;
+      }
+    }
+
+    // Tombstone previously-synced ACTIVE Technical rows the master no longer lists.
+    // Runs on an empty fetch too (valid response = clear stale synced data — the
+    // old semantics, kept). Manual rows (is_sync=false) not in the fetch are kept.
+    let evictSql =
+      `UPDATE moc_approvers SET is_deleted = true, is_active = 0, updated_at = $1
+        WHERE is_sync = true AND COALESCE(is_deleted, false) = false AND modulename = 'Technical'`;
+    const evictParams: any[] = [now];
+    if (rows.length > 0) {
+      const keyPlaceholders = rows
+        .map((_, i) => `($${i * 2 + 2}, $${i * 2 + 3})`)
+        .join(', ');
+      evictSql += ` AND (user_id, approver_level) NOT IN (${keyPlaceholders})`;
+      rows.forEach((r) => evictParams.push(r.userId, r.approverLevel));
+    }
+    const evicted = await client.query(`${evictSql} RETURNING id`, evictParams);
+    stats.deleted = (stats.deleted ?? 0) + (evicted.rowCount ?? 0);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* non-fatal */ }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ── POST /admin/populate-postponement-history ──
@@ -873,6 +1074,11 @@ export async function rhDiagnostic(req: Request, res: Response) {
 
 // ── POST /admin/repair-rh-tracking ──
 
+// DELIBERATE LOCAL-ONLY REPAIR (mig-138 class; plan §9.3, reviewed 2026-07-23): the
+// nextDueReading corrections below write work_orders DIRECTLY and are intentionally NOT
+// field-logged. Each instance derives the correct values from its OWN jobs/links and runs
+// the repair itself — syncing 'system'-authored repairs would recreate the false-conflict
+// class (the removed status-recalculator lesson). Do NOT add logFieldChanges here.
 export async function repairRhTracking(req: Request, res: Response) {
   const vesselId = req.body?.vesselId || req.query.vesselId;
   const dryRun = req.body?.dryRun !== false;

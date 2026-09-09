@@ -1,12 +1,15 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Loader2, Save, ChevronRight, ChevronDown, ShieldCheck } from "lucide-react";
+import { Loader2, Save, ChevronRight, ChevronDown, ShieldCheck, ShoppingCart, MonitorCog, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 
 interface Role {
   id: number;
@@ -150,6 +153,48 @@ export default function AccessControl() {
     return (p.canView || p.canCreate || p.canEdit || p.canDelete) && !isAllChecked(muid);
   };
 
+  // All menu ids in the tree (parents + all nested descendants).
+  const allMenuMuids = useMemo(() => {
+    const ids: string[] = [];
+    const walk = (nodes: MenuTreeNode[]) => {
+      for (const node of nodes) {
+        ids.push(node.muid);
+        walk(node.children);
+      }
+    };
+    walk(menuTree);
+    return ids;
+  }, [menuTree]);
+
+  const toggleGlobalSelectAll = (checked: boolean) => {
+    const newPerms = { ...effectivePermissions };
+    for (const muid of allMenuMuids) {
+      newPerms[muid] = {
+        menuMuid: muid,
+        canView: checked,
+        canCreate: checked,
+        canEdit: checked,
+        canDelete: checked,
+      };
+    }
+    setPermissions(newPerms);
+    setIsDirty(true);
+  };
+
+  const globalCheckState: boolean | "indeterminate" = useMemo(() => {
+    if (allMenuMuids.length === 0) return false;
+    let checkedCount = 0;
+    let anyChecked = false;
+    for (const muid of allMenuMuids) {
+      const p = effectivePermissions[muid];
+      if (!p) continue;
+      if (p.canView || p.canCreate || p.canEdit || p.canDelete) anyChecked = true;
+      if (p.canView && p.canCreate && p.canEdit && p.canDelete) checkedCount++;
+    }
+    if (checkedCount === allMenuMuids.length) return true;
+    return anyChecked ? "indeterminate" : false;
+  }, [allMenuMuids, effectivePermissions]);
+
   const toggleExpand = (muid: string) => {
     setExpandedParents((prev) => {
       const next = new Set(prev);
@@ -191,6 +236,9 @@ export default function AccessControl() {
         </div>
         <p className="text-sm text-gray-500 mt-1">Manage role-based menu permissions</p>
       </div>
+
+      <ShipskartRoleMappingCard roles={rolesQuery.data ?? []} />
+      <RoleViewModeMappingCard />
 
       <div className="flex-1 flex gap-4 min-h-0">
         <div className="w-64 flex-shrink-0 bg-white rounded-lg border border-gray-200 flex flex-col" data-testid="roles-panel">
@@ -239,6 +287,15 @@ export default function AccessControl() {
                 <h2 className="text-sm font-semibold text-gray-700">
                   Permissions for: <span className="text-blue-600">{selectedRole?.assignedRole}</span>
                 </h2>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-600 uppercase">
+                  <span>Select All</span>
+                  <Checkbox
+                    checked={globalCheckState}
+                    onCheckedChange={(checked) => toggleGlobalSelectAll(checked === true)}
+                    aria-label="Select all permissions for all menu items"
+                    data-testid="checkbox-global-select-all"
+                  />
+                </label>
               </div>
 
               <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
@@ -346,6 +403,300 @@ export default function AccessControl() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Shipskart Role Mapping (Purchasing SSO) ─────────────────────────────────
+// UI-configurable, MANY-TO-ONE: several SAIL roles may map to the same Shipskart
+// role. The dropdown options come from GET /shipskart/role-mappings.availableRoles —
+// the single role-source seam, which now returns the tenant's LIVE Shipskart roles
+// (fetched from their get-all-roles API) — NEVER hardcode the list here. A saved row
+// whose role is not in that live list comes back flagged `stale` and is shown as
+// "needs remapping": those users are blocked from Purchasing until it is fixed. Unmapped roles are BLOCKED from Purchasing with the
+// existing "not available for your role" panel (block-not-default by design).
+// Visible/editable only for Sail Admin / Super Admin (backend re-checks on PUT).
+
+const UNMAPPED = "__unmapped__";
+
+interface RoleMappingData {
+  availableRoles: string[];
+  mappings: Array<{ sailRole: string; shipskartRole: string; stale?: boolean }>;
+  staleCount?: number;
+}
+
+// ── Role → View-Mode Mapping (Task #324) ────────────────────────────────────
+// UI-configurable, DB-driven replacement for the hardcoded role→view-mode logic.
+// Rows/options come from GET /admin/role-view-mappings. Unmap = block-not-default:
+// unmapped roles cannot enter the app until an admin maps them. The Office/Sail
+// Admin row is LOCKED (hardcoded bypass; backend rejects edits). Shore-only —
+// hidden on ships (mappings arrive via sync), same gating as the Shipskart card.
+
+interface RoleViewMappingData {
+  availableModes: Array<{ code: string; displayName: string }>;
+  mappings: Array<{ roleRuid: string; roleName: string; roletype: string; viewModeCode: string | null }>;
+}
+
+function RoleViewModeMappingCard() {
+  const { hasRole } = useAuth();
+  const { toast } = useToast();
+  const { isShore } = useSyncInstanceInfo();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState(false);
+
+  const canEdit = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
+
+  const mappingQuery = useQuery<RoleViewMappingData>({
+    queryKey: ["/technical/api/admin/role-view-mappings"],
+    enabled: canEdit && open,
+  });
+
+  useEffect(() => {
+    if (!mappingQuery.data || dirty) return;
+    const next: Record<string, string> = {};
+    for (const m of mappingQuery.data.mappings) next[m.roleRuid] = m.viewModeCode ?? UNMAPPED;
+    setDraft(next);
+  }, [mappingQuery.data, dirty]);
+
+  const rows = mappingQuery.data?.mappings ?? [];
+  const modes = mappingQuery.data?.availableModes ?? [];
+  const isLockedSailAdmin = (r: { roleName: string; roletype: string }) =>
+    r.roletype === "Office" && r.roleName === "Sail Admin";
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      // Only send CHANGED, editable rows (backend rejects the Sail Admin row).
+      const mappings = rows
+        .filter((r) => !isLockedSailAdmin(r))
+        .filter((r) => (draft[r.roleRuid] ?? UNMAPPED) !== (r.viewModeCode ?? UNMAPPED))
+        .map((r) => ({
+          roleRuid: r.roleRuid,
+          viewModeCode: draft[r.roleRuid] && draft[r.roleRuid] !== UNMAPPED ? draft[r.roleRuid] : null,
+        }));
+      const res = await apiRequest("PUT", "/technical/api/admin/role-view-mappings", { mappings });
+      return res.json();
+    },
+    onSuccess: () => {
+      setDirty(false);
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/admin/role-view-mappings"] });
+      // Resolve results may have changed for any role — drop all cached resolves.
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          typeof q.queryKey?.[0] === "string" &&
+          (q.queryKey[0] as string).startsWith("/technical/api/admin/role-view-mappings/resolve"),
+      });
+      toast({ title: "Role view-mode mapping saved" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not save mapping", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  if (!canEdit) return null;
+
+  return (
+    <div className="flex-shrink-0 mb-4 border border-gray-200 rounded-lg bg-white" data-testid="role-view-mode-mapping-card">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full px-4 py-3 flex items-center gap-2 text-left"
+        data-testid="view-mode-mapping-toggle"
+      >
+        {open ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+        <MonitorCog className="h-4 w-4 text-blue-600" />
+        <span className="font-semibold text-gray-900">Role View-Mode Mapping</span>
+        <span className="text-xs text-gray-500 ml-2">Which app view mode each role gets — unmapped roles are blocked from entry</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4">
+          {mappingQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-gray-500 py-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading mapping…</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 max-h-64 overflow-y-auto pr-2">
+                {rows.map((r) => {
+                  const locked = isLockedSailAdmin(r);
+                  return (
+                    <div key={r.roleRuid} className="flex items-center justify-between gap-3 py-1" data-testid={`view-mode-row-${r.roleRuid}`}>
+                      <div className="min-w-0 flex items-center gap-1.5">
+                        <span className="text-sm text-gray-900">{r.roleName}</span>
+                        <span className="text-xs text-gray-400">{r.roletype}</span>
+                        {locked && <Lock className="h-3 w-3 text-gray-400" aria-label="Locked" />}
+                      </div>
+                      {locked ? (
+                        <span className="text-sm text-gray-500 w-44 text-right pr-1" data-testid={`view-mode-locked-${r.roleRuid}`}>Sail Admin (locked)</span>
+                      ) : (
+                        <Select
+                          value={draft[r.roleRuid] ?? UNMAPPED}
+                          onValueChange={(v) => { setDraft((d) => ({ ...d, [r.roleRuid]: v })); setDirty(true); }}
+                        >
+                          <SelectTrigger className="w-44 h-8" data-testid={`view-mode-select-${r.roleRuid}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={UNMAPPED}>— not mapped (blocked) —</SelectItem>
+                            {modes.map((m) => (
+                              <SelectItem key={m.code} value={m.code}>{m.displayName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-end mt-3">
+                <Button
+                  size="sm"
+                  onClick={() => saveMutation.mutate()}
+                  disabled={!dirty || saveMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  data-testid="btn-save-view-mode-mapping"
+                >
+                  {saveMutation.isPending ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>) : (<><Save className="mr-2 h-4 w-4" />Save Mapping</>)}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ShipskartRoleMappingCard({ roles }: { roles: Array<{ assignedRole: string; roletype: string; isActive: boolean }> }) {
+  const { hasRole } = useAuth();
+  const { toast } = useToast();
+  // Shore-only: Shipskart Purchasing needs the shore env config; ships have the table
+  // (migration 136) but the feature cannot work there, so hide the card entirely
+  // (same gating pattern as the Fleet Sync Overview menu entry in SideMenuBar).
+  const { isShore } = useSyncInstanceInfo();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState(false);
+
+  const canEdit = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
+
+  const mappingQuery = useQuery<RoleMappingData>({
+    queryKey: ["/technical/api/shipskart/role-mappings"],
+    enabled: canEdit && open,
+  });
+
+  // Hydrate the draft from the server state whenever fresh data arrives (unless mid-edit).
+  useEffect(() => {
+    if (!mappingQuery.data || dirty) return;
+    const next: Record<string, string> = {};
+    for (const m of mappingQuery.data.mappings) next[m.sailRole] = m.shipskartRole;
+    setDraft(next);
+  }, [mappingQuery.data, dirty]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const mappings = sailRoles.map((r) => ({
+        sailRole: r.assignedRole,
+        shipskartRole: draft[r.assignedRole] && draft[r.assignedRole] !== UNMAPPED ? draft[r.assignedRole] : null,
+      }));
+      const res = await apiRequest("PUT", "/technical/api/shipskart/role-mappings", { mappings });
+      return res.json();
+    },
+    onSuccess: () => {
+      setDirty(false);
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/shipskart/role-mappings"] });
+      toast({ title: "Shipskart role mapping saved" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not save mapping", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  const sailRoles = useMemo(
+    () => roles.filter((r) => r.isActive).sort((a, b) => a.roletype.localeCompare(b.roletype) || a.assignedRole.localeCompare(b.assignedRole)),
+    [roles]
+  );
+
+  if (!canEdit) return null;
+
+  const available = mappingQuery.data?.availableRoles ?? [];
+  const staleRows = (mappingQuery.data?.mappings ?? []).filter((m) => m.stale);
+  // Live role names arrive already formatted (e.g. WAH-KWONG-PUCHASER); only the old
+  // lowercase names needed prettifying, so leave anything containing a capital alone.
+  const label = (s: string) => (/[A-Z]/.test(s) ? s : s.charAt(0).toUpperCase() + s.slice(1));
+
+  return (
+    <div className="flex-shrink-0 mb-4 border border-gray-200 rounded-lg bg-white" data-testid="shipskart-role-mapping-card">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full px-4 py-3 flex items-center gap-2 text-left"
+        data-testid="shipskart-mapping-toggle"
+      >
+        {open ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+        <ShoppingCart className="h-4 w-4 text-blue-600" />
+        <span className="font-semibold text-gray-900">Shipskart Role Mapping</span>
+        <span className="text-xs text-gray-500 ml-2">Purchasing SSO — which Shipskart role each SAIL role opens (many-to-one allowed)</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4">
+          {mappingQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-gray-500 py-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading mapping…</div>
+          ) : (
+            <>
+              {available.length === 0 && (
+                <div className="mb-3 px-3 py-2 rounded border border-amber-300 bg-amber-50 text-sm text-amber-800" data-testid="shipskart-roles-unavailable">
+                  Shipskart roles could not be loaded, so there is nothing to choose from. Check the
+                  Shipskart connection before mapping — saving is blocked until roles are available.
+                </div>
+              )}
+              {staleRows.length > 0 && (
+                <div className="mb-3 px-3 py-2 rounded border border-red-300 bg-red-50 text-sm text-red-800" data-testid="shipskart-mapping-stale">
+                  {staleRows.length} mapping{staleRows.length > 1 ? "s" : ""} point{staleRows.length > 1 ? "" : "s"} at a
+                  Shipskart role this tenant no longer has ({staleRows.map((m) => `${m.sailRole} → ${m.shipskartRole}`).join(", ")}).
+                  Users on {staleRows.length > 1 ? "those roles are" : "that role are"} blocked from Purchasing — please remap
+                  {staleRows.length > 1 ? " them" : " it"}.
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 max-h-64 overflow-y-auto pr-2">
+                {sailRoles.map((r) => (
+                  <div key={r.assignedRole} className="flex items-center justify-between gap-3 py-1" data-testid={`mapping-row-${r.assignedRole}`}>
+                    <div className="min-w-0">
+                      <span className="text-sm text-gray-900">{r.assignedRole}</span>
+                      <span className="ml-2 text-xs text-gray-400">{r.roletype}</span>
+                    </div>
+                    <Select
+                      value={draft[r.assignedRole] ?? UNMAPPED}
+                      onValueChange={(v) => { setDraft((d) => ({ ...d, [r.assignedRole]: v })); setDirty(true); }}
+                    >
+                      <SelectTrigger className="w-44 h-8" data-testid={`mapping-select-${r.assignedRole}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNMAPPED}>— not mapped —</SelectItem>
+                        {available.map((sr) => (
+                          <SelectItem key={sr} value={sr}>{label(sr)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end mt-3">
+                <Button
+                  size="sm"
+                  onClick={() => saveMutation.mutate()}
+                  disabled={!dirty || saveMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  data-testid="btn-save-shipskart-mapping"
+                >
+                  {saveMutation.isPending ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>) : (<><Save className="mr-2 h-4 w-4" />Save Mapping</>)}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

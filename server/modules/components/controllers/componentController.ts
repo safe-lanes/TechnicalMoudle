@@ -1,6 +1,23 @@
 import { Request, Response } from 'express';
 import * as componentService from '../services/componentService';
 import { NotFoundError, ValidationError } from '../../shared/errors';
+import { getRbacIdentity, type AuthenticatedRequest } from '../../../middleware/auth';
+
+type ComponentLifecycleValidationError = ValidationError & {
+  code?: string;
+  activeChildrenCount?: number;
+  activeJobsCount?: number;
+  linkedSparesCount?: number;
+};
+
+function isShipViewer(req: Request): boolean {
+  const identity = getRbacIdentity(req as AuthenticatedRequest);
+  return identity.userType === 'Ship' || (req as any).user?.userType === 'Ship';
+}
+
+function visibleToViewer(component: any, req: Request): boolean {
+  return !isShipViewer(req) || component?.isActive !== false;
+}
 
 export async function updateSortOrder(req: Request, res: Response) {
   try {
@@ -20,7 +37,8 @@ export async function updateSortOrder(req: Request, res: Response) {
 
 // GET /components/:vesselId — list components for a vessel (Target Picker)
 export async function listByVessel(req: Request, res: Response) {
-  const components = await componentService.listByVessel(req.params.vesselId);
+  const components = (await componentService.listByVessel(req.params.vesselId))
+    .filter(component => visibleToViewer(component, req));
   console.log(`📋 GET /technical/api/components/${req.params.vesselId} returning ${components.length} components`);
   components.slice(0, 5).forEach(c => {
     console.log(`  - code: ${c.componentCode}, name: ${c.name?.substring(0, 30)}, parentId: ${c.parentId || 'none'}`);
@@ -31,7 +49,7 @@ export async function listByVessel(req: Request, res: Response) {
 // GET /components/details/:id — single component (component details page)
 export async function getDetails(req: Request, res: Response) {
   const component = await componentService.getById(req.params.id);
-  if (!component) {
+  if (!component || !visibleToViewer(component, req)) {
     return res.status(404).json({ error: 'Component not found' });
   }
   res.json(component);
@@ -42,14 +60,15 @@ export async function listAll(req: Request, res: Response) {
   const vesselId = req.query.vesselId as string | undefined;
   const vesselIdsRaw = req.query.vesselIds as string | undefined;
   const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
-  const components = await componentService.listAll(vesselId, vesselIds);
+  const components = (await componentService.listAll(vesselId, vesselIds))
+    .filter(component => visibleToViewer(component, req));
   res.json(components);
 }
 
 // GET /components/:id — single component by ID
 export async function getById(req: Request, res: Response) {
   const component = await componentService.getById(req.params.id);
-  if (!component) {
+  if (!component || !visibleToViewer(component, req)) {
     return res.status(404).json({ error: 'Component not found' });
   }
   res.json(component);
@@ -97,9 +116,23 @@ export async function update(req: Request, res: Response) {
 // DELETE /components/:id — delete component
 export async function remove(req: Request, res: Response) {
   try {
-    await componentService.remove(req.params.id);
-    res.json({ success: true });
+    await componentService.remove(req.params.id, (req as any).user?.username || 'system');
+    res.json({
+      success: true,
+      message: 'Component deleted successfully. Existing Work Orders and maintenance history have been retained.',
+    });
   } catch (error: any) {
+    if (error instanceof ValidationError) {
+      const lifecycleError = error as ComponentLifecycleValidationError;
+      return res.status(400).json({
+        success: false,
+        error: lifecycleError.message,
+        code: lifecycleError.code,
+        activeChildrenCount: lifecycleError.activeChildrenCount,
+        activeJobsCount: lifecycleError.activeJobsCount,
+        linkedSparesCount: lifecycleError.linkedSparesCount,
+      });
+    }
     if (error.message?.includes('not found')) {
       return res.status(404).json({ error: error.message });
     }

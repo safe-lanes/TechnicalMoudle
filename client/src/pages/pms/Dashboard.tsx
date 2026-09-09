@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import {
@@ -58,6 +59,7 @@ import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
 import { WorkOrdersListModal } from "./WorkOrdersListModal";
 import { SparesListModal } from "./SparesListModal";
+import ApproveRejectModal from "@/pages/change-requests/ApproveRejectModal";
 import WorkOrderForm from "@/components/WorkOrderForm";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import type { TableColumn } from "@/lib/pdfReportGenerator";
@@ -465,7 +467,10 @@ const Dashboard = () => {
   const crListModalOpenRef = useRef(false);
   crListModalOpenRef.current = crListModal.open;
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    const restored = new URLSearchParams(window.location.search).get('dashboardTab');
+    return restored === 'management' ? 'management' : 'overview';
+  });
   const [showFilters, setShowFilters] = useState(false);
   type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
   const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
@@ -473,6 +478,7 @@ const Dashboard = () => {
   const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null; mode?: 'template' | 'execution' }>({ open: false, workOrder: null });
   const [opDetailSpare, setOpDetailSpare] = useState<Spare | null>(null);
   const [opDetailChangeRequest, setOpDetailChangeRequest] = useState<ChangeRequest | null>(null);
+  const [crApproveModalId, setCrApproveModalId] = useState<number | null>(null);
   const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; type: 'wo' | 'cr'; id: string | null; label: string }>({ open: false, type: 'wo', id: null, label: '' });
   const [rejectReason, setRejectReason] = useState('');
@@ -526,13 +532,17 @@ const Dashboard = () => {
 
   const adminDefaultsToAll = isSailAdmin || isClientAdmin;
   const isAdminScope = isSailAdmin || isClientAdmin || isTechSuperintendent;
-  const [mgmtVesselId, setMgmtVesselId] = useState<string>('');
+  const [mgmtVesselId, setMgmtVesselId] = useState<string>(
+    () => new URLSearchParams(window.location.search).get('dashboardVesselId') || '',
+  );
   // Task #224: Scope is an EXPLICIT mode ('all' = entire fleet, 'my' = assigned
   // mini-fleet), NOT derived from which vessel is selected. Vessel selection
   // narrows *within* the active scope. Everyone (incl. admins) defaults to
   // 'all'. Keeping scope explicit prevents picking an assigned vessel while in
   // All-Vessel scope from silently flipping the Scope selector to My Vessel.
-  const [mgmtScope, setMgmtScope] = useState<'all' | 'my'>('all');
+  const [mgmtScope, setMgmtScope] = useState<'all' | 'my'>(
+    () => new URLSearchParams(window.location.search).get('dashboardScope') === 'my' ? 'my' : 'all',
+  );
   useEffect(() => {
     // Task #226: the global scope is now the source of truth for 'my'. When the
     // global VesselContext is in the 'my' aggregate scope (e.g. restored from a
@@ -576,6 +586,7 @@ const Dashboard = () => {
   }
 
   const { currentUser, myVessels } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   const userRankName = currentUser?.rank_name ?? '';
   const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
 
@@ -867,19 +878,23 @@ const Dashboard = () => {
         : !!postponeActiveStep && postponeUserApproverLevels.includes(postponeActiveStep.approvalLevel)
   );
 
+  const superintendentSummaryParams = new URLSearchParams();
+  if (isMyVessels) {
+    superintendentSummaryParams.set('vesselId', 'all');
+    superintendentSummaryParams.set(
+      'vesselIds',
+      assignedVesselIds.length
+        ? assignedVesselIds.join(',')
+        : '00000000-0000-0000-0000-000000000000',
+    );
+  } else {
+    superintendentSummaryParams.set('vesselId', effectiveVesselId || 'all');
+  }
+  const superintendentSummaryUrl =
+    `/technical/api/superintendent/notifications/summary?${superintendentSummaryParams.toString()}`;
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
-    queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
-    queryFn: async () => {
-      const url = isAllVessels
-        ? '/technical/api/superintendent/notifications/summary'
-        : `/technical/api/superintendent/notifications/summary?vesselId=${effectiveVesselId}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch superintendent summary');
-      return response.json();
-    },
-    // Object-returning endpoint without a vesselIds allow-list; skip it for the
-    // 'my' aggregate (it only renders on the management tab anyway).
-    enabled: !!effectiveVesselId && !isMyVessels,
+    queryKey: [superintendentSummaryUrl],
+    enabled: !!effectiveVesselId,
   });
 
   const { data: complianceAnomalies } = useQuery<{
@@ -2406,9 +2421,6 @@ const Dashboard = () => {
   const modifyPmsColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
     const formatRequestedBy = (uid: string | undefined | null) => {
-      if (uid === 'current_user') return 'Chief Engineer';
-      if (uid === '2nd_engineer') return '2nd Engineer';
-      if (uid === '3rd_engineer') return '3rd Engineer';
       return uid || '—';
     };
     const formatDate = (cr: any) => {
@@ -2423,7 +2435,7 @@ const Dashboard = () => {
       field: 'vesselId',
       minWidth: 140,
       flex: 1,
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
       valueGetter: (p: any) => (p.data?.vesselId && vesselNameById.get(String(p.data.vesselId))) || '—',
       cellRenderer: (p: any) => <span className="font-medium">{p.value || '—'}</span>,
     };
@@ -2434,7 +2446,7 @@ const Dashboard = () => {
         field: 'title',
         minWidth: 220,
         flex: 2,
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         tooltipValueGetter: (p: any) => p.data?.title || '',
         cellRenderer: (p: any) => (
           <span className="font-medium text-gray-900">{p.data?.title || '—'}</span>
@@ -2445,7 +2457,7 @@ const Dashboard = () => {
         field: 'requestedByUserId',
         minWidth: 140,
         flex: 1,
-        filter: 'agTextColumnFilter',
+        filter: 'agSetColumnFilter',
         valueGetter: (p: any) => formatRequestedBy(p.data?.requestedByUserId),
       },
       {
@@ -3178,7 +3190,15 @@ const Dashboard = () => {
                       <ComplianceAnomalyPanel
                         vesselId={effectiveVesselId}
                         superintendentSummary={superintendentSummary}
-                        onNavigateToSuperintendent={() => setLocation('/pms/superintendent')}
+                        onNavigateToSuperintendent={() => {
+                          const returnParams = new URLSearchParams({
+                            dashboardTab: activeTab,
+                            dashboardVesselId: effectiveVesselId,
+                            dashboardScope: mgmtScope,
+                          });
+                          const returnTo = `/pms/dashboard?${returnParams.toString()}`;
+                          setLocation(`/pms/superintendent?returnTo=${encodeURIComponent(returnTo)}`);
+                        }}
                       />
                     </div>
                   ) : selectedOpCard === 'pending-approvals' ? (
@@ -3225,6 +3245,14 @@ const Dashboard = () => {
                           rowHeight={52}
                           rowSelection={isHeadOfDept ? "multiple" : undefined}
                           onSelectionChanged={isHeadOfDept ? handlePendingSelectionChanged : undefined}
+                          // Bulk approval is for ON-TIME completions only: tiered/locked or
+                          // missed-cycle WOs need per-WO remarks (Layer 5) — server refuses
+                          // them in bulk; making the rows unselectable is the UX side.
+                          isRowSelectable={isHeadOfDept ? ((node: any) => {
+                            const wo = node.data;
+                            if (!wo) return false;
+                            return (!wo.approvalTier || wo.approvalTier === 'standard') && (wo.missedCycles ?? 0) === 0;
+                          }) : undefined}
                           noRowsMessage={isHeadOfDept ? "No work orders pending your approval" : "No items pending office review"}
                           testId="ag-grid-op-pending-approvals"
                           getRowId={(params) => String(params.data.id)}
@@ -3316,10 +3344,7 @@ const Dashboard = () => {
                               const rows = operationKPIs.openChangeRequestsList.map(cr => ({
                                 title: cr.title || '-',
                                 category: cr.category ? cr.category.charAt(0).toUpperCase() + cr.category.slice(1) : '-',
-                                requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                                  cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                                  cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                                  cr.requestedByUserId || '-',
+                                requestedBy: cr.requestedByUserId || '-',
                                 date: cr.submittedAt
                                   ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
                                   : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' '),
@@ -4460,10 +4485,7 @@ const Dashboard = () => {
                 const data = crListModal.changeRequests.map(cr => ({
                   vessel: (cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name || cr.vesselId : '-'),
                   title: cr.title || '-',
-                  requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                    cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                    cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                    cr.requestedByUserId || '-',
+                  requestedBy: cr.requestedByUserId || '-',
                   date: cr.submittedAt
                     ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
                     : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' '),
@@ -4513,10 +4535,7 @@ const Dashboard = () => {
                       <TableCell>{cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name || cr.vesselId : '-'}</TableCell>
                       <TableCell className="font-medium text-gray-900">{cr.title}</TableCell>
                       <TableCell>
-                        {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                         cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                         cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                         cr.requestedByUserId}
+                        {cr.requestedByUserId || '-'}
                       </TableCell>
                       <TableCell>
                         {cr.submittedAt
@@ -4560,6 +4579,19 @@ const Dashboard = () => {
         </DialogContent>
       </Dialog>
 
+      {crApproveModalId !== null && (
+        <ApproveRejectModal
+          open={crApproveModalId !== null}
+          onClose={() => setCrApproveModalId(null)}
+          requestId={crApproveModalId}
+          action="approve"
+          onProcessed={() => {
+            setCrApproveModalId(null);
+            setOpDetailChangeRequest(null);
+          }}
+        />
+      )}
+
       {opDetailChangeRequest && (
         <Dialog open={!!opDetailChangeRequest} onOpenChange={(isOpen) => !isOpen && setOpDetailChangeRequest(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -4581,10 +4613,7 @@ const Dashboard = () => {
                 <div>
                   <span className="text-sm font-medium text-gray-500">Requested By</span>
                   <p className="text-gray-900" data-testid="text-op-cr-requested-by">
-                    {opDetailChangeRequest.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                     opDetailChangeRequest.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                     opDetailChangeRequest.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                     opDetailChangeRequest.requestedByUserId}
+                    {opDetailChangeRequest.requestedByUserId || '-'}
                   </p>
                 </div>
                 <div>
@@ -4693,24 +4722,7 @@ const Dashboard = () => {
                     <Button
                       variant="default"
                       className="bg-green-600 hover:bg-green-700"
-                      onClick={async () => {
-                        const comment = prompt('Please provide approval comments:');
-                        if (comment) {
-                          try {
-                            const response = await fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/approve`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ comment, reviewerId: 'current_user' })
-                            });
-                            if (!response.ok) throw new Error('Failed to approve');
-                            queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-                            setOpDetailChangeRequest(null);
-                            toast({ title: "Change request approved", description: "The change request has been approved successfully" });
-                          } catch {
-                            toast({ title: "Error", description: "Failed to approve the change request", variant: "destructive" });
-                          }
-                        }
-                      }}
+                      onClick={() => setCrApproveModalId(opDetailChangeRequest.id)}
                       data-testid="button-op-cr-approve"
                     >
                       <CheckCircle className="h-4 w-4 mr-1" />
@@ -4804,7 +4816,7 @@ const Dashboard = () => {
                     const response = await fetch(`/technical/api/change-requests/${rejectDialog.id}/reject`, {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ comment: reason, reviewerId: 'current_user' }),
+                      body: JSON.stringify({ comment: reason, reviewerId: resolvedUserName }),
                     });
                     if (!response.ok) throw new Error('Failed to reject');
                     queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });

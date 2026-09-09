@@ -6,6 +6,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import StampSelect from "@/components/StampSelect";
 import {
   Select,
   SelectContent,
@@ -67,6 +68,7 @@ export default function ComponentRegisterAddEdit({
   const [criticalityFilter, setCriticalityFilter] = useState("all");
   const [makerOpen, setMakerOpen] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const navigateToJobAfterSave = useRef(false);
 
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -115,6 +117,8 @@ export default function ComponentRegisterAddEdit({
     location: "",
     critical: "",
     conditionBased: "",
+    rotationalItem: "No",
+    currentStamp: "",
     installationDate: "",
     // Row 5: Commissioned Date, Rating, Equipment/System Department, (spacer)
     commissionedDate: "",
@@ -477,6 +481,8 @@ export default function ComponentRegisterAddEdit({
         location: comp.location || "",
         critical: comp.critical ? "Yes" : "No",
         conditionBased: comp.conditionBased ? "Yes" : "No",
+        rotationalItem: comp.rotationalItem ? "Yes" : "No",
+        currentStamp: comp.currentStamp || "",
         installationDate: comp.installationDate || "",
         // Row 5
         commissionedDate: comp.commissionedDate || "",
@@ -806,6 +812,11 @@ export default function ComponentRegisterAddEdit({
     ? ALL_MANDATORY_FIELDS.filter(f => !PARENT_OPTIONAL_FIELDS.includes(f.key))
     : ALL_MANDATORY_FIELDS;
 
+  const isMandatoryComplete = MANDATORY_FIELDS.every(field => {
+    const value = componentData[field.key as keyof typeof componentData];
+    return value && String(value).trim() !== '';
+  });
+
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   const validateMandatoryFields = (): boolean => {
@@ -875,6 +886,14 @@ export default function ComponentRegisterAddEdit({
     } else if (componentData.makerCode) {
       handleFieldChange('makerCode', '');
     }
+    if (componentData.rotationalItem === "Yes" && !componentData.currentStamp.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Stamp is mandatory when Rotational Item is Yes.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (componentData.rhCounterType === "INHERITED" && !componentData.rhMasterComponentId) {
       toast({
         title: "Validation Error",
@@ -899,6 +918,8 @@ export default function ComponentRegisterAddEdit({
         location: componentData.location || null,
         critical: componentData.critical === "Yes",
         conditionBased: componentData.conditionBased === "Yes",
+        rotationalItem: componentData.rotationalItem === "Yes",
+        currentStamp: componentData.rotationalItem === "Yes" ? (componentData.currentStamp || null) : null,
         installationDate: componentData.installationDate || null,
         commissionedDate: componentData.commissionedDate || null,
         rating: componentData.rating || null,
@@ -946,7 +967,20 @@ export default function ComponentRegisterAddEdit({
           description: "Component has been updated successfully.",
         });
       } else {
-        await apiRequest('POST', '/technical/api/components', payload);
+        const createRes = await apiRequest('POST', '/technical/api/components', payload);
+        const newComponent = await createRes.json();
+
+        if (navigateToJobAfterSave.current) {
+          navigateToJobAfterSave.current = false;
+          setLocation(
+            `/pms/work-order/new/${encodeURIComponent(newComponent.componentCode)}` +
+            `?mode=template` +
+            `&componentName=${encodeURIComponent(newComponent.name || componentData.componentName)}` +
+            `&componentCuuid=${encodeURIComponent(newComponent.cuuid || '')}`
+          );
+          return;
+        }
+
         toast({
           title: "Component Created",
           description: "New component has been created successfully.",
@@ -1013,6 +1047,8 @@ export default function ComponentRegisterAddEdit({
       location: comp.location || "",
       critical: comp.critical ? "Yes" : "No",
       conditionBased: comp.conditionBased ? "Yes" : "No",
+      rotationalItem: comp.rotationalItem ? "Yes" : "No",
+      currentStamp: comp.currentStamp || "",
       installationDate: comp.installationDate || "",
       // Row 5
       commissionedDate: comp.commissionedDate || "",
@@ -1161,6 +1197,8 @@ export default function ComponentRegisterAddEdit({
                   location: "",
                   critical: "",
                   conditionBased: "",
+                  rotationalItem: "No",
+                  currentStamp: "",
                   installationDate: "",
                   commissionedDate: "",
                   rating: "",
@@ -1503,6 +1541,39 @@ export default function ComponentRegisterAddEdit({
                       data-testid="input-installation-date"
                     />
                   </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Rotational Item</label>
+                    <select
+                      value={componentData.rotationalItem}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setComponentData(prev => ({
+                          ...prev,
+                          rotationalItem: v,
+                          currentStamp: v === "Yes" ? prev.currentStamp : "",
+                        }));
+                      }}
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      data-testid="select-rotational-item"
+                    >
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">
+                      Stamp{componentData.rotationalItem === "Yes" && <span className="text-red-500"> *</span>}
+                    </label>
+                    <StampSelect
+                      vesselId={vesselId}
+                      value={componentData.currentStamp}
+                      onChange={(stamp) => handleFieldChange('currentStamp', stamp)}
+                      disabled={componentData.rotationalItem !== "Yes"}
+                      currentStamp={isEditMode ? componentData.currentStamp || undefined : undefined}
+                      className="h-8 text-sm w-full px-2 border rounded disabled:bg-gray-100 disabled:text-gray-400"
+                      testId="input-stamp"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
@@ -1774,76 +1845,102 @@ export default function ComponentRegisterAddEdit({
                 </CardHeader>
                 {!collapsedSections['C'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                {activeComponentId && componentData.componentCode && (
-                <div className="flex items-center justify-end mb-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs text-sky-600 border-sky-300"
-                    data-testid="button-add-job"
-                    onClick={() => setLocation(`/pms/work-order/new/${componentData.componentCode}?mode=template&componentName=${encodeURIComponent(componentData.componentName)}`)}
-                  >
-                    + Add Jobs
-                  </Button>
-                </div>
+                {(!isEditMode || isAddingNew) ? (
+                  <>
+                    <div className="flex items-center justify-end mb-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs text-sky-600 border-sky-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                        data-testid="button-add-job"
+                        disabled={!isMandatoryComplete || isSaving}
+                        title={!isMandatoryComplete ? "Fill all mandatory fields (Component Code, Name, Category, Dept, Parent, Is Active) first" : "Save component and open Job Form"}
+                        onClick={() => {
+                          navigateToJobAfterSave.current = true;
+                          handleSave();
+                        }}
+                      >
+                        {isSaving ? "Saving..." : "+ Add Job"}
+                      </Button>
+                    </div>
+                    <div className="text-xs text-gray-400 text-center py-4">
+                      Fill mandatory fields and click + Add Job to create a job for this component.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {activeComponentId && componentData.componentCode && (
+                    <div className="flex items-center justify-end mb-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs text-sky-600 border-sky-300"
+                        data-testid="button-add-job"
+                        onClick={() => setLocation(`/pms/work-order/new/${componentData.componentCode}?mode=template&componentName=${encodeURIComponent(componentData.componentName)}`)}
+                      >
+                        + Add Jobs
+                      </Button>
+                    </div>
+                    )}
+                    <div className="border rounded overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">W.O No.</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Job Title</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Assigned to</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Due Date</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
+                            <th className="px-3 py-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {workOrders.length > 0 ? workOrders.map((wo) => {
+                            const isInactive = wo.isActive === false;
+                            const textClass = isInactive ? "text-gray-400" : "text-gray-700";
+                            return (
+                            <tr key={wo.id} className={`border-t ${isInactive ? "opacity-60 bg-gray-50" : ""}`}>
+                              <td className={`px-3 py-2 ${textClass}`}>
+                                {wo.woNo}{isInactive && <span className="ml-1 text-xs text-red-400">(Inactive)</span>}
+                              </td>
+                              <td className={`px-3 py-2 ${textClass}`}>{wo.jobTitle}</td>
+                              <td className={`px-3 py-2 ${textClass}`}>{wo.assignedTo}</td>
+                              <td className={`px-3 py-2 ${textClass}`}>{wo.dueDate}</td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(wo.status)}`}>
+                                  {wo.status}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                {!isInactive && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                    data-testid={`button-delete-wo-${wo.id}`}
+                                    onClick={() => {
+                                      setJobToDeactivate(wo);
+                                      setShowJobDeactivateDialog(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                            );
+                          }) : (
+                            <tr>
+                              <td colSpan={6} className="px-3 py-4 text-center text-gray-400">
+                                No work orders found
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
-                <div className="border rounded overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">W.O No.</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Job Title</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Assigned to</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Due Date</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
-                        <th className="px-3 py-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {workOrders.length > 0 ? workOrders.map((wo) => {
-                        const isInactive = wo.isActive === false;
-                        const textClass = isInactive ? "text-gray-400" : "text-gray-700";
-                        return (
-                        <tr key={wo.id} className={`border-t ${isInactive ? "opacity-60 bg-gray-50" : ""}`}>
-                          <td className={`px-3 py-2 ${textClass}`}>
-                            {wo.woNo}{isInactive && <span className="ml-1 text-xs text-red-400">(Inactive)</span>}
-                          </td>
-                          <td className={`px-3 py-2 ${textClass}`}>{wo.jobTitle}</td>
-                          <td className={`px-3 py-2 ${textClass}`}>{wo.assignedTo}</td>
-                          <td className={`px-3 py-2 ${textClass}`}>{wo.dueDate}</td>
-                          <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(wo.status)}`}>
-                              {wo.status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">
-                            {!isInactive && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                data-testid={`button-delete-wo-${wo.id}`}
-                                onClick={() => {
-                                  setJobToDeactivate(wo);
-                                  setShowJobDeactivateDialog(true);
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                        );
-                      }) : (
-                        <tr>
-                          <td colSpan={6} className="px-3 py-4 text-center text-gray-400">
-                            No work orders found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
                 </CardContent>
                 )}
               </Card>
@@ -2080,16 +2177,6 @@ export default function ComponentRegisterAddEdit({
                 )}
               </Card>
 
-              <div className="flex justify-end pt-4">
-                <Button
-                  onClick={handleSave}
-                  disabled={isSaving || (isEditMode ? !canEditPerm("pms-components") : !canCreatePerm("pms-components"))}
-                  className="bg-green-600 hover:bg-green-700 text-white px-8"
-                  data-testid="button-submit"
-                >
-                  {isSaving ? "Saving..." : "Submit"}
-                </Button>
-              </div>
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { AdminOnly } from "@/components/RoleGuard";
@@ -18,6 +19,8 @@ import ComponentRegisterFormCR from "@/components/ComponentRegisterFormCR";
 import AddEditComponentForm from "@/components/AddEditComponentForm";
 import ComponentRegisterAddEdit from "@/components/ComponentRegisterAddEdit";
 import { ReviewChangesDrawer } from "@/components/ReviewChangesDrawer";
+import { ReplaceRotationalItemDialog } from "@/components/ReplaceRotationalItemDialog";
+import StampSelect from "@/components/StampSelect";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useLocation } from "wouter";
@@ -30,7 +33,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useVessels } from "@/hooks/useVessels";
-import { formatProfessionalDate } from "@/lib/dateUtils";
+import { formatProfessionalDate, parseDate } from "@/lib/dateUtils";
 import { downloadAuthedFile } from "@/lib/authedDownload";
 import {
   Select,
@@ -50,6 +53,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkOrderViewerSheet } from "@/components/WorkOrderViewerSheet";
+import { addDays } from "date-fns";
 
 interface ComponentNode {
   id: string;
@@ -63,6 +67,46 @@ interface ComponentNode {
   critical?: boolean;
   [key: string]: any; // Allow additional properties from component data
 }
+
+const COMPONENT_VIEW_STATE_VERSION = 1;
+const COMPONENT_VIEW_STATE_KEY_PREFIX = "pms-components-view-state:";
+const DEFAULT_COMPONENT_SECTIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+interface ComponentViewState {
+  version: number;
+  selectedComponentCode: string | null;
+  selectedComponentId: string | null;
+  expandedNodeIds: string[];
+  expandedSectionIds: string[];
+  searchTerm: string;
+  criticalFilter: string;
+  treeScrollTop?: number;
+}
+
+const getComponentViewStateKey = (vesselId: string) =>
+  `${COMPONENT_VIEW_STATE_KEY_PREFIX}${vesselId}`;
+
+const findComponentNode = (
+  nodes: ComponentNode[],
+  predicate: (node: ComponentNode) => boolean,
+): ComponentNode | null => {
+  for (const node of nodes) {
+    if (predicate(node)) return node;
+    if (node.children) {
+      const found = findComponentNode(node.children, predicate);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+const collectComponentNodeIds = (nodes: ComponentNode[], ids = new Set<string>()) => {
+  nodes.forEach(node => {
+    ids.add(node.id);
+    if (node.children) collectComponentNodeIds(node.children, ids);
+  });
+  return ids;
+};
 
 
 const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedComponent: ComponentNode | null; isModifyMode?: boolean; onDataChange?: (data: any) => void; previewChanges?: any[]; isPreviewMode?: boolean }> = ({ isExpanded, selectedComponent, isModifyMode = false, onDataChange, previewChanges = [], isPreviewMode = false }) => {
@@ -123,6 +167,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     location: "",
     critical: "",
     conditionBased: "",
+    rotationalItem: "",
+    currentStamp: "",
     installationDate: "",
     commissionedDate: "",
     rating: "",
@@ -142,6 +188,9 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   
   // Track original component data for modify mode
   const [originalComponentData, setOriginalComponentData] = useState<typeof componentData | null>(null);
+
+  // Rotational item replacement dialog (visible only when Rotational Item = Yes)
+  const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   
   // Update component data when selected component changes
   useEffect(() => {
@@ -172,6 +221,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         location: comp.location || "",
         critical: toBoolString(comp.critical),
         conditionBased: toBoolString(comp.conditionBased),
+        rotationalItem: toBoolString(comp.rotationalItem) || "No",
+        currentStamp: comp.currentStamp || "",
         installationDate: comp.installationDate || "",
         commissionedDate: comp.commissionedDate || "",
         rating: comp.rating || "",
@@ -273,6 +324,19 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
 
   return (
     <div className="space-y-4">
+      {selectedComponent && (
+        <ReplaceRotationalItemDialog
+          open={showReplaceDialog}
+          onOpenChange={setShowReplaceDialog}
+          componentCuuid={(selectedComponent as any).actualId || (selectedComponent as any).cuuid || ""}
+          componentName={componentData.componentName}
+          currentStamp={componentData.currentStamp}
+          vesselId={(selectedComponent as any).vesselId || ""}
+          onSwapped={() => {
+            queryClient.invalidateQueries({ queryKey: [`/technical/api/components/${(selectedComponent as any).vesselId}`] });
+          }}
+        />
+      )}
       {/* Auto-flowing grid for component fields - visible fields fill gaps automatically */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
@@ -546,6 +610,65 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               }`}>
                 {componentData.conditionBased}
               </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Rotational Item</label>
+          {isChangeMode ? (
+            <select
+              value={componentData.rotationalItem || "No"}
+              onChange={(e) => {
+                handleFieldChange('rotationalItem', e.target.value);
+                if (e.target.value !== "Yes") handleFieldChange('currentStamp', "");
+              }}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('rotationalItem') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="select-rotational-item"
+            >
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-rotational-item">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                componentData.rotationalItem === "Yes"
+                  ? "bg-purple-100 text-purple-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}>
+                {componentData.rotationalItem || "No"}
+              </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Stamp</label>
+          {isChangeMode ? (
+            <StampSelect
+              vesselId={(selectedComponent as any)?.vesselId || ""}
+              value={componentData.currentStamp}
+              onChange={(stamp) => handleFieldChange('currentStamp', stamp)}
+              disabled={componentData.rotationalItem !== "Yes"}
+              currentStamp={(selectedComponent as any)?.currentStamp || undefined}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('currentStamp') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              } disabled:bg-gray-100 disabled:text-gray-400`}
+              testId="input-stamp"
+            />
+          ) : (
+            <div className="text-sm text-gray-900 flex items-center gap-2" data-testid="text-stamp">
+              <span>{componentData.rotationalItem === "Yes" ? (componentData.currentStamp || "-") : "-"}</span>
+              {componentData.rotationalItem === "Yes" && selectedComponent && (
+                <button
+                  type="button"
+                  onClick={() => setShowReplaceDialog(true)}
+                  className="text-xs px-2 py-0.5 rounded border border-[#52BAF3] text-[#52BAF3] hover:bg-blue-50"
+                  data-testid="button-replace-rotational-item"
+                >
+                  Replace
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -835,6 +958,33 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   );
 };
 
+const hasTrackingValue = (value: unknown): boolean =>
+  value !== null && value !== undefined && value !== '';
+
+const formatRunningHours = (value: unknown): string => {
+  if (!hasTrackingValue(value)) return '—';
+
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return '—';
+
+  return `${Number.isInteger(numericValue) ? numericValue : numericValue.toFixed(2)} RH`;
+};
+
+const getExpectedRunningHoursDueDate = (
+  lastDoneDate: string | null | undefined,
+  intervalRunningHour: unknown,
+): string => {
+  const interval = Number(intervalRunningHour);
+  const parsedLastDoneDate = parseDate(lastDoneDate);
+
+  if (!Number.isFinite(interval) || interval <= 0 || !parsedLastDoneDate) {
+    return '—';
+  }
+
+  const expectedDays = Math.ceil(interval / 24);
+  return formatProfessionalDate(addDays(parsedLastDoneDate, expectedDays));
+};
+
 const JobRow: React.FC<{
   job: any;
   onRowClick: (job: any) => void;
@@ -846,10 +996,43 @@ const JobRow: React.FC<{
 
   // Get component-specific tracking data for THIS component (prevents data mixing between components)
   const componentTracking = job.componentTracking?.[activeComponentCode] || {};
-  const effectiveLastDoneDate = componentTracking.lastDoneDate || job.lastDoneDate;
-  const effectiveNextDueDate = componentTracking.nextDueDate || job.nextDueDate;
-  const effectiveLastDoneRH = componentTracking.lastDoneRH || job.lastDoneRH;
-  const effectiveNextDueRH = componentTracking.nextDueRH || job.nextDueRH;
+  const effectiveLastDoneDate = hasTrackingValue(componentTracking.lastDoneDate)
+    ? componentTracking.lastDoneDate
+    : job.lastDoneDate;
+  const effectiveNextDueDate = hasTrackingValue(componentTracking.nextDueDate)
+    ? componentTracking.nextDueDate
+    : job.nextDueDate;
+  const effectiveLastDoneRH = hasTrackingValue(componentTracking.lastDoneRH)
+    ? componentTracking.lastDoneRH
+    : job.lastDoneRH;
+  const effectiveNextDueRH = hasTrackingValue(componentTracking.nextDueRH)
+    ? componentTracking.nextDueRH
+    : job.nextDueRH;
+  const isRunningHoursBased =
+    job.maintenanceBasis === 'Running Hours' ||
+    job.maintenanceBasis === 'Dual Frequency';
+  const expectedNextDueDate = isRunningHoursBased
+    ? getExpectedRunningHoursDueDate(
+        effectiveLastDoneDate,
+        job.intervalRunningHour,
+      )
+    : formatProfessionalDate(effectiveNextDueDate);
+  const nextDueHour = (() => {
+    if (!isRunningHoursBased) return '—';
+    if (hasTrackingValue(effectiveNextDueRH)) {
+      return formatRunningHours(effectiveNextDueRH);
+    }
+
+    if (!hasTrackingValue(effectiveLastDoneRH) || !hasTrackingValue(job.intervalRunningHour)) {
+      return '—';
+    }
+
+    const lastDoneRH = Number(effectiveLastDoneRH);
+    const intervalRunningHour = Number(job.intervalRunningHour);
+    return Number.isFinite(lastDoneRH) && Number.isFinite(intervalRunningHour)
+      ? formatRunningHours(lastDoneRH + intervalRunningHour)
+      : '—';
+  })();
 
   const generateWOMutation = useMutation({
     mutationFn: async (reason: 'Planning' | 'Breakdown' | 'Other') => {
@@ -926,27 +1109,24 @@ const JobRow: React.FC<{
               ? `${job.frequencyValue} ${job.frequencyUnit} / ${job.intervalRunningHour || 0} RH`
               : `${job.frequencyValue} ${job.frequencyUnit}`}
         </td>
-        <td className={`py-3 px-3 ${inactiveClass}`}>{formatProfessionalDate(effectiveLastDoneDate) || '-'}</td>
         <td className={`py-3 px-3 ${inactiveClass}`}>
           {job.maintenanceBasis === 'Running Hours'
-            ? (() => {
-                const frequency = parseFloat(job.intervalRunningHour || '0');
-                const currentRH = parseFloat(job.componentCurrentRH || '0');
-                const lastDoneRH = parseFloat(effectiveLastDoneRH || '0');
-                const remainingRH = frequency - (currentRH - lastDoneRH);
-                return remainingRH > 0 ? `${remainingRH.toFixed(0)} RH` : 'Due';
-              })()
+            ? formatRunningHours(effectiveLastDoneRH)
             : job.maintenanceBasis === 'Dual Frequency'
-              ? (() => {
-                  const datePart = formatProfessionalDate(effectiveNextDueDate) || '-';
-                  const frequency = parseFloat(job.intervalRunningHour || '0');
-                  const currentRH = parseFloat(job.componentCurrentRH || '0');
-                  const lastDoneRH = parseFloat(effectiveLastDoneRH || '0');
-                  const remainingRH = frequency > 0 ? frequency - (currentRH - lastDoneRH) : 0;
-                  const rhPart = remainingRH > 0 ? `${remainingRH.toFixed(0)} RH` : 'Due';
-                  return `${datePart} / ${rhPart}`;
-                })()
-              : formatProfessionalDate(effectiveNextDueDate) || '-'}
+              ? `${formatProfessionalDate(effectiveLastDoneDate)} / ${formatRunningHours(effectiveLastDoneRH)}`
+              : formatProfessionalDate(effectiveLastDoneDate)}
+        </td>
+        <td
+          className={`py-3 px-3 ${inactiveClass}`}
+          title={isRunningHoursBased ? 'Expected Next Due Date (RH-based estimate)' : undefined}
+        >
+          {expectedNextDueDate}
+          {isRunningHoursBased && expectedNextDueDate !== '—' && (
+            <span className="block text-[10px] text-gray-500">Expected</span>
+          )}
+        </td>
+        <td className={`py-3 px-3 ${inactiveClass}`}>
+          {nextDueHour}
         </td>
         <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
           {!isInactive && (
@@ -1010,7 +1190,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId } = useVessel();
-  const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept, isExternal } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isTechSuperintendent, isVessel, isHeadOfDept, isExternal } = useUIRole();
   const { isChangeRequestMode } = useChangeRequest();
   const { isChangeMode } = useChangeMode();
   
@@ -1100,7 +1280,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   return (
     <>
       <div className="overflow-x-auto">
-        {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
+        {(isSailAdmin || isClientAdmin || isTechSuperintendent || isExternal || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
         <div className="flex justify-end mb-3">
           <Button
             onClick={handleAddWorkOrder}
@@ -1120,21 +1300,22 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
               <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.4"><Marker id="B7.C.4" /> Job Title</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.5"><Marker id="B7.C.5" /> Task Type</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.6"><Marker id="B7.C.6" /> Frequency</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.7"><Marker id="B7.C.7" /> Last Done Date</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.7"><Marker id="B7.C.7" /> Last Done</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.8"><Marker id="B7.C.8" /> Next Due Date</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.C.9"><Marker id="B7.C.9" /> Actions</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.9"><Marker id="B7.C.9" /> Next Due Hour</th>
+              <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.C.10"><Marker id="B7.C.10" /> Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-gray-500">
+                <td colSpan={8} className="py-8 text-center text-gray-500">
                   Loading jobs...
                 </td>
               </tr>
             ) : jobs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-gray-500">
+                <td colSpan={8} className="py-8 text-center text-gray-500">
                   No jobs found for this component
                 </td>
               </tr>
@@ -1848,7 +2029,20 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
 
   const MAX_FILES_PER_TYPE = 5;
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [activeDocId, setActiveDocId] = useState<number | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  useEffect(() => {
+    if (activeDocId === null) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-doc-popup]')) {
+        setActiveDocId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeDocId]);
 
   const documentTypes = [
     { id: "1", type: "Equipment Drawing", fileType: "Drawing" },
@@ -1878,9 +2072,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   const getDocumentsForType = (typeName: string): any[] =>
     viewableDocuments.filter(
       (doc: any) =>
-        doc.fileName?.toLowerCase().includes(typeName.toLowerCase()) ||
-        doc.fileType?.toLowerCase() === typeName.toLowerCase() ||
-        doc.notes?.toLowerCase().includes(typeName.toLowerCase())
+        doc.notes?.toLowerCase() === typeName.toLowerCase()
     );
 
   const handleUploadClick = (docType: string) => {
@@ -2068,24 +2260,32 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
             <span className="text-sm text-gray-700 shrink-0 w-[180px]">{docType.type}</span>
             <div className="flex items-center gap-1 flex-1 min-w-0 justify-end mr-2 flex-wrap">
               {existingDocs.map((doc: any) => (
-                <div key={doc.id} className="relative group/doc" data-testid={`doc-icon-${doc.id}`}>
-                  <div className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors">
+                <div
+                  key={doc.id}
+                  className="relative"
+                  data-doc-popup
+                  data-testid={`doc-icon-${doc.id}`}
+                  onClick={(e) => { e.stopPropagation(); setActiveDocId(activeDocId === doc.id ? null : doc.id); }}
+                >
+                  <div className={`p-1.5 rounded border cursor-pointer transition-colors ${activeDocId === doc.id ? 'bg-blue-50 border-blue-300 text-blue-600' : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600'}`}>
                     {getFileIcon(doc.fileName)}
                   </div>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc:flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]">
-                    <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={doc.fileName}>{doc.fileName}</span>
-                    <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(doc.fileSize)}</span>
-                    <div className="flex items-center gap-1 w-full">
-                      <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => handleViewDocument(doc.id)} data-testid={`btn-view-document-${doc.id}`}>
-                        <Eye className="h-3.5 w-3.5 mr-1" /> Preview
-                      </Button>
-                      {canUpload && (
-                        <Button variant="outline" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300" onClick={() => handleDeleteDocument(doc.id, doc.fileName)} data-testid={`btn-delete-document-${doc.id}`}>
-                          <Trash2 className="h-3.5 w-3.5" />
+                  {activeDocId === doc.id && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]" data-doc-popup>
+                      <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={doc.fileName}>{doc.fileName}</span>
+                      <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(doc.fileSize)}</span>
+                      <div className="flex items-center gap-1 w-full">
+                        <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={(e) => { e.stopPropagation(); handleViewDocument(doc.id); }} data-testid={`btn-view-document-${doc.id}`}>
+                          <Eye className="h-3.5 w-3.5 mr-1" /> Preview
                         </Button>
-                      )}
+                        {canUpload && (
+                          <Button variant="outline" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300" onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id, doc.fileName); }} data-testid={`btn-delete-document-${doc.id}`}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2327,6 +2527,8 @@ const Components: React.FC = () => {
   const { vesselId, setVesselId, pickerVessels, myVesselsEmpty } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept, isExternal } = useUIRole();
+  const { isOfficeUser } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
   const canCreateComponent = canCreatePerm("pms-components");
   const canEditComponent = canEditPerm("pms-components");
@@ -2336,15 +2538,24 @@ const Components: React.FC = () => {
   const [validationErrorDialogOpen, setValidationErrorDialogOpen] = useState(false);
   const [validationErrorMessage, setValidationErrorMessage] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const componentTreeScrollRef = useRef<HTMLDivElement>(null);
+  const hydratedViewStateVesselRef = useRef<string | null>(null);
+  const pendingTreeScrollTopRef = useRef<number | null>(null);
   
   const prevVesselIdRef = React.useRef(vesselId);
   React.useEffect(() => {
     if (prevVesselIdRef.current !== vesselId) {
       setSelectedComponent(null);
+      setExpandedNodes(new Set());
+      setExpandedSections(new Set(DEFAULT_COMPONENT_SECTIONS));
+      setSearchTerm("");
+      setCriticalFilter("all");
       setEditingComponentId(null);
       setEditingComponentCode(null);
       setShowAddEditFullPage(false);
       setShowReviewDrawer(false);
+      hydratedViewStateVesselRef.current = null;
+      pendingTreeScrollTopRef.current = null;
       prevVesselIdRef.current = vesselId;
     }
   }, [vesselId]);
@@ -2355,16 +2566,14 @@ const Components: React.FC = () => {
     enabled: !!vesselId && vesselId !== 'all' && vesselId !== 'my',
   });
   
-  const inactivateMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: async ({ componentId }: { componentId: string }) => {
-      const response = await fetch(`/technical/api/components/${componentId}/inactivate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vesselId, userId: 'User' }),
+      const response = await fetch(`/technical/api/components/${componentId}`, {
+        method: 'DELETE',
       });
       const data = await response.json();
       if (!response.ok) {
-        const error: any = new Error(data.error || 'Failed to deactivate component');
+        const error: any = new Error(data.error || 'Failed to delete component');
         error.code = data.code;
         error.activeChildrenCount = data.activeChildrenCount;
         error.activeJobsCount = data.activeJobsCount;
@@ -2379,19 +2588,19 @@ const Components: React.FC = () => {
       setPendingDeleteId(null);
       setSelectedComponent(null);
       toast({
-        title: "Component deactivated",
-        description: data.message || "The component has been successfully deactivated.",
+        title: "Component deleted",
+        description: data.message || "The component has been deleted and retained for audit history.",
       });
     },
     onError: (error: any) => {
       setDeleteDialogOpen(false);
       let message = error.message;
       if (error.code === 'ACTIVE_CHILDREN') {
-        message = `This component has ${error.activeChildrenCount || ''} active child component(s). Please deactivate the child components first before deactivating this component.`;
+        message = `This component has ${error.activeChildrenCount || ''} active child component(s). Please deactivate the child components first before deleting this component.`;
       } else if (error.code === 'ACTIVE_JOBS') {
-        message = `This component cannot be deactivated because it has ${error.activeJobsCount || ''} active Job(s) linked to it. Please deactivate or delete all linked Jobs first.`;
+        message = `This component cannot be deleted because it has ${error.activeJobsCount || ''} active Job(s) linked to it. Please deactivate or delete all linked Jobs first.`;
       } else if (error.code === 'ACTIVE_SPARES' || error.code === 'LINKED_SPARES') {
-        message = `This component cannot be deactivated because it has ${error.linkedSparesCount || ''} active Spare(s) linked to it. Please deactivate or delete all linked Spares first.`;
+        message = `This component cannot be deleted because it has ${error.linkedSparesCount || ''} active Spare(s) linked to it. Please deactivate or delete all linked Spares first.`;
       }
       setValidationErrorMessage(message);
       setValidationErrorDialogOpen(true);
@@ -2406,7 +2615,7 @@ const Components: React.FC = () => {
 
   const confirmDelete = () => {
     if (!pendingDeleteId) return;
-    inactivateMutation.mutate({ componentId: pendingDeleteId });
+    deleteMutation.mutate({ componentId: pendingDeleteId });
   };
 
   const handleExportComponents = useCallback(() => {
@@ -2669,6 +2878,149 @@ const Components: React.FC = () => {
     return filterTree(componentTreeData);
   }, [componentTreeData, searchTerm, criticalFilter, isVessel, isHeadOfDept, isExternal]);
 
+  const persistComponentViewState = useCallback(() => {
+    if (
+      !vesselId ||
+      vesselId === "all" ||
+      vesselId === "my" ||
+      hydratedViewStateVesselRef.current !== vesselId
+    ) {
+      return;
+    }
+
+    const viewState: ComponentViewState = {
+      version: COMPONENT_VIEW_STATE_VERSION,
+      selectedComponentCode: selectedComponent?.code || null,
+      selectedComponentId: selectedComponent?.actualId || selectedComponent?.id || null,
+      expandedNodeIds: Array.from(expandedNodes),
+      expandedSectionIds: Array.from(expandedSections),
+      searchTerm,
+      criticalFilter,
+      treeScrollTop: componentTreeScrollRef.current?.scrollTop || 0,
+    };
+
+    try {
+      sessionStorage.setItem(
+        getComponentViewStateKey(vesselId),
+        JSON.stringify(viewState),
+      );
+    } catch {
+      // Browser storage can be unavailable or full; the page should still work.
+    }
+  }, [
+    vesselId,
+    selectedComponent,
+    expandedNodes,
+    expandedSections,
+    searchTerm,
+    criticalFilter,
+  ]);
+
+  // Restore the last Component Register view after fresh vessel data is available.
+  // Targeted navigation (for example, from a dashboard drill-down) intentionally wins.
+  useEffect(() => {
+    if (
+      !vesselId ||
+      vesselId === "all" ||
+      vesselId === "my" ||
+      isLoadingComponents ||
+      componentTreeData.length === 0 ||
+      hydratedViewStateVesselRef.current === vesselId
+    ) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    let hasExplicitTarget = false;
+    try {
+      hasExplicitTarget =
+        !!sessionStorage.getItem("targetComponentCode") ||
+        (params.get("previewChanges") === "1" && !!params.get("targetId"));
+    } catch {
+      // Treat unavailable storage as having no target flag.
+    }
+
+    if (hasExplicitTarget) {
+      hydratedViewStateVesselRef.current = vesselId;
+      return;
+    }
+
+    let savedState: ComponentViewState | null = null;
+    try {
+      const raw = sessionStorage.getItem(getComponentViewStateKey(vesselId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          parsed.version === COMPONENT_VIEW_STATE_VERSION &&
+          Array.isArray(parsed.expandedNodeIds) &&
+          Array.isArray(parsed.expandedSectionIds) &&
+          typeof parsed.searchTerm === "string" &&
+          typeof parsed.criticalFilter === "string"
+        ) {
+          savedState = parsed as ComponentViewState;
+        }
+      }
+    } catch {
+      savedState = null;
+    }
+
+    if (!savedState) {
+      hydratedViewStateVesselRef.current = vesselId;
+      return;
+    }
+
+    const validNodeIds = collectComponentNodeIds(componentTreeData);
+    const validExpandedNodeIds = savedState.expandedNodeIds.filter(id =>
+      typeof id === "string" && validNodeIds.has(id),
+    );
+    const selectedNode = findComponentNode(componentTreeData, node =>
+      (!!savedState?.selectedComponentCode &&
+        node.code === savedState.selectedComponentCode) ||
+      (!!savedState?.selectedComponentId &&
+        (node.actualId === savedState.selectedComponentId ||
+          node.id === savedState.selectedComponentId)),
+    );
+
+    setSearchTerm(savedState.searchTerm);
+    setCriticalFilter(savedState.criticalFilter);
+    setExpandedNodes(new Set(validExpandedNodeIds));
+    setExpandedSections(new Set(savedState.expandedSectionIds.filter(section =>
+      typeof section === "string" && /^[A-H]$/.test(section),
+    )));
+    setSelectedComponent(selectedNode);
+
+    if (typeof savedState.treeScrollTop === "number" && savedState.treeScrollTop >= 0) {
+      pendingTreeScrollTopRef.current = savedState.treeScrollTop;
+    }
+    hydratedViewStateVesselRef.current = vesselId;
+  }, [vesselId, isLoadingComponents, componentTreeData]);
+
+  // Persist after each view change, once the current vessel has been hydrated.
+  useEffect(() => {
+    persistComponentViewState();
+  }, [persistComponentViewState]);
+
+  // Apply the saved tree scroll position after restored filters/expansion state render.
+  useEffect(() => {
+    if (
+      !vesselId ||
+      pendingTreeScrollTopRef.current === null ||
+      hydratedViewStateVesselRef.current !== vesselId
+    ) {
+      return;
+    }
+
+    const scrollTop = pendingTreeScrollTopRef.current;
+    pendingTreeScrollTopRef.current = null;
+    const frame = window.requestAnimationFrame(() => {
+      if (componentTreeScrollRef.current) {
+        componentTreeScrollRef.current.scrollTop = scrollTop;
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [vesselId, searchTerm, criticalFilter, expandedNodes, selectedComponent, filteredComponentTree]);
+
   // Helper function to find component by ID
   const findComponentById = (id: string): ComponentNode | null => {
     const searchInTree = (nodes: ComponentNode[]): ComponentNode | null => {
@@ -2764,6 +3116,8 @@ const Components: React.FC = () => {
         critical: originalComponentData.critical,
         classItem: originalComponentData.classItem,
         conditionBased: originalComponentData.conditionBased,
+        rotationalItem: (originalComponentData as any).rotationalItem,
+        currentStamp: (originalComponentData as any).currentStamp,
         commissionedDate: originalComponentData.commissionedDate,
         installationDate: originalComponentData.installationDate,
         rating: originalComponentData.rating,
@@ -3381,7 +3735,7 @@ const Components: React.FC = () => {
       category: 'components',  // Required field
       title: `Modify Component: ${selectedComponent.code} ${selectedComponent.name}`,  // Required field
       reason: 'Component modification request',  // Required field
-      requestedByUserId: 'current_user',  // Required field
+      requestedByUserId: resolvedUserName,  // Real logged-in user
       targetType: 'component',
       targetId: selectedComponent.actualId || selectedComponent.id,  // Use actual database ID
       snapshotBeforeJson: {
@@ -3407,6 +3761,8 @@ const Components: React.FC = () => {
           location: comp.location || "",
           critical: comp.critical === true || comp.critical === "Yes" ? "Yes" : (comp.critical === false || comp.critical === "No" ? "No" : ""),
           conditionBased: comp.conditionBased === true || comp.conditionBased === "Yes" ? "Yes" : (comp.conditionBased === false || comp.conditionBased === "No" ? "No" : ""),
+          rotationalItem: comp.rotationalItem === true || comp.rotationalItem === "Yes" ? "Yes" : "No",
+          currentStamp: comp.currentStamp || "",
           installationDate: comp.installationDate || "",
           commissionedDate: comp.commissionedDate || "",
           rating: comp.rating || "",
@@ -3543,7 +3899,7 @@ const Components: React.FC = () => {
                 Export
               </Button>
             )}
-            {(isSailAdmin || isClientAdmin || isExternal) && !isChangeRequestMode && !isChangeMode && canCreateComponent && (
+            {isOfficeUser && !isChangeRequestMode && !isChangeMode && canCreateComponent && (
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 size="sm"
@@ -3562,7 +3918,7 @@ const Components: React.FC = () => {
         
         {/* Filters Row */}
         <div className="flex items-center gap-3 flex-wrap">
-          {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isChangeRequestMode) && (
+          {(isOfficeUser || isChangeMode || isChangeRequestMode) && (
           <div className="flex items-center gap-2" data-testid="B2">
             <Marker id="B2" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>
@@ -3690,7 +4046,11 @@ const Components: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div
+              ref={componentTreeScrollRef}
+              className="flex-1 overflow-auto"
+              onScroll={persistComponentViewState}
+            >
               <div>
                 {renderComponentTree(isEditMode ? editTreeData : filteredComponentTree)}
               </div>
@@ -3708,7 +4068,7 @@ const Components: React.FC = () => {
                   <h3 className="text-lg font-semibold text-[#15569e]" data-testid="B7.1">
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
-                  {(isSailAdmin || isClientAdmin || isExternal) && !isChangeRequestMode && !isChangeMode && (canEditComponent || canDeleteComponent) && (
+                  {isOfficeUser && !isChangeRequestMode && !isChangeMode && (canEditComponent || canDeleteComponent) && (
                     <div className="flex items-center gap-2">
                       {canEditComponent && (
                       <Button
@@ -3726,13 +4086,13 @@ const Components: React.FC = () => {
                         Edit Component
                       </Button>
                       )}
-                      {canDeleteComponent && selectedComponent.actualId && (selectedComponent as any).isActive !== false && (
+                      {canDeleteComponent && selectedComponent.actualId && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="text-red-500 border-red-300 hover:bg-red-50 hover:text-red-700"
                           onClick={handleDeleteComponent}
-                          disabled={inactivateMutation.isPending}
+                          disabled={deleteMutation.isPending}
                           data-testid="btn-delete-component"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -3977,10 +4337,10 @@ const Components: React.FC = () => {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Deactivate Component</DialogTitle>
+            <DialogTitle>Delete Component</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600" data-testid="text-delete-confirm-message">
-            Are you sure you want to deactivate this component? It will no longer appear for vessel and department users.
+            Are you sure you want to delete this component? It will be hidden from normal Office and Vessel Component views and cannot be restored through normal editing. Existing Work Orders and maintenance history will be retained.
           </p>
           <div className="flex justify-end gap-2 mt-4">
             <Button
@@ -3993,10 +4353,10 @@ const Components: React.FC = () => {
             <Button
               variant="destructive"
               onClick={() => confirmDelete()}
-              disabled={inactivateMutation.isPending}
+              disabled={deleteMutation.isPending}
               data-testid="btn-delete-confirm"
             >
-              {inactivateMutation.isPending ? "Deactivating..." : "Deactivate"}
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </div>
         </DialogContent>
@@ -4007,7 +4367,7 @@ const Components: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertCircle className="h-5 w-5" />
-              Cannot Deactivate Component
+              Cannot Delete Component
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600" data-testid="text-validation-error-message">

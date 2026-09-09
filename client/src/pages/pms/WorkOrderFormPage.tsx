@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown, ChevronsUpDown, ListChecks, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
@@ -54,6 +54,8 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { viewAuthedDocument } from "@/lib/authedDownload";
 import { useModifyMode } from "@/hooks/useModifyMode";
+import { useApprovalPolicy, effectiveApprovalTier } from "@/hooks/useApprovalPolicy";
+import { getQueuePosition, advanceApprovalQueue, clearApprovalQueue } from "@/lib/approvalQueue";
 import { PeriodPicker } from "@/components/filters/PeriodPicker";
 import type { PeriodValue } from "@/components/filters/PeriodPicker";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
@@ -61,6 +63,8 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { generateSuggestions, extractContextFromWorkOrder, type WorkOrderContext } from "@/utils/suggestionEngine";
 import { FEATURES, IHM_ACTIONS } from '@/config/features';
 import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
+import { stripServerManagedWorkOrderRhFields } from '@shared/workOrderPayload';
+import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
 import { SectionBlock } from '@/components/SectionBlock';
 import { PartHeader } from '@/components/PartHeader';
 import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
@@ -89,7 +93,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 }) => {
   const { toast } = useToast();
   const { vesselId: contextVesselId, vessels } = useVessel();
-  const { isVessel } = useUIRole();
+  const { isVessel, isSailAdmin, isClientAdmin } = useUIRole();
   const [location, navigate] = useLocation();
   const [, params] = useRoute("/pms/work-order/:id");
   const [, newParams] = useRoute("/pms/work-order/new/:componentId");
@@ -496,7 +500,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [woDocuments, setWoDocuments] = useState<Array<{id: string, workOrderId: string, documentType: string, fileName: string, fileKey: string, fileType: string, fileSize: number, uploadedBy: string, uploadedAt: string}>>([]);
   const [previewDoc, setPreviewDoc] = useState<{id: string, fileName: string, fileType: string, fileSize?: number, fetchUrl?: string} | null>(null);
-  const [pendingAttachments, setPendingAttachments] = useState<Array<{file: File, documentType: string}>>([]);
+  // Pending attachments (Unplanned WO create): files queued BEFORE a WO id exists, then flushed at
+  // save. Each carries a stable temp `id`, and a ref mirror (`pendingAttachmentsRef`) holds the
+  // committed-latest queue so the async flush at submit reads the real set — not a stale render
+  // closure. This makes upload/match deterministic under fast/multiple uploads, slow responses and
+  // re-submits (no reliance on render timing or array index).
+  const [pendingAttachments, setPendingAttachments] = useState<Array<{id: string, file: File, documentType: string}>>([]);
+  const pendingAttachmentsRef = useRef<Array<{id: string, file: File, documentType: string}>>([]);
+  const pendingSeqRef = useRef(0);
   const [currentReadingWarningAcknowledged, setCurrentReadingWarningAcknowledged] = useState(false);
 
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
@@ -544,8 +555,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // the server returns RH_OVERRIDE_REQUIRED. A Sail Admin (canOverride) can re-approve with the
   // override flag; anyone else just sees the reason.
   const [rhOverridePrompt, setRhOverridePrompt] = useState<{ message: string; canOverride: boolean } | null>(null);
+  // Part B office edit mode — Office users can edit B1/B2 while WO is Pending Approval
+  // B4 (consumedSpareParts) is excluded: inventory transactions were already applied at
+  // submission and editing them here would bypass the consumption-delta reversal logic.
+  const [partBEditMode, setPartBEditMode] = useState(false);
+  const [savedExecutionDataForCancel, setSavedExecutionDataForCancel] = useState<any>(null);
+  const [isSavingPartB, setIsSavingPartB] = useState(false);
   const [skippedCyclesJustification, setSkippedCyclesJustification] = useState('');
   const [ceApprovalRemarks, setCeApprovalRemarks] = useState('');
+  // Vessel policy — a stamped locked tier behaves as notification only when
+  // this work order's vessel has its Superintendent lock turned OFF.
+  const { isSuperintendentLockEnabled } = useApprovalPolicy();
+  // Phase 2 — approval queue: position of this WO in the active review queue
+  // (sessionStorage-backed, survives reloads; null when not reviewing a queue).
+  // Read per render — cheap, and the route is keyed by WO id so each queue
+  // step is a fresh mount anyway.
+  const queuePos = !embedded ? getQueuePosition(workOrderId) : null;
 
   // Superintendent completion-rejection state
   const [completionRejectionRemarks, setCompletionRejectionRemarks] = useState('');
@@ -581,7 +606,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const isReopenedWO = !!(context?.workOrder?.wasReopened === true && currentWorkOrderStatus !== 'Completed' && currentWorkOrderStatus !== 'Pending Approval');
   const isRejectedWO = !!(context?.workOrder?.wasRejected === true && currentWorkOrderStatus !== 'Completed' && currentWorkOrderStatus !== 'Pending Approval') || isReopenedWO;
 
-  const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' || (currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO);
+  // Office/PMS Admin/Sail Admin can toggle Part B into edit mode while Pending Approval.
+  // Eligible roles mirror the backend allowlist exactly: isSailAdmin (Sail Admin) and
+  // isClientAdmin (PMS Admin + regular Office users). Tech_Superintendent ('Admin' role)
+  // and all Vessel roles are excluded — the backend enforces the same boundary.
+  // A stamped locked tier stays fully locked only while this vessel's live
+  // Superintendent lock remains ON.
+  const canOfficeEditPartB = (isSailAdmin || isClientAdmin) && !embedded &&
+    currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO &&
+    effectiveApprovalTier(
+      context?.workOrder?.approvalTier,
+      isSuperintendentLockEnabled(context?.workOrder?.vesselId || contextVesselId),
+    ) !== 'superintendent_locked';
+
+  const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' ||
+    (currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO && !partBEditMode);
+
+  // B3 Running Hours stays locked even while partBEditMode is active — these fields
+  // drive the delta cascade applied to all child components at approval time. Editing
+  // them post-submission risks corrupting component RH records.
+  const isB3EditLocked = partBEditMode && currentWorkOrderStatus === 'Pending Approval';
 
   useEffect(() => {
     if (
@@ -915,10 +959,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Unknown ('') and NOT_RH_DRIVEN are treated as non-blocking so a slow/failed
   // /running-hours/current call can never wrongly block a NOT_RH_DRIVEN work order.
   const isRhDrivenCounter = componentRhCounterType === 'MASTER' || componentRhCounterType === 'INHERITED';
+  const isWoCompletionRhRequired = requiresWoCompletionRh(
+    templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis,
+    componentRhCounterType,
+  );
   const [rhJustificationModalOpen, setRhJustificationModalOpen] = useState(false);
   const [rhJustificationText, setRhJustificationText] = useState('');
   const [rhJustificationConfirmed, setRhJustificationConfirmed] = useState(false);
   const [rhBackdatedBanner, setRhBackdatedBanner] = useState(false);
+  const [rhLowerApprovalNotice, setRhLowerApprovalNotice] = useState<{
+    submittedRH: number;
+    latestRH: number;
+    latestRHDate: string | null;
+  } | null>(null);
   const [rhErrorModalOpen, setRhErrorModalOpen] = useState(false);
   const [rhErrorDetails, setRhErrorDetails] = useState<any>(null);
   const [rhTimelineOpen, setRhTimelineOpen] = useState(false);
@@ -950,6 +1003,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     jobExperienceNotes: "",
     previousReading: "",
     currentReading: "",
+    // RH accuracy (migration 139): B2.1 completion-time RH and B3 date the
+    // reading was taken. These remain independent from the B3 Current Reading.
+    woCompletionRh: "",
+    currentReadingDate: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
     consumedSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityConsumed: string, location: string, locationId: number | null, comments: string}>,
     ihmUpdate: {
@@ -1173,8 +1230,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Check multiple sources: explicit workOrderType field, or infer from WO number prefix (UWO- = Unplanned)
       if (context.workOrder?.workOrderType) {
         setWorkOrderType(context.workOrder.workOrderType as 'Planned' | 'Unplanned');
-      } else if (context.workOrder?.workOrderNo?.startsWith('UWO-')) {
-        // Fallback: detect unplanned WO from number format (UWO-{component_code}-{year}-{increment})
+      } else if (/(?:^|-)UWO-[^-]+-\d{4}-\d+$/.test(context.workOrder?.workOrderNo?.trim() || '')) {
+        // Fallback: detect both legacy UWO-{component}-{year}-{increment} and
+        // vessel-prefixed V_CODE-UWO-{component}-{year}-{increment} formats.
         setWorkOrderType('Unplanned');
       }
 
@@ -1323,14 +1381,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
-  const performRHValidation = async (rhValue: string, completionDate?: string) => {
+  // RH accuracy (migration 139 follow-up): every RH plausibility check anchors on the date the
+  // reading was TAKEN (B2 "Current Reading Date"), NOT the WO completion date — the server has
+  // done so since f93fcef31 (readingDateForRH / readingDateNorm), so anchoring the client
+  // pre-flight on the completion date made the displayed range disagree with what the server
+  // would accept. Materialised EXACTLY like the save path and the B3 input default: an untouched
+  // field is "" in state but both displays and saves TODAY, so reading raw state here would
+  // silently fall back and keep the old behaviour for the commonest case.
+  const rhReadingDateAnchor = executionData.currentReadingDate || new Date().toISOString().split('T')[0];
+
+  // readingDateOverride: pass the NEW value when called from inside a setExecutionData updater —
+  // the closure's executionData is still the pre-change render's state.
+  const performRHValidation = async (rhValue: string, readingDateOverride?: string) => {
     const context = workOrderContext as any;
     const componentId = context?.component?.id;
     if (!componentId || !rhValue || isNaN(Number(rhValue))) {
       setRhValidation(prev => ({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null, componentActualRH: prev.componentActualRH }));
       return;
     }
-    const dateToUse = completionDate || executionData.completionDateTime?.split('T')[0] || executionData.dateOfCompletion || new Date().toISOString().split('T')[0];
+    const dateToUse = readingDateOverride || rhReadingDateAnchor;
     setRhValidation(prev => ({ ...prev, status: 'loading', message: 'Validating...' }));
     try {
       const res = await fetch('/technical/api/running-hours/validate', {
@@ -1419,45 +1488,47 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     fetchComponentActualRH();
   }, [(workOrderContext as any)?.component?.id]);
 
-  // Task #252: instant, client-side guard for RH-driven completions dated BEFORE the component's
+  // Task #252: instant, client-side guard for RH-driven readings dated BEFORE the component's
   // last running-hours update. Mirrors the authoritative server rule (validateRHEntry →
   // INVALID_BACKDATED). To avoid false positives on legitimate backdating BETWEEN two existing
   // historical entries, suppress when the server has resolved a real previous anchor on/before the
-  // completion date.
+  // reading date.
+  // RH accuracy follow-up: anchored on the READING date (B3), matching the server's
+  // readingDateForRH — a WO completed long ago but READ today is no longer "backdated before
+  // baseline" (intended relaxation, confirmed by Jeevan). A reading date genuinely earlier than
+  // the last update still blocks exactly as before.
   const rhBackdateError = useMemo<string | null>(() => {
     // Only guard when a REAL RH baseline exists. A fabricated updatedAt/now fallback (brand-new
     // component with no RH reference) must never block — matches the authoritative server rule.
     if (!isRhDrivenCounter || !componentActualRHHasBaseline || !componentActualRHLastUpdated) return null;
-    const completionStr = executionData.completionDateTime
-      ? executionData.completionDateTime.split('T')[0]
-      : (executionData.dateOfCompletion || '');
-    if (!completionStr) return null;
+    const readingStr = rhReadingDateAnchor;
+    if (!readingStr) return null;
     const toUTCDay = (s: string) => {
       const d = new Date(s);
       return isNaN(d.getTime()) ? NaN : Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
     };
-    const completionMs = toUTCDay(completionStr);
+    const readingMs = toUTCDay(readingStr);
     const lastUpdatedMs = toUTCDay(componentActualRHLastUpdated);
-    if (isNaN(completionMs) || isNaN(lastUpdatedMs)) return null;
-    if (completionMs >= lastUpdatedMs) return null; // same-day or later is fine
+    if (isNaN(readingMs) || isNaN(lastUpdatedMs)) return null;
+    if (readingMs >= lastUpdatedMs) return null; // same-day or later is fine
     // Back-dated LOWER: the backend will silently skip the RH module update and flag the WO.
     // Do not block submission — the amber banner will explain the outcome after save.
     const enteredRHNum = executionData.currentReading ? Number(executionData.currentReading) : NaN;
     const componentCurrentRH = rhValidation.componentActualRH;
     if (!isNaN(enteredRHNum) && componentCurrentRH !== null && enteredRHNum <= componentCurrentRH) return null;
     // Backdated before the latest reading. Allow only if a real prior RH entry exists on/before the
-    // completion date (legitimate between-entries backdating, per the server timeline result).
+    // reading date (legitimate between-entries backdating, per the server timeline result).
     const prev = rhValidation.previousEntry;
     if (prev?.date) {
       const prevMs = toUTCDay(prev.date);
-      if (!isNaN(prevMs) && prevMs <= completionMs) return null;
+      if (!isNaN(prevMs) && prevMs <= readingMs) return null;
     }
     const fmt = (s: string) => {
       const d = new Date(s);
       return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
     };
-    return `Completion Date (${fmt(completionStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
-  }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, executionData.completionDateTime, executionData.dateOfCompletion, executionData.currentReading, rhValidation.previousEntry, rhValidation.componentActualRH]);
+    return `Current Reading Date (${fmt(readingStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
+  }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, rhReadingDateAnchor, executionData.currentReading, rhValidation.previousEntry, rhValidation.componentActualRH]);
 
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {
@@ -1479,10 +1550,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         autoCalcTotalTime(newData);
       }
 
-      if ((field === 'completionDateTime' || field === 'dateOfCompletion') && newData.currentReading) {
-        const newDate = field === 'completionDateTime' ? value.split('T')[0] : value;
+      // RH plausibility anchors on the READING date, so it is the Current Reading Date — not the
+      // completion date — that must re-trigger validation. Pass the new value explicitly: the
+      // performRHValidation closure still holds the pre-change executionData.
+      if (field === 'currentReadingDate' && newData.currentReading) {
+        const newReadingDate = value || new Date().toISOString().split('T')[0];
         if (rhValidationTimeoutRef.current) clearTimeout(rhValidationTimeoutRef.current);
-        rhValidationTimeoutRef.current = setTimeout(() => performRHValidation(newData.currentReading, newDate), 500);
+        rhValidationTimeoutRef.current = setTimeout(() => performRHValidation(newData.currentReading, newReadingDate), 500);
       }
 
       if (field === 'noOfPersons') {
@@ -1945,17 +2019,82 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     getDocsByType(documentType).length +
     pendingAttachments.filter(p => p.documentType === documentType).length;
 
+  // ── Pending-attachment tracking (deterministic) ───────────────────────────────
+  // Queue files locally (Unplanned WO create, before a WO id exists). Writes the ref
+  // synchronously so a flush fired immediately after — even before React re-renders — sees them.
+  const queuePendingAttachments = (files: File[], documentType: string) => {
+    const added = files.map(file => ({ id: `pa-${++pendingSeqRef.current}`, file, documentType }));
+    const next = [...pendingAttachmentsRef.current, ...added];
+    pendingAttachmentsRef.current = next;   // synchronous — flush/counters read the true latest set
+    setPendingAttachments(next);            // UI mirror
+    added.forEach(a => console.log(`// TEMP-TRACE [pending-queue] queued temp=${a.id} type=${a.documentType} file="${a.file.name}" (WO not created yet)`));
+    return added;
+  };
+
+  const removePendingAttachment = (id: string) => {
+    const next = pendingAttachmentsRef.current.filter(a => a.id !== id);
+    pendingAttachmentsRef.current = next;
+    setPendingAttachments(next);
+  };
+
+  // Flush the queued attachments to a now-existing WO id. Reads the ref snapshot (deterministic),
+  // uploads each independently, and removes ONLY the ones that succeeded (by temp id) — so a
+  // re-submit after a partial failure safely retries just the failures and never double-uploads a
+  // success. Files queued during the await are retained. Never throws (upload failures are
+  // collected, not fatal to the WO save). Tenant-context handling on the endpoint is untouched.
+  const flushPendingAttachments = async (
+    targetWoId: string,
+    vesselIdForUpload: string,
+  ): Promise<{ attached: number; failed: string[] }> => {
+    const items = [...pendingAttachmentsRef.current];
+    console.log(`// TEMP-TRACE [pending-flush] WO=${targetWoId} looking for ${items.length} pending attachment(s): [${items.map(i => `${i.id}:${i.documentType}`).join(', ')}]`);
+    if (items.length === 0) return { attached: 0, failed: [] };
+
+    const succeededIds: string[] = [];
+    const failed: string[] = [];
+    for (const { id, file, documentType } of items) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('documentType', documentType);
+        formData.append('vesselId', vesselIdForUpload || '');
+        const uploadRes = await fetch(`/technical/api/work-orders/${targetWoId}/documents`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          const errBody = await uploadRes.json().catch(() => ({}));
+          throw new Error(errBody.message || errBody.error || `Upload failed for ${file.name}`);
+        }
+        succeededIds.push(id);
+        console.log(`// TEMP-TRACE [pending-flush] MATCHED+uploaded temp=${id} file="${file.name}" -> WO=${targetWoId}`);
+      } catch (uploadErr: any) {
+        failed.push(file.name);
+        console.error(`// TEMP-TRACE [pending-flush] FAILED temp=${id} file="${file.name}":`, uploadErr?.message || uploadErr);
+      }
+    }
+    // Remove only the successfully-uploaded ids from the live queue (keep failures for retry).
+    const succeeded = new Set(succeededIds);
+    const remaining = pendingAttachmentsRef.current.filter(a => !succeeded.has(a.id));
+    pendingAttachmentsRef.current = remaining;
+    setPendingAttachments(remaining);
+    console.log(`// TEMP-TRACE [pending-flush] done WO=${targetWoId}: attached=${succeededIds.length} failed=${failed.length} remaining=${remaining.length}`);
+    return { attached: succeededIds.length, failed };
+  };
+
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>, documentType: string) => {
     if (isReadOnly) return;
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    const allowedTypes = documentType === 'other'
-      ? ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
-      : ['application/pdf', 'image/jpeg', 'image/png'];
-    const allowedExtensions = documentType === 'other'
-      ? ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xlsx']
-      : ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowedTypes = [
+      'application/pdf', 'image/jpeg', 'image/png',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel', 'text/csv',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.csv', '.doc', '.docx'];
     const maxSizeBytes = 5 * 1024 * 1024;
 
     // ── Pending mode: WO not saved yet — queue files locally ──────────────────
@@ -1988,10 +2127,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       if (filesToQueue.length > 0) {
-        setPendingAttachments(prev => [...prev, ...filesToQueue.map(file => ({ file, documentType }))]);
+        queuePendingAttachments(filesToQueue, documentType);
         toast({
           title: filesToQueue.length === 1 ? "File queued" : `${filesToQueue.length} files queued`,
-          description: "Files will be attached automatically when you save the draft.",
+          description: "Files will be attached automatically when you save the work order.",
         });
       }
       event.target.value = '';
@@ -2313,11 +2452,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (items.length === 0) return null;
     return (
       <div className="mt-1 flex items-center gap-1 flex-wrap" data-testid={`pending-items-${documentType}`}>
-        {items.map(({ file, globalIdx }) => {
+        {items.map(({ id, file, globalIdx }) => {
           const popupKey = `${documentType}-${globalIdx}`;
           const isOpen = openPendingPopup === popupKey;
           return (
-            <div key={globalIdx} className="relative" data-testid={`pending-item-${documentType}-${globalIdx}`}>
+            <div key={id} className="relative" data-testid={`pending-item-${documentType}-${globalIdx}`}>
               <div
                 data-pending-icon={popupKey}
                 className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors"
@@ -2342,7 +2481,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300 w-full"
                       onClick={() => {
                         setOpenPendingPopup(null);
-                        setPendingAttachments(prev => prev.filter((_, i) => i !== globalIdx));
+                        removePendingAttachment(id);
                       }}
                       data-testid={`button-remove-pending-${documentType}-${globalIdx}`}
                     >
@@ -2683,33 +2822,36 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && !currentRHValue) {
         missingFields.push("Current Reading");
       }
+      if (isWoCompletionRhRequired && String(executionData.woCompletionRh ?? '').trim() === '') {
+        missingFields.push("WO Completion RH");
+      }
 
       const isReadyForSubmission = missingFields.length === 0;
       const isDraftSave = hasAnyPartBData && !isReadyForSubmission;
 
       if (draftIntent) {
         const saveExecutionData = {
-          ...executionData,
+          ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
           runningHours: currentRHValue || executionData.runningHours,
           riskAssessmentStatus: executionData.riskAssessment,
           safetyChecklistsStatus: executionData.safetyChecklists,
           operationalFormsStatus: executionData.operationalForms,
         };
 
+        // Save as Draft (Task #402): stash the form state in the dedicated draft
+        // column ONLY — no live status/completion/RH/due columns are written, so
+        // the work order keeps its current tab (Due stays Due, Overdue stays
+        // Overdue) until the user actually Submits.
         const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...templateData,
-            ...saveExecutionData,
+            draftExecutionData: saveExecutionData,
           })
         });
 
         const result = await response.json();
         if (!response.ok) {
-          if (result.code === 'INVALID_RUNNING_HOURS') {
-            throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
-          }
           throw new Error(result.error || 'Failed to save draft');
         }
 
@@ -2742,27 +2884,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       } else {
         if (isDraftSave && !hasCompletionData) {
           const saveExecutionData = {
-            ...executionData,
+            ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
             runningHours: currentRHValue || executionData.runningHours,
             riskAssessmentStatus: executionData.riskAssessment,
             safetyChecklistsStatus: executionData.safetyChecklists,
             operationalFormsStatus: executionData.operationalForms,
           };
 
+          // Save as Draft (Task #402): implicit draft saves (incomplete Part B)
+          // also go through the draft-only column so live status/completion/RH/
+          // due columns — and therefore the computed tab — are never touched.
           const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              ...templateData,
-              ...saveExecutionData,
+              draftExecutionData: saveExecutionData,
             })
           });
 
           const result = await response.json();
           if (!response.ok) {
-            if (result.code === 'INVALID_RUNNING_HOURS') {
-              throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
-            }
             throw new Error(result.error || 'Failed to save work order');
           }
 
@@ -2804,10 +2945,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           return;
         }
 
-        if (!isNaN(currentRH) && !isNaN(previousRH) && (currentRH - previousRH) > 2000 && !currentReadingWarningAcknowledged) {
+        // Warning-only: compute the "large jump" against the component's ACTUAL current RH, not a
+        // previousReading that can still be 0/empty on the first submit (which produced a false
+        // "0 → 9500" jump). Prefer previousReading when it holds a real value; otherwise fall back to
+        // the already-loaded component RH (lastCompletedCurrentReading / currentCumulativeRH), which is
+        // available before the first submit. Skip the warning if no valid baseline exists rather than
+        // compute against 0. Does NOT affect the save or the range validation above.
+        const jumpBaselineRaw =
+          (executionData.previousReading && parseFloat(executionData.previousReading) > 0)
+            ? executionData.previousReading
+            : ((workOrderContext as any)?.templateData?.lastCompletedCurrentReading
+                ?? ((workOrderContext as any)?.component?.currentCumulativeRH != null
+                     ? String((workOrderContext as any).component.currentCumulativeRH)
+                     : undefined));
+        const jumpBaseline = jumpBaselineRaw != null ? parseFloat(jumpBaselineRaw) : NaN;
+
+        if (!isNaN(currentRH) && !isNaN(jumpBaseline) && jumpBaseline > 0 && (currentRH - jumpBaseline) > 2000 && !currentReadingWarningAcknowledged) {
           toast({
             title: "Warning — Large Reading Jump",
-            description: `Current Reading (${currentRH}) exceeds Previous Reading (${previousRH}) by ${(currentRH - previousRH).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
+            description: `Current Reading (${currentRH}) exceeds Previous Reading (${jumpBaseline}) by ${(currentRH - jumpBaseline).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
             variant: "destructive",
           });
           setCurrentReadingWarningAcknowledged(true);
@@ -2836,6 +2992,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       if (hasCompletionData) {
+        if (isWoCompletionRhRequired && String(executionData.woCompletionRh ?? '').trim() === '') {
+          toast({
+            title: "Validation Error",
+            description: "WO Completion RH is required for Running Hours-based Work Orders",
+            variant: "destructive",
+          });
+          return;
+        }
         if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && !currentRHValue) {
           toast({
             title: "Validation Error",
@@ -2886,8 +3050,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       const saveExecutionData = {
-        ...executionData,
+        ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
         runningHours: currentRHValue || executionData.runningHours,
+        // RH accuracy (migration 139): materialize the DISPLAYED defaults so what the
+        // user sees is what is stored — reading date defaults to today in the UI.
+        currentReadingDate: executionData.currentReadingDate || new Date().toISOString().split('T')[0],
         riskAssessmentStatus: executionData.riskAssessment,
         safetyChecklistsStatus: executionData.safetyChecklists,
         operationalFormsStatus: executionData.operationalForms,
@@ -2898,7 +3065,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
+        body: JSON.stringify(stripServerManagedWorkOrderRhFields({
           ...templateData,
           ...saveExecutionData,
           nextDueDate: recalculatedNextDueDate,
@@ -2908,7 +3075,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             rhJustification: rhJustificationText,
             completionRHSource: 'MANUAL_ENTRY'
           } : {})
-        })
+        }))
       });
 
       // Reset justification state after save attempt
@@ -2919,6 +3086,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
+        if (result.code === 'LOWER_THAN_CURRENT_RH') {
+          const currentDate = result.currentRHDate ? ` recorded on ${result.currentRHDate}` : '';
+          throw new Error(
+            `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
+            `(${result.currentRH} RH${currentDate}). Correct the Current Reading before completing this Work Order.`
+          );
+        }
         if (result.code === 'INVALID_RUNNING_HOURS') {
           throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
         }
@@ -3080,6 +3254,69 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
+  // ── Part B Office Edit Handlers ────────────────────────────────────────────
+
+  const handleStartPartBEdit = () => {
+    setSavedExecutionDataForCancel({ ...executionData });
+    setPartBEditMode(true);
+  };
+
+  const handleCancelPartBEdit = () => {
+    if (savedExecutionDataForCancel) {
+      setExecutionData(savedExecutionDataForCancel);
+    }
+    setPartBEditMode(false);
+    setSavedExecutionDataForCancel(null);
+  };
+
+  const handleSavePartBEdit = async () => {
+    if (!workOrderId) return;
+    setIsSavingPartB(true);
+    try {
+      const payload: Record<string, unknown> = {
+        // B1 — Risk Assessment, Checklists & Records
+        riskAssessmentStatus: executionData.riskAssessment || '',
+        safetyChecklistsStatus: executionData.safetyChecklists || '',
+        operationalFormsStatus: executionData.operationalForms || '',
+        uploadedDocuments: executionData.uploadedDocuments || [],
+        // B2 — Work Details
+        startDateTime: executionData.startDateTime || '',
+        completionDateTime: executionData.completionDateTime || '',
+        executionAssignedTo: executionData.executionAssignedTo || '',
+        performedBy: executionData.performedBy || '',
+        noOfPersons: executionData.noOfPersons || '',
+        totalTimeHours: executionData.totalTimeHours || '',
+        manhours: executionData.manhours || '',
+        workCarriedOut: executionData.workCarriedOut || '',
+        jobExperienceNotes: executionData.jobExperienceNotes || '',
+        remarks: executionData.remarks || '',
+        completionRemarks: executionData.completionRemarks || '',
+        // B4 (consumedSpareParts) intentionally excluded: inventory transactions were
+        // already applied when the WO was submitted. Editing them here without the
+        // full consumption-delta + _deductedQty reversal would corrupt stock balances.
+        // Scoped edit marker — backend enforces the field whitelist
+        partBOfficeEdit: true,
+      };
+      await apiRequest('PATCH', `/technical/api/work-orders/${workOrderId}`, payload);
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
+      toast({ title: 'Part B Updated', description: 'Work completion details saved successfully.' });
+      setPartBEditMode(false);
+      setSavedExecutionDataForCancel(null);
+    } catch (error: any) {
+      toast({
+        title: 'Save Failed',
+        description: error.message || 'Failed to save Part B changes.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingPartB(false);
+    }
+  };
+
+  // ── End Part B Office Edit Handlers ────────────────────────────────────────
+
   const [isDraftSaving, setIsDraftSaving] = useState(false);
 
   const isExistingDraftUnplanned = !isUnplannedCreate && workOrderType === 'Unplanned' && currentWorkOrderStatus === 'Draft';
@@ -3156,42 +3393,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
         queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
 
-        // Upload any pending attachments now that we have a WO id
-        const currentVesselId = contextVesselId || '';
-        const failedFiles: string[] = [];
-        for (const { file, documentType } of pendingAttachments) {
-          try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('documentType', documentType);
-            formData.append('vesselId', currentVesselId);
-            const uploadRes = await fetch(`/technical/api/work-orders/${newWoId}/documents`, {
-              method: 'POST',
-              body: formData,
-            });
-            if (!uploadRes.ok) {
-              const errBody = await uploadRes.json().catch(() => ({}));
-              throw new Error(errBody.message || errBody.error || `Upload failed for ${file.name}`);
-            }
-          } catch (uploadErr: any) {
-            console.error('Pending attachment upload failed:', uploadErr);
-            failedFiles.push(file.name);
-          }
-        }
-        setPendingAttachments([]);
+        // Upload any pending attachments now that we have a WO id (deterministic flush from ref).
+        const { attached, failed } = await flushPendingAttachments(newWoId, contextVesselId || '');
 
-        if (failedFiles.length === 0) {
-          const attachedCount = pendingAttachments.length;
+        if (failed.length === 0) {
           toast({
             title: 'Draft Saved',
-            description: attachedCount > 0
-              ? `Unplanned work order saved as draft with ${attachedCount} file(s) attached. You can resume editing from the Unplanned tab.`
+            description: attached > 0
+              ? `Unplanned work order saved as draft with ${attached} file(s) attached. You can resume editing from the Unplanned tab.`
               : 'Unplanned work order saved as draft. You can resume editing from the Unplanned tab.',
           });
         } else {
           toast({
             title: 'Draft Saved (attachments partially failed)',
-            description: `Work order saved. ${pendingAttachments.length - failedFiles.length} file(s) attached. Failed: ${failedFiles.join(', ')}.`,
+            description: `Work order saved. ${attached} file(s) attached. Failed: ${failed.join(', ')}.`,
             variant: 'destructive',
           });
         }
@@ -3394,10 +3609,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      if (!isNaN(currentRH) && !isNaN(previousRH) && (currentRH - previousRH) > 2000 && !currentReadingWarningAcknowledged) {
+      // Warning-only: compute the "large jump" against the component's ACTUAL current RH, not a
+      // previousReading that can still be 0/empty on the first submit (false "0 → 9500" jump). Prefer
+      // previousReading when it holds a real value; otherwise fall back to the already-loaded component
+      // RH. Skip the warning if no valid baseline exists rather than compute against 0. Does NOT affect
+      // the save or the range validation above.
+      const jumpBaselineRaw =
+        (executionData.previousReading && parseFloat(executionData.previousReading) > 0)
+          ? executionData.previousReading
+          : ((workOrderContext as any)?.templateData?.lastCompletedCurrentReading
+              ?? ((workOrderContext as any)?.component?.currentCumulativeRH != null
+                   ? String((workOrderContext as any).component.currentCumulativeRH)
+                   : undefined));
+      const jumpBaseline = jumpBaselineRaw != null ? parseFloat(jumpBaselineRaw) : NaN;
+
+      if (!isNaN(currentRH) && !isNaN(jumpBaseline) && jumpBaseline > 0 && (currentRH - jumpBaseline) > 2000 && !currentReadingWarningAcknowledged) {
         toast({
           title: 'Warning — Large Reading Jump',
-          description: `Current Reading (${currentRH}) exceeds Previous Reading (${previousRH}) by ${(currentRH - previousRH).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
+          description: `Current Reading (${currentRH}) exceeds Previous Reading (${jumpBaseline}) by ${(currentRH - jumpBaseline).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
           variant: 'destructive',
         });
         setCurrentReadingWarningAcknowledged(true);
@@ -3525,11 +3754,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         await apiRequest('PATCH', `/technical/api/work-orders/${newWoId}`, execPayload);
       }
 
+      // Attach files the user queued before this WO existed. This path (Submit / Create) previously
+      // never flushed the pending queue, so queued attachments were silently dropped on submit —
+      // the core "saved-then-rejected" bug. Flush deterministically from the ref BEFORE navigating
+      // away, so the association is persisted to the new WO regardless of upload/submit timing.
+      const { attached: pendingAttached, failed: pendingFailed } =
+        await flushPendingAttachments(newWoId, contextVesselId || '');
+
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
 
       if (isReadyForSubmission) {
-        toast({ title: 'Work Order Created', description: 'Unplanned work order submitted for approval.' });
+        toast({
+          title: 'Work Order Created',
+          description: pendingFailed.length > 0
+            ? `Unplanned work order submitted for approval. ${pendingAttached} file(s) attached; failed: ${pendingFailed.join(', ')}.`
+            : pendingAttached > 0
+              ? `Unplanned work order submitted for approval with ${pendingAttached} file(s) attached.`
+              : 'Unplanned work order submitted for approval.',
+          variant: pendingFailed.length > 0 ? 'destructive' : undefined,
+        });
         sessionStorage.setItem('workOrdersActiveTab', 'Pending Approval');
         navigate('/pms/work-orders');
       } else {
@@ -3551,6 +3795,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   // Approver actions
+  const advanceAfterApproval = () => {
+    if (!workOrderId) return;
+    const advance = advanceApprovalQueue(workOrderId);
+    if (advance.queueWasActive && advance.nextId) {
+      navigate(`/pms/work-order/${advance.nextId}`);
+    } else {
+      if (advance.queueWasActive) {
+        toast({ title: "Review queue complete", description: "All work orders in the queue have been processed." });
+      }
+      navigate("/pms/work-orders");
+    }
+  };
+
   const handleApprove = async (adminOverride = false) => {
     if (embedded) return;
     if (!workOrderId) return;
@@ -3591,6 +3848,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
+        if (result.code === 'LOWER_THAN_CURRENT_RH') {
+          const currentDate = result.currentRHDate ? ` recorded on ${result.currentRHDate}` : '';
+          throw new Error(
+            `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
+            `(${result.currentRH} RH${currentDate}). Correct the Current Reading before approving this Work Order.`
+          );
+        }
         // Task #240: MASTER component over the per-day RH rate cap — surface the Sail Admin override
         // affordance instead of a dead-end error toast.
         if (result.code === 'RH_OVERRIDE_REQUIRED' && !adminOverride) {
@@ -3603,20 +3867,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         throw new Error(result.error || 'Failed to approve work order');
       }
 
-      if (result.rhBackdated || result.rhBackdatedEntry) {
+      const lowerRhSkipped = result.rhUpdateSkipped || result.rhUpdateOutcome === 'skipped_lower';
+      if (result.rhBackdated || result.rhBackdatedEntry || lowerRhSkipped) {
         setRhBackdatedBanner(true);
       }
       setCurrentWorkOrderStatus('Completed');
       toast({
         title: "Approved",
-        description: result.rhBackdated
+        description: lowerRhSkipped
+          ? "Work order approved. Running Hours were not updated because the submitted reading is lower than the latest live value."
+          : result.rhBackdated
           ? "Work order approved. Note: Running hours were not updated (back-dated entry — see the Running Hours section below)."
           : "Work order has been approved and marked as completed",
       });
-      if (!result.rhBackdated) {
-        navigate("/pms/work-orders");
+      if (lowerRhSkipped) {
+        setRhLowerApprovalNotice({
+          submittedRH: Number(result.submittedRH),
+          latestRH: Number(result.latestRH),
+          latestRHDate: result.latestRHDate || null,
+        });
+        await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      } else if (!result.rhBackdated) {
+        advanceAfterApproval();
       } else {
         // Stay on page so the amber banner is visible; refresh the WO context.
+        // An active queue stays intact — the officer advances via the queue bar.
         await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
       }
     } catch (error: any) {
@@ -3671,7 +3946,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         title: "Rejected",
         description: "Work order has been rejected",
       });
-      navigate("/pms/work-orders");
+      // Phase 2 — approval queue: a rejected WO leaves Pending Approval, so
+      // advance the queue exactly like an approval does.
+      const rejectAdvance = advanceApprovalQueue(workOrderId);
+      if (rejectAdvance.queueWasActive && rejectAdvance.nextId) {
+        navigate(`/pms/work-order/${rejectAdvance.nextId}`);
+      } else {
+        if (rejectAdvance.queueWasActive) {
+          toast({ title: "Review queue complete", description: "All work orders in the queue have been processed." });
+        }
+        navigate("/pms/work-orders");
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -3801,8 +4086,50 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </div>
         </div>
       )}
+      {/* Phase 2 — approval queue bar: N of M + Previous/Skip/Exit. Only
+          navigation — every approval rule stays in the Approval Section and
+          on the server. Locked WOs sit in the queue visibly locked (Skip). */}
+      {!embedded && queuePos && (
+        <div className="sticky top-0 z-[60] bg-[#16324f] border-b border-[#0f2438] px-4 py-2 flex items-center gap-3" data-testid="approval-queue-bar">
+          <ListChecks className="h-4 w-4 text-white shrink-0" />
+          <span className="text-sm font-semibold text-white" data-testid="text-queue-position">
+            Approval Queue — {queuePos.done + queuePos.index + 1} of {queuePos.startedWith}
+          </span>
+          <span className="text-xs text-blue-200" data-testid="text-queue-remaining">
+            {queuePos.remaining} remaining · {queuePos.done} processed
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              className="flex items-center px-2 py-1 rounded text-xs font-medium bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!queuePos.prevId}
+              onClick={() => queuePos.prevId && navigate(`/pms/work-order/${queuePos.prevId}`)}
+              data-testid="button-queue-prev"
+            >
+              <ChevronLeft className="h-3.5 w-3.5 mr-0.5" /> Previous
+            </button>
+            <button
+              className="flex items-center px-2 py-1 rounded text-xs font-medium bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!queuePos.nextId}
+              onClick={() => queuePos.nextId && navigate(`/pms/work-order/${queuePos.nextId}`)}
+              data-testid="button-queue-skip"
+            >
+              Skip <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+            </button>
+            <button
+              className="flex items-center px-2 py-1 rounded text-xs font-medium bg-white/10 text-white hover:bg-white/20"
+              onClick={() => { clearApprovalQueue(); navigate("/pms/work-orders"); }}
+              data-testid="button-queue-exit"
+            >
+              <X className="h-3.5 w-3.5 mr-0.5" /> Exit Queue
+            </button>
+          </div>
+        </div>
+      )}
       {!embedded && currentWorkOrderStatus === 'Pending Approval' && (() => {
-        const topTier: string = (workOrderContext as any)?.workOrder?.approvalTier || 'standard';
+        const topTier: string = effectiveApprovalTier(
+          (workOrderContext as any)?.workOrder?.approvalTier,
+          isSuperintendentLockEnabled((workOrderContext as any)?.workOrder?.vesselId || contextVesselId)
+        );
         const topDaysLate = (workOrderContext as any)?.workOrder?.daysLate || 0;
         const topMissedCycles = (workOrderContext as any)?.workOrder?.missedCycles || 0;
         const topBannerMap: Record<string, { bg: string; text: string; message: string }> = {
@@ -3825,7 +4152,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         };
         const cfg = topBannerMap[topTier] || topBannerMap.standard;
         return (
-          <div className={`sticky top-0 z-50 ${cfg.bg} border-b px-4 py-2`} data-testid="banner-top-approval-tier">
+          // Stacks below the queue bar (also sticky) when a review queue is active.
+          <div className={`sticky z-50 ${cfg.bg} border-b px-4 py-2`} style={{ top: queuePos ? 40 : 0 }} data-testid="banner-top-approval-tier">
             <span className={`text-sm font-medium ${cfg.text}`}>{cfg.message}</span>
           </div>
         );
@@ -5255,13 +5583,53 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             <>
             <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
               <div data-testid="WOF.B"><Marker id="WOF.B" /></div>
-              <PartHeader
-                id="part-b"
-                label="Part B"
-                title="Work Completion Record"
-                description="Enter work completion details here including Risk assessment, checklists, comments etc."
-                variant="inline"
-              />
+              <div className="flex items-start justify-between gap-4">
+                <PartHeader
+                  id="part-b"
+                  label="Part B"
+                  title="Work Completion Record"
+                  description="Enter work completion details here including Risk assessment, checklists, comments etc."
+                  variant="inline"
+                />
+                {canOfficeEditPartB && !partBEditMode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleStartPartBEdit}
+                    className="shrink-0 mt-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+                    data-testid="button-edit-partb"
+                  >
+                    <Edit2 className="h-4 w-4 mr-1" />
+                    Edit Part B
+                  </Button>
+                )}
+                {canOfficeEditPartB && partBEditMode && (
+                  <div className="flex gap-2 shrink-0 mt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelPartBEdit}
+                      disabled={isSavingPartB}
+                      data-testid="button-cancel-partb-edit"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSavePartBEdit}
+                      disabled={isSavingPartB}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      data-testid="button-save-partb-edit"
+                    >
+                      {isSavingPartB
+                        ? <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        : <Check className="h-4 w-4 mr-1" />}
+                      Save
+                    </Button>
+                  </div>
+                )}
+              </div>
 
           {/* B1. Risk Assessment, Checklists & Records */}
           <div data-testid="WOF.B1.1"><Marker id="WOF.B1.1" /></div>
@@ -5337,7 +5705,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="hidden"
                       multiple
                       onChange={(e) => handleFileSelected(e, 'riskAssessment')}
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.doc,.docx"
                     />
                     <span className="text-xs text-gray-400">{getEffectiveDocCount('riskAssessment')}/5</span>
                   </div>
@@ -5410,7 +5778,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="hidden"
                       multiple
                       onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.doc,.docx"
                     />
                     <span className="text-xs text-gray-400">{getEffectiveDocCount('safetyChecklist')}/5</span>
                   </div>
@@ -5483,7 +5851,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="hidden"
                       multiple
                       onChange={(e) => handleFileSelected(e, 'operationalForm')}
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.doc,.docx"
                     />
                     <span className="text-xs text-gray-400">{getEffectiveDocCount('operationalForm')}/5</span>
                   </div>
@@ -5617,6 +5985,48 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       data-testid="WOF.B2.12"
                     />
                   </div>
+
+                  {/* Completion-time RH drives the next RH cycle. It is mandatory for
+                      Running Hours WOs on RH-driven components; Section B3's Current
+                      Reading independently updates the equipment's live RH record. */}
+                  {(() => {
+                    const b21Basis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
+                    if (b21Basis !== 'Running Hours' && b21Basis !== 'Dual Frequency') return null;
+                    const woRhValue = executionData.woCompletionRh ?? '';
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-[#8798ad]" data-testid="label-wo-completion-rh">
+                            WO Completion RH
+                            {isWoCompletionRhRequired && <span className="text-red-500"> *</span>}
+                          </Label>
+                          {isB3EditLocked && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Lock className="h-3.5 w-3.5 text-amber-500 cursor-default" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-xs text-xs">WO Completion RH cannot be edited after submission — it drives the next scheduled RH cycle.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={woRhValue}
+                          onChange={(e) => handleExecutionChange('woCompletionRh', e.target.value)}
+                          disabled={isPartBReadOnly || isB3EditLocked}
+                          className="text-sm"
+                          placeholder="RH at completion (prefilled from Current Reading)"
+                          data-testid="input-wo-completion-rh"
+                        />
+                        <p className="text-[11px] text-gray-400">Hours at the time the work was done — drives the next RH cycle.</p>
+                      </div>
+                    );
+                  })()}
 
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.13"><Marker id="WOF.B2.13" />Performed by <span className="text-red-500">*</span></Label>
@@ -5855,6 +6265,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             title="Running Hours"
             variant="inline"
           >
+            {isB3EditLocked && (
+              <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Running Hours cannot be edited after submission — changes would affect the child component RH cascade at approval.</span>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.3"><Marker id="WOF.B3.3" />Previous reading</Label>
@@ -5917,7 +6333,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     min="0"
                     value={executionData.currentReading}
                     onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
-                    disabled={isPartBReadOnly}
+                    disabled={isPartBReadOnly || isB3EditLocked}
                     className={`text-sm flex-1 ${
                       rhValidation.status === 'valid' ? 'border-green-400 focus:ring-green-400' :
                       rhValidation.status === 'invalid' ? 'border-red-400 focus:ring-red-400' :
@@ -5926,7 +6342,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     }`}
                     data-testid="WOF.B3.6"
                   />
-                  {!isPartBReadOnly && (
+                  {!isPartBReadOnly && !isB3EditLocked && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -5941,10 +6357,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   )}
                 </div>
 
+                {/* RH accuracy (migration 139): date the reading was TAKEN — becomes the
+                    RH module's Last Updated date instead of the WO completion date.
+                    Defaults to today, cannot be in the future. */}
+                <div className="space-y-1 mt-2">
+                  <Label className="text-sm text-[#8798ad]" data-testid="label-current-reading-date">Current Reading Date</Label>
+                  <Input
+                    type="date"
+                    value={executionData.currentReadingDate || new Date().toISOString().split('T')[0]}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => handleExecutionChange('currentReadingDate', e.target.value)}
+                    disabled={isPartBReadOnly || isB3EditLocked}
+                    className="text-sm"
+                    data-testid="input-current-reading-date"
+                  />
+                </div>
+
                 {/* RH Valid Range Helper */}
                 {rhValidation.validRange && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
-                    Valid range: {(() => { const vr = rhValidation.validRange!; const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < vr.min ? prevR : vr.min; const minStr = Number.isFinite(displayMin) ? displayMin.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `${minStr} to ${maxStr}`; })()} hours
+                    Valid range: {(() => { const vr = rhValidation.validRange!; const minStr = Number.isFinite(vr.min) ? vr.min.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `${minStr} to ${maxStr}`; })()} hours
                     {rhValidation.previousEntry && (
                       <span className="ml-1 text-blue-500">
                         | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -5989,42 +6421,52 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 )}
                 {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus !== 'EXCEEDS_COMPONENT_RH' && rhValidation.validationDetails?.validationStatus !== 'INVALID_BACKDATED' && (
                   <div className="text-xs text-red-600 flex items-center gap-1" data-testid="text-rh-invalid">
-                    <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? (() => { const vr = rhValidation.validRange!; const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < vr.min ? prevR : vr.min; const minStr = Number.isFinite(displayMin) ? displayMin.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `Valid range: ${minStr} to ${maxStr} hours`; })() : rhValidation.message}
+                    <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? (() => { const vr = rhValidation.validRange!; const minStr = Number.isFinite(vr.min) ? vr.min.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `Valid range: ${minStr} to ${maxStr} hours`; })() : rhValidation.message}
                   </div>
                 )}
                 {(rhBackdateError || (rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus === 'INVALID_BACKDATED')) && (
                   <div className="mt-2 p-3 bg-red-50 border border-red-300 rounded-md" data-testid="text-rh-backdated">
                     <div className="flex items-center gap-1.5 text-sm font-semibold text-red-800 mb-1">
-                      <AlertTriangle className="h-4 w-4 text-red-600" /> Invalid Completion Date
+                      <AlertTriangle className="h-4 w-4 text-red-600" /> Invalid Current Reading Date
                     </div>
                     <p className="text-xs text-red-700">
                       {rhBackdateError || rhValidation.message}
                     </p>
                   </div>
                 )}
-                {(rhBackdatedBanner || !!(workOrderContext as any)?.executionData?.rhBackdatedEntry) && (() => {
+                {(rhBackdatedBanner ||
+                  !!(workOrderContext as any)?.executionData?.rhBackdatedEntry ||
+                  (workOrderContext as any)?.executionData?.rhUpdateOutcome === 'skipped_lower') && (() => {
                   const fmt = (s: string) => {
                     if (!s) return '';
                     const d = new Date(s);
                     return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
                   };
                   const enteredRH = executionData.currentReading || '';
-                  const enteredDate = (executionData.completionDateTime || executionData.dateOfCompletion || '').split('T')[0];
-                  const latestRH = rhValidation.componentActualRH;
-                  const latestRHDate = componentActualRHLastUpdated || '';
+                  // The server's back-dated-lower skip is keyed on readingDateForRH, so this
+                  // banner must report the reading date it actually compared.
+                  const enteredDate = rhReadingDateAnchor;
+                  const persistedSkip = (workOrderContext as any)?.executionData;
+                  const latestRH = persistedSkip?.rhSkipLatestRh
+                    ? Number(persistedSkip.rhSkipLatestRh)
+                    : rhValidation.componentActualRH;
+                  const latestRHDate = persistedSkip?.rhSkipLatestRhDate || componentActualRHLastUpdated || '';
+                  const submittedRH = persistedSkip?.rhSkipSubmittedRh || enteredRH;
                   return (
                     <div className="mt-2 p-3 bg-amber-50 border border-amber-300 rounded-md" data-testid="text-rh-backdated-banner">
                       <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-800 mb-1">
                         <AlertTriangle className="h-4 w-4 text-amber-600" /> Running Hours Not Updated
                       </div>
                       <p className="text-xs text-amber-700">
-                        {enteredDate && enteredRH
-                          ? `The Completion Date (${fmt(enteredDate)}) and RH reading (${enteredRH} hrs) are older and lower than the component's current RH state`
-                          : "The entered Completion Date and RH reading are older and lower than the component's current RH state"}
+                        {submittedRH
+                          ? `The submitted RH reading (${submittedRH} hrs) is lower than the latest live component RH`
+                          : "The submitted RH reading is lower than the latest live component RH"}
                         {latestRH !== null && latestRHDate
                           ? ` (${latestRH} hrs as of ${fmt(latestRHDate)}).`
+                          : latestRH !== null
+                            ? ` (${latestRH} hrs).`
                           : '.'}
-                        {' '}The RH module has <strong>not</strong> been updated — this reading is saved to the work order for scheduling continuity only. To correct the RH module, use the Running Hours page directly.
+                        {' '}The RH module has <strong>not</strong> been updated. This reading remains saved on the approved Work Order for completion history.
                       </p>
                     </div>
                   );
@@ -6104,14 +6546,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             title="Spare Parts Consumed"
             variant="inline"
           >
-            <div className="space-y-3">
+            {isB3EditLocked && (
+              <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Spare parts consumed cannot be edited after submission — changes to consumed quantities require the work order to be rejected and resubmitted so inventory balances are correctly recalculated.</span>
+              </div>
+            )}
+            {/* When Part B is in office-edit mode, B4 inputs are non-interactive.
+                All qty/location/comments controls inside use disabled={isReadOnly},
+                and isReadOnly is false for Pending Approval — so we overlay a
+                pointer-events-none wrapper to prevent any interaction. */}
+            <div className={`space-y-3${isB3EditLocked ? ' pointer-events-none opacity-60 select-none' : ''}`}>
               <div className="flex justify-end">
                 {!isReadOnly && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleOpenSparePartsModal}
-                  disabled={isPartBReadOnly}
+                  disabled={isPartBReadOnly || isB3EditLocked}
                   data-testid="WOF.B4.10"
                 >
                   <Marker id="WOF.B4.10" />
@@ -6302,7 +6754,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                disabled={isPartBReadOnly || consumedIndex < 0}
+                                disabled={isPartBReadOnly || isB3EditLocked || consumedIndex < 0}
                                 onClick={() => {
                                   setExecutionData(prev => ({
                                     ...prev,
@@ -6541,7 +6993,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  disabled={isPartBReadOnly}
+                                  disabled={isPartBReadOnly || isB3EditLocked}
                                   onClick={() => handleDeleteConsumedSparePart(actualIndex)}
                                   title="Remove spare part"
                                   aria-label="Remove spare part"
@@ -6567,7 +7019,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             const approvalOriginalDueDate = (workOrderContext as any)?.workOrder?.originalDueDate || '';
             const approvalDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime || '';
             const approvalDaysLate = (workOrderContext as any)?.workOrder?.daysLate || 0;
-            const approvalTier: string = (workOrderContext as any)?.workOrder?.approvalTier || 'standard';
+            // EFFECTIVE tier: stamped locked + this vessel lock OFF renders/gates
+            // as the notification tier, mirroring the server's live enforcement.
+            const approvalTier: string = effectiveApprovalTier(
+              (workOrderContext as any)?.workOrder?.approvalTier,
+              isSuperintendentLockEnabled((workOrderContext as any)?.workOrder?.vesselId || contextVesselId)
+            );
             const justificationValid = skippedCyclesJustification.trim().length >= 30;
 
             const isSuptLocked = approvalTier === 'superintendent_locked';
@@ -6990,12 +7447,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {showSplitButtons && (
                   <Button
                     onClick={handleBottomSaveDraft}
-                    disabled={!!isRHSaveBlocked}
-                    className={`font-bold px-8 py-2.5 h-auto text-sm shadow-md ${
-                      isRHSaveBlocked
-                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed hover:bg-gray-400'
-                        : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
-                    }`}
+                    className="font-bold px-8 py-2.5 h-auto text-sm shadow-md bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white"
                     data-testid="button-save-draft-bottom"
                   >
                     Save Draft
@@ -7120,6 +7572,40 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 Override &amp; Approve
               </AlertDialogAction>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!rhLowerApprovalNotice}>
+        <AlertDialogContent data-testid="dialog-rh-lower-approval">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Work Order Approved — Running Hours Unchanged</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  The Work Order was approved, but its lower reading was not applied to the live Running Hours counter.
+                </p>
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <div><strong>Submitted reading:</strong> {rhLowerApprovalNotice?.submittedRH} RH</div>
+                  <div>
+                    <strong>Latest live reading:</strong> {rhLowerApprovalNotice?.latestRH} RH
+                    {rhLowerApprovalNotice?.latestRHDate ? ` (${rhLowerApprovalNotice.latestRHDate})` : ''}
+                  </div>
+                </div>
+                <p>The submitted value remains recorded on this Work Order for completion history.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              data-testid="button-rh-lower-acknowledge"
+              onClick={() => {
+                setRhLowerApprovalNotice(null);
+                advanceAfterApproval();
+              }}
+            >
+              OK
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

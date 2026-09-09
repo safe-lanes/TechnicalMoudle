@@ -1,0 +1,504 @@
+/**
+ * Stage 3C — the catalogue PUSHER (docs/SHIPSKART-CATALOGUE-STAGE3-PLAN.md §5C).
+ *
+ * Per vessel, sequential, resumable: categories → category mappings → product masters
+ * → SKUs → vessel-catalogue adds. Every entity goes through the mig-152 ledger
+ * (ensurePending → markPushed/markFailed), so a RE-RUN IS THE INCREMENTAL SYNC:
+ * pushed entities are skipped, failures retry, new PMS rows get pushed.
+ *
+ * Implements the mapper's collision contracts (shipskartCatalogueMapper.ts header):
+ *  - product masters: vessel-prefixed productCode — collisions structurally impossible
+ *  - categories: tenant-shared; on duplicate, id is resolved by code via
+ *    get-all-categories AND the name compared — mismatch = loud NAME-MISMATCH warning
+ *    recorded on the link (status still 'pushed'; misclassification is cosmetic,
+ *    silence is not allowed)
+ *  - SKUs: ledger guard — same skuCode under a DIFFERENT vessel → markFailed for a
+ *    human, never 'pushed'. Their duplicate answer without a cross-vessel hit is our
+ *    own earlier push → 'pushed'.
+ *
+ * SHORE ONLY (the b2b credentials live shore-side), single-flight per vessel, paced at
+ * ~2 calls/sec. dryRun computes and counts without network or ledger writes; limitSkus
+ * caps the SKU/catalogue phases for smoke tests.
+ */
+import { getPool } from '../../../db';
+import { authorizedB2bRequest } from './shipskartTokenService';
+import { getB2bConfig } from './shipskartB2bClient';
+import { isShipInstance } from '../../sync/syncRole';
+import * as links from '../repositories/shipskartCatalogueLinkRepository';
+import * as map from './shipskartCatalogueMapper';
+
+// Sachin (2026-08-04): back-to-back requests trip their security throttling — space
+// writes 5–10s apart and they go through. Default 5s; SHIPSKART_CATALOGUE_PACE_MS tunes.
+const PACE_MS = Math.max(500, Number(process.env.SHIPSKART_CATALOGUE_PACE_MS ?? 5_000));
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/**
+ * 429 backoff (learned live, Stage E: their limiter cut in after ~1,150 calls and the
+ * remaining 552 items burned straight into failures). On RATE_LIMITED: wait and retry
+ * the same call up to 3 times (30s / 60s / 120s). Retries exhausted → the caller's
+ * normal failure path takes over (ledger 'failed', next run retries).
+ */
+async function requestWithBackoff(method: 'GET' | 'POST', path: string, opts?: { body?: unknown }) {
+  const waits = [30_000, 60_000, 120_000];
+  let r = await authorizedB2bRequest(method, path, opts);
+  for (const w of waits) {
+    if (r.status !== 429) return r;
+    console.warn(`[CataloguePush] 429 rate-limited on ${path} — backing off ${w / 1000}s`);
+    await sleep(w);
+    r = await authorizedB2bRequest(method, path, opts);
+  }
+  return r;
+}
+/**
+ * LOOK UP AN EXISTING SKU BY CODE (Sachin's get-all-spare-part, delivered 18-Aug-2026 —
+ * PROVEN live: exact-match filter `skuCode_eq=`, returns {items:[{id, skuCode, productId,…}]}).
+ * Returns null when absent; THROWS when the call itself fails, so a network/auth failure
+ * is never mistaken for "does not exist" (the same loud-abort rule as the vessel lookup).
+ * This is what makes two things possible that were impossible before: (1) recovering the
+ * id of a SKU whose create answered 409-duplicate with no id, and (2) the SISTER-VESSEL
+ * link — one SKU per code tenant-wide, added to a second vessel's catalogue by id.
+ */
+export async function findRemoteSpareByCode(skuCode: string): Promise<{ id: string; skuCode: string; productId: string | null } | null> {
+  const r = await requestWithBackoff('GET', `/integration/SAIL/get-all-spare-part?filterQuery=${encodeURIComponent(`skuCode_eq=${skuCode}`)}&pageSize=5`);
+  if (!r.ok || !Array.isArray(r.json?.items)) {
+    throw new Error(`spare lookup by code ${skuCode} failed: HTTP ${r.status} ${JSON.stringify(r.json ?? r.text)?.slice(0, 200)}`);
+  }
+  // Exact match only — their filter is exact, but guard against a future 'contains' default.
+  const hit = r.json.items.find((i: any) => String(i.skuCode) === skuCode) ?? null;
+  return hit?.id ? { id: String(hit.id), skuCode: String(hit.skuCode), productId: hit.productId ? String(hit.productId) : null } : null;
+}
+
+const inFlight = new Set<string>();
+
+/** Is a push currently running for this vessel? (Admin card polling) */
+export function isCataloguePushRunning(vesselId: string): boolean { return inFlight.has(vesselId); }
+
+/**
+ * Last finished run per vessel, for the Admin card. Run-LEVEL failures (vessel not linked,
+ * listing 401) never reach the per-item ledger — before this, they lived only in pm2 logs
+ * and the card sat at 0% with no explanation (what the domain team hit on dev 05-Aug).
+ * In-memory by design: it's a UX aid; the ledger stays the durable record.
+ */
+export interface LastRunInfo { finishedAt: string; ok: boolean; errors: string[]; warnings: string[] }
+const lastRunByVessel = new Map<string, LastRunInfo>();
+export function getLastRunInfo(vesselId: string): LastRunInfo | null { return lastRunByVessel.get(vesselId) ?? null; }
+
+export interface PhaseCounts { pushed: number; skipped: number; failed: number; }
+export interface CataloguePushResult {
+  vesselId: string;
+  dryRun: boolean;
+  categories: PhaseCounts; mappings: PhaseCounts; products: PhaseCounts;
+  skus: PhaseCounts; catalogue: PhaseCounts;
+  warnings: string[];
+  errors: string[];
+}
+
+const zero = (): PhaseCounts => ({ pushed: 0, skipped: 0, failed: 0 });
+const isDuplicateAnswer = (status: number, body: any) =>
+  status === 400 && /already (exists|in use)/i.test(JSON.stringify(body ?? ''));
+
+async function fetchAllPaged(path: string): Promise<any[]> {
+  const all: any[] = [];
+  for (let page = 1; ; page++) {
+    const r = await requestWithBackoff('GET', `${path}?pageNumber=${page}&pageSize=100`);
+    if (!r.ok || !Array.isArray(r.json?.items)) {
+      // ABORT LOUDLY (05-Aug lesson). This listing is what lets the push adopt entities
+      // that already exist on Shipskart; when it failed silently (401 SIGNATURE_INVALID
+      // after their verifier change) the empty result read as "nothing exists" and the
+      // push re-created every category — duplicate-create crashes at best, real
+      // duplicates at worst. No trustworthy remote list → no writes.
+      throw new Error(
+        `listing ${path} page ${page} failed: HTTP ${r.status} ${JSON.stringify(r.json ?? r.text)?.slice(0, 200)} — aborting push before any create (cannot see existing remote entities)`,
+      );
+    }
+    all.push(...r.json.items);
+    if (page >= Number(r.json.totalPages ?? 1)) break;
+    await sleep(PACE_MS); // same mandatory gap between paged listing calls
+  }
+  return all;
+}
+
+export async function pushVesselCatalogue(
+  vesselId: string,
+  opts: { includeStores?: boolean; dryRun?: boolean; limitSkus?: number } = {},
+): Promise<CataloguePushResult> {
+  const includeStores = opts.includeStores !== false;
+  const dryRun = opts.dryRun === true;
+  const res: CataloguePushResult = {
+    vesselId, dryRun,
+    categories: zero(), mappings: zero(), products: zero(), skus: zero(), catalogue: zero(),
+    warnings: [], errors: [],
+  };
+
+  if (await isShipInstance()) { res.errors.push('refused: catalogue push is shore-only'); return res; }
+  if (inFlight.has(vesselId)) { res.errors.push('a push for this vessel is already running'); return res; }
+  inFlight.add(vesselId);
+  try {
+    const pool = await getPool();
+    if (!pool) throw new Error('Database not initialized');
+
+    // ── vessel + their-side identity ──
+    const v = (await pool.query(`SELECT vuuid, name, id AS code FROM vessels WHERE vuuid=$1 AND is_deleted=false`, [vesselId])).rows[0];
+    if (!v) throw new Error(`Unknown vessel ${vesselId}`);
+    const vesselCode: string = v.code || v.name.replace(/\s+/g, '').slice(0, 8).toUpperCase();
+    const link = (await pool.query(
+      `SELECT shipskart_vessel_id FROM shipskart_vessel_links WHERE vessel_vuuid=$1 AND push_status='pushed'`, [vesselId])).rows[0];
+    if (!link) throw new Error(`Vessel ${v.name} has no pushed Shipskart vessel link — push the vessel first (Stage 2 reconciler)`);
+    const ref = map.getReferenceIds();
+
+    // ── our data ──
+    // Rev01 (Jeevan, 14-Aug): EVERY coded component feeds categories AND gets a product
+    // master — no longer only components that have spares. (SKUs still come from spares.)
+    const comps = (await pool.query(
+      `SELECT c.cuuid, c.component_code, c.name, c.maker, c.model, c.serial_no, c.installation_date
+         FROM components c
+        WHERE c.vessel_id=$1 AND c.is_deleted=false AND c.component_code IS NOT NULL`, [vesselId])).rows;
+    const allComps = (await pool.query(
+      `SELECT component_code, name FROM components WHERE vessel_id=$1 AND is_deleted=false AND component_code IS NOT NULL`, [vesselId])).rows;
+    const nameByCode = new Map<string, string>(allComps.map((c: any) => [c.component_code, c.name]));
+    const spares = (await pool.query(
+      `SELECT suuid, component_id, part_code "partCode", part_name "partName", part_number "partNumber",
+              maker, model, uom, unit_cost "unitCost", specification, note,
+              drawing_number "drawingNumber", position_number "positionNumber"
+         FROM spares WHERE vessel_id=$1 AND is_deleted=false ORDER BY part_code`, [vesselId])).rows;
+    const stores = includeStores ? (await pool.query(
+      `SELECT id, item_code "itemCode", item_name "itemName", category, specification, uom, supplier, unit_cost "unitCost"
+         FROM stores_items WHERE vessel_id=$1 AND deleted IS NOT TRUE ORDER BY item_code`, [vesselId])).rows : [];
+
+    // ── category set from chains (+ stores categories) ──
+    interface Cat { code: string; name: string; level: number; parent: string | null; hasChildren: boolean }
+    const cats = new Map<string, Cat>();
+    for (const c of comps) {
+      const chain = map.deriveCodeChain(c.component_code);
+      // Category levels = the chain WITHOUT the leaf (the leaf is the product master).
+      // SINGLE-LEVEL CODES (Rev01 surfaced this: root-level components like '60' have no
+      // ancestors): the leaf doubles as its own category, else its product master has no
+      // category to attach to ("category unresolved" — 19/271 on the pilot).
+      const catChain = chain.length > 1 ? chain.slice(0, -1) : chain;
+      catChain.forEach((code, i) => {
+        // Rev01: category display name = "{code} - {name}" (crew sees the PMS code).
+        // Their validator needs categoryCode >= 3 chars (live, 14-Aug) — pad the KEY,
+        // never the display name.
+        const key = map.padCategoryCode(code);
+        if (!cats.has(key)) cats.set(key, {
+          code: key, name: map.codedName(code, nameByCode.get(code)), level: i + 1,
+          parent: i > 0 ? map.padCategoryCode(catChain[i - 1]) : null, hasChildren: true,
+        });
+      });
+    }
+    for (const s of stores) {
+      const cat = (s.category || 'General').trim();
+      const code = `STORES-${cat.toUpperCase().replace(/[^A-Z0-9]+/g, '-')}`;
+      if (!cats.has(code)) cats.set(code, { code, name: `Stores — ${cat}`, level: 1, parent: null, hasChildren: false });
+    }
+
+    if (dryRun) {
+      res.categories.pushed = cats.size;
+      res.mappings.pushed = Array.from(cats.values()).filter(c => c.parent).length;
+      res.products.pushed = comps.length + new Set(stores.map((s: any) => s.category || 'General')).size;
+      res.skus.pushed = spares.length + stores.length;
+      res.catalogue.pushed = res.skus.pushed;
+      console.log(`[CataloguePush] DRY RUN ${v.name}: cats=${res.categories.pushed} maps=${res.mappings.pushed} products=${res.products.pushed} skus=${res.skus.pushed}`);
+      return res;
+    }
+
+    // b2b credentials are needed only from here on — dry runs stay credential-free.
+    const cfg = getB2bConfig();
+    const smc = {
+      smcId: process.env.SHIPSKART_B2B_SMC_ID || cfg.tenantId,
+      smcName: process.env.SHIPSKART_B2B_SMC_NAME || 'WAH-KWONG',
+      smcTenantId: cfg.tenantId,
+    };
+
+    // ── remote maps (resolve-by-code for re-runs and duplicate answers) ──
+    let remoteCats = new Map<string, any>((await fetchAllPaged('/integration/SAIL/get-all-categories')).map((c: any) => [c.categoryCode, c]));
+
+    // 1. categories (parents before children — level order)
+    for (const cat of Array.from(cats.values()).sort((a, b) => a.level - b.level)) {
+      const l = await links.ensurePending('category', cat.code, null, cat.code);
+      const remote = remoteCats.get(cat.code);
+      if (l.pushStatus === 'pushed' && remote) { res.categories.skipped++; continue; }
+      if (remote) {
+        // Exists on their side (created earlier or by another vessel's run) — the shared-by-design case.
+        if (String(remote.name).trim() !== cat.name.trim()) {
+          const w = `NAME-MISMATCH category ${cat.code}: ours='${cat.name}' theirs='${remote.name}' — shared category kept, review classification`;
+          res.warnings.push(w); console.warn(`[CataloguePush] ⚠️ ${w}`);
+          await links.markPushedWithWarning(l.id, remote.id, w); // status pushed, warning kept
+        } else {
+          await links.markPushed(l.id, remote.id);
+        }
+        res.categories.skipped++; continue;
+      }
+      const r = await requestWithBackoff('POST', '/integration/SAIL/create-category',
+        { body: map.buildCategoryPayload({ name: cat.name, categoryCode: cat.code, level: cat.level, hasChildren: cat.hasChildren, description: nameByCode.get(cat.code) }) });
+      await sleep(PACE_MS);
+      if (r.ok) { await links.markPushed(l.id, r.json?.data?.id ?? null); res.categories.pushed++; }
+      else if (isDuplicateAnswer(r.status, r.json)) { await links.markPushed(l.id); res.categories.pushed++; }
+      else { await links.markFailed(l.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`); res.categories.failed++; res.errors.push(`category ${cat.code}: ${r.status}`); }
+    }
+    // refresh ids once after creations
+    remoteCats = new Map((await fetchAllPaged('/integration/SAIL/get-all-categories')).map((c: any) => [c.categoryCode, c]));
+
+    // 2. category mappings (parent → child)
+    for (const cat of Array.from(cats.values()).filter(c => c.parent)) {
+      const l = await links.ensurePending('category', `MAP:${cat.code}`, null, cat.code);
+      if (l.pushStatus === 'pushed') { res.mappings.skipped++; continue; }
+      const child = remoteCats.get(cat.code), parent = remoteCats.get(cat.parent!);
+      if (!child || !parent) { await links.markFailed(l.id, 'category id unresolved'); res.mappings.failed++; continue; }
+      const r = await requestWithBackoff('POST', '/integration/SAIL/category-mapping', {
+        // Rev01: ids are theirs, NAMES are built from OUR components table (coded format) —
+        // never Shipskart's stored name (which may predate the format change).
+        body: map.buildCategoryMappingPayload({
+          categoryId: child.id, categoryName: cat.name,
+          parentCategoryId: parent.id, parentCategoryName: cats.get(cat.parent!)?.name ?? parent.name,
+        }),
+      });
+      await sleep(PACE_MS);
+      if (r.ok || isDuplicateAnswer(r.status, r.json)) { await links.markPushed(l.id); res.mappings.pushed++; }
+      else { await links.markFailed(l.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`); res.mappings.failed++; }
+    }
+
+    // 3. product masters (components + one synthetic per stores category)
+    interface ProductRef { productId: string; productName: string; productCode: string; categoryId: string; categoryName: string }
+    const productByLocal = new Map<string, ProductRef>(); // component cuuid | STORES:<cat> → ref
+    let remoteProds = new Map<string, any>((await fetchAllPaged('/integration/SAIL/get-all-product-masters')).map((p: any) => [p.productCode, p]));
+
+    const productSpecs: Array<{ localKey: string; code: string; payload: any; catCode: string }> = [];
+    for (const c of comps) {
+      const chain = map.deriveCodeChain(c.component_code);
+      const catCode = map.padCategoryCode(chain.length > 1 ? chain[chain.length - 2] : chain[0]);
+      const rc = remoteCats.get(catCode);
+      if (!rc) { res.products.failed++; res.errors.push(`product ${c.component_code}: category ${catCode} unresolved`); continue; }
+      productSpecs.push({
+        localKey: c.cuuid, code: map.productCodeFor(vesselCode, c.component_code), catCode,
+        payload: map.buildProductMasterPayload({
+          vesselCode, component: { componentCode: c.component_code, name: c.name, maker: c.maker, model: c.model, serialNo: c.serial_no, installationDate: c.installation_date },
+          categoryId: rc.id, categoryName: rc.name,
+        }),
+      });
+    }
+    for (const cat of Array.from(new Set(stores.map((s: any) => (s.category || 'General').trim())))) {
+      const code = `STORES-${String(cat).toUpperCase().replace(/[^A-Z0-9]+/g, '-')}`;
+      const rc = remoteCats.get(code);
+      if (!rc) { res.products.failed++; res.errors.push(`stores product for ${cat}: category unresolved`); continue; }
+      productSpecs.push({
+        localKey: `STORES:${cat}`, code: map.productCodeFor(vesselCode, code), catCode: code,
+        payload: map.buildProductMasterPayload({
+          vesselCode, component: { componentCode: code, name: `Stores — ${cat}` },
+          categoryId: rc.id, categoryName: rc.name,
+          nameStyle: 'plain',   // synthetic stores master — coded prefix would read as noise
+        }),
+      });
+    }
+
+    for (const spec of productSpecs) {
+      const l = await links.ensurePending('product', spec.localKey, vesselId, spec.code);
+      const remote = remoteProds.get(spec.code);
+      if ((l.pushStatus === 'pushed' || remote) && remote) {
+        await links.markPushed(l.id, remote.id);
+        productByLocal.set(spec.localKey, { productId: remote.id, productName: remote.name, productCode: spec.code, categoryId: remote.categoryId ?? spec.payload.data.categoryId, categoryName: remote.categoryName ?? spec.payload.data.categoryName });
+        res.products.skipped++; continue;
+      }
+      const r = await requestWithBackoff('POST', '/integration/SAIL/create-product-masters', { body: spec.payload });
+      await sleep(PACE_MS);
+      if (r.ok || isDuplicateAnswer(r.status, r.json)) { await links.markPushed(l.id, r.json?.data?.id ?? null); res.products.pushed++; }
+      else { await links.markFailed(l.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`); res.products.failed++; res.errors.push(`product ${spec.code}: ${r.status}`); }
+    }
+    remoteProds = new Map((await fetchAllPaged('/integration/SAIL/get-all-product-masters')).map((p: any) => [p.productCode, p]));
+    for (const spec of productSpecs) {
+      const remote = remoteProds.get(spec.code);
+      if (remote && !productByLocal.has(spec.localKey)) {
+        productByLocal.set(spec.localKey, { productId: remote.id, productName: remote.name, productCode: spec.code, categoryId: remote.categoryId ?? spec.payload.data.categoryId, categoryName: remote.categoryName ?? spec.payload.data.categoryName });
+      }
+    }
+
+    // 4 + 5. SKUs and catalogue adds
+    const skuJobs: Array<{ localKey: string; skuCode: string; skuName: string; make?: string; model?: string; productKey: string; buildSku: () => any }> = [
+      ...spares.map((s: any) => ({
+        localKey: s.suuid, skuCode: map.sanitizeCode(s.partCode), skuName: s.partName, make: s.maker, model: s.partNumber, // Rev01: part number doubles as model
+        productKey: s.component_id,
+        buildSku: () => {
+          const pr = productByLocal.get(s.component_id)!;
+          return map.buildSkuFromSpare(s, { productId: pr.productId, productName: pr.productName }, { categoryId: pr.categoryId, categoryName: pr.categoryName }, ref);
+        },
+      })),
+      ...stores.map((s: any) => ({
+        localKey: `STORE:${s.id}`, skuCode: map.sanitizeCode(s.itemCode), skuName: s.itemName, make: undefined, model: undefined,
+        productKey: `STORES:${(s.category || 'General').trim()}`,
+        buildSku: () => {
+          const pr = productByLocal.get(`STORES:${(s.category || 'General').trim()}`)!;
+          return map.buildSkuFromStoreItem(s, { productId: pr.productId, productName: pr.productName }, { categoryId: pr.categoryId, categoryName: pr.categoryName }, ref);
+        },
+      })),
+    ].slice(0, opts.limitSkus ?? Number.MAX_SAFE_INTEGER);
+
+    // SANITIZE-COLLISION GUARD (2026-08-04): two DIFFERENT raw codes can sanitize to the
+    // same string (e.g. 'A.B' vs 'A-B'). Zero such pairs exist on the pilot (1,125 codes
+    // audited), but production data is unaudited — and without this, the second one would
+    // ride their "already in use" answer into 'pushed', silently attached to the first's
+    // SKU. Same-vessel collisions fail loudly here; cross-vessel ones fail via the ledger.
+    const sanitizedSeen = new Map<string, string>();
+
+    // QUOTA-EXHAUSTION ABORT (learned live, Stage E retry): when the limiter is a hard
+    // window (not a burst), every item burns ~3.5 min of backoff and still 429s — a
+    // 324-item remainder would grind for a day. After 5 consecutive items that exhaust
+    // their backoff on 429, STOP the run; the ledger keeps them retryable and a later
+    // run (after the window resets) picks up exactly where this one stopped.
+    let consecutive429 = 0;
+
+    for (const job of skuJobs) {
+      if (consecutive429 >= 5) {
+        res.errors.push('run aborted: rate-limit quota exhausted (5 consecutive 429s after full backoff) — re-run after the window resets');
+        console.warn('[CataloguePush] quota exhausted — aborting run; ledger keeps the remainder retryable');
+        break;
+      }
+      const pr = productByLocal.get(job.productKey);
+      if (!pr) { res.skus.failed++; res.errors.push(`sku ${job.skuCode}: product unresolved`); continue; }
+
+      // SKU phase
+      const sl = await links.ensurePending('sku', job.localKey, vesselId, job.skuCode);
+      // Option B (Sachin, 14-Aug): the catalogue add needs THIS SKU's id — captured on
+      // create, recovered from the ledger on re-runs, and — since 18-Aug — recoverable by
+      // CODE via findRemoteSpareByCode when neither is available.
+      let skuId: string | null = sl.remoteId ?? null;
+      const firstHolder = sanitizedSeen.get(job.skuCode);
+      if (firstHolder && firstHolder !== job.localKey) {
+        await links.markFailed(sl.id, `SANITIZE COLLISION: code '${job.skuCode}' also produced by ${firstHolder} in this vessel — needs human decision`);
+        res.skus.failed++; res.errors.push(`sku ${job.skuCode}: same-vessel sanitize collision`);
+        continue;
+      }
+      sanitizedSeen.set(job.skuCode, job.localKey);
+      if (sl.pushStatus !== 'pushed') {
+        // SISTER-VESSEL LINK (Jeevan 17-Aug, unblocked by Sachin's lookup 18-Aug): the same
+        // part code on two vessels is LEGITIMATE (shared equipment). Shipskart keeps ONE SKU
+        // per code tenant-wide, so we never create it again — we look the existing SKU up by
+        // code and add THAT id to this vessel's catalogue. The ledger row for this vessel is
+        // marked pushed with the SHARED remote id (so re-runs skip cleanly and the add phase
+        // has its id). Never a duplicate create, never attached to the wrong vessel.
+        const clash = await links.findSkuCodeOtherVessel(job.skuCode, vesselId);
+        if (clash) {
+          try {
+            const remote = await findRemoteSpareByCode(job.skuCode);
+            await sleep(PACE_MS);
+            if (remote) {
+              await links.markPushedWithWarning(sl.id, remote.id, `LINKED (shared): SKU '${job.skuCode}' exists on Shipskart (first pushed for vessel ${clash.vesselId}) — reused id, not re-created`);
+              skuId = remote.id; res.skus.pushed++; res.warnings.push(`sku ${job.skuCode}: linked to existing (shared with vessel ${clash.vesselId})`);
+            } else {
+              // Ledger says another vessel pushed it, Shipskart says it is not there: their
+              // side lost it (or it was deleted). Fall through to a normal create below.
+              res.warnings.push(`sku ${job.skuCode}: ledger says shared with ${clash.vesselId} but absent on Shipskart — creating`);
+            }
+          } catch (lookupErr: any) {
+            await links.markFailed(sl.id, `LOOKUP FAILED for shared SKU '${job.skuCode}': ${String(lookupErr?.message || lookupErr).slice(0, 300)} — retry later`);
+            res.skus.failed++; res.errors.push(`sku ${job.skuCode}: lookup failed`);
+            continue;
+          }
+        }
+        if (!skuId) {
+          const r = await requestWithBackoff('POST', '/integration/SAIL/create-spare-part', { body: job.buildSku() });
+          await sleep(PACE_MS);
+          if (r.ok && r.json?.data?.id) {
+            await links.markPushed(sl.id, r.json.data.id); skuId = String(r.json.data.id); res.skus.pushed++; consecutive429 = 0;
+          } else if (isDuplicateAnswer(r.status, r.json) || r.status === 409) {
+            // Their duplicate answer (409, or 400 'already in use') carries NO id. Before
+            // 18-Aug this stranded the SKU forever; now recover the id by code.
+            try {
+              const remote = await findRemoteSpareByCode(job.skuCode);
+              await sleep(PACE_MS);
+              if (remote) { await links.markPushed(sl.id, remote.id); skuId = remote.id; res.skus.pushed++; consecutive429 = 0; }
+              else {
+                await links.markFailed(sl.id, `${r.status} duplicate but lookup by code found nothing — ask Shipskart which record holds '${job.skuCode}'`);
+                res.skus.failed++; res.errors.push(`sku ${job.skuCode}: duplicate but not found by lookup`);
+                continue;
+              }
+            } catch (lookupErr: any) {
+              await links.markFailed(sl.id, `${r.status} duplicate; id lookup failed: ${String(lookupErr?.message || lookupErr).slice(0, 300)}`);
+              res.skus.failed++; res.errors.push(`sku ${job.skuCode}: duplicate, lookup failed`);
+              continue;
+            }
+          } else {
+            await links.markFailed(sl.id, `${r.status} ${JSON.stringify(r.json ?? r.text)}`);
+            res.skus.failed++; res.errors.push(`sku ${job.skuCode}: ${r.status}`);
+            if (r.status === 429) consecutive429++; else consecutive429 = 0;
+            continue;
+          }
+        }
+      } else res.skus.skipped++;
+
+      // catalogue-add phase
+      const cl = await links.ensurePending('catalogue', job.localKey, vesselId, job.skuCode);
+      if (cl.pushStatus === 'pushed') { res.catalogue.skipped++; continue; }
+      if (!skuId) {
+        // SKU marked pushed but the id was never captured (pre-Option-B rows) — recover it
+        // by code (18-Aug lookup) and back-fill the ledger so this never repeats.
+        try {
+          const remote = await findRemoteSpareByCode(job.skuCode);
+          await sleep(PACE_MS);
+          if (remote) { skuId = remote.id; await links.markPushed(sl.id, remote.id); }
+        } catch (lookupErr: any) {
+          await links.markFailed(cl.id, `SKU id unknown and lookup failed: ${String(lookupErr?.message || lookupErr).slice(0, 300)} — retry later`);
+          res.catalogue.failed++; res.errors.push(`catalogue ${job.skuCode}: id lookup failed`);
+          continue;
+        }
+        if (!skuId) {
+          await links.markFailed(cl.id, `SKU id unknown and '${job.skuCode}' not found on Shipskart by code — needs re-create (ledger says pushed; their side has no such SKU)`);
+          res.catalogue.failed++; res.errors.push(`catalogue ${job.skuCode}: sku id unknown, not found remotely`);
+          continue;
+        }
+      }
+      const addBody = map.buildCatalogueAddPayload({
+        skuCode: job.skuCode, skuName: job.skuName,
+        skuId, productMasterCode: pr.productCode, categoryId: pr.categoryId,
+        smc, vessel: { vesselId: link.shipskart_vessel_id, vesselName: v.name },
+        make: job.make ?? null, model: job.model ?? null,
+      });
+      const r2 = await requestWithBackoff('POST', '/integration/SAIL/add-spare-part-in-company-catalogue', { body: addBody });
+      await sleep(PACE_MS);
+      if (r2.ok || isDuplicateAnswer(r2.status, r2.json)) { await links.markPushed(cl.id); res.catalogue.pushed++; }
+      else { await links.markFailed(cl.id, `${r2.status} ${JSON.stringify(r2.json ?? r2.text)}`); res.catalogue.failed++; res.errors.push(`catalogue ${job.skuCode}: ${r2.status}`); }
+    }
+
+    console.log(`[CataloguePush] ${v.name}: cats +${res.categories.pushed}/~${res.categories.skipped} maps +${res.mappings.pushed} products +${res.products.pushed}/~${res.products.skipped} skus +${res.skus.pushed}/~${res.skus.skipped}/x${res.skus.failed} catalogue +${res.catalogue.pushed} warnings=${res.warnings.length}`);
+    return res;
+  } catch (err: any) {
+    res.errors.push(String(err?.message || err));
+    console.error(`[CataloguePush] FAILED for ${vesselId}: ${err?.message || err}`);
+    return res;
+  } finally {
+    inFlight.delete(vesselId);
+    if (!dryRun) {
+      lastRunByVessel.set(vesselId, {
+        finishedAt: new Date().toISOString(),
+        ok: res.errors.length === 0,
+        errors: res.errors.slice(0, 5),
+        warnings: res.warnings.slice(0, 3),
+      });
+    }
+  }
+}
+
+/**
+ * PRE-FLIGHT (17-Aug, dev round with Jeevan): tell the admin BEFORE the run which of this
+ * vessel's spare/store codes are already pushed for ANOTHER vessel — every one of them
+ * will hit the collision guard. On dev the test vessels are clones of each other (Vessel 5
+ * carried Vessel 2's exact MV0001-* codes), so a second-vessel push failed 1,100 items one
+ * by one with no warning up front. Zero Shipskart calls: our own DB only.
+ */
+export async function preflightVesselCatalogue(vesselId: string): Promise<{
+  collisions: number;
+  byOtherVessel: Array<{ vesselId: string; vesselName: string | null; count: number; sample: string[] }>;
+}> {
+  const pool = await getPool();
+  if (!pool) return { collisions: 0, byOtherVessel: [] };
+  const spares = (await pool.query(`SELECT part_code c FROM spares WHERE vessel_id=$1 AND is_deleted=false`, [vesselId])).rows;
+  const stores = (await pool.query(`SELECT item_code c FROM stores_items WHERE vessel_id=$1 AND deleted IS NOT TRUE`, [vesselId])).rows;
+  const codes = Array.from(new Set([...spares, ...stores].map((r: any) => map.sanitizeCode(r.c)).filter(Boolean)));
+  const hits = await links.findCrossVesselSkuCollisions(vesselId, codes);
+  const grouped = new Map<string, { vesselId: string; vesselName: string | null; count: number; sample: string[] }>();
+  for (const h of hits) {
+    const g = grouped.get(h.otherVesselId) ?? { vesselId: h.otherVesselId, vesselName: h.otherVesselName, count: 0, sample: [] };
+    g.count++; if (g.sample.length < 5) g.sample.push(h.skuCode);
+    grouped.set(h.otherVesselId, g);
+  }
+  return { collisions: hits.length, byOtherVessel: Array.from(grouped.values()).sort((a, b) => b.count - a.count) };
+}

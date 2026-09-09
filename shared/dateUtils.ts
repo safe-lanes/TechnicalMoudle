@@ -240,6 +240,24 @@ export function shouldGenerateWorkOrder(
   }
 }
 
+// Locale-independent 3-letter English month abbreviations. NEVER use
+// toLocaleDateString('en-GB', { month: 'short' }) for stored date strings:
+// modern browsers abbreviate September as "Sept" (4 letters), which the
+// read-side TO_TIMESTAMP(..., 'DD-Mon-YYYY-HH24:MI') parser cannot consume
+// (Postgres eats "Sep" then chokes on "t-2025" for the year → 22007 crash).
+const MONTH_ABBREV_3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * Format a Date as `DD MMM YYYY HH:mm` in local time, byte-identical to the
+ * legacy en-GB toLocaleDateString/toLocaleTimeString output except September
+ * is always "Sep" (3 letters), never "Sept". Used by the RH entry screen for
+ * running_hours_audit.date_updated_local.
+ */
+export function formatLocalDateTimeDDMMMYYYY(date: Date): string {
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  return `${pad2(date.getDate())} ${MONTH_ABBREV_3[date.getMonth()]} ${date.getFullYear()} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
 export function formatRelativeTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
   const normalized = normalizeDateToDDMMMYYYY(dateStr);

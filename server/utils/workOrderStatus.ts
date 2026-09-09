@@ -36,6 +36,8 @@ const BLOCKING_STATUSES_EXACT = new Set([
   'inprogress',
   'open',
   'rejected',  // Rejected WOs block new generation - work needs rework before cycle can advance
+  'awaiting office approval', // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
+  'postponement approved',    // Postponement approved — WO is still active, scanner must not re-generate
 ]);
 
 /**
@@ -86,33 +88,64 @@ export function isCompletedStatus(status: string | null | undefined): boolean {
 /**
  * Extract jobNo from a work order number
  * Handles multiple formats:
- * - NEW format: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING> (e.g., MKR-IN-00002-403.001-2025-439)
+ * - NEW format: <V_CODE>-<JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING>
+ *   (e.g., 001-MKR-IN-00002-403.001-2025-439)
+ * - PREVIOUS format: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING>
+ *   (e.g., MKR-IN-00002-403.001-2025-439)
  * - OLD format: <JOB_NO>-<YYYY>-<RUNNING> (e.g., MKR-IN-00001-2025-001)
  * - Variant: <JOB_NO>.WO-<YYYY>-<RUNNING> (e.g., MKR-SE-00005.WO-2025-002)
  */
-export function extractJobNoFromWorkOrderNo(workOrderNo: string | undefined): string | null {
+export function extractJobNoFromWorkOrderNo(
+  workOrderNo: string | undefined,
+  vesselCode?: string | null
+): string | null {
   if (!workOrderNo) return null;
+  if (isUnplannedWorkOrderNo(workOrderNo)) return null;
+
+  const knownVesselCode = vesselCode?.trim();
+  const numberWithoutKnownVesselPrefix =
+    knownVesselCode && workOrderNo.startsWith(`${knownVesselCode}-`)
+      ? workOrderNo.slice(knownVesselCode.length + 1)
+      : workOrderNo;
+
+  // New vessel-prefixed numbers retain the standard MKR job number after the
+  // prefix. This keeps legacy fallback matching working even where only the
+  // work-order number is available.
+  const vesselPrefixedMkrMatch = numberWithoutKnownVesselPrefix.match(
+    /^(?:.+-)?(MKR-[^-]+-\d+)-\d+\.\d+.*-\d{4}-\d+$/
+  );
+  if (vesselPrefixedMkrMatch) {
+    return vesselPrefixedMkrMatch[1];
+  }
   
   // Try NEW format first: has component code with dots before the year
   // Pattern: capture everything before -<digits>.<digits> pattern
-  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+  const newFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
   if (newFormatMatch) {
     return newFormatMatch[1];
   }
   
   // Try OLD format with .WO suffix: MKR-SE-00005.WO-2025-002
-  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
+  const woSuffixMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)\.WO-\d{4}-\d+$/);
   if (woSuffixMatch) {
     return woSuffixMatch[1];
   }
   
   // Try OLD format: MKR-IN-00001-2025-001 (jobNo-year-running)
-  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
+  const oldFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+)-\d{4}-\d+$/);
   if (oldFormatMatch) {
     return oldFormatMatch[1];
   }
   
   return null;
+}
+
+/**
+ * Supports both legacy UWO numbers and the vessel-prefixed UWO format.
+ */
+export function isUnplannedWorkOrderNo(workOrderNo: string | undefined | null): boolean {
+  if (!workOrderNo) return false;
+  return /(?:^|-)UWO-[^-]+-\d{4}-\d+$/.test(workOrderNo.trim());
 }
 
 /**
@@ -144,6 +177,14 @@ export function buildJobsWithActiveWOSet(
   const byJobNo = new Set<string>();
   
   workOrders.forEach(wo => {
+    // ARCHIVED ROWS NEVER BLOCK (corpse fix, 2026-08-04): a reconciler-retired loser is
+    // soft-deleted but storage.getWorkOrders still returns it — counting it here froze
+    // shore generation for the job+component forever (proven on the pilot). Numbering
+    // (generatePlannedWorkOrderNumber) deliberately still SEES deleted rows so an
+    // archived number is never reused.
+    if ((wo as any).isDeleted === true) {
+      return;
+    }
     // If vesselId filter is provided, only include WOs for that vessel
     if (vesselId && wo.vesselId !== vesselId) {
       return;
@@ -190,6 +231,9 @@ export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: stri
   workOrders.forEach(wo => {
     // Skip cancelled WOs - they don't count as cycle satisfaction
     // NOTE: Rejected WOs ARE included - they block new WO generation until rework is complete
+    if ((wo as any).isDeleted === true) {
+      return; // archived rows never satisfy/block a cycle (corpse fix, 2026-08-04)
+    }
     const normalizedStatus = wo.status?.toLowerCase().trim() || '';
     if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled') {
       return;
@@ -245,6 +289,9 @@ export function buildCalendarCycleWOMap<T extends { status: string; workOrderNo?
   workOrders.forEach(wo => {
     // Skip cancelled WOs - they don't count as cycle satisfaction
     // NOTE: Rejected WOs ARE included - they block new WO generation until rework is complete
+    if ((wo as any).isDeleted === true) {
+      return; // archived rows never satisfy/block a cycle (corpse fix, 2026-08-04)
+    }
     const normalizedStatus = wo.status?.toLowerCase().trim() || '';
     if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled') {
       return;
@@ -287,6 +334,7 @@ export function findBlockingWOForJob<T extends { status: string; jobId?: string 
   jobNo: string
 ): T | undefined {
   return workOrders.find(wo => {
+    if ((wo as any).isDeleted === true) return false; // archived rows never block (corpse fix)
     if (!isBlockingStatus(wo.status)) return false;
     
     // Direct match by jobId

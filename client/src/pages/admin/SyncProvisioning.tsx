@@ -15,6 +15,7 @@ import { useState, useContext, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { VesselContext } from "@/contexts/VesselContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +91,8 @@ function getCategoryColor(category: string): string {
 
 export default function SyncProvisioning() {
   const { toast } = useToast();
+  const { canEdit } = usePermissions();
+  const canProvision = canEdit("admin-sync-provisioning");
   const vesselCtx = useContext(VesselContext);
   const vessels = vesselCtx?.vessels ?? [];
 
@@ -423,19 +426,21 @@ export default function SyncProvisioning() {
                 className="hidden"
                 data-testid="input-import-file"
               />
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importMutation.isPending}
-                data-testid="btn-import-bundle"
-              >
-                {importMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <FileJson className="h-4 w-4 mr-2" />
-                )}
-                {importMutation.isPending ? "Importing..." : "Select & Import Bundle"}
-              </Button>
+              {canProvision && (
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importMutation.isPending}
+                  data-testid="btn-import-bundle"
+                >
+                  {importMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileJson className="h-4 w-4 mr-2" />
+                  )}
+                  {importMutation.isPending ? "Importing..." : "Select & Import Bundle"}
+                </Button>
+              )}
               {manifest && (
                 <Button
                   variant="outline"

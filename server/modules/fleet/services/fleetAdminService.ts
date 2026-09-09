@@ -225,6 +225,17 @@ export async function createFleetComponent(body: any) {
     throw err;
   }
 
+  if (validatedData.fleetEquipmentName) {
+    const existingByName = await repo.getFleetComponentByName(validatedData.fleetEquipmentName);
+    if (existingByName) {
+      const err: any = new Error(
+        `Component Name '${validatedData.fleetEquipmentName}' already exists. Please use a unique name.`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
   return repo.createFleetComponent(validatedData);
 }
 
@@ -235,6 +246,18 @@ export async function updateFleetComponent(id: number, body: any) {
     err.statusCode = 404;
     throw err;
   }
+
+  if (body.fleetEquipmentName && body.fleetEquipmentName !== existing.fleetEquipmentName) {
+    const duplicateByName = await repo.getFleetComponentByName(body.fleetEquipmentName, id);
+    if (duplicateByName) {
+      const err: any = new Error(
+        `Component Name '${body.fleetEquipmentName}' already exists. Please use a unique name.`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
   return repo.updateFleetComponent(id, body);
 }
 

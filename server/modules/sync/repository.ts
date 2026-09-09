@@ -83,6 +83,50 @@ export async function getAllInstanceMetadata(): Promise<SyncMetadata[]> {
 // sync_field_log
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * RETRY BACKOFF LADDER (migration 147).
+ *
+ * A record that fails to deliver is NOT abandoned — it is throttled. `sync_attempts` counts failed
+ * delivery attempts; the ladder maps that to how long to wait before trying again. The final tier
+ * repeats FOREVER: there is deliberately no quarantine and no give-up, because giving up is
+ * exactly what the old dead-letter did and it is how the Frontier Venture "71" were lost.
+ *
+ *   0  -> immediately eligible (never attempted)
+ *   1  -> 1 hour     2 -> 6 hours    3 -> 24 hours    4 -> 3 days    5+ -> every 7 days, forever
+ *
+ * Defined ONCE here and rendered into the gather. Deliberately not inlined ad hoc: the gather is
+ * already a ROW_NUMBER() complete-row-batching CTE and a hand-written CASE inside it would rot.
+ */
+export const RETRY_LADDER: ReadonlyArray<{ attempts: number; interval: string }> = [
+  { attempts: 1, interval: '1 hour' },
+  { attempts: 2, interval: '6 hours' },
+  { attempts: 3, interval: '24 hours' },
+  { attempts: 4, interval: '3 days' },
+];
+export const RETRY_LADDER_TAIL = '7 days';
+
+/**
+ * SQL predicate: is this row due for another attempt?
+ * Never-attempted rows (last_attempt_at IS NULL) are ALWAYS due — so on the first cycle after
+ * migration 147 every existing unsynced row is eligible, i.e. exactly today's behaviour.
+ */
+export function retryDuePredicate(alias = ''): string {
+  const p = alias ? `${alias}.` : '';
+  const cases = RETRY_LADDER
+    .map(t => `WHEN ${p}sync_attempts = ${t.attempts} THEN interval '${t.interval}'`)
+    .join(' ');
+  return `(${p}last_attempt_at IS NULL OR ${p}last_attempt_at < now() - (CASE ${cases} ELSE interval '${RETRY_LADDER_TAIL}' END))`;
+}
+
+/** The same ladder in JS, for the operator surface and the harness. ms to wait after N attempts. */
+export function retryDelayMs(attempts: number): number {
+  const H = 3600_000, D = 24 * H;
+  if (attempts <= 0) return 0;
+  const map: Record<string, number> = { '1 hour': H, '6 hours': 6 * H, '24 hours': D, '3 days': 3 * D };
+  const tier = RETRY_LADDER.find(t => t.attempts === attempts);
+  return tier ? map[tier.interval] : 7 * D;
+}
+
 export async function getUnsyncedFieldLogs(
   instanceId: string,
   vesselId: string,
@@ -96,13 +140,30 @@ export async function getUnsyncedFieldLogs(
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
 
   const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(', ');
+  // Complete-row batching (Fix 1): take the oldest `limit` field-logs by changed_at,
+  // then include ALL field-logs of every (table_name,row_uuid) appearing in that
+  // window — so one row's fields are NEVER split across a push batch. A split row
+  // arrives partial on the receiver and is dropped on NOT-NULL (component_id /
+  // date_updated_local / source), stranding that record's RH on office. Batch may
+  // exceed `limit` by straddling rows' remaining fields (bounded); throughput
+  // (~field-log count) otherwise unchanged. `limit` is a config integer, not input.
   const result = await pool.query(
-    `SELECT * FROM sync_field_log
-     WHERE instance_id = $1
-       AND vessel_id IN (${placeholders})
-       AND is_synced = false
-     ORDER BY changed_at ASC
-     LIMIT ${limit}`,
+    `WITH picked AS (
+       SELECT table_name, row_uuid
+       FROM (
+         SELECT table_name, row_uuid,
+                ROW_NUMBER() OVER (ORDER BY changed_at ASC, id ASC) AS rn
+         FROM sync_field_log
+         WHERE instance_id = $1 AND vessel_id IN (${placeholders}) AND is_synced = false
+           AND ${retryDuePredicate()}
+       ) ranked
+       WHERE rn <= ${limit}
+       GROUP BY table_name, row_uuid
+     )
+     SELECT s.* FROM sync_field_log s
+     JOIN picked p ON s.table_name = p.table_name AND s.row_uuid = p.row_uuid
+     WHERE s.instance_id = $1 AND s.vessel_id IN (${placeholders}) AND s.is_synced = false
+     ORDER BY s.changed_at ASC, s.row_uuid, s.id`,
     [instanceId, ...vesselValues]
   );
   return result.rows;
@@ -124,17 +185,37 @@ export async function getFieldLogsSinceCheckpoint(
   const vesselPlaceholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
   let paramIdx = vesselValues.length;
 
-  let query = `SELECT * FROM sync_field_log
-     WHERE vessel_id IN (${vesselPlaceholders})
+  let whereClause = `vessel_id IN (${vesselPlaceholders})
        AND instance_id != $${++paramIdx}
        AND is_synced = false`;
   const params: any[] = [...vesselValues, excludeInstanceId];
 
-  if (sinceTimestamp) {
-    query += ` AND changed_at > $${++paramIdx}`;
-    params.push(sinceTimestamp);
-  }
-  query += ` ORDER BY changed_at ASC LIMIT ${limit}`;
+  // Resend gate is is_synced-driven, NOT checkpoint-gated — mirrors the push gather
+  // getUnsyncedFieldLogs. The `changed_at > $sinceTimestamp` filter was REMOVED: it let the
+  // pull checkpoint (advanced to wall-clock now() on session complete) move past shore rows
+  // that were never delivered/applied, permanently orphaning is_synced=false rows behind it
+  // (LIMIT-truncation of a burst + import commit-visibility skew). Keying purely on
+  // is_synced=false guarantees any undelivered row is re-offered until the ship acks it applied.
+  // `sinceTimestamp` is retained in the signature (callers still pass it; the one-way gather uses
+  // its own checkpoint) but is intentionally NOT applied to field logs. `changed_at` still drives
+  // the ORDER BY below for oldest-first drain. Ack scoping lives in completeSyncSession.
+  void sinceTimestamp;
+  void paramIdx;
+  // Complete-row batching (Fix 1, pull path): identical guarantee to getUnsyncedFieldLogs —
+  // never split a row's field-logs across a pull batch (LIMIT) boundary, or the receiving
+  // ship drops the partial row on NOT-NULL. Take the oldest `limit` logs by changed_at, then
+  // ALL logs of those (table_name,row_uuid). Same where-clause/params reused in both scopes.
+  const query = `WITH picked AS (
+       SELECT table_name, row_uuid FROM (
+         SELECT table_name, row_uuid,
+                ROW_NUMBER() OVER (ORDER BY changed_at ASC, id ASC) AS rn
+         FROM sync_field_log WHERE ${whereClause}
+       ) ranked WHERE rn <= ${limit} GROUP BY table_name, row_uuid
+     )
+     SELECT s.* FROM sync_field_log s
+     JOIN picked p ON s.table_name = p.table_name AND s.row_uuid = p.row_uuid
+     WHERE ${whereClause}
+     ORDER BY s.changed_at ASC, s.row_uuid, s.id`;
 
   const result = await pool.query(query, params);
 
@@ -380,6 +461,26 @@ export async function getPendingFiles(
 }
 
 /**
+ * Count pending files for a vessel/direction that are <= maxBytes (unknown NULL size counts as
+ * small so it isn't stuck). Drives the size-gated drain: only these "small" files hold one
+ * "Sync Now" open until they fully arrive; larger files transfer over cycles without blocking.
+ */
+export async function getPendingFileCountBySize(
+  vesselId: string,
+  direction: string,
+  maxBytes: number,
+): Promise<number> {
+  const pool = await getPool();
+  const result = await pool.query(
+    `SELECT count(*)::int AS c FROM sync_file_queue
+     WHERE vessel_id = $1 AND direction = $2 AND status = 'pending'
+       AND (file_size_bytes IS NULL OR file_size_bytes <= $3)`,
+    [vesselId, direction, maxBytes]
+  );
+  return result.rows[0]?.c ?? 0;
+}
+
+/**
  * B-P1.1: All non-completed files for a vessel (pending / in_progress / failed /
  * unsendable / skipped) for the Sync Dashboard file panel. Read-only; newest activity first.
  */
@@ -526,6 +627,95 @@ export async function getRecentBatches(vesselId: string, limit: number = 10): Pr
 // sync_settings
 // ═══════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════
+// PER-TABLE ONE-WAY WATERMARKS (migration 148)
+// ═══════════════════════════════════════════════════════════════
+//
+// The single sync_metadata.last_sync_checkpoint let one unappliable table pin every
+// other one-way table for a vessel. These are per (instance_id, table_name).
+//
+// 🔴 A MISSING ROW IS NOT ZERO — it means "fall back to the single checkpoint". That
+// COALESCE is what makes day one byte-identical without seeding a hardcoded table list
+// into migration 148 (a list that would drift the moment syncConfig gains a table).
+
+/** All per-table watermarks for an instance, as { tableName: Date }. Missing = fall back. */
+export async function getTableCheckpoints(instanceId: string): Promise<Record<string, Date>> {
+  const pool = await getPool();
+  const r = await pool.query(
+    `SELECT table_name, last_checkpoint FROM sync_table_checkpoints
+      WHERE instance_id = $1 AND last_checkpoint IS NOT NULL`,
+    [instanceId]
+  );
+  const out: Record<string, Date> = {};
+  for (const row of r.rows) out[row.table_name] = new Date(row.last_checkpoint);
+  return out;
+}
+
+/**
+ * Upsert watermarks. Only ever moves a watermark FORWARD — an out-of-order or replayed
+ * response can never rewind one and cause a silent skip of rows already passed over.
+ */
+export async function setTableCheckpoints(
+  instanceId: string,
+  checkpoints: Record<string, string | Date>
+): Promise<number> {
+  const entries = Object.entries(checkpoints || {});
+  if (entries.length === 0) return 0;
+  const pool = await getPool();
+  let written = 0;
+  for (const [tableName, ts] of entries) {
+    if (!ts) continue;
+    const r = await pool.query(
+      `INSERT INTO sync_table_checkpoints (instance_id, table_name, last_checkpoint, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (instance_id, table_name) DO UPDATE
+         SET last_checkpoint = GREATEST(
+               sync_table_checkpoints.last_checkpoint,
+               EXCLUDED.last_checkpoint
+             ),
+             updated_at = NOW()
+       WHERE sync_table_checkpoints.last_checkpoint IS NULL
+          OR EXCLUDED.last_checkpoint > sync_table_checkpoints.last_checkpoint`,
+      [instanceId, tableName, ts instanceof Date ? ts.toISOString() : ts]
+    );
+    written += r.rowCount ?? 0;
+  }
+  return written;
+}
+
+/**
+ * The CONSERVATIVE FLOOR sent to shore as `lastCheckpoint`.
+ *
+ * 🔴 THIS MUST BE THE MINIMUM, NEVER THE MAXIMUM. An OLD shore ignores the per-table map
+ * and gathers `WHERE updated_at > lastCheckpoint`, so:
+ *    min -> re-offers rows some tables already applied. Harmless: one-way applies are
+ *           idempotent upserts.
+ *    max -> SILENTLY SKIPS every row between a lagging table's watermark and the max.
+ *           That is unrecoverable data loss, and it is exactly the stranded-parent bug.
+ * Returns null if ANY known one-way table has no watermark — null means "send everything",
+ * the safe direction.
+ *
+ * That null is now a MEANINGFUL SIGNAL rather than a permanent state: the gather stamps a
+ * watermark for every table it CONSIDERED, including ones with nothing to deliver (no
+ * vessel scope, or queried and empty). Only a table that THREW during gather stays
+ * unstamped — a real unknown, where being conservative is correct. Before this, 12 of 52
+ * tables were never stamped, the floor was null forever, and a new ship against an old
+ * shore full-snapshotted all 52 tables every sync — the 60s-504 path.
+ */
+export async function getConservativeFloor(
+  instanceId: string,
+  knownTables: string[]
+): Promise<Date | null> {
+  const perTable = await getTableCheckpoints(instanceId);
+  let min: Date | null = null;
+  for (const t of knownTables) {
+    const cp = perTable[t];
+    if (!cp) return null;               // a table with no watermark ⇒ full offer
+    if (min === null || cp < min) min = cp;
+  }
+  return min;
+}
+
 export async function getAllSettings(): Promise<Record<string, string>> {
   const db = await getDb();
   const rows = await db.select().from(syncSettings)
@@ -575,12 +765,19 @@ export async function updateSetting(key: string, value: string, userId?: string)
 export async function seedSettingIfEmpty(key: string, value: string): Promise<void> {
   if (value === undefined || value === null || value === '') return;
   const db = await getDb();
-  await db.update(syncSettings)
-    .set({ settingValue: value, updatedAt: new Date() })
-    .where(and(
-      eq(syncSettings.settingKey, key),
-      sql`COALESCE(${syncSettings.settingValue}, '') = ''`,
-    ));
+  // UPDATE-then-INSERT (was UPDATE-only). The old UPDATE-only form silently no-oped when the
+  // row did not exist (a key not pre-seeded by migration 132) — the latent defect behind two
+  // incidents (the timeout key on un-re-provisioned ships, and the selfheal_reoffer_v1 marker
+  // which had to hand-roll UPDATE-then-INSERT in autoSyncScheduler). ON CONFLICT keeps it
+  // idempotent and the setWhere ensures we ONLY write when the existing value is empty — an
+  // operator-set value is never overwritten.
+  await db.execute(sql`
+    INSERT INTO sync_settings (ssuuid, setting_key, setting_value, updated_at)
+    VALUES (gen_random_uuid()::text, ${key}, ${value}, NOW())
+    ON CONFLICT (setting_key) DO UPDATE
+      SET setting_value = EXCLUDED.setting_value, updated_at = NOW()
+      WHERE COALESCE(sync_settings.setting_value, '') = ''
+  `);
 }
 
 export async function updateSettings(settings: Record<string, string>, userId?: string): Promise<void> {
@@ -648,8 +845,15 @@ export async function getConnectivityLogs(
 }
 
 /**
- * Count unsynced field logs for a vessel — used by catch-up logic to decide
- * whether another consecutive sync cycle is needed.
+ * Count unsynced field logs for a vessel — the TRUE BACKLOG TOTAL.
+ *
+ * This is the number the crew and support see (`remainingPush` on /sync/status and the Sync
+ * Dashboard). It deliberately counts every undelivered row, including ones currently waiting out
+ * a retry-ladder backoff, because a backlog that hides itself is exactly the failure this stack
+ * exists to end. Do NOT filter it by retry-eligibility.
+ *
+ * For "should I run another cycle right now?" use getDueFieldLogCount below — see the comment
+ * there for why the two must not be the same number.
  */
 export async function getUnsyncedFieldLogCount(
   instanceId: string,
@@ -668,4 +872,303 @@ export async function getUnsyncedFieldLogCount(
     [instanceId, ...vesselValues]
   );
   return result.rows[0]?.c ?? 0;
+}
+
+/**
+ * Count field logs that are undelivered AND retry-eligible RIGHT NOW — the catch-up loop's
+ * stop condition. Same predicate the gather uses, so this answers "would another cycle actually
+ * send anything?".
+ *
+ * WHY THIS IS SEPARATE FROM getUnsyncedFieldLogCount (migration 147 regression, pilot-caught):
+ * the catch-up loop used the total, which before the retry ladder could only mean "there is work
+ * to do" — a row was either sent or dead-lettered away. Now a row can legitimately be waiting out
+ * a backoff, so the total never reaches zero, the loop keeps going, and every gather correctly
+ * returns nothing. Observed on the pilot: 20 catch-up cycles, "found 0 unsynced field logs" each
+ * time, for one held row. Harmless to data, but on a vessel that is 20 wasted VSAT round-trips per
+ * tick for as long as the row is held.
+ *
+ * The two counts answer different questions and must stay different: this one gates WORK, the
+ * total reports TRUTH. Making the dashboard use this number would re-hide the backlog.
+ */
+export async function getDueFieldLogCount(
+  instanceId: string,
+  vesselId: string,
+  vesselCode?: string | null,
+): Promise<number> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(', ');
+  const result = await pool.query(
+    `SELECT count(*)::int AS c FROM sync_field_log
+     WHERE instance_id = $1
+       AND vessel_id IN (${placeholders})
+       AND is_synced = false
+       AND ${retryDuePredicate()}`,
+    [instanceId, ...vesselValues]
+  );
+  return result.rows[0]?.c ?? 0;
+}
+
+/**
+ * Count shore-authored rows still pending delivery to a ship for this vessel:
+ * is_synced=false AND instance_id != <ship>. Mirrors the pull gather's filter (minus LIMIT),
+ * so it's the exact "office→ship remaining" backlog — used by the drain loop's stop condition.
+ */
+export async function getShorePullRemainingCount(
+  vesselId: string,
+  excludeInstanceId: string,
+  vesselCode?: string | null,
+): Promise<number> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+  const result = await pool.query(
+    `SELECT count(*)::int AS c FROM sync_field_log
+     WHERE vessel_id IN (${placeholders})
+       AND instance_id != $${vesselValues.length + 1}
+       AND is_synced = false`,
+    [...vesselValues, excludeInstanceId]
+  );
+  return result.rows[0]?.c ?? 0;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Part B — re-provision delivery-state reset (office side)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Re-provision detection: does this vessel/instance carry any PRIOR delivery state?
+ * True when EITHER any sync_field_log row for the vessel is already is_synced=true (a
+ * prior ship pulled it) OR this instance has a non-null last_sync_checkpoint. A genuinely
+ * brand-new instance (never provisioned, never synced) returns false so the reset is skipped
+ * and provisioning behaves exactly as today.
+ * Runs in the caller's (vessel's) tenant context via getPool().
+ */
+export async function hasDeliveredSyncHistory(
+  vesselId: string,
+  instanceId: string,
+  vesselCode?: string | null,
+): Promise<boolean> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+  const delivered = await pool.query(
+    `SELECT 1 FROM sync_field_log
+      WHERE vessel_id IN (${placeholders}) AND is_synced = true LIMIT 1`,
+    vesselValues
+  );
+  if (delivered.rows.length > 0) return true;
+  const cp = await pool.query(
+    `SELECT 1 FROM sync_metadata
+      WHERE instance_id = $1 AND last_sync_checkpoint IS NOT NULL LIMIT 1`,
+    [instanceId]
+  );
+  return cp.rows.length > 0;
+}
+
+/**
+ * Re-provision reset: align this vessel/instance's office-side DELIVERY state with the
+ * provisioning bundle so a freshly provisioned ship on the SAME instance id does NOT re-drain
+ * the vessel's entire history — the bundle IS the baseline as of the snapshot moment T.
+ *
+ * PARTITION mode (default, when a snapshot marker T is supplied): partition the shore-authored
+ * field logs at T = manifest.generatedAt (export start):
+ *   (a1) changed_at <= T  → is_synced=TRUE   — the bundle already delivered these; don't re-send.
+ *   (a2) changed_at >  T   → is_synced=FALSE  — post-snapshot edits the fresh ship still needs.
+ *   (b)  shore checkpoint  = T (tidy; not load-bearing — field-log pull is is_synced-driven and
+ *        the one-way gather uses the SHIP-sent checkpoint, which the import sets to generatedAt).
+ * Result: remainingPull ≈ 0 after import; only post-T rows flow; the edit-for-a-missing-row
+ * class stays impossible because baseline and bookmark agree exactly at T.
+ *
+ * BLUNT mode (opts.blunt, or when no T is supplied): today's behaviour — set ALL delivered
+ * shore logs back to is_synced=FALSE and clear the checkpoint (re-deliver everything). The
+ * guaranteed self-heal used when import verification fails or when explicitly requested.
+ *
+ * SAFETY: every statement is scoped by vessel_id (a1/a2) or instance_id (b/c) — provably
+ * incapable of touching another vessel's or instance's rows, and it NEVER touches real data
+ * tables (spares, spare_location_stock, …). It only flips sync-machinery delivery flags and
+ * clears this instance's batch history. One instance id = one unique vessel (by design).
+ * Runs in the caller's (vessel's) tenant context via getPool().
+ */
+export async function resetInstanceDeliveryStateForReprovision(
+  vesselId: string,
+  instanceId: string,
+  vesselCode?: string | null,
+  opts?: { snapshotAt?: Date | null; blunt?: boolean },
+): Promise<{
+  mode: 'partition' | 'blunt';
+  baselineMarkedSynced: number;
+  postSnapshotUnsynced: number;
+  batchesDeleted: number;
+  checkpoint: string | null;
+}> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const vp = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+  const ip = `$${vesselValues.length + 1}`;      // instance_id param
+  const tp = `$${vesselValues.length + 2}`;      // snapshot T param
+
+  // (c) Always: drop stale/in-progress batches initiated by THIS instance so a leftover
+  //     in_progress batch can't interfere with the fresh ship's first /sync/initiate.
+  const batches = await pool.query(
+    `DELETE FROM sync_batches WHERE initiated_by_instance = $1`,
+    [instanceId]
+  );
+  const batchesDeleted = batches.rowCount ?? 0;
+
+  const T = opts?.snapshotAt ?? null;
+
+  if (opts?.blunt || !T) {
+    // BLUNT: re-deliver everything (today's behaviour). Guaranteed self-heal.
+    const fl = await pool.query(
+      `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
+        WHERE vessel_id IN (${vp}) AND instance_id != ${ip} AND is_synced = true`,
+      [...vesselValues, instanceId]
+    );
+    await pool.query(
+      `UPDATE sync_metadata SET last_sync_checkpoint = NULL, updated_at = NOW() WHERE instance_id = $1`,
+      [instanceId]
+    );
+    const postSnapshotUnsynced = fl.rowCount ?? 0;
+    syncDiag(
+      `PROVISION-REPROVISION-RESET (blunt) instance=${instanceId} vessel=${vesselId}: ` +
+      `allUnsynced=${postSnapshotUnsynced} batchesDeleted=${batchesDeleted}`
+    );
+    return { mode: 'blunt', baselineMarkedSynced: 0, postSnapshotUnsynced, batchesDeleted, checkpoint: null };
+  }
+
+  // PARTITION at T.
+  // (a1) baseline (<= T) is carried by the bundle → mark delivered (flip the not-yet-true ones).
+  const a1 = await pool.query(
+    `UPDATE sync_field_log SET is_synced = true
+      WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
+        AND changed_at <= ${tp} AND is_synced = false`,
+    [...vesselValues, instanceId, T]
+  );
+  // (a2) post-snapshot edits (> T) must flow to the fresh ship → mark undelivered (flip any that
+  //      a prior sync had marked delivered to the OLD ship). Disjoint from (a1) by the T split.
+  const a2 = await pool.query(
+    `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
+      WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
+        AND changed_at > ${tp} AND is_synced = true`,
+    [...vesselValues, instanceId, T]
+  );
+  // (b) shore checkpoint = T (tidy). Row exists (upserted before the reset in provisioning).
+  //     This is its own statement with its own params, so T is $2 here.
+  await pool.query(
+    `UPDATE sync_metadata SET last_sync_checkpoint = $2, updated_at = NOW() WHERE instance_id = $1`,
+    [instanceId, T]
+  );
+
+  const baselineMarkedSynced = a1.rowCount ?? 0;
+  const postSnapshotUnsynced = a2.rowCount ?? 0;
+  syncDiag(
+    `PROVISION-REPROVISION-RESET (partition T=${T.toISOString()}) instance=${instanceId} vessel=${vesselId}: ` +
+    `baselineMarkedSynced=${baselineMarkedSynced} postSnapshotUnsynced=${postSnapshotUnsynced} batchesDeleted=${batchesDeleted}`
+  );
+  return { mode: 'partition', baselineMarkedSynced, postSnapshotUnsynced, batchesDeleted, checkpoint: T.toISOString() };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOLEAN SETTING PARSING (SYNC-HARDENING-PLAN §16)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Keys in sync_settings whose value is a boolean. Used both to PARSE tolerantly on read and
+ * to CANONICALISE on write, so the stored form can never drift from what the reader expects.
+ */
+export const BOOLEAN_SETTING_KEYS = ['auto_sync_enabled', 'local_mode'] as const;
+
+/**
+ * Tolerant boolean read for a sync_settings value.
+ *
+ * WHY: `settings['auto_sync_enabled'] === 'true'` was a strict, case-sensitive comparison. A
+ * value of 'TRUE', 'True', ' true' or '1' therefore read as FALSE and auto-sync silently never
+ * ran — while manual Sync Now kept working, because it never consults this flag. That failure is
+ * completely invisible: no error, no log beyond a single skip line.
+ *
+ * Every seed path in this repo writes lowercase (migrations 103 and 119), so the stored value is
+ * normally fine. The exposure is the settings-save endpoint, which persists whatever a caller
+ * sends without canonicalising, and any hand-edited DB row.
+ *
+ * Accepts: true/1/yes/y/on/t  (and the matching negatives) in any case, with surrounding space.
+ * Anything unrecognised returns `fallback` — an unparseable value must not silently mean "off".
+ */
+export function parseBooleanSetting(raw: string | null | undefined, fallback = false): boolean {
+  if (raw === null || raw === undefined) return fallback;
+  const v = String(raw).trim().toLowerCase();
+  if (v === '') return fallback;
+  if (['true', '1', 'yes', 'y', 'on', 't'].includes(v)) return true;
+  if (['false', '0', 'no', 'n', 'off', 'f'].includes(v)) return false;
+  console.warn(`[SyncSettings] Unrecognised boolean setting value ${JSON.stringify(raw)} — using fallback ${fallback}`);
+  return fallback;
+}
+
+/** Canonicalise boolean-ish setting values to 'true'/'false' before persisting. */
+export function canonicaliseBooleanSettings(settings: Record<string, any>): string[] {
+  const changed: string[] = [];
+  for (const key of BOOLEAN_SETTING_KEYS) {
+    if (!(key in settings)) continue;
+    const original = settings[key];
+    if (typeof original === 'boolean') { settings[key] = original ? 'true' : 'false'; }
+    else {
+      const parsed = parseBooleanSetting(String(original), false);
+      settings[key] = parsed ? 'true' : 'false';
+    }
+    if (String(original) !== settings[key]) changed.push(`${key}: ${JSON.stringify(original)} -> '${settings[key]}'`);
+  }
+  return changed;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RETRY LADDER BOOKKEEPING (migration 147)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Record a FAILED delivery attempt for rows that were offered but NOT confirmed applied.
+ *
+ * This replaces the in-memory `droppedRetryCount` Map. Because it is a column the count survives
+ * a restart — the Map reset on every PM2 bounce, so history was lost and the (now deleted)
+ * dead-letter threshold could be reached or never reached depending on uptime.
+ *
+ * Keyed by row_uuid, not log_uuid: delivery succeeds or fails per ROW under complete-row
+ * batching, so every log of an unconfirmed row shares the count and backs off together.
+ */
+export async function recordDeliveryAttempt(rowUuids: string[], instanceId: string): Promise<number> {
+  if (!rowUuids.length) return 0;
+  const pool = await getPool();
+  if (!pool) return 0;
+  const res = await pool.query(
+    `UPDATE sync_field_log
+        SET sync_attempts = sync_attempts + 1,
+            last_attempt_at = now(),
+            updated_at = now()
+      WHERE instance_id = $1 AND row_uuid = ANY($2::text[]) AND is_synced = false`,
+    [instanceId, rowUuids]
+  );
+  return res.rowCount ?? 0;
+}
+
+/**
+ * Backlog shape for the operator surface. `stuck` = rows that have fallen through to the final
+ * (7-day) tier. They are still retried forever — "stuck" means a human should look, not that the
+ * system gave up.
+ */
+export async function getRetryBacklog(
+  instanceId: string
+): Promise<{ total: number; stuck: number; maxAttempts: number }> {
+  const pool = await getPool();
+  if (!pool) return { total: 0, stuck: 0, maxAttempts: 0 };
+  const tailFrom = RETRY_LADDER.length + 1;
+  const r = await pool.query(
+    `SELECT count(*)::int AS total,
+            count(*) FILTER (WHERE sync_attempts >= $2)::int AS stuck,
+            COALESCE(max(sync_attempts), 0)::int AS max_attempts
+       FROM sync_field_log
+      WHERE instance_id = $1 AND is_synced = false`,
+    [instanceId, tailFrom]
+  );
+  return { total: r.rows[0].total, stuck: r.rows[0].stuck, maxAttempts: r.rows[0].max_attempts };
 }

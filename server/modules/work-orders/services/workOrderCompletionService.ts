@@ -7,6 +7,8 @@ import { invalidateComplianceCache } from './complianceAnomalyService';
 import { validateRHEntry } from '../../running-hours/services/rhTimelineValidationService';
 import { logFieldChanges } from '../../sync';
 import { isShipInstance } from '../../sync/syncRole';
+import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
+import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
 
 // ── Complete Work Order ──
 
@@ -37,14 +39,36 @@ export async function completeWorkOrder(
     adminOverride,
     userId: bodyUserId,
     userUuid: bodyUserUuid,
+    woCompletionRh: bodyWoCompletionRh,
+    currentReadingDate: bodyCurrentReadingDate,
     ...executionData
   } = body;
+
+  // RH accuracy (migration 139):
+  //  - woCompletionRh (Section B2.1 "WO Completion RH") = reading AT completion —
+  //    drives the NEXT RH cycle + missed-cycles. Fallback to the Section B3
+  //    Current Reading reproduces pre-feature behaviour for old/in-flight WOs.
+  //  - currentReadingDate (Section B3) = date the reading was TAKEN — threads into
+  //    the RH module so last_updated/audit reflect the reading date, not the WO
+  //    completion date.
+  const woCompletionRh: string | null =
+    bodyWoCompletionRh !== undefined && bodyWoCompletionRh !== null && String(bodyWoCompletionRh).trim() !== ''
+      ? String(bodyWoCompletionRh)
+      : null;
+  const currentReadingDate: string | null =
+    bodyCurrentReadingDate ? String(bodyCurrentReadingDate) : null;
+  // Effective source for next-cycle math (R1 fallback chain).
+  const cycleRH: string | undefined = woCompletionRh ?? runningHours;
+  const completionWarnings: string[] = [];
 
   // Get work order and component context
   const workOrder = await repo.findById(workOrderId);
   if (!workOrder) {
     throw new NotFoundError('Work order not found');
   }
+  const vesselCode = workOrder.vesselId
+    ? (await repo.getStorage().getVessel(workOrder.vesselId))?.vCode
+    : undefined;
 
   // Try multiple methods to find the component:
   // 1. By ID (workOrder.component might be an ID for some work orders)
@@ -110,6 +134,38 @@ export async function completeWorkOrder(
   if (workOrder.maintenanceBasis === 'Running Hours' && counterType !== 'NOT_RH_DRIVEN' && !runningHours) {
     throw new ValidationError('Running hours is required for RH-based maintenance work orders');
   }
+  if (requiresWoCompletionRh(workOrder.maintenanceBasis, counterType) && woCompletionRh === null) {
+    throw new ValidationError(
+      'WO Completion RH is required for Running Hours-based Work Orders',
+      { code: 'WO_COMPLETION_RH_REQUIRED' }
+    );
+  }
+
+  // ── RH accuracy validations (migration 139) ──
+  // BLOCK: completion RH cannot exceed the current reading — the machine cannot
+  // have had MORE hours at job completion than its latest meter reading.
+  if (woCompletionRh && runningHours) {
+    const woRhNum = parseFloat(woCompletionRh);
+    const readingNum = parseFloat(runningHours);
+    if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
+      throw new ValidationError(
+        `WO Completion RH (${woRhNum}) cannot be greater than the Current Reading (${readingNum}). ` +
+        `The completion reading is the hours at the time the work was done; the Current Reading is the latest meter value.`,
+        { code: 'WO_COMPLETION_RH_EXCEEDS_READING' }
+      );
+    }
+  }
+  // BLOCK: the reading date cannot be in the future.
+  if (currentReadingDate) {
+    const readingDateParsed = new Date(currentReadingDate);
+    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+    if (isNaN(readingDateParsed.getTime())) {
+      throw new ValidationError('Current Reading Date is not a valid date.', { code: 'INVALID_READING_DATE' });
+    }
+    if (readingDateParsed.getTime() > todayEnd.getTime()) {
+      throw new ValidationError('Current Reading Date cannot be in the future.', { code: 'READING_DATE_IN_FUTURE' });
+    }
+  }
 
   // === Layer 7: RH Reading Sync (Task #240) — branch by rhCounterType ===
   //  MASTER        → the completion reading is the source of truth: route it through
@@ -133,9 +189,33 @@ export async function completeWorkOrder(
   // shore MASTER reading into INHERITED validation/audit. This outer block has no else (closes
   // cleanly), so a shore instance simply skips RH sync and continues. updateMasterRH still runs on
   // the ship, so the shore mirrors via running_hours_audit sync (propagation untouched).
-  if (runningHours && counterType !== 'NOT_RH_DRIVEN' && await isShipInstance()) {
+  // Task #394: the office may now advance the RH counter from WO completion, but ONLY for
+  // vessels whose per-vessel office-RH-entry switch is ON (default OFF, fail closed). Ship
+  // behaviour is unchanged; receiving-side latest-reading-wins guards are always on.
+  const isShipForRhSync = await isShipInstance();
+  let officeRhEntryAllowedCompletion = false;
+  if (!isShipForRhSync && (workOrder.vesselId || component.vesselId)) {
+    const { isOfficeRhEntryEnabled } = await import('./workOrderGenerationGate');
+    officeRhEntryAllowedCompletion = await isOfficeRhEntryEnabled(workOrder.vesselId || component.vesselId || '');
+  }
+  if (runningHours && counterType !== 'NOT_RH_DRIVEN' && (isShipForRhSync || officeRhEntryAllowedCompletion)) {
     const newRH = parseInt(runningHours);
-    const completionDateForValidation = dateOfCompletion || new Date().toISOString().split('T')[0];
+    // Task #427: canonicalize ONCE at the boundary via the shared calendar-day
+    // parser — the same YYYY-MM-DD flows to validation, updateMasterRH, audit
+    // insert and stamp accrual (locale/offset inputs can no longer shift days).
+    const { requireReadingDayInput, todayReadingDay } = await import('../../running-hours/utils/readingDate');
+    const completionDateForValidation = requireReadingDayInput(dateOfCompletion ?? null, 'completion date') || todayReadingDay();
+    // R2 (migration 139): the RH MODULE operates on the date the reading was TAKEN.
+    // Falls back to the completion date = exact pre-feature behaviour.
+    const readingDateForRH = requireReadingDayInput(currentReadingDate ?? null, 'current reading date') || completionDateForValidation;
+    // Task #394: an OFFICE RH entry must carry an explicit observed reading date — never
+    // default to "now" (a wrong reading date poisons the latest-reading-wins comparator).
+    if (!isShipForRhSync && !currentReadingDate && !dateOfCompletion) {
+      throw new ValidationError(
+        'Office RH entry requires the reading date (Current Reading Date or Date of Completion). Enter the date the counter was actually read.',
+        { code: 'RH_READING_DATE_REQUIRED', workOrderNo: workOrder.workOrderNo }
+      );
+    }
     const componentVesselId = workOrder.vesselId || component.vesselId || 'V001';
     const previousRH = parseInt(component.currentCumulativeRH || '0');
     // Double-sync guard: if this WO's reading was already applied once, do not re-apply it on
@@ -163,40 +243,68 @@ export async function completeWorkOrder(
         // normally; the reading is saved for scheduling / next-due calculation only.
         const masterCurrentRH = parseFloat((component.rhCurrentMaster ?? component.currentCumulativeRH) || '0');
         if (newRH <= masterCurrentRH) {
+          // Task #394: baseline from AUDIT HISTORY first (legacy component stamps may be
+          // poisoned with entry/sync time); component stamp only as fallback.
+          const { resolveRhBaselineDay } = await import('../../running-hours/rhEventComparator');
+          const { getPool } = await import('../../../db');
           const masterUpdRaw: any = component.rhMasterUpdatedAt ?? (component.lastUpdated ? new Date(component.lastUpdated) : null);
-          const masterUpdDate: Date | null = masterUpdRaw instanceof Date ? masterUpdRaw : (masterUpdRaw ? new Date(masterUpdRaw) : null);
+          const stampFallback: Date | null = masterUpdRaw instanceof Date ? masterUpdRaw : (masterUpdRaw ? new Date(masterUpdRaw) : null);
+          const masterUpdDate: Date | null = await resolveRhBaselineDay(
+            await getPool(), component.cuuid,
+            stampFallback && !isNaN(stampFallback.getTime()) ? stampFallback : null
+          );
           if (masterUpdDate && !isNaN(masterUpdDate.getTime())) {
-            const woCompletionDate = new Date(completionDateForValidation);
+            const woCompletionDate = new Date(readingDateForRH);
             const masterDay = Date.UTC(masterUpdDate.getUTCFullYear(), masterUpdDate.getUTCMonth(), masterUpdDate.getUTCDate());
             const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
             if (woDay < masterDay) {
               rhBackdatedSkipped = true;
               rhBackdatedLatestRH = masterCurrentRH;
               rhBackdatedLatestRHDate = masterUpdDate.toISOString().split('T')[0];
-              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master current ${masterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated — reading saved to WO for scheduling only.`);
+              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (reading date ${readingDateForRH}) is older and lower than master current ${masterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated — reading saved to WO for scheduling only.`);
             }
           }
         }
 
         if (!rhBackdatedSkipped) {
+          // Task #394/#243: atomic compare-and-set claim on rh_synced_at — a concurrent or
+          // replayed completion of the SAME WO sees 0 rows and skips (no double-advance).
+          // Released on failure so a corrected retry can apply.
+          const { claimWoRhSync, releaseWoRhSync } = await import('../../running-hours/rhEventComparator');
+          const { getPool: getClaimPool } = await import('../../../db');
+          const claimPool = await getClaimPool();
+          if (!(await claimWoRhSync(claimPool, workOrder.wouuid))) {
+            console.warn(`⚠️ [RH Sync] WO ${workOrder.workOrderNo} RH already claimed/applied by a concurrent completion — skipping duplicate RH advance`);
+          } else {
           const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
           try {
             await updateMasterRH(component.cuuid, {
               newRHValue: newRH,
-              updateSource: 'MANUAL',
+              updateSource: 'WORKORDER',
               userId: bodyUserId || executionData.performedBy || 'system',
               userUuid: bodyUserUuid,
               userRole: userRole || 'Ship',
               adminOverride: adminOverride || false,
               comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ''})`,
-              dateUpdated: completionDateForValidation
+              dateUpdated: readingDateForRH
             });
             rhReadingApplied = true;
             console.log(`✅ [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
           } catch (masterErr: any) {
+            // Release the claim so a corrected retry can apply RH (Task #243 contract).
+            await releaseWoRhSync(claimPool, workOrder.wouuid);
             // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
             if (masterErr instanceof ValidationError) {
               const det: any = masterErr.details || {};
+              if (det.code === 'LOWER_THAN_CURRENT_RH') {
+                throw new ValidationError(masterErr.message, {
+                  ...det,
+                  componentId: component.cuuid,
+                  componentCode: component.componentCode || workOrder.componentCode,
+                  workOrderNo: workOrder.workOrderNo,
+                  rhCounterType: 'MASTER',
+                });
+              }
               throw new ValidationError(masterErr.message, {
                 code: 'RH_OVERRIDE_REQUIRED',
                 ...det,
@@ -209,6 +317,7 @@ export async function completeWorkOrder(
             }
             throw masterErr;
           }
+          } // end claim else — MASTER branch
         }
       }
     } else {
@@ -236,17 +345,24 @@ export async function completeWorkOrder(
           // INHERITED pre-flight: detect back-dated lower entry against the master component.
           const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || '0');
           if (newRH <= inhMasterCurrentRH) {
+            // Task #394: audit-history baseline first; component stamp only as fallback.
+            const { resolveRhBaselineDay } = await import('../../running-hours/rhEventComparator');
+            const { getPool } = await import('../../../db');
             const inhMasterUpdRaw: any = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhMasterUpdDate: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
+            const inhStampFallback: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
+            const inhMasterUpdDate: Date | null = await resolveRhBaselineDay(
+              await getPool(), masterComp.cuuid,
+              inhStampFallback && !isNaN(inhStampFallback.getTime()) ? inhStampFallback : null
+            );
             if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
-              const woCompletionDate = new Date(completionDateForValidation);
+              const woCompletionDate = new Date(readingDateForRH);
               const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
               const woDay = Date.UTC(woCompletionDate.getUTCFullYear(), woCompletionDate.getUTCMonth(), woCompletionDate.getUTCDate());
               if (woDay < masterDay) {
                 rhBackdatedSkipped = true;
                 rhBackdatedLatestRH = inhMasterCurrentRH;
                 rhBackdatedLatestRHDate = inhMasterUpdDate.toISOString().split('T')[0];
-                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (${completionDateForValidation}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated — reading saved to WO for scheduling only.`);
+                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry: WO ${workOrder.workOrderNo} entered RH ${newRH} (reading date ${readingDateForRH}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${rhBackdatedLatestRHDate}). RH module NOT updated — reading saved to WO for scheduling only.`);
               }
             }
           }
@@ -254,6 +370,13 @@ export async function completeWorkOrder(
           if (!rhBackdatedSkipped) {
           // Master resolved: advance its counter, which cascades the delta to every sibling
           // INHERITED component and stamps them all with the WO completion date.
+          // Task #394/#243: atomic claim — same double-advance protection as the MASTER branch.
+          const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await import('../../running-hours/rhEventComparator');
+          const { getPool: getPoolInh } = await import('../../../db');
+          const claimPoolInh = await getPoolInh();
+          if (!(await claimInh(claimPoolInh, workOrder.wouuid))) {
+            console.warn(`⚠️ [RH Sync] WO ${workOrder.workOrderNo} RH already claimed/applied by a concurrent completion — skipping duplicate RH advance (INHERITED)`);
+          } else {
           const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
           try {
             await updateMasterRH(masterComp.cuuid, {
@@ -264,12 +387,23 @@ export async function completeWorkOrder(
               userRole: userRole || 'Ship',
               adminOverride: adminOverride || false,
               comments: `WO ${workOrder.workOrderNo} (INHERITED → cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-              dateUpdated: completionDateForValidation
+              dateUpdated: readingDateForRH
             });
             console.log(`✅ [RH Sync] INHERITED component ${component.componentCode || component.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${workOrder.workOrderNo}`);
           } catch (masterErr: any) {
+            // Release the claim so a corrected retry can apply RH (Task #243 contract).
+            await releaseInh(claimPoolInh, workOrder.wouuid);
             if (masterErr instanceof ValidationError) {
               const det: any = masterErr.details || {};
+              if (det.code === 'LOWER_THAN_CURRENT_RH') {
+                throw new ValidationError(masterErr.message, {
+                  ...det,
+                  componentId: masterComp.cuuid,
+                  componentCode: masterComp.componentCode || workOrder.componentCode,
+                  workOrderNo: workOrder.workOrderNo,
+                  rhCounterType: 'INHERITED',
+                });
+              }
               throw new ValidationError(masterErr.message, {
                 code: 'RH_OVERRIDE_REQUIRED',
                 ...det,
@@ -282,10 +416,11 @@ export async function completeWorkOrder(
             }
             throw masterErr;
           }
+          } // end claim else — INHERITED branch
           } // end if (!rhBackdatedSkipped) — INHERITED branch
         } else {
           // No valid master link: timeline-validate and record on this child only.
-          const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
+          const validation = await validateRHEntry(component.cuuid, readingDateForRH, newRH);
           if (!validation.isValid) {
             throw new ValidationError(validation.errorMessage, {
               code: validation.validationStatus,
@@ -319,7 +454,7 @@ export async function completeWorkOrder(
             previousRH: previousRH.toString(),
             newRH: newRH.toString(),
             cumulativeRH: newRH.toString(),
-            dateUpdatedLocal: completionDateForValidation,
+            dateUpdatedLocal: readingDateForRH,
             dateUpdatedTZ: 'UTC',
             enteredAtUTC: new Date(),
             userId: executionData.performedBy || 'System',
@@ -337,22 +472,38 @@ export async function completeWorkOrder(
   }
 
   let missedCycles: number;
-  if (workOrder.maintenanceBasis === 'Running Hours' && runningHours) {
-    const completionRHValue = parseInt(runningHours);
+  if (workOrder.maintenanceBasis === 'Running Hours' && cycleRH) {
+    // R1 (migration 139): missed-cycles measures intervals elapsed AT THE MOMENT
+    // THE WORK WAS DONE — the WO Completion RH (fallback: Current Reading, which
+    // reproduces pre-feature behaviour exactly).
+    const completionRHValue = parseInt(cycleRH);
     const dueRH = workOrder.nextDueReading ? parseFloat(workOrder.nextDueReading) : null;
     let jobIntervalRH: number | null = null;
+    let prevLastDoneRH: number | null = null;
     if (workOrder.jobId) {
       const jobForRH = await repo.findJob(workOrder.jobId);
       if (jobForRH?.intervalRunningHour) {
         jobIntervalRH = jobForRH.intervalRunningHour;
       }
+      const prevRaw = (jobForRH as any)?.lastDoneRH;
+      if (prevRaw !== undefined && prevRaw !== null && String(prevRaw).trim() !== '') {
+        const parsedPrev = parseFloat(String(prevRaw));
+        if (!isNaN(parsedPrev)) prevLastDoneRH = parsedPrev;
+      }
     }
     if (!jobIntervalRH && workOrder.frequencyValue) {
       jobIntervalRH = parseInt(String(workOrder.frequencyValue));
     }
+    // WARN-ONLY (Jeevan's call): completion RH below the previous completion's
+    // lastDoneRH is suspicious but allowed — it still field-logs for audit.
+    if (woCompletionRh && prevLastDoneRH !== null && !isNaN(completionRHValue) && completionRHValue < prevLastDoneRH) {
+      const warnMsg = `WO Completion RH (${completionRHValue}) is below the previous completion's RH (${prevLastDoneRH}) for this job — saved as entered; please verify the reading.`;
+      completionWarnings.push(warnMsg);
+      console.warn(`⚠️ [RH Accuracy] ${warnMsg} (WO ${workOrder.workOrderNo})`);
+    }
     missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
     if (missedCycles > 0) {
-      console.log(`⚠️ Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, completionRH: ${completionRHValue}, interval: ${jobIntervalRH})`);
+      console.log(`⚠️ Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, cycleRH: ${completionRHValue}${woCompletionRh ? ' [woCompletionRh]' : ' [currentReading fallback]'}, interval: ${jobIntervalRH})`);
     }
   } else if (workOrder.maintenanceBasis === 'Dual Frequency') {
     // Dual Frequency: use calendar missed cycles (calendar leg is always present)
@@ -411,6 +562,9 @@ export async function completeWorkOrder(
     missedCycles,
     originalDueDate,
     completionRH: runningHours ? runningHours : undefined,
+    // RH accuracy (migration 139): persist the completion-time RH + reading date.
+    woCompletionRh: woCompletionRh ?? undefined,
+    currentReadingDate: currentReadingDate ?? undefined,
     completionRHValidated: runningHours ? true : undefined,
     completionRHSource: runningHours ? completionRHSource : undefined,
     completionRHValidationDetails: rhValidationDetails || undefined,
@@ -420,7 +574,9 @@ export async function completeWorkOrder(
     // Double-sync guard: stamp when a completion reading was applied this run (MASTER cascade or
     // INHERITED cycle). Leaves an existing stamp intact on replay.
     rhSyncedAt: rhReadingApplied ? new Date() : undefined,
-    rhBackdatedEntry: rhBackdatedSkipped ? true : undefined
+    rhBackdatedEntry: rhBackdatedSkipped ? true : undefined,
+    // Save as Draft (Task #402): completion supersedes any stashed draft.
+    draftExecutionData: null
   });
 
   // Sync field logging — log completion UPDATE
@@ -606,106 +762,26 @@ export async function completeWorkOrder(
     }
 
     if (job) {
-      const jobUpdates: any = {};
-      const linkUpdates: any = { updatedAt: new Date() };
+      // Cycle math extracted to the SHARED helper (jobCycleCalc) so the shore
+      // completion-learning hook computes identical values from synced ship
+      // completions. Semantics unchanged: Calendar/Dual/RH legs, D2 RH
+      // conditionality, R1 completion-RH source — see the helper's header.
+      const { computeJobCycleUpdates } = await import('@shared/workOrders/jobCycleCalc');
+      const { jobUpdates } = computeJobCycleUpdates({
+        maintenanceBasis: workOrder.maintenanceBasis,
+        dateOfCompletion,
+        completionRH: cycleRH,
+        originalDueDate,
+        job,
+      });
 
-      const woComponentId = (workOrder as any).componentId || component.cuuid;
-
-      // Calendar-based job cycle update
-      if (workOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
-        const { calculateNextDueDate } = await import('@shared/dateUtils');
-        linkUpdates.lastDoneDate = dateOfCompletion;
-        jobUpdates.lastDoneDate = dateOfCompletion;
-
-        if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate(dateOfCompletion, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) {
-            linkUpdates.nextDueDate = nextDue;
-            jobUpdates.nextDueDate = nextDue;
-            console.log(`✅ Auto-calculated next due date for job ${job.jobNo}: ${nextDue} (last done: ${dateOfCompletion}, interval: ${job.frequencyValue} ${job.frequencyUnit})`);
-          }
-        }
-
-        const updateVesselId = workOrder.vesselId || job.vesselId;
-        if (woComponentId && updateVesselId) {
-          await repo.updateJobComponentLinkTracking(updateVesselId, job.juuid, woComponentId, linkUpdates);
-          console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneDate: ${dateOfCompletion}`);
-        }
-
-        await repo.updateJob(job.juuid, jobUpdates);
-        console.log(`✅ Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
+      if (workOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletion && !cycleRH) {
+        console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
       }
 
-      // Dual Frequency job cycle update — Calendar ALWAYS, RH only if RH entered (D2)
-      if (workOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletion) {
-        const { calculateNextDueDate } = await import('@shared/dateUtils');
-
-        // Calendar leg: ALWAYS update
-        linkUpdates.lastDoneDate = dateOfCompletion;
-        jobUpdates.lastDoneDate = dateOfCompletion;
-
-        if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate(dateOfCompletion, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) {
-            linkUpdates.nextDueDate = nextDue;
-            jobUpdates.nextDueDate = nextDue;
-            console.log(`✅ [Dual] Auto-calculated next due date for job ${job.jobNo}: ${nextDue}`);
-          }
-        }
-
-        // RH leg: ONLY if runningHours entered (D2: if not entered, RH leg UNCHANGED)
-        if (runningHours) {
-          const dualCurrentRH = parseInt(runningHours);
-          if (!isNaN(dualCurrentRH)) {
-            linkUpdates.lastDoneRH = dualCurrentRH.toString();
-            jobUpdates.lastDoneRH = dualCurrentRH;
-
-            const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-            if (dualRhInterval && !isNaN(dualRhInterval)) {
-              const nextDueRH = dualCurrentRH + dualRhInterval;
-              linkUpdates.nextDueRH = nextDueRH.toString();
-              jobUpdates.nextDueRH = nextDueRH;
-              console.log(`✅ [Dual] Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done RH: ${dualCurrentRH}, interval: ${dualRhInterval})`);
-            }
-          }
-        } else {
-          console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
-        }
-
-        const dualUpdateVesselId = workOrder.vesselId || job.vesselId;
-        if (woComponentId && dualUpdateVesselId) {
-          await repo.updateJobComponentLinkTracking(dualUpdateVesselId, job.juuid, woComponentId, linkUpdates);
-          console.log(`✅ [Dual] Updated component tracking for vessel ${dualUpdateVesselId}, job ${job.jobNo} + component ${woComponentId}`);
-        }
-
+      if (Object.keys(jobUpdates).length > 0) {
         await repo.updateJob(job.juuid, jobUpdates);
-        console.log(`✅ Updated Dual Frequency job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}${runningHours ? ', lastDoneRH: ' + runningHours : ' (RH unchanged)'}`);
-      }
-
-      // Running Hours-based job cycle update
-      if (workOrder.maintenanceBasis === 'Running Hours' && runningHours) {
-        const currentRH = parseInt(runningHours);
-        if (!isNaN(currentRH)) {
-          linkUpdates.lastDoneRH = currentRH.toString();
-          jobUpdates.lastDoneRH = currentRH;
-
-          const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-          if (rhInterval && !isNaN(rhInterval)) {
-            const nextDueRH = currentRH + rhInterval;
-            linkUpdates.nextDueRH = nextDueRH.toString();
-            jobUpdates.nextDueRH = nextDueRH;
-            console.log(`✅ Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done: ${currentRH}, interval: ${rhInterval} hours)`);
-          }
-
-          const rhUpdateVesselId = workOrder.vesselId || job.vesselId;
-          if (woComponentId && rhUpdateVesselId) {
-            await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, woComponentId, linkUpdates);
-            console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneRH: ${currentRH}`);
-          }
-
-          await repo.updateJob(job.juuid, jobUpdates);
-          console.log(`✅ Updated RH job ${job.jobNo} with lastDoneRH: ${currentRH}`);
-        }
+        console.log(`✅ Updated ${workOrder.maintenanceBasis} job ${job.jobNo} cycle fields: ${JSON.stringify(jobUpdates)}`);
       }
     } else {
       console.warn(`⚠️ Could not find job to update for work order ${workOrder.workOrderNo}`);
@@ -818,6 +894,9 @@ export async function completeWorkOrder(
     runningHoursUpdated: !!runningHours,
     missedCycles,
     rhBackdated: rhBackdatedSkipped,
+    // RH accuracy (migration 139): warn-only advisories (e.g. completion RH below
+    // the previous completion) — saved as entered, surfaced for the UI to toast.
+    ...(completionWarnings.length > 0 && { warnings: completionWarnings }),
     ...(rhBackdatedSkipped && {
       latestRH: rhBackdatedLatestRH,
       latestRHDate: rhBackdatedLatestRHDate
@@ -836,6 +915,9 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
     console.error(`[Finalize] Work order ${workOrderId} not found`);
     return;
   }
+  const vesselCode = workOrder.vesselId
+    ? (await repo.getStorage().getVessel(workOrder.vesselId))?.vCode
+    : undefined;
 
   // ── 1. Resolve component ─────────────────────────────────────────────────
   let component: any = await repo.findComponent(workOrder.component);
@@ -879,7 +961,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
           componentCode: workOrder.componentCode || component.componentCode,
           vesselCode: workOrder.vesselId,
           jobId: workOrder.jobId || null,
-          jobCode: workOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+          jobCode: extractJobNoFromWorkOrderNo(workOrder.workOrderNo, vesselCode) || null,
           workOrderId: workOrder.wouuid,
           workOrderNo: workOrder.workOrderNo || `WO-${workOrder.id}`,
           jobTitle: workOrder.jobTitle,
@@ -911,9 +993,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
     let job: any = null;
     if (workOrder.jobId) job = await repo.findJob(workOrder.jobId);
     if (!job && workOrder.workOrderNo) {
-      const m1 = workOrder.workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-      const m2 = workOrder.workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-      const extractedJobNo = m1 ? m1[1] : (m2 ? m2[1] : null);
+      const extractedJobNo = extractJobNoFromWorkOrderNo(workOrder.workOrderNo, vesselCode);
       if (extractedJobNo && workOrder.vesselId) {
         const jobs = await repo.findJobs(workOrder.vesselId);
         job = jobs.find((j: any) => j.jobNo === extractedJobNo) || null;
@@ -927,32 +1007,24 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
       if ((basis === 'Calendar' || basis === 'Dual Frequency') && dateOfCompletionNorm) {
         const { calculateNextDueDate } = await import('@shared/dateUtils');
         const updates: any = { lastDoneDate: dateOfCompletionNorm };
-        const linkUpdates: any = { lastDoneDate: dateOfCompletionNorm, updatedAt: new Date() };
         if (job.frequencyValue && job.frequencyUnit) {
           const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) { updates.nextDueDate = nextDue; linkUpdates.nextDueDate = nextDue; }
-        }
-        const vId = workOrder.vesselId || job.vesselId;
-        if (component.cuuid && vId) {
-          await repo.updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, linkUpdates);
+          if (nextDue) updates.nextDueDate = nextDue;
         }
         await repo.updateJob(job.juuid, updates);
         console.log(`✅ [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
       }
 
-      if ((basis === 'Running Hours' || basis === 'Dual Frequency') && workOrder.runningHours) {
-        const currentRH = parseInt(workOrder.runningHours);
+      // R1 (migration 139): next cycle derives from the stored WO Completion RH
+      // (fallback: the stored reading = pre-feature behaviour for old rows).
+      const finalizeCycleRH = (workOrder as any).woCompletionRh ?? workOrder.runningHours;
+      if ((basis === 'Running Hours' || basis === 'Dual Frequency') && finalizeCycleRH) {
+        const currentRH = parseInt(String(finalizeCycleRH));
         if (!isNaN(currentRH)) {
           const rhUpdates: any = { lastDoneRH: currentRH };
-          const rhLinkUpdates: any = { lastDoneRH: currentRH.toString(), updatedAt: new Date() };
           const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
           if (rhInterval && !isNaN(rhInterval)) {
             rhUpdates.nextDueRH = currentRH + rhInterval;
-            rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
-          }
-          const vId = workOrder.vesselId || job.vesselId;
-          if (component.cuuid && vId) {
-            await repo.updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, rhLinkUpdates);
           }
           await repo.updateJob(job.juuid, rhUpdates);
           console.log(`✅ [Finalize] Updated RH job ${job.jobNo} lastDoneRH: ${currentRH}`);

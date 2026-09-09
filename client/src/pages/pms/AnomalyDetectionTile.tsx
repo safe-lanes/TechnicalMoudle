@@ -106,14 +106,14 @@ interface AnomalyDetectionTileProps {
 }
 
 export default function AnomalyDetectionTile({ vesselId }: AnomalyDetectionTileProps) {
-  const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isTechSuperintendent, isHeadOfDept, isVessel } = useUIRole();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
 
-  const canView = isSailAdmin || isClientAdmin || isHeadOfDept;
-  const canAcknowledge = isSailAdmin || isClientAdmin;
+  const canView = isSailAdmin || isClientAdmin || isTechSuperintendent || isHeadOfDept;
+  const canAcknowledge = isSailAdmin || isClientAdmin || isTechSuperintendent;
   const effectiveVesselId = vesselId && vesselId !== 'all' ? vesselId : undefined;
 
   const statsQuery = useQuery<AnomalyStats>({

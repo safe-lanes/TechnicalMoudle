@@ -1,9 +1,17 @@
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
+import { requirePermission } from '../../middleware/permissions';
 import * as defectsCtrl from './controllers/defectsController';
 import * as adminCtrl from './controllers/defectAdminController';
 
 const router = Router();
+
+// ── Permission policy (requirePermission, per-endpoint) ──
+// Vessel daily-operation defect writes STAY OPEN (create/update/close/link/notes,
+// actions & attachments CRUD, reports, recurring recalculate, e2e seed). Only
+// ADMIN-shaped writes are gated on 'admin-masters': defect-categories & defect-types
+// (POST=create, PATCH=edit, DELETE=delete), and defects-clear-all (delete). GETs open.
+// Sail/PMS Admin bypass; unconfigured roles fail-open (see middleware).
 
 // ══════════════════════════════════════════════════════════
 // Defects Routes
@@ -86,7 +94,7 @@ router.patch('/defects/:id/close', asyncHandler(defectsCtrl.closeDefect));
 // ══════════════════════════════════════════════════════════
 
 // DELETE /defects-clear-all — reserved for admin/testing
-router.delete('/defects-clear-all', asyncHandler(defectsCtrl.clearAllDefects));
+router.delete('/defects-clear-all', requirePermission('admin-masters', 'delete'), asyncHandler(defectsCtrl.clearAllDefects));
 
 // POST /defects-seed-e2e-test — reserved for testing
 router.post('/defects-seed-e2e-test', asyncHandler(defectsCtrl.seedE2eTest));
@@ -99,18 +107,18 @@ router.get('/defects-count', asyncHandler(defectsCtrl.getDefectsCountSummary));
 // ══════════════════════════════════════════════════════════
 
 router.get('/defect-categories', asyncHandler(adminCtrl.getCategories));
-router.post('/defect-categories', asyncHandler(adminCtrl.createCategory));
-router.patch('/defect-categories/:id', asyncHandler(adminCtrl.updateCategory));
-router.delete('/defect-categories/:id', asyncHandler(adminCtrl.deleteCategory));
+router.post('/defect-categories', requirePermission('admin-masters', 'create'), asyncHandler(adminCtrl.createCategory));
+router.patch('/defect-categories/:id', requirePermission('admin-masters', 'edit'), asyncHandler(adminCtrl.updateCategory));
+router.delete('/defect-categories/:id', requirePermission('admin-masters', 'delete'), asyncHandler(adminCtrl.deleteCategory));
 
 // ══════════════════════════════════════════════════════════
 // Defect Types Routes
 // ══════════════════════════════════════════════════════════
 
 router.get('/defect-types', asyncHandler(adminCtrl.getTypes));
-router.post('/defect-types', asyncHandler(adminCtrl.createType));
-router.patch('/defect-types/:id', asyncHandler(adminCtrl.updateType));
-router.delete('/defect-types/:id', asyncHandler(adminCtrl.deleteType));
+router.post('/defect-types', requirePermission('admin-masters', 'create'), asyncHandler(adminCtrl.createType));
+router.patch('/defect-types/:id', requirePermission('admin-masters', 'edit'), asyncHandler(adminCtrl.updateType));
+router.delete('/defect-types/:id', requirePermission('admin-masters', 'delete'), asyncHandler(adminCtrl.deleteType));
 
 // ══════════════════════════════════════════════════════════
 // Recurring Defects Routes

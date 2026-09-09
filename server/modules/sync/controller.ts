@@ -10,12 +10,16 @@ import * as syncRepo from './repository';
 import * as provisioningService from './provisioningService';
 import { getSyncEngine } from './syncEngine';
 import { syncAutoScheduler } from './autoSyncScheduler';
-import { FileSyncProcessor } from './fileSyncProcessor';
+import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import { runPruning } from './pruningService';
+import { runDriftScan, getOpenDrift } from './driftDetector';
+import { getInsertLogSkipCount } from './oneWayApplier';
+import { getBuildInfo } from '../../utils/buildInfo';
 import { runHealthCheck, getTableStats } from './healthMonitor';
+import { getFieldLogFailureSessionCount } from './fieldLogger';
 import { getPool } from '../../db';
 import { isShipInstanceId, isShipInstance } from './syncRole';
-import { getSyncLogPath, getSyncLogDir } from './syncDiagLogger';
+import { getSyncLogPath, getSyncLogDir, syncDiag } from './syncDiagLogger';
 
 // ── POST /sync/initiate ──
 
@@ -43,7 +47,7 @@ export async function initiateSyncHandler(req: Request, res: Response) {
 
 export async function pushHandler(req: Request, res: Response) {
   try {
-    const { batchUuid, vesselId, oneWayRows, fieldLogs, masterRecordHints } = req.body;
+    const { batchUuid, vesselId, oneWayRows, fieldLogs, masterRecordHints, fullRows } = req.body;
     if (!batchUuid || !vesselId) {
       return res.status(400).json({ error: 'batchUuid and vesselId are required' });
     }
@@ -52,6 +56,7 @@ export async function pushHandler(req: Request, res: Response) {
       oneWayRows,
       fieldLogs,
       masterRecordHints,
+      fullRows, // self-heal delivery (optional; absent from old ships)
     });
     res.json(result);
   } catch (error: any) {
@@ -70,11 +75,27 @@ export async function pullHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'batchUuid, vesselId, and instanceId are required' });
     }
 
+    // 148: tableCheckpoints is OPTIONAL — new ships send per-table one-way watermarks.
+    // ABSENT (old ship) → every table falls back to the single lastCheckpoint, which is
+    // byte-identical to pre-148 behaviour. Presence of the key IS the capability signal.
+    const rawTableCps = req.body.tableCheckpoints;
+    let tableCheckpoints: Record<string, Date> | undefined;
+    if (rawTableCps && typeof rawTableCps === 'object' && !Array.isArray(rawTableCps)) {
+      tableCheckpoints = {};
+      for (const [t, iso] of Object.entries(rawTableCps)) {
+        if (typeof iso === 'string') {
+          const d = new Date(iso);
+          if (!isNaN(d.getTime())) tableCheckpoints[t] = d;
+        }
+      }
+    }
+
     const result = await syncService.preparePullData(
       batchUuid,
       vesselId,
       instanceId,
-      lastCheckpoint ? new Date(lastCheckpoint) : null
+      lastCheckpoint ? new Date(lastCheckpoint) : null,
+      tableCheckpoints
     );
     res.json(result);
   } catch (error: any) {
@@ -117,13 +138,55 @@ export async function resolveConflictHandler(req: Request, res: Response) {
 
 export async function completeSyncHandler(req: Request, res: Response) {
   try {
-    const { batchUuid, vesselId, instanceId } = req.body;
+    const { batchUuid, vesselId, instanceId, appliedRowUuids } = req.body;
     if (!batchUuid || !vesselId || !instanceId) {
       return res.status(400).json({ error: 'batchUuid, vesselId, and instanceId are required' });
     }
 
-    const result = await syncService.completeSyncSession(batchUuid, vesselId, instanceId);
+    // appliedRowUuids is OPTIONAL — new ships send the rows they applied so the shore marks only
+    // those synced. Absent (old ship) → completeSyncSession falls back to today's behaviour.
+    // failedOneWayTables is OPTIONAL — new ships report one-way tables whose apply failed so the
+    // shore holds the checkpoint back (one-way orphaning fix). Absent → advance as today.
+    const failedOneWayTables = Array.isArray(req.body.failedOneWayTables)
+      ? req.body.failedOneWayTables.filter((t: unknown) => typeof t === 'string')
+      : undefined;
+    // 148: appliedTableCheckpoints is OPTIONAL — new ships echo back the per-table max
+    // they applied cleanly. Absent (old ship) → single-watermark path, unchanged.
+    const rawApplied = req.body.appliedTableCheckpoints;
+    let appliedTableCheckpoints: Record<string, string> | undefined;
+    if (rawApplied && typeof rawApplied === 'object' && !Array.isArray(rawApplied)) {
+      appliedTableCheckpoints = {};
+      for (const [t, iso] of Object.entries(rawApplied)) {
+        if (typeof iso === 'string') appliedTableCheckpoints[t] = iso;
+      }
+    }
+
+    const result = await syncService.completeSyncSession(
+      batchUuid,
+      vesselId,
+      instanceId,
+      Array.isArray(appliedRowUuids) ? appliedRowUuids : undefined,
+      failedOneWayTables,
+      appliedTableCheckpoints
+    );
     res.json(result);
+
+    // ── POST-SYNC RECONCILE TRIGGER (2026-08-04, plan §9.6 revision — explicit instruction) ──
+    // A duplicate WO pair only becomes VISIBLE on shore when a sync delivers the ship's
+    // copy — so the sync cycle that just completed is the exact right moment to resolve
+    // it. Fire-and-forget AFTER the response: the ship's cycle is never delayed, a failure
+    // here costs nothing (the NEXT cycle fires this hook again — that is the only backup;
+    // the periodic reconciler timers were deliberately removed), and the reconciler's own
+    // per-vessel lock + shore-only guard make re-entry safe.
+    setImmediate(() => {
+      import('../work-orders/services/workOrderReconcilerService')
+        .then(svc => svc.reconcileVessel(vesselId))
+        .then(r => {
+          const n = r.resolved.case1 + r.resolved.case2 + r.resolved.case3;
+          if (n > 0) console.log(`[WO-Reconciler] post-sync trigger: resolved ${n} duplicate(s) for vessel ${vesselId}`);
+        })
+        .catch(err => console.warn(`[WO-Reconciler] post-sync trigger failed (next sync retries): ${err?.message || err}`));
+    });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] complete error:', error);
@@ -142,7 +205,42 @@ export async function statusHandler(req: Request, res: Response) {
     }
 
     const result = await syncService.getSyncStatus(vesselId, instanceId);
-    res.json(result);
+
+    // Phase-0 un-swallow (§9.4): surface LOST field logs until the Sync-Health panel exists.
+    // session = failures since this process started; unresolved = durable backlog needing the
+    // full-row-diff recovery. Best-effort — an old DB without migration 142 reports nulls.
+    let fieldLogFailures: { session: number; unresolved: number | null } = {
+      session: getFieldLogFailureSessionCount(),
+      unresolved: null,
+    };
+    try {
+      const pool = await getPool();
+      const r = await pool.query(`SELECT count(*)::int AS n FROM sync_field_log_failures WHERE resolved = false`);
+      fieldLogFailures.unresolved = r.rows[0]?.n ?? 0;
+    } catch { /* table absent pre-migration — leave null */ }
+
+    // §13 guard: count of re-delivered INSERT-origin logs SKIPPED to protect a populated
+    // column. A skip deliberately writes no conflict row and fires no notification, so this
+    // counter is the ONLY signal — a spike means someone is re-offering old logs (recovery,
+    // dead-letter replay, checkpoint rewind) and each skip is a value that did NOT get applied.
+    const insertLogSkips = { session: getInsertLogSkipCount() };
+
+    // Migration 147 — retry backlog. Now that is_synced=true means CONFIRMED APPLIED, unconfirmed
+    // rows are never marked and never pruned (pruning deletes is_synced=true only). That is the
+    // right trade — better a retained undelivered record than a deleted one — but it must be
+    // VISIBLE or the backlog just grows unseen. `stuck` = rows on the final 7-day tier; they are
+    // still retried forever, "stuck" means a human should look, not that anything gave up.
+    let retryBacklog: { total: number; stuck: number; maxAttempts: number } | null = null;
+    try {
+      retryBacklog = await syncRepo.getRetryBacklog(instanceId);
+    } catch { /* pre-migration-147 DB — leave null */ }
+
+    // Build identity, so a vessel can be version-confirmed WITHOUT shell access. That is the
+    // real constraint: ships are intermittently reachable, and the sync guards only log when
+    // they fire, so there was previously no way to prove a fix was live except SSH + git log.
+    const build = getBuildInfo();
+
+    res.json({ ...result, fieldLogFailures, insertLogSkips, retryBacklog, build });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] status error:', error);
@@ -201,12 +299,33 @@ export async function triggerSyncHandler(req: Request, res: Response) {
     }
 
     const engine = getSyncEngine();
-    const result = await engine.runSync(vesselId);
+    // Drain-to-zero: one "Sync Now" fully reconciles the vessel (push + pull) in this single
+    // action, looping whole cycles until both backlogs are 0 or a safety stop (cap / time budget /
+    // no-progress). Bounded so a large historical backlog drains a chunk without hanging the request.
+    const result = await engine.runSyncToCompletion(vesselId);
     res.json(result);
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] trigger error:', error);
     res.status(500).json({ error: 'Failed to trigger sync' });
+  }
+}
+
+// ── POST /sync/fetch-rows ──  self-heal (pull direction): the ship requests complete rows
+// for fragments that target rows absent on the ship. Read-only; tenant-scoped by the guard.
+
+export async function fetchRowsHandler(req: Request, res: Response) {
+  try {
+    const { vesselId, instanceId, requests } = req.body || {};
+    if (!vesselId || !instanceId || !Array.isArray(requests)) {
+      return res.status(400).json({ error: 'vesselId, instanceId, and requests[] are required' });
+    }
+    const tables = await syncService.fetchFullRowsForHeal(requests);
+    res.json({ tables });
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] fetch-rows error:', error);
+    res.status(500).json({ error: 'Failed to fetch rows for self-heal' });
   }
 }
 
@@ -305,6 +424,70 @@ export async function skipFileHandler(req: Request, res: Response) {
   }
 }
 
+// ── POST /sync/file/pending ──  shore→ship pull: list shore_to_ship pending for a vessel
+// Mirror of upload-chunk (server-to-server, syncTenantGuard). Ship calls this to discover files.
+export async function pendingFilesHandler(req: Request, res: Response) {
+  try {
+    const { vesselId, maxBytes } = req.body;
+    if (!vesselId) return res.status(400).json({ error: 'vesselId is required' });
+    const processor = new FileSyncProcessor();
+    const result = await processor.listPendingForPull(vesselId, Number(maxBytes) || DEFAULT_FILE_DRAIN_MAX_BYTES);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] file-pending error:', error);
+    res.status(500).json({ error: 'Failed to list pending files' });
+  }
+}
+
+// ── POST /sync/file/download-chunk ──  shore→ship pull: stream one chunk of a queued file
+export async function downloadChunkHandler(req: Request, res: Response) {
+  try {
+    const { queueUuid, chunkIndex } = req.body;
+    if (!queueUuid || chunkIndex === undefined) {
+      return res.status(400).json({ error: 'queueUuid and chunkIndex are required' });
+    }
+    const processor = new FileSyncProcessor();
+    const chunk = await processor.readChunkForPull(queueUuid, Number(chunkIndex));
+    if (!chunk) return res.status(404).json({ error: 'File not found in local storage' });
+    res.json(chunk);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] download-chunk error:', error);
+    res.status(500).json({ error: 'Failed to read file chunk' });
+  }
+}
+
+// ── POST /sync/file/:queueUuid/complete ──  shore→ship pull: ship confirms a verified file;
+// the shore marks its shore_to_ship entry completed so it stops re-offering it.
+export async function completeFileHandler(req: Request, res: Response) {
+  try {
+    const { queueUuid } = req.params;
+    if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
+    await syncRepo.markFileCompleted(queueUuid);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Sync] file complete error:', error);
+    res.status(500).json({ error: 'Failed to mark file completed' });
+  }
+}
+
+// ── POST /sync/file/:queueUuid/fail ──  shore→ship pull dead-letter: the ship gave up after 3
+// failed attempts; the shore marks its entry terminal 'failed' (leaves 'pending' → drops from the
+// drain count). Mirror of the push's dead-letter.
+export async function failFileHandler(req: Request, res: Response) {
+  try {
+    const { queueUuid } = req.params;
+    if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
+    const reason = (req.body?.reason as string) || 'Dead-lettered after repeated failed pull attempts';
+    await syncRepo.updateFileStatus(queueUuid, 'failed', undefined, reason);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Sync] file fail error:', error);
+    res.status(500).json({ error: 'Failed to mark file failed' });
+  }
+}
+
 // ══════════════════════════════════════════════════════════════
 // Provisioning endpoints (offline_admin / Sail Admin gated)
 // ══════════════════════════════════════════════════════════════
@@ -368,7 +551,10 @@ export async function downloadProvisionHandler(req: Request, res: Response) {
     // map row (master). Domain is the verified tenant domain (set by tenantMiddleware,
     // since provisioning routes are no longer exempt). No-op when multi-tenant disabled.
     const domain = (req as any).tenantDomain || undefined;
-    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, { domain, persist: true });
+    // ?blunt=true forces the full re-deliver-everything reset (the guaranteed self-heal used
+    // when a prior import failed verification). Default = snapshot-baseline partition.
+    const blunt = req.query.blunt === 'true' || req.query.blunt === '1';
+    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, { domain, persist: true, blunt });
 
     const fileName = `provision_${vesselId}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     res.setHeader('Content-Type', 'application/json');
@@ -518,6 +704,15 @@ export async function updateSettingsHandler(req: Request, res: Response) {
       newIntervalMinutes = n;
     }
 
+    // §16: canonicalise boolean-ish values to lowercase 'true'/'false' BEFORE persisting. The
+    // endpoint previously stored whatever a caller sent, so a UI posting "TRUE" would silently
+    // disable auto-sync forever (the reader used a strict === 'true'). Reader is now tolerant
+    // too, but normalising on write keeps the stored form canonical for SQL and for humans.
+    const canonicalised = syncRepo.canonicaliseBooleanSettings(settings);
+    if (canonicalised.length > 0) {
+      console.log(`[Sync Settings] Canonicalised boolean value(s): ${canonicalised.join(', ')}`);
+    }
+
     const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
     await syncRepo.updateSettings(settings, userId);
 
@@ -528,7 +723,18 @@ export async function updateSettingsHandler(req: Request, res: Response) {
     // Apply the new interval LIVE. The scheduler only runs on a ship instance;
     // on shore restartWithNewInterval is a graceful no-op (records the preference).
     if (newIntervalMinutes !== null && (await isShipInstance())) {
-      syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+      if (!syncAutoScheduler.isStarted()) {
+        // Self-heal: this instance resolves as a SHIP right now but the scheduler
+        // was never started — the boot-time role decision was taken against a
+        // stale instance_id (reproduced 2026-07-28). "Recording a preference"
+        // here left auto-sync dead until a restart; start it instead. start()
+        // reads sync_interval_minutes from the DB, which we just saved.
+        console.warn('[AutoSync] 🩹 SELF-HEAL: settings saved on a ship instance while the scheduler was not running (stale boot-time role decision) — starting it now.');
+        syncDiag('[AutoSync] SELF-HEAL: settings-save found the scheduler not running on a ship instance — started late (boot-time role decision was stale).');
+        await syncAutoScheduler.start();
+      } else {
+        syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+      }
     }
 
     res.json({
@@ -657,4 +863,28 @@ export async function diagLogsListHandler(req: Request, res: Response) {
     console.error('[Sync] diag-logs error:', error);
     res.status(500).json({ error: 'Failed to list diagnostic logs' });
   }
+}
+
+
+/** GET /sync/drift — open drift findings (row value != its own newest field log). */
+export async function driftListHandler(req: any, res: any) {
+  const limit = Math.min(parseInt(req.query?.limit ?? '500', 10) || 500, 2000);
+  res.json({ success: true, findings: await getOpenDrift(limit) });
+}
+
+/**
+ * POST /sync/drift/scan — run the scan on demand.
+ * Body: { vesselId?, tables?: string[], sinceDays?, maxRowsPerTable?, dryRun? }
+ * dryRun=true reports without writing findings — safe to run against production to look.
+ */
+export async function driftScanHandler(req: any, res: any) {
+  const b = req.body || {};
+  const result = await runDriftScan({
+    vesselId: b.vesselId,
+    tables: Array.isArray(b.tables) ? b.tables : undefined,
+    sinceDays: b.sinceDays ? parseInt(b.sinceDays, 10) : undefined,
+    maxRowsPerTable: b.maxRowsPerTable ? parseInt(b.maxRowsPerTable, 10) : undefined,
+    dryRun: b.dryRun === true,
+  });
+  res.json({ success: true, ...result });
 }

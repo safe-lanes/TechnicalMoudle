@@ -1,3 +1,5 @@
+import { parseReadingDayStrict, canonicalizeReadingDateInput } from './readingDate';
+
 export interface RHValidationResult {
   allowed: boolean;
   maxAllowedIncrease: number;
@@ -18,11 +20,93 @@ export interface RHValidationInput {
   adminOverride?: boolean;
 }
 
+export type RHMonotonicityReason =
+  | 'VALID_INCREASE'
+  | 'EQUAL_CURRENT_RH'
+  | 'LOWER_THAN_CURRENT_RH'
+  | 'APPROVED_RESET';
+
+export interface RHMonotonicityResult {
+  allowed: boolean;
+  reason: RHMonotonicityReason;
+  currentRH: number;
+  submittedRH: number;
+  delta: number;
+  currentRHDate: string | null;
+  submittedRHDate: string | null;
+  message: string;
+}
+
+/**
+ * Running-hour counters are monotonic during normal operation. Rate validation
+ * and the vessel validation toggle are deliberately separate from this
+ * integrity rule: a newer reading still cannot move a physical counter
+ * backwards. Meter replacement / renewal resets use their explicit workflows.
+ */
+export function validateRHMonotonicity(input: {
+  currentRH: number;
+  submittedRH: number;
+  currentRHDate?: string | null;
+  submittedRHDate?: string | null;
+  approvedReset?: boolean;
+}): RHMonotonicityResult {
+  const currentRHDate = input.currentRHDate ?? null;
+  const submittedRHDate = input.submittedRHDate ?? null;
+  const delta = input.submittedRH - input.currentRH;
+
+  if (input.approvedReset) {
+    return {
+      allowed: true,
+      reason: 'APPROVED_RESET',
+      currentRH: input.currentRH,
+      submittedRH: input.submittedRH,
+      delta,
+      currentRHDate,
+      submittedRHDate,
+      message: 'Approved running-hours reset or meter replacement.',
+    };
+  }
+
+  if (delta < 0) {
+    const dateContext = currentRHDate ? ` recorded on ${currentRHDate}` : '';
+    return {
+      allowed: false,
+      reason: 'LOWER_THAN_CURRENT_RH',
+      currentRH: input.currentRH,
+      submittedRH: input.submittedRH,
+      delta,
+      currentRHDate,
+      submittedRHDate,
+      message: `Current Reading (${input.submittedRH} RH) cannot be lower than the latest Running Hours value (${input.currentRH} RH${dateContext}). Correct the reading before continuing.`,
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: delta === 0 ? 'EQUAL_CURRENT_RH' : 'VALID_INCREASE',
+    currentRH: input.currentRH,
+    submittedRH: input.submittedRH,
+    delta,
+    currentRHDate,
+    submittedRHDate,
+    message: delta === 0
+      ? `Running Hours is already ${input.currentRH} RH; no update is required.`
+      : `Running Hours increases by ${delta} RH.`,
+  };
+}
+
 const MAX_HOURS_PER_DAY = 25;
 
-function getCalendarDate(dateStr: string): Date {
-  const date = new Date(dateStr);
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+/**
+ * Task #427: calendar-day parse via the SHARED strict parser (no unrestricted
+ * `new Date(str)` — locale text must not shift days by machine timezone).
+ * Returns null for unparseable values; callers decide the fallback.
+ */
+function getCalendarDate(dateStr: string): Date | null {
+  const strict = parseReadingDayStrict(dateStr);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(dateStr);
+  return canonical ? parseReadingDayStrict(canonical) : null;
 }
 
 function getDaysBetweenCalendarDates(date1: Date, date2: Date): number {
@@ -32,8 +116,8 @@ function getDaysBetweenCalendarDates(date1: Date, date2: Date): number {
 
 function formatDMY(dateStr: string): string {
   if (!dateStr) return dateStr;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  const d = getCalendarDate(dateStr);
+  if (!d) return dateStr;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
@@ -52,10 +136,10 @@ export function validateRunningHoursIncrease(
   let daysSinceLastUpdate = 0;
   let sameDayUpdate = false;
 
-  if (componentLastUpdated) {
-    const lastCalendarDate = getCalendarDate(componentLastUpdated);
-    const newCalendarDate = getCalendarDate(newUpdateDate);
+  const lastCalendarDate = componentLastUpdated ? getCalendarDate(componentLastUpdated) : null;
+  const newCalendarDate = getCalendarDate(newUpdateDate);
 
+  if (lastCalendarDate && newCalendarDate) {
     daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
 
     if (daysSinceLastUpdate < 0) {
@@ -73,7 +157,7 @@ export function validateRunningHoursIncrease(
         backdatedLower: requestedIncrease <= 0,
         message: canOverride
           ? 'Sail Admin override applied for backdated running-hours entry.'
-          : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated)}). Running hours can only be recorded on or after the latest reading.`,
+          : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated || '')}). Running hours can only be recorded on or after the latest reading.`,
         requiresAdminOverride: !canOverride
       };
     }
@@ -149,4 +233,30 @@ export function validateRunningHoursIncrease(
 
 export function canAdminOverride(userRole: string): boolean {
   return userRole === 'Sail Admin';
+}
+
+/**
+ * Safely parse any date value (string, Date, null, undefined) into a Date object.
+ * Returns null for invalid, unparseable, or missing values instead of throwing or
+ * returning an Invalid Date — guards against mixed text formats (DD-MMM-YYYY, ISO,
+ * timestamp strings) that appear across different columns.
+ */
+export function safeParseDate(value: string | Date | null | undefined): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  // Full ISO timestamps (e.g. "2026-08-05T14:30:00Z", entered_at values) keep
+  // their time-of-day for MAX comparisons; anything else parses to a UTC-day
+  // via the SHARED strict parser (Task #427: no unrestricted `new Date(str)`).
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}/.test(trimmed)) {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return d;
+  }
+  const strict = parseReadingDayStrict(trimmed);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(trimmed);
+  return canonical ? parseReadingDayStrict(canonical) : null;
 }

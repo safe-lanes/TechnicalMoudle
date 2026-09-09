@@ -18,6 +18,8 @@ const upload = multer({
       'image/jpeg',
       'image/png',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv',
     ];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
@@ -63,6 +65,13 @@ router.get('/work-orders/planner/export', asyncHandler(woCtrl.exportPlanner));
 // POST /work-orders/planner/export — export planner as Excel from client-provided items
 router.post('/work-orders/planner/export', asyncHandler(woCtrl.exportPlannerFromItems));
 
+// ── Retired Company Approval Policy ──
+// Kept only as a compatibility response; live policy is in PMS vessel settings.
+router.get('/approval-policy', asyncHandler(woCtrl.getApprovalPolicy));
+
+// PUT /approval-policy — retired; responds 410 and cannot alter live policy.
+router.put('/approval-policy', asyncHandler(woCtrl.updateApprovalPolicy));
+
 // ── Core Work Order CRUD ──
 
 // GET  /work-orders — list all (optional ?vesselId= filter)
@@ -80,6 +89,15 @@ router.get('/work-orders/:id/rejection-history', asyncHandler(woCtrl.getRejectio
 // POST /work-orders/generate-now — office on-demand generation sweep for one vessel
 // (registered before POST /work-orders; distinct path, no :param collision)
 router.post('/work-orders/generate-now', asyncHandler(woCtrl.generateNow));
+
+// GET /work-orders/reconciler/status — duplicate-reconciler telemetry (plan §9.6).
+// No collision with GET /work-orders/:id — that is a single-segment param and cannot
+// match this two-segment path.
+router.get('/work-orders/reconciler/status', asyncHandler(woCtrl.getReconcilerStatus));
+
+// POST /work-orders/reconciler/run — manual one-vessel reconcile: the escape hatch for
+// vessels that never sync again (the post-sync trigger cannot reach them).
+router.post('/work-orders/reconciler/run', asyncHandler(woCtrl.runReconcilerNow));
 
 // POST /work-orders — create work order
 router.post('/work-orders', asyncHandler(woCtrl.createWorkOrder));
@@ -116,8 +134,21 @@ router.post('/work-orders/:id/reopen-completion',
   asyncHandler(woCtrl.reopenCompletion)
 );
 
+// POST /work-orders/bulk-superintendent-acknowledge — must be before /:id route
+// Phase 0 / P0.4 (defect D4): releasing the compliance lock is an office action — the same
+// guard as reviewer-approve. (The 12-Jun-2026 "How to Acknowledge the Locked WO" note called
+// the vessel-side option a testing-phase allowance to be removed in production.)
+// Merge note (21-Aug): kept the P0.4 role list over Jeevan's ['PMS Admin','Sail Admin','Super Admin'].
+router.post('/work-orders/bulk-superintendent-acknowledge',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.bulkSuperintendentAcknowledge)
+);
+
 // POST /work-orders/:id/superintendent-acknowledge
-router.post('/work-orders/:id/superintendent-acknowledge', asyncHandler(woCtrl.superintendentAcknowledge));
+router.post('/work-orders/:id/superintendent-acknowledge',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.superintendentAcknowledge)
+);
 
 // GET /superintendent/notifications — unacknowledged only
 router.get('/superintendent/notifications', asyncHandler(woCtrl.getSuperintendentNotifications));
@@ -184,6 +215,29 @@ router.post('/work-orders/:id/postpone-reject',
 
 // GET /work-orders/:id/postpone-approval-steps — get approval steps for the active postponement
 router.get('/work-orders/:id/postpone-approval-steps', asyncHandler(woCtrl.getPostponementApprovalSteps));
+
+// ── Re-Postponement Approval Workflow ──
+
+// POST /work-orders/:id/re-postpone-request — ship submits re-postponement (WO must be 'Postponement Approved')
+router.post('/work-orders/:id/re-postpone-request', asyncHandler(woCtrl.submitRePostponeRequest));
+
+// PUT /work-orders/:id/re-postpone-request — ship edits & resubmits a pending re-postponement request
+router.put('/work-orders/:id/re-postpone-request', asyncHandler(woCtrl.editRePostponeRequest));
+
+// POST /work-orders/:id/re-postpone-approve — office approves a re-postponement request
+router.post('/work-orders/:id/re-postpone-approve',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.approveRePostponement)
+);
+
+// POST /work-orders/:id/re-postpone-reject — office rejects a re-postponement request
+router.post('/work-orders/:id/re-postpone-reject',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.rejectRePostponement)
+);
+
+// GET /work-orders/:id/re-postpone-approval-steps — get approval steps for the active re-postponement
+router.get('/work-orders/:id/re-postpone-approval-steps', asyncHandler(woCtrl.getRePostponementApprovalSteps));
 
 // ── Work Order Executions ──
 

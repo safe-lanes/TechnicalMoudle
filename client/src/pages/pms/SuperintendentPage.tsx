@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ExternalLink, Check, ArrowLeft } from "lucide-react";
+import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
+import { ExternalLink, Check, ArrowLeft, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,8 +12,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import WOAgGridTable from "@/components/WOAgGridTable";
+import { effectiveApprovalTier, useApprovalPolicy } from "@/hooks/useApprovalPolicy";
+import { useVessel } from "@/contexts/VesselContext";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  formatSuperintendentNotificationReason,
+  type SuperintendentNotificationCategory,
+} from "@shared/utils/superintendentNotifications";
 
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return "—";
@@ -41,10 +48,55 @@ function getTierBadge(tier: string | null | undefined, approver?: string | null)
 export default function SuperintendentPage() {
   const [, setLocation] = useLocation();
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; notification: any | null }>({ open: false, notification: null });
+  const [selectedRows, setSelectedRows] = useState<any[]>([]);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<SuperintendentNotificationCategory>("pending");
+  const {
+    vesselId,
+    applyVesselScope,
+    isMyVessels,
+    myVesselsEmpty,
+  } = useVessel();
+  const { isSuperintendentLockEnabled } = useApprovalPolicy();
+  const getEffectiveTier = useCallback(
+    (notification: any) => notification?.effectiveApprovalTier || effectiveApprovalTier(
+        notification?.approvalTier,
+        isSuperintendentLockEnabled(notification?.vesselId),
+      ),
+    [isSuperintendentLockEnabled],
+  );
 
-  const { data: allNotifications = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/technical/api/superintendent/notifications/all"],
-  });
+  const buildNotificationsUrl = useCallback((category: SuperintendentNotificationCategory) => {
+    const params = new URLSearchParams({ category });
+    applyVesselScope(params);
+    return `/technical/api/superintendent/notifications?${params.toString()}`;
+  }, [applyVesselScope]);
+  const pendingUrl = buildNotificationsUrl("pending");
+  const acknowledgedUrl = buildNotificationsUrl("acknowledged");
+  const informationUrl = buildNotificationsUrl("information");
+  const pendingQuery = useQuery<any[]>({ queryKey: [pendingUrl], enabled: !!vesselId });
+  const acknowledgedQuery = useQuery<any[]>({ queryKey: [acknowledgedUrl], enabled: !!vesselId });
+  const informationQuery = useQuery<any[]>({ queryKey: [informationUrl], enabled: !!vesselId });
+  const pendingNotifications = pendingQuery.data || [];
+  const tabNotifications =
+    activeTab === "pending"
+      ? pendingNotifications
+      : activeTab === "acknowledged"
+        ? acknowledgedQuery.data || []
+        : informationQuery.data || [];
+  const isLoading =
+    activeTab === "pending"
+      ? pendingQuery.isLoading
+      : activeTab === "acknowledged"
+        ? acknowledgedQuery.isLoading
+        : informationQuery.isLoading;
+
+  const invalidateNotifications = () => {
+    invalidateByUrlPrefix([
+      "/technical/api/superintendent/notifications",
+      "/technical/api/work-orders",
+    ]);
+  };
 
   const acknowledgeMutation = useMutation({
     mutationFn: async (workOrderId: string) => {
@@ -52,28 +104,59 @@ export default function SuperintendentPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/summary"] });
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/work-orders"] });
+      invalidateNotifications();
       setConfirmDialog({ open: false, notification: null });
     },
   });
 
-  const pendingCount = allNotifications.filter((n: any) => !n.isAcknowledged).length;
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const acknowledgedThisMonth = allNotifications.filter(
-    (n: any) => n.isAcknowledged && n.acknowledgedAt && new Date(n.acknowledgedAt) >= startOfMonth
-  ).length;
+  const bulkAcknowledgeMutation = useMutation({
+    mutationFn: async (workOrderIds: string[]) => {
+      const res = await apiRequest("POST", "/technical/api/work-orders/bulk-superintendent-acknowledge", { workOrderIds });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateNotifications();
+      setSelectedRows([]);
+      setBulkConfirmOpen(false);
+    },
+  });
+
+  const pendingCount = pendingNotifications.length;
+
+  const isRowSelectable = useCallback((params: any) => {
+    const n = params.data;
+    return !!(n && getEffectiveTier(n) === 'superintendent_locked' && !n.isAcknowledged);
+  }, [getEffectiveTier]);
+
+  const onSelectionChanged = useCallback((event: SelectionChangedEvent) => {
+    setSelectedRows(event.api.getSelectedRows());
+  }, []);
+
+  const eligibleSelected = activeTab === "pending" ? selectedRows.filter(
+    (n) => getEffectiveTier(n) === 'superintendent_locked' && !n.isAcknowledged
+  ) : [];
 
   const columnDefs: ColDef[] = useMemo(() => [
+    ...(activeTab === "pending" ? [{
+      headerName: "",
+      field: "__select__",
+      headerCheckboxSelection: true,
+      checkboxSelection: true,
+      maxWidth: 50,
+      minWidth: 50,
+      lockPosition: true,
+      suppressMovable: true,
+      filter: false as any,
+      sortable: false,
+      resizable: false,
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    } as ColDef] : []),
     {
       headerName: "Work Order Code",
       field: "workOrderCode",
       minWidth: 200,
       flex: 1.2,
-      filter: "agTextColumnFilter",
+      filter: activeTab === "information" ? "agTextColumnFilter" : "agSetColumnFilter",
       cellRenderer: (params: any) => {
         const n = params.data;
         if (!n) return null;
@@ -170,7 +253,7 @@ export default function SuperintendentPage() {
       filter: "agSetColumnFilter",
       cellStyle: { justifyContent: "center" },
       headerClass: "ag-header-center",
-      cellRenderer: (params: any) => getTierBadge(params.data?.approvalTier, params.data?.approver),
+      cellRenderer: (params: any) => getTierBadge(getEffectiveTier(params.data), params.data?.approver),
     },
     {
       headerName: "Notified At",
@@ -193,31 +276,35 @@ export default function SuperintendentPage() {
       cellRenderer: (params: any) => {
         const n = params.data;
         if (!n) return null;
-        if (n.isAcknowledged) {
+        if (activeTab === "acknowledged") {
           return (
             <span className="text-green-600 text-xs font-medium" data-testid={`status-acknowledged-${n.id}`}>
               Acknowledged ({formatDate(n.acknowledgedAt)})
             </span>
           );
         }
+        const requiresAcknowledgment = activeTab === "pending";
         return (
           <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700" data-testid={`status-awaiting-${n.id}`}>
-            Awaiting Acknowledgment
+            {requiresAcknowledgment ? 'Awaiting Acknowledgment' : 'Notification Sent'}
           </span>
         );
       },
     },
     {
-      headerName: "Action",
-      field: "action",
-      minWidth: 150,
-      flex: 0.8,
-      filter: "agSetColumnFilter",
+      headerName: activeTab === "information" ? "Reason" : "Action",
+      field: activeTab === "information" ? "reason" : "action",
+      minWidth: activeTab === "information" ? 240 : 150,
+      flex: activeTab === "information" ? 1.4 : 0.8,
+      filter: "agTextColumnFilter",
       valueGetter: (p: any) => {
         const n = p.data;
         if (!n) return "";
+        if (activeTab === "information") {
+          return formatSuperintendentNotificationReason(n);
+        }
         if (n.isAcknowledged) return "Acknowledged";
-        if (n.approvalTier === "superintendent_locked") return "Acknowledge";
+        if (getEffectiveTier(n) === "superintendent_locked") return "Acknowledge";
         return "Info Only";
       },
       cellStyle: { justifyContent: "center" },
@@ -225,7 +312,17 @@ export default function SuperintendentPage() {
       cellRenderer: (params: any) => {
         const n = params.data;
         if (!n) return null;
-        if (n.isAcknowledged) {
+        if (activeTab === "information") {
+          return (
+            <span
+              className="text-sm text-gray-700 whitespace-normal leading-5"
+              data-testid={`text-information-reason-${n.id}`}
+            >
+              {formatSuperintendentNotificationReason(n)}
+            </span>
+          );
+        }
+        if (activeTab === "acknowledged") {
           return (
             <Button variant="outline" size="sm" disabled className="text-xs" data-testid={`button-acknowledged-${n.id}`}>
               <Check className="h-3 w-3 mr-1" />
@@ -233,7 +330,7 @@ export default function SuperintendentPage() {
             </Button>
           );
         }
-        if (n.approvalTier === 'superintendent_locked') {
+        if (activeTab === "pending" && getEffectiveTier(n) === 'superintendent_locked') {
           return (
             <Button
               size="sm"
@@ -253,42 +350,98 @@ export default function SuperintendentPage() {
         );
       },
     },
-  ], [acknowledgeMutation.isPending, setLocation]);
+  ], [acknowledgeMutation.isPending, activeTab, getEffectiveTier, setLocation]);
+
+  const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+  const safeReturnTo = returnTo?.split("?")[0] === "/pms/dashboard"
+    ? returnTo
+    : "/pms/dashboard";
 
   return (
     <div className="space-y-6" data-testid="superintendent-page">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => setLocation("/pms/dashboard")} data-testid="button-back-dashboard">
+        <Button variant="ghost" onClick={() => setLocation(safeReturnTo)} data-testid="button-back-dashboard">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
         </Button>
         <div>
           <h1 className="text-2xl font-semibold text-gray-900" data-testid="text-page-title">Superintendent Notifications</h1>
-          <p className="text-sm text-gray-500 mt-1" data-testid="text-page-subtitle">Work orders requiring shore-side acknowledgment before the Head of Department can approve</p>
+          <p className="text-sm text-gray-500 mt-1" data-testid="text-page-subtitle">Review pending acknowledgments and current-month Superintendent notices</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          setActiveTab(value as SuperintendentNotificationCategory);
+          setSelectedRows([]);
+        }}
+      >
+        <TabsList data-testid="tabs-superintendent-notifications">
+          <TabsTrigger value="pending" data-testid="tab-pending-acknowledgment">
+            Pending Acknowledgment
+          </TabsTrigger>
+          <TabsTrigger value="acknowledged" data-testid="tab-acknowledged">
+            Acknowledged
+          </TabsTrigger>
+          <TabsTrigger value="information" data-testid="tab-information-only">
+            Information only
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {activeTab === "pending" && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4" data-testid="card-pending-count">
           <div className="text-sm text-red-600 font-medium">Total Pending Acknowledgment</div>
           <div className="text-3xl font-bold text-red-700 mt-1">{pendingCount}</div>
         </div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4" data-testid="card-acknowledged-count">
-          <div className="text-sm text-green-600 font-medium">Acknowledged This Month</div>
-          <div className="text-3xl font-bold text-green-700 mt-1">{acknowledgedThisMonth}</div>
+      )}
+
+      {isMyVessels && myVesselsEmpty && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" data-testid="banner-no-assigned-vessels">
+          No vessels are assigned to you yet.
         </div>
-      </div>
+      )}
 
       <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+        {activeTab === "pending" && <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50">
+          <span className="text-sm text-gray-500">
+            {eligibleSelected.length > 0
+              ? `${eligibleSelected.length} WO${eligibleSelected.length !== 1 ? 's' : ''} selected`
+              : "Select locked WOs using checkboxes to bulk acknowledge"}
+          </span>
+          <Button
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={eligibleSelected.length === 0 || bulkAcknowledgeMutation.isPending}
+            onClick={() => setBulkConfirmOpen(true)}
+            data-testid="button-bulk-acknowledge"
+          >
+            <CheckSquare className="h-4 w-4 mr-1.5" />
+            {eligibleSelected.length > 0
+              ? `Bulk Acknowledge (${eligibleSelected.length})`
+              : "Bulk Acknowledge"}
+          </Button>
+        </div>}
+
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading notifications...</div>
         ) : (
-          <div style={{ height: 'calc(100vh - 320px)', minHeight: '420px' }} data-testid="table-notifications">
+          <div style={{ height: 'calc(100vh - 360px)', minHeight: '400px' }} data-testid="table-notifications">
             <WOAgGridTable
               columnDefs={columnDefs}
-              rowData={allNotifications}
+              rowData={tabNotifications}
               height="100%"
               suppressRowClickSelection
-              noRowsMessage="No superintendent notifications found."
+              rowSelection={activeTab === "pending" ? "multiple" : undefined}
+              onSelectionChanged={onSelectionChanged}
+              isRowSelectable={isRowSelectable}
+              noRowsMessage={
+                activeTab === "pending"
+                  ? "No notifications are awaiting acknowledgment."
+                  : activeTab === "acknowledged"
+                    ? "No notifications were acknowledged this month."
+                    : "No information-only notifications were created this month."
+              }
               testId="ag-grid-superintendent-notifications"
               getRowClass={(params) => params.data?.id ? `row-notification-${params.data.id}` : undefined}
             />
@@ -296,6 +449,7 @@ export default function SuperintendentPage() {
         )}
       </div>
 
+      {/* Single acknowledge confirm dialog */}
       <Dialog open={confirmDialog.open} onOpenChange={(open) => { if (!open) setConfirmDialog({ open: false, notification: null }); }}>
         <DialogContent data-testid="dialog-confirm-acknowledge">
           <DialogHeader>
@@ -326,6 +480,36 @@ export default function SuperintendentPage() {
               data-testid="button-confirm-acknowledge"
             >
               {acknowledgeMutation.isPending ? "Acknowledging..." : "Confirm Acknowledge"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk acknowledge confirm dialog */}
+      <Dialog open={bulkConfirmOpen} onOpenChange={(open) => { if (!open) setBulkConfirmOpen(false); }}>
+        <DialogContent data-testid="dialog-bulk-acknowledge">
+          <DialogHeader>
+            <DialogTitle>Bulk Acknowledge Work Orders</DialogTitle>
+            <DialogDescription>
+              You are about to acknowledge <strong>{eligibleSelected.length}</strong> locked work order{eligibleSelected.length !== 1 ? 's' : ''}.
+              This will allow the respective Head of Department to proceed with approval for each WO.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)} data-testid="button-cancel-bulk-acknowledge">
+              Cancel
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                const ids = eligibleSelected.map((n) => n.workOrderId);
+                bulkAcknowledgeMutation.mutate(ids);
+              }}
+              disabled={bulkAcknowledgeMutation.isPending}
+              data-testid="button-confirm-bulk-acknowledge"
+            >
+              {bulkAcknowledgeMutation.isPending ? "Acknowledging..." : `Acknowledge ${eligibleSelected.length} WO${eligibleSelected.length !== 1 ? 's' : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>

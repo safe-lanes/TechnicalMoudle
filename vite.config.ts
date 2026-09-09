@@ -21,6 +21,11 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      // jspdf is blanket-blocked by the workspace security policy (CVE).
+      // These stubs let the build resolve; PDF export shows a graceful message.
+      // Restore by removing these two lines once the block is lifted.
+      "jspdf": path.resolve(import.meta.dirname, "client", "src", "lib", "stubs", "jspdf.ts"),
+      "jspdf-autotable": path.resolve(import.meta.dirname, "client", "src", "lib", "stubs", "jspdf-autotable.ts"),
     },
   },
   root: path.resolve(import.meta.dirname, "client"),

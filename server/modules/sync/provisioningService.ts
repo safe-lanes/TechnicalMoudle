@@ -17,12 +17,14 @@ import * as crypto from 'crypto';
 import { getPool } from '../../db';
 import { tenantConnectionManager } from '../../utils/tenantConnectionManager';
 import * as syncRepo from './repository';
+import { coerceArrayValue } from './oneWayApplier';
 import {
   getTablesByCategory,
   getTableSyncConfig,
   getSyncPhaseOrder,
   type TableSyncConfig,
 } from '../../../shared/syncConfig';
+import { SYNC_REQUEST_TIMEOUT_FLOOR_MS } from './syncEngine';
 
 // ── Types ──
 
@@ -53,7 +55,7 @@ export interface ProvisioningBundle {
 export async function generateProvisioningBundle(
   vesselId: string,
   generatedBy: string,
-  opts?: { domain?: string; persist?: boolean }
+  opts?: { domain?: string; persist?: boolean; blunt?: boolean }
 ): Promise<ProvisioningBundle> {
   const pool = await getPool();
 
@@ -105,6 +107,9 @@ export async function generateProvisioningBundle(
     } catch (keyErr: any) {
       console.warn(`[Provisioning] sync key / instance-map seed skipped: ${keyErr.message}`);
     }
+    // NOTE: the delivery-state partition (mark shore logs <= T synced) runs AFTER the export +
+    // export-integrity verification below — we only trust the bundle as "delivered" once we've
+    // proven it was written completely. See the persist block after the export phases.
   }
 
   // Phase 0: Export the vessel row FIRST — almost every other table has
@@ -207,7 +212,117 @@ export async function generateProvisioningBundle(
       `${bundle.manifest.totalRows} total rows across ${bundle.manifest.tables.length} tables`
   );
 
+  // ── Addition 2: export-integrity verification (integrity at birth) ──
+  // A bundle born incomplete (a per-table export that threw is degraded to rowCount:0 with an
+  // "ERROR:" marker in exportAndAdd) is otherwise only caught AFTER satellite transfer, at import.
+  // Verify NOW, shore-side: for each exported table re-COUNT(*) under the SAME export filter and
+  // fail the whole generation loudly on any shortfall — never return/persist a bad bundle. The
+  // per-table counts proven here ARE bundle.manifest.tables[].rowCount, the same numbers the ship's
+  // import verify re-checks, so the chain is: proven at birth → manifest → proven at landing.
+  const exportIntegrity = await verifyBundleExportIntegrity(pool, vesselId, vesselCode, bundle);
+  if (!exportIntegrity.ok) {
+    const summary = exportIntegrity.shortfalls
+      .map((s) => `${s.tableName} written=${s.written} dbCount=${s.dbCount}${s.reason ? ` (${s.reason})` : ''}`)
+      .join(' | ');
+    const msg =
+      `[Provisioning] ⚠️ EXPORT INTEGRITY FAILED for vessel ${vesselCode} — ${exportIntegrity.shortfalls.length} ` +
+      `table(s) under-exported: ${summary}. Bundle NOT generated (a complete baseline could not be produced).`;
+    console.error(msg);
+    throw Object.assign(new Error(msg), { statusCode: 500 });
+  }
+  console.log(`[Provisioning] Export integrity PASSED (${bundle.manifest.tables.length} tables).`);
+
+  // ── Addition 1: snapshot-baseline delivery-state partition (first + re-provision) ──
+  // On ANY persisted generation, once the export is proven complete, the bundle IS the delivered
+  // baseline as of T = manifest.generatedAt. Mark this vessel's shore field logs changed_at <= T
+  // is_synced=true (don't re-drain the history the bundle carries) and post-T logs false. This
+  // now applies to FIRST provisions too (Wah Kwong) — without it their shore-imported history
+  // full-drains after import. Blunt (?blunt=true) reverts to re-deliver-everything. Wrapped so a
+  // partition failure NEVER aborts an already-verified bundle — it only degrades to a full drain.
+  if (opts?.persist && vesselCode) {
+    const convInstanceId = `SHIP-${vesselCode}`;
+    try {
+      const snapshotAt = new Date(bundle.manifest.generatedAt);
+      const wasReprovision = await syncRepo.hasDeliveredSyncHistory(vesselId, convInstanceId, vesselCode);
+      const r = await syncRepo.resetInstanceDeliveryStateForReprovision(
+        vesselId, convInstanceId, vesselCode,
+        { snapshotAt, blunt: opts?.blunt }
+      );
+      console.warn(
+        `[Provisioning] ${wasReprovision ? 'RE-PROVISION' : 'FIRST-PROVISION'} delivery-state partition for ` +
+        `${convInstanceId} (vessel ${vesselCode}) — mode=${r.mode}: baselineMarkedSynced=${r.baselineMarkedSynced}, ` +
+        `postSnapshotUnsynced=${r.postSnapshotUnsynced}, batchesDeleted=${r.batchesDeleted}, checkpoint=${r.checkpoint || 'NULL'}. ` +
+        (r.mode === 'partition'
+          ? `Fresh ship boots from the T=${snapshotAt.toISOString()} snapshot (remainingPull ≈ 0; only post-T edits flow).`
+          : `BLUNT re-delivery: fresh ship receives the FULL shore-authored baseline.`)
+      );
+    } catch (resetErr: any) {
+      console.error(
+        `[Provisioning] ⚠️ delivery-state partition FAILED for ${convInstanceId} (vessel ${vesselCode}): ` +
+        `${resetErr.message}. Bundle is complete and returned; the fresh ship will re-drain the full baseline ` +
+        `(safe, just slower) until this is resolved.`
+      );
+    }
+  }
+
   return bundle;
+}
+
+/**
+ * Addition 2 helper — shore-side export-integrity check. For each exported table, re-COUNT(*)
+ * under the SAME filter exportAndAdd used and flag a shortfall when the DB has MORE rows than the
+ * bundle wrote (an under-export), plus any table whose export threw (category carries "ERROR:").
+ * planner_dates and join-scoped tables legitimately export a filtered subset, so they are checked
+ * for the export-error marker only (no strict count — a strict count would false-positive). A
+ * strict-count query that itself errors is skipped (logged) rather than false-failing a healthy
+ * export.
+ */
+export async function verifyBundleExportIntegrity(
+  pool: any,
+  vesselId: string,
+  vesselCode: string | null,
+  bundle: ProvisioningBundle,
+): Promise<{ ok: boolean; shortfalls: { tableName: string; written: number; dbCount: number | null; reason?: string }[] }> {
+  const shortfalls: { tableName: string; written: number; dbCount: number | null; reason?: string }[] = [];
+  for (const entry of bundle.manifest.tables) {
+    // (1) Any export that threw was degraded to rowCount:0 with an "ERROR:" marker → shortfall.
+    if (/ERROR:/.test(entry.category)) {
+      shortfalls.push({ tableName: entry.tableName, written: entry.rowCount, dbCount: null, reason: 'export threw' });
+      continue;
+    }
+    // Phase-0 identity export: 'vessels' is INTENTIONALLY a single row (the provisioned vessel),
+    // while its syncConfig entry is global — a global COUNT(*) would false-fail every generation
+    // on a multi-vessel shore DB (vessels written=1 vs dbCount=<fleet size>). Skip it here; the
+    // ERROR-marker check above still covers a thrown vessels export.
+    if (entry.tableName === 'vessels') continue;
+    const tc = getTableSyncConfig(entry.tableName);
+    if (!tc) continue; // unknown → not strictly countable here
+    // planner_dates + join-scoped tables export a filtered subset — error-marker check only.
+    const looseOnly = entry.tableName === 'planner_dates' || (!!tc.vesselScopeJoinPath && !tc.vesselScopeColumn);
+    if (looseOnly) continue;
+    try {
+      let dbCount: number;
+      if (tc.isGlobal || !tc.vesselScopeColumn) {
+        const res = await pool.query(`SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false`);
+        dbCount = res.rows[0]?.c ?? 0;
+      } else {
+        const scopeValue = tc.vesselScopeColumn === 'vessel_code' ? vesselCode : vesselId;
+        if (!scopeValue) continue;
+        const res = await pool.query(
+          `SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE "${tc.vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false`,
+          [scopeValue]
+        );
+        dbCount = res.rows[0]?.c ?? 0;
+      }
+      if (dbCount > entry.rowCount) {
+        shortfalls.push({ tableName: entry.tableName, written: entry.rowCount, dbCount, reason: 'db has more rows than exported' });
+      }
+    } catch (cErr: any) {
+      // Count query itself failed — do NOT false-fail a healthy export; log and skip this table.
+      console.warn(`[Provisioning] export-integrity count skipped for ${entry.tableName}: ${cErr.message}`);
+    }
+  }
+  return { ok: shortfalls.length === 0, shortfalls };
 }
 
 // ── Bundle Import (Ship side) ──
@@ -259,6 +374,8 @@ export async function importProvisioningBundle(
   bundle: ProvisioningBundle
 ): Promise<{
   success: boolean;
+  verified: boolean;
+  verifyMismatches: { tableName: string; expected: number; actual: number }[];
   tablesImported: number;
   rowsImported: number;
   errors: string[];
@@ -345,6 +462,44 @@ export async function importProvisioningBundle(
     }
   }
 
+  // ── Pre-import: clear seeded view-mode tables (Task #324, same RBAC pattern) ──
+  // Migration 140 seeds both tables on BOTH sides with per-instance random uuids.
+  // Deleting local seeds lets the shore bundle land cleanly (shore uuids adopted,
+  // natural-key convergence immediate). Mapping first, then master (no FKs — hygiene).
+  if (bundleTableNames.has('view_modes_master') || bundleTableNames.has('role_view_mode_mapping')) {
+    try {
+      const deletedRvm = await pool.query('DELETE FROM role_view_mode_mapping');
+      const deletedVm = await pool.query('DELETE FROM view_modes_master');
+      console.log(
+        `[Provisioning] View-mode cleanup: deleted ${deletedRvm.rowCount} mapping(s), ${deletedVm.rowCount} mode(s) before import`
+      );
+    } catch (cleanupErr: any) {
+      // Non-fatal: tables may not exist on older DBs
+      console.warn(
+        `[Provisioning] View-mode cleanup partial: ${cleanupErr.message}`
+      );
+    }
+  }
+
+  // ── Pre-import: clear seeded approval_workflow_config (same RBAC pattern) ──
+  // Migration 126 seeds ~20 rows on BOTH sides with per-instance random awcuuid and a
+  // UNIQUE (function_id, variable_name). Upserting shore's rows (different awcuuid) into
+  // the ship's seeds would 23505 on the natural unique. Delete local seeds first so the
+  // shore's authoritative rows (and their awcuuids) land cleanly. No FK children.
+  if (bundleTableNames.has('approval_workflow_config')) {
+    try {
+      const deletedAwc = await pool.query('DELETE FROM approval_workflow_config');
+      console.log(
+        `[Provisioning] approval_workflow_config cleanup: deleted ${deletedAwc.rowCount} seeded row(s) before import`
+      );
+    } catch (cleanupErr: any) {
+      // Non-fatal: table may not exist on older DBs
+      console.warn(
+        `[Provisioning] approval_workflow_config cleanup partial: ${cleanupErr.message}`
+      );
+    }
+  }
+
   // Cache for GENERATED ALWAYS identity columns per table
   const identityAlwaysCache = new Map<string, Set<string>>();
 
@@ -418,6 +573,7 @@ export async function importProvisioningBundle(
       // Also track JSON/JSONB columns for proper value serialization.
       let existingCols: Set<string> | null = null;
       let jsonCols: Set<string> = new Set();
+      let arrayCols: Set<string> = new Set();
       try {
         const colResult = await pool.query(
           `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
@@ -427,6 +583,11 @@ export async function importProvisioningBundle(
         jsonCols = new Set(
           colResult.rows
             .filter((r: any) => r.data_type === 'json' || r.data_type === 'jsonb')
+            .map((r: any) => r.column_name)
+        );
+        arrayCols = new Set(
+          colResult.rows
+            .filter((r: any) => r.data_type === 'ARRAY')
             .map((r: any) => r.column_name)
         );
       } catch { /* fallback: don't filter */ }
@@ -444,6 +605,10 @@ export async function importProvisioningBundle(
           const values = columns.map((k) => {
             const v = row[k];
             if (v === null || v === undefined) return v;
+            if (arrayCols.has(k)) {
+              // Postgres array — pass a JS array; node-pg serializes {...}. JSON.stringify → ["..."] = malformed.
+              return coerceArrayValue(v);
+            }
             if (jsonCols.has(k)) {
               // JSON column: ensure value is a valid JSON string for PostgreSQL
               if (typeof v === 'object' && !(v instanceof Date)) {
@@ -505,6 +670,7 @@ export async function importProvisioningBundle(
               const values = columns.map((k) => {
                 const v = row[k];
                 if (v === null || v === undefined) return v;
+                if (arrayCols.has(k)) return coerceArrayValue(v);
                 if (jsonCols.has(k)) {
                   if (typeof v === 'object' && !(v instanceof Date)) return JSON.stringify(v);
                   if (typeof v === 'string') { try { JSON.parse(v); return v; } catch { return JSON.stringify(v); } }
@@ -538,24 +704,42 @@ export async function importProvisioningBundle(
         }
       }
 
-      // Advance sequences for tables where GENERATED ALWAYS columns were skipped
-      if (alwaysCols.size > 0 && tableRowCount > 0) {
-        const alwaysColNames = Array.from(alwaysCols);
-        for (let ci = 0; ci < alwaysColNames.length; ci++) {
-          const col = alwaysColNames[ci];
-          try {
-            await pool.query(
-              `SELECT setval(
-                pg_get_serial_sequence('"${tableData.tableName}"', '${col}'),
-                GREATEST(COALESCE((SELECT MAX("${col}") FROM "${tableData.tableName}"), 0), 1)
-              )`
-            );
-          } catch (seqErr: any) {
-            // Not fatal — sequence may not exist for all identity columns
-            console.warn(
-              `[Provisioning] Could not advance sequence for ${tableData.tableName}.${col}: ${seqErr.message}`
-            );
+      // Advance EVERY sequence-backed integer PK (serial + GENERATED BY DEFAULT + ALWAYS) to its
+      // MAX(id). Provisioning inserts rows with explicit ids, which does NOT advance a BY-DEFAULT/
+      // serial identity sequence — so without this the next vessel-side insert collides (23505
+      // duplicate key). Previously only GENERATED ALWAYS (attidentity='a') sequences were advanced,
+      // leaving the 79 BY-DEFAULT + 6 serial PKs desynced.
+      if (tableRowCount > 0) {
+        try {
+          const seqCols = await pool.query(
+            `SELECT a.attname AS col
+             FROM pg_attribute a
+             JOIN pg_class c ON a.attrelid = c.oid
+             JOIN pg_namespace n ON c.relnamespace = n.oid
+             WHERE n.nspname = 'public' AND c.relname = $1
+               AND pg_get_serial_sequence('"' || c.relname || '"', a.attname) IS NOT NULL`,
+            [tableData.tableName]
+          );
+          for (const r of (seqCols.rows || [])) {
+            const col = r.col;
+            try {
+              await pool.query(
+                `SELECT setval(
+                  pg_get_serial_sequence('"${tableData.tableName}"', '${col}'),
+                  GREATEST(COALESCE((SELECT MAX("${col}") FROM "${tableData.tableName}"), 0), 1)
+                )`
+              );
+            } catch (seqErr: any) {
+              // Not fatal — sequence may not exist for all identity columns
+              console.warn(
+                `[Provisioning] Could not advance sequence for ${tableData.tableName}.${col}: ${seqErr.message}`
+              );
+            }
           }
+        } catch (discErr: any) {
+          console.warn(
+            `[Provisioning] Could not enumerate sequence columns for ${tableData.tableName}: ${discErr.message}`
+          );
         }
       }
 
@@ -603,7 +787,15 @@ export async function importProvisioningBundle(
     if (bundle.manifest.syncApiKey) await syncRepo.seedSettingIfEmpty('sync_api_key', bundle.manifest.syncApiKey);
     const env = bundle.manifest.envSettings;
     const pushBatch = env?.syncPushBatchSize ?? 200;
-    const reqTimeout = env?.syncRequestTimeoutMs ?? 120000;
+    // VSAT FLOOR (not just a default): a shore .env carrying a too-short timeout (e.g. 1200)
+    // would otherwise seed 1200 into every newly provisioned ship — reviving the Frontier
+    // Venture incident. Clamp the seeded value to the floor so a short value can NEVER be
+    // provisioned, and log loudly when a below-floor bundle value is clamped.
+    const rawTimeout = typeof env?.syncRequestTimeoutMs === 'number' ? env.syncRequestTimeoutMs : SYNC_REQUEST_TIMEOUT_FLOOR_MS;
+    const reqTimeout = Math.max(rawTimeout, SYNC_REQUEST_TIMEOUT_FLOOR_MS);
+    if (rawTimeout < SYNC_REQUEST_TIMEOUT_FLOOR_MS) {
+      console.warn(`[Provisioning] ⚠️ Bundle syncRequestTimeoutMs=${rawTimeout}ms is below the ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms VSAT floor — clamped to ${SYNC_REQUEST_TIMEOUT_FLOOR_MS}ms (a short timeout aborts pushes the shore has already applied → false failures → data loss).`);
+    }
     await syncRepo.seedSettingIfEmpty('sync_push_batch_size', String(pushBatch));
     await syncRepo.seedSettingIfEmpty('sync_request_timeout_ms', String(reqTimeout));
   } catch (seedErr: any) {
@@ -614,8 +806,40 @@ export async function importProvisioningBundle(
     `[Provisioning] Import complete: ${tablesImported} tables, ${rowsImported} rows, ${errors.length} errors`
   );
 
+  // ── Import verification (the trust condition for the snapshot-baseline reset) ──
+  // The shore marks pre-T field logs is_synced=true at GENERATION time, trusting the bundle as
+  // the delivered baseline. If a table silently under-imported here (per-table failures are
+  // caught + skipped above, not aborted), those rows are "delivered" but ABSENT on the ship —
+  // future edits would hit a missing row. So verify per-table row counts NOW and fail loudly.
+  // On mismatch the operator re-provisions with the blunt/full re-sync (?blunt=true).
+  let verified = true;
+  let verifyMismatches: { tableName: string; expected: number; actual: number }[] = [];
+  try {
+    const v = await verifyProvisioning(bundle.manifest);
+    verified = v.valid;
+    verifyMismatches = v.mismatches;
+    if (!v.valid) {
+      const summary = v.mismatches
+        .map((m) => `${m.tableName} expected=${m.expected} actual=${m.actual}`)
+        .join(' | ');
+      console.error(
+        `[Provisioning] ⚠️ IMPORT VERIFICATION FAILED — ${v.mismatches.length} table(s) short: ${summary}. ` +
+        `Ship is NOT a complete baseline; re-provision with blunt/full re-sync (?blunt=true) before going live.`
+      );
+      errors.push(`VERIFY: ${v.mismatches.length} table(s) short: ${summary}`);
+    } else {
+      console.log(`[Provisioning] Import verification PASSED (${bundle.manifest.tables.length} tables).`);
+    }
+  } catch (verErr: any) {
+    verified = false;
+    errors.push(`VERIFY failed to run: ${verErr.message}`);
+    console.error(`[Provisioning] ⚠️ IMPORT VERIFICATION could not run: ${verErr.message}`);
+  }
+
   return {
-    success: errors.length === 0,
+    success: errors.length === 0 && verified,
+    verified,
+    verifyMismatches,
     tablesImported,
     rowsImported,
     errors,
@@ -814,7 +1038,8 @@ async function exportTableWithJoin(
 
     if (
       tableName === 'change_request_attachment' ||
-      tableName === 'change_request_comment'
+      tableName === 'change_request_comment' ||
+      tableName === 'change_request_approval'
     ) {
       const result = await pool.query(
         `SELECT a.* FROM "${tableName}" a JOIN change_request cr ON a.change_request_id = cr.id WHERE cr.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
@@ -823,7 +1048,17 @@ async function exportTableWithJoin(
       return result.rows;
     }
 
-    // Fallback — export all
+    if (tableName === 'wo_postponement_approvals') {
+      const result = await pool.query(
+        `SELECT a.* FROM "wo_postponement_approvals" a JOIN work_order_postponements p ON a.postponement_id = p.id WHERE p.vessel_id = $1 AND COALESCE(a.is_deleted, false) = false`,
+        [vesselId]
+      );
+      return result.rows;
+    }
+
+    // Fallback — export all. ⚠️ CROSS-VESSEL LEAK for vessel-scoped tables: any join-scoped
+    // table registered in syncConfig MUST have an explicit branch above (the approval tables
+    // do). Loud so a future registration without a branch is caught in the first test bundle.
     console.warn(
       `[Provisioning] Unknown join path for ${tableName}, exporting all rows`
     );

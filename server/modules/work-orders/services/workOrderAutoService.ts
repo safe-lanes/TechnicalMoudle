@@ -270,7 +270,13 @@ export async function backfillJobIds(vesselId?: string) {
     );
 
     if (matchingJob) {
-      await repo.update(wo.wouuid, { jobId: (matchingJob as any).id });
+      const updatedWO = await repo.update(wo.wouuid, { jobId: (matchingJob as any).id });
+      // Sync field logging — jobId backfill is a synced-field write and must reach the other
+      // side (was UNLOGGED; plan §9.3). Same actor convention as the auto-generation creates.
+      try {
+        const { logFieldChanges } = await import('../../sync');
+        await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO || { ...wo, jobId: (matchingJob as any).id }, 'auto-generation');
+      } catch (err) { console.error('[FieldLogger] WO jobId backfill:', err); }
       updated++;
       updateResults.push({
         workOrderId: wo.id,

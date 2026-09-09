@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Switch, Route, useLocation } from "wouter";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UIRoleProvider } from "@/contexts/UIRoleContext";
+import { ViewModeGate } from "@/components/ViewModeGate";
 import { ChangeRequestProvider } from "@/contexts/ChangeRequestContext";
 import { ChangeModeProvider } from "@/contexts/ChangeModeContext";
 import { VesselProvider } from "@/contexts/VesselContext";
@@ -27,9 +28,12 @@ import { ChatButton } from "./components/chat/ChatButton";
 function App() {
   return (
     <MarkerProvider>
-      <AuthProvider>
-        <UIRoleProvider>
-          <QueryClientProvider client={queryClient}>
+      {/* QueryClientProvider must wrap AuthProvider/UIRoleProvider — both resolve
+          the view mode via a shared TanStack query (Task #324). */}
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <UIRoleProvider>
+            <ViewModeGate>
             <PermissionsProvider>
             <VesselProvider>
               <OfflineProvider>
@@ -54,8 +58,11 @@ function App() {
                 <Route path="/pms/work-order/unplanned/new">
                   {() => <ProtectedRoute><WorkOrderFormPage mode="unplanned-create" /></ProtectedRoute>}
                 </Route>
+                {/* key={id}: approval-queue advance navigates id→id on the SAME route —
+                    without a key React reuses the mounted form and local state (remarks,
+                    justification, execution fields) would leak across work orders. */}
                 <Route path="/pms/work-order/:id">
-                  {() => <ProtectedRoute><WorkOrderFormPage mode="execution" /></ProtectedRoute>}
+                  {(params) => <ProtectedRoute><WorkOrderFormPage key={params.id} mode="execution" /></ProtectedRoute>}
                 </Route>
                 
                 {/* Jobs Form route - standalone, no TechnicalModule layout */}
@@ -121,9 +128,10 @@ function App() {
               </OfflineProvider>
             </VesselProvider>
           </PermissionsProvider>
-          </QueryClientProvider>
-        </UIRoleProvider>
-      </AuthProvider>
+            </ViewModeGate>
+          </UIRoleProvider>
+        </AuthProvider>
+      </QueryClientProvider>
     </MarkerProvider>
   );
 }

@@ -37,6 +37,7 @@ import RetentionSettings from "./admin/RetentionSettings";
 import RanksAdmin from "./admin/RanksAdmin";
 import AddEditFleetComponent from "./admin/AddEditFleetComponent";
 import SyncDashboard from "./admin/SyncDashboard";
+import ShipskartCatalogue from "./admin/ShipskartCatalogue";
 import SyncConflictReview from "./admin/SyncConflictReview";
 import SyncProvisioning from "./admin/SyncProvisioning";
 import SyncFleetOverview from "./admin/SyncFleetOverview";
@@ -59,12 +60,13 @@ export const TechnicalModule = () => {
   
   // Derive state from URL
   const getStateFromUrl = () => {
-    if (location === "/admin") {
+    const pathname = location.split("?")[0];
+    if (pathname === "/admin") {
       return { subModule: "admin", menuItem: "masters" };
-    } else if (location.startsWith("/admin/fleet-component-editor")) {
+    } else if (pathname.startsWith("/admin/fleet-component-editor")) {
       return { subModule: "admin", menuItem: "fleet-component-editor" };
-    } else if (location.startsWith("/admin/")) {
-      const subpage = location.replace("/admin/", "");
+    } else if (pathname.startsWith("/admin/")) {
+      const subpage = pathname.replace("/admin/", "");
       return { subModule: "admin", menuItem: subpage };
     } else if (location === "/defects/new") {
       return { subModule: "defects", menuItem: "new" };
@@ -81,8 +83,8 @@ export const TechnicalModule = () => {
     } else if (location.startsWith("/defects/")) {
       const subpage = location.replace("/defects/", "");
       return { subModule: "defects", menuItem: subpage };
-    } else if (location.startsWith("/pms/")) {
-      const subpage = location.replace("/pms/", "");
+    } else if (pathname.startsWith("/pms/")) {
+      const subpage = pathname.replace("/pms/", "");
       return { subModule: "pms", menuItem: subpage };
     } else if (location.startsWith("/spares")) {
       return { subModule: "pms", menuItem: "spares" };
@@ -280,6 +282,8 @@ export const TechnicalModule = () => {
             <SyncProvisioning />
           ) : selectedSubModule === "admin" && selectedMenuItem === "sync-fleet" ? (
             <SyncFleetOverview />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "shipskart-catalogue" ? (
+            <ShipskartCatalogue />
           ) : selectedSubModule === "admin" && selectedMenuItem === "approval-workflow" ? (
             <ApprovalWorkflow />
           ) : selectedSubModule === "admin" && selectedMenuItem === "fleet-component-editor" ? (

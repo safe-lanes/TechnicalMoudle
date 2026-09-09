@@ -19,7 +19,7 @@
  */
 
 import { getDb, getPool } from '../../db';
-import { syncFieldLog } from '../../../shared/schema';
+import { syncFieldLog, syncFieldLogFailures } from '../../../shared/schema';
 import { requiresFieldLogging } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
 import { getRequestContext } from '../../middleware/requestContext';
@@ -141,7 +141,65 @@ async function getInstanceId(): Promise<string> {
  * @param userId - Who made the change
  * @param txConn - Optional transaction connection (if inside a db.transaction block)
  */
+// ── Phase-0 un-swallow (SYNC-HARDENING-PLAN §9.4) ──
+// A lost field log means the business row committed but the change will NEVER sync — and until
+// now the only trace was a scrolled-away console.error (the 4th root cause behind the Frontier
+// Venture "52"). Every standalone logging failure is now recorded LOUDLY and DURABLY:
+// syncDiag FIELD-LOG-LOST line + session counter (surfaced via /sync/status) + a row in
+// sync_field_log_failures (migration 142) so recovery works from a list, not from count-diffing.
+// The business write is NEVER broken by a logging failure.
+let fieldLogFailureSessionCount = 0;
+export function getFieldLogFailureSessionCount(): number {
+  return fieldLogFailureSessionCount;
+}
+
+async function recordFieldLogFailure(
+  tableName: string,
+  rowUuid: string,
+  vesselId: string | null,
+  failedFields: number,
+  error: string,
+): Promise<void> {
+  fieldLogFailureSessionCount++;
+  const msg = `FIELD-LOG-LOST: ${tableName} row=${rowUuid} vessel=${vesselId ?? 'null'} failedFields=${failedFields} — ${error}`;
+  // The syncDiag file line is itself a durable trace (last resort if the insert below fails).
+  syncDiag(`⚠️ ${msg} (business row COMMITTED; sync log NOT written — recover via sync_field_log_failures)`);
+  console.error(`[FieldLogger] ⚠️ ${msg}`);
+  try {
+    const db = await getDb();
+    await db.insert(syncFieldLogFailures).values({
+      tableName,
+      rowUuid,
+      vesselId: vesselId ?? null,
+      failedFields,
+      error: String(error).slice(0, 2000),
+    });
+  } catch (persistErr: any) {
+    console.error(`[FieldLogger] ⚠️ Could not persist field-log failure record (syncDiag line above is the trace): ${persistErr?.message}`);
+  }
+}
+
 export async function logFieldChanges(
+  tableName: string,
+  rowUuid: string,
+  vesselId: string | null,
+  oldRow: Record<string, any> | null,
+  newRow: Record<string, any> | null,
+  userId: string | null,
+  txConn?: any
+): Promise<number> {
+  try {
+    return await logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow, userId, txConn);
+  } catch (error: any) {
+    // Tx callers rely on throw-to-rollback (write+log abort together) — preserve that contract.
+    if (txConn) throw error;
+    // Standalone callers: never break the business write; record the loss loudly + durably.
+    await recordFieldLogFailure(tableName, rowUuid, vesselId, 0, error?.message || String(error));
+    return 0;
+  }
+}
+
+async function logFieldChangesCore(
   tableName: string,
   rowUuid: string,
   vesselId: string | null,
@@ -164,6 +222,8 @@ export async function logFieldChanges(
   const instanceId = await getInstanceId();
   const changedAt = new Date();
   let logCount = 0;
+  let failedFields = 0;
+  let lastFieldError = '';
   const skipFields = await getEffectiveSkipFields(tableName);
 
   // Audit identity (Phase 0). The request-context actor is AUTHORITATIVE for the audit-identity
@@ -212,6 +272,8 @@ export async function logFieldChanges(
         });
         logCount++;
       } catch (error: any) {
+        failedFields++;
+        lastFieldError = error.message;
         console.error(`[FieldLogger] Error logging INSERT field ${tableName}.${fieldName}:`, error.message);
       }
     }
@@ -247,6 +309,8 @@ export async function logFieldChanges(
         });
         logCount++;
       } catch (error: any) {
+        failedFields++;
+        lastFieldError = error.message;
         console.error(`[FieldLogger] Error logging UPDATE field ${tableName}.${key}:`, error.message);
       }
     }
@@ -258,6 +322,13 @@ export async function logFieldChanges(
   if (logCount > 0) {
     syncDiag(`FIELD-LOGGER: ${tableName} row=${rowUuid} — ${logCount} fields changed, isInsert=${oldRow === null}, vesselId=${vesselId}, instanceId=${instanceId}`);
     console.log(`[FieldLogger] Logged ${logCount} field change(s) for ${tableName}.${rowUuid}`);
+  }
+
+  // Per-field insert failures = partially lost log (§9.4). Standalone: record durably.
+  // Tx callers: skip recording here — a failed statement has aborted the tx (25P02) and the
+  // caller's rollback discards the row too, so nothing was lost (contract preserved).
+  if (failedFields > 0 && !txConn) {
+    await recordFieldLogFailure(tableName, rowUuid, vesselId, failedFields, lastFieldError);
   }
 
   return logCount;

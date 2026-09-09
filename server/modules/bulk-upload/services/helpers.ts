@@ -521,7 +521,7 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
     'part_code': 'Part Code',
     'part code': 'Part Code',
     'fleetequipmentcode': 'Fleet Equipment Code',
-    'fleet_equipment_code': 'Fleet Equipment Code',
+    'fleet_equipment_code': 'Fleet EqCan this uipment Code',
     'fleet equipment code': 'Fleet Equipment Code',
     'fleetequipmentname': 'Fleet Equipment Name',
     'fleet_equipment_name': 'Fleet Equipment Name',
@@ -866,11 +866,17 @@ export const RESPONSIBLE_RANKS = [
 // Scoped to job-import validation only — do NOT reuse for reviewer-rank or template
 // dropdowns, which intentionally rely on RESPONSIBLE_RANKS.
 export const JOB_ASSIGNED_TO_RANKS = [
-  'Master', 'Chief Officer', '2nd Officer', '3rd Officer',
-  'Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer',
-  '5th Engineer', 'Electrical Officer', 'Gas Engineer', 'Deck Cadet',
-  'Engine Cadet', 'Bosun', 'AB', 'OS', 'Pumpman', 'Fitter',
-  'Motorman', 'Oiler', 'Wiper', 'Chief Cook', 'Messman', 'Junior Officer'
+  'Master', 'Chief Officer',
+  '2nd Officer', 'Second Officer',
+  '3rd Officer', 'Third Officer',
+  'Chief Engineer',
+  '2nd Engineer', 'Second Engineer',
+  '3rd Engineer', 'Third Engineer',
+  '4th Engineer', 'Fourth Engineer',
+  '5th Engineer', 'Electrical Officer', 'Electrical Engineer', 'Electrician',
+  'Gas Engineer', 'Deck Cadet', 'Engine Cadet', 'Bosun', 'AB', 'OS',
+  'Pumpman', 'Fitter', 'Motorman', 'Oiler', 'Wiper',
+  'Chief Cook', 'Messman', 'Junior Officer'
 ];
 
 // Schedule types

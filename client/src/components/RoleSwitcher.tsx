@@ -10,6 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { isReplit } from "@/lib/env";
 import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
 import type { UIRole } from "@shared/uiRoles";
 import { User, Check } from "lucide-react";
@@ -17,6 +18,10 @@ import { Button } from "@/components/ui/button";
 
 export function RoleSwitcher() {
   const { uiRole, setUIRole } = useUIRole();
+
+  // Visible in every environment so users can see their current view mode.
+  // Switching is Replit-only: outside the workspace the menu items are dimmed
+  // and inert (guarded here AND in UIRoleContext.setUIRole).
 
   return (
     <DropdownMenu>
@@ -41,9 +46,18 @@ export function RoleSwitcher() {
         {VISIBLE_UI_ROLES.map((role) => (
           <DropdownMenuItem
             key={role}
-            className={`flex items-center justify-between ${uiRole === role ? "cursor-default font-medium" : "cursor-default opacity-50"}`}
+            className={`flex items-center justify-between ${
+              uiRole === role
+                ? "cursor-default font-medium"
+                : isReplit()
+                  ? "cursor-pointer"
+                  : "cursor-default opacity-50"
+            }`}
             data-testid={`menu-role-${role.toLowerCase().replace("_", "-")}`}
-            onSelect={(e) => e.preventDefault()}
+            onSelect={(e) => {
+              if (!isReplit()) { e.preventDefault(); return; }
+              setUIRole(role as import("@shared/uiRoles").UIRole);
+            }}
           >
             <span>{UI_ROLE_LABELS[role]}</span>
             {uiRole === role && <Check className="h-4 w-4 text-green-600" />}

@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -130,7 +131,9 @@ function vesselSyncStatus(v: FleetVessel): {
       icon: <XCircle className="h-3 w-3 mr-1" />,
     };
   }
-  if (hoursSince > 24 || v.pending_changes > 0) {
+  // Stale is TIME-BASED ONLY: a vessel that synced recently is not "stale" just because a
+  // residual backlog exists. pending_changes stays visible as its own info count elsewhere.
+  if (hoursSince > 24) {
     return {
       label: "Stale",
       color: "bg-amber-100 text-amber-700 border-amber-200",
@@ -150,6 +153,8 @@ export default function SyncFleetOverview() {
   const { isShip } = useSyncInstanceInfo();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { canEdit } = usePermissions();
+  const canEditFleet = canEdit("admin-sync-fleet");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editedSettings, setEditedSettings] = useState<
     Record<string, string>
@@ -663,22 +668,24 @@ export default function SyncFleetOverview() {
 
               {/* Save button */}
               <div className="flex justify-end pt-2">
-                <Button
-                  onClick={() => updateSettingsMutation.mutate(editedSettings)}
-                  disabled={
-                    !hasUnsavedChanges() || updateSettingsMutation.isPending
-                  }
-                >
-                  {updateSettingsMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  Save Settings
-                  {hasUnsavedChanges() && (
-                    <Badge className="ml-2 bg-blue-500 text-white">
-                      {Object.keys(editedSettings).length}
-                    </Badge>
-                  )}
-                </Button>
+                {canEditFleet && (
+                  <Button
+                    onClick={() => updateSettingsMutation.mutate(editedSettings)}
+                    disabled={
+                      !hasUnsavedChanges() || updateSettingsMutation.isPending
+                    }
+                  >
+                    {updateSettingsMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Save Settings
+                    {hasUnsavedChanges() && (
+                      <Badge className="ml-2 bg-blue-500 text-white">
+                        {Object.keys(editedSettings).length}
+                      </Badge>
+                    )}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </CollapsibleContent>

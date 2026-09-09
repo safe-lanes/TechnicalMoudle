@@ -32,6 +32,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { useVessels } from "@/hooks/useVessels";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 interface LabelConfig {
   key: string;
@@ -109,6 +110,10 @@ interface VesselSurvey {
 export default function ShipsSurveysAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canEditSurveys = canEdit("admin-ships-surveys");
+  const canCreateSurveys = canCreate("admin-ships-surveys");
+  const canDeleteSurveys = canDelete("admin-ships-surveys");
   
   const [activeTab, setActiveTab] = useState<TabType>("master");
   const [viewModes, setViewModes] = useState<Record<TabType, ViewMode>>({
@@ -1205,14 +1210,16 @@ export default function ShipsSurveysAdmin() {
           
           <div className="flex items-center gap-2">
             {currentViewMode === "view" ? (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={toggleViewMode}
-                data-testid="button-edit-mode"
-              >
-                Edit
-              </Button>
+              canEditSurveys && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={toggleViewMode}
+                  data-testid="button-edit-mode"
+                >
+                  Edit
+                </Button>
+              )
             ) : (
               <>
                 <Button 
@@ -1246,14 +1253,16 @@ export default function ShipsSurveysAdmin() {
                         <><Save className="w-4 h-4 mr-1" /> Save</>
                       )}
                     </Button>
-                    <Button 
-                      size="sm" 
-                      onClick={addNewRow}
-                      className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-                      data-testid="button-add-row"
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add Survey
-                    </Button>
+                    {canCreateSurveys && (
+                      <Button 
+                        size="sm" 
+                        onClick={addNewRow}
+                        className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                        data-testid="button-add-row"
+                      >
+                        <Plus className="w-4 h-4 mr-1" /> Add Survey
+                      </Button>
+                    )}
                   </>
                 )}
                 {activeTab === "company" && (
@@ -1279,14 +1288,16 @@ export default function ShipsSurveysAdmin() {
                         <><Save className="w-4 h-4 mr-1" /> Save</>
                       )}
                     </Button>
-                    <Button 
-                      size="sm" 
-                      onClick={handleAddNewCompanySurvey}
-                      className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-                      data-testid="button-add-company-survey"
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add Survey
-                    </Button>
+                    {canCreateSurveys && (
+                      <Button 
+                        size="sm" 
+                        onClick={handleAddNewCompanySurvey}
+                        className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                        data-testid="button-add-company-survey"
+                      >
+                        <Plus className="w-4 h-4 mr-1" /> Add Survey
+                      </Button>
+                    )}
                   </>
                 )}
                 {activeTab === "vessel" && (
@@ -1305,7 +1316,7 @@ export default function ShipsSurveysAdmin() {
                       )}
                       Save
                     </Button>
-                    {selectedVessels.length > 0 && (
+                    {selectedVessels.length > 0 && canCreateSurveys && (
                       <Button 
                         size="sm" 
                         onClick={handleAddNewVesselSurvey}
@@ -1478,15 +1489,17 @@ export default function ShipsSurveysAdmin() {
                         </td>
                         {isEditMode && (
                           <td className="px-4 py-2 text-center">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => deleteRow(survey.id)}
-                              data-testid={`button-delete-${survey.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {canDeleteSurveys && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => deleteRow(survey.id)}
+                                data-testid={`button-delete-${survey.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </td>
                         )}
                       </tr>
@@ -2230,9 +2243,9 @@ export default function ShipsSurveysAdmin() {
           </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLabelsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveLabelsAndClose} className="bg-[#5dc86f] hover:bg-[#4db85f] text-white">
+            {canEditSurveys && <Button onClick={saveLabelsAndClose} className="bg-[#5dc86f] hover:bg-[#4db85f] text-white">
               Save Labels
-            </Button>
+            </Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2262,9 +2275,9 @@ export default function ShipsSurveysAdmin() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCompanyGroupDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveCompanyGroupLabelsAndClose} className="bg-[#5dc86f] hover:bg-[#4db85f] text-white">
+            {canEditSurveys && <Button onClick={saveCompanyGroupLabelsAndClose} className="bg-[#5dc86f] hover:bg-[#4db85f] text-white">
               Save Labels
-            </Button>
+            </Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -8,6 +8,7 @@ import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 
 interface ReviewChangesDrawerProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export const ReviewChangesDrawer: React.FC<ReviewChangesDrawerProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { resolvedUserName } = useResolvedUserName();
   
   const diffs = getDiffs();
   
@@ -57,6 +59,7 @@ export const ReviewChangesDrawer: React.FC<ReviewChangesDrawerProps> = ({
         targetId,
         status,
         reason,
+        requestedByUserId: resolvedUserName,
         diffs: diffs.map(d => ({
           field_path: d.path,
           old_value: d.oldVal,

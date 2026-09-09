@@ -1,10 +1,19 @@
 import * as repo from '../repositories/runningHoursRepository';
+/**
+ * Missing settings are deliberately treated as validation ON. This also makes
+ * the setting safe during first sync, before a vessel receives its PMS row.
+ */
+export function isRhValidationEnabledForVessel(settings?: { rhValidationEnabled?: boolean | null }): boolean {
+  return settings?.rhValidationEnabled !== false;
+}
+
 import type { RHHistoryQuery, RHHistoryResult } from '../repositories/runningHoursRepository';
-import { validateRunningHoursIncrease, canAdminOverride } from '../utils/rhValidation';
-import { NotFoundError, ValidationError } from '../../shared/errors';
+import { validateRunningHoursIncrease, validateRHMonotonicity, canAdminOverride, safeParseDate } from '../utils/rhValidation';
+import { canonicalizeReadingDateInput, requireReadingDayInput, todayReadingDay } from '../utils/readingDate';
+import { ForbiddenError, NotFoundError, ValidationError } from '../../shared/errors';
 import { z } from 'zod';
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema } from '@shared/schema';
-import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
+import type { InsertRunningHoursAudit, RunningHoursAudit, Component, CascadeRunningHoursRequest } from '@shared/schema';
 
 // ── Zod schemas for RH configuration API validation ──
 
@@ -25,12 +34,71 @@ const updateMasterRHSchema = z.object({
   dateUpdated: z.string().optional()
 });
 
+/**
+ * Checks that depend on the vessel RH policy are deliberately performed after
+ * the component and its settings have been loaded. The transport flag is never
+ * used to decide these rules.
+ */
+export function validateCascadePolicyRules(
+  data: CascadeRunningHoursRequest,
+  vesselValidationEnabled: boolean,
+  validationBypassAuthorized: boolean,
+): void {
+  if (data.mode === 'addDelta' && data.value <= 0) {
+    throw new ValidationError('addDelta mode requires value > 0');
+  }
+
+  if (
+    data.mode === 'setTotal' &&
+    data.value === 0 &&
+    (vesselValidationEnabled || data.meterReplaced) &&
+    !(
+      data.isRenewalReset === true &&
+      !!data.renewalActionType &&
+      !!data.renewalReason &&
+      data.renewalReason.trim().length > 0
+    )
+  ) {
+    throw new ValidationError('When setting RH to 0, renewal confirmation with action type and reason is required');
+  }
+}
+
+function enforceRHMonotonicity(input: {
+  currentRH: number;
+  submittedRH: number;
+  currentRHDate?: string | null;
+  submittedRHDate?: string | null;
+  approvedReset?: boolean;
+}) {
+  const result = validateRHMonotonicity(input);
+  if (!result.allowed) {
+    throw new ValidationError(result.message, {
+      code: 'LOWER_THAN_CURRENT_RH',
+      currentRH: result.currentRH,
+      submittedRH: result.submittedRH,
+      delta: result.delta,
+      currentRHDate: result.currentRHDate,
+      submittedRHDate: result.submittedRHDate,
+      monotonicity: result,
+    });
+  }
+  return result;
+}
+
 // ── Helper: resolve last-updated date with fallback chain ──
+// Task #427: canonicalize legacy stamp text via the shared calendar-day
+// parser — no naive `new Date(text)`, no machine-timezone day shifts. When
+// the component's own text stamp is unparseable, fall through to the typed
+// timestamp columns.
 
 function resolveLastUpdated(component: Component): string | null {
-  return component.lastUpdated
-    || (component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt).toISOString() : null)
-    || (component.updatedAt ? new Date(component.updatedAt).toISOString() : null);
+  const own = canonicalizeReadingDateInput(component.lastUpdated ?? null);
+  if (own) return own;
+  const master = canonicalizeReadingDateInput(
+    component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt) : null
+  );
+  if (master) return master;
+  return canonicalizeReadingDateInput(component.updatedAt ? new Date(component.updatedAt) : null);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -46,19 +114,41 @@ export async function createAudit(body: unknown): Promise<RunningHoursAudit> {
   if (!parseResult.success) {
     throw new ValidationError("Invalid audit data", { details: parseResult.error.errors });
   }
-  return repo.createRunningHoursAudit(parseResult.data);
+  const data = parseResult.data;
+  // Task #427 calendar-day contract: date_updated_local is ALWAYS persisted as
+  // canonical YYYY-MM-DD. A supplied-but-unparseable date is rejected loudly —
+  // silently persisting raw text would re-open the poisoning path the
+  // normalization migration just closed.
+  if (data.dateUpdatedLocal !== undefined && data.dateUpdatedLocal !== null && String(data.dateUpdatedLocal).trim() !== '') {
+    const canonical = canonicalizeReadingDateInput(String(data.dateUpdatedLocal));
+    if (!canonical) {
+      throw new ValidationError(
+        `Invalid reading date "${data.dateUpdatedLocal}". Use a real calendar date (e.g. 2026-08-17).`,
+        { code: 'RH_INVALID_READING_DATE' }
+      );
+    }
+    data.dateUpdatedLocal = canonical;
+  }
+  return repo.createRunningHoursAudit(data);
 }
 
 // ══════════════════════════════════════════════════════════
 // Cascade Update (from routes.ts)
 // ══════════════════════════════════════════════════════════
 
-export async function cascadeUpdate(body: unknown) {
+export async function cascadeUpdate(body: unknown, authenticatedRole?: string) {
   const parseResult = cascadeRunningHoursSchema.safeParse(body);
   if (!parseResult.success) {
     throw new ValidationError("Invalid cascade data", { details: parseResult.error.errors });
   }
   const validatedData = parseResult.data;
+  const validationBypassRequested = validatedData.rhValidationEnabled === false;
+
+  // Task #427: canonicalize the user's reading date ONCE at the service
+  // boundary — validation and the cascade's persistence (date_updated_local,
+  // component stamps, rotational stamp accrual) all see the same YYYY-MM-DD.
+  // Absent → today; PRESENT-but-unparseable → reject (never silently 'today').
+  validatedData.dateUpdated = requireReadingDayInput(validatedData.dateUpdated ?? null) ?? todayReadingDay();
 
   // Get the parent component to determine current RH
   const parentComponent = await repo.getComponent(validatedData.parentComponentId);
@@ -66,7 +156,28 @@ export async function cascadeUpdate(body: unknown) {
     throw new NotFoundError('Parent component not found');
   }
 
+  // This is a vessel policy, never a client-controlled permission. Missing
+  // settings (including vessels awaiting their first settings sync) fail closed
+  // to ON. A client requesting OFF cannot override a vessel configured ON.
+  const vesselSettings = parentComponent.vesselId
+    ? await repo.getPmsVesselSettings(parentComponent.vesselId)
+    : undefined;
+  const vesselValidationEnabled = isRhValidationEnabledForVessel(vesselSettings);
+
+  // Preserve an explicit authorization failure for an untrusted request trying
+  // to bypass an ON vessel. When the vessel policy is OFF, synced ship users
+  // are deliberately allowed through regardless of their local role.
+  if (validationBypassRequested && vesselValidationEnabled && authenticatedRole !== 'Sail Admin') {
+    throw new ForbiddenError('Running Hours validation is enabled for this vessel.');
+  }
+
+  // Meter replacement deliberately retains its complete existing validation and
+  // calculation path regardless of the vessel RH validation policy.
+  const validationBypassAuthorized = !vesselValidationEnabled && !validatedData.meterReplaced;
+  validateCascadePolicyRules(validatedData, vesselValidationEnabled, validationBypassAuthorized);
+
   const currentRH = parseFloat(parentComponent.currentCumulativeRH || '0');
+  const effectiveUserRole = authenticatedRole || 'Ship';
   let targetRH: number;
 
   if (validatedData.mode === 'setTotal') {
@@ -76,8 +187,33 @@ export async function cascadeUpdate(body: unknown) {
     targetRH = currentRH + validatedData.value;
   }
 
+  if (!Number.isFinite(targetRH) || targetRH < 0) {
+    throw new ValidationError('Resulting Running Hours cannot be negative.');
+  }
+
+  const monotonicity = enforceRHMonotonicity({
+    currentRH,
+    submittedRH: targetRH,
+    currentRHDate: resolveLastUpdated(parentComponent),
+    submittedRHDate: validatedData.dateUpdated,
+    approvedReset: validatedData.meterReplaced || validatedData.isRenewalReset,
+  });
+  if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+    return {
+      updatedComponents: 0,
+      auditsCreated: 0,
+      workOrdersGenerated: 0,
+      workOrders: [],
+      noChange: true,
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0,
+      },
+    };
+  }
+
   // Skip daily-limit validation for meter replacements (physical device swap, not normal accumulation)
-  if (!validatedData.meterReplaced) {
+  if (!validatedData.meterReplaced && !validationBypassAuthorized) {
     // Validate running hours increase against daily limits
     // Use same fallback logic as the Running Hours display
     const componentLastUpdated = resolveLastUpdated(parentComponent);
@@ -91,7 +227,7 @@ export async function cascadeUpdate(body: unknown) {
       newRH: targetRH,
       componentLastUpdated: componentLastUpdated,
       newUpdateDate: validatedData.dateUpdated,
-      userRole: validatedData.userRole || 'Ship',
+      userRole: effectiveUserRole,
       adminOverride: validatedData.adminOverride || false
     });
 
@@ -105,12 +241,15 @@ export async function cascadeUpdate(body: unknown) {
           daysSinceLastUpdate: validation.daysSinceLastUpdate,
           lastUpdateDate: validation.lastUpdateDate,
           requiresAdminOverride: validation.requiresAdminOverride,
-          canOverride: canAdminOverride(validatedData.userRole || 'Ship')
+          canOverride: canAdminOverride(effectiveUserRole)
         }
       });
     }
 
-    const result = await repo.cascadeRunningHoursUpdate(validatedData);
+    const result = await repo.cascadeRunningHoursUpdate({
+      ...validatedData,
+      rhValidationBypassed: false,
+    });
     return {
       ...result,
       validation: {
@@ -120,7 +259,17 @@ export async function cascadeUpdate(body: unknown) {
     };
   }
 
-  const result = await repo.cascadeRunningHoursUpdate(validatedData);
+  if (validationBypassAuthorized) {
+    console.warn(
+      `[RH Validation Bypass] Vessel RH policy allowed correction for component ${validatedData.parentComponentId} ` +
+      `(mode=${validatedData.mode}, value=${validatedData.value}, date=${validatedData.dateUpdated}).`
+    );
+  }
+
+  const result = await repo.cascadeRunningHoursUpdate({
+    ...validatedData,
+    rhValidationBypassed: validationBypassAuthorized,
+  });
   return {
     ...result,
     validation: {
@@ -179,9 +328,6 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
   const startEntries = await repo.getRunningHoursAtDateBatch(masterRefs, periodStartDate);
   const endEntries = periodEndDate ? await repo.getRunningHoursAtDateBatch(masterRefs, periodEndDate) : null;
   const lastUpdatedByMap = await repo.getLatestAuditUserBatch(masterRefs);
-  // Latest approved completion date per master (component_maintenance_history).
-  // Used to drive the Overview "Last Updated" column for MASTER rows.
-  const lastCompletedMap = await repo.getLatestCompletedDateBatch(masterRefs);
 
   const parentsWithCounts = masterComponents.map((component) => {
       // Under 'all'/'my' aggregate, vesselId is 'all' — scope inherited lookup to the
@@ -246,18 +392,29 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
         ? Math.round((periodRunningHours / periodDays) * 10) / 10
         : 0;
 
-      const lastUpdatedBy = lastUpdatedByMap.get(component.cuuid) ?? null;
-      // Only MASTER components surface the last completed date (the Overview grid
-      // is MASTER-only, but branch explicitly to enforce the intent). ISO string.
-      const lastCompletedDate = component.rhCounterType === 'MASTER'
-        ? (lastCompletedMap.get(component.cuuid) ?? null)
+      const auditEntry = lastUpdatedByMap.get(component.cuuid) ?? null;
+      const lastUpdatedBy = auditEntry?.userId ?? null;
+
+      // Compute the most recent RH-specific "Last Updated" date as MAX of three
+      // sources that are only written when Running Hours actually change:
+      //   1. running_hours_audit.dateUpdatedLocal — the user's entered reading date
+      //   2. components.last_updated              — written on every RH update
+      //   3. components.rh_master_updated_at      — explicit RH timestamp
+      // Nulls and unparseable values are filtered out before the comparison.
+      const auditDateParsed = safeParseDate(auditEntry?.auditDate);
+      const lastUpdatedParsed = safeParseDate((component as any).lastUpdated);
+      const rhMasterUpdatedParsed = safeParseDate((component as any).rhMasterUpdatedAt);
+      const rhDates = [auditDateParsed, lastUpdatedParsed, rhMasterUpdatedParsed].filter((d): d is Date => d !== null);
+      const latestRHDate = rhDates.length > 0
+        ? new Date(Math.max(...rhDates.map(d => d.getTime())))
         : null;
 
       return {
         ...component,
         sfiCode: component.componentCode || '',
-        latestUpdate: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt || new Date().toISOString(),
-        lastCompletedDate,
+        latestUpdate: latestRHDate
+          ? latestRHDate.toISOString()
+          : ((component as any).lastUpdated || (component as any).rhMasterUpdatedAt || null),
         currentCumulativeRH: totalCumulativeRH.toFixed(2),
         currentMeterRH: currentMeterRH.toFixed(2),
         meterReplacedLastRh: meterReplacedLastRh > 0 ? meterReplacedLastRh.toFixed(2) : null,
@@ -293,18 +450,51 @@ export async function listChildren(parentCode: string, vesselId: string) {
     throw new NotFoundError('Parent component not found');
   }
 
-  const children = await repo.getInheritedComponents(parent.cuuid, vesselId);
+  // Scope children to the parent's OWN vessel: under aggregate scope ('all')
+  // the incoming vesselId is not a concrete vessel, and component codes can
+  // repeat across vessels.
+  const children = await repo.getInheritedComponents(parent.cuuid, parent.vesselId || vesselId);
   const activeChildren = children.filter((child: any) => child.isActive !== false);
+
+  // Batch-fetch the installed stamps' OWN accrued hours per vessel (Task #372):
+  // the component counter shows the inherited engine total by design; the stamp
+  // tracks only the hours it actually ran while installed.
+  const stampsByVessel = new Map<string, string[]>();
+  for (const child of activeChildren) {
+    const cVessel = (child as any).vesselId;
+    const cStamp = (child as any).currentStamp;
+    if (cVessel && cStamp) {
+      const list = stampsByVessel.get(cVessel) || [];
+      list.push(cStamp);
+      stampsByVessel.set(cVessel, list);
+    }
+  }
+  const stampInfoByVesselStamp = new Map<string, repo.StampRhInfo>();
+  for (const [cVessel, stamps] of Array.from(stampsByVessel.entries())) {
+    const infoMap = await repo.getInstalledStampRhBatch(cVessel, stamps);
+    for (const [stamp, info] of Array.from(infoMap.entries())) {
+      stampInfoByVesselStamp.set(`${cVessel}::${stamp}`, info);
+    }
+  }
 
   const childrenWithRH = activeChildren.map(child => {
     const displayRH = child.currentCumulativeRH || child.rhCurrentInheritedCached || '0.00';
+    const stampInfo = (child as any).currentStamp && (child as any).vesselId
+      ? stampInfoByVesselStamp.get(`${(child as any).vesselId}::${(child as any).currentStamp}`) || null
+      : null;
     return {
       id: child.id,
       componentCode: child.componentCode || '',
       name: child.name || '',
       currentCumulativeRH: displayRH,
       rhCounterType: child.rhCounterType || 'INHERITED',
-      lastUpdated: child.lastUpdated || child.updatedAt || '-'
+      lastUpdated: child.lastUpdated || child.updatedAt || '-',
+      stamp: stampInfo ? {
+        stamp: stampInfo.stamp,
+        stampName: stampInfo.stampName,
+        currentRh: stampInfo.currentRh,
+        rhLastUpdated: stampInfo.rhLastUpdated
+      } : null
     };
   });
 
@@ -333,8 +523,12 @@ export async function updateChildRH(componentId: string, body: {
   userRole?: string;
   adminOverride?: boolean;
   dateUpdated?: string;
-}) {
-  const { newRHValue, comments, userId, userUuid, userRole, adminOverride, dateUpdated } = body;
+  rhValidationEnabled?: boolean;
+}, authenticatedRole?: string) {
+  const { newRHValue, comments, userId, userUuid, adminOverride, dateUpdated, rhValidationEnabled = true } = body;
+  const validationBypassRequested = rhValidationEnabled === false;
+
+  const effectiveUserRole = authenticatedRole || 'Ship';
 
   // Validate newRHValue
   if (typeof newRHValue !== 'number' || newRHValue < 0) {
@@ -346,6 +540,17 @@ export async function updateChildRH(componentId: string, body: {
   if (!component) {
     throw new NotFoundError('Component not found');
   }
+
+  // Child updates use the exact same vessel policy as parent cascades. It is
+  // read server-side so a request cannot disable validation for an ON vessel.
+  const vesselSettings = component.vesselId
+    ? await repo.getPmsVesselSettings(component.vesselId)
+    : undefined;
+  const vesselValidationEnabled = isRhValidationEnabledForVessel(vesselSettings);
+  if (validationBypassRequested && vesselValidationEnabled && authenticatedRole !== 'Sail Admin') {
+    throw new ForbiddenError('Running Hours validation is enabled for this vessel.');
+  }
+  const validationBypassAuthorized = !vesselValidationEnabled;
 
   // Only allow updating INHERITED components via this endpoint
   // MASTER components should be updated via the cascade endpoint
@@ -359,52 +564,120 @@ export async function updateChildRH(componentId: string, body: {
   // Use same fallback logic as the Running Hours display
   const componentLastUpdated = resolveLastUpdated(component);
 
-  // Validate running hours increase against daily limits
-  const validation = validateRunningHoursIncrease({
-    currentRH: currentRHValue,
-    newRH: newRHValue,
-    componentLastUpdated: componentLastUpdated,
-    newUpdateDate: dateUpdated || new Date().toISOString(),
-    userRole: userRole || 'Ship',
-    adminOverride: adminOverride || false
-  });
+  // Task #427: canonicalize the user's reading date ONCE at the service
+  // boundary — validation, component write, audit insert, and stamp accrual
+  // all use this SAME calendar day (offset/locale inputs can no longer make
+  // them disagree).
+  // Absent → today; PRESENT-but-unparseable → reject (never silently 'today').
+  const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
 
-  if (!validation.allowed) {
-    throw new ValidationError(validation.message, {
+  const monotonicity = enforceRHMonotonicity({
+    currentRH: currentRHValue,
+    submittedRH: newRHValue,
+    currentRHDate: componentLastUpdated,
+    submittedRHDate: canonicalDay,
+  });
+  if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+    return {
+      success: true,
+      noChange: true,
+      message: monotonicity.message,
+      previousRH,
+      newRH: newRHValue.toFixed(2),
       validation: {
-        maxAllowedIncrease: validation.maxAllowedIncrease,
-        requestedIncrease: validation.requestedIncrease,
-        daysSinceLastUpdate: validation.daysSinceLastUpdate,
-        lastUpdateDate: validation.lastUpdateDate,
-        requiresAdminOverride: validation.requiresAdminOverride,
-        canOverride: canAdminOverride(userRole || 'Ship')
-      }
+        maxAllowedIncrease: 0,
+        actualIncrease: 0,
+      },
+    };
+  }
+
+  let validation: ReturnType<typeof validateRunningHoursIncrease> | null = null;
+  if (!validationBypassAuthorized) {
+    // Validate running hours increase against daily limits
+    validation = validateRunningHoursIncrease({
+      currentRH: currentRHValue,
+      newRH: newRHValue,
+      componentLastUpdated: componentLastUpdated,
+      newUpdateDate: canonicalDay,
+      userRole: effectiveUserRole,
+      adminOverride: adminOverride || false
     });
+
+    if (!validation.allowed) {
+      throw new ValidationError(validation.message, {
+        validation: {
+          maxAllowedIncrease: validation.maxAllowedIncrease,
+          requestedIncrease: validation.requestedIncrease,
+          daysSinceLastUpdate: validation.daysSinceLastUpdate,
+          lastUpdateDate: validation.lastUpdateDate,
+          requiresAdminOverride: validation.requiresAdminOverride,
+          canOverride: canAdminOverride(effectiveUserRole)
+        }
+      });
+    }
+  } else {
+    console.warn(
+      `[RH Validation Bypass] Vessel RH policy allowed inherited-child RH correction for component ${componentId} ` +
+      `(value=${newRHValue}, date=${canonicalDay}).`
+    );
   }
 
   const newRHFormatted = newRHValue.toFixed(2);
 
   // Update component RH - only update currentCumulativeRH (child's actual hours)
   // Do NOT update rhCurrentInheritedCached as it stores the master's value
-  await repo.updateComponent(componentId, {
-    currentCumulativeRH: newRHFormatted,
-    runningHours: newRHFormatted,
-    lastUpdated: new Date().toISOString()
+  // Use user's entered reading date for last_updated (not server time) so the
+  // overview grid MAX logic shows the correct reading date, not today's date.
+  // Component write + stamp DELTA accrual happen in ONE locked transaction (Task #374):
+  // the delta is computed from a fresh in-tx read, so a duplicate/overlapping
+  // submission sees the committed value and accrues 0 instead of double-counting.
+  // Task #427: rotational-stamp date contract is the CANONICAL calendar day
+  // (YYYY-MM-DD), never an instant — offset/local-midnight inputs must not
+  // shift the stored day.
+  const atomicResult = await repo.updateChildRhWithStampAccrual({
+    componentId,
+    newRHValue,
+    lastUpdated: canonicalDay,
+    readingDateIso: canonicalDay,
+    userId: userId || null,
   });
+  if (!atomicResult.changed) {
+    return {
+      success: true,
+      noChange: true,
+      message: `Running Hours is already ${newRHFormatted} for ${component.name}`,
+      previousRH: atomicResult.previousRH.toFixed(2),
+      newRH: newRHFormatted,
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0,
+      },
+    };
+  }
+  // Audit the value that was actually committed as previous (fresh in-tx read),
+  // not the possibly-stale pre-validation read.
+  const committedPreviousRH = atomicResult.previousRH.toFixed(2);
+
+  // dateUpdatedLocal must also use the user's entered date so the audit-based
+  // MAX in listParents reads the correct reading date, not the server save time.
+  const auditDateLocal = canonicalDay;
 
   await repo.createRunningHoursAudit({
     vesselId: component.vesselId || '',
     componentId: componentId,
-    previousRH: previousRH,
+    previousRH: committedPreviousRH,
     newRH: newRHFormatted,
     cumulativeRH: newRHFormatted,
-    dateUpdatedLocal: new Date().toISOString().split('T')[0],
+    dateUpdatedLocal: auditDateLocal,
     dateUpdatedTZ: 'UTC',
     enteredAtUTC: new Date(),
     userId: userId || 'system',
     updatedByUuid: userUuid || null,
     source: 'manual',
-    notes: comments || 'Manual update of child component RH',
+    notes: validationBypassAuthorized
+      ? `RH validation bypassed by vessel policy. ${comments || ''}`.trim()
+      : comments || 'Manual update of child component RH',
+    // (previousRH above reflects the committed in-tx read)
     meterReplaced: false,
     version: 1
   });
@@ -415,8 +688,8 @@ export async function updateChildRH(componentId: string, body: {
     previousRH,
     newRH: newRHFormatted,
     validation: {
-      maxAllowedIncrease: validation.maxAllowedIncrease,
-      actualIncrease: validation.requestedIncrease
+      maxAllowedIncrease: validation?.maxAllowedIncrease ?? null,
+      actualIncrease: validation?.requestedIncrease ?? null
     }
   };
 }
@@ -439,6 +712,10 @@ export async function resetChildRH(componentId: string, body: {
   }
 
   const previousRH = component.currentCumulativeRH || '0.00';
+
+  // NOTE (Task #369): NO stamp accrual here by design — this is a baseline reset
+  // (component replaced / meter reset), not hours the installed stamp actually ran.
+  // The stamp keeps its own accrued service history.
 
   // Update component RH to 0
   await repo.updateComponent(componentId, {
@@ -611,7 +888,11 @@ export async function updateRHConfig(componentId: string, body: unknown) {
 // RH Config: Update Master RH with Cascade (from runningHoursRoutes.ts)
 // ══════════════════════════════════════════════════════════
 
-export async function updateMasterRH(componentId: string, body: unknown) {
+export async function updateMasterRH(
+  componentId: string,
+  body: unknown,
+  internalOptions?: { allowLowerWorkOrderApprovalSkip?: boolean },
+) {
   // Validate request body with Zod
   const parseResult = updateMasterRHSchema.safeParse(body);
   if (!parseResult.success) {
@@ -619,6 +900,12 @@ export async function updateMasterRH(componentId: string, body: unknown) {
   }
 
   const { newRHValue, updateSource, userId, userUuid, userRole, adminOverride, comments, dateUpdated } = parseResult.data;
+
+  // Task #427: canonicalize the user's reading date ONCE at the service
+  // boundary — validation and persistence (cascade writes date_updated_local
+  // + component stamps) use the SAME calendar day.
+  // Absent → today; PRESENT-but-unparseable → reject (never silently 'today').
+  const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
 
   // Verify component exists and is a MASTER type
   const component = await repo.getComponent(componentId);
@@ -630,16 +917,50 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     throw new ValidationError('Running hours can only be updated for MASTER counter type components');
   }
 
+  const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+  const lastUpdate = resolveLastUpdated(component);
+  const monotonicity = validateRHMonotonicity({
+    currentRH: currentRHValue,
+    submittedRH: newRHValue,
+    currentRHDate: lastUpdate,
+    submittedRHDate: canonicalDay,
+  });
+  const lowerApprovalSkipAllowed =
+    internalOptions?.allowLowerWorkOrderApprovalSkip === true &&
+    updateSource === 'WORKORDER';
+  if (!monotonicity.allowed && !lowerApprovalSkipAllowed) {
+    enforceRHMonotonicity({
+      currentRH: currentRHValue,
+      submittedRH: newRHValue,
+      currentRHDate: lastUpdate,
+      submittedRHDate: canonicalDay,
+    });
+  }
+  // Approval calls continue into the locked repository transaction even when
+  // this pre-flight read is equal/lower. A concurrent RH update may have
+  // advanced the live value after this read.
+  if (monotonicity.reason === 'EQUAL_CURRENT_RH' && !lowerApprovalSkipAllowed) {
+    return {
+      success: true,
+      noChange: true,
+      message: monotonicity.message,
+      masterUpdated: component,
+      inheritedUpdated: 0,
+      woGeneration: { rhJobsChecked: 0, rhWOsGenerated: 0 },
+    };
+  }
+
   // Validate running hours increase against daily limits (MANUAL and WORKORDER updates).
   // IMPORT and AUTOMATION bypass this check — they carry pre-validated bulk data.
-  if (updateSource === 'MANUAL' || updateSource === 'WORKORDER') {
-    const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
-    const lastUpdate = resolveLastUpdated(component);
+  if (
+    (updateSource === 'MANUAL' || updateSource === 'WORKORDER') &&
+    !(lowerApprovalSkipAllowed && !monotonicity.allowed)
+  ) {
     const validation = validateRunningHoursIncrease({
       currentRH: currentRHValue,
       newRH: newRHValue,
       componentLastUpdated: lastUpdate,
-      newUpdateDate: dateUpdated || new Date().toISOString(),
+      newUpdateDate: canonicalDay,
       userRole: userRole || 'Ship',
       adminOverride: adminOverride || false
     });
@@ -667,8 +988,26 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     comments,
     // Persist the reading date (WO completion date / RH Section "Date Updated") so the stored
     // reading and the component's last-updated reflect when the hours were observed, not "now".
-    dateUpdated
+    // Task #427: canonical YYYY-MM-DD only.
+    dateUpdated: canonicalDay,
+    allowLowerWorkOrderApprovalSkip: lowerApprovalSkipAllowed,
   });
+
+  if (result.rhSkipped) {
+    return {
+      success: true,
+      rhSkipped: true,
+      rhSkipReason: result.rhSkipped.reason,
+      submittedRH: result.rhSkipped.submittedRH,
+      currentRH: result.rhSkipped.currentRH,
+      currentRHDate: result.rhSkipped.currentRHDate,
+      submittedRHDate: result.rhSkipped.submittedRHDate,
+      message: `Work Order approved without updating Running Hours because ${result.rhSkipped.submittedRH} RH is lower than the latest live value of ${result.rhSkipped.currentRH} RH.`,
+      masterUpdated: result.masterUpdated,
+      inheritedUpdated: 0,
+      woGeneration: { rhJobsChecked: 0, rhWOsGenerated: 0 },
+    };
+  }
 
   // TRIGGER 1 HOOK: After MASTER RH is updated, scan for RH-based WO generation
   let woGenerationResult = { rhJobsChecked: 0, rhWOsGenerated: 0 };
@@ -678,7 +1017,9 @@ export async function updateMasterRH(componentId: string, body: unknown) {
       // Scope the event-driven generation to the affected vessel only (master RH
       // + its inherited cascades are all within this vessel). Avoids a fleet-wide
       // scan on every RH entry — far lower heap/CPU than the previous unscoped call.
-      const scanResult = await jobDueScanner.runScan(component.vesselId);
+      // Task #394: tag the trigger — on shore, RH-triggered scans are always refused
+      // (office RH entries must never generate WOs); on ship this changes nothing.
+      const scanResult = await jobDueScanner.runScan(component.vesselId, { triggerSource: 'rh-update' });
       woGenerationResult = {
         rhJobsChecked: scanResult.rhJobsChecked,
         rhWOsGenerated: scanResult.rhWOsGenerated
@@ -695,6 +1036,7 @@ export async function updateMasterRH(componentId: string, body: unknown) {
 
   return {
     success: true,
+    noChange: result.noChange === true,
     message: `Master RH updated to ${newRHValue}. Cascaded to ${result.inheritedUpdated} inherited components.`,
     masterUpdated: result.masterUpdated,
     inheritedUpdated: result.inheritedUpdated,

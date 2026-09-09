@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import * as rhService from '../services/runningHoursService';
 import * as rhTimelineValidation from '../services/rhTimelineValidationService';
 import { ValidationError } from '../../shared/errors';
+import { ForbiddenError } from '../../shared/errors';
+import type { AuthenticatedRequest } from '../../../middleware/auth';
 
 const PLACEHOLDER_USER_IDS = ['admin', 'system', 'User', 'user', ''];
 
@@ -55,11 +57,13 @@ export async function cascadeUpdate(req: Request, res: Response) {
   try {
     req.body.userId = resolveUserId(req);
     req.body.userUuid = resolveUserUuid(req);
-    const result = await rhService.cascadeUpdate(req.body);
+    // Role comes from the authenticated server session, never from the browser payload.
+    const authenticatedRole = (req as AuthenticatedRequest).user?.role;
+    const result = await rhService.cascadeUpdate(req.body, authenticatedRole);
     res.json(result);
   } catch (error: any) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ error: error.message, ...error.details });
+    if (error instanceof ValidationError || error instanceof ForbiddenError) {
+      return res.status(error.statusCode).json({ error: error.message, ...error.details });
     }
     console.error('Error cascading running hours update:', error);
     res.status(500).json({ error: error.message || "Failed to cascade running hours update" });
@@ -113,11 +117,12 @@ export async function updateChildRH(req: Request, res: Response) {
   try {
     req.body.userId = resolveUserId(req);
     req.body.userUuid = resolveUserUuid(req);
-    const result = await rhService.updateChildRH(req.params.componentId, req.body);
+    const authenticatedRole = (req as AuthenticatedRequest).user?.role;
+    const result = await rhService.updateChildRH(req.params.componentId, req.body, authenticatedRole);
     res.json(result);
   } catch (error: any) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ error: error.message, ...error.details });
+    if (error instanceof ValidationError || error instanceof ForbiddenError) {
+      return res.status(error.statusCode).json({ error: error.message, ...error.details });
     }
     console.error("Error updating child RH:", error);
     res.status(500).json({ error: "Failed to update child running hours" });
@@ -242,13 +247,6 @@ export async function validateRHEntry(req: Request, res: Response) {
     const isNotRhDriven = rhCounterType === 'NOT_RH_DRIVEN';
     const exceedsComponentRH = false;
 
-    const prevReading = previousReading !== undefined && previousReading !== null ? Number(previousReading) : null;
-
-    let adjustedMin = result.validRange ? result.validRange.min : 0;
-    if (prevReading !== null && !isNaN(prevReading) && result.validRange && prevReading < result.validRange.min) {
-      adjustedMin = prevReading;
-    }
-
     // Never cap the displayed max at the current reading — show the true timeline range.
     // An unbounded upper limit is represented internally as Infinity, which JSON.stringify
     // silently converts to null. Emit an explicit null sentinel so the client has a stable
@@ -257,8 +255,13 @@ export async function validateRHEntry(req: Request, res: Response) {
       ? result.validRange.max
       : null;
 
+    // The valid range minimum is the audit-trail-based minimum computed by the timeline
+    // service — always use it as-is. The previousReading from the WO request body is NOT
+    // used to influence the min: it reflects the RH at WO generation time, which may be
+    // stale (component RH was updated after the WO was created), so substituting it would
+    // show a misleadingly low floor (e.g. 20) when the real minimum is higher (e.g. 80).
     const cappedValidRange = result.validRange
-      ? { ...result.validRange, min: adjustedMin, max: adjustedMax }
+      ? { ...result.validRange, max: adjustedMax }
       : result.validRange;
 
     res.json({

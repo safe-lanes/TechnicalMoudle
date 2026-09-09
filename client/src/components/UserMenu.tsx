@@ -1,8 +1,11 @@
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LogOut } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -32,7 +35,7 @@ function computeInitials(
 }
 
 export function UserMenu() {
-  const { currentUser, domain } = useAuth();
+  const { currentUser, domain, logout } = useAuth();
 
   const fullName = currentUser?.fullName || currentUser?.username || "User";
   const role = currentUser?.role || "—";
@@ -86,6 +89,15 @@ export function UserMenu() {
             {domainName}
           </span>
         </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={logout}
+          className="cursor-pointer text-red-600 focus:text-red-600"
+          data-testid="button-logout"
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

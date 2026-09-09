@@ -18,6 +18,9 @@ import {
   computeApprovalTierCounts,
   type WorkOrderFilterParams,
 } from '@shared/utils/workOrderFilters';
+import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
+import { classifyApprovalTransition } from '../utils/approvalTransition';
+import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
 
 async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Promise<string | null> {
   if (!assignedTo) return null;
@@ -126,11 +129,32 @@ function calculateBackdatingDaysForApproval(completionDate: string | null | unde
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
+/**
+ * Vessel approval policy — Superintendent lock toggle (migration 168).
+ * The vessel setting overrides the legacy company approval policy. OFF is the
+ * requested default, so a missing or unreadable vessel settings row stays on
+ * the notify-only path rather than reading the legacy global value.
+ */
+export async function isSuperintendentLockEnabled(vesselId: string | null | undefined): Promise<boolean> {
+  if (!vesselId) return false;
+  try {
+    const settings = await storage.getPmsVesselSettings(vesselId);
+    return settings?.superintendentLockEnabled === true;
+  } catch (err: any) {
+    console.warn(`[ApprovalPolicy] Could not read vessel settings for ${vesselId} (defaulting to lock OFF): ${err.message}`);
+    return false;
+  }
+}
+
 export function calculateApprovalTier(
   dueDate: string | null | undefined,
   completionDate: string | null | undefined,
   missedCycles: number,
-  backdatingDays: number = 0
+  backdatingDays: number = 0,
+  // Superintendent lock toggle: when FALSE the high-severity branch assigns
+  // 'superintendent_notification' instead of 'superintendent_locked' — approval
+  // allowed, Superintendent still notified, HOD remarks (>=20) still mandatory.
+  superintendentLockEnabled: boolean = false
 ) {
   // SHARED parser (dateParse.ts contract): raw new Date() made DD-MM-YYYY due
   // dates Invalid (daysLate NaN) or month/day-swapped (daysLate 0) → WOs that
@@ -150,10 +174,18 @@ export function calculateApprovalTier(
   let approvalBlockReason: string | null = null;
 
   if (missedCycles >= 3 || daysLate >= 21 || backdatingDays >= 7) {
-    approvalTier = 'superintendent_locked';
-    superintendentAcknowledged = false;
-    superintendentNotifiedAt = new Date().toISOString();
-    approvalBlockReason = 'Awaiting Superintendent acknowledgment';
+    if (superintendentLockEnabled) {
+      approvalTier = 'superintendent_locked';
+      superintendentAcknowledged = false;
+      superintendentNotifiedAt = new Date().toISOString();
+      approvalBlockReason = 'Awaiting Superintendent acknowledgment';
+    } else {
+      // Lock disabled by this vessel policy — notify-only downgrade. Notification
+      // still fires (notification tier), remarks (>=20) still mandatory, no block.
+      approvalTier = 'superintendent_notification';
+      superintendentNotifiedAt = new Date().toISOString();
+      superintendentAcknowledged = false;
+    }
   } else if (missedCycles === 2 || (daysLate >= 14 && daysLate < 21) || (backdatingDays >= 3 && backdatingDays < 7)) {
     approvalTier = 'superintendent_notification';
     superintendentNotifiedAt = new Date().toISOString();
@@ -208,8 +240,20 @@ export async function createSuperintendentNotificationForWO(wo: any, daysLate: n
 
 // ── List Work Orders with Enrichment ──
 
-export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
-  const workOrders = await repo.findWorkOrders(vesselId, vesselIds);
+export async function listWorkOrders(vesselId?: string, vesselIds?: string[], preloadedRows?: any[]) {
+  // preloadedRows: a caller that already holds (a subset of) WO rows — e.g. the
+  // alert engine's SQL-prefiltered candidates — reuses this function's enrichment
+  // and status computation unchanged instead of duplicating it.
+  const allRows = preloadedRows ?? await repo.findWorkOrders(vesselId, vesselIds);
+
+  // ARCHIVED ROWS ARE NOT LISTED (2026-08-04). The storage layer deliberately returns
+  // soft-deleted rows (numbering must see them so archived numbers are never reused),
+  // so every user-facing consumer must exclude them itself. This function feeds the
+  // office AND vessel Work Orders screens, the paged list, and the computed-status
+  // contract (reports/alerts) — without this filter, a reconciler-archived duplicate
+  // stayed visible next to its survivor forever, which read as "the duplicate fix
+  // doesn't work" (Jeevan, dev, 2026-08-04 — the merge itself was proven working).
+  const workOrders = allRows.filter((wo: any) => wo.isDeleted !== true);
 
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
@@ -490,6 +534,24 @@ export async function getWorkOrdersWithComputedStatus(vesselId?: string, vesselI
   return enriched.map((wo: any) => ({ ...wo, status: wo.computedStatus ?? wo.status }));
 }
 
+/**
+ * Overdue vessel WOs for the 5-minute alert scan — CONTRACT-compliant (status is
+ * computed by the same listWorkOrders enrichment), but fed from an SQL-prefiltered
+ * candidate set instead of the entire fleet's WO history. The prefilter drops only
+ * rows whose authored status computeWorkOrderStatus passes through unchanged
+ * (Completed/Cancelled/Pending Approval/Postponed/… can never compute to Overdue),
+ * which on a mature fleet is the vast majority of the table. Perf: the unscoped
+ * getWorkOrdersWithComputedStatus() here loaded ALL WOs + jobs + components of
+ * every vessel every 5 minutes per tenant (prod CPU finding, 02-Sep-2026).
+ */
+export async function getOverdueVesselWorkOrdersForAlerts() {
+  const candidates = await repo.findAlertCandidateWorkOrders();
+  const enriched = await listWorkOrders(undefined, undefined, candidates);
+  return enriched
+    .map((wo: any) => ({ ...wo, status: wo.computedStatus ?? wo.status }))
+    .filter((wo: any) => wo.status === 'Overdue' && wo.dataScope === 'vessel');
+}
+
 export interface ListWorkOrdersPagedParams extends WorkOrderFilterParams {
   page: number;
   pageSize: number;
@@ -503,6 +565,21 @@ export interface ListWorkOrdersPagedResult {
   statusCounts: Record<string, number>;
   approvalTierCounts: ReturnType<typeof computeApprovalTierCounts>;
   rankOptions: string[];
+}
+
+async function computeVesselAwareApprovalTierCounts(workOrders: any[]) {
+  const vesselSettings = await repo.findAllPmsVesselSettings();
+  const lockByVessel = new Map(
+    vesselSettings.map((settings: any) => [settings.vesselId, settings.superintendentLockEnabled === true]),
+  );
+
+  return computeApprovalTierCounts(
+    workOrders.map((workOrder: any) => (
+      workOrder.approvalTier === 'superintendent_locked' && !lockByVessel.get(workOrder.vesselId)
+        ? { ...workOrder, approvalTier: 'superintendent_notification' }
+        : workOrder
+    )),
+  );
 }
 
 /**
@@ -531,7 +608,7 @@ export async function listWorkOrdersPaged(
   ).sort((a, b) => a.localeCompare(b));
 
   const filtered = filterAndSortWorkOrders(enriched, params);
-  const approvalTierCounts = computeApprovalTierCounts(filtered);
+  const approvalTierCounts = await computeVesselAwareApprovalTierCounts(filtered);
 
   const total = filtered.length;
   const pageSize = params.pageSize;
@@ -725,6 +802,12 @@ export async function createWorkOrder(body: any) {
   const { insertWorkOrderSchema } = await import('@shared/schema');
   let workOrderData = insertWorkOrderSchema.parse(body);
 
+  if (!workOrderData.vesselId) {
+    throw new ValidationError('Vessel ID is required to generate a work order number', {
+      code: 'VESSEL_ID_REQUIRED_FOR_WO_NUMBER'
+    });
+  }
+
   // AUTO-CORRECT: Fetch correct componentCode from database
   if (workOrderData.vesselId && (workOrderData.component || workOrderData.componentCode)) {
     let resolvedComponent: any = null;
@@ -818,7 +901,7 @@ export async function createWorkOrder(body: any) {
         storage, jobCode, componentCode, workOrderData.vesselId || undefined
       );
     } else {
-      const vesselId = workOrderData.vesselId || 'V001';
+      const vesselId = workOrderData.vesselId;
       let unplannedComponentCode = workOrderData.componentCode || '';
       if (!unplannedComponentCode && workOrderData.component) {
         const components = await repo.findComponents(vesselId);
@@ -924,8 +1007,12 @@ export async function createWorkOrder(body: any) {
 export async function updateWorkOrder(id: string, body: any) {
   // Log incoming data for debugging
   console.log('📝 PATCH work order request body keys:', Object.keys(body));
-  // Tracks whether the approval RH sync was skipped due to a back-dated lower entry.
+  // Approval and RH application are separate outcomes. A lower completion
+  // reading may approve successfully while the live RH write is skipped.
   let rhBackdatedApproval = false;
+  let rhUpdateOutcomeApproval: 'applied' | 'no_change' | 'skipped_lower' | 'already_processed' | null = null;
+  let rhSkipReasonApproval: 'LOWER_THAN_LIVE_RH' | null = null;
+  let submittedRHApproval: number | null = null;
   let latestRHApproval: number | null = null;
   let latestRHDateApproval: string | null = null;
 
@@ -934,6 +1021,179 @@ export async function updateWorkOrder(id: string, body: any) {
   if (!existingWO) {
     throw new NotFoundError('Work order not found');
   }
+
+  // RH synchronization stamps and approval outcomes are server-owned. No
+  // client PATCH path may forge an applied/skipped state.
+  const SERVER_OWNED_RH_FIELDS = [
+    'rhSyncedAt',
+    'rhUpdateOutcome',
+    'rhSkipReason',
+    'rhSkipSubmittedRh',
+    'rhSkipLatestRh',
+    'rhSkipLatestRhDate',
+  ];
+  const forgedRhFields = Object.keys(body).filter((key) => SERVER_OWNED_RH_FIELDS.includes(key));
+  if (forgedRhFields.length > 0) {
+    throw new ValidationError(
+      `Cannot modify server-managed Running Hours fields: ${forgedRhFields.join(', ')}`,
+      { code: 'RH_OUTCOME_FIELDS_READ_ONLY', disallowedFields: forgedRhFields }
+    );
+  }
+
+  // ── Part B Office Edit (Pending Approval) ──────────────────────────────────
+  // Office/PMS Admin/Sail Admin can correct B1/B2/B4 fields while a WO awaits
+  // approval. B3 Running Hours are EXPLICITLY BLOCKED — they drive the delta
+  // cascade applied to all child components at approval time; editing them
+  // post-submission risks corrupting component RH records.
+  if (body.partBOfficeEdit === true) {
+    if (existingWO.status !== 'Pending Approval') {
+      throw new ValidationError('Part B office edit is only permitted when the work order is in Pending Approval status.');
+    }
+    // Role check — explicitly allowlist eligible office roles. body.userRole is set
+    // server-side by the controller from the authenticated session; the client cannot spoof it.
+    const PART_B_EDIT_ALLOWED_ROLES = ['Office', 'PMS Admin', 'Sail Admin'];
+    if (!PART_B_EDIT_ALLOWED_ROLES.includes(body.userRole)) {
+      throw new ValidationError('Only Office, PMS Admin, or Sail Admin users can edit Part B on a Pending Approval work order.');
+    }
+    // A stamped locked tier only remains locked while its vessel's live policy
+    // is ON. Switching this vessel OFF immediately restores the notify-only
+    // path, including the Part B edit behavior.
+    if (existingWO.approvalTier === 'superintendent_locked' && await isSuperintendentLockEnabled(existingWO.vesselId)) {
+      throw new ValidationError('This work order is superintendent-locked. The superintendent must act on it before Part B can be edited.');
+    }
+    // B3 Running Hours fields — explicitly blocked (delta cascade risk)
+    const B3_FIELDS = ['runningHours', 'previousReading', 'runningHoursDifference', 'readingDate', 'currentReadingDate', 'currentReading'];
+    // Approval/workflow fields — must never change through this path
+    const PROTECTED_FIELDS = [
+      'status', 'approvalAction', 'approvalDate', 'submittedDate', 'rhSyncedAt',
+      'rhUpdateOutcome', 'rhSkipReason', 'rhSkipSubmittedRh', 'rhSkipLatestRh',
+      'rhSkipLatestRhDate', 'wasRejected', 'approvalTier', 'rejectionComments',
+      'missedCycles', 'dateCompleted', 'isDeleted'
+    ];
+    const attempted = Object.keys(body);
+    const blockedB3 = attempted.filter((f: string) => B3_FIELDS.includes(f));
+    const blockedProtected = attempted.filter((f: string) => PROTECTED_FIELDS.includes(f));
+    if (blockedB3.length > 0 || blockedProtected.length > 0) {
+      throw new ValidationError(
+        `Part B office edit cannot modify: ${[...blockedB3, ...blockedProtected].join(', ')}. Running Hours and approval fields are protected.`
+      );
+    }
+    // Whitelist: only B1/B2/B4 fields and controller-injected audit fields
+    // B4 (consumedSpareParts) is intentionally excluded: those inventory transactions
+    // were already applied when the WO was submitted. Editing quantities/locations here
+    // without running the full consumption-delta + _deductedQty reversal logic would
+    // corrupt stock balances. B4 changes must go through the normal Pending→Rejected→
+    // Resubmit cycle so the inventory reconciliation path runs correctly.
+    const ALLOWED_FIELDS = new Set([
+      // B1 — Risk Assessment, Checklists & Records
+      'riskAssessmentStatus', 'safetyChecklistsStatus', 'operationalFormsStatus',
+      'uploadedDocuments',
+      // B2 — Work Execution Details
+      'startDateTime', 'completionDateTime', 'executionAssignedTo', 'performedBy',
+      'noOfPersons', 'totalTimeHours', 'manhours', 'workCarriedOut', 'jobExperienceNotes',
+      'remarks', 'completionRemarks',
+      // controller-injected fields (safe, set server-side)
+      'userId', 'userRole', 'userUuid',
+    ]);
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (key === 'partBOfficeEdit') continue; // strip the marker
+      if (ALLOWED_FIELDS.has(key)) updateData[key] = value;
+    }
+    console.log(`📝 Part B office edit — WO ${existingWO.workOrderNo}: updating [${Object.keys(updateData).filter(k => !['userId','userRole','userUuid'].includes(k)).join(', ')}]`);
+    // updatedAt is set automatically by the Drizzle .$onUpdateFn on the column,
+    // ensuring shore's edit wins over any in-flight ship sync for the same fields.
+    const workOrder = await repo.update(id, updateData);
+    return workOrder;
+  }
+  // ── End Part B Office Edit ─────────────────────────────────────────────────
+
+  // ── Pending Approval Field Guard (general PATCH path) ─────────────────────
+  // B3 Running Hours, B4 consumed spares, and explicit status transitions are
+  // blocked on the generic PATCH path for Pending Approval WOs. This guard runs
+  // regardless of what the client sends — partBOfficeEdit already returned above,
+  // and approvalAction routes through the explicit approval flow further below.
+  //
+  // Ship users also land here (no early-return) and are subject to the same guard,
+  // meaning they cannot re-write RH or spare fields once submitted.
+  //
+  // Sync engine operations use oneWayApplier.ts and bypass updateWorkOrder entirely,
+  // so bidirectional sync for other fields is not affected.
+  if (existingWO.status === 'Pending Approval' && !body.partBOfficeEdit) {
+    const actionClassification = classifyApprovalTransition({
+      existingStatus: existingWO.status,
+      requestedStatus: body.status,
+      approvalAction: body.approvalAction,
+    });
+    if (actionClassification.invalidActionStatus) {
+      throw new ValidationError(
+        'The approval action does not match the requested Work Order status.',
+        { code: 'INVALID_APPROVAL_ACTION_STATUS' }
+      );
+    }
+
+    const PENDING_APPROVAL_IMMUTABLE_FIELDS = [
+      // B3 Running Hours — drive the delta cascade at approval; immutable post-submission
+      'runningHours', 'previousReading', 'runningHoursDifference',
+      'readingDate', 'currentReadingDate', 'currentReading', 'woCompletionRh',
+      // B4 Consumed Spare Parts — inventory already applied; reversal requires reject/resubmit
+      'consumedSpareParts',
+    ];
+    const attempted = Object.keys(body).filter((k: string) => PENDING_APPROVAL_IMMUTABLE_FIELDS.includes(k));
+    if (attempted.length > 0) {
+      console.warn(`⚠️ Blocked attempt to modify protected fields on Pending Approval WO ${existingWO.workOrderNo}: ${attempted.join(', ')}`);
+      throw new ValidationError(
+        `Cannot modify [${attempted.join(', ')}] on a Pending Approval work order. ` +
+        `Running Hours and consumed spare parts are locked until the work order is approved or rejected.`
+      );
+    }
+
+    if (body.superintendentAck) {
+      // Only the dedicated RBAC-protected acknowledgment controllers can
+      // preserve this marker; the generic PATCH controller strips it.
+      const ACK_ALLOWED_FIELDS = new Set([
+        'superintendentAck',
+        'superintendentAcknowledged',
+        'superintendentAcknowledgedAt',
+        'approvalTier',
+        'approvalBlockReason',
+      ]);
+      const strayAckFields = Object.keys(body).filter((key) => !ACK_ALLOWED_FIELDS.has(key));
+      if (strayAckFields.length > 0) {
+        throw new ValidationError(
+          `Unexpected fields in Superintendent acknowledgment: ${strayAckFields.join(', ')}`,
+          { code: 'INVALID_SUPERINTENDENT_ACK_PAYLOAD', disallowedFields: strayAckFields }
+        );
+      }
+    } else {
+      const SERVER_MANAGED_APPROVAL_FIELDS = [
+        'approvalTier',
+        'superintendentAcknowledged',
+        'superintendentAcknowledgedAt',
+        'approvalBlockReason',
+      ];
+      const forgedApprovalFields = Object.keys(body).filter((key) => SERVER_MANAGED_APPROVAL_FIELDS.includes(key));
+      if (forgedApprovalFields.length > 0) {
+        throw new ValidationError(
+          `Cannot modify server-managed approval fields: ${forgedApprovalFields.join(', ')}`,
+          { code: 'APPROVAL_FIELDS_READ_ONLY', disallowedFields: forgedApprovalFields }
+        );
+      }
+    }
+
+    const hasRawStatusTransition =
+      body.status !== undefined &&
+      body.status !== 'Pending Approval' &&
+      !actionClassification.explicitApproval &&
+      !actionClassification.explicitRejection;
+    if (hasRawStatusTransition) {
+      throw new ValidationError(
+        'Pending Approval status changes require an explicit approved or rejected action.',
+        { code: 'APPROVAL_ACTION_REQUIRED' }
+      );
+    }
+  }
+  // ── End Pending Approval Field Guard ──────────────────────────────────────
 
   // Check if WO is completed - if so, only allow limited updates
   const { isCompletedStatus } = await import('../../../utils/workOrderStatus');
@@ -969,6 +1229,7 @@ export async function updateWorkOrder(id: string, body: any) {
   }
 
   let updateData = { ...body };
+  delete (updateData as any).superintendentAck; // control flag (field-guard bypass), not a WO column
 
   // Run the assignment-sync helper only when the request actually
   // touches the assignment fields, so a partial PATCH (e.g. remarks
@@ -985,6 +1246,42 @@ export async function updateWorkOrder(id: string, body: any) {
       delete updateData[key];
     }
   });
+
+  // ── Save as Draft (migration 165, Task #402) ──────────────────────────────
+  // A draft save sends ONLY draftExecutionData (a non-null JSON document) and
+  // no status/completion fields. It writes exclusively to the draft column so
+  // the stored status and every derivation input (completionDateTime, due
+  // dates, RH readings) stay untouched — the WO keeps its current tab. All
+  // completion mapping, auto-promotion, RH validation and job side effects
+  // below are deliberately skipped. draftExecutionData:null (clearing) and
+  // payloads that also carry status/completion fields fall through to the
+  // normal path.
+  const draftDoc = updateData.draftExecutionData;
+  const isDraftOnlySave =
+    draftDoc != null && typeof draftDoc === 'object' && !Array.isArray(draftDoc) &&
+    updateData.status === undefined &&
+    updateData.completionDateTime === undefined &&
+    updateData.dateOfCompletion === undefined;
+  if (isDraftOnlySave) {
+    // Strict payload check: a draft save must not smuggle in live-column
+    // writes. Anything beyond the draft doc + actor metadata is rejected
+    // loudly rather than silently dropped.
+    // userRole/userUuid are injected into the body by route middleware.
+    const DRAFT_SAVE_ALLOWED_KEYS = new Set(['draftExecutionData', 'userId', 'performedBy', 'userRole', 'userUuid']);
+    const strayKeys = Object.keys(updateData).filter((k: string) => !DRAFT_SAVE_ALLOWED_KEYS.has(k));
+    if (strayKeys.length > 0) {
+      throw new ValidationError(
+        'Draft save must contain only draftExecutionData',
+        { message: `Unexpected fields in draft save: ${strayKeys.join(', ')}. Send them via a normal update or include them inside draftExecutionData.`, strayKeys }
+      );
+    }
+    const workOrder = await repo.update(id, { draftExecutionData: draftDoc });
+    try {
+      await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, workOrder, body.userId || body.performedBy || 'system');
+    } catch (err) { console.error('[FieldLogger] WO draft save:', err); }
+    console.log(`📝 Draft saved for WO ${existingWO.workOrderNo || id} (draft-only update, status/tab unchanged)`);
+    return workOrder;
+  }
 
   // VALIDATION: Numeric field precision
   const validateNumericField = (
@@ -1034,6 +1331,9 @@ export async function updateWorkOrder(id: string, body: any) {
   if (updateData.currentReading !== undefined) {
     validateNumericField(updateData.currentReading, 'Current Reading', { maxDecimals: 2 });
   }
+  if (updateData.woCompletionRh !== undefined) {
+    validateNumericField(updateData.woCompletionRh, 'WO Completion RH', { maxDecimals: 2 });
+  }
   if (updateData.noOfPersons !== undefined) {
     validateNumericField(updateData.noOfPersons, 'Number of Persons', { integerOnly: true });
   }
@@ -1058,9 +1358,8 @@ export async function updateWorkOrder(id: string, body: any) {
   const componentRef = updateData.component || existingWO.component;
   const componentCodeRef = updateData.componentCode || existingWO.componentCode;
   const vesselId = updateData.vesselId || existingWO.vesselId;
+  let resolvedComponent: any = null;
   if (vesselId && (componentRef || componentCodeRef)) {
-    let resolvedComponent: any = null;
-
     if (componentRef) {
       resolvedComponent = await repo.findComponent(componentRef);
     }
@@ -1133,6 +1432,47 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   }
 
+  const isSubmittingForApproval =
+    updateData.status === 'Pending Approval' &&
+    existingWO.status !== 'Pending Approval';
+  const effectiveCompletionRh = updateData.woCompletionRh ?? (existingWO as any).woCompletionRh;
+  const effectiveCounterType = resolvedComponent?.rhCounterType || 'MASTER';
+  if (
+    isSubmittingForApproval &&
+    requiresWoCompletionRh(existingWO.maintenanceBasis, effectiveCounterType) &&
+    (effectiveCompletionRh === null || effectiveCompletionRh === undefined || String(effectiveCompletionRh).trim() === '')
+  ) {
+    throw new ValidationError(
+      'WO Completion RH is required for Running Hours-based Work Orders',
+      { code: 'WO_COMPLETION_RH_REQUIRED' }
+    );
+  }
+
+  // ── RH accuracy validations (migration 139) — PATCH path mirror of the
+  // completion-service checks (the ship Part-B save submits via PATCH). ──
+  if (updateData.woCompletionRh !== undefined && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== '') {
+    const woRhNum = parseFloat(String(updateData.woCompletionRh));
+    const readingRaw = updateData.runningHours ?? updateData.currentReading ?? existingWO.runningHours ?? existingWO.currentReading;
+    const readingNum = readingRaw !== undefined && readingRaw !== null && String(readingRaw).trim() !== '' ? parseFloat(String(readingRaw)) : NaN;
+    if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
+      throw new ValidationError(
+        `WO Completion RH (${woRhNum}) cannot be greater than the Current Reading (${readingNum}). ` +
+        `The completion reading is the hours at the time the work was done; the Current Reading is the latest meter value.`,
+        { code: 'WO_COMPLETION_RH_EXCEEDS_READING' }
+      );
+    }
+  }
+  if (updateData.currentReadingDate) {
+    const rdParsed = new Date(String(updateData.currentReadingDate));
+    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+    if (isNaN(rdParsed.getTime())) {
+      throw new ValidationError('Current Reading Date is not a valid date.', { code: 'INVALID_READING_DATE' });
+    }
+    if (rdParsed.getTime() > todayEnd.getTime()) {
+      throw new ValidationError('Current Reading Date cannot be in the future.', { code: 'READING_DATE_IN_FUTURE' });
+    }
+  }
+
   // REJECTION WORKFLOW
   const isBeingRejected = updateData.status?.toLowerCase() === 'rejected';
   if (isBeingRejected) {
@@ -1185,6 +1525,15 @@ export async function updateWorkOrder(id: string, body: any) {
     console.log('📝 Capturing submittedDate for audit trail on submission/Pending Approval');
   }
 
+  // Save as Draft (Task #402): a real submission supersedes any stashed draft —
+  // clear it so the form no longer prefers stale drafted values after approval.
+  if ((isSubmissionAction || hasCompletionData || updateData.status === 'Completed') &&
+      updateData.draftExecutionData === undefined &&
+      (existingWO as any).draftExecutionData != null) {
+    updateData.draftExecutionData = null;
+    console.log('📝 Clearing draftExecutionData on submission');
+  }
+
   if (isSubmissionAction || updateData.status === 'Pending Approval') {
     const completionDateForCalc = updateData.completionDateTime || updateData.dateCompleted ||
       existingWO.completionDateTime || existingWO.dateCompleted;
@@ -1210,7 +1559,8 @@ export async function updateWorkOrder(id: string, body: any) {
       tierCompDate,
       updateData.submittedDate || existingWO.submittedDate
     );
-    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays);
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled(existingWO.vesselId);
+    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
     updateData.superintendentNotifiedAt = tierResult.superintendentNotifiedAt;
@@ -1248,29 +1598,36 @@ export async function updateWorkOrder(id: string, body: any) {
   // branch in workOrderCompletionService. The legacy RH_EXCEEDS_MASTER guard was removed here so
   // the two completion paths behave identically.
 
-  const isApprovalTransition = (updateData.approvalAction === 'approved' && updateData.status === 'Completed') ||
-    (updateData.status === 'Completed' && existingWO.status === 'Pending Approval');
-
-  // ── Level 2 Review Interception ──────────────────────────────────────────
-  // If the linked job requires a Level 2 Office reviewer, redirect the WO to
-  // "Pending Office Review" instead of completing it. This gate covers the
-  // direct-PATCH path; the bulk-approve path has its own identical check.
-  let interceptedForL2Review = false;
-  if (isApprovalTransition && existingWO.jobId) {
-    try {
-      const linkedJob = await repo.findJob(existingWO.jobId);
-      if (linkedJob && (linkedJob as any).level2ReviewerRankId) {
-        interceptedForL2Review = true;
-        updateData.status = 'Pending Office Review';
-        updateData.approvalDate = new Date().toISOString();
-        console.log(`🔒 [L2 Review] WO ${existingWO.workOrderNo} intercepted — job requires Level 2 reviewer rank "${(linkedJob as any).level2ReviewerRankId}"`);
-      }
-    } catch (err) {
-      console.warn(`[L2 Review] Could not load linked job ${existingWO.jobId} for L2 check — proceeding without interception:`, err);
-    }
+  const approvalTransition = classifyApprovalTransition({
+    existingStatus: existingWO.status,
+    // Use the immutable request values. Rejection normalization above changes
+    // updateData.status from Rejected to Due for rework, but that must not make
+    // the original explicit rejection look like an invalid action/status pair.
+    requestedStatus: body.status,
+    approvalAction: body.approvalAction,
+  });
+  if (approvalTransition.missingExplicitApproval) {
+    throw new ValidationError(
+      'Completing a Pending Approval Work Order requires an explicit approval action.',
+      { code: 'APPROVAL_ACTION_REQUIRED' }
+    );
   }
+  if (approvalTransition.invalidActionStatus) {
+    throw new ValidationError(
+      'The approval action does not match the requested Work Order status.',
+      { code: 'INVALID_APPROVAL_ACTION_STATUS' }
+    );
+  }
+  const isApprovalTransition = approvalTransition.explicitApproval;
 
-  if (isApprovalTransition && !interceptedForL2Review) {
+  // Phase 0 / P0.2 (defect D1): the Layer-5 safety gates below run for EVERY approval
+  // transition — the Level 2 interception happens AFTER them (see below), so an L2 job
+  // is held to exactly the same justification / superintendent-lock / CE-remarks rules
+  // as a non-L2 job. Previously the intercept ran first and the gates were skipped for
+  // intercepted WOs (DEFECT-REPRODUCTION-REPORT.md §1). The bulk path already gates first.
+  let interceptedForL2Review = false;
+
+  if (isApprovalTransition) {
     const { resolveHodForDepartment, getHodShortLabel } = await import('../../ranks/hodResolutionService');
     const hodResolution = await resolveHodForDepartment(
       existingWO.vesselId,
@@ -1315,10 +1672,21 @@ export async function updateWorkOrder(id: string, body: any) {
     const ceRemarks = (updateData.ceApprovalRemarks || '').trim();
 
     if (currentTier === 'superintendent_locked') {
-      throw new ValidationError(
-        `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
-        { code: 'SUPERINTENDENT_LOCKED' }
-      );
+      // Live vessel policy read: turning this vessel OFF unlocks already-stamped
+      // locked WOs immediately; other vessels remain unaffected.
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
+      if (lockEnabled) {
+        throw new ValidationError(
+          `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
+          { code: 'SUPERINTENDENT_LOCKED' }
+        );
+      }
+      if (!ceRemarks || ceRemarks.length < 20) {
+        throw new ValidationError(
+          `This work order has high severity issues and the Superintendent lock is disabled for this vessel. The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
+          { code: 'CE_REMARKS_REQUIRED', minLength: 20 }
+        );
+      }
     }
 
     if (currentTier === 'superintendent_notification') {
@@ -1337,6 +1705,26 @@ export async function updateWorkOrder(id: string, body: any) {
           { code: 'CE_REMARKS_REQUIRED', minLength: 10 }
         );
       }
+    }
+  }
+
+  // ── Level 2 Review Interception ──────────────────────────────────────────
+  // If the linked job requires a Level 2 Office reviewer, redirect the WO to
+  // "Pending Office Review" instead of completing it. Runs AFTER the gates above
+  // (Phase 0 / P0.2) — only a WO that has passed every safety rule is handed to the
+  // office reviewer. This covers the direct-PATCH path; the bulk-approve path has its
+  // own identical check (after its own gates).
+  if (isApprovalTransition && existingWO.jobId) {
+    try {
+      const linkedJob = await repo.findJob(existingWO.jobId);
+      if (linkedJob && (linkedJob as any).level2ReviewerRankId) {
+        interceptedForL2Review = true;
+        updateData.status = 'Pending Office Review';
+        updateData.approvalDate = new Date().toISOString();
+        console.log(`🔒 [L2 Review] WO ${existingWO.workOrderNo} intercepted — job requires Level 2 reviewer rank "${(linkedJob as any).level2ReviewerRankId}"`);
+      }
+    } catch (err) {
+      console.warn(`[L2 Review] Could not load linked job ${existingWO.jobId} for L2 check — proceeding without interception:`, err);
     }
   }
 
@@ -1372,12 +1760,22 @@ export async function updateWorkOrder(id: string, body: any) {
   //     updateMasterRH still runs on the ship, so the shore mirrors the value via the
   //     running_hours_audit sync + derived-RH-update (propagation untouched).
   const { isShipInstance: isShipInstanceForRH } = await import('../../sync/syncRole');
+  // Task #394: the office may now advance the RH counter from WO completion, but ONLY
+  // for vessels whose per-vessel office-RH-entry switch is ON (default OFF, fail closed).
+  // Ship behaviour is unchanged. The receiving-side latest-reading-wins guards are
+  // always on regardless of this switch.
+  const isShipForRhWrite = await isShipInstanceForRH();
+  let officeRhEntryAllowed = false;
+  if (!isShipForRhWrite && existingWO.vesselId) {
+    const { isOfficeRhEntryEnabled } = await import('./workOrderGenerationGate');
+    officeRhEntryAllowed = await isOfficeRhEntryEnabled(existingWO.vesselId);
+  }
   if (
     isApprovalTransition &&
     !interceptedForL2Review &&
     updateData.status === 'Completed' &&
     !(existingWO as any).rhSyncedAt &&
-    await isShipInstanceForRH()
+    (isShipForRhWrite || officeRhEntryAllowed)
   ) {
     const rhRaw = existingWO.runningHours || updateData.runningHours;
     if (rhRaw) {
@@ -1387,57 +1785,83 @@ export async function updateWorkOrder(id: string, body: any) {
       }
       const rhCounterType = (rhComp?.rhCounterType || 'MASTER').toUpperCase();
       const rhValue = parseInt(rhRaw);
-      const normRhDate = (d?: string | null): string | undefined => {
-        if (!d) return undefined;
-        if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split('T')[0];
-        const m = d.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
-        if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-        const p = new Date(d);
-        return !isNaN(p.getTime()) ? p.toISOString().split('T')[0] : undefined;
-      };
+      // Task #427: SHARED canonicalizer — same calendar-day contract as every
+      // other RH writer (ISO prefix literal day, legacy DD Mon YYYY, numeric
+      // day-first D-M-YYYY); no unrestricted `new Date(d)` fallback.
+      const { requireReadingDayInput } = await import('../../running-hours/utils/readingDate');
+      // Absent → undefined (documented fallback chain); PRESENT-but-unparseable → reject.
+      const normRhDate = (d?: string | null): string | undefined =>
+        requireReadingDayInput(d ?? null, 'reading/completion date') ?? undefined;
       const completionDateNorm = normRhDate(existingWO.completionDateTime || existingWO.dateCompleted || updateData.completionDateTime);
+      // R2 (migration 139): the RH module operates on the date the reading was
+      // TAKEN (stored Current Reading Date); fallback to the completion date =
+      // exact pre-feature behaviour.
+      const readingDateNorm = normRhDate((existingWO as any).currentReadingDate || (updateData as any).currentReadingDate) || completionDateNorm;
+
+      // Task #394: an OFFICE RH entry must carry an explicit observed reading date —
+      // never default to "now" (a wrong reading date poisons the latest-reading-wins
+      // comparator fleet-wide). Ship entries keep their existing fallback behaviour.
+      if (!isShipForRhWrite && !readingDateNorm) {
+        throw new ValidationError(
+          'Office RH entry requires the reading date (Current Reading Date or Completion Date). Enter the date the counter was actually read.',
+          { code: 'RH_READING_DATE_REQUIRED', workOrderNo: existingWO.workOrderNo }
+        );
+      }
 
       if (rhComp && rhCounterType === 'MASTER' && !isNaN(rhValue)) {
-        // MASTER pre-flight: detect back-dated lower entry.
-        // If the completion date predates the master's last RH update AND the entered RH is not
-        // greater than the current master RH, skip the RH module write. The WO still completes.
-        let rhBackdatedSkippedApproval = false;
-        const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || '0');
-        if (rhValue <= masterCurrentRHApproval && completionDateNorm) {
-          const masterUpdRawApproval: any = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
-          const masterUpdDateApproval: Date | null = masterUpdRawApproval instanceof Date ? masterUpdRawApproval : (masterUpdRawApproval ? new Date(masterUpdRawApproval) : null);
-          if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
-            const approvalCompletionDate = new Date(completionDateNorm);
-            const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
-            const woDay = Date.UTC(approvalCompletionDate.getUTCFullYear(), approvalCompletionDate.getUTCMonth(), approvalCompletionDate.getUTCDate());
-            if (woDay < masterDay) {
-              rhBackdatedSkippedApproval = true;
-              updateData.rhBackdatedEntry = true;
-              rhBackdatedApproval = true;
-              latestRHApproval = masterCurrentRHApproval;
-              latestRHDateApproval = masterUpdDateApproval.toISOString().split('T')[0];
-              console.warn(`⚠️ [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
-            }
-          }
-        }
-
-        if (!rhBackdatedSkippedApproval) {
         // MASTER: completion reading is source of truth — advance master counter + cascade.
+        // Task #394/#243: atomic compare-and-set claim on rh_synced_at — a concurrent or
+        // replayed approval of the SAME WO sees 0 rows and skips (no double-advance).
+        // Released on failure so a corrected retry can apply.
+        const { claimWoRhSync, releaseWoRhSync } = await import('../../running-hours/rhEventComparator');
+        const { getPool: getPoolForClaim } = await import('../../../db');
+        const claimPool = await getPoolForClaim();
+        if (!(await claimWoRhSync(claimPool, existingWO.wouuid))) {
+          console.warn(`⚠️ [RH Sync] WO ${existingWO.workOrderNo} RH already claimed/applied by a concurrent completion — skipping duplicate RH advance`);
+          rhUpdateOutcomeApproval = 'already_processed';
+          updateData.rhUpdateOutcome = 'already_processed';
+        } else {
         const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
         try {
-          await updateMasterRH(rhComp.cuuid, {
+          const rhResult = await updateMasterRH(rhComp.cuuid, {
             newRHValue: rhValue,
-            updateSource: 'MANUAL',
+            updateSource: 'WORKORDER',
             userId: body.userId || existingWO.performedBy || 'system',
             userUuid: body.userUuid,
             userRole: body.userRole || 'Ship',
             adminOverride: body.adminOverride || false,
             comments: `RH update via work order completion ${existingWO.workOrderNo}`,
-            dateUpdated: completionDateNorm
+            dateUpdated: readingDateNorm
+          }, {
+            allowLowerWorkOrderApprovalSkip: true
           });
-          updateData.rhSyncedAt = new Date();
-          console.log(`✅ [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO.workOrderNo} (cascaded to INHERITED children)`);
+          if (rhResult.rhSkipped) {
+            await releaseWoRhSync(claimPool, existingWO.wouuid);
+            rhBackdatedApproval = true;
+            rhUpdateOutcomeApproval = 'skipped_lower';
+            rhSkipReasonApproval = 'LOWER_THAN_LIVE_RH';
+            submittedRHApproval = rhResult.submittedRH;
+            latestRHApproval = rhResult.currentRH;
+            latestRHDateApproval = rhResult.currentRHDate;
+            updateData.rhUpdateOutcome = 'skipped_lower';
+            updateData.rhSkipReason = 'LOWER_THAN_LIVE_RH';
+            updateData.rhSkipSubmittedRh = rhResult.submittedRH.toString();
+            updateData.rhSkipLatestRh = rhResult.currentRH.toString();
+            updateData.rhSkipLatestRhDate = rhResult.currentRHDate;
+            console.warn(`⚠️ [RH Sync] Approval continued for WO ${existingWO.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live ${rhResult.currentRH} RH. RH module was not updated.`);
+          } else {
+            updateData.rhSyncedAt = new Date();
+            rhUpdateOutcomeApproval = rhResult.noChange ? 'no_change' : 'applied';
+            updateData.rhUpdateOutcome = rhUpdateOutcomeApproval;
+            updateData.rhSkipReason = null;
+            updateData.rhSkipSubmittedRh = null;
+            updateData.rhSkipLatestRh = null;
+            updateData.rhSkipLatestRhDate = null;
+            console.log(`✅ [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} processed ${rhValue} RH via WO ${existingWO.workOrderNo} (cascaded to INHERITED children when increased)`);
+          }
         } catch (masterErr: any) {
+          // Release the claim so a corrected retry can apply RH (Task #243 contract).
+          await releaseWoRhSync(claimPool, existingWO.wouuid);
           // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
           if (masterErr instanceof ValidationError) {
             const det: any = masterErr.details || {};
@@ -1453,7 +1877,7 @@ export async function updateWorkOrder(id: string, body: any) {
           }
           throw masterErr;
         }
-        } // end if (!rhBackdatedSkippedApproval) — MASTER branch
+        } // end claim else — MASTER branch
       } else if (rhComp && rhCounterType === 'INHERITED' && !isNaN(rhValue)) {
         // INHERITED: route through master propagation so the 25 hrs/day cap, cascade to all
         // sibling INHERITED components, and WO completion date stamp apply exactly as for MASTER.
@@ -1474,32 +1898,19 @@ export async function updateWorkOrder(id: string, body: any) {
         }
 
         if (masterComp) {
-          // INHERITED pre-flight: detect back-dated lower entry against the master.
-          let rhBackdatedSkippedInherited = false;
-          const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || '0');
-          if (rhValue <= inhMasterCurrentRH && completionDateNorm) {
-            const inhMasterUpdRaw: any = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhMasterUpdDate: Date | null = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : (inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null);
-            if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
-              const inhCompletionDate = new Date(completionDateNorm);
-              const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
-              const woDay = Date.UTC(inhCompletionDate.getUTCFullYear(), inhCompletionDate.getUTCMonth(), inhCompletionDate.getUTCDate());
-              if (woDay < masterDay) {
-                rhBackdatedSkippedInherited = true;
-                updateData.rhBackdatedEntry = true;
-                rhBackdatedApproval = true;
-                latestRHApproval = inhMasterCurrentRH;
-                latestRHDateApproval = inhMasterUpdDate.toISOString().split('T')[0];
-                console.warn(`⚠️ [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO.workOrderNo} entered RH ${rhValue} (${completionDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
-              }
-            }
-          }
-
-          if (!rhBackdatedSkippedInherited) {
           // Master resolved: advance its counter, cascading delta + completion date to all siblings.
+          // Task #394/#243: atomic claim — same double-advance protection as the MASTER branch.
+          const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await import('../../running-hours/rhEventComparator');
+          const { getPool: getPoolInh } = await import('../../../db');
+          const claimPoolInh = await getPoolInh();
+          if (!(await claimInh(claimPoolInh, existingWO.wouuid))) {
+            console.warn(`⚠️ [RH Sync] WO ${existingWO.workOrderNo} RH already claimed/applied by a concurrent completion — skipping duplicate RH advance (INHERITED)`);
+            rhUpdateOutcomeApproval = 'already_processed';
+            updateData.rhUpdateOutcome = 'already_processed';
+          } else {
           const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
           try {
-            await updateMasterRH(masterComp.cuuid, {
+            const rhResult = await updateMasterRH(masterComp.cuuid, {
               newRHValue: rhValue,
               updateSource: 'WORKORDER',
               userId: body.userId || existingWO.performedBy || 'system',
@@ -1507,11 +1918,37 @@ export async function updateWorkOrder(id: string, body: any) {
               userRole: body.userRole || 'Ship',
               adminOverride: body.adminOverride || false,
               comments: `WO ${existingWO.workOrderNo} (INHERITED → cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-              dateUpdated: completionDateNorm
+              dateUpdated: readingDateNorm
+            }, {
+              allowLowerWorkOrderApprovalSkip: true
             });
-            updateData.rhSyncedAt = new Date();
-            console.log(`✅ [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO.workOrderNo}`);
+            if (rhResult.rhSkipped) {
+              await releaseInh(claimPoolInh, existingWO.wouuid);
+              rhBackdatedApproval = true;
+              rhUpdateOutcomeApproval = 'skipped_lower';
+              rhSkipReasonApproval = 'LOWER_THAN_LIVE_RH';
+              submittedRHApproval = rhResult.submittedRH;
+              latestRHApproval = rhResult.currentRH;
+              latestRHDateApproval = rhResult.currentRHDate;
+              updateData.rhUpdateOutcome = 'skipped_lower';
+              updateData.rhSkipReason = 'LOWER_THAN_LIVE_RH';
+              updateData.rhSkipSubmittedRh = rhResult.submittedRH.toString();
+              updateData.rhSkipLatestRh = rhResult.currentRH.toString();
+              updateData.rhSkipLatestRhDate = rhResult.currentRHDate;
+              console.warn(`⚠️ [RH Sync] Approval continued for INHERITED WO ${existingWO.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live master ${rhResult.currentRH} RH. RH module was not updated.`);
+            } else {
+              updateData.rhSyncedAt = new Date();
+              rhUpdateOutcomeApproval = rhResult.noChange ? 'no_change' : 'applied';
+              updateData.rhUpdateOutcome = rhUpdateOutcomeApproval;
+              updateData.rhSkipReason = null;
+              updateData.rhSkipSubmittedRh = null;
+              updateData.rhSkipLatestRh = null;
+              updateData.rhSkipLatestRhDate = null;
+              console.log(`✅ [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}; ${rhValue} RH processed via WO ${existingWO.workOrderNo}`);
+            }
           } catch (masterErr: any) {
+            // Release the claim so a corrected retry can apply RH (Task #243 contract).
+            await releaseInh(claimPoolInh, existingWO.wouuid);
             if (masterErr instanceof ValidationError) {
               const det: any = masterErr.details || {};
               throw new ValidationError(masterErr.message, {
@@ -1526,12 +1963,12 @@ export async function updateWorkOrder(id: string, body: any) {
             }
             throw masterErr;
           }
-          } // end if (!rhBackdatedSkippedInherited) — INHERITED branch
+          } // end claim else — INHERITED branch
         } else {
           // No valid master link: timeline-validate and record on this child only.
-          if (completionDateNorm) {
+          if (readingDateNorm) {
             const { validateRHEntry } = await import('../../running-hours/services/rhTimelineValidationService');
-            const backdateCheck = await validateRHEntry(rhComp.cuuid, completionDateNorm, rhValue);
+            const backdateCheck = await validateRHEntry(rhComp.cuuid, readingDateNorm, rhValue);
             if (!backdateCheck.isValid && backdateCheck.validationStatus === 'INVALID_BACKDATED') {
               throw new ValidationError(backdateCheck.errorMessage, {
                 code: 'INVALID_BACKDATED',
@@ -1552,7 +1989,9 @@ export async function updateWorkOrder(id: string, body: any) {
               previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
               newRH: rhValue.toString(),
               cumulativeRH: rhValue.toString(),
-              dateUpdatedLocal: completionDateNorm || new Date().toISOString().split('T')[0],
+              // Task #394 fix: stamp the READING date (not the completion date, and never
+              // "today") — a wrong date here poisons the latest-reading-wins comparator.
+              dateUpdatedLocal: readingDateNorm || completionDateNorm || new Date().toISOString().split('T')[0],
               dateUpdatedTZ: 'UTC',
               enteredAtUTC: new Date(),
               userId: body.userId || existingWO.performedBy || 'System',
@@ -1745,6 +2184,10 @@ export async function updateWorkOrder(id: string, body: any) {
     if (!freshWorkOrder) {
       console.error('Failed to get work order for completion processing');
     } else {
+      const freshVesselCode = freshWorkOrder.vesselId
+        ? (await storage.getVessel(freshWorkOrder.vesselId))?.vCode
+        : undefined;
+
       // Find the component for maintenance history
       let component = await repo.findComponent(freshWorkOrder.component);
 
@@ -1837,7 +2280,7 @@ export async function updateWorkOrder(id: string, body: any) {
                   componentCode: freshWorkOrder.componentCode || component.componentCode,
                   vesselCode: freshWorkOrder.vesselId,
                   jobId: freshWorkOrder.jobId || null,
-                  jobCode: freshWorkOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+                  jobCode: extractJobNoFromWorkOrderNo(freshWorkOrder.workOrderNo, freshVesselCode) || null,
                   workOrderId: freshWorkOrder.wouuid,
                   workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
                   jobTitle: freshWorkOrder.jobTitle,
@@ -1877,16 +2320,7 @@ export async function updateWorkOrder(id: string, body: any) {
 
           // Fallback: Extract jobNo from work order number
           if (!job && freshWorkOrder.workOrderNo) {
-            const woNumber = freshWorkOrder.workOrderNo;
-            let extractedJobNo: string | null = null;
-
-            const newFormatMatch = woNumber.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-            if (newFormatMatch) extractedJobNo = newFormatMatch[1];
-
-            if (!extractedJobNo) {
-              const oldFormatMatch = woNumber.match(/^(.+)-\d{4}-\d+$/);
-              if (oldFormatMatch) extractedJobNo = oldFormatMatch[1];
-            }
+            const extractedJobNo = extractJobNoFromWorkOrderNo(freshWorkOrder.workOrderNo, freshVesselCode);
 
             if (extractedJobNo && freshWorkOrder.vesselId) {
               const jobs = await repo.findJobs(freshWorkOrder.vesselId);
@@ -1896,7 +2330,11 @@ export async function updateWorkOrder(id: string, body: any) {
 
           if (job) {
             const rawJobCompletionDate = freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime;
-            const runningHours = freshWorkOrder.runningHours;
+            // R1 (migration 139): next-cycle math derives from the stored WO
+            // Completion RH; fallback to the stored reading = pre-feature
+            // behaviour for historical/in-flight WOs. The raw reading is still
+            // used for display/logging where it denotes the meter value.
+            const runningHours = (freshWorkOrder as any).woCompletionRh ?? freshWorkOrder.runningHours;
 
             const normalizeJobDate = (dateStr: string | undefined | null): string | null => {
               if (!dateStr) return null;
@@ -1914,21 +2352,13 @@ export async function updateWorkOrder(id: string, body: any) {
             if (freshWorkOrder.maintenanceBasis === 'Calendar' && dateOfCompletionNorm) {
               const { calculateNextDueDate } = await import('@shared/dateUtils');
               const calendarUpdates: any = { lastDoneDate: dateOfCompletionNorm };
-              const linkUpdates: any = { lastDoneDate: dateOfCompletionNorm, updatedAt: new Date() };
 
               if (job.frequencyValue && job.frequencyUnit) {
                 const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
                 if (nextDue) {
                   calendarUpdates.nextDueDate = nextDue;
-                  linkUpdates.nextDueDate = nextDue;
                   console.log(`✅ Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
                 }
-              }
-
-              const updateVesselId = freshWorkOrder.vesselId || job.vesselId;
-              if (component.cuuid && updateVesselId) {
-                await repo.updateJobComponentLinkTracking(updateVesselId, job.juuid, component.cuuid, linkUpdates);
-                console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneDate: ${dateOfCompletionNorm}`);
               }
 
               await repo.updateJob(job.juuid, calendarUpdates);
@@ -1939,18 +2369,10 @@ export async function updateWorkOrder(id: string, body: any) {
               const currentRH = parseInt(runningHours);
               if (!isNaN(currentRH)) {
                 const rhUpdates: any = { lastDoneRH: currentRH };
-                const rhLinkUpdates: any = { lastDoneRH: currentRH.toString(), updatedAt: new Date() };
                 const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                 if (rhInterval && !isNaN(rhInterval)) {
                   rhUpdates.nextDueRH = currentRH + rhInterval;
-                  rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
                   console.log(`✅ Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
-                }
-
-                const rhUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
-                if (component.cuuid && rhUpdateVesselId) {
-                  await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, component.cuuid, rhLinkUpdates);
-                  console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneRH: ${currentRH}`);
                 }
 
                 await repo.updateJob(job.juuid, rhUpdates);
@@ -1965,14 +2387,12 @@ export async function updateWorkOrder(id: string, body: any) {
             if (freshWorkOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletionNorm) {
               const { calculateNextDueDate } = await import('@shared/dateUtils');
               const dualUpdates: any = { lastDoneDate: dateOfCompletionNorm };
-              const dualLinkUpdates: any = { lastDoneDate: dateOfCompletionNorm, updatedAt: new Date() };
 
               // Calendar leg: ALWAYS update
               if (job.frequencyValue && job.frequencyUnit) {
                 const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
                 if (nextDue) {
                   dualUpdates.nextDueDate = nextDue;
-                  dualLinkUpdates.nextDueDate = nextDue;
                   console.log(`✅ [Dual] Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
                 }
               }
@@ -1982,23 +2402,15 @@ export async function updateWorkOrder(id: string, body: any) {
                 const dualCurrentRH = parseInt(runningHours);
                 if (!isNaN(dualCurrentRH)) {
                   dualUpdates.lastDoneRH = dualCurrentRH;
-                  dualLinkUpdates.lastDoneRH = dualCurrentRH.toString();
 
                   const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                   if (dualRhInterval && !isNaN(dualRhInterval)) {
                     dualUpdates.nextDueRH = dualCurrentRH + dualRhInterval;
-                    dualLinkUpdates.nextDueRH = (dualCurrentRH + dualRhInterval).toString();
                     console.log(`✅ [Dual] Updated job ${job.jobNo} nextDueRH: ${dualUpdates.nextDueRH}`);
                   }
                 }
               } else {
                 console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
-              }
-
-              const dualUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
-              if (component.cuuid && dualUpdateVesselId) {
-                await repo.updateJobComponentLinkTracking(dualUpdateVesselId, job.juuid, component.cuuid, dualLinkUpdates);
-                console.log(`✅ [Dual] Updated component tracking for vessel ${dualUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid}`);
               }
 
               await repo.updateJob(job.juuid, dualUpdates);
@@ -2218,6 +2630,10 @@ export async function updateWorkOrder(id: string, body: any) {
   return {
     workOrder,
     rhBackdated: rhBackdatedApproval,
+    rhUpdateOutcome: rhUpdateOutcomeApproval,
+    rhUpdateSkipped: rhUpdateOutcomeApproval === 'skipped_lower',
+    rhSkipReason: rhSkipReasonApproval,
+    submittedRH: submittedRHApproval,
     latestRH: latestRHApproval,
     latestRHDate: latestRHDateApproval
   };
@@ -2721,21 +3137,7 @@ export async function approvePostponement(id: string, body: any) {
   const today = new Date().toISOString().split('T')[0];
   const newDueDate = wo.postponeRequestedDate || body.newDueDate;
 
-  const updatedWO = await repo.update(id, {
-    status: 'Postponement Approved',
-    dueDate: newDueDate,
-    postponementEndDate: newDueDate,
-    postponeApprover: body.approvedBy || 'Office',
-    postponementApprovalDate: today,
-    postponementApprovalRemarks: body.approvalRemarks || null,
-  });
-
-  // Sync field logging — log the work_orders UPDATE so the office's approval reaches the vessel.
-  try {
-    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || 'system');
-  } catch (err) { console.error('[FieldLogger] WO postpone-approve:', err); }
-
-  // Insert a new immutable decision audit row (approve)
+  // Values for the new immutable decision audit row (approve) — unchanged business logic.
   const existingRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
   const prevMaxApprove = existingRows?.length
     ? existingRows.reduce((a: any, b: any) =>
@@ -2748,24 +3150,49 @@ export async function approvePostponement(id: string, body: any) {
       )
     : null;
 
-  await repo.createPostponement({
-    id: crypto.randomUUID(),
-    workOrderId: wo.wouuid,
-    vesselId: wo.vesselId!,
-    postponementNumber: prevMaxApprove + 1,
-    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
-    newDueDate: newDueDate,
-    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
-    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
-    authorizedBy: body.approvedBy || 'Office',
-    approvedBy: body.approvedBy || 'Office',
-    approvedDate: today,
-    approvalRemarks: body.approvalRemarks || null,
-    approver: body.approvedBy || 'Office',
-    durationDays: latestApprove?.durationDays || null,
-    submittedDate: today,
-    status: 'Approved',
-    informOffice: true,
+  // Phase 0 / P0.3d (defect D3): the finalize is ONE transaction — WO update + its field log,
+  // the 'Awaiting Approval' REQUEST row settled to 'Approved' (it was left dangling before, and
+  // getLatestAwaitingPostponement kept matching it), and the decision row + its log. A failure
+  // in any of the writes rolls all of them back. The status guard at the top of this function
+  // is unchanged: a second call on an approved WO is still refused before reaching here.
+  const actor = body.approvedBy || body.userId || 'system';
+  const updatedWO = await repo.finalizePostponementApproval({
+    workOrderId: id,
+    woUpdates: {
+      status: 'Postponement Approved',
+      dueDate: newDueDate,
+      postponementEndDate: newDueDate,
+      postponeApprover: body.approvedBy || 'Office',
+      postponementApprovalDate: today,
+      postponementApprovalRemarks: body.approvalRemarks || null,
+    },
+    awaitingPostponementId: awaitingPostponement?.id ?? null,
+    awaitingUpdates: {
+      status: 'Approved',
+      approvedBy: body.approvedBy || 'Office',
+      approvedDate: today,
+      approvalRemarks: body.approvalRemarks || null,
+    },
+    decisionRow: {
+      id: crypto.randomUUID(),
+      workOrderId: wo.wouuid,
+      vesselId: wo.vesselId!,
+      postponementNumber: prevMaxApprove + 1,
+      originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+      newDueDate: newDueDate,
+      postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+      postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+      authorizedBy: body.approvedBy || 'Office',
+      approvedBy: body.approvedBy || 'Office',
+      approvedDate: today,
+      approvalRemarks: body.approvalRemarks || null,
+      approver: body.approvedBy || 'Office',
+      durationDays: latestApprove?.durationDays || null,
+      submittedDate: today,
+      status: 'Approved',
+      informOffice: true,
+    },
+    actor,
   });
 
   return updatedWO;
@@ -2880,6 +3307,434 @@ export async function rejectPostponement(id: string, body: any) {
     status: 'Rejected',
     informOffice: true,
   });
+
+  return updatedWO;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WO Re-Postponement
+// Mirrors the base Postponement flow but uses pms-wo-re-postponement config,
+// always reverts to 'Postponement Approved' on reject, and fails fast if the
+// approval config has not yet arrived on this vessel via sync.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Classify a WO for Re-Postponement and look up the pms-wo-re-postponement
+ * approval workflow config. Returns the classification and enabled levels.
+ * Returns { level1Enabled: false, level2Enabled: false } for WOs without a
+ * linked job (same behaviour as the base postponement classifier).
+ *
+ * Unlike the base classifier this function throws a ValidationError when the
+ * config rows for pms-wo-re-postponement do not exist (they arrive via
+ * ONE_WAY sync from shore after migration 150 runs). The caller must NOT
+ * proceed if config is absent — a missing config produces a stuck WO that
+ * cannot be approved or rejected through the normal UI.
+ */
+async function classifyWoForRePostponement(wo: any): Promise<{
+  classification: 'criticalEquipment' | 'critical' | 'normal';
+  level1Enabled: boolean;
+  level2Enabled: boolean;
+}> {
+  // WOs with no linked job always fall into normal
+  if (!wo.jobId) {
+    // Still need to verify config exists even for normal WOs — fail fast if not
+    const allConfigs = await storage.getApprovalWorkflowConfig();
+    const cfg = allConfigs.find(
+      (c: any) => c.functionId === 'pms-wo-re-postponement' && c.variableName === 'Normal WO' && !c.isDeleted
+    );
+    if (!cfg) {
+      throw new ValidationError(
+        'Re-Postponement approval configuration is not yet available on this vessel. ' +
+        'Please sync and try again.'
+      );
+    }
+    return { classification: 'normal', level1Enabled: cfg.level1Enabled ?? false, level2Enabled: cfg.level2Enabled ?? false };
+  }
+
+  let classification: 'criticalEquipment' | 'critical' | 'normal' = 'normal';
+
+  const job = await repo.findJob(wo.jobId);
+  if (job) {
+    let isOnCriticalEquipment = false;
+    if ((job as any).componentId) {
+      const comp = await repo.findComponent((job as any).componentId);
+      isOnCriticalEquipment = (comp as any)?.critical === true;
+    }
+    if (isOnCriticalEquipment) {
+      classification = 'criticalEquipment';
+    } else if ((job as any).criticality === 'Yes') {
+      classification = 'critical';
+    }
+  }
+
+  const variableNameMap: Record<'criticalEquipment' | 'critical' | 'normal', string> = {
+    criticalEquipment: 'Critical Equipment WO',
+    critical: 'Critical WO',
+    normal: 'Normal WO',
+  };
+
+  const allConfigs = await storage.getApprovalWorkflowConfig();
+  const config = allConfigs.find(
+    (c: any) =>
+      c.functionId === 'pms-wo-re-postponement' &&
+      c.variableName === variableNameMap[classification] &&
+      !c.isDeleted
+  );
+
+  if (!config) {
+    throw new ValidationError(
+      'Re-Postponement approval configuration is not yet available on this vessel. ' +
+      'Please sync and try again.'
+    );
+  }
+
+  return {
+    classification,
+    level1Enabled: config.level1Enabled ?? false,
+    level2Enabled: config.level2Enabled ?? false,
+  };
+}
+
+/**
+ * Core logic for creating a re-postponement audit row and approval steps.
+ * Shared by submit (new) and edit (resubmit) paths.
+ *
+ * @param wo           - Resolved work order record (pre-update)
+ * @param body         - Request body
+ * @param dueDateSnapshot - The due date to store as originalDueDate (pre-submission value)
+ */
+async function createRePostponementRecord(wo: any, body: any, dueDateSnapshot: string | null) {
+  const today = new Date().toISOString().split('T')[0];
+
+  const classification = await classifyWoForRePostponement(wo);
+  const approvalWorkflowSnapshot = {
+    woClassification: classification.classification,
+    level1Enabled: classification.level1Enabled,
+    level2Enabled: classification.level2Enabled,
+  };
+
+  // Update WO status to Awaiting Office Approval (idempotent on re-submit)
+  const updatedWO = await repo.update(wo.wouuid, {
+    status: 'Awaiting Office Approval',
+    postponeRequestedDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    postponeApprover: body.approver || 'Office',
+    postponementApprovalDate: null,
+    postponementApprovalRemarks: null,
+  });
+
+  // Field-log the WO update so it reaches the office via sync
+  try {
+    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.userId || body.performedBy || 'system');
+  } catch (err) { console.error('[FieldLogger] WO re-postpone-request:', err); }
+
+  // Create audit row — postponementNumber continues the same sequence across all types
+  const prevMax = await repo.getMaxPostponementNumber(wo.wouuid);
+  const postponementId = crypto.randomUUID();
+  await repo.createPostponement({
+    id: postponementId,
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMax + 1,
+    originalDueDate: dueDateSnapshot,   // snapshot: used by rejectRePostponement to restore date
+    newDueDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    approver: body.approver || 'Office',
+    postponeDate: body.postponeDate,
+    durationDays: body.duration ? parseInt(String(body.duration), 10) : null,
+    submittedDate: today,
+    status: 'Awaiting Approval',
+    informOffice: true,
+    approvalWorkflowSnapshot,
+    requestType: 'Re-Postponement',
+  } as any);
+
+  // Create level approval step rows
+  if (classification.level1Enabled) {
+    await repo.createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: 'Level 1',
+      status: 'Pending',
+      requestType: 'Re-Postponement',
+    } as any);
+  }
+  if (classification.level2Enabled) {
+    await repo.createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: 'Level 2',
+      status: 'Pending',
+      requestType: 'Re-Postponement',
+    } as any);
+  }
+
+  return updatedWO;
+}
+
+/**
+ * Ship submits a NEW Re-Postponement request.
+ * Eligibility: WO status must be 'Postponement Approved'.
+ * Snapshots wo.dueDate as originalDueDate for use by rejectRePostponement.
+ */
+export async function submitRePostponeRequest(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Postponement Approved') {
+    throw new ValidationError(
+      `Only work orders with status "Postponement Approved" can submit a Re-Postponement. Current status: ${wo.status}`
+    );
+  }
+
+  // Snapshot the current due date before the WO is updated — this is the date
+  // that rejectRePostponement must restore if the request is rejected
+  const dueDateSnapshot = wo.dueDate;
+
+  return createRePostponementRecord(wo, body, dueDateSnapshot);
+}
+
+/**
+ * Ship edits and resubmits a pending Re-Postponement request.
+ * Eligibility: WO status must be 'Awaiting Office Approval' (a re-postponement
+ * is in progress). Always creates a new audit row (same as base editPostponeRequest).
+ *
+ * The originalDueDate carried forward is sourced from the current pending
+ * re-postponement record to preserve the pre-submission due date even across
+ * multiple resubmits.
+ */
+export async function editRePostponeRequest(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Awaiting Office Approval') {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can edit a Re-Postponement. Current status: ${wo.status}`
+    );
+  }
+
+  // Recover the originalDueDate from the currently pending re-postponement record
+  // so that on rejection the due date is always restored to the pre-submission value,
+  // not to whatever the WO fields hold mid-flow.
+  const pending = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  const dueDateSnapshot = pending?.originalDueDate ?? wo.dueDate;
+
+  return createRePostponementRecord(wo, body, dueDateSnapshot);
+}
+
+/**
+ * Office approves a Re-Postponement request.
+ * Gates on multi-level approval steps if configured; finalises when all levels
+ * are satisfied. Final WO status is always 'Postponement Approved'.
+ */
+export async function approveRePostponement(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Awaiting Office Approval') {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
+    );
+  }
+
+  // ── Multi-level approval gate ────────────────────────────────────────────
+  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) {
+    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const now = new Date();
+      const activeStep = steps.find((s: any) => s.status === 'Pending');
+      if (!activeStep) {
+        throw new ValidationError('No pending approval step found — this request may have already been fully approved');
+      }
+
+      const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
+      if (!isSailAdmin) {
+        const reviewerId = body.userUuid || body.approvedBy;
+        const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+        if (!isAuthorised) {
+          throw new ValidationError(`Not authorised to approve at ${activeStep.approvalLevel}`);
+        }
+      }
+
+      const remaining = steps.filter((s: any) => s.id !== activeStep.id && s.status === 'Pending');
+      await repo.updateWoPostponementApprovalStep(activeStep.id, {
+        status: 'Approved',
+        actionByUserId: body.approvedBy,
+        actionAt: now,
+        remarks: body.approvalRemarks || null,
+      });
+
+      if (remaining.length > 0) {
+        console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} — ${activeStep.approvalLevel} approved; awaiting ${remaining.length} more level(s)`);
+        return (await repo.findById(id)) || wo;
+      }
+      console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} — all approval levels satisfied, finalising`);
+    }
+  }
+  // ── End gate — fall through to finalisation ──────────────────────────────
+
+  const today = new Date().toISOString().split('T')[0];
+  const newDueDate = wo.postponeRequestedDate || body.newDueDate;
+
+  const updatedWO = await repo.update(id, {
+    status: 'Postponement Approved',
+    dueDate: newDueDate,
+    postponementEndDate: newDueDate,
+    postponeApprover: body.approvedBy || 'Office',
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null,
+  });
+
+  // Field-log so the approved due date syncs back to the vessel
+  try {
+    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || 'system');
+  } catch (err) { console.error('[FieldLogger] WO re-postpone-approve:', err); }
+
+  // Insert immutable decision audit row (approve)
+  const existingRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxApprove = existingRows?.length
+    ? existingRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      ).postponementNumber || 1
+    : 1;
+  const latestApprove = existingRows?.length
+    ? existingRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      )
+    : null;
+
+  await repo.createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMaxApprove + 1,
+    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: newDueDate,
+    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || 'Office',
+    approvedBy: body.approvedBy || 'Office',
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || 'Office',
+    durationDays: latestApprove?.durationDays || null,
+    submittedDate: today,
+    status: 'Approved',
+    informOffice: true,
+    requestType: 'Re-Postponement',
+  } as any);
+
+  return updatedWO;
+}
+
+/**
+ * Office rejects a Re-Postponement request.
+ * Records the rejection on the active approval step, then reverts the WO to
+ * 'Postponement Approved' and restores the due date that was snapshotted at
+ * submission time (the originalDueDate stored on the Awaiting Approval record).
+ *
+ * Unlike rejectPostponement, this function does NOT call computeWorkOrderStatus —
+ * the WO was already in 'Postponement Approved' before the re-postponement was
+ * submitted, and it must return to that state unconditionally.
+ */
+export async function rejectRePostponement(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Awaiting Office Approval') {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be rejected. Current status: ${wo.status}`
+    );
+  }
+
+  // ── Mark the active approval step as Rejected ────────────────────────────
+  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  let dueDateToRestore: string | null = null;
+
+  if (awaitingPostponement) {
+    // The originalDueDate on the pending record is the due date that was active
+    // when the re-postponement was submitted — restore it on rejection
+    dueDateToRestore = awaitingPostponement.originalDueDate || null;
+
+    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const activeStep = steps.find((s: any) => s.status === 'Pending');
+      if (activeStep) {
+        const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
+        if (!isSailAdmin) {
+          const reviewerId = body.userUuid || body.approvedBy;
+          const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+          if (!isAuthorised) {
+            throw new ValidationError(`Not authorised to reject at ${activeStep.approvalLevel}`);
+          }
+        }
+        await repo.updateWoPostponementApprovalStep(activeStep.id, {
+          status: 'Rejected',
+          actionByUserId: body.approvedBy,
+          actionAt: new Date(),
+          remarks: body.approvalRemarks || null,
+        });
+      }
+    }
+  }
+  // ── End step rejection — revert WO to Postponement Approved ─────────────
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const updatedWO = await repo.update(id, {
+    status: 'Postponement Approved',
+    // Restore the due date that was active before the re-postponement was submitted
+    ...(dueDateToRestore ? { dueDate: dueDateToRestore, postponementEndDate: dueDateToRestore } : {}),
+    postponeApprover: body.approvedBy || 'Office',
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null,
+  });
+
+  // Field-log so the revert syncs to the vessel
+  try {
+    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || 'system');
+  } catch (err) { console.error('[FieldLogger] WO re-postpone-reject:', err); }
+
+  // Insert immutable decision audit row (reject)
+  const rejectRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxReject = rejectRows?.length
+    ? rejectRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      ).postponementNumber || 1
+    : 1;
+  const latestReject = rejectRows?.length
+    ? rejectRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      )
+    : null;
+
+  await repo.createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMaxReject + 1,
+    originalDueDate: latestReject?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: latestReject?.newDueDate || wo.postponeRequestedDate,
+    postponementReason: latestReject?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestReject?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || 'Office',
+    approvedBy: body.approvedBy || 'Office',
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || 'Office',
+    durationDays: latestReject?.durationDays || null,
+    submittedDate: today,
+    status: 'Rejected',
+    informOffice: true,
+    requestType: 'Re-Postponement',
+  } as any);
 
   return updatedWO;
 }

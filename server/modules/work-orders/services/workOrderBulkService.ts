@@ -1,10 +1,11 @@
 import * as repo from '../repositories/workOrderRepository';
 import { ValidationError } from '../../shared/errors';
-import { calculateMissedCycles, calculateNextDueDate } from '@shared/dateUtils';
+import { calculateMissedCycles, calculateNextDueDate, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
 import { invalidateComplianceCache } from './complianceAnomalyService';
 import { logFieldChanges } from '../../sync';
 import { finalizeWorkOrderCompletion } from './workOrderCompletionService';
+import { isSuperintendentLockEnabled } from './workOrderService';
 
 // ── Bulk Approve Work Orders ──
 
@@ -19,6 +20,8 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
     success: [],
     failed: []
   };
+
+  const remarks = (approverRemarks || '').trim();
 
   for (const workOrderId of workOrderIds) {
     try {
@@ -61,21 +64,68 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
             nextDueDate = computed;
           }
         }
-      } else if (existingWO.maintenanceBasis === "Running Hours" && existingWO.currentReading) {
-        nextDueReading = (parseInt(existingWO.currentReading) + parseInt(existingWO.frequencyValue || "0")).toString();
+      } else if (existingWO.maintenanceBasis === "Running Hours" && ((existingWO as any).woCompletionRh || existingWO.currentReading)) {
+        // R1 (migration 139): next due derives from the stored WO Completion RH
+        // (fallback: current reading = pre-feature behaviour).
+        const bulkCycleRH = (existingWO as any).woCompletionRh ?? existingWO.currentReading;
+        nextDueReading = (parseInt(String(bulkCycleRH)) + parseInt(existingWO.frequencyValue || "0")).toString();
       }
 
       const completionDateForCalc = actualCompletionDate || existingWO.completionDateTime || existingWO.dateCompleted;
-      const missedCycles = existingWO.maintenanceBasis === 'Running Hours'
-        ? 0
-        : calculateMissedCycles(
-            existingWO.nextDueDate || existingWO.dueDate,
-            completionDateForCalc,
-            existingWO.frequencyValue,
-            existingWO.frequencyUnit
-          );
+      // Real missed-cycle computation per maintenance basis — the RH branch was
+      // previously hardcoded to 0, which let late RH WOs bypass the justification
+      // gate on the bulk path. Mirrors workOrderCompletionService.
+      let missedCycles: number;
+      if (existingWO.maintenanceBasis === 'Running Hours') {
+        // R1 (migration 139): missed-cycles measures intervals at the moment the
+        // work was done — WO Completion RH first, stored completion reading fallback.
+        const completionRHValue = (existingWO as any).woCompletionRh ?? existingWO.completionRH;
+        const dueRH = existingWO.nextDueReading ?? null;
+        let jobIntervalRH: number | string | null = null;
+        if (existingWO.jobId) {
+          try {
+            const jobForRH = await repo.findJob(existingWO.jobId);
+            if (jobForRH?.intervalRunningHour) jobIntervalRH = jobForRH.intervalRunningHour;
+          } catch { /* fall through to frequencyValue */ }
+        }
+        if (!jobIntervalRH && existingWO.frequencyValue) jobIntervalRH = existingWO.frequencyValue;
+        missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
+      } else {
+        missedCycles = calculateMissedCycles(
+          existingWO.nextDueDate || existingWO.dueDate,
+          completionDateForCalc,
+          existingWO.frequencyValue,
+          existingWO.frequencyUnit
+        );
+      }
       if (missedCycles > 0) {
         console.log(`⚠️ Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
+      }
+
+      // ── Layer 5 approval-tier gates (same rules as the single-approve path) ──
+      const currentTier = existingWO.approvalTier || 'standard';
+      // A bulk request can contain several vessels, so resolve this policy for
+      // each work order instead of using one fleet-wide setting.
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
+
+      if (currentTier === 'superintendent_locked' && lockEnabled) {
+        results.failed.push({
+          id: workOrderId,
+          error: 'Work order is LOCKED pending Superintendent acknowledgment and cannot be bulk-approved.'
+        });
+        continue;
+      }
+      // locked-with-lock-disabled behaves as the notification tier (min 20 chars).
+      const tierMinRemarks =
+        (currentTier === 'superintendent_locked' || currentTier === 'superintendent_notification') ? 20
+        : currentTier === 'ce_with_justification' ? 10
+        : 0;
+      if (tierMinRemarks > 0 && remarks.length < tierMinRemarks) {
+        results.failed.push({
+          id: workOrderId,
+          error: `Work order approval tier requires detailed approver remarks (minimum ${tierMinRemarks} characters).`
+        });
+        continue;
       }
 
       if (missedCycles >= 1) {
@@ -107,9 +157,14 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         approvalAction: "approved",
         approver: resolvedApprover,
         approverRemarks,
+        // Parity with the single-approve path: tiered approvals persist the
+        // mandatory remarks in ceApprovalRemarks for the audit trail.
+        ceApprovalRemarks: tierMinRemarks > 0 ? remarks : null,
         skippedCyclesJustification: (missedCycles >= 1 && skippedCyclesJustification) ? skippedCyclesJustification : null,
         approvalDate: new Date().toISOString(),
-        wasRejected: false
+        wasRejected: false,
+        // Save as Draft (Task #402): approval supersedes any stashed draft.
+        draftExecutionData: null
       };
 
       if (!requiresLevel2Review) {
@@ -180,6 +235,23 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     throw new ValidationError(`Work order is not pending office review (status: ${existingWO.status})`);
   }
 
+  // Phase 0 / P0.2 (defect D1): the office step must not complete a WO that is still held by
+  // the superintendent lock. The HOD step now gates before the L2 hand-off, but a WO that
+  // reached "Pending Office Review" before that fix (or any future path) must still be
+  // refused here — same code the HOD step uses, same live policy read.
+  if (existingWO.approvalTier === 'superintendent_locked' && !existingWO.superintendentAcknowledged) {
+    // Merge note (21-Aug): Jeevan's vessel-settings refactor made isSuperintendentLockEnabled
+    // per-vessel (required vesselId). P0.2 was written against the old no-arg global signature;
+    // pass existingWO.vesselId so the office-step lock read matches the HOD-step read (the gate
+    // in updateWorkOrder already reads per-vessel). Same P0.2 intent, now vessel-scoped.
+    if (await isSuperintendentLockEnabled(existingWO.vesselId)) {
+      throw new ValidationError(
+        'This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The office reviewer cannot complete it until the Superintendent has acknowledged.',
+        { code: 'SUPERINTENDENT_LOCKED' }
+      );
+    }
+  }
+
   const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
   const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
 
@@ -192,8 +264,10 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
       const computed = calculateNextDueDate(actualCompletionDate, existingWO.frequencyValue, existingWO.frequencyUnit, originalDueDate);
       if (computed) nextDueDate = computed;
     }
-  } else if (existingWO.maintenanceBasis === 'Running Hours' && existingWO.currentReading) {
-    nextDueReading = (parseInt(existingWO.currentReading) + parseInt(existingWO.frequencyValue || '0')).toString();
+  } else if (existingWO.maintenanceBasis === 'Running Hours' && ((existingWO as any).woCompletionRh || existingWO.currentReading)) {
+    // R1 (migration 139): same source switch as the bulk path above.
+    const cycleRHSrc = (existingWO as any).woCompletionRh ?? existingWO.currentReading;
+    nextDueReading = (parseInt(String(cycleRHSrc)) + parseInt(existingWO.frequencyValue || '0')).toString();
   }
 
   const { calculateMissedCycles } = await import('@shared/dateUtils');
@@ -210,6 +284,8 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     nextDueReading,
     missedCycles,
     originalDueDate,
+    // Save as Draft (Task #402): Level-2 approval supersedes any stashed draft.
+    draftExecutionData: null,
   };
   if (actualCompletionDate) {
     updateData.dateCompleted = actualCompletionDate;

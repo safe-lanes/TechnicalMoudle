@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,13 +18,14 @@ interface AddCommentModalProps {
 
 export default function AddCommentModal({ open, onClose, requestId }: AddCommentModalProps) {
   const { toast } = useToast();
+  const { resolvedUserName } = useResolvedUserName();
   const [message, setMessage] = useState("");
 
   const addCommentMutation = useMutation({
     mutationFn: async () => {
       return apiRequest('POST', `/technical/api/change-requests/${requestId}/comments`, {
         message,
-        userId: 'Current User' // In real app, get from auth context
+        userId: resolvedUserName
       });
     },
     onSuccess: () => {

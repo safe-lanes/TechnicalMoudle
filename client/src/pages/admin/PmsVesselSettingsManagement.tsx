@@ -11,8 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Clock, Settings, Ship, Save, X, Calendar, Gauge, CheckCircle2, ArrowLeft, Search, Building2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import type { PmsVesselSettings } from "@shared/schema";
 import { Marker } from "@/components/Marker";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 
 interface Vessel {
   id: string;
@@ -148,6 +151,90 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
   });
 
   const settingsMap = new Map(allSettings.map(s => [s.vesselId, s]));
+
+  // Office WO generation kill switch (migration 161): shore Sail Admin / Super Admin only.
+  const { hasRole } = useAuth();
+  const { isShore } = useSyncInstanceInfo();
+  const canToggleOfficeWoGeneration = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
+
+  const officeWoSwitchMutation = useMutation({
+    mutationFn: async (data: { vesselId: string; enabled: boolean }) => {
+      const res = await apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}/office-wo-generation`, { enabled: data.enabled });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
+      toast({
+        title: data.officeWoGenerationEnabled ? "Office generation ENABLED" : "Office generation DISABLED",
+        description: data.officeWoGenerationEnabled
+          ? "The office will now generate work orders for this vessel in the daily sweep and manual generation."
+          : "The office will not generate work orders for this vessel. The ship's own generation is unaffected.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not change office generation", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  // Office RH entry kill switch (migration 162, Task #394): shore Sail Admin / Super Admin only.
+  const officeRhSwitchMutation = useMutation({
+    mutationFn: async (data: { vesselId: string; enabled: boolean }) => {
+      const res = await apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}/office-rh-entry`, { enabled: data.enabled });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
+      toast({
+        title: data.officeRhEntryEnabled ? "Office RH entry ENABLED" : "Office RH entry DISABLED",
+        description: data.officeRhEntryEnabled
+          ? "The office may now record running hours when completing work orders for this vessel. The latest reading date always wins; ship readings win same-day ties."
+          : "The office cannot record running hours for this vessel. Ship-side RH entry is unaffected.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not change office RH entry", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  // Vessel-specific RH validation policy (migration 163): shore Sail Admin /
+  // Super Admin only. The setting syncs with the existing PMS settings row.
+  const rhValidationSwitchMutation = useMutation({
+    mutationFn: async (data: { vesselId: string; enabled: boolean }) => {
+      const res = await apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}/rh-validation`, { enabled: data.enabled });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
+      toast({
+        title: data.rhValidationEnabled ? "RH validation ENABLED" : "RH validation DISABLED",
+        description: data.rhValidationEnabled
+          ? "Normal Running Hours validation is enforced for this vessel."
+          : "Authorized Running Hours corrections for this vessel may bypass normal validation after sync.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not change RH validation", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  const superintendentLockSwitchMutation = useMutation({
+    mutationFn: async (data: { vesselId: string; enabled: boolean }) => {
+      const res = await apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}/superintendent-lock`, { enabled: data.enabled });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
+      toast({
+        title: data.superintendentLockEnabled ? "Superintendent lock ENABLED" : "Superintendent lock DISABLED",
+        description: data.superintendentLockEnabled
+          ? "High-severity work orders for this vessel require Superintendent acknowledgment."
+          : "High-severity work orders for this vessel are notify-only; detailed remarks remain mandatory.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not change Superintendent lock", description: error?.message, variant: "destructive" });
+    },
+  });
 
   const saveMutation = useMutation({
     mutationFn: async (data: { vesselId: string; settings: typeof formData }) => {
@@ -406,6 +493,94 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                     {summary}
                   </span>
                 </div>
+                {canToggleOfficeWoGeneration && (
+                  <div
+                    className="mt-3 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`row-office-wo-generation-${vessel.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">Office WO Generation</p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {settingsMap.get(vessel.id)?.officeWoGenerationEnabled
+                          ? "Office generates work orders for this vessel"
+                          : "Off — ship-only generation (default)"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settingsMap.get(vessel.id)?.officeWoGenerationEnabled === true}
+                      disabled={officeWoSwitchMutation.isPending}
+                      onCheckedChange={(checked) => officeWoSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
+                      data-testid={`switch-office-wo-generation-${vessel.id}`}
+                    />
+                  </div>
+                )}
+                {canToggleOfficeWoGeneration && (
+                  <div
+                    className="mt-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`row-superintendent-lock-${vessel.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">Superintendent Approval Lock</p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {(settingsMap.get(vessel.id) as any)?.superintendentLockEnabled === true
+                            ? "Per-vessel: On — Superintendent acknowledgment required"
+                            : "Per-vessel: Off — notify-only approval path (default)"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={(settingsMap.get(vessel.id) as any)?.superintendentLockEnabled === true}
+                      disabled={superintendentLockSwitchMutation.isPending}
+                      onCheckedChange={(checked) => superintendentLockSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
+                      data-testid={`switch-superintendent-lock-${vessel.id}`}
+                    />
+                  </div>
+                )}
+                {canToggleOfficeWoGeneration && (
+                  <div
+                    className="mt-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`row-office-rh-entry-${vessel.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">Office RH Entry</p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {(settingsMap.get(vessel.id) as any)?.officeRhEntryEnabled
+                          ? "Office records running hours via WO completion"
+                          : "Off — ship-only RH entry (default)"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={(settingsMap.get(vessel.id) as any)?.officeRhEntryEnabled === true}
+                      disabled={officeRhSwitchMutation.isPending}
+                      onCheckedChange={(checked) => officeRhSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
+                      data-testid={`switch-office-rh-entry-${vessel.id}`}
+                    />
+                  </div>
+                )}
+                {canToggleOfficeWoGeneration && (
+                  <div
+                    className="mt-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`row-rh-validation-${vessel.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">RH Validation</p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {(settingsMap.get(vessel.id) as any)?.rhValidationEnabled !== false
+                          ? "On — standard Running Hours validation"
+                          : "Off — applies to this vessel after sync"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={(settingsMap.get(vessel.id) as any)?.rhValidationEnabled !== false}
+                      disabled={rhValidationSwitchMutation.isPending}
+                      onCheckedChange={(checked) => rhValidationSwitchMutation.mutate({ vesselId: vessel.id, enabled: checked })}
+                      data-testid={`switch-rh-validation-${vessel.id}`}
+                    />
+                  </div>
+                )}
                 <Button 
                   variant="ghost" 
                   size="sm" 

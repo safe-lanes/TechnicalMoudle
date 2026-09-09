@@ -109,6 +109,7 @@ export async function approveChangeRequest(req: Request, res: Response) {
     comment: req.body.comment,
     reviewerId: serverReviewerId,
     role: userRole,
+    overriddenChanges: req.body.overriddenChanges,
   });
   res.json(updated);
 }

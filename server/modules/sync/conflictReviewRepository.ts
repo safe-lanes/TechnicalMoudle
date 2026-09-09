@@ -12,6 +12,38 @@ import { getPool } from '../../db';
 import { SYNC_CONFIG, getIdentityColumn } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
 import { isShipInstanceId } from './syncRole';
+import { RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, findWouuidsWithOpenDualConflicts } from './dualCompletionResolver';
+
+/**
+ * Task #399: after a dual-completion conflict on a work order is resolved locally,
+ * run completion learning for that WO (it was HELD OUT while the conflict was open
+ * so job tracking wouldn't advance from an interim value). Shore-only, best-effort.
+ */
+async function runPostResolutionLearning(pool: any, wouuid: string): Promise<void> {
+  const instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+  if (isShipInstanceId(instanceId)) return; // learner is shore-only
+  // Only learn once the ENTIRE completion is settled — sibling field conflicts still
+  // open mean the WO is still showing interim values.
+  const stillOpen = await findWouuidsWithOpenDualConflicts(pool, [wouuid]);
+  if (stillOpen.has(wouuid)) {
+    syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING DEFERRED: wouuid=${wouuid} — sibling field conflicts still open`);
+    return;
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+    const { learnFromShipCompletions } = await import('./shipCompletionLearner');
+    await learnFromShipCompletions(client, [wouuid]);
+    await client.query('COMMIT');
+    syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING: wouuid=${wouuid}`);
+  } catch (err: any) {
+    try { await client.query('ROLLBACK'); } catch { /* non-fatal */ }
+    syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING FAILED (non-fatal): wouuid=${wouuid}: ${String(err?.message || err).substring(0, 150)}`);
+  } finally {
+    client.release();
+  }
+}
 
 // ── Types ──
 
@@ -41,6 +73,8 @@ export interface EnrichedConflict {
   resolvedAt: string | null;
   resolvedBy: string | null;
   resolvedAction: string | null;
+  /** 'dual_completion' when the same record was completed independently on both sides (Task #399). */
+  conflictKind?: string | null;
 }
 
 export interface ConflictCount {
@@ -352,6 +386,7 @@ export async function listConflicts(filters: ListConflictsFilters): Promise<{ ro
         resolvedAt: row.resolved_at?.toISOString?.() || null,
         resolvedBy: row.resolved_by,
         resolvedAction: row.resolved_action,
+        conflictKind: row.conflict_kind ?? null,
       });
     }
   }
@@ -550,6 +585,7 @@ export async function getConflict(id: number, source: 'log' | 'old'): Promise<En
       resolvedAt: row.resolved_at?.toISOString?.() || null,
       resolvedBy: row.resolved_by,
       resolvedAction: row.resolved_action,
+      conflictKind: row.conflict_kind ?? null,
     };
   } else {
     // source === 'old'
@@ -597,6 +633,87 @@ export async function getConflict(id: number, source: 'log' | 'old'): Promise<En
 }
 
 /**
+ * Task #399: WO-LEVEL ATOMIC RESOLUTION for dual-completion conflicts.
+ *
+ * A dual completion is ONE decision, not per-field picks: resolving ANY field of the
+ * group applies the chosen SIDE to EVERY open dual-completion field of that work order
+ * in a single transaction — otherwise the two sides could retain a mixed completion
+ * that neither side actually entered.
+ *   choice='incoming' → the other side's completion wins everywhere (Apply incoming)
+ *   choice='current'  → this side's current values are kept everywhere (Dismiss)
+ * Every field gets a RESOLUTION_ACTOR sync_field_log so the other instance
+ * force-applies the full set and closes all its mirror conflicts.
+ */
+async function resolveDualCompletionGroup(
+  pool: any,
+  conflict: any,
+  choice: 'incoming' | 'current',
+  userId: string,
+): Promise<void> {
+  const identityCol = getIdentityColumn(conflict.table_name) || 'id';
+  const instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+  const resolvedAction = choice === 'incoming' ? 'APPLY_INCOMING' : 'DISMISS';
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+    const siblings = (await client.query(
+      `SELECT * FROM sync_conflict_log
+        WHERE conflict_kind = $1 AND table_name = $2 AND row_uuid = $3 AND is_resolved = false
+        FOR UPDATE`,
+      [DUAL_COMPLETION_KIND, conflict.table_name, conflict.row_uuid]
+    )).rows;
+    const vesselRow = await client.query(
+      `SELECT vessel_id FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+      [conflict.row_uuid]
+    );
+    const vesselId = vesselRow.rows[0]?.vessel_id ?? null;
+
+    for (const sib of siblings) {
+      const fieldSnake = toSnakeCase(sib.field_name);
+      const cur = await client.query(
+        `SELECT "${fieldSnake}" AS v FROM "${conflict.table_name}" WHERE "${identityCol}" = $1`,
+        [conflict.row_uuid]
+      );
+      const currentValue = cur.rows[0]?.v ?? null;
+      const chosenValue = choice === 'incoming' ? sib.incoming_new_value : (currentValue !== null ? String(currentValue) : null);
+      const rejectedValue = choice === 'incoming' ? (currentValue !== null ? String(currentValue) : null) : sib.incoming_new_value;
+
+      if (choice === 'incoming') {
+        await client.query(
+          `UPDATE "${conflict.table_name}" SET "${fieldSnake}" = $1, "updated_at" = NOW()
+            WHERE "${identityCol}" = $2`,
+          [chosenValue, conflict.row_uuid]
+        );
+      }
+      // Resolution log — RESOLUTION_ACTOR makes the other side force-apply it and close
+      // its mirror conflict; the human resolver is kept in sync_conflict_log.resolved_by.
+      await client.query(
+        `INSERT INTO sync_field_log
+          (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
+           changed_by_user_id, instance_id, is_synced, is_sync)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)`,
+        [conflict.table_name, conflict.row_uuid, sib.field_name,
+         rejectedValue, chosenValue, vesselId, RESOLUTION_ACTOR, instanceId]
+      );
+      await client.query(
+        `UPDATE sync_conflict_log
+            SET is_resolved = true, resolved_at = NOW(), resolved_by = $1, resolved_action = $2
+          WHERE id = $3`,
+        [userId, resolvedAction, sib.id]
+      );
+    }
+    await client.query('COMMIT');
+    syncDiag(`DUAL-COMPLETION GROUP RESOLVED: row=${conflict.row_uuid} choice=${choice} fields=${siblings.length} by=${userId} — resolution logs queued for propagation`);
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* non-fatal */ }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * 1.4 Apply incoming — overwrite the winner's value with the rejected (incoming) value
  */
 export async function applyIncomingConflict(
@@ -617,6 +734,19 @@ export async function applyIncomingConflict(
 
     if (conflict.is_resolved) {
       throw Object.assign(new Error('Conflict is already resolved'), { statusCode: 409 });
+    }
+
+    // Task #399: a dual-completion conflict is ONE WO-level decision — applying the
+    // incoming side resolves EVERY open dual-completion field of this work order
+    // atomically with the other side's values, and propagates the full set.
+    const isDualCompletion = conflict.conflict_kind === DUAL_COMPLETION_KIND;
+    if (isDualCompletion) {
+      await resolveDualCompletionGroup(pool, conflict, 'incoming', userId);
+      syncDiag(`CONFLICT RESOLVED: id=${id} source=log action=APPLY_INCOMING by=${userId} table=${conflict.table_name}.${conflict.field_name} kind=dual_completion (whole completion group)`);
+      if (conflict.table_name === 'work_orders') {
+        await runPostResolutionLearning(pool, conflict.row_uuid);
+      }
+      return getConflict(id, source);
     }
 
     // Get the identity column for this table
@@ -753,8 +883,24 @@ export async function dismissConflict(
       [id]
     );
     if (conflictResult.rows.length === 0) return null;
-    if (conflictResult.rows[0].is_resolved) {
+    const conflict = conflictResult.rows[0];
+    if (conflict.is_resolved) {
       throw Object.assign(new Error('Conflict is already resolved'), { statusCode: 409 });
+    }
+
+    // Task #399: dismissing a dual-completion conflict means "keep THIS side's completion" —
+    // one WO-level decision. All open dual-completion fields of the work order are resolved
+    // atomically and the kept values are re-asserted as RESOLUTION_ACTOR field logs so the
+    // other side force-applies them and closes its mirror conflicts (otherwise the two
+    // instances would stay diverged).
+    const isDualDismiss = conflict.conflict_kind === DUAL_COMPLETION_KIND;
+    if (isDualDismiss) {
+      await resolveDualCompletionGroup(pool, conflict, 'current', userId);
+      syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId} kind=dual_completion (whole completion group kept + re-asserted for propagation)`);
+      if (conflict.table_name === 'work_orders') {
+        await runPostResolutionLearning(pool, conflict.row_uuid);
+      }
+      return getConflict(id, source);
     }
 
     await pool.query(
@@ -765,6 +911,7 @@ export async function dismissConflict(
     );
 
     syncDiag(`CONFLICT DISMISSED: id=${id} source=log by=${userId}`);
+
     return getConflict(id, source);
   } else {
     const conflictResult = await pool.query(

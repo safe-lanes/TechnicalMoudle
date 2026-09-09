@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ChevronDown, Zap } from "lucide-react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ChevronDown, Zap, ListChecks } from "lucide-react";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
 import type { ColDef, RowClickedEvent } from 'ag-grid-community';
@@ -27,7 +27,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import PostponeWorkOrderDialog from "@/components/PostponeWorkOrderDialog";
+import RePostponeWorkOrderDialog from "@/components/RePostponeWorkOrderDialog";
 import PostponeApprovalDialog from "@/components/PostponeApprovalDialog";
 import OverdueReasonDialog from "@/components/OverdueReasonDialog";
 import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
@@ -42,7 +52,10 @@ import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
+import { useApprovalPolicy, effectiveApprovalTier } from "@/hooks/useApprovalPolicy";
+import { startApprovalQueue } from "@/lib/approvalQueue";
 import * as XLSX from "xlsx";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
@@ -161,13 +174,34 @@ const AG_FIELD_TO_SORT_FIELD: Record<string, WOSortField> = {
   approvalTier: "approvalTier",
 };
 
+// List-state persistence (WK approval-flow complaint): approving a WO navigates
+// to the full-page form and back, remounting this component — page, filters and
+// sort were plain useState and reset to defaults every round-trip (page 8 → page
+// 1 with 100+ pending). Persist them in sessionStorage exactly like activeTab
+// already was. sessionStorage = per-browser-tab, clears when the tab closes.
+function readListState<T>(key: string, fallback: T): T {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (raw == null) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeListState(key: string, value: unknown) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
 const WorkOrders: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
-  const [selectedRank, setSelectedRank] = useState("");
-  const [criticalitySelections, setCriticalitySelections] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState(() => readListState<string>('workOrdersSearch', ""));
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(() => readListState<PeriodFilterValue | null>('workOrdersPeriodFilter', null));
+  const [selectedRank, setSelectedRank] = useState(() => readListState<string>('workOrdersRank', ""));
+  const [criticalitySelections, setCriticalitySelections] = useState<Set<string>>(() => new Set(readListState<string[]>('workOrdersCriticality', [])));
   const [criticalityPopoverOpen, setCriticalityPopoverOpen] = useState(false);
-  const [selectedPostponementReason, setSelectedPostponementReason] = useState("");
+  const [selectedPostponementReason, setSelectedPostponementReason] = useState(() => readListState<string>('workOrdersPostponementReason', ""));
   const VALID_TABS = new Set(["Planned", "Due", "Overdue", "Postponed", "Unplanned", "Pending Approval", "Completed"]);
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('workOrdersActiveTab');
@@ -186,19 +220,36 @@ const WorkOrders: React.FC = () => {
   }, [activeTab]);
   const [showPlanner, setShowPlanner] = useState(false);
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
+  const [rePostponeDialogOpen, setRePostponeDialogOpen] = useState(false);
   const [postponeApprovalDialogOpen, setPostponeApprovalDialogOpen] = useState(false);
   const [postponeApprovalWorkOrder, setPostponeApprovalWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [overdueReasonDialogOpen, setOverdueReasonDialogOpen] = useState(false);
   const [overdueReasonWorkOrder, setOverdueReasonWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
+  const [rhLowerApprovalNotice, setRhLowerApprovalNotice] = useState<{
+    submittedRH: number;
+    latestRH: number;
+    latestRHDate: string | null;
+  } | null>(null);
   
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  // Pagination state (persisted — see readListState note above)
+  const [currentPage, setCurrentPage] = useState(() => readListState<number>('workOrdersPage', 1));
+  const [itemsPerPage, setItemsPerPage] = useState(() => readListState<number>('workOrdersPageSize', 10));
 
-  const [woSortField, setWoSortField] = useState<WOSortField | null>(null);
-  const [woSortDir, setWoSortDir] = useState<WOSortDir>("asc");
+  const [woSortField, setWoSortField] = useState<WOSortField | null>(() => readListState<WOSortField | null>('workOrdersSortField', null));
+  const [woSortDir, setWoSortDir] = useState<WOSortDir>(() => readListState<WOSortDir>('workOrdersSortDir', "asc"));
+
+  // Write-through persistence for the list state restored above.
+  useEffect(() => { writeListState('workOrdersSearch', searchTerm); }, [searchTerm]);
+  useEffect(() => { writeListState('workOrdersPeriodFilter', periodFilter); }, [periodFilter]);
+  useEffect(() => { writeListState('workOrdersRank', selectedRank); }, [selectedRank]);
+  useEffect(() => { writeListState('workOrdersCriticality', Array.from(criticalitySelections)); }, [criticalitySelections]);
+  useEffect(() => { writeListState('workOrdersPostponementReason', selectedPostponementReason); }, [selectedPostponementReason]);
+  useEffect(() => { writeListState('workOrdersPage', currentPage); }, [currentPage]);
+  useEffect(() => { writeListState('workOrdersPageSize', itemsPerPage); }, [itemsPerPage]);
+  useEffect(() => { writeListState('workOrdersSortField', woSortField); }, [woSortField]);
+  useEffect(() => { writeListState('workOrdersSortDir', woSortDir); }, [woSortDir]);
 
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
@@ -210,14 +261,20 @@ const WorkOrders: React.FC = () => {
   const vesselScopeKey = isMyVessels ? `my:${assignedVesselIds.join(',')}` : vesselId;
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
   const { isOfficeUser } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
   // Office (shore) replacement for the removed every-minute auto-scan: on shore,
   // WO generation is on-demand. The ship generates on its daily schedule.
   const { isShore } = useSyncInstanceInfo();
+  // The effective tier is resolved from each row's vessel settings. This keeps
+  // mixed My Vessels and fleet views aligned with the server's live policy.
+  const { isSuperintendentLockEnabled } = useApprovalPolicy();
   const { data: vessels = [] } = useVessels();
   
   // Debounce the search box so each keystroke doesn't fire a server round-trip
   // (mirrors the Spares module's server-side search behavior).
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Seed with the (possibly restored) searchTerm so the ""→restored transition
+  // 300ms after mount doesn't trip the page-1 reset effect below.
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(t);
@@ -331,9 +388,19 @@ const WorkOrders: React.FC = () => {
       const response = await apiRequest('PATCH', `/technical/api/work-orders/${id}`, data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
-      toast({ title: "Success", description: "Work order updated successfully" });
+      const lowerRhSkipped = result?.rhUpdateSkipped || result?.rhUpdateOutcome === 'skipped_lower';
+      if (lowerRhSkipped) {
+        setRhLowerApprovalNotice({
+          submittedRH: Number(result.submittedRH),
+          latestRH: Number(result.latestRH),
+          latestRHDate: result.latestRHDate || null,
+        });
+        toast({ title: "Approved", description: "Work order approved without lowering the live Running Hours value." });
+      } else {
+        toast({ title: "Success", description: "Work order updated successfully" });
+      }
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to update work order" });
@@ -633,8 +700,8 @@ const WorkOrders: React.FC = () => {
           minWidth: 130,
           flex: 0,
           cellRenderer: (params: any) => {
-            const tier = params.value;
             const wo = params.data;
+            const tier = effectiveApprovalTier(params.value, isSuperintendentLockEnabled(wo?.vesselId));
             const approverLabel = wo?.approver || 'HOD';
             if (tier === "superintendent_locked") return (
               <TooltipProvider delayDuration={150}>
@@ -731,8 +798,8 @@ const WorkOrders: React.FC = () => {
           minWidth: 130,
           flex: 0,
           cellRenderer: (params: any) => {
-            const tier = params.value;
             const woCompleted = params.data;
+            const tier = effectiveApprovalTier(params.value, isSuperintendentLockEnabled(woCompleted?.vesselId));
             if (tier === "superintendent_locked") return (
               <TooltipProvider delayDuration={150}>
                 <Tooltip>
@@ -777,7 +844,7 @@ const WorkOrders: React.FC = () => {
         if (!wo) return null;
         return (
           <div className="flex items-center justify-center gap-2">
-            {activeTab === "Pending Approval" && wo.approvalTier === "superintendent_locked" ? (
+            {activeTab === "Pending Approval" && effectiveApprovalTier(wo.approvalTier, isSuperintendentLockEnabled(wo.vesselId)) === "superintendent_locked" ? (
               <div className="relative group" data-testid={`locked-action-${wo.id}`}>
                 <Lock className="h-4 w-4 text-gray-400" />
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[9999]">
@@ -826,7 +893,7 @@ const WorkOrders: React.FC = () => {
     });
 
     return cols;
-  }, [activeTab, isVessel]);
+  }, [activeTab, isVessel, isSuperintendentLockEnabled]);
 
   const handleWoSortChanged = (field: string | null, direction: 'asc' | 'desc') => {
     if (!field) {
@@ -844,12 +911,24 @@ const WorkOrders: React.FC = () => {
   // Pagination calculations (totalItems comes from the server envelope above)
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   
-  // Reset to page 1 when filters or sort change
+  // Reset to page 1 when filters or sort CHANGE. Two non-changes must be
+  // skipped or they clobber the page just restored from sessionStorage (the
+  // approve-and-return reset bug): (1) the initial mount run, and (2) the
+  // VesselContext's ASYNC hydration — vesselId transitions ''/undefined → the
+  // restored vessel shortly AFTER mount, which is not a user vessel switch.
+  const skipMountPageReset = useRef(true);
+  const prevVesselIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
+    const prevVessel = prevVesselIdRef.current;
+    prevVesselIdRef.current = vesselId;
+    if (skipMountPageReset.current) { skipMountPageReset.current = false; return; }
+    if (!prevVessel && vesselId) return; // vessel hydration, not a user change
     setCurrentPage(1);
   }, [activeTab, debouncedSearch, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason, vesselId, woSortField, woSortDir]);
 
+  const skipMountSortReset = useRef(true);
   useEffect(() => {
+    if (skipMountSortReset.current) { skipMountSortReset.current = false; return; }
     setWoSortField(null);
     setWoSortDir("asc");
   }, [activeTab]);
@@ -892,6 +971,34 @@ const WorkOrders: React.FC = () => {
     setPostponeDialogOpen(true);
   };
 
+  // Phase 2 — approval queue: capture the FULL ordered pending set (same
+  // filters + sort the officer is looking at, reproduced client-side over the
+  // full fetch exactly like the export builders do) and walk it on the form
+  // page with approve-auto-advance.
+  const [startingQueue, setStartingQueue] = useState(false);
+  const handleStartReviewQueue = async () => {
+    setStartingQueue(true);
+    try {
+      const allWorkOrders = await fetchAllWorkOrders();
+      const ordered = filterAndSortWorkOrders(allWorkOrders, {
+        ...currentFilterParams,
+        sortField: woSortField ?? undefined,
+        sortDir: woSortDir,
+      });
+      const ids = ordered.map((wo) => wo.id).filter(Boolean);
+      if (ids.length === 0) {
+        toast({ title: "Nothing to review", description: "No work orders pending approval for the current filters." });
+        return;
+      }
+      startApprovalQueue(ids, vesselId ?? null);
+      setLocation(`/pms/work-order/${ids[0]}`);
+    } catch (err: any) {
+      toast({ title: "Could not start review queue", description: err?.message, variant: "destructive" });
+    } finally {
+      setStartingQueue(false);
+    }
+  };
+
   const handleWorkOrderClick = (workOrder: WorkOrder) => {
     // Navigate to work order detail page (full-screen)
     setLocation(`/pms/work-order/${workOrder.id}`);
@@ -915,6 +1022,12 @@ const WorkOrders: React.FC = () => {
           return;
         }
       } catch { /* fall through to postpone form on network error */ }
+    }
+    // WO already has an approved postponement — open the Re-Postponement screen
+    if (workOrder.status === 'Postponement Approved' || workOrder.computedStatus === 'Postponement Approved') {
+      setSelectedWorkOrder(workOrder);
+      setRePostponeDialogOpen(true);
+      return;
     }
     setSelectedWorkOrder(workOrder);
     setPostponeDialogOpen(true);
@@ -990,8 +1103,9 @@ const WorkOrders: React.FC = () => {
     }
     
     const updateData: Record<string, any> = {
-      status: "Approved",
-      approver: "Current User", // Replace with actual user
+      status: "Completed",
+      approvalAction: "approved",
+      approver: resolvedUserName,
       approverRemarks,
       approvalDate: new Date().toISOString(),
       nextDueDate,
@@ -1012,7 +1126,7 @@ const WorkOrders: React.FC = () => {
     
     const updateData = {
       status: "Rejected",
-      approver: "Current User", // Replace with actual user
+      approver: resolvedUserName,
       approverRemarks: rejectionComments,
       rejectionDate: new Date().toISOString()
     };
@@ -1035,6 +1149,21 @@ const WorkOrders: React.FC = () => {
     },
   });
 
+  const rePostponeRequestMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await apiRequest('POST', `/technical/api/work-orders/${id}/re-postpone-request`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
+      toast({ title: "Re-Postponement Submitted", description: "Your re-postponement request has been sent to the office for approval." });
+      setRePostponeDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to submit re-postponement request", variant: "destructive" });
+    },
+  });
+
   const handlePostponeConfirm = (workOrderId: string, postponeData: any) => {
     const wo = paginatedWorkOrders.find(w => w.id === workOrderId);
     const isResubmit = wo?.status === 'Awaiting Office Approval' || wo?.computedStatus === 'Awaiting Office Approval' ||
@@ -1042,6 +1171,20 @@ const WorkOrders: React.FC = () => {
     postponeRequestMutation.mutate({
       id: workOrderId,
       method: isResubmit ? 'PUT' : 'POST',
+      data: {
+        postponeDate: postponeData.postponeDate,
+        nextDueDate: postponeData.nextDueDate,
+        reason: postponeData.reason,
+        postponementRemarks: postponeData.postponementRemarks,
+        approver: postponeData.approver || 'Office',
+        duration: postponeData.duration,
+      },
+    });
+  };
+
+  const handleRePostponeConfirm = (workOrderId: string, postponeData: any) => {
+    rePostponeRequestMutation.mutate({
+      id: workOrderId,
       data: {
         postponeDate: postponeData.postponeDate,
         nextDueDate: postponeData.nextDueDate,
@@ -1394,7 +1537,7 @@ const WorkOrders: React.FC = () => {
 
       {/* Filters - Single Row */}
       <div className="flex items-center gap-3 flex-wrap">
-        {(isSailAdmin || isClientAdmin) && (
+        {isOfficeUser && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
             <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
@@ -1558,20 +1701,33 @@ const WorkOrders: React.FC = () => {
           { icon: Eye, label: "Standard Approval", count: standardCount, bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-800 dark:text-green-300", testId: "stat-standard" },
         ];
         return (
-          <div className="grid grid-cols-4 gap-3" data-testid="pending-approval-stat-bar">
-            {statCards.map((card) => (
-              <div
-                key={card.testId}
-                className={`flex items-center gap-3 rounded-md px-4 py-3 ${card.count === 0 ? "bg-gray-100 dark:bg-gray-800 opacity-60" : card.bg}`}
-                data-testid={card.testId}
-              >
-                <card.icon className={`h-5 w-5 ${card.count === 0 ? "text-gray-400" : card.text}`} />
-                <div>
-                  <div className={`text-xl font-bold ${card.count === 0 ? "text-gray-400" : card.text}`} data-testid={`${card.testId}-count`}>{card.count}</div>
-                  <div className={`text-xs ${card.count === 0 ? "text-gray-400" : card.text}`}>{card.label}</div>
+          <div className="flex items-stretch gap-3" data-testid="pending-approval-stat-bar">
+            <div className="grid grid-cols-4 gap-3 flex-1">
+              {statCards.map((card) => (
+                <div
+                  key={card.testId}
+                  className={`flex items-center gap-3 rounded-md px-4 py-3 ${card.count === 0 ? "bg-gray-100 dark:bg-gray-800 opacity-60" : card.bg}`}
+                  data-testid={card.testId}
+                >
+                  <card.icon className={`h-5 w-5 ${card.count === 0 ? "text-gray-400" : card.text}`} />
+                  <div>
+                    <div className={`text-xl font-bold ${card.count === 0 ? "text-gray-400" : card.text}`} data-testid={`${card.testId}-count`}>{card.count}</div>
+                    <div className={`text-xs ${card.count === 0 ? "text-gray-400" : card.text}`}>{card.label}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            {/* Phase 2 — approval queue: walk every pending WO with approve-auto-advance,
+                no pagination round-trips. Locked WOs appear in the queue locked (Skip only). */}
+            <Button
+              className="h-auto px-4 bg-[#1E5A8E] hover:bg-[#174a78] text-white shrink-0"
+              disabled={startingQueue || totalItems === 0}
+              onClick={handleStartReviewQueue}
+              data-testid="button-start-review-queue"
+            >
+              {startingQueue ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ListChecks className="h-4 w-4 mr-2" />}
+              Review Queue{totalItems > 0 ? ` (${totalItems})` : ''}
+            </Button>
           </div>
         );
       })()}
@@ -1697,6 +1853,14 @@ const WorkOrders: React.FC = () => {
         onConfirm={handlePostponeConfirm}
       />
 
+      {/* Re-Postponement Dialog — opened when WO status is 'Postponement Approved' */}
+      <RePostponeWorkOrderDialog
+        isOpen={rePostponeDialogOpen}
+        onClose={() => setRePostponeDialogOpen(false)}
+        workOrder={selectedWorkOrder}
+        onConfirm={handleRePostponeConfirm}
+      />
+
       {/* Office: Postponement Approval Dialog */}
       <PostponeApprovalDialog
         isOpen={postponeApprovalDialogOpen}
@@ -1719,6 +1883,30 @@ const WorkOrders: React.FC = () => {
           invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
         }}
       />
+
+      <AlertDialog open={!!rhLowerApprovalNotice}>
+        <AlertDialogContent data-testid="dialog-list-rh-lower-approval">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Work Order Approved — Running Hours Unchanged</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>The Work Order was approved, but the lower submitted reading was not applied to live Running Hours.</p>
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <div><strong>Submitted reading:</strong> {rhLowerApprovalNotice?.submittedRH} RH</div>
+                  <div>
+                    <strong>Latest live reading:</strong> {rhLowerApprovalNotice?.latestRH} RH
+                    {rhLowerApprovalNotice?.latestRHDate ? ` (${rhLowerApprovalNotice.latestRHDate})` : ''}
+                  </div>
+                </div>
+                <p>The submitted value remains in the Work Order completion history.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setRhLowerApprovalNotice(null)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Unplanned Work Order Form */}
       <UnplannedWorkOrderForm

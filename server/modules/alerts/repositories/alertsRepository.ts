@@ -71,6 +71,13 @@ export async function getAllVesselSpares() {
   return storage.getAllVesselSpares();
 }
 
+// SQL-prefiltered candidates for UC2 — only critical spares already below minimum,
+// projected to the columns evaluateLowSpares reads (was: every spare of the fleet,
+// full rows, every 5 minutes).
+export async function getLowCriticalSpareCandidates() {
+  return storage.getLowCriticalSpareCandidates();
+}
+
 export async function getUnacknowledgedAlertEventsForRole(userRole: string, vesselId?: string | null) {
   return storage.getUnacknowledgedAlertEventsForRole(userRole, vesselId);
 }

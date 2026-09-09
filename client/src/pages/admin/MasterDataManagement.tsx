@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2, Download, RefreshCw, FileCode2, Package, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -39,6 +40,10 @@ type SfiDetails = {
 
 export default function MasterDataManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateMasters = canCreate("admin-masters");
+  const canEditMasters = canEdit("admin-masters");
+  const canDeleteMasters = canDelete("admin-masters");
   const [searchQuery, setSearchQuery] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MasterData | null>(null);
@@ -314,14 +319,16 @@ export default function MasterDataManagement({ onBack }: { onBack?: () => void }
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
-                <Button
-                  onClick={handleAddNew}
-                  className="whitespace-nowrap bg-cyan-600"
-                  data-testid="button-add-master-data"
-                >
-                  <Plus className="mr-1 h-4 w-4" />
-                  Add Entry
-                </Button>
+                {canCreateMasters && (
+                  <Button
+                    onClick={handleAddNew}
+                    className="whitespace-nowrap bg-cyan-600"
+                    data-testid="button-add-master-data"
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add Entry
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -346,10 +353,12 @@ export default function MasterDataManagement({ onBack }: { onBack?: () => void }
                     ? "No entries found matching your search" 
                     : "No master data entries yet. Add your first entry to get started."}
                 </p>
-                <Button onClick={handleAddNew} className="mt-4" data-testid="button-add-first">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add First Entry
-                </Button>
+                {canCreateMasters && (
+                  <Button onClick={handleAddNew} className="mt-4" data-testid="button-add-first">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add First Entry
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -378,23 +387,27 @@ export default function MasterDataManagement({ onBack }: { onBack?: () => void }
                         <TableCell className="text-center">{item.countSfiCode || 0}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(item)}
-                              data-testid={`button-edit-${item.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteClick(item)}
-                              className="text-red-500"
-                              data-testid={`button-delete-${item.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {canEditMasters && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(item)}
+                                data-testid={`button-edit-${item.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDeleteMasters && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteClick(item)}
+                                className="text-red-500"
+                                data-testid={`button-delete-${item.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -582,13 +595,15 @@ export default function MasterDataManagement({ onBack }: { onBack?: () => void }
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isPending}
-                data-testid="button-save-master-data"
-              >
-                {isPending ? "Saving..." : selectedItem ? "Update" : "Create"}
-              </Button>
+              {(selectedItem ? canEditMasters : canCreateMasters) && (
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  data-testid="button-save-master-data"
+                >
+                  {isPending ? "Saving..." : selectedItem ? "Update" : "Create"}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>
@@ -605,14 +620,16 @@ export default function MasterDataManagement({ onBack }: { onBack?: () => void }
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
+            {canDeleteMasters && (
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleteMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -79,6 +79,7 @@ export const vessels = pgTable("vessels", {
   vuuid: text("vuuid").notNull().unique(), // Canonical UUID identity — FK target for all child tables
   name: text("name").notNull(), // Vessel display name
   code: text("code").notNull(), // Same as id for compatibility
+  vCode: text("v_code"), // External vessel code; stored as text to preserve leading zeros
   fleetId: text("fleet_id"), // Optional reference to fleet
   imoNumber: text("imo_number"), // IMO number if applicable
   vesselType: text("vessel_type"), // e.g., Tanker, Bulk Carrier, Container
@@ -181,6 +182,11 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
   componentCode: text("component_code"),
   componentName: text("component_name"),
   updatedByUuid: text("updated_by_uuid"),
+  // Task #394 (migration 162): atomic RH event metadata for the canonical
+  // "latest reading wins" comparator. Nullable — legacy rows rank between
+  // ship and shore on ties (see rhEventComparator.originRank).
+  originSide: text("origin_side"), // 'ship' | 'shore'
+  stampHolder: text("stamp_holder"), // component's current_stamp at observation (rotational epoch)
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
   isDeleted: boolean("is_deleted").default(false),
@@ -207,7 +213,9 @@ export type RenewalActionType = typeof RENEWAL_ACTION_TYPES[number];
 export const cascadeRunningHoursSchema = z.object({
   parentComponentId: z.string(),
   mode: z.enum(['setTotal', 'addDelta']),
-  value: z.number().nonnegative(), // Allow zero for setTotal (meter replacement), but addDelta will be validated separately
+  // Set Total remains non-negative. Add Delta represents accumulated operating
+  // time and must be positive; counter reductions use explicit reset/correction flows.
+  value: z.number().finite(),
   dateUpdated: z.string(), // DD-MMM-YYYY HH:mm format
   dateUpdatedTZ: z.string().default('UTC'),
   comments: z.string().optional(),
@@ -218,27 +226,18 @@ export const cascadeRunningHoursSchema = z.object({
   userUuid: z.string().optional(),
   userRole: z.string().optional().default('Ship'),
   adminOverride: z.boolean().optional().default(false),
+  // Request preference only. The running-hours service authorizes a false value
+  // using the authenticated server session; never trust this flag by itself.
+  rhValidationEnabled: z.boolean().optional().default(true),
   // Renewal/Replacement fields (required when value = 0)
   isRenewalReset: z.boolean().optional().default(false),
   renewalActionType: z.enum(RENEWAL_ACTION_TYPES).optional(),
   renewalReason: z.string().optional(),
   renewalReference: z.string().optional(),
   renewalEvidenceUrls: z.array(z.string()).optional(),
-}).refine(data => data.mode === 'setTotal' || data.value > 0, {
-  message: "addDelta mode requires value > 0",
+}).refine(data => data.mode !== 'setTotal' || data.value >= 0, {
+  message: "setTotal mode requires value >= 0",
   path: ["value"]
-}).refine(data => {
-  // When value is 0 in setTotal mode, isRenewalReset must be true with required fields
-  if (data.mode === 'setTotal' && data.value === 0) {
-    return data.isRenewalReset === true && 
-           !!data.renewalActionType && 
-           !!data.renewalReason && 
-           data.renewalReason.trim().length > 0;
-  }
-  return true;
-}, {
-  message: "When setting RH to 0, renewal confirmation with action type and reason is required",
-  path: ["renewalReason"]
 }).refine(data => {
   // When meterReplaced is true, oldMeterFinal is mandatory
   if (data.meterReplaced === true) {
@@ -372,6 +371,13 @@ export const components = pgTable("components", {
   // Total RH = meterReplacedLastRh + currentCumulativeRH (new meter reading)
   meterReplacedDate: timestamp("meter_replaced_date"),
   meterReplacedLastRh: decimal("meter_replaced_last_rh", { precision: 10, scale: 2 }),
+
+  // === Rotational Items Tracking (migration 156) ===
+  // rotationalItem: flag — office-managed, flows shore→ship via normal component sync.
+  // currentStamp: MUTABLE POINTER to the currently-installed physical item; rewritten on
+  // every swap. Permanent stamp identity lives ONLY in rotational_items.stamp.
+  rotationalItem: boolean("rotational_item").notNull().default(false),
+  currentStamp: text("current_stamp"),
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
@@ -398,6 +404,89 @@ export const insertComponentSchema = createInsertSchema(components).omit({
 
 export type InsertComponent = z.infer<typeof insertComponentSchema>;
 export type Component = typeof components.$inferSelect;
+
+// Rotational Items master registry (migration 156) — physical parts identified by a
+// unique Stamp; RH history follows the stamp, not the equipment position.
+// BOTH_EDITABLE sync (ship swaps; shore can create/retire stamps) — identity: riuuid.
+// PURE MASTER TABLE (Task #366): no component back-pointer. The installed-on link is
+// DERIVED via join components.current_stamp = rotational_items.stamp (per vessel).
+// Historical "where fitted" trace lives in immutable rotation_history.
+export const ROTATIONAL_ITEM_STATUSES = ['Installed', 'Spare', 'In Store', 'Retired'] as const;
+export type RotationalItemStatus = typeof ROTATIONAL_ITEM_STATUSES[number];
+
+export const rotationalItems = pgTable("rotational_items", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  riuuid: text("riuuid").notNull().unique().default(sql`gen_random_uuid()`),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  stamp: text("stamp").notNull(),
+  stampName: text("stamp_name"), // part description shown wherever the stamp is picked/displayed
+  currentRh: decimal("current_rh", { precision: 10, scale: 2 }).notNull().default("0"),
+  rhLastUpdated: text("rh_last_updated"),
+  status: text("status").notNull().default("Spare"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").default(false),
+  sortOrder: integer("sort_order"),
+}, (table) => ({
+  // Stamp unique per vessel among non-deleted items (partial index in migration 156)
+  vesselIdx: index("idx_rotational_items_vessel").on(table.vesselId),
+  statusIdx: index("idx_rotational_items_status").on(table.vesselId, table.status),
+}));
+
+export const insertRotationalItemSchema = createInsertSchema(rotationalItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRotationalItem = z.infer<typeof insertRotationalItemSchema>;
+export type RotationalItem = typeof rotationalItems.$inferSelect;
+
+// Rotation history (migration 157) — insert-only immutable event log of physical swaps
+// AND the sync carrier of the swap. components is ONE_WAY_SHORE_TO_SHIP, so a ship-side
+// swap syncs ship→shore via this BOTH_EDITABLE row; derived-update hooks in the sync
+// appliers re-apply stamp + RH baseline onto the receiving side's component row.
+// UPDATE-blocking trigger (prevent_rotation_history_update) enforces immutability.
+export const rotationHistory = pgTable("rotation_history", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  rhruuid: text("rhruuid").notNull().unique().default(sql`gen_random_uuid()`),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  componentId: text("component_id").notNull(), // components.cuuid of the position swapped
+  componentCode: text("component_code"),       // historical snapshot at swap time
+  componentName: text("component_name"),       // historical snapshot at swap time
+  outRiuuid: text("out_riuuid"),               // NULL when the position was empty
+  outStamp: text("out_stamp"),
+  outRh: decimal("out_rh", { precision: 10, scale: 2 }),
+  inRiuuid: text("in_riuuid").notNull(),
+  inStamp: text("in_stamp").notNull(),
+  inRh: decimal("in_rh", { precision: 10, scale: 2 }).notNull(), // component's new RH baseline
+  rotationDate: timestamp("rotation_date").notNull().defaultNow(),
+  userId: text("user_id"),
+  actorLabel: text("actor_label"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").default(false),
+  sortOrder: integer("sort_order"),
+}, (table) => ({
+  vesselIdx: index("idx_rotation_history_vessel").on(table.vesselId),
+  componentIdx: index("idx_rotation_history_component").on(table.componentId, table.rotationDate),
+}));
+
+export const insertRotationHistorySchema = createInsertSchema(rotationHistory).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRotationHistory = z.infer<typeof insertRotationHistorySchema>;
+export type RotationHistory = typeof rotationHistory.$inferSelect;
 
 // Form Definitions Table
 export const formDefinitions = pgTable("form_definitions", {
@@ -1104,6 +1193,9 @@ export const jobs = pgTable("jobs", {
   nextDueDate: text("next_due_date"), // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar-based jobs)
   lastDoneRH: text("last_done_rh"), // Last completion running hours (for RH-based jobs)
   nextDueRH: text("next_due_rh"), // Calculated: lastDoneRH + frequencyValue (for RH-based jobs)
+  // Authorized-rebaseline stamp (migration 161): shore tracking values only pass the
+  // one-way applier's job-tracking guard when this incoming stamp is newer than local.
+  trackingRebaselinedAt: timestamp("tracking_rebaselined_at"),
   jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
   classRelated: text("class_related"), // 'Yes' | 'No'
   briefWorkDescription: text("brief_work_description"),
@@ -1186,6 +1278,9 @@ export const workOrders = pgTable("work_orders", {
   nextDueDate: text("next_due_date"),
   nextDueReading: text("next_due_reading"),
   currentReading: text("current_reading"),
+  // Explicit origin marker (migration 161): SYNC instance id that generated this WO
+  // (system generation paths only). Identifies office-created rows without log history.
+  generatedByInstance: text("generated_by_instance"),
   classRelated: text("class_related"), // 'Yes' | 'No'
   jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
   briefWorkDescription: text("brief_work_description"),
@@ -1271,6 +1366,15 @@ export const workOrders = pgTable("work_orders", {
 
   // === Layer 7: Running Hours Validation & Isolation ===
   completionRH: decimal("completion_rh", { precision: 10, scale: 2 }),
+  // RH accuracy (migration 139): reading AT completion — drives the NEXT RH cycle
+  // (lastDoneRH/nextDueRH/nextDueReading + RH missed-cycles) via the fallback chain
+  // (woCompletionRh ?? completion reading). Section B3 Current Reading remains only
+  // the equipment-RH-record update source.
+  woCompletionRh: decimal("wo_completion_rh", { precision: 10, scale: 2 }),
+  // RH accuracy (migration 139): date the Current Reading was taken (ISO string);
+  // threads into the RH module's dateUpdated → last_updated/audit reflect the
+  // actual reading date, not the WO completion date.
+  currentReadingDate: text("current_reading_date"),
   completionRHValidated: boolean("completion_rh_validated"),
   completionRHSource: text("completion_rh_source"),
   completionRHValidationDetails: jsonb("completion_rh_validation_details"),
@@ -1289,6 +1393,20 @@ export const workOrders = pgTable("work_orders", {
   // master RH. In this case the RH module is NOT updated; the reading is saved to the
   // WO only for job scheduling / next-due calculation.
   rhBackdatedEntry: boolean("rh_backdated_entry"),
+
+  // Approval-time RH application outcome. A lower submitted reading can be
+  // retained on the WO while the authoritative live RH counter stays unchanged.
+  rhUpdateOutcome: text("rh_update_outcome"),
+  rhSkipReason: text("rh_skip_reason"),
+  rhSkipSubmittedRh: decimal("rh_skip_submitted_rh", { precision: 10, scale: 2 }),
+  rhSkipLatestRh: decimal("rh_skip_latest_rh", { precision: 10, scale: 2 }),
+  rhSkipLatestRhDate: text("rh_skip_latest_rh_date"),
+
+  // === Save as Draft (migration 165, Task #402) ===
+  // In-progress Part-B edits stashed as a JSON document. Draft saves write ONLY
+  // this column (no status/completion/RH/due writes) so the computed tab never
+  // moves; Submit promotes values through the normal workflow and clears it.
+  draftExecutionData: jsonb("draft_execution_data"),
 
   // === Postponement Approval Fields (Plan B) ===
   postponeRequestedDate: text("postpone_requested_date"), // Ship's requested new due date (populated on postpone-request submit)
@@ -2250,6 +2368,22 @@ export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   locationAName: text("location_a_name").notNull().default("Location A"),
   locationBName: text("location_b_name").notNull().default("Location B"),
 
+  // Office WO generation kill switch (migration 161): per-vessel opt-in for the shore
+  // daily sweep and all office generation entry points. Default OFF (fail closed).
+  officeWoGenerationEnabled: boolean("office_wo_generation_enabled").notNull().default(false),
+
+  // Office RH entry kill switch (migration 162, Task #394): per-vessel opt-in for
+  // office-side running-hours entry via WO completion. Default OFF (fail closed).
+  officeRhEntryEnabled: boolean("office_rh_entry_enabled").notNull().default(false),
+
+  // Running Hours validation policy (migration 163): per-vessel opt-out for
+  // normal RH correction validation. Default ON (fail closed).
+  rhValidationEnabled: boolean("rh_validation_enabled").notNull().default(true),
+
+  // Superintendent approval lock (migration 168): per-vessel control of
+  // high-severity work-order approval. Default OFF = notify-only path.
+  superintendentLockEnabled: boolean("superintendent_lock_enabled").notNull().default(false),
+
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
@@ -2320,6 +2454,22 @@ export type CompanyStandardGraceSettings = typeof companyStandardGraceSettings.$
 
 export type CompanyGraceMethod = 'FIXED_DAYS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH';
 export type CompanyGraceScope = 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH';
+
+// Legacy company approval-policy settings (migration 137). Kept for historical
+// compatibility only; active Superintendent lock enforcement is vessel-specific
+// in pms_vessel_settings as of migration 168.
+export const companyApprovalSettings = pgTable("company_approval_settings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  singletonKey: text("singleton_key").notNull().unique().default("ACTIVE"),
+  superintendentLockEnabled: boolean("superintendent_lock_enabled").notNull().default(true),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: updatedAtColumn(),
+  // Required by the provisioning exporter / one-way sync filters (see mig 137).
+  isDeleted: boolean("is_deleted").default(false),
+});
+
+export type CompanyApprovalSettings = typeof companyApprovalSettings.$inferSelect;
 
 // =====================================================
 // MAKER LIST - Master data for equipment manufacturers
@@ -3142,6 +3292,8 @@ export const jobComponentLinks = pgTable("job_component_links", {
   nextDueDate: text("next_due_date"), // Calculated next due date for THIS component
   lastDoneRH: text("last_done_rh"), // Last completion running hours for THIS component
   nextDueRH: text("next_due_rh"), // Calculated next due RH for THIS component
+  // Authorized-rebaseline stamp (migration 161) — see jobs.trackingRebaselinedAt.
+  trackingRebaselinedAt: timestamp("tracking_rebaselined_at"),
   updatedAt: updatedAtColumn(),
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
@@ -3350,7 +3502,9 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
   issueDate: text("issue_date"), // Date certificate was issued
   expiryDate: text("expiry_date"), // Date certificate expires
   lastAnnual: text("last_annual"), // Date of last annual survey
+  nextAnnual: text("next_annual"), // Date of next annual survey
   lastInterm: text("last_interm"), // Date of last intermediate survey
+  nextInterm: text("next_interm"), // Date of next intermediate survey
   endorsementDate: text("endorsement_date"), // Date of endorsement
   lastEditUpload: text("last_edit_upload"), // Date of last edit or file upload
   attachments: jsonb("attachments").$type<Array<{ name: string; size: number; key: string; uploadedAt: string }>>().default([]),
@@ -3530,7 +3684,10 @@ export type VesselSurveyData = typeof vesselSurveyData.$inferSelect;
 
 // Work Order Postponements - History/Audit table to track multiple postponements over time
 export const workOrderPostponements = pgTable("work_order_postponements", {
-  id: text("id").primaryKey(),
+  // UUID default (migration 133): ship-created postponements are app-id'd today
+  // (pp-<wo>-<ts> / crypto.randomUUID) — the default guarantees global uniqueness
+  // for any future insert that omits id (defensive; id is the sync identity).
+  id: text("id").primaryKey().default(sql`gen_random_uuid()::text`),
   workOrderId: text("work_order_id").notNull().references(() => workOrders.wouuid), // FK → work_orders.wouuid
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // References vessels.vuuid
   postponementNumber: integer("postponement_number").notNull().default(1), // 1st, 2nd, 3rd postponement, etc.
@@ -3550,6 +3707,7 @@ export const workOrderPostponements = pgTable("work_order_postponements", {
   informOffice: boolean("inform_office").notNull().default(false), // Whether office was informed
   attachmentPath: text("attachment_path"), // Path to any attached documents
   approvalWorkflowSnapshot: jsonb("approval_workflow_snapshot"), // Snapshot of level1/level2 config at submission time
+  requestType: text("request_type"), // 'Postponement' | 'Re-Postponement'; NULL treated as 'Postponement' for pre-migration rows
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
   isSync: boolean("is_sync").default(false),
@@ -3583,6 +3741,7 @@ export const woPostponementApprovals = pgTable("wo_postponement_approvals", {
   actionByUserId: text("action_by_user_id"),
   actionAt: timestamp("action_at", { withTimezone: true }),
   remarks: text("remarks"),
+  requestType: text("request_type"), // 'Postponement' | 'Re-Postponement'; NULL treated as 'Postponement' for pre-migration rows
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
   createdByUuid: text("created_by_uuid"),
@@ -3870,6 +4029,70 @@ export const insertAdmnRoleMasterSchema = createInsertSchema(admnRoleMaster).omi
 
 export type InsertAdmnRoleMaster = z.infer<typeof insertAdmnRoleMasterSchema>;
 export type AdmnRoleMaster = typeof admnRoleMaster.$inferSelect;
+
+// ── Role → View-Mode mapping (Task #324) ──────────────────────────────────────
+// DB-driven replacement for the hardcoded mapLoggedRoleToUIRole logic.
+// Both tables are ONE_WAY_SHORE_TO_SHIP and SEEDED ON BOTH SIDES by migration,
+// so the sync identity is the NATURAL KEY (code / role_ruid), NOT the uuid
+// (approval_workflow_config seeded-both-sides lesson). uuids are kept as stable
+// row ids but are not the sync identity. No FKs / CHECKs on synced columns —
+// referential validation lives in the service layer.
+
+export const viewModesMaster = pgTable("view_modes_master", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vmuuid: text("vmuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  // Natural key + sync identity. Matches the UIRole union in shared/uiRoles.ts.
+  code: text("code").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  // Retire modes via isActive=false — NEVER hard-delete (hard deletes don't sync;
+  // historical mapping rows must stay resolvable).
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+});
+
+export const insertViewModesMasterSchema = createInsertSchema(viewModesMaster).omit({
+  id: true,
+  vmuuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertViewModesMaster = z.infer<typeof insertViewModesMasterSchema>;
+export type ViewModesMaster = typeof viewModesMaster.$inferSelect;
+
+export const roleViewModeMapping = pgTable("role_view_mode_mapping", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  rvmuuid: text("rvmuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  // Natural key + sync identity: one role → exactly one view mode.
+  roleRuid: text("role_ruid").notNull().unique(),
+  // References view_modes_master.code (no DB FK — synced table rule).
+  viewModeCode: text("view_mode_code").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  // Unmap = SOFT delete (is_deleted=true + explicit updated_at bump) — a hard
+  // DELETE never enters the updated_at>checkpoint sync delta, so ships would
+  // keep the mapping forever. Remap revives via ON CONFLICT (role_ruid).
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
+});
+
+export const insertRoleViewModeMappingSchema = createInsertSchema(roleViewModeMapping).omit({
+  id: true,
+  rvmuuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertRoleViewModeMapping = z.infer<typeof insertRoleViewModeMappingSchema>;
+export type RoleViewModeMapping = typeof roleViewModeMapping.$inferSelect;
 
 export const admMenumasterAc = pgTable("adm_menumaster_ac", {
   id: integer("id").primaryKey(),
@@ -4180,6 +4403,28 @@ export const syncMetadata = pgTable("sync_metadata", {
   isSync: boolean("is_sync").default(false).notNull(),
 });
 
+/**
+ * Per-table one-way watermark (migration 148). Replaces the single
+ * sync_metadata.last_sync_checkpoint as the gather predicate for
+ * ONE_WAY_SHORE_TO_SHIP tables, so one broken table cannot pin the other ~51.
+ *
+ * A MISSING ROW MEANS "use sync_metadata.last_sync_checkpoint" — that COALESCE is
+ * what makes day one byte-identical without seeding a hardcoded table list here.
+ *
+ * NO_SYNC. Each instance owns its own watermarks; this must never travel.
+ */
+export const syncTableCheckpoints = pgTable("sync_table_checkpoints", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  instanceId: text("instance_id").notNull(),
+  tableName: text("table_name").notNull(),
+  lastCheckpoint: timestamp("last_checkpoint", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.instanceId, table.tableName),
+]);
+
+export type SyncTableCheckpoint = typeof syncTableCheckpoints.$inferSelect;
+
 export const insertSyncMetadataSchema = createInsertSchema(syncMetadata).omit({
   id: true, smuuid: true, createdAt: true, updatedAt: true,
 });
@@ -4202,6 +4447,12 @@ export const syncFieldLog = pgTable("sync_field_log", {
   instanceId: text("instance_id").notNull(),
   syncBatchId: text("sync_batch_id"),
   isSynced: boolean("is_synced").default(false).notNull(),
+  // Retry ladder (migration 147). LOCAL bookkeeping — never on the sync wire.
+  // Replaces the in-memory droppedRetryCount Map so attempts survive a restart, and lets the
+  // backoff ladder throttle retries instead of the old dead-letter force-marking undelivered
+  // rows as synced (the Frontier Venture "71" loss path).
+  syncAttempts: integer("sync_attempts").default(0).notNull(),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   isDeleted: boolean("is_deleted").default(false).notNull(),
@@ -4220,6 +4471,27 @@ export const insertSyncFieldLogSchema = createInsertSchema(syncFieldLog).omit({
 
 export type InsertSyncFieldLog = z.infer<typeof insertSyncFieldLogSchema>;
 export type SyncFieldLog = typeof syncFieldLog.$inferSelect;
+
+// Durable record of LOST field logs (migration 142, SYNC-HARDENING-PLAN §9.4).
+// Written best-effort by the field logger when a standalone logFieldChanges call fails —
+// the business row committed but its sync log was never written. Recovery tooling reads
+// unresolved rows and regenerates the missing logs (full-row diff), then marks resolved.
+// LOCAL BOOKKEEPING ONLY: never synced (not in syncConfig), never provisioned.
+export const syncFieldLogFailures = pgTable("sync_field_log_failures", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  tableName: text("table_name").notNull(),
+  rowUuid: text("row_uuid").notNull(),
+  vesselId: text("vessel_id"),
+  failedFields: integer("failed_fields").notNull().default(0),
+  error: text("error"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  resolved: boolean("resolved").notNull().default(false),
+}, (table) => ({
+  idxUnresolved: index("idx_sflf_unresolved").on(table.resolved, table.occurredAt),
+  idxRow: index("idx_sflf_row").on(table.tableName, table.rowUuid),
+}));
+
+export type SyncFieldLogFailure = typeof syncFieldLogFailures.$inferSelect;
 
 export const syncConflicts = pgTable("sync_conflicts", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -4371,12 +4643,106 @@ export const mocApprovers = pgTable("moc_approvers", {
   isActive: integer("is_active").default(1),
   modulename: text("modulename"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // $onUpdateFn (defensive): the Sync-All writer stamps updatedAt explicitly on both its
+  // insert and soft-delete paths, but any future in-place Drizzle .update() must also bump
+  // updated_at or the ONE_WAY incremental gather (updated_at > checkpoint) would miss it.
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
 });
+
+// ── Shipskart role mappings (Purchasing SSO) ──
+// UI-configurable many-to-one map: SAIL role → Shipskart role ('captain'|'purchaser'|'manager',
+// validated in the service against the role-source seam — later Shipskart's Get Role API).
+// Per-tenant by construction (db-per-tenant). Will also serve the future user-registration
+// push; the SHIPSKART_USER_* env account layer is the temporary bridge until per-user accounts.
+export const shipskartRoleMappings = pgTable("shipskart_role_mappings", {
+  id: serial("id").primaryKey(),
+  sailRole: text("sail_role").notNull().unique(), // one SAIL role → exactly one Shipskart role
+  shipskartRole: text("shipskart_role").notNull(), // many rows may share this (many-to-one)
+  // Migration 164: Shipskart's role GUID — the value that actually travels on create-user.
+  // Preferred over the name at resolve time so a Shipskart-side RENAME (the 07-Aug
+  // WAH-KWONG-PUCHASER outage) no longer breaks enrolment. Nullable: legacy rows keep
+  // resolving by name until re-saved in Access Control.
+  shipskartRoleId: text("shipskart_role_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+  updatedByUuid: text("updated_by_uuid"),
+});
+export type ShipskartRoleMapping = typeof shipskartRoleMappings.$inferSelect;
+
+// ── Shipskart b2b integration (migration 149) — ALL FOUR SHORE-ONLY, NO_SYNC ──
+
+// Per-tenant b2b state. Rotating token pair lives HERE (survives restarts); the bootstrap
+// seed credentials stay in env. Row created by the bootstrap endpoint, never seeded.
+export const shipskartTenantConfig = pgTable("shipskart_tenant_config", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  tenantId: text("tenant_id").notNull().unique(),
+  enabled: boolean("enabled").notNull().default(false),
+  reconcilerEnabled: boolean("reconciler_enabled").notNull().default(false),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  accessExpiresAt: timestamp("access_expires_at", { withTimezone: true }),
+  refreshExpiresAt: timestamp("refresh_expires_at", { withTimezone: true }),
+  lastBootstrapAt: timestamp("last_bootstrap_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+});
+export type ShipskartTenantConfig = typeof shipskartTenantConfig.$inferSelect;
+
+// SAILERP user (master_users.id uuid) → Shipskart user. externalUserId = OUR uuid, which is
+// also what Shipskart SSO keys on (proven on UAT 2026-07-30). shipskart_user_id is persisted
+// because Shipskart has NO lookup endpoints — a lost create response = unmappable entity.
+export const shipskartUserLinks = pgTable("shipskart_user_links", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userUuid: text("user_uuid").notNull().unique(),
+  shipskartUserId: text("shipskart_user_id"),
+  pushStatus: text("push_status").notNull().default("pending"),
+  // mig 153: the Shipskart role we last pushed — role-drift detection for update-user-details
+  pushedRoleId: text("pushed_role_id"),
+  pushedRoleName: text("pushed_role_name"),
+  lastError: text("last_error"),
+  pushedAt: timestamp("pushed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+});
+export type ShipskartUserLink = typeof shipskartUserLinks.$inferSelect;
+
+export const shipskartVesselLinks = pgTable("shipskart_vessel_links", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  vesselVuuid: text("vessel_vuuid").notNull().unique(),
+  imoNumber: text("imo_number"),
+  shipskartVesselId: text("shipskart_vessel_id"),
+  pushStatus: text("push_status").notNull().default("pending"),
+  lastError: text("last_error"),
+  pushedAt: timestamp("pushed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+});
+export type ShipskartVesselLink = typeof shipskartVesselLinks.$inferSelect;
+
+// user↔vessel assignments captured from SAILERP myVessels at login; feeds map-user-to-vessel.
+export const masterUserVessels = pgTable("master_user_vessels", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userUuid: text("user_uuid").notNull(),
+  vesselId: text("vessel_id").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  shipskartMappingId: text("shipskart_mapping_id"),
+  mapStatus: text("map_status").notNull().default("pending"),
+  lastError: text("last_error"),
+  // Retry ladder (migration 164) — LOCAL bookkeeping, mirrors sync_field_log's
+  // sync_attempts/last_attempt_at. Never on any wire; the table is NO_SYNC.
+  mapAttempts: integer("map_attempts").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+  mappedAt: timestamp("mapped_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+}, (table) => ({
+  userVesselUnique: unique("master_user_vessels_user_vessel_unique").on(table.userUuid, table.vesselId),
+  userIdx: index("idx_master_user_vessels_user").on(table.userUuid),
+}));
+export type MasterUserVessel = typeof masterUserVessels.$inferSelect;
 
 export const insertMocApproverSchema = createInsertSchema(mocApprovers).omit({
   id: true,

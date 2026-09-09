@@ -114,6 +114,17 @@ export class SyncAutoScheduler {
     }, this.tickIntervalMs);
 
     this.isRunning = true;
+    // EFFECTIVE-STATE line (§16): "is auto-sync actually on?" must be answerable from the boot
+    // log, not a DB query. Mirrors how the sync timeout now reports its resolved source.
+    try {
+      const s = await syncRepo.getAllSettings();
+      const raw = s['auto_sync_enabled'];
+      const on = syncRepo.parseBooleanSetting(raw, false);
+      const mins = Math.round(this.tickIntervalMs / 60000);
+      console.log(`[AutoSync] EFFECTIVE STATE — auto_sync_enabled=${on ? 'ON' : 'OFF'} (raw ${JSON.stringify(raw ?? null)}), interval=${mins}min. ${on ? `Next tick in ${Math.round(BOOT_DELAY_MS / 1000)}s, then every ${mins}min.` : 'TICKS WILL NO-OP until this is enabled.'}`);
+    } catch (e: any) {
+      console.warn(`[AutoSync] Could not read effective auto-sync state at startup: ${e?.message || e}`);
+    }
     console.log(`[AutoSync] Scheduler started — will run every ${Math.round(this.tickIntervalMs / 60000)} minutes`);
   }
 
@@ -190,6 +201,57 @@ export class SyncAutoScheduler {
     console.log('[AutoSync] Scheduler stopped');
   }
 
+  /** True when the tick timer is live. Used by the role watchdog and the
+   *  settings-save self-heal to detect a ship whose scheduler never started
+   *  (stale boot-time role decision). */
+  isStarted(): boolean {
+    return this.isRunning;
+  }
+
+  // ────────────────────────────────────────────────
+  // One-time self-heal re-offer sweep (Build 2b)
+  // ────────────────────────────────────────────────
+  // Rows dead-lettered by the push-side 3-strike guard were marked is_synced=true and are
+  // indistinguishable from delivered rows in the DB. This ONE-TIME sweep (marker-guarded via
+  // sync_settings 'selfheal_reoffer_v1') re-offers this ship's recent logs for the affected
+  // tables; genuinely-delivered rows re-apply as idempotent no-op updates on the shore, while
+  // stranded rows re-fail there and trigger the full-row self-heal (needsFullRows → next push
+  // delivers the complete row → fragments apply). Bounded: 2 tables × 30-day window.
+  private async maybeRunSelfHealReofferSweep(
+    settings: Record<string, string>,
+    instanceId: string,
+  ): Promise<void> {
+    const MARKER = 'selfheal_reoffer_v1';
+    if ((settings[MARKER] || '') === 'done') return;
+    try {
+      const pool = await getPool();
+      const r = await pool.query(
+        `UPDATE sync_field_log SET is_synced = false
+          WHERE instance_id = $1 AND is_synced = true
+            AND table_name IN ('work_orders','superintendent_notifications')
+            AND changed_at >= NOW() - interval '30 days'`,
+        [instanceId],
+      );
+      // Persist the marker (sync_settings row may not exist for a brand-new key — UPDATE
+      // then INSERT; seedSettingIfEmpty is UPDATE-only and would no-op here).
+      const upd = await pool.query(
+        `UPDATE sync_settings SET setting_value = 'done', updated_at = NOW() WHERE setting_key = $1`,
+        [MARKER],
+      );
+      if ((upd.rowCount ?? 0) === 0) {
+        await pool.query(
+          `INSERT INTO sync_settings (setting_key, setting_value) VALUES ($1, 'done')`,
+          [MARKER],
+        );
+      }
+      console.log(`[AutoSync] 🩹 Self-heal re-offer sweep: ${r.rowCount ?? 0} log(s) re-offered (one-time, marker set).`);
+      syncDiag(`SELF-HEAL REOFFER SWEEP: ${r.rowCount ?? 0} log(s) re-offered for instance=${instanceId} (work_orders, superintendent_notifications, 30d window). Marker '${MARKER}' set.`);
+    } catch (err: any) {
+      // Marker NOT set on failure → retried next tick.
+      console.warn(`[AutoSync] Self-heal re-offer sweep failed (will retry next tick): ${err?.message || err}`);
+    }
+  }
+
   // ────────────────────────────────────────────────
   // Tick — one scheduler wake-up
   // ────────────────────────────────────────────────
@@ -206,7 +268,11 @@ export class SyncAutoScheduler {
       // 1. Read settings on every tick (hot-reloadable)
       const settings = await syncRepo.getAllSettings();
 
-      const enabled = settings['auto_sync_enabled'] === 'true';
+      // Tolerant parse (§16): a strict === 'true' meant 'TRUE'/'True'/'1' read as FALSE and
+      // auto-sync silently never ran, while manual Sync Now kept working because it never
+      // consults this flag. Default TRUE on an unparseable value would be worse; default is
+      // the seeded intent, so an unrecognised value logs a warning and falls back to false.
+      const enabled = syncRepo.parseBooleanSetting(settings['auto_sync_enabled'], false);
       if (!enabled) {
         syncDiag('[AutoSync] auto_sync_enabled=false — skipping tick');
         return; // silent skip — don't log connectivity for disabled state
@@ -228,6 +294,9 @@ export class SyncAutoScheduler {
         console.warn('[AutoSync] No instance_id configured — cannot determine vessel. Skipping.');
         return;
       }
+
+      // 3b. One-time self-heal re-offer sweep (marker-guarded; ship-only by the gate above).
+      await this.maybeRunSelfHealReofferSweep(settings, instanceId);
 
       const metadata = await syncRepo.getInstanceMetadata(instanceId);
       const vesselId = metadata?.vesselId;
@@ -254,8 +323,10 @@ export class SyncAutoScheduler {
     vesselId: string,
     maxCatchUpCycles: number,
   ): Promise<void> {
-    // Re-entrancy guard
-    if (this.syncInProgress.get(vesselId)) {
+    // Re-entrancy guard — scheduler's own flag PLUS the engine's shared inFlight set, so an auto
+    // tick can never overlap a manual "Sync Now" drain (or vice-versa) on the same vessel.
+    const engine = getSyncEngine();
+    if (this.syncInProgress.get(vesselId) || !engine.tryAcquireVessel(vesselId)) {
       console.log(`[AutoSync] Sync already in progress for vessel ${vesselId} — skipping`);
       await syncRepo.insertConnectivityLog({
         instanceId,
@@ -282,7 +353,16 @@ export class SyncAutoScheduler {
       if (maxCatchUpCycles <= 0) return;
 
       const vesselCode = await getVesselCode(vesselId);
-      let remaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+      // Drain condition covers BOTH directions: ship's unsynced (push) + shore's pending for this
+      // vessel (pull). Without the pull term, office→ship large changes lagged across ticks.
+      //
+      // Push term is the DUE count, not the total (migration 147). A row waiting out a retry
+      // backoff is undelivered but not sendable, so counting it here spins the loop to its full
+      // cap while every gather returns nothing — 20 pointless VSAT round-trips per tick. The
+      // total is still what we REPORT (see finalRemaining below and /sync/status); it is just not
+      // what we act on.
+      let remaining = await syncRepo.getDueFieldLogCount(instanceId, vesselId, vesselCode)
+        + await syncRepo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
 
       while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
         cycleNumber++;
@@ -296,17 +376,26 @@ export class SyncAutoScheduler {
           break;
         }
 
-        // Re-check remaining
-        remaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+        // Re-check remaining (push + pull) — DUE count, same reasoning as above.
+        remaining = await syncRepo.getDueFieldLogCount(instanceId, vesselId, vesselCode)
+          + await syncRepo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
       }
 
       if (cycleNumber > 0) {
-        const finalRemaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
-        console.log(`[AutoSync] Catch-up complete — ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced`);
+        // Report the TRUE TOTAL, not the due count — this line is how support learns a vessel is
+        // carrying undelivered records. "0 due" with rows still held would read as all-clear.
+        const finalRemaining = await syncRepo.getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode)
+          + await syncRepo.getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+        const heldBack = finalRemaining - remaining;
+        console.log(
+          `[AutoSync] Catch-up complete — ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced` +
+          (heldBack > 0 ? ` (${heldBack} waiting on retry backoff — not an error)` : '')
+        );
       }
 
     } finally {
       this.syncInProgress.set(vesselId, false);
+      engine.releaseVessel(vesselId); // always release the shared guard
     }
   }
 
@@ -356,6 +445,9 @@ export class SyncAutoScheduler {
         durationMs: latencyMs,
         error: error.message,
         newCheckpoint: null,
+        remainingPush: null,
+        remainingPull: null,
+        remainingFilePull: null,
       };
     }
 

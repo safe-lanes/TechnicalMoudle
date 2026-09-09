@@ -1,8 +1,9 @@
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
-import { runningHoursAudit, componentMaintenanceHistory } from '@shared/schema';
+import { runningHoursAudit, componentMaintenanceHistory, rotationalItems } from '@shared/schema';
 import { desc, asc, eq, and, gte, lte, or, ilike, sql, inArray } from 'drizzle-orm';
 import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
+import { readingDayLocalExpr, targetReadingDay } from './dateUpdatedLocalSql';
 
 // ── Component Queries ──
 
@@ -12,6 +13,77 @@ export async function getComponents(vesselId: string, vesselIds?: string[]): Pro
 
 export async function getComponent(id: string): Promise<Component | undefined> {
   return storage.getComponent(id);
+}
+
+export async function getPmsVesselSettings(vesselId: string) {
+  return storage.getPmsVesselSettings(vesselId);
+}
+
+// RH follows the Stamp (Task #369): accrue a running-hours DELTA onto the component's
+// currently Installed rotational item (field-logged; delta-based, never absolute).
+export async function accrueInstalledStampRh(params: {
+  vesselId: string | null;
+  currentStamp: string | null;
+  delta: number;
+  readingDateIso: string;
+  userId: string | null;
+}): Promise<void> {
+  return storage.accrueInstalledStampRh(params);
+}
+
+// Atomic child (INHERITED) RH update: component write + stamp accrual in one locked
+// transaction so duplicate/overlapping submissions cannot double-accrue (Task #374).
+export async function updateChildRhWithStampAccrual(params: {
+  componentId: string;
+  newRHValue: number;
+  lastUpdated: string;
+  readingDateIso: string;
+  userId: string | null;
+}): Promise<{ previousRH: number; changed: boolean }> {
+  return storage.updateChildRhWithStampAccrual(params);
+}
+
+// Batch lookup of Installed rotational items by (vesselId, stamp) so the
+// Inherited Components dialog can show each stamp's OWN accrued hours next to
+// the component's inherited counter (Task #372). Returns a Map keyed by stamp.
+export interface StampRhInfo {
+  stamp: string;
+  stampName: string | null;
+  currentRh: string;
+  rhLastUpdated: string | null;
+}
+
+export async function getInstalledStampRhBatch(
+  vesselId: string,
+  stamps: string[]
+): Promise<Map<string, StampRhInfo>> {
+  const result = new Map<string, StampRhInfo>();
+  const unique = Array.from(new Set(stamps.filter(Boolean)));
+  if (!vesselId || unique.length === 0) return result;
+  const db = await getDb();
+  const rows = await db
+    .select({
+      stamp: rotationalItems.stamp,
+      stampName: rotationalItems.stampName,
+      currentRh: rotationalItems.currentRh,
+      rhLastUpdated: rotationalItems.rhLastUpdated,
+    })
+    .from(rotationalItems)
+    .where(and(
+      eq(rotationalItems.vesselId, vesselId),
+      inArray(rotationalItems.stamp, unique),
+      eq(rotationalItems.status, 'Installed'),
+      eq(rotationalItems.isDeleted, false)
+    ));
+  for (const row of rows) {
+    result.set(row.stamp, {
+      stamp: row.stamp,
+      stampName: row.stampName,
+      currentRh: row.currentRh || '0.00',
+      rhLastUpdated: row.rhLastUpdated,
+    });
+  }
+  return result;
 }
 
 export async function updateComponent(id: string, data: Partial<Component>): Promise<Component> {
@@ -83,14 +155,14 @@ export async function getRunningHoursAtDateBatch(
   const { identifiers, idToCuuid } = buildIdentifierIndex(masters);
   if (identifiers.length === 0) return result;
 
-  // NOTE: use [0-9] not \d — inside a JS sql`` template literal, "\d" is cooked to
-  // "d", producing a regex that never matches ISO dates and crashes TO_TIMESTAMP on
-  // the DD-Mon-YYYY branch ("invalid value ... for Mon"). [0-9] survives intact.
-  const parsedDateExpr = sql`CASE 
-    WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' 
-      THEN TO_TIMESTAMP(${runningHoursAudit.dateUpdatedLocal}, 'YYYY-MM-DD')
-    ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
-  END`;
+  // Crash-proof CALENDAR-DAY parse of the free-text date_updated_local column
+  // (Task #427): normalizes long month names ("Sept"/"June"/…), yields NULL
+  // (row excluded) for unparseable strings instead of aborting the batch, and
+  // — unlike the old timestamptz comparison — is session-timezone-safe: DATE
+  // vs target calendar day, so a vessel-local day never shifts across
+  // midnight in a non-UTC DB session.
+  const parsedDateExpr = readingDayLocalExpr();
+  const targetDay = targetReadingDay(targetDate);
 
   // Per-cuuid reducer: keep the row with the latest (primary) / earliest (fallback)
   // parsed date, so audits split across legacy id + cuuid still collapse correctly.
@@ -121,7 +193,7 @@ export async function getRunningHoursAtDateBatch(
     .from(runningHoursAudit)
     .where(and(
       inArray(runningHoursAudit.componentId, identifiers),
-      sql`${parsedDateExpr} <= ${targetDate}`
+      sql`${parsedDateExpr} <= ${targetDay}::date`
     ))
     .orderBy(runningHoursAudit.componentId, sql`${parsedDateExpr} DESC`);
 
@@ -146,7 +218,7 @@ export async function getRunningHoursAtDateBatch(
       .from(runningHoursAudit)
       .where(and(
         inArray(runningHoursAudit.componentId, missingIds),
-        sql`${parsedDateExpr} > ${targetDate}`
+        sql`${parsedDateExpr} > ${targetDay}::date`
       ))
       .orderBy(runningHoursAudit.componentId, sql`${parsedDateExpr} ASC`);
 
@@ -164,10 +236,15 @@ export async function getRunningHoursAtDateBatch(
 // Latest audit userId per component (mirrors storage.getRunningHoursAudits(id, 1)
 // reading audits[0].userId) in a single round-trip. Accepts dual identifiers per
 // master and returns a Map keyed by master cuuid.
+export interface AuditUserEntry {
+  userId: string | null;
+  auditDate: string | null;
+}
+
 export async function getLatestAuditUserBatch(
   masters: MasterRef[]
-): Promise<Map<string, string | null>> {
-  const result = new Map<string, string | null>();
+): Promise<Map<string, AuditUserEntry>> {
+  const result = new Map<string, AuditUserEntry>();
   if (masters.length === 0) return result;
   const db = await getDb();
   const { identifiers, idToCuuid } = buildIdentifierIndex(masters);
@@ -178,6 +255,7 @@ export async function getLatestAuditUserBatch(
       componentId: runningHoursAudit.componentId,
       userId: runningHoursAudit.userId,
       enteredAtUTC: runningHoursAudit.enteredAtUTC,
+      dateUpdatedLocal: runningHoursAudit.dateUpdatedLocal,
     })
     .from(runningHoursAudit)
     .where(inArray(runningHoursAudit.componentId, identifiers))
@@ -193,7 +271,10 @@ export async function getLatestAuditUserBatch(
     const existing = latestTimes.get(cuuid);
     if (existing === undefined || t >= existing) {
       latestTimes.set(cuuid, t);
-      result.set(cuuid, row.userId || null);
+      result.set(cuuid, {
+        userId: row.userId || null,
+        auditDate: row.dateUpdatedLocal || null,
+      });
     }
   }
 
@@ -311,6 +392,7 @@ export async function cascadeRunningHoursUpdate(params: {
   meterReplaced?: boolean;
   oldMeterFinal?: string;
   newMeterStart?: string;
+  rhValidationBypassed?: boolean;
 }): Promise<{
   updatedComponents: number;
   auditsCreated: number;
@@ -342,14 +424,23 @@ export async function updateRHConfig(params: {
 export async function updateMasterRunningHours(params: {
   componentId: string;
   newRHValue: number;
-  updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
+  updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'WORKORDER';
   userId: string;
   userUuid?: string;
   comments?: string;
   dateUpdated?: string;
+  allowLowerWorkOrderApprovalSkip?: boolean;
 }): Promise<{
   masterUpdated: Component;
   inheritedUpdated: number;
+  noChange?: boolean;
+  rhSkipped?: {
+    reason: 'LOWER_THAN_LIVE_RH';
+    submittedRH: number;
+    currentRH: number;
+    currentRHDate: string | null;
+    submittedRHDate: string;
+  };
 }> {
   return storage.updateMasterRunningHours(params);
 }

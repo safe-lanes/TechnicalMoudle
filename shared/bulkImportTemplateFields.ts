@@ -55,6 +55,8 @@ export const MACHINERY_COMPONENT_TEMPLATE_FIELDS: BulkImportTemplateField[] = [
   { header: 'RH Counter Source',             key: 'rhCounterSource',         required: false, description: 'Component code that is the running hours source' },
   { header: 'Running Hours',                  key: 'runningHours',            required: false, description: 'Numeric value, must be ≥ 0' },
   { header: 'Last Updated',                   key: 'lastUpdated',             required: false, description: 'Timestamp text' },
+  { header: 'Rotational Item (Yes/No)',       key: 'rotationalItem',          required: false, description: 'Yes or No — defaults to No' },
+  { header: 'Stamp',                          key: 'currentStamp',            required: false, description: 'Unique stamp ID — mandatory when Rotational Item is Yes' },
 ];
 
 /**

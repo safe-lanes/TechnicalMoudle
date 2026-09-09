@@ -7,9 +7,10 @@ import * as woAutoService from '../services/workOrderAutoService';
 import * as executionService from '../services/executionService';
 import * as complianceAnomalyService from '../services/complianceAnomalyService';
 import * as plannerService from '../services/workOrderPlannerService';
+import * as superintendentNotificationService from '../services/superintendentNotificationService';
 import { ValidationError } from '../../shared/errors';
 import { storage } from '../../../storage';
-import type { AuthenticatedRequest } from '../../../middleware/auth';
+import { getRbacIdentity, rbacMatches, type AuthenticatedRequest } from '../../../middleware/auth';
 import type {
   WorkOrderPeriodFilter,
   WorkOrderSortField,
@@ -33,6 +34,25 @@ function resolveActorIdentity(req: Request): string | undefined {
     if (typeof value === 'string' && value.trim()) return value.trim();
   }
   return undefined;
+}
+
+// ── Retired company approval policy endpoint ──
+
+export async function getApprovalPolicy(_req: Request, res: Response) {
+  res.json({
+    superintendentLockEnabled: false,
+    deprecated: true,
+    message: 'The Superintendent approval lock is now configured per vessel in PMS Vessel Settings.',
+    updatedBy: null,
+    updatedAt: null,
+  });
+}
+
+export async function updateApprovalPolicy(req: Request, res: Response) {
+  return res.status(410).json({
+    error: 'deprecated',
+    message: 'The company-wide Superintendent approval lock is retired. Configure the lock for an individual vessel in PMS Vessel Settings.',
+  });
 }
 
 // ── Core Work Order CRUD ──
@@ -102,6 +122,36 @@ export async function generateNow(req: Request, res: Response) {
     throw new ValidationError('A specific vesselId is required to generate work orders.');
   }
 
+  // ── GATE (added 2026-08-03, reduced same day — plan §9.5) ──────────────────
+  // This endpoint previously had NO server-side gate; the UI check is presentation,
+  // not enforcement. Under the dual-writer design shore generation is intended even
+  // for live vessels (the post-sync reconciler de-duplicates), so the gate refuses
+  // only unknown/unresolvable vessels (fail closed) and non-Sail-Admin callers.
+  // See workOrderGenerationGate.ts for the rule and its limits.
+  const { isShipInstance } = await import('../../sync/syncRole');
+  const gate = await import('../services/workOrderGenerationGate');
+  const decision = await gate.evaluateDirectGeneration({
+    vesselId,
+    role: gate.resolveGateRole((req as AuthenticatedRequest).user),
+    isShip: await isShipInstance(),
+  });
+
+  if (!decision.allowed) {
+    console.warn(
+      `[WO-Gate] REFUSED direct generation: vessel=${vesselId} reason=${decision.code} ` +
+        `verdict=${decision.state?.verdict ?? 'unknown'} ` +
+        `metadataRows=${decision.state?.metadataRows ?? '?'} lastSyncAt=${decision.state?.lastSyncAt?.toISOString() ?? 'never'}`,
+    );
+    return res.status(403).json({
+      success: false,
+      error: decision.code,
+      message: decision.message,
+      vesselState: decision.state
+        ? { verdict: decision.state.verdict, lastSyncAt: decision.state.lastSyncAt }
+        : null,
+    });
+  }
+
   // Dynamic import mirrors routes.ts and avoids a static cycle with the scanner.
   const { jobDueScanner } = await import('../../../services/jobDueScanner');
   const result = await jobDueScanner.runScan(vesselId);
@@ -125,6 +175,32 @@ export async function generateNow(req: Request, res: Response) {
       ? `Generated ${generated} work order(s) from ${checked} due job(s).`
       : `No work orders were due. Checked ${checked} job(s).`,
   });
+}
+
+// GET /work-orders/reconciler/status — telemetry for the duplicate reconciler (plan §9.6):
+// per-vessel resolved counts by case from the archive, plus the last sweep's summary.
+// Case-3 volume is the signal that would have caught Gas Mia in week one.
+export async function getReconcilerStatus(req: Request, res: Response) {
+  const reconciler = await import('../services/workOrderReconcilerService');
+  const reconRepo = await import('../repositories/workOrderReconcileRepository');
+  res.json({
+    archive: await reconRepo.archiveSummary(),
+    lastRun: reconciler.getLastRunSummary(),
+  });
+}
+
+// POST /work-orders/reconciler/run — manual reconcile for ONE vessel. The escape hatch
+// for the single case the post-sync trigger cannot reach: a vessel whose ship never
+// syncs again (dead/decommissioned, or import-created duplicates with no ship). Safe to
+// call anytime: shore-only guard, per-vessel lock, idempotent, archive-backed.
+export async function runReconcilerNow(req: Request, res: Response) {
+  const vesselId = ((req.body && req.body.vesselId) ?? req.query.vesselId) as string | undefined;
+  if (!vesselId || typeof vesselId !== 'string' || vesselId === 'all') {
+    throw new ValidationError('A specific vesselId is required.');
+  }
+  const reconciler = await import('../services/workOrderReconcilerService');
+  const result = await reconciler.reconcileVessel(vesselId);
+  res.json(result);
 }
 
 export async function getWorkOrderContext(req: Request, res: Response) {
@@ -161,6 +237,10 @@ export async function updateWorkOrder(req: Request, res: Response) {
     const actor = resolveActorIdentity(req);
     const authReq = req as AuthenticatedRequest;
     const body = { ...req.body };
+    // This marker is reserved for the dedicated, RBAC-protected
+    // superintendent-acknowledgment controllers, which call the service
+    // directly. Generic PATCH callers cannot opt into that internal path.
+    delete body.superintendentAck;
     if (actor) {
       // Prefer caller-supplied userId, but fall back to the authenticated user
       // so audit entries (e.g. rejections) capture a real identity.
@@ -176,9 +256,24 @@ export async function updateWorkOrder(req: Request, res: Response) {
     const result = await woService.updateWorkOrder(req.params.id, body);
     const workOrder = (result as any).workOrder ?? result;
     const rhBackdated = (result as any).rhBackdated ?? !!workOrder.rhBackdatedEntry;
-    const latestRH = (result as any).latestRH ?? null;
-    const latestRHDate = (result as any).latestRHDate ?? null;
-    res.json({ ...workOrder, rhBackdated, latestRH, latestRHDate });
+    const rhUpdateOutcome = (result as any).rhUpdateOutcome ?? workOrder.rhUpdateOutcome ?? null;
+    const rhUpdateSkipped =
+      (result as any).rhUpdateSkipped ??
+      (workOrder.rhUpdateOutcome === 'skipped_lower');
+    const rhSkipReason = (result as any).rhSkipReason ?? workOrder.rhSkipReason ?? null;
+    const submittedRH = (result as any).submittedRH ?? workOrder.rhSkipSubmittedRh ?? null;
+    const latestRH = (result as any).latestRH ?? workOrder.rhSkipLatestRh ?? null;
+    const latestRHDate = (result as any).latestRHDate ?? workOrder.rhSkipLatestRhDate ?? null;
+    res.json({
+      ...workOrder,
+      rhBackdated,
+      rhUpdateOutcome,
+      rhUpdateSkipped,
+      rhSkipReason,
+      submittedRH,
+      latestRH,
+      latestRHDate,
+    });
   } catch (error: any) {
     console.error('❌ Work order update error:', error);
     if (error.name === 'ZodError') {
@@ -429,6 +524,77 @@ export async function getPostponementApprovalSteps(req: Request, res: Response) 
   res.json(steps);
 }
 
+// ── Re-Postponement Approval Workflow ──
+
+export async function submitRePostponeRequest(req: Request, res: Response) {
+  try {
+    const result = await woService.submitRePostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function editRePostponeRequest(req: Request, res: Response) {
+  try {
+    const result = await woService.editRePostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function approveRePostponement(req: Request, res: Response) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const authReq = req as AuthenticatedRequest;
+    const result = await woService.approveRePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || 'Office',
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role,
+    });
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function rejectRePostponement(req: Request, res: Response) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const authReq = req as AuthenticatedRequest;
+    const result = await woService.rejectRePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || 'Office',
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role,
+    });
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function getRePostponementApprovalSteps(req: Request, res: Response) {
+  const woId = req.params.id;
+  let wo = await storage.getWorkOrder(woId);
+  if (!wo) wo = await storage.getWorkOrderByCode(woId);
+  if (!wo) return res.status(404).json({ error: 'Work order not found' });
+  const awaitingPostponement = await storage.getLatestAwaitingPostponement(wo.wouuid);
+  if (!awaitingPostponement) return res.json([]);
+  const steps = await storage.getWoPostponementApprovalSteps(awaitingPostponement.id);
+  res.json(steps);
+}
+
 // ── Work Order Executions ──
 
 export async function getExecutions(req: Request, res: Response) {
@@ -467,8 +633,76 @@ export async function updateExecution(req: Request, res: Response) {
 
 // ── Superintendent Endpoints (Layer 5) ──
 
+// Aligned with the P0.4 route guard on these same endpoints (requireRole(['Office','PMS Admin',
+// 'Sail Admin'])): an authorised OFFICE user must be able to acknowledge a locked WO (product
+// owner confirmed). 'Super Admin' is kept — it is a real role (shared/schema.ts UserRole,
+// admn_role_master seed) and an Office-type admin. Both guards now evaluate the SAME source —
+// the RBAC identity (req.rbac / forwarded SAILERP role + userType) via rbacMatches — instead of
+// the legacy req.user.role mock, so they cannot diverge.
+const SUPERINTENDENT_ACKNOWLEDGER_ROLES = ['Office', 'PMS Admin', 'Sail Admin', 'Super Admin'] as const;
+
+function canAcknowledgeAsSuperintendent(req: Request): boolean {
+  return rbacMatches(getRbacIdentity(req as AuthenticatedRequest), SUPERINTENDENT_ACKNOWLEDGER_ROLES);
+}
+
+export async function bulkSuperintendentAcknowledge(req: Request, res: Response) {
+  try {
+    if (!canAcknowledgeAsSuperintendent(req)) {
+      return res.status(403).json({ error: 'forbidden', message: 'Only authorized shore administrators may acknowledge Superintendent-locked work orders.' });
+    }
+    const { workOrderIds } = req.body as { workOrderIds: string[] };
+    if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
+      return res.status(400).json({ error: 'workOrderIds must be a non-empty array' });
+    }
+
+    const results: { id: string; success: boolean; error?: string }[] = [];
+
+    for (const id of workOrderIds) {
+      try {
+        const wo = await woService.getWorkOrder(id);
+        if (!wo) { results.push({ id, success: false, error: 'Not found' }); continue; }
+        if (wo.approvalTier !== 'superintendent_locked') { results.push({ id, success: false, error: 'Not locked' }); continue; }
+        if (!await woService.isSuperintendentLockEnabled(wo.vesselId)) {
+          results.push({ id, success: false, error: 'Superintendent lock is disabled for this vessel' });
+          continue;
+        }
+
+        await woService.updateWorkOrder(id, {
+          superintendentAck: true, // authorized ack — exempt from the Pending-Approval field guard
+          superintendentAcknowledged: true,
+          superintendentAcknowledgedAt: new Date().toISOString(),
+          approvalTier: 'ce_with_justification',
+          approvalBlockReason: null,
+        });
+
+        const notifications = await storage.getAllSuperintendentNotifications();
+        const matchingNotification = notifications.find(
+          (n: any) => (n.workOrderId === wo.wouuid || n.workOrderId === wo.id) && !n.isAcknowledged
+        );
+        if (matchingNotification) {
+          await storage.acknowledgeSuperintendentNotification(matchingNotification.id);
+        }
+
+        results.push({ id, success: true });
+      } catch (err: any) {
+        results.push({ id, success: false, error: err.message || 'Unknown error' });
+      }
+    }
+
+    const succeeded = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    res.json({ success: true, succeeded, failed, results });
+  } catch (error: any) {
+    console.error('Bulk superintendent acknowledge error:', error);
+    throw error;
+  }
+}
+
 export async function superintendentAcknowledge(req: Request, res: Response) {
   try {
+    if (!canAcknowledgeAsSuperintendent(req)) {
+      return res.status(403).json({ error: 'forbidden', message: 'Only authorized shore administrators may acknowledge Superintendent-locked work orders.' });
+    }
     const wo = await woService.getWorkOrder(req.params.id);
     if (!wo) {
       return res.status(404).json({ error: 'Work order not found' });
@@ -477,8 +711,14 @@ export async function superintendentAcknowledge(req: Request, res: Response) {
     if (wo.approvalTier !== 'superintendent_locked') {
       return res.status(400).json({ error: 'This WO does not require Superintendent acknowledgment' });
     }
+    if (!await woService.isSuperintendentLockEnabled(wo.vesselId)) {
+      return res.status(400).json({
+        error: 'This vessel has the Superintendent lock disabled; this work order follows the notify-only approval path.',
+      });
+    }
 
     await woService.updateWorkOrder(req.params.id, {
+      superintendentAck: true, // authorized ack — exempt from the Pending-Approval field guard
       superintendentAcknowledged: true,
       superintendentAcknowledgedAt: new Date().toISOString(),
       approvalTier: 'ce_with_justification',
@@ -504,12 +744,30 @@ export async function superintendentAcknowledge(req: Request, res: Response) {
 }
 
 export async function getSuperintendentNotifications(req: Request, res: Response) {
-  const notifications = await storage.getSuperintendentNotifications();
+  const categoryRaw = req.query.category as string | undefined;
+  const category =
+    categoryRaw === 'acknowledged' || categoryRaw === 'information' || categoryRaw === 'pending'
+      ? categoryRaw
+      : 'pending';
+  const vesselIdsRaw = req.query.vesselIds as string | undefined;
+  const notifications = await superintendentNotificationService.listSuperintendentNotifications(
+    category,
+    {
+      vesselId: req.query.vesselId as string | undefined,
+      vesselIds: vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined,
+    },
+  );
   res.json(notifications);
 }
 
 export async function getAllSuperintendentNotifications(req: Request, res: Response) {
-  const notifications = await storage.getAllSuperintendentNotifications();
+  const vesselIdsRaw = req.query.vesselIds as string | undefined;
+  const scope = {
+    vesselId: req.query.vesselId as string | undefined,
+    vesselIds: vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined,
+  };
+  const notifications =
+    await superintendentNotificationService.listAllActiveSuperintendentNotifications(scope);
   res.json(notifications);
 }
 
@@ -600,34 +858,12 @@ export async function getAnomalyForWorkOrder(req: Request, res: Response) {
 }
 
 export async function getSuperintendentNotificationsSummary(req: Request, res: Response) {
-  const vesselId = req.query.vesselId as string | undefined;
-  let vesselName: string | undefined;
-  if (vesselId && vesselId !== 'all') {
-    const vessels = await storage.getVessels();
-    const vessel = vessels.find(v => v.id === vesselId || v.vuuid === vesselId);
-    if (!vessel) {
-      return res.json({ pendingCount: 0, acknowledgedThisMonthCount: 0 });
-    }
-    vesselName = vessel.name;
-  }
-
-  const [unacknowledged, all] = await Promise.all([
-    storage.getSuperintendentNotifications(vesselName),
-    storage.getAllSuperintendentNotifications(vesselName),
-  ]);
-
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-
-  const pendingCount = unacknowledged.length;
-  const acknowledgedThisMonthCount = all.filter((n: any) => {
-    if (!n.isAcknowledged || !n.acknowledgedAt) return false;
-    const ackDate = new Date(n.acknowledgedAt);
-    return ackDate.getMonth() === currentMonth && ackDate.getFullYear() === currentYear;
-  }).length;
-
-  res.json({ pendingCount, acknowledgedThisMonthCount });
+  const vesselIdsRaw = req.query.vesselIds as string | undefined;
+  const summary = await superintendentNotificationService.getSuperintendentNotificationSummary({
+    vesselId: req.query.vesselId as string | undefined,
+    vesselIds: vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined,
+  });
+  res.json(summary);
 }
 
 // ── Work Order Planner ──

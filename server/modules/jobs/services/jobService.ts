@@ -306,6 +306,11 @@ export async function updateJob(id: string, body: any) {
 
   let updateData = { ...body };
 
+  if (Object.prototype.hasOwnProperty.call(updateData, 'isDeleted') ||
+      Object.prototype.hasOwnProperty.call(updateData, 'is_deleted')) {
+    throw new ValidationError('Job deletion status can only be changed through the Delete Job action');
+  }
+
   if (updateData.isActive === 'Yes') updateData.isActive = true;
   if (updateData.isActive === 'No') updateData.isActive = false;
 
@@ -326,11 +331,66 @@ export async function updateJob(id: string, body: any) {
     throw new NotFoundError('Job not found');
   }
 
+  // Validate jobNo if it is being changed: blank values are not allowed
+  if ('jobNo' in updateData) {
+    const trimmed = (updateData.jobNo || '').trim();
+    if (!trimmed) {
+      throw new ValidationError('Job code cannot be blank. Please provide a valid job code.');
+    }
+    updateData.jobNo = trimmed;
+  }
+
+  // Component-scoped duplicate check: if jobNo is changing, ensure no other job
+  // on the same component (and vessel) already uses the new code.
+  // Checks both the legacy direct componentId and all many-to-many job-component links.
+  if ('jobNo' in updateData && updateData.jobNo !== existingJob.jobNo) {
+    const effectiveVesselId = existingJob.vesselId || '';
+    const { storage: store } = await import('../../../storage');
+    // Collect all component IDs this job is assigned to
+    const links = await store.getJobComponentLinksByJob(existingJob.juuid);
+    const componentIds = Array.from(
+      new Set<string>([
+        ...links.map((l: any) => l.componentId),
+        ...(existingJob.componentId ? [existingJob.componentId] : [])
+      ])
+    );
+
+    for (const compId of componentIds) {
+      const componentJobs = await repo.findJobs(effectiveVesselId, compId);
+      const duplicate = componentJobs.find(
+        (j: any) => j.jobNo === updateData.jobNo && j.juuid !== existingJob.juuid && j.id !== id
+      );
+      if (duplicate) {
+        throw new ValidationError(
+          `Job code "${updateData.jobNo}" is already used by another job on this component (${duplicate.jobTitle || duplicate.juuid}). Please choose a different code.`
+        );
+      }
+    }
+  }
+
   // D3: Block Dual Frequency if component RH Counter Type is not MASTER/INHERITED
   const effectiveBasis = updateData.maintenanceBasis ?? existingJob.maintenanceBasis;
   const effectiveComponentId = updateData.componentId ?? existingJob.componentId;
   const basisChangingToDual = updateData.maintenanceBasis === 'Dual Frequency' && existingJob.maintenanceBasis !== 'Dual Frequency';
   const componentChangingOnDual = effectiveBasis === 'Dual Frequency' && updateData.componentId !== undefined && updateData.componentId !== existingJob.componentId;
+
+  // Running Hours has one canonical persisted interval. Accept frequencyValue from
+  // legacy/direct callers, but normalize it to intervalRunningHour and do not
+  // overwrite the calendar-frequency column on an RH-only job.
+  if (effectiveBasis === 'Running Hours' && Object.prototype.hasOwnProperty.call(updateData, 'frequencyValue')) {
+    if (!Object.prototype.hasOwnProperty.call(updateData, 'intervalRunningHour')) {
+      updateData.intervalRunningHour = updateData.frequencyValue;
+    }
+    delete updateData.frequencyValue;
+  }
+
+  if (effectiveBasis === 'Running Hours' && Object.prototype.hasOwnProperty.call(updateData, 'intervalRunningHour')) {
+    const normalizedIntervalRH = Number(updateData.intervalRunningHour);
+    if (!Number.isInteger(normalizedIntervalRH) || normalizedIntervalRH <= 0) {
+      throw new ValidationError('Running Hours jobs require Frequency (Hours) to be a whole number greater than 0');
+    }
+    updateData.intervalRunningHour = normalizedIntervalRH;
+  }
 
   if (basisChangingToDual || componentChangingOnDual) {
     // Ensure we have the component for D3 check
@@ -384,8 +444,8 @@ export async function updateJob(id: string, body: any) {
 
   if (mergedData.maintenanceBasis === 'Running Hours') {
     const intervalRH = Number(mergedData.intervalRunningHour);
-    if (isNaN(intervalRH) || intervalRH <= 0) {
-      throw new ValidationError('Running Hours jobs require a valid numeric intervalRunningHour greater than 0');
+    if (!Number.isInteger(intervalRH) || intervalRH <= 0) {
+      throw new ValidationError('Running Hours jobs require Frequency (Hours) to be a whole number greater than 0');
     }
 
     if (!component && mergedData.componentId) {
@@ -422,7 +482,7 @@ export async function deleteJob(id: string) {
   await repo.remove(id);
 }
 
-// ── Job Inactivation (Soft Delete) ──
+// ── Job Inactivation ──
 
 export async function inactivateJob(id: string, vesselId: string) {
   const job = await repo.findById(id);
@@ -474,6 +534,29 @@ export async function getJobMaintenanceHistory(jobId: string, user: UserInfo) {
 
 // ── Generate Work Order ──
 
+/**
+ * Rebaseline job tracking (migration 161 escape hatch): stamps tracking_rebaselined_at
+ * NOW() on the job and its component links so the next shore→ship sync is AUTHORIZED to
+ * overwrite the ship's tracking columns. Instance/role enforcement is in the controller.
+ */
+export async function rebaselineJobTracking(jobId: string, username: string) {
+  const job = await repo.findById(jobId);
+  if (!job) throw new NotFoundError('Job not found');
+
+  const { getPool } = await import('../../../db');
+  const pool = await getPool();
+  const jobRes = await pool.query(
+    `UPDATE jobs SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE juuid = $1`,
+    [jobId],
+  );
+  const linkRes = await pool.query(
+    `UPDATE job_component_links SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE job_id = $1`,
+    [jobId],
+  );
+  console.log(`[Rebaseline] job ${job.jobNo || jobId} tracking rebaselined by ${username} (links: ${linkRes.rowCount ?? 0})`);
+  return { success: true, jobId, jobStamped: (jobRes.rowCount ?? 0) > 0, linksStamped: linkRes.rowCount ?? 0 };
+}
+
 export async function generateWorkOrder(jobId: string, reason: string, activeComponentCode?: string) {
   if (!reason || !['Planning', 'Breakdown', 'Other'].includes(reason)) {
     throw new ValidationError("Invalid reason. Must be 'Planning', 'Breakdown', or 'Other'");
@@ -483,8 +566,21 @@ export async function generateWorkOrder(jobId: string, reason: string, activeCom
   if (!job) {
     throw new NotFoundError('Job not found');
   }
-  if (job.isActive === false) {
+  if (job.isDeleted === true || job.isActive === false) {
     throw new ValidationError('Cannot generate work orders for an inactive job');
+  }
+
+  // Per-vessel office kill switch (migration 161): this per-job path previously
+  // bypassed the generation gate entirely. Ship instances stay ungated (their own
+  // scanner/manual generation is the normal single-writer path).
+  const { isShipInstance } = await import('../../sync/syncRole');
+  if (!(await isShipInstance())) {
+    const { isOfficeWoGenerationEnabled } = await import('../../work-orders/services/workOrderGenerationGate');
+    if (!job.vesselId || !(await isOfficeWoGenerationEnabled(job.vesselId))) {
+      throw new ForbiddenError(
+        'Office work-order generation is not enabled for this vessel. A Sail Admin can enable it per vessel on the Lead Time & Grace Period Settings screen.',
+      );
+    }
   }
 
   const { jobDueScanner } = await import('../../../services/jobDueScanner');

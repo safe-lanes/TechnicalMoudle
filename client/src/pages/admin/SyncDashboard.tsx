@@ -11,6 +11,7 @@ import { useState, useContext, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { VesselContext } from "@/contexts/VesselContext";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -100,15 +101,26 @@ interface FileQueueItem {
   createdAt: string | null;
 }
 
+/**
+ * MUST match SyncResult in server/modules/sync/syncEngine.ts.
+ * It previously did not: this interface declared `status`, `recordsSent`,
+ * `recordsReceived` and `filesProcessed`, none of which the server has ever
+ * emitted — so `?? 0` fired every time and the panel reported 0 pushed / 0 pulled
+ * / 0 files on EVERY sync, successful or not. `res.json()` is `any`, so the cast
+ * silenced it. Only conflictsFound and durationMs were ever real.
+ */
 interface SyncTriggerResult {
-  batchUuid: string;
-  status: string;
-  recordsSent: number;
-  recordsReceived: number;
+  success: boolean;
+  batchUuid: string | null;
+  recordsPushed: number;
+  recordsPulled: number;
   conflictsFound: number;
-  filesProcessed: number;
+  conflictsAutoResolved: number;
+  filesQueued: number;
   durationMs: number;
-  error?: string;
+  error: string | null;
+  remainingPush: number | null;
+  remainingPull: number | null;
 }
 
 // ── Helpers ──
@@ -182,6 +194,8 @@ function statusBadge(status: string) {
 
 export default function SyncDashboard() {
   const { toast } = useToast();
+  const { canEdit } = usePermissions();
+  const canEditSync = canEdit("admin-sync-dashboard");
   const { isShip } = useSyncInstanceInfo();
   const vesselCtx = useContext(VesselContext);
   const vessels = vesselCtx?.vessels ?? [];
@@ -261,13 +275,20 @@ export default function SyncDashboard() {
   });
 
   // ── Combined Conflict Count (from conflict review endpoint) ──
+  // Vessel-scoped (pilot 2026-07-26). This previously called the endpoint with NO vesselId, so
+  // the header counted conflicts across the WHOLE FLEET while the panel below it listed only the
+  // selected vessel — on shore with 18 vessels the two numbers could never agree. The endpoint
+  // has always supported the filter (conflictReviewController.ts:40); the client just never
+  // passed it. Fleet-wide totals belong on Fleet Overview, not on a vessel-scoped dashboard.
   const conflictCountQuery = useQuery<{ total: number; fromLog: number; fromOld: number }>({
-    queryKey: ["/technical/api/sync/conflicts/review/count"],
+    queryKey: ["/technical/api/sync/conflicts/review/count", selectedVesselId],
     queryFn: async () => {
-      const res = await fetch("/technical/api/sync/conflicts/review/count");
+      if (!selectedVesselId) return { total: 0, fromLog: 0, fromOld: 0 };
+      const res = await fetch(`/technical/api/sync/conflicts/review/count?vesselId=${selectedVesselId}`);
       if (!res.ok) return { total: 0, fromLog: 0, fromOld: 0 };
       return res.json();
     },
+    enabled: !!selectedVesselId,
     refetchInterval: 30_000,
   });
   const totalConflictCount = conflictCountQuery.data?.total ?? 0;
@@ -284,22 +305,48 @@ export default function SyncDashboard() {
       setSyncLog([`[${new Date().toLocaleTimeString()}] Sync initiated...`]);
     },
     onSuccess: (data) => {
+      // HTTP 200 only means the request came back — the controller returns 200 even
+      // when success is false. Read the payload, not the status code: a sync that
+      // failed to apply rows must never render as "Sync complete".
+      const failed = data.success === false;
+      const hasErrors = Boolean(data.error);
+      const headline = failed
+        ? "SYNC FAILED"
+        : hasErrors
+          ? "Sync finished WITH ERRORS — some records did not apply"
+          : "Sync complete";
+
       setSyncProgress(100);
-      setSyncStage("Sync complete!");
+      setSyncStage(failed ? "Sync failed" : hasErrors ? "Finished with errors" : "Sync complete!");
       const logLines = [
-        `[${new Date().toLocaleTimeString()}] Sync ${data.status || "complete"}`,
-        `  Records pushed: ${data.recordsSent ?? 0}`,
-        `  Records pulled: ${data.recordsReceived ?? 0}`,
+        `[${new Date().toLocaleTimeString()}] ${headline}`,
+        `  Records pushed: ${data.recordsPushed ?? 0}`,
+        `  Records pulled: ${data.recordsPulled ?? 0}`,
         `  Conflicts: ${data.conflictsFound ?? 0}`,
-        `  Files processed: ${data.filesProcessed ?? 0}`,
+        `  Files queued: ${data.filesQueued ?? 0}`,
         `  Duration: ${formatDuration(data.durationMs)}`,
       ];
-      if (data.error) logLines.push(`  Error: ${data.error}`);
+      // A non-zero remainder is NOT a fault — undelivered records now stay queued and
+      // retry instead of being silently dropped (migration 147). Surface it so support
+      // reads it as "still to send", not as data loss.
+      if (data.remainingPush) logLines.push(`  Still to send: ${data.remainingPush}`);
+      if (data.remainingPull) logLines.push(`  Still to receive: ${data.remainingPull}`);
+      // Split the joined error string so each failure is its own line — previously the
+      // whole block was one run-on line and only the first was legible.
+      if (data.error) {
+        String(data.error)
+          .split("\n")
+          .filter((l) => l.trim())
+          .forEach((l) => logLines.push(`  Error: ${l.trim()}`));
+      }
       setSyncLog((prev) => [...prev, ...logLines]);
 
       toast({
-        title: "Sync Complete",
-        description: `Pushed ${data.recordsSent ?? 0}, pulled ${data.recordsReceived ?? 0} records`,
+        title: failed ? "Sync Failed" : hasErrors ? "Sync Finished With Errors" : "Sync Complete",
+        description: failed || hasErrors
+          ? "Some records did not apply — see the sync log below."
+          : `Pushed ${data.recordsPushed ?? 0}, pulled ${data.recordsPulled ?? 0} records`,
+        variant: failed || hasErrors ? "destructive" : undefined,
       });
 
       // Invalidate queries
@@ -486,24 +533,26 @@ export default function SyncDashboard() {
             <CardDescription>Trigger a manual sync cycle for the selected vessel</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button
-              onClick={() => syncMutation.mutate(selectedVesselId)}
-              disabled={syncMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
-              data-testid="btn-sync-now"
-            >
-              {syncMutation.isPending ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Sync Now
-                </>
-              )}
-            </Button>
+            {canEditSync && (
+              <Button
+                onClick={() => syncMutation.mutate(selectedVesselId)}
+                disabled={syncMutation.isPending}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="btn-sync-now"
+              >
+                {syncMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Sync Now
+                  </>
+                )}
+              </Button>
+            )}
 
             {/* Progress */}
             {(syncMutation.isPending || syncProgress > 0) && (
@@ -521,11 +570,17 @@ export default function SyncDashboard() {
                     <div
                       key={i}
                       className={
-                        line.includes("FAILED")
+                        // Order matters: FAILED and Error must win before the
+                        // "complete" test, or an error line renders green/grey.
+                        line.includes("FAILED") || line.includes("Error:")
                           ? "text-red-600"
-                          : line.includes("complete")
-                            ? "text-green-600"
-                            : "text-gray-700"
+                          : line.includes("WITH ERRORS")
+                            ? "text-amber-600 font-semibold"
+                            : line.includes("Still to")
+                              ? "text-amber-600"
+                              : line.includes("complete")
+                                ? "text-green-600"
+                                : "text-gray-700"
                       }
                     >
                       {line}
@@ -543,13 +598,13 @@ export default function SyncDashboard() {
                   {
                     icon: ArrowUpCircle,
                     label: "Pushed",
-                    value: syncMutation.data.recordsSent ?? 0,
+                    value: syncMutation.data.recordsPushed ?? 0,
                     color: "text-blue-600",
                   },
                   {
                     icon: ArrowDownCircle,
                     label: "Pulled",
-                    value: syncMutation.data.recordsReceived ?? 0,
+                    value: syncMutation.data.recordsPulled ?? 0,
                     color: "text-green-600",
                   },
                   {
@@ -561,7 +616,7 @@ export default function SyncDashboard() {
                   {
                     icon: FileText,
                     label: "Files",
-                    value: syncMutation.data.filesProcessed ?? 0,
+                    value: syncMutation.data.filesQueued ?? 0,
                     color: "text-purple-600",
                   },
                   {
@@ -686,10 +741,31 @@ export default function SyncDashboard() {
           </CardHeader>
           <CardContent>
             {conflicts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle className="h-10 w-10 mx-auto mb-2 text-green-300" />
-                <p>No conflicts - all synced!</p>
-              </div>
+              /* Two distinct empty states. Some conflicts are resolvable inline here; others are
+                 only actionable on Conflict Review. Showing "all synced" whenever THIS list was
+                 empty contradicted the count directly above it. The user is never shown the
+                 reason — just one honest number and a way to act on it. */
+              totalConflictCount > 0 ? (
+                <div className="text-center py-8" data-testid="conflicts-needs-review">
+                  <AlertTriangle className="h-10 w-10 mx-auto mb-2 text-amber-400" />
+                  <p className="font-medium">
+                    {totalConflictCount} {totalConflictCount === 1 ? "conflict needs" : "conflicts need"} review
+                  </p>
+                  <Button
+                    variant="link"
+                    className="mt-1"
+                    onClick={() => setLocation("/admin/sync-conflicts")}
+                    data-testid="link-open-conflict-review"
+                  >
+                    Open Conflict Review →
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="h-10 w-10 mx-auto mb-2 text-green-300" />
+                  <p>No conflicts - all synced!</p>
+                </div>
+              )
             ) : (
               <ScrollArea className="h-[300px]">
                 <Table>
@@ -719,6 +795,8 @@ export default function SyncDashboard() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
+                            {canEditSync && (
+                              <>
                             <Button
                               variant="outline"
                               size="sm"
@@ -747,6 +825,8 @@ export default function SyncDashboard() {
                             >
                               Shore Wins
                             </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -754,6 +834,19 @@ export default function SyncDashboard() {
                   </TableBody>
                 </Table>
               </ScrollArea>
+            )}
+            {conflicts.length > 0 && totalConflictCount > conflicts.length && (
+              /* The table shows only what can be resolved inline. Without this the row count
+                 would silently disagree with the total above. */
+              <div className="pt-2 text-center">
+                <Button
+                  variant="link"
+                  onClick={() => setLocation("/admin/sync-conflicts")}
+                  data-testid="link-open-conflict-review-all"
+                >
+                  Open Conflict Review to see all {totalConflictCount} conflicts →
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -814,6 +907,8 @@ export default function SyncDashboard() {
                       <TableCell className="text-right text-sm text-muted-foreground">{formatAge(f.createdAt)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {canEditSync && (
+                            <>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -832,6 +927,8 @@ export default function SyncDashboard() {
                           >
                             <XCircle className="h-3.5 w-3.5 mr-1" /> Skip
                           </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -59,6 +59,7 @@ const masterTypes: MasterType[] = [
     idFields: ["vuid", "vuuid", "vesselId", "id"],
     columns: [
       { header: "Vessel", fields: ["vessel", "vesselName", "name"] },
+      { header: "Vessel Code", fields: ["vCode", "v_code"] },
       { header: "IMO Number", fields: ["imo_number", "imoNumber", "imo_no", "imo"] },
       { header: "Vessel Type", fields: ["vessel_type_name", "vesselTypeName", "vessel_type", "vesselType", "type"] },
     ],
@@ -392,20 +393,30 @@ export default function DataMasters() {
     },
     onSuccess: (data) => {
       const stats = data.statistics;
-      const totalUpdated = 
-        (stats.vessels?.updated || 0) + (stats.vessels?.inserted || 0) +
-        (stats.vesselTypes?.updated || 0) + (stats.vesselTypes?.inserted || 0) +
-        (stats.additionalGroups?.updated || 0) + (stats.additionalGroups?.inserted || 0) +
-        (stats.ports?.updated || 0) + (stats.ports?.inserted || 0) +
-        (stats.users?.updated || 0) + (stats.users?.inserted || 0) +
-        (stats.fleetGroups?.updated || 0) + (stats.fleetGroups?.inserted || 0) +
-        (stats.approvers?.updated || 0) + (stats.approvers?.inserted || 0);
+      const masterStats = Object.values(stats || {}) as Array<{
+        inserted?: number;
+        updated?: number;
+        deleted?: number;
+        skipped?: number;
+        errors?: unknown[];
+      }>;
+      const totals = masterStats.reduce(
+        (total, item) => ({
+          inserted: total.inserted + (item.inserted || 0),
+          updated: total.updated + (item.updated || 0),
+          deleted: total.deleted + (item.deleted || 0),
+          skipped: total.skipped + (item.skipped || 0),
+          errors: total.errors + (item.errors?.length || 0),
+        }),
+        { inserted: 0, updated: 0, deleted: 0, skipped: 0, errors: 0 },
+      );
       
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/local-approvers'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/vessels'] });
       
       toast({
         title: "Master data sync completed successfully",
-        description: `${totalUpdated} records synchronized across all masters.`,
+        description: `${totals.inserted} inserted, ${totals.updated} updated, ${totals.deleted} deleted, ${totals.skipped} skipped, ${totals.errors} errors.`,
       });
     },
     onError: (error: Error) => {

@@ -18,8 +18,26 @@
 
 import crypto from 'crypto';
 import { AppError } from '../../shared/errors';
+import * as roleMappingRepo from '../repositories/shipskartRoleMappingRepository';
+import { IDENTITY_MISSING_TAG } from './identityGuard';
 
 const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * 🔴 DEAD SWITCH — the legacy SHARED per-role Shipskart account is RETIRED (Ghazi,
+ * 2026-07-30). It is false and nothing sets it: every code path below that depends on it
+ * is unreachable by construction.
+ *
+ * WHY RETIRED, not just discouraged: a shared session attributes one user's requisitions
+ * to another and makes the audit trail meaningless. On the WK trial a visibly broken
+ * Purchasing tab is fixed within the hour, whereas users quietly sharing one account may
+ * never be noticed. Loud failure is the correct behaviour.
+ *
+ * THE CODE IS DELIBERATELY KEPT (accountForShipskartRole + the legacy initiate/logout
+ * branches) so it can be restored by flipping this one constant if the trial forces it.
+ * Do not delete those functions.
+ */
+const LEGACY_SHARED_ACCOUNT_ENABLED = false;
 
 // ── Config (cached getter, fail-fast, no fallback values) ──
 // Mirrors the pattern in server/config/externalApi.ts. Reads process.env
@@ -44,6 +62,37 @@ export class ShipskartRoleNotMappedError extends Error {
   }
 }
 
+/**
+ * Thrown when the user's role IS mapped but their OWN Shipskart account cannot be created
+ * or resolved. The controller returns 409 USER_NOT_PROVISIONED so Purchasing shows a clear
+ * "not available yet, contact your administrator" screen.
+ *
+ * DELIBERATELY NOT a shared-account fallback (Ghazi, 2026-07-30): the shared per-role
+ * account is being retired, and on the WK trial a VISIBLE failure beats users quietly
+ * sharing one Shipskart identity — a shared session would attribute one user's
+ * requisitions to another and make the audit trail meaningless.
+ */
+export class ShipskartUserNotProvisionedError extends Error {
+  /**
+   * `reason` is the raw diagnostic (also written to shipskart_user_links.last_error).
+   * `reasonCode` is the MACHINE key the controller turns into a plain-English explanation
+   * and the exact remedy — so a blocked user, and the support person reading over their
+   * shoulder, are told what is wrong and who fixes it instead of "not available yet".
+   */
+  constructor(
+    public readonly userUuid: string,
+    public readonly reason: string,
+    public readonly reasonCode: string = 'unknown',
+    public readonly sailRole: string | null = null,
+    /** Concrete values behind the block (whose profile, which role, which purchasing role)
+     *  so the screen can NAME them instead of describing a category. */
+    public readonly facts: { fullName?: string | null; sailRole?: string | null; shipskartRole?: string | null } = {},
+  ) {
+    super(`Shipskart account not provisioned for user ${userUuid}: ${reason}`);
+    this.name = 'ShipskartUserNotProvisionedError';
+  }
+}
+
 let _cachedConfig: ShipskartConfig | null = null;
 
 function getShipskartConfig(): ShipskartConfig {
@@ -60,15 +109,15 @@ function getShipskartConfig(): ShipskartConfig {
   if (!hmacSecret) missing.push('SHIPSKART_HMAC_SECRET');
   if (!tenantId) missing.push('SHIPSKART_TENANT_ID');
 
-  // At least one role→externalUserId mapping must be configured, otherwise the
-  // role map is empty and every user would be blocked.
+  // At least one Shipskart-role ACCOUNT must be configured (new role-named vars or their
+  // legacy SAIL-role-named aliases), otherwise every mapped user would still be blocked.
   const hasAnyRoleMapping = !!(
-    process.env.SHIPSKART_USER_VESSEL_ADMIN ||
-    process.env.SHIPSKART_USER_ADMIN ||
-    process.env.SHIPSKART_USER_REGULAR
+    process.env.SHIPSKART_USER_CAPTAIN || process.env.SHIPSKART_USER_VESSEL_ADMIN ||
+    process.env.SHIPSKART_USER_PURCHASER || process.env.SHIPSKART_USER_ADMIN ||
+    process.env.SHIPSKART_USER_MANAGER || process.env.SHIPSKART_USER_REGULAR
   );
   if (!hasAnyRoleMapping) {
-    missing.push('at least one of SHIPSKART_USER_VESSEL_ADMIN / SHIPSKART_USER_ADMIN / SHIPSKART_USER_REGULAR');
+    missing.push('at least one SHIPSKART_USER_* account (CAPTAIN/PURCHASER/MANAGER or legacy VESSEL_ADMIN/ADMIN/REGULAR)');
   }
 
   if (missing.length > 0) {
@@ -157,22 +206,217 @@ async function signedPost(path: string, body: Record<string, unknown>): Promise<
 }
 
 /**
- * Resolve the Shipskart externalUserId for one of our roles. Per-role mapping
- * (NOT per-user): every user with the same role gets the same Shipskart
- * account. Returns null if the role has no mapping → caller blocks the user.
+ * Shipskart-role → externalUserId ACCOUNT layer. This is the TEMPORARY bridge until
+ * Shipskart's User Registration API gives us per-user accounts: today every user resolved
+ * to the same Shipskart role shares that role's account. Reads the NEW role-named env vars
+ * first (SHIPSKART_USER_CAPTAIN/PURCHASER/MANAGER) and falls back to the LEGACY SAIL-role-
+ * named ones (VESSEL_ADMIN/ADMIN/REGULAR) so existing deployments keep working without an
+ * .env change (the recurring re-seed gotcha).
+ */
+export function accountForShipskartRole(shipskartRole: string): string | null {
+  const accounts: Record<string, string | undefined> = {
+    captain:   process.env.SHIPSKART_USER_CAPTAIN   || process.env.SHIPSKART_USER_VESSEL_ADMIN,
+    purchaser: process.env.SHIPSKART_USER_PURCHASER || process.env.SHIPSKART_USER_ADMIN,
+    manager:   process.env.SHIPSKART_USER_MANAGER   || process.env.SHIPSKART_USER_REGULAR,
+  };
+  const exact = accounts[shipskartRole];
+  if (exact) return exact;
+
+  // LIVE ROLE NAMES (from get-all-roles, e.g. 'WAH-KWONG-PUCHASER') have no legacy env
+  // account, so an admin mapping a role to a live name used to BLOCK every user who had
+  // not been pushed yet — the legacy fallback silently disappeared (found by test,
+  // 2026-07-30). Two escape hatches, in order:
+  //   1. an explicit per-live-role env var: SHIPSKART_USER_WAH_KWONG_PUCHASER=<account>
+  //   2. a logged bucket match on the role name (captain / purchaser / manager)
+  // Both are TRANSITIONAL: once a user is pushed by the b2b reconciler, the per-user path
+  // in resolveExternalUserId wins and this bridge is never consulted for them.
+  const envKey = `SHIPSKART_USER_${shipskartRole.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`;
+  const explicit = process.env[envKey];
+  if (explicit) return explicit;
+
+  const upper = shipskartRole.toUpperCase();
+  const bucket = /CAPTAIN|MASTER/.test(upper) ? 'captain'
+    : /PURCHAS|PUCHAS|BUYER/.test(upper) ? 'purchaser'      // 'PUCHASER' matches their live typo
+    : /MANAGER|SUPER/.test(upper) ? 'manager'
+    : null;
+  if (bucket && accounts[bucket]) {
+    console.warn(
+      `[Shipskart] Live role '${shipskartRole}' has no account env; using the '${bucket}' shared account ` +
+      `as a TRANSITIONAL fallback for users not yet pushed to Shipskart. Set ${envKey} to be explicit.`,
+    );
+    return accounts[bucket]!;
+  }
+  return null;
+}
+
+/**
+ * Resolve the Shipskart externalUserId for one of our roles.
+ *
+ * Two layers (both many-to-one friendly):
+ *   1. SAIL role → Shipskart role: the UI-CONFIGURABLE shipskart_role_mappings table
+ *      (per-tenant via db-per-tenant; replaces the old hardcoded roleMap — admins edit it
+ *      under Admin → Access Control). Many SAIL roles may map to the same Shipskart role.
+ *      This table will also serve the future user-registration push (role assignment at
+ *      user creation, once Shipskart's Registration API lands).
+ *   2. Shipskart role → account: accountForShipskartRole() env bridge (see above).
+ *
+ * Returns null when the role has no mapping row OR the mapped Shipskart role has no
+ * account configured → caller blocks with ROLE_NOT_MAPPED (block-not-default by design:
+ * never silently grant Purchasing to an unmapped role).
  *
  * For dev testing on this codebase, temporarily change mockAuthMiddleware
- * (server/middleware/auth.ts) to return one of the mapped roles (Vessel Admin /
- * Admin / User) instead of "Sail Admin". Do NOT commit that change.
+ * (server/middleware/auth.ts) to return a mapped role instead of "Sail Admin" —
+ * or simply add a 'Sail Admin' mapping row via the Access Control UI.
  */
-export function resolveExternalUserId(userRole: string): string | null {
-  const roleMap: Record<string, string | undefined> = {
-    'Vessel Admin': process.env.SHIPSKART_USER_VESSEL_ADMIN,
-    'Admin':        process.env.SHIPSKART_USER_ADMIN,
-    'User':         process.env.SHIPSKART_USER_REGULAR,
-  };
-  const externalUserId = roleMap[userRole];
-  return externalUserId ?? null;
+export async function resolveExternalUserId(userRole: string, userUuid?: string | null): Promise<string | null> {
+  // LAYER 0 (per-user, preferred): if this user has been pushed to Shipskart by the b2b
+  // reconciler, their externalUserId IS our own uuid — proven on UAT 2026-07-30: SSO
+  // initiate resolves on that value and the session carries THAT user's identity, not a
+  // shared role account. Checked FIRST so per-user sessions win as soon as a user is pushed.
+  //
+  // The legacy shared-account bridge below remains the fallback for users not yet pushed,
+  // so a partially-migrated fleet keeps working. It retires when every user is pushed
+  // (decision deferred until after the WK trial).
+  if (userUuid) {
+    const { getUserLink } = await import('../repositories/shipskartB2bRepository');
+    let link: Awaited<ReturnType<typeof getUserLink>>;
+    let lookupError: string | null = null;
+    try {
+      link = await getUserLink(userUuid);
+    } catch (err: any) {
+      lookupError = `link lookup failed: ${err?.message || err}`;
+      link = undefined;
+    }
+
+    // Settle this user's Shipskart state on EVERY click, not only their first one.
+    //   • not enrolled yet → enrol now, so new joiners / role changes / users the
+    //     reconciler has not reached resolve on their FIRST click (no cutover day);
+    //   • already enrolled → repair role drift and settle the vessel assignments that
+    //     capture-at-login recorded (crew rotation).
+    // Opt-out via SHIPSKART_B2B_JIT=false.
+    //
+    // 🔴 BUG FIXED 2026-08-10 — this block was gated on `link?.pushStatus !== 'pushed'`.
+    // ensureUserPushed is the ONLY caller of settleAssignmentChanges on the click path, so
+    // that condition meant it ran solely for users who were NOT yet enrolled, and the
+    // crew-rotation settle added inside it on 06-Aug was unreachable for exactly the users
+    // it was written for. An already-enrolled user's reassignment sat in master_user_vessels
+    // untouched — map_status 'pending' / 'revoked' with NO last_error, because nothing ever
+    // tried. PROVEN on production with nilesh.kumar3 (Gas Mia → Testvessel): repeated clicks
+    // changed nothing; only Admin → Sync Vessels settled it.
+    //
+    // ensureUserPushed branches internally, and BOTH branches are cheap when there is
+    // nothing to do — one DB read plus a local role comparison, no Shipskart calls.
+    let jitReason: string | null = null;
+    const wasAlreadyPushed = link?.pushStatus === 'pushed';
+    if (!lookupError && (process.env.SHIPSKART_B2B_JIT || '').toLowerCase() !== 'false') {
+      try {
+        const { ensureUserPushed } = await import('./shipskartReconcilerService');
+        const jit = await ensureUserPushed(userUuid, userRole || null);
+        jitReason = jit.reason;
+        // Only re-read when the link may have CHANGED — i.e. this call enrolled them.
+        if (jit.pushed && !wasAlreadyPushed) {
+          link = await getUserLink(userUuid);
+        }
+      } catch (err: any) {
+        // A settle/enrol failure must NEVER block an already-enrolled user from Purchasing:
+        // `link` is untouched here, so the pushed check below still lets them straight in.
+        jitReason = `jit threw: ${err?.message || err}`;
+      }
+    }
+
+    if (link?.pushStatus === 'pushed') return userUuid;
+
+    // ── NO SHARED-ACCOUNT FALLBACK for an identified user ──
+    // The shared per-role account is being retired. A user whose role IS mapped but whose
+    // OWN account cannot be created/resolved is BLOCKED with a clear message rather than
+    // silently dropped into a shared identity (Ghazi, 2026-07-30). The link row already
+    // carries the machine-readable status + the raw upstream error, so the reconciler
+    // retries it durably and the admin console shows WHY.
+    const mappingForUser = userRole ? await roleMappingRepo.getMappingForSailRole(userRole) : undefined;
+    if (mappingForUser) {
+      const reason = lookupError
+        ?? jitReason
+        ?? (link ? `link status '${link.pushStatus}'${link.lastError ? `: ${link.lastError}` : ''}` : 'no link row yet');
+      console.warn(
+        `[Shipskart] BLOCKING Purchasing for user ${userUuid} (role '${userRole}' is mapped to ` +
+        `'${mappingForUser.shipskartRole}') — own Shipskart account not provisioned: ${reason}. ` +
+        `No shared-account fallback by design; the reconciler will retry.`,
+      );
+      // Make sure the reason is DURABLE. pushUser/ensureUserPushed already record their own
+      // specific statuses (unmapped_role / missing_email / blocked_duplicate / error /
+      // no_master_row) — do not overwrite those. Only fill the gaps: no row at all, or a
+      // failure that happened before any push was attempted (lookup error / JIT threw).
+      if (!link || lookupError || (jitReason ?? '').startsWith('jit threw')) {
+        try {
+          const { upsertUserLink } = await import('../repositories/shipskartB2bRepository');
+          await upsertUserLink(userUuid, { pushStatus: 'jit_failed', lastError: reason.slice(0, 400) });
+        } catch (writeErr: any) {
+          console.warn(`[Shipskart] could not record the block reason for ${userUuid}: ${writeErr?.message || writeErr}`);
+        }
+      }
+      // The link row's own status IS the machine reason wherever a SPECIFIC one was recorded
+      // (unmapped_role / missing_email / blocked_duplicate / no_master_row).
+      let reasonCode = link?.pushStatus && link.pushStatus !== 'pending'
+        ? link.pushStatus
+        : (lookupError ? 'lookup_failed' : 'jit_failed');
+      let reasonText = reason;
+      let facts: { fullName?: string | null; sailRole?: string | null; shipskartRole?: string | null } = { sailRole: userRole || null };
+
+      // ...but jit_failed / error / pending say only "it did not work", which is useless on
+      // the screen: the user cannot tell a missing email from an unmapped role, and neither
+      // can support. It is also exactly what a first click or a JIT-disabled instance
+      // produces. So INSPECT the preconditions and name the real cause (no Shipskart call).
+      if (reasonCode === 'jit_failed' || reasonCode === 'error') {
+        try {
+          const { diagnoseUserBlock } = await import('./shipskartReconcilerService');
+          const dx = await diagnoseUserBlock(userUuid, userRole || null);
+          if (dx) { reasonCode = dx.reasonCode; reasonText = dx.reason; facts = dx.facts; }
+        } catch { /* diagnosis is best-effort — keep the recorded status */ }
+      }
+      // Even when the recorded status was already specific, fetch the names behind it so the
+      // screen can say WHICH purchasing role is dead rather than "a purchasing role".
+      if (!facts.shipskartRole && reasonCode === 'unmapped_role') {
+        try {
+          const m = userRole ? await roleMappingRepo.getMappingForSailRole(userRole) : undefined;
+          if (m) facts.shipskartRole = m.shipskartRole;
+        } catch { /* best-effort */ }
+      }
+      throw new ShipskartUserNotProvisionedError(userUuid, reasonText, reasonCode, userRole || null, facts);
+    }
+    // No role mapping at all → the existing ROLE_NOT_MAPPED path below (null return).
+  } else if (!LEGACY_SHARED_ACCOUNT_ENABLED) {
+    // ── NO FORWARDED IDENTITY → REFUSE (shared account retired) ──
+    // identityGuard already returned null for: header absent, header blank, or header
+    // carrying the mock default. Without a real identity there is no per-user account to
+    // open, and we will NOT open a shared one. Refuse loudly so a non-integrated
+    // deployment is fixed within the hour instead of quietly sharing one Shipskart login.
+    console.warn(
+      `${IDENTITY_MISSING_TAG} sso: refusing to open Purchasing without a forwarded user identity ` +
+      `(role='${userRole}'). The legacy shared-account fallback is RETIRED — wire the x-user-id header ` +
+      `(SAILERP profile) on this deployment.`,
+    );
+    throw new ShipskartUserNotProvisionedError('(no identity)', 'identity_not_configured');
+  }
+
+  // ══ UNREACHABLE while LEGACY_SHARED_ACCOUNT_ENABLED === false ══════════════════════
+  // The legacy SHARED per-role account path. Retained verbatim so the behaviour can be
+  // restored by flipping that one constant if the WK trial forces it. Do not delete.
+  if (!userRole) return null;
+  const mapping = await roleMappingRepo.getMappingForSailRole(userRole);
+  if (!mapping) return null;
+  console.warn(
+    `[Shipskart] No forwarded user identity (x-user-id) — using the LEGACY shared '${mapping.shipskartRole}' ` +
+    `account for role '${userRole}'. Per-user SSO requires the identity header.`,
+  );
+  const account = accountForShipskartRole(mapping.shipskartRole);
+  if (!account) {
+    console.warn(
+      `[Shipskart] Role '${userRole}' maps to '${mapping.shipskartRole}' but no account env is set ` +
+      `(SHIPSKART_USER_${mapping.shipskartRole.toUpperCase()} or its legacy alias) — blocking SSO.`,
+    );
+    return null;
+  }
+  return account;
 }
 
 /**
@@ -183,24 +427,45 @@ export function resolveExternalUserId(userRole: string): string | null {
  *
  * @param userRole  the current user's role; resolved to an externalUserId via
  *                  the per-role map. Unmapped roles throw ShipskartRoleNotMappedError.
+ * @param userUuid  the current user's uuid (x-user-id / req.user.userUuid). When this user
+ *                  has been pushed by the b2b reconciler, the PER-USER path is taken: the
+ *                  uuid itself is the externalUserId and initiate goes through the b2b
+ *                  endpoint (that is the tenant the user lives in). Otherwise the legacy
+ *                  shared-account bridge is used, unchanged.
  *
  * SECURITY: never log the returned ssoCode.
  */
-export async function initiateSso(userRole: string): Promise<{
+export async function initiateSso(userRole: string, userUuid?: string | null): Promise<{
   success: boolean;
   ssoCode: string;
   expiresIn: number;
   partnerName: string;
   iframeUrl: string;
 }> {
-  const cfg = getShipskartConfig();
-
-  const externalUserId = resolveExternalUserId(userRole);
+  const externalUserId = await resolveExternalUserId(userRole, userUuid);
   if (externalUserId === null) {
     throw new ShipskartRoleNotMappedError(userRole);
   }
 
-  // Per-role externalUserId mapping; tenantId is fixed for the environment.
+  // PER-USER path: externalUserId === our own uuid means the b2b link exists, so initiate
+  // must go to the b2b tenant/endpoint. tenantId travels in the x-tenant-id HEADER only
+  // (Sachin, 2026-07-30) — the b2b client enforces that and rejects it in a body.
+  if (userUuid && externalUserId === userUuid) {
+    const { signedB2bRequest } = await import('./shipskartB2bClient');
+    const res = await signedB2bRequest('POST', '/integration/SAIL/sso/initiate', { body: { externalUserId } });
+    if (!res.ok || !res.json?.iframeUrl) {
+      const errorCode = res.json?.errorCode || res.json?.error?.code || `HTTP_${res.status}`;
+      throw new AppError(res.status || 502, `[Shipskart] per-user SSO initiate failed (${errorCode})`, { errorCode });
+    }
+    console.log(`[Shipskart] SSO initiate OK — PER-USER (role=${userRole}, partner=${res.json.partnerName}, expiresIn=${res.json.expiresIn}s)`);
+    return res.json;
+  }
+
+  // ══ UNREACHABLE while LEGACY_SHARED_ACCOUNT_ENABLED === false ══════════════════════
+  // LEGACY path: shared per-role account, tenantId in the body as that older endpoint
+  // expects. resolveExternalUserId can no longer return a shared account, so this is dead
+  // code retained for a one-constant restore. Do not delete.
+  const cfg = getShipskartConfig();
   const body = {
     externalUserId,
     tenantId: cfg.tenantId,
@@ -208,7 +473,7 @@ export async function initiateSso(userRole: string): Promise<{
 
   const result = await signedPost('/api/v1/sso/initiate', body);
   console.log(
-    `[Shipskart] SSO initiate OK (role=${userRole}, partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`,
+    `[Shipskart] SSO initiate OK — legacy shared account (role=${userRole}, partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`,
   ); // intentionally NOT logging ssoCode or externalUserId
   return result;
 }
@@ -222,11 +487,26 @@ export async function initiateSso(userRole: string): Promise<{
  *                  (returns without calling Shipskart and without throwing) —
  *                  local logout must always complete.
  */
-export async function logoutSso(userRole: string): Promise<{ success: boolean; message?: string }> {
-  const externalUserId = resolveExternalUserId(userRole);
+export async function logoutSso(userRole: string, userUuid?: string | null): Promise<{ success: boolean; message?: string }> {
+  // A non-provisioned user never had a session — resolving must not throw out of logout,
+  // which is best-effort by contract and must never block the local logout.
+  let externalUserId: string | null;
+  try {
+    externalUserId = await resolveExternalUserId(userRole, userUuid);
+  } catch (err: any) {
+    return { success: true, message: `No Shipskart session to evict (${err?.name || 'resolve failed'})` };
+  }
   if (externalUserId === null) {
     // Unmapped role never had a Shipskart session — nothing to evict.
     return { success: true, message: 'No Shipskart mapping for role — logout skipped' };
+  }
+  // Per-user sessions were opened through the b2b endpoint; evict them there. Callers
+  // already treat logout as best-effort (never blocks local logout).
+  if (userUuid && externalUserId === userUuid) {
+    const { signedB2bRequest } = await import('./shipskartB2bClient');
+    const res = await signedB2bRequest('POST', '/integration/SAIL/sso/logout', { body: { externalUserId } });
+    console.log(`[Shipskart] SSO logout (per-user) → ${res.status}`);
+    return { success: res.ok, message: res.ok ? undefined : `remote status ${res.status}` };
   }
   const body = { externalUserId };
   const result = await signedPost('/api/v1/sso/logout', body);

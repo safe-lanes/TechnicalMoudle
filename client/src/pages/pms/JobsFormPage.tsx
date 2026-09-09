@@ -29,6 +29,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useVessel } from "@/contexts/VesselContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useResolvedUserName } from "@/hooks/useResolvedUserName";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 
@@ -139,6 +142,14 @@ const JobsFormPage: React.FC = () => {
   const { ranks: rankOptions } = useRanks();
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRebaselineConfirm, setShowRebaselineConfirm] = useState(false);
+  // Rebaseline is a SHORE-admin escape hatch: it authorizes this job's office-side
+  // cycle values (last done / next due) to overwrite the ship's protected tracking
+  // columns on the next sync. Shore instance + Sail Admin/Super Admin only.
+  const { hasRole } = useAuth();
+  const { resolvedUserName } = useResolvedUserName();
+  const { isShore } = useSyncInstanceInfo();
+  const canRebaseline = isShore && hasRole(["Sail Admin", "Super Admin"] as any);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -152,7 +163,7 @@ const JobsFormPage: React.FC = () => {
   // This is crucial for multi-linked jobs where the same job can be accessed from different components
   const activeComponentCode = urlParams.get('activeComponentCode') || '';
 
-  const { data: jobContext, isLoading } = useQuery({
+  const { data: jobContext, isLoading, isError } = useQuery({
     queryKey: [`/technical/api/jobs/${jobId}/context`],
     enabled: !!jobId
   });
@@ -162,13 +173,12 @@ const JobsFormPage: React.FC = () => {
 
   const [, setLocation] = useLocation();
 
-  const inactivateMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/technical/api/jobs/${jobId}/inactivate`, { vesselId });
-      return response.json();
+      await apiRequest('DELETE', `/technical/api/jobs/${jobId}`);
     },
-    onSuccess: (data: any) => {
-      toast({ title: "Job Deactivated", description: data.message });
+    onSuccess: () => {
+      toast({ title: "Job Deleted", description: "The Job has been removed from normal Job views." });
       queryClient.invalidateQueries({ predicate: (query) =>
         typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/technical/api/jobs')
       });
@@ -176,11 +186,32 @@ const JobsFormPage: React.FC = () => {
       setLocation('/pms/components');
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to deactivate job", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to delete job", variant: "destructive" });
       setShowDeleteConfirm(false);
     }
   });
   
+  const rebaselineMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/technical/api/jobs/${jobId}/rebaseline-tracking`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Rebaseline authorized",
+        description: "This job's office cycle values will overwrite the ship's tracking on the next sync.",
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/technical/api/jobs')
+      });
+      setShowRebaselineConfirm(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Rebaseline failed", description: error.message || "Could not rebaseline job tracking", variant: "destructive" });
+      setShowRebaselineConfirm(false);
+    }
+  });
+
   const [originalData, setOriginalData] = useState<Record<string, any>>({});
 
   const [templateData, setTemplateData] = useState({
@@ -230,14 +261,11 @@ const JobsFormPage: React.FC = () => {
           normalizedFrequencyUnit = 'Months';
         }
 
-        // For RH-only jobs, map intervalRunningHour into frequencyValue
-        // For Dual Frequency, keep them separate (calendar leg in frequencyValue, RH leg in intervalRunningHour)
-        const frequencyValue = isRunningHours
-          ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
-          : (context.templateData.frequencyValue || '');
-
-        const intervalRunningHour = isDualFrequency
-          ? (context.templateData.intervalRunningHour || '')
+        // Keep the calendar and RH legs in their canonical fields.
+        // The frequencyValue fallback supports legacy RH jobs that predate intervalRunningHour.
+        const frequencyValue = context.templateData.frequencyValue || '';
+        const intervalRunningHour = (isRunningHours || isDualFrequency)
+          ? (context.templateData.intervalRunningHour || (isRunningHours ? context.templateData.frequencyValue : '') || '')
           : '';
         
         // IMPORTANT: Use activeComponentCode from URL if provided (for multi-linked jobs),
@@ -279,7 +307,7 @@ const JobsFormPage: React.FC = () => {
 
   const getChangedFields = (): string[] => {
     const changedFields: string[] = [];
-    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
+    const fieldsToCheck = ['woTitle', 'woTemplateCode', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
     
     for (const field of fieldsToCheck) {
       if (templateData[field as keyof typeof templateData] !== originalData[field]) {
@@ -290,6 +318,18 @@ const JobsFormPage: React.FC = () => {
   };
 
   const handleSaveForApproval = async () => {
+    if (templateData.maintenanceBasis === 'Running Hours') {
+      const intervalRH = Number(templateData.intervalRunningHour);
+      if (!Number.isInteger(intervalRH) || intervalRH <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Frequency (Hours) must be a whole number greater than 0.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     const changedFields = getChangedFields();
     
     if (changedFields.length === 0) {
@@ -320,7 +360,7 @@ const JobsFormPage: React.FC = () => {
         snapshotBeforeJson: originalData,
         proposedChangesJson: proposedChanges,
         status: 'submitted',
-        requestedByUserId: 'Current User'
+        requestedByUserId: resolvedUserName
       });
       
       // Invalidate change requests cache so ModifyPMS shows the new request
@@ -394,6 +434,18 @@ const JobsFormPage: React.FC = () => {
       }
     }
 
+    if (templateData.maintenanceBasis === 'Running Hours') {
+      const intervalRH = Number(templateData.intervalRunningHour);
+      if (!Number.isInteger(intervalRH) || intervalRH <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Frequency (Hours) must be a whole number greater than 0.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const updatePayload: Record<string, any> = {};
@@ -443,6 +495,9 @@ const JobsFormPage: React.FC = () => {
       if (templateData.criticality !== originalData.criticality) {
         updatePayload.criticality = templateData.criticality || null;
       }
+      if (templateData.woTemplateCode !== originalData.woTemplateCode) {
+        updatePayload.jobNo = templateData.woTemplateCode;
+      }
       
       if (Object.keys(updatePayload).length === 0) {
         toast({
@@ -453,18 +508,43 @@ const JobsFormPage: React.FC = () => {
         setIsSaving(false);
         return;
       }
+
+      // Component-scoped duplicate check: if job code changed, ensure no other job
+      // on the same component already uses the new code.
+      if (updatePayload.jobNo) {
+        const componentCuuid = (jobContext as any)?.component?.id;
+        if (componentCuuid) {
+          const dupCheckRes = await apiRequest('GET', `/technical/api/jobs?vesselId=${encodeURIComponent(vesselId || '')}&componentId=${encodeURIComponent(componentCuuid)}`);
+          const componentJobs: any[] = await dupCheckRes.json();
+          const duplicate = componentJobs.find(
+            (j: any) => j.jobNo === updatePayload.jobNo && j.juuid !== jobId && j.id !== jobId
+          );
+          if (duplicate) {
+            toast({
+              title: "Job Code already in use",
+              description: `Job code "${updatePayload.jobNo}" is already used by another job on this component (${duplicate.jobTitle || duplicate.juuid}). Please choose a different code.`,
+              variant: "destructive",
+            });
+            setIsSaving(false);
+            return;
+          }
+        }
+      }
       
       await apiRequest('PATCH', `/technical/api/jobs/${jobId}`, updatePayload);
-      
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/jobs/${jobId}/context`] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs'] });
+
+      // Wait for the active job context to reload so the form reflects persisted values,
+      // including the recalculated nextDueRH, rather than a local display alias.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [`/technical/api/jobs/${jobId}/context`] }),
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs'] })
+      ]);
       
       toast({
         title: "Changes saved",
         description: "Job details have been updated successfully.",
       });
       
-      setOriginalData({ ...templateData });
       setIsEditMode(false);
     } catch (error) {
       console.error('Error saving job changes:', error);
@@ -479,9 +559,12 @@ const JobsFormPage: React.FC = () => {
   };
 
   const formatFrequency = () => {
-    if (!templateData.frequencyValue) return '-';
+    const value = templateData.maintenanceBasis === 'Running Hours'
+      ? templateData.intervalRunningHour
+      : templateData.frequencyValue;
+    if (!value) return '-';
     const unit = templateData.maintenanceBasis === 'Running Hours' ? 'Hours' : templateData.frequencyUnit;
-    return `${templateData.frequencyValue} ${unit}`;
+    return `${value} ${unit}`;
   };
 
   const [isExportingHistoryExcel, setIsExportingHistoryExcel] = useState(false);
@@ -822,6 +905,23 @@ const JobsFormPage: React.FC = () => {
     );
   }
 
+  if (isError || !jobContext) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm" data-testid="job-unavailable">
+          <h1 className="text-xl font-semibold text-gray-900">Job unavailable</h1>
+          <p className="mt-3 text-sm text-gray-600">
+            This Job does not exist, has been deleted, or is not available in the current view.
+          </p>
+          <Button className="mt-6" onClick={() => setLocation('/pms/components')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Component Register
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Modification Mode Banner */}
@@ -917,7 +1017,19 @@ const JobsFormPage: React.FC = () => {
                   Cancel
                 </Button>
               )}
-              {!isModifyMode && !isEditMode && (isSailAdmin || isClientAdmin) && templateData.isActive !== 'No' && templateData.isActive !== false && (
+              {!isModifyMode && !isEditMode && canRebaseline && templateData.isActive !== 'No' && (templateData.isActive as any) !== false && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                  onClick={() => setShowRebaselineConfirm(true)}
+                  data-testid="button-rebaseline-job"
+                >
+                  <Clock className="h-4 w-4 mr-1" />
+                  Rebaseline &amp; Push to Ship
+                </Button>
+              )}
+              {!isModifyMode && !isEditMode && (isSailAdmin || isClientAdmin) && (
                 <Button
                   variant="outline"
                   size="icon"
@@ -1051,7 +1163,17 @@ const JobsFormPage: React.FC = () => {
                   />
                   <ReadOnlyField label="Component Name" value={templateData.componentName || templateData.component} labelMarker="JF.A1.5" valueMarker="JF.A1.6" />
                   <ReadOnlyField label="Component Code" value={templateData.componentCode} labelMarker="JF.A1.7" valueMarker="JF.A1.8" />
-                  <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} labelMarker="JF.A1.9" valueMarker="JF.A1.10" />
+                  <EditableField
+                    label="Job Code"
+                    field="woTemplateCode"
+                    value={templateData.woTemplateCode}
+                    originalValue={originalData.woTemplateCode}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
+                    labelMarker="JF.A1.9"
+                    valueMarker="JF.A1.10"
+                  />
                   {/* Maintenance Basis — editable in edit mode, read-only otherwise */}
                   {(() => {
                     const basisChanged = isModifyMode && templateData.maintenanceBasis !== originalData.maintenanceBasis;
@@ -1098,8 +1220,11 @@ const JobsFormPage: React.FC = () => {
                   {(() => {
                     const showCalendarFields = templateData.maintenanceBasis === 'Calendar' || templateData.maintenanceBasis === 'Dual Frequency';
                     const showRhOnlyField = templateData.maintenanceBasis === 'Running Hours';
-                    const freqValueChanged = isModifyMode && templateData.frequencyValue !== originalData.frequencyValue;
-                    const freqUnitChanged = isModifyMode && templateData.frequencyUnit !== originalData.frequencyUnit;
+                    const frequencyField = showRhOnlyField ? 'intervalRunningHour' : 'frequencyValue';
+                    const displayedFrequencyValue = showRhOnlyField ? templateData.intervalRunningHour : templateData.frequencyValue;
+                    const originalFrequencyValue = showRhOnlyField ? originalData.intervalRunningHour : originalData.frequencyValue;
+                    const freqValueChanged = isModifyMode && displayedFrequencyValue !== originalFrequencyValue;
+                    const freqUnitChanged = !showRhOnlyField && isModifyMode && templateData.frequencyUnit !== originalData.frequencyUnit;
                     const isFreqModified = freqValueChanged || freqUnitChanged;
                     if (!showCalendarFields && !showRhOnlyField) return null;
                     return (
@@ -1112,13 +1237,16 @@ const JobsFormPage: React.FC = () => {
                         <div className="flex gap-2">
                           {(isModifyMode || isEditMode) ? (
                             <Input
-                              value={templateData.frequencyValue || ''}
-                              onChange={(e) => handleFieldChange('frequencyValue', e.target.value)}
+                              type={showRhOnlyField ? "number" : "text"}
+                              min={showRhOnlyField ? 1 : undefined}
+                              step={showRhOnlyField ? 1 : undefined}
+                              value={displayedFrequencyValue || ''}
+                              onChange={(e) => handleFieldChange(frequencyField, e.target.value)}
                               className={`text-sm flex-1 ${freqValueChanged ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
                               data-testid="JF.A1.14"
                             />
                           ) : (
-                            <Input disabled value={templateData.frequencyValue || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default flex-1" data-testid="JF.A1.14" />
+                            <Input disabled value={displayedFrequencyValue || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default flex-1" data-testid="JF.A1.14" />
                           )}
                           {showRhOnlyField ? (
                             <Input disabled value="Hours" className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
@@ -1138,7 +1266,9 @@ const JobsFormPage: React.FC = () => {
                           )}
                         </div>
                         {isFreqModified && (
-                          <p className="text-xs text-gray-500">Original: {originalData.frequencyValue || '-'} {originalData.frequencyUnit || 'Months'}</p>
+                          <p className="text-xs text-gray-500">
+                            Original: {originalFrequencyValue || '-'} {showRhOnlyField ? 'Hours' : (originalData.frequencyUnit || 'Months')}
+                          </p>
                         )}
                       </div>
                     );
@@ -1813,20 +1943,42 @@ const JobsFormPage: React.FC = () => {
         onClose={() => setIsWorkInstructionsOpen(false)}
       />
 
-      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <Dialog open={showRebaselineConfirm} onOpenChange={setShowRebaselineConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Deactivate Job</DialogTitle>
+            <DialogTitle>Rebaseline job cycle &amp; push to ship?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to deactivate this job? The job will be soft-deleted and no new work orders will be generated for it. Existing work orders will continue to completion.
+              This authorizes the office's current cycle values for this job (last done and next due dates/running hours)
+              to <strong>overwrite the ship's tracking</strong> on the next sync. Normally the ship's own completion history
+              is protected from office changes — only use this after correcting the cycle in the office (e.g. after a survey
+              or data fix). This action is recorded with your username.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={inactivateMutation.isPending} data-testid="button-cancel-delete-job">
+            <Button variant="outline" onClick={() => setShowRebaselineConfirm(false)} disabled={rebaselineMutation.isPending} data-testid="button-cancel-rebaseline">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={() => inactivateMutation.mutate()} disabled={inactivateMutation.isPending} data-testid="button-confirm-delete-job">
-              {inactivateMutation.isPending ? 'Deactivating...' : 'Deactivate'}
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => rebaselineMutation.mutate()} disabled={rebaselineMutation.isPending} data-testid="button-confirm-rebaseline">
+              {rebaselineMutation.isPending ? 'Authorizing…' : 'Rebaseline & Push'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Job</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this job? It will be hidden from normal Office and Vessel Job views and cannot be restored through normal editing. Existing work orders and maintenance history will be retained.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleteMutation.isPending} data-testid="button-cancel-delete-job">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} data-testid="button-confirm-delete-job">
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -20,11 +20,16 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Search, Pencil, Trash2, Download, PlayCircle, Briefcase, Package, ArrowLeft, Info, Settings, Users, FileText, Shield, CheckCircle, XCircle, Wrench, MapPin, Clock, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Marker } from "@/components/Marker";
 import { SectionBlock } from "@/components/SectionBlock";
 
 export default function FleetJobsManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateMasters = canCreate("admin-masters");
+  const canEditMasters = canEdit("admin-masters");
+  const canDeleteMasters = canDelete("admin-masters");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEquipment, setSelectedEquipment] = useState<string>("all");
   const [isAddMode, setIsAddMode] = useState(false);
@@ -391,19 +396,21 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                   <ArrowLeft className="h-4 w-4" />
                   Back to List
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
-                  onClick={() => {
-                    setDetailJob(null);
-                    handleEdit(detailJob);
-                  }}
-                  data-testid="btn-edit-job-detail"
-                >
-                  <Pencil className="mr-1 h-4 w-4" />
-                  Edit
-                </Button>
+                {canEditMasters && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+                    onClick={() => {
+                      setDetailJob(null);
+                      handleEdit(detailJob);
+                    }}
+                    data-testid="btn-edit-job-detail"
+                  >
+                    <Pencil className="mr-1 h-4 w-4" />
+                    Edit
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -1409,16 +1416,18 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
             <Download className="h-4 w-4" />
             Export
           </Button>
-          <Button
-            size="sm"
-            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-            onClick={handleAddNew}
-            data-testid="I4.QL.4.14"
-          >
-            <Marker id="I4.QL.4.14" />
-            <Plus className="h-4 w-4 mr-1" />
-            Add New Job
-          </Button>
+          {canCreateMasters && (
+            <Button
+              size="sm"
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+              onClick={handleAddNew}
+              data-testid="I4.QL.4.14"
+            >
+              <Marker id="I4.QL.4.14" />
+              <Plus className="h-4 w-4 mr-1" />
+              Add New Job
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1555,22 +1564,26 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                               <PlayCircle className="h-4 w-4 mr-1" />
                               Create WO
                             </Button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleEdit(job); }}
-                              className="p-1 hover:bg-gray-200 rounded"
-                              data-testid={isFirstRow ? "I4.QL.4.27" : `button-edit-${job.id}`}
-                            >
-                              {isFirstRow && <Marker id="I4.QL.4.27" />}
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteClick(job); }}
-                              className="p-1 hover:bg-gray-200 rounded text-red-500"
-                              data-testid={isFirstRow ? "I4.QL.4.28" : `button-delete-${job.id}`}
-                            >
-                              {isFirstRow && <Marker id="I4.QL.4.28" />}
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            {canEditMasters && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleEdit(job); }}
+                                className="p-1 hover:bg-gray-200 rounded"
+                                data-testid={isFirstRow ? "I4.QL.4.27" : `button-edit-${job.id}`}
+                              >
+                                {isFirstRow && <Marker id="I4.QL.4.27" />}
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDeleteMasters && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(job); }}
+                                className="p-1 hover:bg-gray-200 rounded text-red-500"
+                                data-testid={isFirstRow ? "I4.QL.4.28" : `button-delete-${job.id}`}
+                              >
+                                {isFirstRow && <Marker id="I4.QL.4.28" />}
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

@@ -1,0 +1,170 @@
+/**
+ * ViewModeGate (Task #324) — fail-closed app gate on the server-resolved view mode.
+ *
+ * Renders children ONLY when resolution succeeded (or no user is present yet —
+ * login screens must stay reachable). Sail Admin resolves via a local constant
+ * bypass, so this gate can never lock out the fixer role.
+ *
+ *   loading → lightweight spinner (brief; resolve is one cached GET)
+ *   error   → retry screen (server/network failure — never guess a mode)
+ *   blocked → "role not mapped" screen (admin must map the role first)
+ */
+import { ReactNode, useEffect } from "react";
+import { Loader2, ShieldAlert, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { isReplit } from "@/lib/env";
+import {
+  secureClear,
+  hasLoggedOutMarker,
+  clearLoggedOutMarker,
+} from "@/utils/secureStorage";
+import { LogOut } from "lucide-react";
+
+// One-shot guard (module scope) so a re-render can never double-redirect.
+let redirectedToLogin = false;
+
+/**
+ * Session expired/invalid (401/403 on resolve). Outside Replit this means the
+ * user must log in again: clear the stale local session so a reload cannot
+ * re-hydrate it, then hard-navigate to the parent app's /login page (same
+ * pattern as onTokenFailure in lib/authToken.ts). On Replit (mock auth, no
+ * real login flow) we never redirect — the retry screen renders instead.
+ */
+function shouldRedirectToLogin(): boolean {
+  return (
+    !isReplit() &&
+    typeof window !== "undefined" &&
+    !redirectedToLogin &&
+    window.location.pathname !== "/login"
+  );
+}
+
+function GateScreen({
+  icon,
+  title,
+  message,
+  onRetry,
+  retryLabel = "Retry",
+}: {
+  icon: ReactNode;
+  title: string;
+  message: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+}) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div className="max-w-md w-full bg-white border rounded-lg shadow-sm p-8 text-center space-y-4">
+        <div className="flex justify-center">{icon}</div>
+        <h1 className="text-lg font-semibold text-gray-900" data-testid="text-gate-title">
+          {title}
+        </h1>
+        <p className="text-sm text-gray-600" data-testid="text-gate-message">
+          {message}
+        </p>
+        {onRetry && (
+          <Button onClick={onRetry} variant="outline" data-testid="button-gate-retry">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            {retryLabel}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ViewModeGate({ children }: { children: ReactNode }) {
+  const { currentUser, uiRoleResolution } = useAuth();
+
+  const authExpired =
+    !!currentUser && uiRoleResolution.status === "unauthenticated";
+
+  // Redirect to login on session expiry — non-Replit environments only.
+  useEffect(() => {
+    if (authExpired && shouldRedirectToLogin()) {
+      redirectedToLogin = true;
+      secureClear();
+      window.location.assign("/login");
+    }
+  }, [authExpired]);
+
+  // No user (pre-hydration / logged out). In the Replit dev preview there is
+  // no parent /login page, so an intentional logout (marker set) must render
+  // an explicit signed-out screen instead of leaving the app mounted — data
+  // components would otherwise keep firing unauthenticated requests
+  // (Task #422). Outside Replit (and pre-hydration) pass through: the token
+  // layer / logout redirect owns navigation to the parent app's login page.
+  if (!currentUser) {
+    if (isReplit() && hasLoggedOutMarker()) {
+      return (
+        <GateScreen
+          icon={<LogOut className="h-10 w-10 text-gray-400" />}
+          title="You are signed out"
+          message="You have been logged out. In this development preview there is no login page — use the button below to start a new dev session as the default user."
+          retryLabel="Start new dev session"
+          onRetry={() => {
+            clearLoggedOutMarker();
+            window.location.reload();
+          }}
+        />
+      );
+    }
+    return <>{children}</>;
+  }
+
+  if (uiRoleResolution.status === "unauthenticated") {
+    if (isReplit()) {
+      // Replit dev (mock auth): keep the existing fail-closed retry screen.
+      return (
+        <GateScreen
+          icon={<ShieldAlert className="h-10 w-10 text-amber-500" />}
+          title="Unable to verify your access"
+          message="We couldn't determine your view mode because the server didn't respond. Please retry — access stays blocked until verification succeeds."
+          onRetry={uiRoleResolution.retry}
+        />
+      );
+    }
+    // Production/vessel/local: redirecting to login (effect above) — show a
+    // brief spinner, never the app. Still fail-closed.
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" data-testid="loader-view-mode" />
+      </div>
+    );
+  }
+
+  switch (uiRoleResolution.status) {
+    case "loading":
+    case "idle":
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" data-testid="loader-view-mode" />
+        </div>
+      );
+    case "error":
+      return (
+        <GateScreen
+          icon={<ShieldAlert className="h-10 w-10 text-amber-500" />}
+          title="Unable to verify your access"
+          message="We couldn't determine your view mode because the server didn't respond. Please retry — access stays blocked until verification succeeds."
+          onRetry={uiRoleResolution.retry}
+        />
+      );
+    case "blocked":
+      return (
+        <GateScreen
+          icon={<ShieldAlert className="h-10 w-10 text-red-500" />}
+          title="Your role isn't mapped to a view mode"
+          message={
+            uiRoleResolution.reason === "ROLE_NOT_FOUND"
+              ? "Your login role was not recognized by the system. Please contact your administrator."
+              : "An administrator needs to assign a view mode to your role in Access Control before you can use the application."
+          }
+          onRetry={uiRoleResolution.retry}
+        />
+      );
+    default:
+      return <>{children}</>;
+  }
+}

@@ -145,6 +145,18 @@ function readTokenFromStore(store: Storage): string | null {
  * (keeps dev/Replit mock auth working).
  */
 export function getAccessToken(): string | null {
+  const token = peekAccessToken();
+  if (token) return token;
+  return onTokenFailure();
+}
+
+/**
+ * Read the access token with NO side effects: same decrypt/normalize pipeline
+ * as `getAccessToken()`, but never triggers the login redirect on failure.
+ * For callers (e.g. the view-mode resolve fetch) that must stay the single
+ * redirect authority and clear the stale session themselves before navigating.
+ */
+export function peekAccessToken(): string | null {
   if (typeof sessionStorage !== "undefined") {
     const fromSession = readTokenFromStore(sessionStorage);
     if (fromSession) {
@@ -159,5 +171,5 @@ export function getAccessToken(): string | null {
     }
   }
 
-  return onTokenFailure();
+  return null;
 }

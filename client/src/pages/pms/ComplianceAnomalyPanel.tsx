@@ -821,12 +821,12 @@ interface ComplianceAnomalyPanelProps {
 export function ComplianceAnomalyPanel({ vesselId, superintendentSummary, onNavigateToSuperintendent }: ComplianceAnomalyPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isTechSuperintendent, isHeadOfDept, isVessel } = useUIRole();
 
-  const canViewPanel = isSailAdmin;
+  const canViewPanel = isSailAdmin || isTechSuperintendent;
   const isRestricted = isVessel;
-  const canAcknowledge = isSailAdmin || isClientAdmin;
-  const canViewAnomalies = isSailAdmin || isClientAdmin || isHeadOfDept;
+  const canAcknowledge = isSailAdmin || isClientAdmin || isTechSuperintendent;
+  const canViewAnomalies = isSailAdmin || isClientAdmin || isTechSuperintendent || isHeadOfDept;
 
   const queryUrl = vesselId && vesselId !== "all"
     ? `/technical/api/dashboard/compliance-anomalies?vesselId=${vesselId}`

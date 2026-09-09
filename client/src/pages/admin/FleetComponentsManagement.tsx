@@ -11,10 +11,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package, ArrowLeft, Info, MapPin, Star, FileText, CheckCircle, XCircle, Save, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Marker } from "@/components/Marker";
 
 export default function FleetComponentsManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateMasters = canCreate("admin-masters");
+  const canEditMasters = canEdit("admin-masters");
+  const canDeleteMasters = canDelete("admin-masters");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState<FleetComponents | null>(null);
@@ -653,16 +658,18 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
                       <ArrowLeft className="h-4 w-4" />
                       Back to List
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
-                      onClick={handleStartEdit}
-                      data-testid="btn-edit-component-detail"
-                    >
-                      <Pencil className="mr-1 h-4 w-4" />
-                      Edit
-                    </Button>
+                    {canEditMasters && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+                        onClick={handleStartEdit}
+                        data-testid="btn-edit-component-detail"
+                      >
+                        <Pencil className="mr-1 h-4 w-4" />
+                        Edit
+                      </Button>
+                    )}
                   </>
                 )}
               </div>
@@ -876,36 +883,42 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
           </td>
           <td className="text-right py-3 px-4">
             <div className="flex justify-end gap-1">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleAddNew(node.fleetEquipmentCode); }}
-                onDoubleClick={(e) => e.stopPropagation()}
-                className="p-1 hover:bg-gray-200 rounded"
-                data-testid={isFirstRoot ? "I4.QL.3.25" : `button-add-child-${nodeKey}`}
-                title="Add Child"
-              >
-                {isFirstRoot && <Marker id="I4.QL.3.25" />}
-                <Plus className="h-4 w-4" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleEdit(node); }}
-                onDoubleClick={(e) => e.stopPropagation()}
-                className="p-1 hover:bg-gray-200 rounded"
-                data-testid={isFirstRoot ? "I4.QL.3.26" : `button-edit-${nodeKey}`}
-                title="Edit"
-              >
-                {isFirstRoot && <Marker id="I4.QL.3.26" />}
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleDeleteClick(node); }}
-                onDoubleClick={(e) => e.stopPropagation()}
-                className="p-1 hover:bg-gray-200 rounded text-red-500"
-                data-testid={isFirstRoot ? "I4.QL.3.27" : `button-delete-${nodeKey}`}
-                title="Delete"
-              >
-                {isFirstRoot && <Marker id="I4.QL.3.27" />}
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {canCreateMasters && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleAddNew(node.fleetEquipmentCode); }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  className="p-1 hover:bg-gray-200 rounded"
+                  data-testid={isFirstRoot ? "I4.QL.3.25" : `button-add-child-${nodeKey}`}
+                  title="Add Child"
+                >
+                  {isFirstRoot && <Marker id="I4.QL.3.25" />}
+                  <Plus className="h-4 w-4" />
+                </button>
+              )}
+              {canEditMasters && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleEdit(node); }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  className="p-1 hover:bg-gray-200 rounded"
+                  data-testid={isFirstRoot ? "I4.QL.3.26" : `button-edit-${nodeKey}`}
+                  title="Edit"
+                >
+                  {isFirstRoot && <Marker id="I4.QL.3.26" />}
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
+              {canDeleteMasters && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDeleteClick(node); }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  className="p-1 hover:bg-gray-200 rounded text-red-500"
+                  data-testid={isFirstRoot ? "I4.QL.3.27" : `button-delete-${nodeKey}`}
+                  title="Delete"
+                >
+                  {isFirstRoot && <Marker id="I4.QL.3.27" />}
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </td>
         </tr>
@@ -942,16 +955,18 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
             <Download className="h-4 w-4" />
             Export
           </Button>
-          <Button
-            size="sm"
-            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-            onClick={() => handleAddNew()}
-            data-testid="I4.QL.3.13"
-          >
-            <Marker id="I4.QL.3.13" />
-            <Plus className="h-4 w-4 mr-1" />
-            Add New Component
-          </Button>
+          {canCreateMasters && (
+            <Button
+              size="sm"
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+              onClick={() => handleAddNew()}
+              data-testid="I4.QL.3.13"
+            >
+              <Marker id="I4.QL.3.13" />
+              <Plus className="h-4 w-4 mr-1" />
+              Add New Component
+            </Button>
+          )}
         </div>
       </div>
 

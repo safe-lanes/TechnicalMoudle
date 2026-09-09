@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
-import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
 import { getDb } from './db';
+import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
 import {
   users,
   fleets,
@@ -8,6 +9,8 @@ import {
   vessels,
   pmsVesselSettings,
   companyStandardGraceSettings,
+  companyApprovalSettings,
+  type CompanyApprovalSettings,
   makers,
   masterLists,
   masterListTypes,
@@ -17,6 +20,7 @@ import {
   sfiDetails,
   masterData,
   components,
+  rotationalItems,
   componentDocuments,
   componentClassRegulatory,
   componentMaintenanceHistory,
@@ -217,7 +221,48 @@ import {
   type InsertWoPostponementApproval,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
+import { readingDayLocalExpr, targetReadingDay } from './modules/running-hours/repositories/dateUpdatedLocalSql';
+import { canonicalizeReadingDateInput, requireReadingDayInput, parseReadingDayStrict, formatReadingDay } from './modules/running-hours/utils/readingDate';
+import { validateRHMonotonicity } from './modules/running-hours/utils/rhValidation';
+import { ValidationError } from './modules/shared/errors';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
+
+function enforceFreshRHMonotonicity(input: {
+  currentRH: number;
+  submittedRH: number;
+  currentRHDate?: string | null;
+  submittedRHDate?: string | null;
+  approvedReset?: boolean;
+}) {
+  const result = validateRHMonotonicity(input);
+  if (!result.allowed) {
+    throw new ValidationError(result.message, {
+      code: 'LOWER_THAN_CURRENT_RH',
+      currentRH: result.currentRH,
+      submittedRH: result.submittedRH,
+      delta: result.delta,
+      currentRHDate: result.currentRHDate,
+      submittedRHDate: result.submittedRHDate,
+      monotonicity: result,
+    });
+  }
+  return result;
+}
+
+// Task #394: which side observed/entered an RH reading — feeds running_hours_audit.origin_side
+// for the canonical latest-reading-wins comparator (ship wins exact-date ties). Cached after
+// first resolution; falls back to null (legacy rank) if the role cannot be resolved.
+let cachedRhOriginSide: string | null | undefined;
+async function getRhOriginSide(): Promise<string | null> {
+  if (cachedRhOriginSide !== undefined) return cachedRhOriginSide;
+  try {
+    const { getInstanceRole } = await import('./modules/sync/syncRole');
+    cachedRhOriginSide = await getInstanceRole(); // 'ship' | 'shore'
+  } catch {
+    cachedRhOriginSide = null;
+  }
+  return cachedRhOriginSide;
+}
 
 /**
  * PostgreSQL Storage Implementation
@@ -226,6 +271,32 @@ import { getAuditActor, getRequestContext } from './middleware/requestContext';
  * This file implements IStorage methods using PostgreSQL via Drizzle ORM.
  * Additional modules will be added incrementally.
  */
+/**
+ * Property names on `work_orders` whose column is integer- or numeric-backed.
+ *
+ * Schema-derived on purpose. The previous hand-written list silently failed to cover
+ * migration 139's `wo_completion_rh`, so every calendar-based work-order completion 500'd.
+ * Keying off `columnType` (PgInteger / PgNumeric / …) rather than `dataType` is deliberate:
+ * Drizzle represents PgNumeric as a JS *string* to preserve precision, so a `dataType`
+ * filter would miss exactly the decimal columns that break.
+ *
+ * Computed lazily once — getTableColumns is cheap but this runs on every WO update.
+ */
+let _woNumericFields: string[] | null = null;
+export function getWorkOrderNumericFields(): string[] {
+  if (_woNumericFields) return _woNumericFields;
+  try {
+    const cols = getTableColumns(workOrders as any) as Record<string, any>;
+    _woNumericFields = Object.entries(cols)
+      .filter(([, c]) => /numeric|decimal|integer|bigint|real|double|serial/i.test(String(c?.columnType ?? '')))
+      .map(([prop]) => prop);
+  } catch {
+    // Never let introspection failure break a save — fall back to the known offenders.
+    _woNumericFields = ['maintenanceIntervalValue', 'intervalRunningHour', 'woCompletionRh', 'missedCycles', 'daysLate'];
+  }
+  return _woNumericFields;
+}
+
 export class PostgresStorage {
 
   private async insertWithSequenceRepair<T>(
@@ -421,34 +492,43 @@ export class PostgresStorage {
 
   // ============= VESSELS (Module 1) =============
 
-  async getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string, imoNumber: string | null, vesselType: string | null}>> {
+  async getVessels(options: { includeDeleted?: boolean } = {}): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>> {
     const db = await getDb();
-    const result = await db.select().from(vessels);
+    const result = options.includeDeleted
+      ? await db.select().from(vessels)
+      : await db.select().from(vessels).where(or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted)));
     return result.map(v => ({
       id: v.id,
       vuuid: v.vuuid,
       name: v.name,
       code: v.code,
+      vCode: v.vCode ?? null,
       imoNumber: v.imoNumber ?? null,
       vesselType: v.vesselType ?? null,
     }));
   }
 
-  async getVessel(id: string): Promise<Vessel | undefined> {
+  async getVessel(id: string, options: { includeDeleted?: boolean } = {}): Promise<Vessel | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.vuuid, id));
+    const result = await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.vuuid, id)
+      : and(eq(vessels.vuuid, id), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
     return result[0];
   }
 
-  async getVesselByCode(code: string): Promise<Vessel | undefined> {
+  async getVesselByCode(code: string, options: { includeDeleted?: boolean } = {}): Promise<Vessel | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.code, code));
+    const result = await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.code, code)
+      : and(eq(vessels.code, code), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
     return result[0];
   }
 
-  async getVesselIdByName(vesselName: string): Promise<string | undefined> {
+  async getVesselIdByName(vesselName: string, options: { includeDeleted?: boolean } = {}): Promise<string | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.name, vesselName));
+    const result = await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.name, vesselName)
+      : and(eq(vessels.name, vesselName), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
     return result[0]?.vuuid;
   }
 
@@ -1066,24 +1146,32 @@ export class PostgresStorage {
       return await db.select().from(components)
         .where(and(
           inArray(components.vesselId, vesselIds),
-          eq(components.dataScope, 'vessel')
+          eq(components.dataScope, 'vessel'),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
         ));
     }
     if (!vesselId || vesselId === 'all') {
       return await db.select().from(components)
-        .where(eq(components.dataScope, 'vessel'));
+        .where(and(
+          eq(components.dataScope, 'vessel'),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
+        ));
     }
     return await db.select().from(components)
       .where(and(
         eq(components.vesselId, vesselId),
-        eq(components.dataScope, 'vessel')
+        eq(components.dataScope, 'vessel'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
   }
 
   async getComponent(id: string): Promise<Component | undefined> {
     const db = await getDb();
     const result = await db.select().from(components).where(
-      or(eq(components.cuuid, id), eq(components.id, id))
+      and(
+        or(eq(components.cuuid, id), eq(components.id, id)),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
+      )
     );
     return result[0];
   }
@@ -1093,7 +1181,8 @@ export class PostgresStorage {
     const result = await db.select().from(components)
       .where(and(
         eq(components.componentCode, componentCode),
-        eq(components.vesselId, vesselId)
+        eq(components.vesselId, vesselId),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
     return result[0];
   }
@@ -1114,7 +1203,10 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(components)
       .set({ ...data, updatedAt: new Date() })
-      .where(or(eq(components.cuuid, id), eq(components.id, id)))
+      .where(and(
+        or(eq(components.cuuid, id), eq(components.id, id)),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
+      ))
       .returning();
     if (!result[0]) {
       throw new Error(`Component ${id} not found`);
@@ -1122,12 +1214,68 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async deleteComponent(id: string): Promise<void> {
+  async deleteComponent(id: string, userId?: string): Promise<void> {
     const db = await getDb();
-    await db.delete(components).where(or(eq(components.cuuid, id), eq(components.id, id)));
+    await db.transaction(async (tx) => {
+      const existing = await tx.select().from(components)
+        .where(and(
+          or(eq(components.cuuid, id), eq(components.id, id)),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
+        ))
+        .limit(1);
+      const component = existing[0];
+      if (!component) {
+        throw new Error(`Component ${id} not found`);
+      }
+
+      // The installed link is derived from the Component's current stamp. Release
+      // the matching registry row in the same transaction as the retained delete
+      // so the position cannot be deleted while its physical item stays installed.
+      const currentStamp = (component as any).currentStamp;
+      if (component.vesselId && currentStamp) {
+        const installed = await tx.select().from(rotationalItems)
+          .where(and(
+            eq(rotationalItems.vesselId, component.vesselId),
+            eq(rotationalItems.stamp, currentStamp),
+            eq(rotationalItems.status, 'Installed'),
+            eq(rotationalItems.isDeleted, false)
+          ))
+          .limit(1);
+        if (installed[0]) {
+          const released = await tx.update(rotationalItems)
+            .set({ status: 'Spare', updatedAt: new Date(), updatedByUuid: userId })
+            .where(eq(rotationalItems.riuuid, installed[0].riuuid))
+            .returning();
+          if (!released[0]) {
+            throw new Error(`Unable to release rotational item for component ${id}`);
+          }
+          await logFieldChanges(
+            'rotational_items',
+            installed[0].riuuid,
+            component.vesselId,
+            installed[0],
+            released[0],
+            userId || 'system',
+            tx
+          );
+        }
+      }
+
+      const result = await tx.update(components)
+        .set({ isDeleted: true, isActive: false, updatedAt: new Date() })
+        .where(eq(components.cuuid, component.cuuid))
+        .returning();
+      if (!result[0]) {
+        throw new Error(`Component ${id} not found`);
+      }
+    });
+
+    // Components are shore-to-ship full-row synchronized records. The updated
+    // lifecycle flags are picked up by the regular one-way snapshot; no field
+    // log is needed because components are not BOTH_EDITABLE.
   }
 
-  async inactivateComponent(id: string, vesselId: string, userId?: string): Promise<{
+  async inactivateComponent(id: string, vesselId: string, userId?: string, apply = true): Promise<{
     success: boolean;
     message: string;
     code?: string;
@@ -1142,7 +1290,8 @@ export class PostgresStorage {
     const componentResult = await db.select().from(components)
       .where(and(
         or(eq(components.cuuid, id), eq(components.id, id)),
-        eq(components.vesselId, vesselId)
+        eq(components.vesselId, vesselId),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ))
       .limit(1);
     
@@ -1160,7 +1309,8 @@ export class PostgresStorage {
       .where(and(
         or(eq(components.parentId, component.cuuid), eq(components.parentId, component.id)),
         eq(components.isActive, true),
-        eq(components.vesselId, vesselId)
+        eq(components.vesselId, vesselId),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
     
     if (activeChildren.length > 0) {
@@ -1183,7 +1333,8 @@ export class PostgresStorage {
           ...(componentCode ? [eq(jobs.componentCode, componentCode)] : [])
         ),
         eq(jobs.isActive, true),
-        eq(jobs.vesselId, vesselId)
+        eq(jobs.vesselId, vesselId),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
       ));
     for (const job of directJobs) {
       activeJobIds.add(job.juuid);
@@ -1197,7 +1348,12 @@ export class PostgresStorage {
     const linkedJobs = Array.from(linkedJobsMap.values());
     for (const link of linkedJobs) {
       const jobResult = await db.select().from(jobs)
-        .where(and(eq(jobs.juuid, link.jobId), eq(jobs.isActive, true), eq(jobs.vesselId, vesselId)))
+        .where(and(
+          eq(jobs.juuid, link.jobId),
+          eq(jobs.isActive, true),
+          eq(jobs.vesselId, vesselId),
+          or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+        ))
         .limit(1);
       if (jobResult.length > 0) {
         activeJobIds.add(link.jobId);
@@ -1223,7 +1379,8 @@ export class PostgresStorage {
           ...(componentCode ? [eq(spares.componentCode, componentCode)] : [])
         ),
         eq(spares.isActive, true),
-        eq(spares.vesselId, vesselId)
+        eq(spares.vesselId, vesselId),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ));
     for (const s of directSpares) {
       activeSpareIds.add(s.id);
@@ -1236,7 +1393,8 @@ export class PostgresStorage {
           eq(spares.id, spareComponentLinks.spareId)
         ),
         eq(spares.isActive, true),
-        eq(spares.vesselId, vesselId)
+        eq(spares.vesselId, vesselId),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ))
       .where(or(
         eq(spareComponentLinks.componentId, component.cuuid),
@@ -1266,9 +1424,20 @@ export class PostgresStorage {
       const { isBlockingStatus } = await import('./utils/workOrderStatus');
       activeWorkOrdersCount = woResults.filter(wo => isBlockingStatus(wo.status)).length;
     }
+
+    // Delete Component uses this preflight to apply the same dependency policy
+    // without changing the record before its rotational-item release succeeds.
+    if (!apply) {
+      return {
+        success: true,
+        message: 'Component passed lifecycle dependency checks.',
+        componentsInactivated: 0,
+        activeWorkOrdersCount,
+      };
+    }
     
     await db.update(components)
-      .set({ isActive: false })
+      .set({ isActive: false, updatedAt: new Date() })
       .where(and(
         eq(components.cuuid, component.cuuid),
         eq(components.vesselId, vesselId)
@@ -1288,7 +1457,10 @@ export class PostgresStorage {
   async getFleetScopedComponents(): Promise<Component[]> {
     const db = await getDb();
     return await db.select().from(components)
-      .where(eq(components.dataScope, 'fleet'));
+      .where(and(
+        eq(components.dataScope, 'fleet'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
+      ));
   }
 
   async getFleetScopedComponent(id: string): Promise<Component | undefined> {
@@ -1296,7 +1468,8 @@ export class PostgresStorage {
     const result = await db.select().from(components)
       .where(and(
         or(eq(components.cuuid, id), eq(components.id, id)),
-        eq(components.dataScope, 'fleet')
+        eq(components.dataScope, 'fleet'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
     return result[0];
   }
@@ -1329,7 +1502,8 @@ export class PostgresStorage {
       .where(and(
         eq(components.vesselId, vesselId),
         eq(components.rhCounterType, 'MASTER'),
-        eq(components.dataScope, 'vessel')
+        eq(components.dataScope, 'vessel'),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
   }
 
@@ -1345,7 +1519,10 @@ export class PostgresStorage {
     // If not found by ID, try finding by component code
     if (!masterComponent) {
       const byCode = await db.select().from(components)
-        .where(eq(components.componentCode, masterComponentId))
+        .where(and(
+          eq(components.componentCode, masterComponentId),
+          or(eq(components.isDeleted, false), isNull(components.isDeleted))
+        ))
         .limit(1);
       masterComponent = byCode[0] || null;
     }
@@ -1377,7 +1554,8 @@ export class PostgresStorage {
           eq(components.rhMasterComponentId, masterComponentCode),
           eq(components.rhMasterComponentId, masterComponentId),
           eq(components.rhCounterSource, masterComponentCode)
-        )
+        ),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted))
       ));
   }
 
@@ -1451,6 +1629,97 @@ export class PostgresStorage {
 
   // Update MASTER running hours with automatic cascade to INHERITED components
   // DELTA-BASED: Inherited components receive the change amount, not the absolute value
+  // RH follows the Stamp (Task #369): accrue the update's DELTA onto the component's
+  // currently Installed rotational item — never overwrite with the component's absolute
+  // total, because a stamp fitted mid-life carries its own service history (e.g. a stamp
+  // at 150 hrs + a 50-hr update must read 200, not the engine's 400). Field-logged
+  // (rotational_items is BOTH_EDITABLE — unlogged writes never sync ship↔shore).
+  private async accrueStampRhDelta(
+    tx: any,
+    vesselId: string | null,
+    currentStamp: string | null,
+    delta: number,
+    readingDateIso: string,
+    userId: string | null,
+  ): Promise<void> {
+    if (!vesselId || !currentStamp || !Number.isFinite(delta) || delta === 0) return;
+    const rows = await tx.select().from(rotationalItems).where(and(
+      eq(rotationalItems.vesselId, vesselId),
+      eq(rotationalItems.stamp, currentStamp),
+      eq(rotationalItems.status, 'Installed'),
+      eq(rotationalItems.isDeleted, false),
+    ));
+    const before = rows[0];
+    if (!before) return;
+    const newRh = Math.max(0, parseFloat(before.currentRh || '0') + delta);
+    const after = await tx.update(rotationalItems)
+      .set({ currentRh: newRh.toFixed(2), rhLastUpdated: readingDateIso, updatedAt: new Date() })
+      .where(eq(rotationalItems.riuuid, before.riuuid))
+      .returning();
+    if (after[0]) {
+      await logFieldChanges('rotational_items', before.riuuid, vesselId, before, after[0], userId, tx);
+    }
+  }
+
+  // Public wrapper for RH paths that live outside this class (e.g. the child-RH
+  // endpoints in the running-hours module).
+  async accrueInstalledStampRh(params: {
+    vesselId: string | null;
+    currentStamp: string | null;
+    delta: number;
+    readingDateIso: string;
+    userId: string | null;
+  }): Promise<void> {
+    const db = await getDb();
+    await this.accrueStampRhDelta(db, params.vesselId, params.currentStamp, params.delta, params.readingDateIso, params.userId);
+  }
+
+  // Atomic child (INHERITED) RH update: component write + stamp delta accrual in ONE
+  // transaction, with a per-component lock and a fresh in-tx read (Task #374). Prevents
+  // overlapping duplicate submissions from double-accruing stamp hours: the second
+  // submission waits, sees the committed value, and applies delta 0.
+  async updateChildRhWithStampAccrual(params: {
+    componentId: string;
+    newRHValue: number;
+    lastUpdated: string;
+    readingDateIso: string;
+    userId: string | null;
+  }): Promise<{ previousRH: number; changed: boolean }> {
+    const db = await getDb();
+    const component = await this.getComponent(params.componentId);
+    if (!component) {
+      throw new Error(`Component ${params.componentId} not found`);
+    }
+    const rhStr = params.newRHValue.toFixed(2);
+    return db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
+      const freshRows = await tx.select().from(components)
+        .where(eq(components.cuuid, component.cuuid))
+        .limit(1);
+      const fresh = freshRows[0] || component;
+      const previousRH = parseFloat(fresh.currentCumulativeRH || '0');
+      const monotonicity = enforceFreshRHMonotonicity({
+        currentRH: previousRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: fresh.lastUpdated || null,
+        submittedRHDate: params.readingDateIso,
+      });
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { previousRH, changed: false };
+      }
+      await tx.update(components)
+        .set({
+          currentCumulativeRH: rhStr,
+          runningHours: rhStr,
+          lastUpdated: params.lastUpdated,
+          updatedAt: new Date(),
+        })
+        .where(eq(components.cuuid, component.cuuid));
+      await this.accrueStampRhDelta(tx, fresh.vesselId, fresh.currentStamp, params.newRHValue - previousRH, params.readingDateIso, params.userId);
+      return { previousRH, changed: true };
+    });
+  }
+
   async updateMasterRunningHours(params: {
     componentId: string;
     newRHValue: number;
@@ -1459,7 +1728,19 @@ export class PostgresStorage {
     userUuid?: string;
     comments?: string;
     dateUpdated?: string;
-  }): Promise<{ masterUpdated: Component; inheritedUpdated: number }> {
+    allowLowerWorkOrderApprovalSkip?: boolean;
+  }): Promise<{
+    masterUpdated: Component;
+    inheritedUpdated: number;
+    noChange?: boolean;
+    rhSkipped?: {
+      reason: 'LOWER_THAN_LIVE_RH';
+      submittedRH: number;
+      currentRH: number;
+      currentRHDate: string | null;
+      submittedRHDate: string;
+    };
+  }> {
     const db = await getDb();
     const now = new Date();
     // Reading date: the date the running hours were actually observed (WO completion date or the
@@ -1467,9 +1748,10 @@ export class PostgresStorage {
     // last-updated stamps so the RH timeline reflects when hours were read — NOT when the row was
     // written. Falls back to "now" when omitted or unparseable. enteredAtUTC stays "now" (it is
     // the audit trail of when the row was entered, not the reading date).
-    const parsedReadingDate = params.dateUpdated ? new Date(params.dateUpdated) : null;
-    const readingDate = parsedReadingDate && !isNaN(parsedReadingDate.getTime()) ? parsedReadingDate : now;
-    const readingDateLocal = readingDate.toISOString().split('T')[0];
+    // Task #427: canonical calendar-day contract — the persisted reading date is
+    // ALWAYS YYYY-MM-DD (shared parser; no naive new Date(text) day shifts).
+    const readingDateLocal = requireReadingDayInput(params.dateUpdated ?? null) ?? formatReadingDay(now);
+    const readingDate = parseReadingDayStrict(readingDateLocal)!;
     
     // Verify component exists and is a MASTER
     const component = await this.getComponent(params.componentId);
@@ -1479,10 +1761,6 @@ export class PostgresStorage {
     if (component.rhCounterType !== 'MASTER') {
       throw new Error(`Component ${params.componentId} is not a MASTER counter type. Cannot update RH directly.`);
     }
-
-    // Calculate delta: difference between new and old master RH value
-    const previousMasterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
-    const delta = params.newRHValue - previousMasterRH;
 
     // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
     const masterComponentCode = component.componentCode || '';
@@ -1497,6 +1775,55 @@ export class PostgresStorage {
 
     // All writes in one transaction: master UPDATE + audit INSERT + inherited UPDATEs
     const txResult = await db.transaction(async (tx) => {
+      // Duplicate-submission guard (Task #374): serialize concurrent updates of the same
+      // component and compute the delta from a fresh in-tx read. Without this, two
+      // overlapping identical submissions both see the stale previous value and each
+      // apply the same positive delta to installed stamps and inherited children.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
+      const freshMaster = await tx.select().from(components)
+        .where(eq(components.cuuid, component.cuuid))
+        .limit(1);
+      const freshComponent = freshMaster[0] || component;
+      const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || '0');
+      const delta = params.newRHValue - previousMasterRH;
+      const monotonicity = validateRHMonotonicity({
+        currentRH: previousMasterRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: freshComponent.lastUpdated || null,
+        submittedRHDate: readingDateLocal,
+      });
+      if (!monotonicity.allowed) {
+        if (params.allowLowerWorkOrderApprovalSkip && params.updateSource === 'WORKORDER') {
+          return {
+            masterUpdated: freshComponent,
+            inheritedUpdated: 0,
+            rhSkipped: {
+              reason: 'LOWER_THAN_LIVE_RH' as const,
+              submittedRH: params.newRHValue,
+              currentRH: previousMasterRH,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: readingDateLocal,
+            },
+          };
+        }
+        enforceFreshRHMonotonicity({
+          currentRH: previousMasterRH,
+          submittedRH: params.newRHValue,
+          currentRHDate: freshComponent.lastUpdated || null,
+          submittedRHDate: readingDateLocal,
+        });
+      }
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { masterUpdated: freshComponent, inheritedUpdated: 0, noChange: true };
+      }
+
+      // Re-read inherited children's values inside the locked tx (Task #374): stale
+      // pre-lock reads must not drive the per-child delta math.
+      if (inheritedComponents.length > 0) {
+        inheritedComponents = await tx.select().from(components)
+          .where(inArray(components.cuuid, inheritedComponents.map((i) => i.cuuid)));
+      }
+
       // Update the MASTER component - update both rhCurrentMaster and currentCumulativeRH for compatibility
       const masterResult = await tx.update(components)
         .set({
@@ -1505,7 +1832,7 @@ export class PostgresStorage {
           rhMasterUpdatedAt: readingDate,
           rhMasterUpdatedBy: params.userId,
           rhMasterUpdateSource: params.updateSource,
-          lastUpdated: readingDate.toISOString(),
+          lastUpdated: readingDateLocal,
           updatedAt: now,
         })
         .where(eq(components.cuuid, component.cuuid))
@@ -1538,9 +1865,16 @@ export class PostgresStorage {
         version: 1,
         componentCode: masterComponentCode,
         componentName: component.name || null,
+        // Task #394: comparator metadata — origin side + rotational epoch (stamp holder)
+        originSide: await getRhOriginSide(),
+        stampHolder: freshComponent.currentStamp || null,
       }).returning();
       // Sync field logging — INSERT (best-effort)
       try { await logFieldChanges('running_hours_audit', rhaResult[0].rhauuid, masterVesselId, null, rhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha tx create:', e); }
+
+      // RH follows the Stamp: accrue the DELTA onto the master's Installed rotational item
+      // (delta-based — Task #369). Inside the tx: stamp RH and component RH stay atomic.
+      await this.accrueStampRhDelta(tx, masterVesselId, freshComponent.currentStamp, delta, readingDateLocal, params.userId);
 
       // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
       // rhCurrentInheritedCached stores the master's absolute value (for display/config)
@@ -1561,7 +1895,7 @@ export class PostgresStorage {
             // Stamp the reading date (WO completion date / RH section date), not the server
             // clock, so the family's Last Updated reflects when the hours were observed.
             rhInheritedUpdatedAt: readingDate,
-            lastUpdated: readingDate.toISOString(),
+            lastUpdated: readingDateLocal,
             updatedAt: now,
           })
           .where(eq(components.cuuid, inherited.cuuid));
@@ -1589,8 +1923,15 @@ export class PostgresStorage {
           version: 1,
           componentCode: inherited.componentCode || null,
           componentName: inherited.name || null,
+          // Task #394: comparator metadata — origin side + rotational epoch (stamp holder)
+          originSide: await getRhOriginSide(),
+          stampHolder: inherited.currentStamp || null,
         }).returning();
         try { await logFieldChanges('running_hours_audit', childRhaResult[0].rhauuid, inherited.vesselId || masterVesselId, null, childRhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha cascade create:', e); }
+
+        // RH follows the Stamp: accrue the DELTA onto the child's Installed rotational item
+        // too (delta-based — Task #369; the child's cumulative is NOT the stamp's hours).
+        await this.accrueStampRhDelta(tx, inherited.vesselId || masterVesselId, inherited.currentStamp, delta, readingDateLocal, params.userId);
 
         inheritedUpdated++;
       }
@@ -1613,7 +1954,8 @@ export class PostgresStorage {
   }): Promise<{ component: Component; inheritedUpdated: number }> {
     const db = await getDb();
     const now = new Date();
-    const lastUpdatedValue = params.lastUpdatedDate || now.toISOString();
+    // Task #427: canonical calendar-day contract for component stamps.
+    const lastUpdatedValue = requireReadingDayInput(params.lastUpdatedDate ?? null, 'last updated date') ?? formatReadingDay(now);
     
     // Get the component to determine its counter type
     const component = await this.getComponent(params.componentId);
@@ -1623,14 +1965,48 @@ export class PostgresStorage {
 
     const rhValueStr = params.newRHValue.toString();
     let inheritedUpdated = 0;
+    // Reading date for the stamp accrual: canonical calendar day (Task #427 —
+    // rotational-item rh_last_updated holds YYYY-MM-DD, never an instant).
+    const readingIso = lastUpdatedValue;
 
+    // Fetch inherited components list before the tx (read-only)
+    let inheritedComponentsPre = component.rhCounterType === 'MASTER' && component.vesselId
+      ? await this.getInheritedComponents(component.cuuid, component.vesselId)
+      : [];
+
+    // All writes in ONE transaction (Task #369): component RH, inherited cascade and
+    // stamp accruals are all-or-nothing — a mid-sequence failure must not leave the
+    // component, its children and the rotational registry out of sync.
+    return db.transaction(async (tx) => {
+    // Duplicate-submission guard (Task #374): serialize concurrent updates of the same
+    // component and compute deltas from a fresh in-tx read so overlapping identical
+    // submissions cannot double-accrue stamp hours.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
+    const freshRows = await tx.select().from(components)
+      .where(eq(components.cuuid, component.cuuid))
+      .limit(1);
+    const freshComponent = freshRows[0] || component;
+    // Re-read inherited children's values inside the locked tx (Task #374)
+    if (inheritedComponentsPre.length > 0) {
+      inheritedComponentsPre = await tx.select().from(components)
+        .where(inArray(components.cuuid, inheritedComponentsPre.map((i) => i.cuuid)));
+    }
     if (component.rhCounterType === 'MASTER') {
       // Calculate delta: difference between new and old master RH value
-      const previousMasterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+      const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || '0');
       const delta = params.newRHValue - previousMasterRH;
+      const monotonicity = enforceFreshRHMonotonicity({
+        currentRH: previousMasterRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: freshComponent.lastUpdated || null,
+        submittedRHDate: lastUpdatedValue,
+      });
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { component: freshComponent, inheritedUpdated: 0 };
+      }
 
       // For MASTER components: update rhCurrentMaster AND currentCumulativeRH, then cascade
-      const result = await db.update(components)
+      const result = await tx.update(components)
         .set({
           rhCurrentMaster: rhValueStr,
           currentCumulativeRH: rhValueStr,
@@ -1647,6 +2023,9 @@ export class PostgresStorage {
         throw new Error(`Failed to update MASTER component ${params.componentId}`);
       }
 
+      // RH follows the Stamp: accrue the DELTA onto the master's Installed rotational item (Task #369)
+      await this.accrueStampRhDelta(tx, freshComponent.vesselId, freshComponent.currentStamp, delta, readingIso, params.userId);
+
       // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
       const masterVesselId = component.vesselId;
 
@@ -1656,17 +2035,14 @@ export class PostgresStorage {
         return { component: result[0], inheritedUpdated: 0 };
       }
 
-      // Get all inherited components linked to this master
-      const inheritedComponents = await this.getInheritedComponents(component.cuuid, masterVesselId);
-      
       // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
       // rhCurrentInheritedCached stores the master's absolute value (for display/config)
       // currentCumulativeRH tracks the child's individual running hours (delta-based)
-      for (const inherited of inheritedComponents) {
+      for (const inherited of inheritedComponentsPre) {
         const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
         const newChildRH = Math.max(0, currentChildRH + delta); // Apply delta, ensure non-negative
         
-        await db.update(components)
+        await tx.update(components)
           .set({
             rhCurrentInheritedCached: params.newRHValue.toString(), // Cache master's absolute value
             currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
@@ -1675,7 +2051,10 @@ export class PostgresStorage {
             updatedAt: now,
           })
           .where(eq(components.cuuid, inherited.cuuid));
-        
+
+        // RH follows the Stamp: accrue the DELTA onto the child's Installed item too (Task #369)
+        await this.accrueStampRhDelta(tx, inherited.vesselId || component.vesselId, inherited.currentStamp, delta, readingIso, params.userId);
+
         inheritedUpdated++;
       }
 
@@ -1685,7 +2064,17 @@ export class PostgresStorage {
       // For INHERITED components: only update currentCumulativeRH (child's actual hours)
       // Do NOT update rhCurrentInheritedCached as it stores the master's value
       // This is typically used for component replacement scenarios (reset to 0) or manual adjustments
-      const result = await db.update(components)
+      const previousInheritedRH = parseFloat(freshComponent.currentCumulativeRH || '0');
+      const monotonicity = enforceFreshRHMonotonicity({
+        currentRH: previousInheritedRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: freshComponent.lastUpdated || null,
+        submittedRHDate: lastUpdatedValue,
+      });
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { component: freshComponent, inheritedUpdated: 0 };
+      }
+      const result = await tx.update(components)
         .set({
           currentCumulativeRH: rhValueStr,
           rhInheritedUpdatedAt: now,
@@ -1698,11 +2087,25 @@ export class PostgresStorage {
       if (!result[0]) {
         throw new Error(`Failed to update INHERITED component ${params.componentId}`);
       }
+      // RH follows the Stamp: accrue the DELTA of the child's own cumulative hours (Task #369)
+      // Delta computed from the fresh locked in-tx read (Task #374 duplicate guard).
+      const inheritedDelta = params.newRHValue - previousInheritedRH;
+      await this.accrueStampRhDelta(tx, freshComponent.vesselId, freshComponent.currentStamp, inheritedDelta, readingIso, params.userId);
       return { component: result[0], inheritedUpdated: 0 };
 
     } else {
       // For NOT_RH_DRIVEN or unknown: just update currentCumulativeRH for backward compatibility
-      const result = await db.update(components)
+      const previousFallbackRH = parseFloat(freshComponent.currentCumulativeRH || '0');
+      const monotonicity = enforceFreshRHMonotonicity({
+        currentRH: previousFallbackRH,
+        submittedRH: params.newRHValue,
+        currentRHDate: freshComponent.lastUpdated || null,
+        submittedRHDate: lastUpdatedValue,
+      });
+      if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+        return { component: freshComponent, inheritedUpdated: 0 };
+      }
+      const result = await tx.update(components)
         .set({
           currentCumulativeRH: rhValueStr,
           lastUpdated: lastUpdatedValue,
@@ -1714,8 +2117,12 @@ export class PostgresStorage {
       if (!result[0]) {
         throw new Error(`Failed to update component ${params.componentId}`);
       }
+      // RH follows the Stamp: accrue the DELTA onto the Installed item (Task #369)
+      const fallbackDelta = params.newRHValue - previousFallbackRH;
+      await this.accrueStampRhDelta(tx, component.vesselId, component.currentStamp, fallbackDelta, readingIso, params.userId);
       return { component: result[0], inheritedUpdated: 0 };
     }
+    });
   }
 
   // ============= MODULE 3: COMPONENT DOCUMENTS =============
@@ -1963,7 +2370,22 @@ export class PostgresStorage {
   async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
     const db = await getDb();
     // Audit Phase 0: freeze the human actor label unless the caller already supplied one.
-    const auditWithActor = { ...audit, actorLabel: audit.actorLabel ?? getAuditActor().actorLabel };
+    // Task #394: stamp origin_side (ship/shore) so the canonical latest-reading-wins
+    // comparator can break exact-date ties (ship wins).
+    // Task #427: the storage insert is the LAST boundary — no writer may
+    // persist non-canonical date_updated_local text. Absent → today (UTC day);
+    // PRESENT-but-unparseable → reject (never silently default). Sync appliers
+    // bypass this method (raw apply paths), so verbatim legacy rows arriving
+    // via sync are unaffected.
+    const canonicalDateUpdatedLocal =
+      requireReadingDayInput((audit as any).dateUpdatedLocal ?? null, 'reading date (dateUpdatedLocal)')
+      ?? formatReadingDay(new Date());
+    const auditWithActor = {
+      ...audit,
+      dateUpdatedLocal: canonicalDateUpdatedLocal,
+      actorLabel: audit.actorLabel ?? getAuditActor().actorLabel,
+      originSide: (audit as any).originSide ?? await getRhOriginSide(),
+    };
     const result = await db.insert(runningHoursAudit).values(auditWithActor).returning();
     // Sync field logging — INSERT
     try { await logFieldChanges('running_hours_audit', result[0].rhauuid, (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] rha create:', e); }
@@ -2038,14 +2460,11 @@ export class PostgresStorage {
     const comp = await this.getComponent(componentId);
     const resolvedId = comp ? comp.cuuid : componentId;
 
-    // NOTE: use [0-9] not \d — inside a JS sql`` template literal, "\d" is cooked to
-    // "d", producing a regex that never matches ISO dates and crashes TO_TIMESTAMP on
-    // the DD-Mon-YYYY branch ("invalid value ... for Mon"). [0-9] survives intact.
-    const parsedDateExpr = sql`CASE 
-      WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' 
-        THEN TO_TIMESTAMP(${runningHoursAudit.dateUpdatedLocal}, 'YYYY-MM-DD')
-      ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
-    END`;
+    // Crash-proof CALENDAR-DAY parse of the free-text date_updated_local
+    // column (Task #427): NULL for unparseable strings (no 22007), and DATE
+    // vs target calendar day so a non-UTC DB session can't shift the day.
+    const parsedDateExpr = readingDayLocalExpr();
+    const targetDay = targetReadingDay(targetDate);
 
     const idCondition = or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId));
 
@@ -2056,7 +2475,7 @@ export class PostgresStorage {
       .from(runningHoursAudit)
       .where(and(
         idCondition,
-        sql`${parsedDateExpr} <= ${targetDate}`
+        sql`${parsedDateExpr} <= ${targetDay}::date`
       ))
       .orderBy(sql`${parsedDateExpr} DESC`)
       .limit(1);
@@ -2076,7 +2495,7 @@ export class PostgresStorage {
       .from(runningHoursAudit)
       .where(and(
         idCondition,
-        sql`${parsedDateExpr} > ${targetDate}`
+        sql`${parsedDateExpr} > ${targetDay}::date`
       ))
       .orderBy(sql`${parsedDateExpr} ASC`)
       .limit(1);
@@ -2096,12 +2515,14 @@ export class PostgresStorage {
 
   async getJobs(vesselId?: string, componentId?: string, vesselIds?: string[]): Promise<Job[]> {
     const db = await getDb();
+    const notDeleted = or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted));
 
     if (vesselIds && vesselIds.length > 0) {
       return await db.select().from(jobs)
         .where(and(
           inArray(jobs.vesselId, vesselIds),
-          eq(jobs.dataScope, 'vessel')
+          eq(jobs.dataScope, 'vessel'),
+          notDeleted
         ))
         .orderBy(asc(jobs.jobNo));
     }
@@ -2113,7 +2534,8 @@ export class PostgresStorage {
         .where(and(
           eq(jobs.vesselId, vesselId),
           eq(jobs.componentId, componentId),
-          eq(jobs.dataScope, 'vessel')
+          eq(jobs.dataScope, 'vessel'),
+          notDeleted
         ))
         .orderBy(asc(jobs.jobNo));
       
@@ -2149,27 +2571,34 @@ export class PostgresStorage {
       return await db.select().from(jobs)
         .where(and(
           eq(jobs.vesselId, vesselId),
-          eq(jobs.dataScope, 'vessel')
+          eq(jobs.dataScope, 'vessel'),
+          notDeleted
         ))
         .orderBy(asc(jobs.jobNo));
     }
     
     return await db.select().from(jobs)
-      .where(eq(jobs.dataScope, 'vessel'))
+      .where(and(eq(jobs.dataScope, 'vessel'), notDeleted))
       .orderBy(asc(jobs.jobNo));
   }
 
   async getJob(id: string): Promise<Job | undefined> {
     const db = await getDb();
     const result = await db.select().from(jobs).where(
-      or(eq(jobs.juuid, id), eq(jobs.id, id))
+      and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+      )
     );
     return result[0];
   }
 
   async getJobByJobNo(jobNo: string): Promise<Job | undefined> {
     const db = await getDb();
-    const result = await db.select().from(jobs).where(eq(jobs.jobNo, jobNo));
+    const result = await db.select().from(jobs).where(and(
+      eq(jobs.jobNo, jobNo),
+      or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+    ));
     return result[0];
   }
 
@@ -2189,7 +2618,10 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(jobs)
       .set({ ...data, updatedAt: new Date() })
-      .where(or(eq(jobs.juuid, id), eq(jobs.id, id)))
+      .where(and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+      ))
       .returning();
     if (!result[0]) {
       throw new Error(`Job ${id} not found`);
@@ -2199,7 +2631,27 @@ export class PostgresStorage {
 
   async deleteJob(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(jobs).where(or(eq(jobs.juuid, id), eq(jobs.id, id)));
+    const existing = await db.select().from(jobs).where(
+      and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+      )
+    );
+    if (!existing[0]) {
+      throw new Error(`Job ${id} not found`);
+    }
+
+    const result = await db.update(jobs)
+      .set({ isDeleted: true, isActive: false, updatedAt: new Date() })
+      .where(eq(jobs.juuid, existing[0].juuid))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Job ${id} not found`);
+    }
+
+    // Jobs are shore-to-ship full-row synchronized records. Updating updatedAt
+    // makes this lifecycle marker eligible for the next one-way sync snapshot;
+    // field logs intentionally apply only to BOTH_EDITABLE tables.
   }
 
   async bulkCreateJobs(jobList: InsertJob[]): Promise<Job[]> {
@@ -2275,11 +2727,15 @@ export class PostgresStorage {
       result = await db.select().from(jobs)
         .where(and(
           inArray(jobs.jobNo, jobNos),
-          eq(jobs.vesselId, vesselId)
+          eq(jobs.vesselId, vesselId),
+          or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
         ));
     } else {
       result = await db.select().from(jobs)
-        .where(inArray(jobs.jobNo, jobNos));
+        .where(and(
+          inArray(jobs.jobNo, jobNos),
+          or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
+        ));
     }
     
     const map = new Map<string, Job>();
@@ -2291,6 +2747,16 @@ export class PostgresStorage {
 
 
   // ============= MODULE 5: WORK ORDERS =============
+
+  // Light projection for WO numbering — one indexed column instead of full rows.
+  // Full-row getWorkOrders here cost ~930 rows read per WO generated (perf probe 02-Sep-2026).
+  async getWorkOrderNumbers(vesselId?: string): Promise<string[]> {
+    const db = await getDb();
+    const rows = vesselId
+      ? await db.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders).where(eq(workOrders.vesselId, vesselId))
+      : await db.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders);
+    return rows.map(r => r.workOrderNo).filter((n): n is string => !!n);
+  }
 
   async getWorkOrders(vesselId?: string, vesselIds?: string[]): Promise<WorkOrder[]> {
     const db = await getDb();
@@ -2360,13 +2826,23 @@ export class PostgresStorage {
   async updateWorkOrder(id: string, data: Partial<InsertWorkOrder>): Promise<WorkOrder> {
     const db = await getDb();
     
-    // Sanitize data: convert empty strings to null for integer fields
-    // PostgreSQL cannot cast empty strings to integers
-    const integerFields = ['maintenanceIntervalValue', 'intervalRunningHour'];
+    // Sanitize data: empty string -> NULL for every numeric-ish column.
+    // Postgres cannot cast '' to integer/numeric; the form submits '' for any blank field.
+    //
+    // This was a HAND-MAINTAINED LIST of two names ('maintenanceIntervalValue',
+    // 'intervalRunningHour'), which is why migration 139's new `wo_completion_rh` fell straight
+    // through it: the WO form sends woCompletionRh:'' on EVERY completion where the RH box is
+    // blank (i.e. every calendar-based job), and the PATCH 500'd with
+    //   invalid input syntax for type numeric: ""
+    // `missedCycles` and `daysLate` had the same latent defect and are covered by the same pass.
+    //
+    // Derived from the Drizzle schema so a column added tomorrow cannot repeat this. NOTE the
+    // filter keys off columnType, NOT dataType: Drizzle types PgNumeric as a *string* in JS to
+    // preserve precision, so a `dataType === 'number'` test would have missed woCompletionRh —
+    // the very field that broke. Computed once, then cached.
     const sanitizedData = { ...data };
-    
-    for (const field of integerFields) {
-      if (field in sanitizedData && sanitizedData[field as keyof typeof sanitizedData] === '') {
+    for (const field of getWorkOrderNumericFields()) {
+      if (field in sanitizedData && (sanitizedData as any)[field] === '') {
         (sanitizedData as any)[field] = null;
       }
     }
@@ -2473,7 +2949,10 @@ export class PostgresStorage {
   async getAllSpares(): Promise<Spare[]> {
     const db = await getDb();
     return await db.select().from(spares)
-      .where(eq(spares.deleted, false));
+      .where(and(
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
+      ));
   }
 
   async getSpares(vesselId: string, vesselIds?: string[]): Promise<Spare[]> {
@@ -2483,21 +2962,24 @@ export class PostgresStorage {
         .where(and(
           inArray(spares.vesselId, vesselIds),
           eq(spares.dataScope, 'vessel'),
-          eq(spares.deleted, false)
+          eq(spares.deleted, false),
+          or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
         ));
     }
     if (!vesselId || vesselId === 'all') {
       return await db.select().from(spares)
         .where(and(
           eq(spares.dataScope, 'vessel'),
-          eq(spares.deleted, false)
+          eq(spares.deleted, false),
+          or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
         ));
     }
     return await db.select().from(spares)
       .where(and(
         eq(spares.vesselId, vesselId),
         eq(spares.dataScope, 'vessel'),
-        eq(spares.deleted, false)
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ));
   }
 
@@ -2508,6 +2990,14 @@ export class PostgresStorage {
       or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : []))
     );
     return result[0];
+  }
+
+  private async getOperationalSpare(id: string): Promise<Spare> {
+    const spare = await this.getSpare(id);
+    if (!spare || spare.deleted || spare.isDeleted) {
+      throw Object.assign(new Error(`Spare ${id} not found`), { statusCode: 404 });
+    }
+    return spare;
   }
 
   async createSpare(spare: InsertSpare, skipSiblingSync: boolean = false): Promise<Spare> {
@@ -2591,15 +3081,91 @@ export class PostgresStorage {
     else if (updateData.ihmPresence === 'NO' && !updateData.ihm) updateData.ihm = 'No';
 
     const numId = Number(id);
-    const result = await db.update(spares)
-      .set(updateData)
-      .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])))
-      .returning();
-    if (!result[0]) {
-      throw new Error(`Spare ${id} not found`);
+
+    // Determine whether this update touches ROB values or location labels — if so,
+    // spare_location_stock must change in the SAME transaction as the spares row.
+    const robChanged = data.rob !== undefined || data.robLocationA !== undefined || data.robLocationB !== undefined;
+    const locationChanged = data.location !== undefined || data.location2 !== undefined;
+    const needsStockSync = (robChanged || locationChanged) && !!(existingSpare?.vesselId || (data as any).vesselId);
+
+    // Normalize ROB fields so the invariant rob == robLocationA + robLocationB
+    // (== sum of spare_location_stock) always holds after this update:
+    // - a direct `rob` edit without A/B is applied to Location A (same convention
+    //   as adjustSpareQuantity), keeping B unchanged;
+    // - whenever any ROB field changes, the rollup is re-derived from A + B.
+    if (robChanged && existingSpare) {
+      const effB = data.robLocationB !== undefined ? (data.robLocationB ?? 0) : (existingSpare.robLocationB ?? 0);
+      let effA: number;
+      if (data.robLocationA !== undefined) {
+        effA = data.robLocationA ?? 0;
+      } else if (data.rob !== undefined) {
+        effA = Math.max(0, (data.rob ?? 0) - effB);
+      } else {
+        effA = existingSpare.robLocationA ?? 0;
+      }
+      (updateData as any).robLocationA = effA;
+      (updateData as any).robLocationB = effB;
+      (updateData as any).rob = effA + effB;
     }
 
-    const updatedSpare = result[0];
+    // Pre-resolve stock targets from the post-update effective spare (read-only, safe pre-tx)
+    let stockTargets: Array<{ locationId: number; which: 'A' | 'B' }> = [];
+    let effectiveSpare: Spare | null = null;
+    if (needsStockSync && existingSpare) {
+      effectiveSpare = { ...existingSpare, ...data } as Spare;
+      stockTargets = await this.resolveLegacyStockTargets(effectiveSpare);
+    }
+
+    const updatedSpare = await db.transaction(async (tx) => {
+      const result = await tx.update(spares)
+        .set(updateData)
+        .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])))
+        .returning();
+      if (!result[0]) {
+        throw new Error(`Spare ${id} not found`);
+      }
+      const updated = result[0];
+
+      if (needsStockSync && effectiveSpare) {
+        // Upsert stock rows for the (possibly new) configured locations
+        await this.syncLegacyRobToLocationStockTx(
+          tx,
+          { ...effectiveSpare, id: updated.id, suuid: updated.suuid } as Spare,
+          stockTargets,
+          updated.robLocationA ?? 0,
+          updated.robLocationB ?? 0
+        );
+
+        // Remove stock rows orphaned by an explicit location-label change (same tx).
+        // Guards: never on ROB-only edits; never when no label resolved (would wipe
+        // everything); never for rows with inventory-transaction evidence at that
+        // location (they represent real per-location stock, not stale seeds).
+        if (locationChanged && stockTargets.length > 0) {
+          const activeLocationIds = stockTargets.map(t => t.locationId);
+          const allStockRows = await tx.select().from(spareLocationStock)
+            .where(eq(spareLocationStock.spareId, updated.id));
+          for (const row of allStockRows) {
+            if (activeLocationIds.includes(row.locationId)) continue;
+            const evidence = await tx.select({ id: inventoryTransactions.id })
+              .from(inventoryTransactions)
+              .where(and(
+                eq(inventoryTransactions.spareId, updated.id),
+                eq(inventoryTransactions.locationId, row.locationId)
+              ))
+              .limit(1);
+            if (evidence.length > 0) continue;
+            await tx.delete(spareLocationStock).where(
+              and(
+                eq(spareLocationStock.spareId, updated.id),
+                eq(spareLocationStock.locationId, row.locationId)
+              )
+            );
+          }
+        }
+      }
+
+      return updated;
+    });
 
     // Sync field logging — spare UPDATE
     if (existingSpare) {
@@ -2628,81 +3194,90 @@ export class PostgresStorage {
       }
     }
 
-    // SYNC: Update spare_location_stock if ROB values or location fields changed
-    const robChanged = data.robLocationA !== undefined || data.robLocationB !== undefined;
-    const locationChanged = data.location !== undefined || data.location2 !== undefined;
-    if ((robChanged || locationChanged) && updatedSpare.vesselId) {
-      const vesselId = updatedSpare.vesselId;
-      const robA = updatedSpare.robLocationA ?? 0;
-      const robB = updatedSpare.robLocationB ?? 0;
-
-      if (updatedSpare.location) {
-        try {
-          const locationAObj = await this.findLocationStrict(vesselId, updatedSpare.location);
-          await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationAObj.id, qty: robA });
-        } catch (syncError: any) {
-          console.warn(`[updateSpare] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-        }
-      }
-      if (updatedSpare.location2) {
-        try {
-          const locationBObj = await this.findLocationStrict(vesselId, updatedSpare.location2);
-          await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationBObj.id, qty: robB });
-        } catch (syncError: any) {
-          console.warn(`[updateSpare] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-        }
-      }
-
-      const activeLocationIds: number[] = [];
-      if (updatedSpare.location) {
-        try {
-          const locA = await this.findLocationStrict(vesselId, updatedSpare.location);
-          activeLocationIds.push(locA.id);
-        } catch (_) {}
-      }
-      if (updatedSpare.location2) {
-        try {
-          const locB = await this.findLocationStrict(vesselId, updatedSpare.location2);
-          activeLocationIds.push(locB.id);
-        } catch (_) {}
-      }
-      try {
-        const allStockRows = await this.getSpareLocationStock(updatedSpare.id);
-        const orphanedRows = allStockRows.filter(r => !activeLocationIds.includes(r.locationId));
-        for (const orphan of orphanedRows) {
-          await db.delete(spareLocationStock).where(
-            and(
-              eq(spareLocationStock.spareId, updatedSpare.id),
-              eq(spareLocationStock.locationId, orphan.locationId)
-            )
-          );
-        }
-        if (orphanedRows.length > 0) {
-          console.log(`[updateSpare] Cleaned up ${orphanedRows.length} orphaned spare_location_stock entries for spare ${id}`);
-        }
-      } catch (cleanupError: any) {
-        console.warn(`[updateSpare] Failed to cleanup orphaned spare_location_stock for spare ${id}: ${cleanupError.message}`);
-      }
-    }
-    
     return updatedSpare;
   }
 
-  async deleteSpare(id: string): Promise<void> {
+  async deleteSpare(id: string, userId = 'system'): Promise<void> {
     const db = await getDb();
     // Fetch-before-delete for sync field logging
     const existingSpare = await this.getSpare(id);
+    if (!existingSpare || existingSpare.deleted || existingSpare.isDeleted) {
+      throw new Error(`Spare ${id} not found`);
+    }
 
     const numId = Number(id);
     await db.update(spares)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ deleted: true, isDeleted: true, isActive: false, updatedAt: new Date() })
       .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])));
 
     // Sync field logging — spare soft-delete
     if (existingSpare) {
       try {
-        await logSoftDelete('spares', existingSpare.suuid, existingSpare.vesselId || null, 'system');
+        await logSoftDelete('spares', existingSpare.suuid, existingSpare.vesselId || null, userId);
       } catch (err) { console.error('[FieldLogger] Spare delete:', err); }
+    }
+  }
+
+  /**
+   * Resolve the location rows that a spare's legacy location/location2 text labels map to.
+   * Read-only; safe to call before opening a transaction.
+   */
+  private async resolveLegacyStockTargets(
+    spare: Spare
+  ): Promise<Array<{ locationId: number; which: 'A' | 'B' }>> {
+    const vesselId = spare.vesselId || 'V001';
+    const targets: Array<{ locationId: number; which: 'A' | 'B' }> = [];
+    // FAIL-CLOSED: if a location label is configured but cannot be resolved to a
+    // locations row, abort the mutation instead of silently updating only the
+    // legacy columns — a partial update here is exactly the drift this system
+    // is designed to prevent. Surface the data problem so it can be fixed.
+    if (spare.location && spare.location.trim() !== '') {
+      try {
+        const locA = await this.findLocationStrict(vesselId, spare.location);
+        targets.push({ locationId: locA.id, which: 'A' });
+      } catch (e: any) {
+        throw new Error(
+          `Data integrity error: spare ${spare.id} (${spare.partName}) has Location A "${spare.location}" ` +
+          `which does not match any location for vessel ${vesselId}. Fix the spare's location before changing stock. (${e.message})`
+        );
+      }
+    }
+    if (spare.location2 && spare.location2.trim() !== '') {
+      try {
+        const locB = await this.findLocationStrict(vesselId, spare.location2);
+        targets.push({ locationId: locB.id, which: 'B' });
+      } catch (e: any) {
+        throw new Error(
+          `Data integrity error: spare ${spare.id} (${spare.partName}) has Location B "${spare.location2}" ` +
+          `which does not match any location for vessel ${vesselId}. Fix the spare's location before changing stock. (${e.message})`
+        );
+      }
+    }
+    return targets;
+  }
+
+  /**
+   * Single transactional core for keeping spare_location_stock in lockstep with the
+   * legacy spares.rob_location_a/b columns. MUST be called INSIDE the same DB
+   * transaction that updates the legacy columns, with pre-resolved targets, so the
+   * two representations can never diverge on a partial failure.
+   */
+  private async syncLegacyRobToLocationStockTx(
+    tx: any,
+    spare: Spare,
+    targets: Array<{ locationId: number; which: 'A' | 'B' }>,
+    newRobA: number,
+    newRobB: number
+  ): Promise<void> {
+    const vesselId = spare.vesselId || 'V001';
+    for (const t of targets) {
+      await this.upsertSpareLocationStock({
+        vesselId,
+        spareId: spare.id,
+        spareUuid: spare.suuid,
+        locationId: t.locationId,
+        qty: Math.max(0, t.which === 'A' ? newRobA : newRobB),
+      }, tx);
     }
   }
 
@@ -2715,14 +3290,12 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const newRob = (spare.rob ?? 0) - quantity;
     const newRobA = (spare.robLocationA ?? 0) - quantity;
+    const stockTargets = await this.resolveLegacyStockTargets(spare);
     
     const updated = await db.transaction(async (tx) => {
       const result = await tx.update(spares)
@@ -2756,6 +3329,13 @@ export class PostgresStorage {
         place: place ?? null,
       }, tx);
 
+      // Keep spare_location_stock in lockstep inside the same transaction
+      await this.syncLegacyRobToLocationStockTx(
+        tx, spare, stockTargets,
+        newRobA < 0 ? 0 : newRobA,
+        spare.robLocationB ?? 0
+      );
+
       return result[0];
     });
 
@@ -2763,23 +3343,6 @@ export class PostgresStorage {
     try {
       await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, updated, userId);
     } catch (err) { console.error('[FieldLogger] Spare consume:', err); }
-
-    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
-    const vesselId = spare.vesselId || 'V001';
-    if (spare.location) {
-      try {
-        const locationA = await this.findLocationStrict(vesselId, spare.location);
-        await this.upsertSpareLocationStock({
-          vesselId,
-          spareId: spare.id,
-          spareUuid: spare.suuid,
-          locationId: locationA.id,
-          qty: newRobA < 0 ? 0 : newRobA,
-        });
-      } catch (syncError: any) {
-        console.warn(`[consumeSpare] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-      }
-    }
 
     return updated;
   }
@@ -2793,11 +3356,8 @@ export class PostgresStorage {
     workOrderRef?: string,
     dateLocal?: string
   ): Promise<{ spare: Spare; deducted: number; requested: number; shortageQty: number }> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const currentRobA = spare.robLocationA ?? 0;
     const currentRobB = spare.robLocationB ?? 0;
@@ -2818,6 +3378,7 @@ export class PostgresStorage {
     }
     
     const newRob = Math.max(0, currentRob - deducted);
+    const stockTargets = await this.resolveLegacyStockTargets(spare);
     
     const txResult = await db.transaction(async (tx) => {
       const result = await tx.update(spares)
@@ -2852,6 +3413,9 @@ export class PostgresStorage {
         place: null,
       }, tx);
 
+      // Keep spare_location_stock in lockstep inside the same transaction
+      await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newRobA, newRobB);
+
       return result[0];
     });
 
@@ -2859,25 +3423,6 @@ export class PostgresStorage {
     try {
       await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, txResult, userId);
     } catch (err) { console.error('[FieldLogger] Spare consumeFromLocation:', err); }
-
-    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
-    const vesselId = spare.vesselId || 'V001';
-    if (spare.location) {
-      try {
-        const locationAObj = await this.findLocationStrict(vesselId, spare.location);
-        await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newRobA });
-      } catch (syncError: any) {
-        console.warn(`[consumeSpareFromLocation] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-      }
-    }
-    if (spare.location2) {
-      try {
-        const locationBObj = await this.findLocationStrict(vesselId, spare.location2);
-        await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newRobB });
-      } catch (syncError: any) {
-        console.warn(`[consumeSpareFromLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-      }
-    }
 
     return {
       spare: txResult,
@@ -2896,11 +3441,8 @@ export class PostgresStorage {
     supplierPO?: string,
     dateLocal?: string
   ): Promise<{ spare: Spare; received: number }> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const currentRobA = spare.robLocationA ?? 0;
     const currentRobB = spare.robLocationB ?? 0;
@@ -2916,6 +3458,7 @@ export class PostgresStorage {
     }
     
     const newRob = currentRob + quantity;
+    const stockTargets = await this.resolveLegacyStockTargets(spare);
     
     const updated = await db.transaction(async (tx) => {
       const result = await tx.update(spares)
@@ -2951,6 +3494,9 @@ export class PostgresStorage {
         place: null,
       }, tx);
 
+      // Keep spare_location_stock in lockstep inside the same transaction
+      await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newRobA, newRobB);
+
       return result[0];
     });
 
@@ -2958,25 +3504,6 @@ export class PostgresStorage {
     try {
       await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, updated, userId);
     } catch (err) { console.error('[FieldLogger] Spare receiveToLocation:', err); }
-
-    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
-    const vesselId = spare.vesselId || 'V001';
-    if (spare.location) {
-      try {
-        const locationAObj = await this.findLocationStrict(vesselId, spare.location);
-        await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newRobA });
-      } catch (syncError: any) {
-        console.warn(`[receiveSpareToLocation] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-      }
-    }
-    if (spare.location2) {
-      try {
-        const locationBObj = await this.findLocationStrict(vesselId, spare.location2);
-        await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newRobB });
-      } catch (syncError: any) {
-        console.warn(`[receiveSpareToLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-      }
-    }
 
     return {
       spare: updated,
@@ -2994,11 +3521,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     if (isNaN(newRob) || newRob < 0) {
       throw new Error('newRob must be a valid non-negative number');
@@ -3025,6 +3549,7 @@ export class PostgresStorage {
     }
     
     const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
+    const stockTargets = await this.resolveLegacyStockTargets(spare);
 
     const updated = await db.transaction(async (tx) => {
       const result = await tx.update(spares)
@@ -3059,6 +3584,9 @@ export class PostgresStorage {
         place: place ?? null,
       }, tx);
 
+      // Keep spare_location_stock in lockstep inside the same transaction
+      await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newLocA, newLocB);
+
       return result[0];
     });
 
@@ -3066,25 +3594,6 @@ export class PostgresStorage {
     try {
       await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, updated, userId);
     } catch (err) { console.error('[FieldLogger] Spare adjustAtLocation:', err); }
-
-    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
-    const vesselId = spare.vesselId || 'V001';
-    if (spare.location) {
-      try {
-        const locationAObj = await this.findLocationStrict(vesselId, spare.location);
-        await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newLocA });
-      } catch (syncError: any) {
-        console.warn(`[adjustSpareAtLocation] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-      }
-    }
-    if (spare.location2) {
-      try {
-        const locationBObj = await this.findLocationStrict(vesselId, spare.location2);
-        await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newLocB });
-      } catch (syncError: any) {
-        console.warn(`[adjustSpareAtLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-      }
-    }
 
     return updated;
   }
@@ -3099,11 +3608,8 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<{ spare: Spare; isTransfer: boolean }> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const oldLocA = spare.robLocationA ?? 0;
     const oldLocB = spare.robLocationB ?? 0;
@@ -3131,6 +3637,7 @@ export class PostgresStorage {
     // (total ROB unchanged AND stock moved between locations)
     const oldTotalRob = oldLocA + oldLocB;
     const isTrueTransfer = deltaA !== 0 && deltaB !== 0 && newTotalRob === oldTotalRob;
+    const stockTargets = await this.resolveLegacyStockTargets(spare);
 
     const txResult = await db.transaction(async (tx) => {
       const result = await tx.update(spares)
@@ -3210,6 +3717,9 @@ export class PostgresStorage {
         }, tx);
       }
 
+      // Keep spare_location_stock in lockstep inside the same transaction
+      await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newLocA, newLocB);
+
       return result[0];
     });
 
@@ -3217,40 +3727,6 @@ export class PostgresStorage {
     try {
       await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, txResult, userId);
     } catch (err) { console.error('[FieldLogger] Spare transfer:', err); }
-
-    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
-    const vesselId = spare.vesselId || 'V001';
-
-    if (spare.location) {
-      try {
-        const locationA = await this.findLocationStrict(vesselId, spare.location);
-        await this.upsertSpareLocationStock({
-          vesselId,
-          spareId: spare.id,
-          spareUuid: spare.suuid,
-          locationId: locationA.id,
-          qty: newLocA,
-        });
-        console.log(`[transferSpareLocation] Synced Location A spare_location_stock for spare ${id}: ${spare.location}=${newLocA}`);
-      } catch (syncError: any) {
-        console.warn(`[transferSpareLocation] Failed to sync Location A spare_location_stock for spare ${id}: ${syncError.message}`);
-      }
-    }
-    if (spare.location2) {
-      try {
-        const locationB = await this.findLocationStrict(vesselId, spare.location2);
-        await this.upsertSpareLocationStock({
-          vesselId,
-          spareId: spare.id,
-          spareUuid: spare.suuid,
-          locationId: locationB.id,
-          qty: newLocB,
-        });
-        console.log(`[transferSpareLocation] Synced Location B spare_location_stock for spare ${id}: ${spare.location2}=${newLocB}`);
-      } catch (syncError: any) {
-        console.warn(`[transferSpareLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
-      }
-    }
 
     return { spare: txResult, isTransfer: isTrueTransfer };
   }
@@ -3265,14 +3741,12 @@ export class PostgresStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(id);
     const db = await getDb();
-    const spare = await this.getSpare(id);
-    if (!spare) {
-      throw new Error(`Spare ${id} not found`);
-    }
     
     const newRob = (spare.rob ?? 0) + quantity;
     const newRobA = (spare.robLocationA ?? 0) + quantity;
+    const stockTargets = await this.resolveLegacyStockTargets(spare);
     
     const updated = await db.transaction(async (tx) => {
       const result = await tx.update(spares)
@@ -3307,6 +3781,9 @@ export class PostgresStorage {
         place: place ?? null,
       }, tx);
 
+      // Keep spare_location_stock in lockstep inside the same transaction
+      await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newRobA, spare.robLocationB ?? 0);
+
       return result[0];
     });
 
@@ -3325,11 +3802,8 @@ export class PostgresStorage {
     reference?: string,
     notes?: string
   ): Promise<Spare> {
+    const spare = await this.getOperationalSpare(spareId);
     const db = await getDb();
-    const spare = await this.getSpare(spareId);
-    if (!spare) {
-      throw new Error(`Spare ${spareId} not found`);
-    }
     
     const currentRob = spare.rob ?? 0;
     const currentRobA = spare.robLocationA ?? 0;
@@ -3337,6 +3811,7 @@ export class PostgresStorage {
     // Calculate new values based on quantity change
     const newRob = Math.max(0, currentRob + qtyChange);
     const newRobA = Math.max(0, currentRobA + qtyChange); // Apply to location A by default
+    const stockTargets = await this.resolveLegacyStockTargets(spare);
     
     const updated = await db.transaction(async (tx) => {
       const result = await tx.update(spares)
@@ -3369,6 +3844,9 @@ export class PostgresStorage {
         tz: null,
         place: null,
       }, tx);
+
+      // Keep spare_location_stock in lockstep inside the same transaction
+      await this.syncLegacyRobToLocationStockTx(tx, spare, stockTargets, newRobA, spare.robLocationB ?? 0);
 
       return result[0];
     });
@@ -4610,8 +5088,11 @@ export class PostgresStorage {
   async createDefectAction(action: InsertDefectAction): Promise<DefectAction> {
     const db = await getDb();
     const result = await db.insert(defectActions).values(action).returning();
-    // Sync field logging — INSERT (vesselId via parent defect lookup is deferred; log without vesselId)
-    try { await logFieldChanges('defect_actions', result[0].dauuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defectAction create:', e); }
+    // Sync field logging — INSERT (parent-resolved vessel_id: the gather drops null-vessel rows)
+    try {
+      const vId = await this.defVesselId(result[0].defectId);
+      await logFieldChanges('defect_actions', result[0].dauuid, vId, null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] defectAction create:', e); }
     return result[0];
   }
 
@@ -4631,8 +5112,11 @@ export class PostgresStorage {
     if (!result[0]) {
       throw new Error(`Defect action ${id} not found`);
     }
-    // Sync field logging — UPDATE
-    try { await logFieldChanges('defect_actions', existingAction.dauuid, null, existingAction, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defectAction update:', e); }
+    // Sync field logging — UPDATE (parent-resolved vessel_id)
+    try {
+      const vId = await this.defVesselId(existingAction.defectId);
+      await logFieldChanges('defect_actions', existingAction.dauuid, vId, existingAction, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] defectAction update:', e); }
     return result[0];
   }
 
@@ -4643,9 +5127,12 @@ export class PostgresStorage {
     if (!existing[0]) {
       throw new Error(`Defect action ${id} not found`);
     }
+    // Resolve parent vessel BEFORE the hard delete (the row's defect link is gone after)
+    const vIdDel = await this.defVesselId(existing[0].defectId);
     await db.delete(defectActions).where(eq(defectActions.id, id));
-    // Sync field logging — DELETE
-    try { await logFieldChanges('defect_actions', existing[0].dauuid, null, { is_deleted: false }, { is_deleted: true }, 'system'); } catch (e) { console.error('[FieldLogger] defectAction delete:', e); }
+    // Sync field logging — DELETE (parent-resolved vessel_id; hard delete + soft-delete log is
+    // the pre-existing semantics — receiver soft-deletes its copy)
+    try { await logFieldChanges('defect_actions', existing[0].dauuid, vIdDel, { is_deleted: false }, { is_deleted: true }, 'system'); } catch (e) { console.error('[FieldLogger] defectAction delete:', e); }
   }
 
   // ============= MODULE 9: DEFECT ATTACHMENTS =============
@@ -5004,12 +5491,59 @@ export class PostgresStorage {
       ));
   }
 
+  // Alert-scan candidate WOs: only rows whose authored status can still compute to a
+  // derived band. Excludes exactly the statuses computeWorkOrderStatus passes through
+  // unchanged (shared/workOrders/status.ts): the FINALIZED set (lowercased/trimmed
+  // compare) and the exact-match workflow statuses. On a mature fleet this drops the
+  // completed history — the bulk of the table — before the 5-minute alert scan
+  // enriches anything. NULL status = candidate.
+  async getAlertCandidateWorkOrders(): Promise<any[]> {
+    const db = await getDb();
+    return await db.select().from(workOrders)
+      .where(and(
+        eq(workOrders.dataScope, 'vessel'),
+        sql`${workOrders.isDeleted} IS NOT TRUE`,
+        sql`(${workOrders.status} IS NULL OR (
+          lower(trim(${workOrders.status})) NOT IN ('completed','approved','closed','cancelled','canceled')
+          AND ${workOrders.status} NOT IN ('Pending Approval','Pending Office Review','Postponed','Awaiting Office Approval','Postponement Approved','Postponement Rejected','Rejected')
+        ))`,
+      ));
+  }
+
+  // Alert-scan candidate spares: SQL mirror of evaluateLowSpares' preconditions
+  // (lowSparesEvaluator.ts) with only the columns it reads — instead of loading
+  // every spare of the fleet, full rows, every 5 minutes.
+  async getLowCriticalSpareCandidates(): Promise<any[]> {
+    const db = await getDb();
+    return await db.select({
+      suuid: spares.suuid,
+      partCode: spares.partCode,
+      partName: spares.partName,
+      rob: spares.rob,
+      min: spares.min,
+      critical: spares.critical,
+      componentCode: spares.componentCode,
+      componentName: spares.componentName,
+      vesselId: spares.vesselId,
+    }).from(spares)
+      .where(and(
+        eq(spares.dataScope, 'vessel'),
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted)),
+        sql`${spares.vesselId} IS NOT NULL`,
+        sql`lower(${spares.critical}) IN ('critical','yes')`,
+        sql`${spares.min} > 0`,
+        sql`${spares.rob} < ${spares.min}`,
+      ));
+  }
+
   async getAllVesselSpares(): Promise<any[]> {
     const db = await getDb();
     return await db.select().from(spares)
       .where(and(
         eq(spares.dataScope, 'vessel'),
-        eq(spares.deleted, false)
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
       ));
   }
 
@@ -5338,19 +5872,72 @@ export class PostgresStorage {
       .orderBy(changeRequestApproval.approvalLevel);
   }
 
+  // ── Approval-sync parent-vessel helpers ─────────────────────────────────
+  // The BOTH_EDITABLE field-log gather is `WHERE vessel_id IN (...)` — a NULL
+  // vessel_id log row is silently dropped and NEVER syncs (the historic
+  // null-vessel trap). Every approval-step log below must stamp the PARENT's
+  // vessel_id, resolved via these best-effort lookups.
+
+  private async crVesselId(changeRequestId: number): Promise<string | null> {
+    try {
+      const db = await getDb();
+      const r = await db.select({ v: changeRequest.vesselId }).from(changeRequest)
+        .where(eq(changeRequest.id, changeRequestId)).limit(1);
+      return r[0]?.v ?? null;
+    } catch { return null; }
+  }
+
+  private async wopVesselId(postponementId: string): Promise<string | null> {
+    try {
+      const db = await getDb();
+      const r = await db.select({ v: workOrderPostponements.vesselId }).from(workOrderPostponements)
+        .where(eq(workOrderPostponements.id, postponementId)).limit(1);
+      return r[0]?.v ?? null;
+    } catch { return null; }
+  }
+
+  // resolve defects.vessel_id for a defect action (defect_actions.defect_id → defects.duuid)
+  private async defVesselId(defectDuuid: string): Promise<string | null> {
+    try {
+      const db = await getDb();
+      const r = await db.select({ v: defects.vesselId }).from(defects)
+        .where(eq(defects.duuid, defectDuuid)).limit(1);
+      return r[0]?.v ?? null;
+    } catch { return null; }
+  }
+
   async createChangeRequestApprovalStep(step: InsertChangeRequestApproval): Promise<ChangeRequestApproval> {
     const db = await getDb();
     const result = await db.insert(changeRequestApproval).values(step).returning();
+
+    // Sync field logging — CR approval step INSERT (parent-resolved vessel_id)
+    try {
+      const vId = await this.crVesselId(result[0].changeRequestId);
+      await logFieldChanges('change_request_approval', result[0].crauuid, vId, null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] CRApproval create:', e); }
+
     return result[0];
   }
 
   async updateChangeRequestApprovalStep(id: number, data: Partial<ChangeRequestApproval>): Promise<ChangeRequestApproval> {
     const db = await getDb();
+
+    // Fetch-before-update for sync field logging (diff old vs new)
+    const existing = (await db.select().from(changeRequestApproval)
+      .where(eq(changeRequestApproval.id, id)).limit(1))[0];
+
     const result = await db.update(changeRequestApproval)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(changeRequestApproval.id, id))
       .returning();
     if (!result[0]) throw new Error(`Approval step ${id} not found`);
+
+    // Sync field logging — CR approval step UPDATE (parent-resolved vessel_id)
+    try {
+      const vId = await this.crVesselId(result[0].changeRequestId);
+      await logFieldChanges('change_request_approval', result[0].crauuid, vId, existing ?? null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] CRApproval update:', e); }
+
     return result[0];
   }
 
@@ -5371,8 +5958,8 @@ export class PostgresStorage {
 
   // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──
 
-  private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string): Promise<ChangeRequest> {
-    return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, new Date());
+  private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
+    return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, new Date(), overriddenChanges);
   }
 
   // ── Internal: atomically mark the final approval step AND finalise the CR ──
@@ -5384,7 +5971,8 @@ export class PostgresStorage {
     stepId: number | null,
     reviewerId: string,
     comment: string,
-    now: Date
+    now: Date,
+    overriddenChanges?: Array<{ field: string; approverNewValue: string }>
   ): Promise<ChangeRequest> {
     const db = await getDb();
     const newRevisionNumber = (existing.revisionNumber || 0) + 1;
@@ -5393,7 +5981,11 @@ export class PostgresStorage {
       const result = await db.transaction(async (tx) => {
         // Mark the final approval step as Approved inside the same transaction
         if (stepId !== null) {
-          await tx.update(changeRequestApproval)
+          // Fetch-before-update for sync field logging (diff old vs new, inside the tx)
+          const oldStep = (await tx.select().from(changeRequestApproval)
+            .where(eq(changeRequestApproval.id, stepId)).limit(1))[0];
+
+          const updatedStep = (await tx.update(changeRequestApproval)
             .set({
               status: 'Approved',
               actionByUserId: reviewerId,
@@ -5401,20 +5993,118 @@ export class PostgresStorage {
               remarks: comment,
               updatedAt: now
             })
-            .where(eq(changeRequestApproval.id, stepId));
+            .where(eq(changeRequestApproval.id, stepId))
+            .returning())[0];
+
+          // Sync field logging — final CR approval step (tx-scoped; parent CR is in scope
+          // so its vesselId is used directly, no lookup). Best-effort: never blocks the tx.
+          if (updatedStep) {
+            try {
+              await logFieldChanges('change_request_approval', updatedStep.crauuid,
+                existing.vesselId ?? null, oldStep ?? null, updatedStep, reviewerId, tx);
+            } catch (e) { console.error('[FieldLogger] CRApproval finalise:', e); }
+          }
         }
 
-        const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existing);
+        // Merge approver-edited values into a working copy of proposedChangesJson.
+        // The original proposedChangesJson is NEVER written back to the DB — this
+        // is purely an in-memory merge used only for this apply call and the audit entry.
+        const originalProposedChanges: Array<any> = Array.isArray(existing.proposedChangesJson)
+          ? [...(existing.proposedChangesJson as Array<any>)]
+          : [];
 
-        const revisionHistoryEntry = {
+        let effectiveProposedChanges = originalProposedChanges;
+
+        // Accumulate overrides from all partial_approval entries already in revisionHistory
+        // (recorded by non-final approvers who approved in earlier levels), then apply the
+        // current (final) approver's overrides on top — later wins.
+        const allPriorHistory: Array<any> = Array.isArray(existing.revisionHistory)
+          ? (existing.revisionHistory as Array<any>)
+          : [];
+        const partialApprovals = allPriorHistory.filter((e: any) => e.type === 'partial_approval');
+
+        // Map from field -> { approverNewValue, modifiedBy, modifiedAt }
+        // Earlier levels go in first so that higher levels can override them.
+        const accumulatedOverrideMap = new Map<string, { approverNewValue: string; modifiedBy: string; modifiedAt: string }>();
+        for (const partial of partialApprovals) {
+          for (const ov of (partial.overriddenFields || [])) {
+            accumulatedOverrideMap.set(String(ov.field), {
+              approverNewValue: String(ov.approverNewValue ?? ''),
+              modifiedBy: String(ov.modifiedBy ?? partial.approvedBy ?? ''),
+              modifiedAt: String(ov.modifiedAt ?? partial.approvedAt ?? now.toISOString())
+            });
+          }
+        }
+        // Final approver's overrides take precedence over all previous levels
+        for (const ov of (overriddenChanges || [])) {
+          accumulatedOverrideMap.set(ov.field, {
+            approverNewValue: ov.approverNewValue,
+            modifiedBy: reviewerId,
+            modifiedAt: now.toISOString()
+          });
+        }
+
+        if (accumulatedOverrideMap.size > 0) {
+          effectiveProposedChanges = originalProposedChanges.map((change: any) => {
+            const fieldKey = change.field ?? change.columnName;
+            if (fieldKey && accumulatedOverrideMap.has(String(fieldKey))) {
+              return { ...change, newValue: accumulatedOverrideMap.get(String(fieldKey))!.approverNewValue };
+            }
+            return change;
+          });
+          console.log(`[CR_APPLY] Applied ${accumulatedOverrideMap.size} accumulated field override(s) before applying CR ${id} (${partialApprovals.length} prior level(s), ${overriddenChanges?.length ?? 0} final-level override(s))`);
+        }
+
+        // Apply the effective (possibly overridden) changes
+        const existingWithOverrides: ChangeRequest = { ...existing, proposedChangesJson: effectiveProposedChanges };
+        const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existingWithOverrides);
+
+        // Build overriddenFields for the audit trail — all accumulated overrides vs original values.
+        // Records the last approver who touched each field and the timestamp of that edit.
+        const overriddenFields: Array<{
+          field: string;
+          originalNewValue: any;
+          approverNewValue: string;
+          modifiedBy: string;
+          modifiedAt: string;
+        }> = [];
+        for (const [field, overrideData] of Array.from(accumulatedOverrideMap.entries())) {
+          const original = originalProposedChanges.find(
+            (c: any) => (c.field ?? c.columnName) === field
+          );
+          const originalNewValue = original?.newValue ?? null;
+          if (String(originalNewValue ?? '') !== overrideData.approverNewValue) {
+            overriddenFields.push({
+              field,
+              originalNewValue,
+              approverNewValue: overrideData.approverNewValue,
+              modifiedBy: overrideData.modifiedBy,
+              modifiedAt: overrideData.modifiedAt
+            });
+          }
+        }
+
+        const revisionHistoryEntry: {
+          revisionNumber: number;
+          approvedBy: string;
+          approvedAt: string;
+          appliedChanges: any[];
+          appliedStatus?: 'success' | 'failed' | 'pending';
+          appliedAt?: string;
+          appliedFieldCount?: number;
+          appliedError?: string;
+          comments?: string;
+          overriddenFields?: Array<{ field: string; originalNewValue: any; approverNewValue: string; modifiedBy: string; modifiedAt: string }>;
+        } = {
           revisionNumber: newRevisionNumber,
           approvedBy: reviewerId,
           approvedAt: now.toISOString(),
-          appliedChanges: Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson : [],
+          appliedChanges: effectiveProposedChanges,
           appliedStatus: 'success' as const,
           appliedAt: now.toISOString(),
           appliedFieldCount: appliedChangesResult.appliedFieldCount,
-          comments: comment
+          comments: comment,
+          ...(overriddenFields.length > 0 ? { overriddenFields } : {})
         };
         const updatedHistory = [...(existing.revisionHistory || []), revisionHistoryEntry];
 
@@ -5439,11 +6129,14 @@ export class PostgresStorage {
       return result;
     } catch (error: any) {
       console.error(`[CR_APPLY] Transaction failed for CR ${id}, all changes rolled back:`, error);
+      // Preserve domain validation errors (e.g. rotational stamp rules) so the
+      // API surfaces a 4xx with the real message instead of a generic 500.
+      if (error?.statusCode) throw error;
       throw new Error(`Failed to approve change request: ${error.message}`);
     }
   }
 
-  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {
+  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
     const existing = await this.getChangeRequest(id);
     if (!existing) throw new Error('Change request not found');
 
@@ -5453,7 +6146,7 @@ export class PostgresStorage {
 
     // No approval steps → legacy single-step approval (backward compat)
     if (steps.length === 0) {
-      return this.finaliseApprovedCR(id, existing, reviewerId, comment);
+      return this.finaliseApprovedCR(id, existing, reviewerId, comment, overriddenChanges);
     }
 
     // Find the current active step (lowest-level still Pending)
@@ -5478,6 +6171,35 @@ export class PostgresStorage {
     if (remainingSteps.length > 0) {
       // More steps remain — mark the active step approved non-atomically is fine here;
       // CR stays in 'submitted' state awaiting the next level.
+
+      // Persist any field-level overrides from this non-final approver into revisionHistory
+      // so they can be accumulated when the final approver triggers finalization.
+      if (overriddenChanges && overriddenChanges.length > 0) {
+        const originalProposed = Array.isArray(existing.proposedChangesJson)
+          ? (existing.proposedChangesJson as Array<any>)
+          : [];
+        const partialEntry: Record<string, any> = {
+          type: 'partial_approval',
+          approvedBy: reviewerId,
+          approvedAt: now.toISOString(),
+          approvalLevel: activeStep.approvalLevel,
+          comments: comment,
+          overriddenFields: overriddenChanges.map(o => {
+            const orig = originalProposed.find((c: any) => (c.field ?? c.columnName) === o.field);
+            return {
+              field: o.field,
+              originalNewValue: orig?.newValue ?? null,
+              approverNewValue: o.approverNewValue,
+              modifiedBy: reviewerId,
+              modifiedAt: now.toISOString()
+            };
+          })
+        };
+        const updatedHistory = [...((existing.revisionHistory as Array<any>) || []), partialEntry];
+        await this.updateChangeRequest(id, { revisionHistory: updatedHistory as any });
+        console.log(`[CR_WORKFLOW] CR ${id} — non-final approver ${reviewerId} overrode ${overriddenChanges.length} field(s) at ${activeStep.approvalLevel}, recorded in revisionHistory`);
+      }
+
       await this.updateChangeRequestApprovalStep(activeStep.id, {
         status: 'Approved',
         actionByUserId: reviewerId,
@@ -5490,7 +6212,7 @@ export class PostgresStorage {
 
     // All steps approved — mark the final step AND finalise atomically in one transaction.
     console.log(`[CR_WORKFLOW] CR ${id} — all approval levels satisfied, finalising`);
-    return this.finaliseApprovedCRWithStep(id, existing, activeStep.id, reviewerId, comment, now);
+    return this.finaliseApprovedCRWithStep(id, existing, activeStep.id, reviewerId, comment, now, overriddenChanges);
   }
 
   /**
@@ -5603,6 +6325,46 @@ export class PostgresStorage {
       return;
     }
 
+    // Rotational Item rules (Task #356): CR approval must enforce the same stamp
+    // rules as normal component saves. Normalize Yes/No strings and validate here
+    // (throw → whole approval rolls back); registry sync happens after the update.
+    let rotationalTouched = false;
+    if ('rotationalItem' in safeUpdateData || 'currentStamp' in safeUpdateData) {
+      rotationalTouched = true;
+      const rotSvc = await import('./modules/rotational-items/services/rotationalItemService');
+      const rawFlag = safeUpdateData.rotationalItem;
+      const effectiveRotational = rawFlag !== undefined
+        ? (rawFlag === true || rawFlag === 'Yes' || rawFlag === 'yes' || rawFlag === 'true')
+        : beforeState.rotationalItem === true;
+      if ('rotationalItem' in safeUpdateData) safeUpdateData.rotationalItem = effectiveRotational;
+      let effectiveStamp = 'currentStamp' in safeUpdateData ? safeUpdateData.currentStamp : beforeState.currentStamp;
+      effectiveStamp = typeof effectiveStamp === 'string' && effectiveStamp.trim() !== '' ? effectiveStamp.trim() : null;
+      if (!effectiveRotational) {
+        effectiveStamp = null;
+      } else if (!effectiveStamp) {
+        const { ValidationError } = await import('./modules/shared/errors');
+        throw new ValidationError('Stamp is mandatory when Rotational Item is Yes');
+      } else if (beforeState.vesselId) {
+        // Strict master-first (Task #366): stamp must exist in the Rotation Item Master;
+        // installed-on link is derived via components.current_stamp (no back-pointer).
+        const clash = await rotSvc.getByStamp(beforeState.vesselId, effectiveStamp);
+        const { ValidationError } = await import('./modules/shared/errors');
+        if (!clash) {
+          throw new ValidationError(`Stamp "${effectiveStamp}" not found in Rotation Item Master. Create it first under PMS → Admin → Master Data → Rotation Item Master List (or bulk import).`);
+        }
+        if (clash.status === 'Retired') {
+          throw new ValidationError(`Stamp "${effectiveStamp}" is retired and cannot be fitted to a component.`);
+        }
+        if (clash.status === 'Installed') {
+          const holder = await rotSvc.getComponentHoldingStamp(beforeState.vesselId, effectiveStamp);
+          if (holder && holder.cuuid !== resolvedCuuid) {
+            throw new ValidationError(`Stamp "${effectiveStamp}" is already installed on another component on this vessel. Stamps must be unique.`);
+          }
+        }
+      }
+      safeUpdateData.currentStamp = effectiveStamp;
+    }
+
     // Log before values for each field being updated
     console.log(`[CR_APPLY] Component ${componentId} (resolved cuuid: ${resolvedCuuid}) BEFORE update:`);
     for (const field of Object.keys(safeUpdateData)) {
@@ -5620,6 +6382,17 @@ export class PostgresStorage {
     
     // Verify the update by comparing returned values
     const afterState = result[0];
+
+    // Rotational registry sync after an approved CR touched the two fields.
+    // Delegates to the shared componentService state machine (create/rename/
+    // detach/relink of spare stamps) — single source of truth with normal saves.
+    // Runs on a separate connection: if the outer approval tx still fails after this
+    // point, the next component save re-syncs the registry (sync is idempotent).
+    if (rotationalTouched) {
+      const { syncRotationalRegistry } = await import('./modules/components/services/componentService');
+      await syncRotationalRegistry(beforeState, afterState);
+    }
+
     console.log(`[CR_APPLY] Component ${componentId} AFTER update:`);
     for (const field of Object.keys(safeUpdateData)) {
       const applied = afterState[field];
@@ -5630,6 +6403,12 @@ export class PostgresStorage {
         console.warn(`[CR_APPLY] WARNING: Field ${field} was not updated correctly`);
       }
     }
+    // Phase 0 / P0.3a (defect D2): sync field logging — tx-JOINED, symmetric with the
+    // work_orders / spares / stores applies. `components` is a ONE_WAY_SHORE_TO_SHIP row table,
+    // so shore→ship transport still happens via updated_at; the log is the audit/field-level
+    // record the other three applies already write (and what the engine's §2a callback
+    // contract expects). Throwing on log failure is intentional (apply-without-log not allowed).
+    await logFieldChanges('components', resolvedCuuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   /**
@@ -5667,8 +6446,66 @@ export class PostgresStorage {
       delete safeUpdateData.taskType;
     }
 
+    // woTemplateCode -> jobNo (UI uses woTemplateCode, schema column is jobNo)
+    if ('woTemplateCode' in safeUpdateData) {
+      console.log(`[CR_APPLY] Job field translation: woTemplateCode -> jobNo`);
+      safeUpdateData.jobNo = safeUpdateData.woTemplateCode;
+      delete safeUpdateData.woTemplateCode;
+    }
+
+    // Reject blank jobNo values if jobNo is being changed via CR approval
+    if ('jobNo' in safeUpdateData) {
+      const trimmed = (safeUpdateData.jobNo || '').trim();
+      if (!trimmed) {
+        throw new Error('Job code cannot be blank. Please provide a valid job code.');
+      }
+      safeUpdateData.jobNo = trimmed;
+    }
+
+    // Component-scoped duplicate check for jobNo changes via CR approval
+    // Covers both legacy direct assignment and many-to-many job-component links
+    if ('jobNo' in safeUpdateData && safeUpdateData.jobNo !== beforeState.jobNo) {
+      const vesselId = beforeState.vesselId;
+      // Collect all component IDs this job is linked to
+      const links = await tx.select({ componentId: jobComponentLinks.componentId })
+        .from(jobComponentLinks)
+        .where(eq(jobComponentLinks.jobId, resolvedJuuid));
+      const componentIds = Array.from(
+        new Set<string>([
+          ...links.map((l: any) => l.componentId as string),
+          ...(beforeState.componentId ? [beforeState.componentId as string] : [])
+        ])
+      );
+
+      for (const compId of componentIds) {
+        // Check direct-assignment siblings
+        const direct = await tx.select({ juuid: jobs.juuid }).from(jobs)
+          .where(and(
+            eq(jobs.vesselId, vesselId),
+            eq(jobs.componentId, compId),
+            eq(jobs.jobNo, safeUpdateData.jobNo)
+          ));
+        if (direct.find((j: any) => j.juuid !== resolvedJuuid)) {
+          throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
+        }
+        // Check many-to-many linked siblings
+        const siblingLinks = await tx.select({ jobId: jobComponentLinks.jobId })
+          .from(jobComponentLinks)
+          .where(eq(jobComponentLinks.componentId, compId));
+        for (const sl of siblingLinks) {
+          if (sl.jobId === resolvedJuuid) continue;
+          const linked = await tx.select({ jobNo: jobs.jobNo }).from(jobs)
+            .where(eq(jobs.juuid, sl.jobId));
+          if (linked[0]?.jobNo === safeUpdateData.jobNo) {
+            throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
+          }
+        }
+      }
+      console.log(`[CR_APPLY] Job ${resolvedJuuid}: jobNo duplicate check passed for "${safeUpdateData.jobNo}"`);
+    }
+
     // Remove any fields that don't exist in the jobs table schema
-    const invalidFields = ['woTemplateCode', 'componentName', 'componentCode', 'nextDueReading'];
+    const invalidFields = ['componentName', 'componentCode', 'nextDueReading'];
     for (const field of invalidFields) {
       if (field in safeUpdateData) {
         console.log(`[CR_APPLY] Removing invalid job field: ${field}`);
@@ -5705,6 +6542,9 @@ export class PostgresStorage {
       const success = String(applied) === String(expected);
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
+    // Phase 0 / P0.3a (defect D2): sync field logging — tx-JOINED, symmetric with the
+    // work_orders / spares / stores applies (see applyComponentChangesInTx for the rationale).
+    await logFieldChanges('jobs', resolvedJuuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   /**
@@ -5757,8 +6597,12 @@ export class PostgresStorage {
       const success = String(applied) === String(expected);
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
-    // Sync field logging — WO entity changes applied by CR approval (best-effort)
-    try { await logFieldChanges('work_orders', resolvedWouuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply work_order:', e); }
+    // Sync field logging — tx-JOINED (plan §9.5, pulled forward): the log commits or rolls back
+    // WITH the CR apply. Previously the log was written on the GLOBAL pool while this tx was
+    // still open — a CR-finalize ROLLBACK left a phantom field log for changes that never
+    // applied, which would sync a false value to the other side. Throwing on log failure is
+    // intentional here: apply-without-log is not allowed (atomicity contract).
+    await logFieldChanges('work_orders', resolvedWouuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   /**
@@ -5821,7 +6665,8 @@ export class PostgresStorage {
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
     // Sync field logging — spare entity changes applied by CR approval (best-effort)
-    try { await logFieldChanges('spares', resolvedSuuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply spare:', e); }
+    // Tx-joined logging (see applyWorkOrderChangesInTx comment — phantom-log-on-rollback fix).
+    await logFieldChanges('spares', resolvedSuuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   /**
@@ -5884,7 +6729,8 @@ export class PostgresStorage {
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
     // Sync field logging — store entity changes applied by CR approval (best-effort)
-    try { await logFieldChanges('stores_items', resolvedStuuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply store:', e); }
+    // Tx-joined logging (see applyWorkOrderChangesInTx comment — phantom-log-on-rollback fix).
+    await logFieldChanges('stores_items', resolvedStuuid, beforeState.vesselId || null, beforeState, afterState, 'system', tx);
   }
 
   async rejectChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {
@@ -5978,8 +6824,11 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(changeRequestAttachment).values(attachment).returning();
     const created = result[0];
-    // Sync field logging — INSERT
-    try { await logFieldChanges('change_request_attachment', created.crauuid, null, null, created, 'system'); } catch (e) { console.error('[FieldLogger] CRAttach create:', e); }
+    // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
+    try {
+      const vId = await this.crVesselId(created.changeRequestId);
+      await logFieldChanges('change_request_attachment', created.crauuid, vId, null, created, 'system');
+    } catch (e) { console.error('[FieldLogger] CRAttach create:', e); }
     // Queue binary file for sync if stored locally (not base64 data URIs or external URLs)
     if (created.url && (created.url.startsWith('local://') || created.url.startsWith('.private/'))) {
       try { await FileSyncProcessor.queueFileForSync('change_request_attachment', created.crauuid, created.url, created.filename, null, null); } catch (e) { console.error('[FileSyncQueue] CRAttach:', e); }
@@ -5999,8 +6848,11 @@ export class PostgresStorage {
   async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
     const db = await getDb();
     const result = await db.insert(changeRequestComment).values(comment).returning();
-    // Sync field logging — INSERT
-    try { await logFieldChanges('change_request_comment', result[0].crcuuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CRComment create:', e); }
+    // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
+    try {
+      const vId = await this.crVesselId(result[0].changeRequestId);
+      await logFieldChanges('change_request_comment', result[0].crcuuid, vId, null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] CRComment create:', e); }
     return result[0];
   }
 
@@ -6655,7 +7507,10 @@ export class PostgresStorage {
 
   async getSuperintendentNotifications(vesselName?: string): Promise<SuperintendentNotification[]> {
     const db = await getDb();
-    const conditions = [eq(superintendentNotifications.isAcknowledged, false)];
+    const conditions = [
+      eq(superintendentNotifications.isAcknowledged, false),
+      or(eq(superintendentNotifications.isDeleted, false), isNull(superintendentNotifications.isDeleted))!,
+    ];
     if (vesselName) {
       conditions.push(eq(superintendentNotifications.vesselName, vesselName));
     }
@@ -6666,8 +7521,14 @@ export class PostgresStorage {
 
   async getAllSuperintendentNotifications(vesselName?: string): Promise<SuperintendentNotification[]> {
     const db = await getDb();
+    const activeCondition = or(
+      eq(superintendentNotifications.isDeleted, false),
+      isNull(superintendentNotifications.isDeleted),
+    );
     return await db.select().from(superintendentNotifications)
-      .where(vesselName ? eq(superintendentNotifications.vesselName, vesselName) : undefined)
+      .where(vesselName
+        ? and(activeCondition, eq(superintendentNotifications.vesselName, vesselName))
+        : activeCondition)
       .orderBy(desc(superintendentNotifications.createdAt));
   }
 
@@ -7133,17 +7994,85 @@ export class PostgresStorage {
   async createWoPostponementApprovalStep(step: InsertWoPostponementApproval): Promise<WoPostponementApproval> {
     const db = await getDb();
     const result = await db.insert(woPostponementApprovals).values(step).returning();
+
+    // Sync field logging — WO postponement approval step INSERT (parent-resolved vessel_id)
+    try {
+      const vId = await this.wopVesselId(result[0].postponementId);
+      await logFieldChanges('wo_postponement_approvals', result[0].wpauuid, vId, null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] WOPApproval create:', e); }
+
     return result[0];
   }
 
   async updateWoPostponementApprovalStep(id: number, data: Partial<WoPostponementApproval>): Promise<WoPostponementApproval> {
     const db = await getDb();
+
+    // Fetch-before-update for sync field logging (diff old vs new)
+    const existing = (await db.select().from(woPostponementApprovals)
+      .where(eq(woPostponementApprovals.id, id)).limit(1))[0];
+
     const result = await db.update(woPostponementApprovals)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(woPostponementApprovals.id, id))
       .returning();
     if (!result[0]) throw new Error(`WO postponement approval step ${id} not found`);
+
+    // Sync field logging — WO postponement approval step UPDATE (parent-resolved vessel_id)
+    try {
+      const vId = await this.wopVesselId(result[0].postponementId);
+      await logFieldChanges('wo_postponement_approvals', result[0].wpauuid, vId, existing ?? null, result[0], 'system');
+    } catch (e) { console.error('[FieldLogger] WOPApproval update:', e); }
+
     return result[0];
+  }
+
+  /**
+   * Phase 0 / P0.3d (defect D3): the postponement-approval finalize as ONE transaction.
+   * Previously approvePostponement issued four sequential writes on the global pool (WO update,
+   * WO field log, decision-row insert, its field log) and never touched the 'Awaiting Approval'
+   * request row — a dangling row per approval that getLatestAwaitingPostponement kept matching
+   * (DEFECT-REPRODUCTION-REPORT.md §3). Here: WO update + log, request row → 'Approved' + log,
+   * decision row insert + log — all tx-joined, so a failure rolls every write back.
+   * The caller still decides the business values; this method only owns atomicity.
+   */
+  async finalizePostponementApproval(params: {
+    workOrderId: string;               // work_orders.id (or wouuid) — same dual lookup as updateWorkOrder
+    woUpdates: Partial<InsertWorkOrder>;
+    awaitingPostponementId: string | null;
+    awaitingUpdates: Partial<InsertWorkOrderPostponement>;
+    decisionRow: InsertWorkOrderPostponement;
+    actor: string;
+  }): Promise<WorkOrder> {
+    const db = await getDb();
+    return db.transaction(async (tx) => {
+      const before = (await tx.select().from(workOrders)
+        .where(or(eq(workOrders.wouuid, params.workOrderId), eq(workOrders.id, params.workOrderId))).limit(1))[0];
+      if (!before) throw new Error(`Work order ${params.workOrderId} not found`);
+
+      const updated = (await tx.update(workOrders)
+        .set({ ...params.woUpdates, updatedAt: new Date() })
+        .where(eq(workOrders.wouuid, before.wouuid))
+        .returning())[0];
+      // tx-JOINED field logs: commit or roll back WITH the writes (same contract as the CR applies).
+      await logFieldChanges('work_orders', before.wouuid, before.vesselId || null, before, updated, params.actor, tx);
+
+      if (params.awaitingPostponementId) {
+        const reqBefore = (await tx.select().from(workOrderPostponements)
+          .where(eq(workOrderPostponements.id, params.awaitingPostponementId)).limit(1))[0];
+        if (reqBefore) {
+          const reqAfter = (await tx.update(workOrderPostponements)
+            .set({ ...params.awaitingUpdates, updatedAt: new Date() } as any)
+            .where(eq(workOrderPostponements.id, params.awaitingPostponementId))
+            .returning())[0];
+          await logFieldChanges('work_order_postponements', params.awaitingPostponementId, (reqBefore as any).vesselId || null, reqBefore, reqAfter, params.actor, tx);
+        }
+      }
+
+      const decision = (await tx.insert(workOrderPostponements).values(params.decisionRow).returning())[0];
+      await logFieldChanges('work_order_postponements', decision.id, decision.vesselId || null, null, decision, params.actor, tx);
+
+      return updated;
+    });
   }
 
   async getLatestAwaitingPostponement(workOrderId: string): Promise<WorkOrderPostponement | undefined> {
@@ -7208,10 +8137,21 @@ export class PostgresStorage {
     renewalReason?: string;
     renewalReference?: string;
     renewalEvidenceUrls?: string[];
+    // Internal service flag: set only after the authenticated Sail Admin role
+    // has authorized a normal (non-meter-replacement) validation bypass.
+    rhValidationBypassed?: boolean;
   }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
-    const { parentComponentId, mode, value, dateUpdated, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+    const { parentComponentId, mode, value, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls, rhValidationBypassed } = params;
     const now = new Date();
+    // Reading date: when the hours were actually observed (user-entered date), not when
+    // the row is written. Falls back to "now" only when omitted or unparseable.
+    // enteredAtUTC and updatedAt stay "now" — they are the server-write audit trail.
+    // Task #427: canonical calendar-day contract — every persisted date text
+    // (date_updated_local, components.last_updated, rotational stamp dates) is
+    // YYYY-MM-DD via the shared parser; no locale text ever reaches storage.
+    const dateUpdated = requireReadingDayInput(params.dateUpdated ?? null) ?? formatReadingDay(now);
+    const readingDate = parseReadingDayStrict(dateUpdated)!;
 
     // ── Phase 1: Reads + Validation (outside transaction) ──
 
@@ -7233,88 +8173,47 @@ export class PostgresStorage {
     let inheritedComponents: any[] = [];
     let inheritedDelta = 0;
     let currentRH = 0;
+    let structuralDelta = 0;
     // Master's TOTAL running hours (meterReplacedLastRh + newRH). Hoisted so the inherited
     // cascade inside the transaction can cache it on each child. For a meter replacement this
     // is the preserved total; for a normal update it is the master's cumulative reading.
     let masterTotalRH = 0;
 
-    if (parentResult.length > 0) {
-      const parent = parentResult[0];
+    // Recompute ALL RH-derived values from a given parent row. Called once in Phase 1
+    // (for validation) and AGAIN inside the transaction after taking a per-component
+    // lock (Task #374): two overlapping identical submissions must not both compute a
+    // positive delta — the second must see the committed value and apply delta 0.
+    const computeDerived = (parent: typeof parentResult[0]) => {
       currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || '0');
 
-      // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
-      const latestAudit = await db.select()
-        .from(runningHoursAudit)
-        .where(or(eq(runningHoursAudit.componentId, resolvedParentId), eq(runningHoursAudit.componentId, parentComponentId)))
-        .orderBy(desc(runningHoursAudit.enteredAtUTC))
-        .limit(1);
-
-      if (latestAudit.length > 0) {
-        const latestDate = latestAudit[0].dateUpdatedLocal;
-        // Parse dates for comparison (format: DD-MMM-YYYY HH:mm)
-        const parseDate = (dateStr: string): Date => {
-          const months: Record<string, number> = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
-          const parts = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{4})\s*(\d{2})?:?(\d{2})?/);
-          if (parts) {
-            const [, day, month, year, hours = '00', minutes = '00'] = parts;
-            return new Date(parseInt(year), months[month], parseInt(day), parseInt(hours), parseInt(minutes));
-          }
-          return new Date(dateStr);
-        };
-
-        const latestParsedDate = parseDate(latestDate);
-        const newParsedDate = parseDate(dateUpdated);
-
-        if (newParsedDate < latestParsedDate) {
-          throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${latestDate}).`);
-        }
-      }
-
-      // VALIDATION 2: Value Rule - RH must never go backwards (except when isRenewalReset is true for 0)
-      if (mode === 'setTotal' && value < currentRH && !isRenewalReset) {
-        throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
-      }
-
-      // VALIDATION 3: When value is 0, isRenewalReset must be true
-      if (mode === 'setTotal' && value === 0 && !isRenewalReset) {
-        throw new Error('Running Hours cannot be set to 0 without confirming renewal/replacement.');
-      }
-
-      // Handle meter replacement logic
-      // When meter is replaced, store the current cumulative total in meterReplacedLastRh
-      // The new meter reading starts fresh, but Total = meterReplacedLastRh + new reading
       let previousTotalForReplacement = 0;
       if (meterReplaced) {
-        // Calculate the previous total (existing meterReplacedLastRh + current reading)
         const existingMeterReplacedLastRh = parseFloat(parent.meterReplacedLastRh || '0');
         previousTotalForReplacement = existingMeterReplacedLastRh + currentRH;
-        // The new meter starts at the provided value (usually 0 or initial reading of new meter)
         newRH = value;
       } else {
         newRH = mode === 'addDelta' ? currentRH + value : value;
       }
 
-      // Build update object - always update currentCumulativeRH
+      if (!Number.isFinite(newRH) || newRH < 0) {
+        throw new Error('Invalid Running Hours. Resulting reading cannot be negative.');
+      }
+
       updateData = {
         currentCumulativeRH: newRH.toString(),
         lastUpdated: dateUpdated,
         updatedAt: now
       };
-
-      // If meter was replaced, update the meter replacement tracking fields
       if (meterReplaced) {
         updateData.meterReplacedLastRh = previousTotalForReplacement.toString();
         updateData.meterReplacedDate = now;
       }
-
-      // If this component is a MASTER type, also update rhCurrentMaster
       if (parent.rhCounterType === 'MASTER') {
         updateData.rhCurrentMaster = newRH.toString();
-        updateData.rhMasterUpdatedAt = now;
+        updateData.rhMasterUpdatedAt = readingDate;
         updateData.rhMasterUpdateSource = 'MANUAL';
       }
 
-      // Prepare parent audit values
       const totalCumulativeRH = meterReplaced
         ? previousTotalForReplacement + newRH
         : (parseFloat(parent.meterReplacedLastRh || '0') + newRH);
@@ -7335,6 +8234,8 @@ export class PostgresStorage {
         source: 'cascade',
         notes: meterReplaced
           ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ''}`
+          : rhValidationBypassed
+            ? `RH validation bypassed by Sail Admin. ${comments || ''}`.trim()
           : comments,
         meterReplaced: meterReplaced || false,
         isRenewalReset: isRenewalReset || false,
@@ -7345,6 +8246,63 @@ export class PostgresStorage {
         componentCode: parent.componentCode || null,
         componentName: parent.name || null,
       };
+
+      // Meter replacement: the master's TOTAL increases by the new meter reading (newRH),
+      // because the old reading is preserved in meterReplacedLastRh. The normal-path delta
+      // (newRH - currentRH) would be hugely negative on a meter reset (old large reading ->
+      // fresh ~0 reading) and collapse every inherited component, so use the true Total
+      // change instead. For a normal update both expressions equal the master's RH increase.
+      inheritedDelta = meterReplaced ? newRH : (newRH - currentRH);
+      structuralDelta = mode === 'addDelta' ? value : (newRH - currentRH);
+    };
+
+    if (parentResult.length > 0) {
+      const parent = parentResult[0];
+      currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || '0');
+      const requestedRH = meterReplaced
+        ? value
+        : mode === 'addDelta'
+          ? currentRH + value
+          : value;
+      enforceFreshRHMonotonicity({
+        currentRH,
+        submittedRH: requestedRH,
+        currentRHDate: parent.lastUpdated || null,
+        submittedRHDate: dateUpdated,
+        approvedReset: !!meterReplaced || !!isRenewalReset,
+      });
+
+      if (!rhValidationBypassed) {
+        // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
+        // Task #427: the date guard uses the SAME winner selection as every other
+        // RH consumer (shared calendar-day parser + latest-reading-wins ranking).
+        {
+          const { selectWinningRhEvent } = await import('./modules/running-hours/rhEventComparator');
+          const { getPool } = await import('./db');
+          const rhPool = await getPool();
+          const winner = await selectWinningRhEvent(rhPool, resolvedParentId);
+          if (winner) {
+            const newDay = parseReadingDayStrict(dateUpdated);
+            if (newDay && newDay.getTime() < winner.readingDay.getTime()) {
+              throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${formatReadingDay(winner.readingDay)}).`);
+            }
+          }
+        }
+
+        // VALIDATION 2: Value Rule - RH must never go backwards (except when isRenewalReset is true for 0)
+        if (mode === 'setTotal' && value < currentRH && !meterReplaced && !isRenewalReset) {
+          throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
+        }
+
+        // VALIDATION 3: When value is 0, isRenewalReset must be true
+        if (mode === 'setTotal' && value === 0 && !isRenewalReset) {
+          throw new Error('Running Hours cannot be set to 0 without confirming renewal/replacement.');
+        }
+      }
+
+      // Compute all derived values from the Phase-1 read (recomputed inside the tx
+      // after locking — see below).
+      computeDerived(parent);
 
       // If parent is MASTER, fetch inherited components for cascade (read outside tx)
       if (parent.rhCounterType === 'MASTER') {
@@ -7365,18 +8323,12 @@ export class PostgresStorage {
                 eq(components.rhCounterSource, masterComponentCode)
               )
             ));
-          // Meter replacement: the master's TOTAL increases by the new meter reading (newRH),
-          // because the old reading is preserved in meterReplacedLastRh. The normal-path delta
-          // (newRH - currentRH) would be hugely negative on a meter reset (old large reading ->
-          // fresh ~0 reading) and collapse every inherited component, so use the true Total
-          // change instead. For a normal update both expressions equal the master's RH increase.
-          inheritedDelta = meterReplaced ? newRH : (newRH - currentRH);
         }
       }
+    } else {
+      // No parent resolved: delta for structural children falls back to the raw value
+      structuralDelta = mode === 'addDelta' ? value : newRH;
     }
-
-    // Calculate delta for structural children
-    const structuralDelta = mode === 'addDelta' ? value : (newRH - parseFloat(parentResult[0]?.currentCumulativeRH || '0'));
 
     // ── Phase 2: All writes in one transaction ──
     const txResult = await db.transaction(async (tx) => {
@@ -7385,6 +8337,38 @@ export class PostgresStorage {
 
       // Parent update + audit
       if (parentResult.length > 0) {
+        // Duplicate-submission guard (Task #374): serialize concurrent updates of the
+        // same component, then RE-READ the parent inside the transaction and recompute
+        // every derived value. Component totals are absolute (idempotent), but stamp
+        // accrual is delta-based — without this, two overlapping identical submissions
+        // both read the stale value and each add the same delta to installed stamps.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${resolvedParentId}))`);
+        const freshParentResult = await tx.select().from(components)
+          .where(eq(components.cuuid, resolvedParentId))
+          .limit(1);
+        if (freshParentResult.length > 0) {
+          computeDerived(freshParentResult[0]);
+        }
+        const freshParent = freshParentResult[0] || parentResult[0];
+        const monotonicity = enforceFreshRHMonotonicity({
+          currentRH,
+          submittedRH: newRH,
+          currentRHDate: freshParent.lastUpdated || null,
+          submittedRHDate: dateUpdated,
+          approvedReset: !!meterReplaced || !!isRenewalReset,
+        });
+        if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+          return { updatedComponents: 0, auditsCreated: 0 };
+        }
+
+        // Re-read the inherited children's VALUES inside the locked tx too: their
+        // per-child current RH must not come from the stale pre-lock read, or a
+        // waiting duplicate would overwrite the first submission's child updates.
+        if (inheritedComponents.length > 0) {
+          inheritedComponents = await tx.select().from(components)
+            .where(inArray(components.cuuid, inheritedComponents.map((i: any) => i.cuuid)));
+        }
+
         await tx.update(components)
           .set(updateData)
           .where(eq(components.cuuid, resolvedParentId));
@@ -7392,6 +8376,13 @@ export class PostgresStorage {
         const parentAuditResult = await tx.insert(runningHoursAudit).values(parentAuditValues).returning();
         // Sync field logging — parent audit INSERT
         try { await logFieldChanges('running_hours_audit', parentAuditResult[0].rhauuid, parentAuditResult[0].vesselId || null, null, parentAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade parent:', e); }
+
+        // RH follows the Stamp: accrue the DELTA onto the parent's Installed rotational item
+        // (Task #369). Skipped on meter replacement / renewal reset — those are baseline
+        // resets, not hours actually run by the stamp.
+        if (!meterReplaced && !isRenewalReset) {
+          await this.accrueStampRhDelta(tx, freshParent.vesselId, freshParent.currentStamp, newRH - currentRH, dateUpdated, userId || null);
+        }
 
         updatedComponents++;
         auditsCreated++;
@@ -7409,7 +8400,7 @@ export class PostgresStorage {
               // Cache the master's TOTAL (meterReplacedLastRh + newRH), not the raw new meter
               // reading, so the inherited display matches the master after a meter replacement.
               rhCurrentInheritedCached: masterTotalRH.toString(),
-              rhInheritedUpdatedAt: now,
+              rhInheritedUpdatedAt: readingDate,
               currentCumulativeRH: newInheritedRH.toString(),
               lastUpdated: dateUpdated,
               updatedAt: now
@@ -7434,6 +8425,11 @@ export class PostgresStorage {
           // Sync field logging — inherited audit INSERT
           try { await logFieldChanges('running_hours_audit', inheritedAuditResult[0].rhauuid, inherited.vesselId || null, null, inheritedAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade inherited:', e); }
 
+          // RH follows the Stamp: accrue the DELTA onto the inherited child's Installed item (Task #369)
+          if (!meterReplaced && !isRenewalReset) {
+            await this.accrueStampRhDelta(tx, inherited.vesselId || parentResult[0]?.vesselId || null, inherited.currentStamp, inheritedDelta, dateUpdated, userId || null);
+          }
+
           updatedComponents++;
           auditsCreated++;
         }
@@ -7447,8 +8443,30 @@ export class PostgresStorage {
       // meter-replacement-aware inherited cascade.
       const inheritedCuuidSet = new Set(inheritedComponents.map((i: any) => i.cuuid));
 
+      // Re-read structural children's values inside the locked tx (Task #374): their
+      // delta math must not run on stale pre-lock reads.
+      const freshChildren = children.length > 0
+        ? await tx.select().from(components)
+            .where(inArray(components.cuuid, children.map((c: any) => c.cuuid)))
+        : [];
+
+      // Preserve the existing parent/child cascade invariant: every structural
+      // child receives the parent's exact delta. An authorized downward
+      // correction must therefore fail atomically when that delta would make a
+      // child negative, rather than clamping only that child and causing it to
+      // diverge from its parent.
+      for (const child of freshChildren) {
+        if (inheritedCuuidSet.has(child.cuuid)) continue;
+        const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
+        if (!Number.isFinite(childCurrentRH) || childCurrentRH + structuralDelta < 0) {
+          throw new Error(
+            `Running Hours correction would make structural child "${child.componentCode || child.name || child.cuuid}" negative.`
+          );
+        }
+      }
+
       // Update all structural children (by parentId hierarchy)
-      for (const child of children) {
+      for (const child of freshChildren) {
         if (inheritedCuuidSet.has(child.cuuid)) continue;
 
         const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
@@ -7494,6 +8512,11 @@ export class PostgresStorage {
         }).returning();
         // Sync field logging — structural child audit INSERT
         try { await logFieldChanges('running_hours_audit', childAuditResult[0].rhauuid, child.vesselId || null, null, childAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade child:', e); }
+
+        // RH follows the Stamp: accrue the DELTA onto the structural child's Installed item (Task #369)
+        if (!meterReplaced && !isRenewalReset) {
+          await this.accrueStampRhDelta(tx, child.vesselId, child.currentStamp, structuralDelta, dateUpdated, userId || null);
+        }
 
         updatedComponents++;
         auditsCreated++;
@@ -7704,15 +8727,18 @@ export class PostgresStorage {
     return { jobsDeleted: jobResult.length, workOrdersDeleted };
   }
 
-  async getVesselsByFleet(fleetId: string): Promise<Vessel[]> {
+  async getVesselsByFleet(fleetId: string, options: { includeDeleted?: boolean } = {}): Promise<Vessel[]> {
     const db = await getDb();
-    return await db.select().from(vessels)
-      .where(eq(vessels.fleetId, fleetId));
+    return await db.select().from(vessels).where(options.includeDeleted
+      ? eq(vessels.fleetId, fleetId)
+      : and(eq(vessels.fleetId, fleetId), or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted))));
   }
 
-  async getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>> {
+  async getVesselsWithFleets(options: { includeDeleted?: boolean } = {}): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>> {
     const db = await getDb();
-    const allVessels = await db.select().from(vessels);
+    const allVessels = options.includeDeleted
+      ? await db.select().from(vessels)
+      : await db.select().from(vessels).where(or(eq(vessels.isDeleted, false), isNull(vessels.isDeleted)));
     const allFleets = await db.select().from(fleets);
     
     const fleetMap = new Map(allFleets.map(f => [f.id, f]));
@@ -7956,8 +8982,33 @@ export class PostgresStorage {
     }
   }
 
+  async getCompanyApprovalSettings(): Promise<CompanyApprovalSettings | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(companyApprovalSettings).limit(1);
+    return result[0];
+  }
+
+  async upsertCompanyApprovalSettings(settings: { superintendentLockEnabled: boolean; updatedBy?: string | null }): Promise<CompanyApprovalSettings> {
+    const db = await getDb();
+    const existing = await db.select().from(companyApprovalSettings).limit(1);
+
+    if (existing.length > 0) {
+      // updated_at bump is what the ONE_WAY_SHORE_TO_SHIP gather keys on.
+      const result = await db.update(companyApprovalSettings)
+        .set({ superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null, updatedAt: new Date() })
+        .where(eq(companyApprovalSettings.id, existing[0].id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(companyApprovalSettings)
+        .values({ singletonKey: 'ACTIVE', superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null })
+        .returning();
+      return result[0];
+    }
+  }
+
   // ============= FLEET MANAGEMENT =============
-  
+
   async getAllFleets(): Promise<Fleet[]> {
     const db = await getDb();
     return await db.select().from(fleets)
@@ -8304,19 +9355,21 @@ export class PostgresStorage {
     if (job.length === 0 || !job[0].jobNo) return [];
     
     const jobNo = job[0].jobNo;
+    const vessel = job[0].vesselId
+      ? await db.select({ vCode: vessels.vCode }).from(vessels).where(eq(vessels.vuuid, job[0].vesselId)).limit(1)
+      : [];
+    const vesselCode = vessel[0]?.vCode;
     
     // Get all maintenance history for this component, then filter by jobNo match
     const allRecords = await db.select().from(componentMaintenanceHistory)
       .where(eq(componentMaintenanceHistory.componentCode, componentCode))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     
-    // Filter records where work_order_no starts with the jobNo
+    // Legacy and vessel-prefixed work order numbers both resolve to the
+    // underlying job number before comparison.
     return allRecords.filter(record => {
       if (!record.workOrderNo) return false;
-      // Work order format: "JOBNO-COMPCODE-YEAR-SEQ" 
-      // e.g., "MKR-IN-00063-601.004.03-2026-001"
-      // JobNo is at the start, before the component code
-      return record.workOrderNo.startsWith(jobNo + '-');
+      return extractJobNoFromWorkOrderNo(record.workOrderNo, vesselCode) === jobNo;
     });
   }
 
@@ -8580,7 +9633,11 @@ export class PostgresStorage {
     })
     .from(spareLocationStock)
     .innerJoin(spares, eq(spareLocationStock.spareUuid, spares.suuid))
-    .where(eq(spareLocationStock.locationId, locationId));
+    .where(and(
+      eq(spareLocationStock.locationId, locationId),
+      eq(spares.deleted, false),
+      or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
+    ));
     
     return result;
   }
@@ -8623,6 +9680,8 @@ export class PostgresStorage {
     .where(and(
       eq(spareLocationStock.locationId, locationId),
       eq(spares.vesselId, vesselId),
+      eq(spares.deleted, false),
+      or(eq(spares.isDeleted, false), isNull(spares.isDeleted)),
       gt(spareLocationStock.qty, 0)
     ));
     
@@ -8641,6 +9700,8 @@ export class PostgresStorage {
     .innerJoin(spares, eq(spareLocationStock.spareUuid, spares.suuid))
     .where(and(
       eq(spares.vesselId, vesselId),
+      eq(spares.deleted, false),
+      or(eq(spares.isDeleted, false), isNull(spares.isDeleted)),
       gt(spareLocationStock.qty, 0)
     ))
     .groupBy(locations.id, locations.locationName)
@@ -8722,6 +9783,7 @@ export class PostgresStorage {
     referenceNote?: string;
     userId: string;
   }): Promise<{ transaction: InventoryTransaction; newLocationQty: number; newTotalRob: number }> {
+    await this.getOperationalSpare(String(input.spareId));
     const db = await getDb();
     
     // Validate location exists
@@ -8734,26 +9796,35 @@ export class PostgresStorage {
     let currentLocationStock = await this.getSpareLocationStockItem(input.spareId, input.locationId);
     
     if (!currentLocationStock) {
+      // GUARD against double-counting (the "2x ROB" drift bug): auto-seed from legacy
+      // ROB is capped at the RESIDUAL — the portion of the legacy total NOT already
+      // represented by existing spare_location_stock rows at other locations.
+      // residual = max(0, legacy rob - sum(existing rows)). Seeding at most the
+      // residual provably cannot double-count: total seeded never exceeds legacy rob.
+      const existingStockRows = await this.getSpareLocationStock(input.spareId);
       const spareForSync = await db.select().from(spares).where(eq(spares.id, input.spareId));
       const spareLegacy = spareForSync[0];
       if (spareLegacy) {
+        const existingSum = existingStockRows.reduce((s, r) => s + (r.qty ?? 0), 0);
+        const residual = Math.max(0, (spareLegacy.rob ?? 0) - existingSum);
         const locName = (location.locationName || '').toLowerCase().trim();
         const spareLegacyLocA = (spareLegacy.location || '').toLowerCase().trim();
         const spareLegacyLocB = (spareLegacy.location2 || '').toLowerCase().trim();
         
-        let seedQty: number | null = null;
+        let labelQty: number | null = null;
         if (spareLegacyLocA && locName === spareLegacyLocA) {
-          seedQty = spareLegacy.robLocationA ?? 0;
+          labelQty = spareLegacy.robLocationA ?? 0;
         } else if (spareLegacyLocB && locName === spareLegacyLocB) {
-          seedQty = spareLegacy.robLocationB ?? 0;
+          labelQty = spareLegacy.robLocationB ?? 0;
         } else if (spareLegacyLocA && !spareLegacyLocB) {
-          seedQty = spareLegacy.robLocationA ?? 0;
+          labelQty = spareLegacy.robLocationA ?? 0;
         } else if (!spareLegacyLocA && spareLegacyLocB) {
-          seedQty = spareLegacy.robLocationB ?? 0;
+          labelQty = spareLegacy.robLocationB ?? 0;
         } else if (!spareLegacyLocA && !spareLegacyLocB) {
-          seedQty = spareLegacy.rob ?? 0;
+          labelQty = spareLegacy.rob ?? 0;
         }
         
+        const seedQty = labelQty !== null ? Math.min(labelQty, residual) : null;
         if (seedQty !== null) {
           console.log(`[performInventoryTransaction] AUTO-SYNC: No spare_location_stock record for spare ${input.spareId} at location ${input.locationId}. Seeding from legacy ROB: ${seedQty}`);
           await this.upsertSpareLocationStock({
@@ -8981,12 +10052,10 @@ export class PostgresStorage {
 
   async getSpareWithInventory(spareId: string): Promise<SpareWithInventory | null> {
     const spare = await this.getSpare(spareId);
-    if (!spare) return null;
+    if (!spare || spare.deleted || spare.isDeleted) return null;
     
-    const activeLocationNames = [spare.location, spare.location2].filter((n): n is string => !!n && n.trim() !== '');
-    const locationsWithQty = activeLocationNames.length > 0
-      ? await this.getSpareLocationsWithQty(spare.id, activeLocationNames)
-      : [];
+    // Include ALL stock rows (no name filtering) so no location stock is silently dropped
+    const locationsWithQty = await this.getSpareLocationsWithQty(spare.id);
     const robTotal = locationsWithQty.reduce((sum, l) => sum + l.qty, 0);
     const linkedComponents = await this.getLinkedComponentsForSpare(spare.id, spare.vesselId || undefined);
     
@@ -9013,12 +10082,7 @@ export class PostgresStorage {
           'locationId', sls.location_id,
           'locationName', l.location_name,
           'qty', sls.qty
-        )) FILTER (WHERE sls.id IS NOT NULL
-          AND LOWER(TRIM(l.location_name)) IN (
-            LOWER(TRIM(COALESCE(s.location, ''))),
-            LOWER(TRIM(COALESCE(s.location_2, '')))
-          )
-        ), '[]'::json) AS locations,
+        )) FILTER (WHERE sls.id IS NOT NULL), '[]'::json) AS locations,
         COALESCE(json_agg(DISTINCT jsonb_build_object(
           'componentId', scl.component_id,
           'componentCode', c.component_code,
@@ -9031,6 +10095,7 @@ export class PostgresStorage {
       LEFT JOIN components c ON scl.component_id = c.cuuid
       WHERE ${vesselId === 'all' ? sql`TRUE` : sql`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
+        AND (s.is_deleted IS NULL OR s.is_deleted = false)
         AND s.data_scope = 'vessel'
       GROUP BY s.id
     `);
@@ -9149,6 +10214,7 @@ export class PostgresStorage {
     // filter and return spares across every vessel (still paginated).
     const filters: any[] = [
       sql`s.deleted = false`,
+      sql`(s.is_deleted IS NULL OR s.is_deleted = false)`,
       sql`s.data_scope = 'vessel'`,
     ];
     if (vesselId !== 'all') {
@@ -9248,10 +10314,6 @@ export class PostgresStorage {
           FROM spare_location_stock sls
           JOIN locations l ON l.id = sls.location_id
           WHERE sls.spare_id = f.id
-            AND LOWER(TRIM(l.location_name)) IN (
-              LOWER(TRIM(COALESCE(f.location, ''))),
-              LOWER(TRIM(COALESCE(f.location_2, '')))
-            )
         ), '[]'::json) AS locations,
         COALESCE((
           SELECT json_agg(jsonb_build_object(
@@ -9365,7 +10427,11 @@ export class PostgresStorage {
     // MANY-TO-MANY SUPPORT: Get spares directly assigned to component
     // AND spares linked via spare_component_links table
     const directSpares = await db.select().from(spares)
-      .where(eq(spares.componentId, componentId));
+      .where(and(
+        eq(spares.componentId, componentId),
+        eq(spares.deleted, false),
+        or(eq(spares.isDeleted, false), isNull(spares.isDeleted))
+      ));
     
     // Get spares linked via spare_component_links
     const links = await this.getSpareComponentLinksByComponent(componentId);
@@ -9546,10 +10612,18 @@ export class PostgresStorage {
 
     for (const spare of sparesInVessel) {
       try {
+        // NON-DESTRUCTIVE: only backfill spares that have NO spare_location_stock rows.
+        // Previously this deleted + rewrote all rows from legacy ROB, which wiped out
+        // transaction-derived location stock and caused ROB drift. Existing rows are
+        // now left untouched — spare_location_stock and legacy columns are kept in
+        // lockstep by the transactional write paths instead.
+        const existingRows = await this.getSpareLocationStock(spare.id);
+        if (existingRows.length > 0) {
+          continue;
+        }
+
         const robA = spare.robLocationA ?? 0;
         const robB = spare.robLocationB ?? 0;
-
-        await db.delete(spareLocationStock).where(eq(spareLocationStock.spareId, spare.id));
 
         let locationSynced = false;
         if (spare.location) {

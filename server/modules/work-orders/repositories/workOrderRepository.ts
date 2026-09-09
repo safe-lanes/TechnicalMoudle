@@ -6,6 +6,12 @@ export async function findWorkOrders(vesselId?: string, vesselIds?: string[]) {
   return storage.getWorkOrders(vesselId, vesselIds);
 }
 
+// Alert-scan candidates: vessel-scoped rows whose authored status can still compute
+// to a derived band (see getOverdueVesselWorkOrdersForAlerts in the service).
+export async function findAlertCandidateWorkOrders() {
+  return storage.getAlertCandidateWorkOrders();
+}
+
 export async function findById(id: string) {
   return storage.getWorkOrder(id);
 }
@@ -219,6 +225,11 @@ export async function updateWoPostponementApprovalStep(id: number, data: any) {
 
 export async function getLatestAwaitingPostponement(workOrderId: string) {
   return storage.getLatestAwaitingPostponement(workOrderId);
+}
+
+/** Phase 0 / P0.3d — one-transaction postponement-approval finalize (see postgresStorage). */
+export async function finalizePostponementApproval(params: Parameters<typeof storage.finalizePostponementApproval>[0]) {
+  return storage.finalizePostponementApproval(params);
 }
 
 export async function verifyApproverForLevel(reviewerId: string, approvalLevel: string) {

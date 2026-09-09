@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { asyncHandler } from '../shared/middleware';
 import { requireAuth, requirePMSAdmin } from '../../middleware/auth';
+import { requirePermission } from '../../middleware/permissions';
 import * as componentCtrl from './controllers/componentController';
 import * as uploadCtrl from './controllers/componentUploadController';
 import * as subCtrl from './controllers/subEntityController';
@@ -42,11 +43,13 @@ router.post('/components', asyncHandler(componentCtrl.create));
 // GET /components/:vesselId (line 25) which Express matched first.
 // Use GET /components/details/:id instead (line 28).
 router.patch('/components/:id', asyncHandler(componentCtrl.update));
-// DELETE /components/:id REMOVED (Audit Phase 4 cleanup): it hard-deleted a component row,
-// bypassing the retain-and-deactivate model. The register "delete" is deactivation
-// (POST /components/:id/inactivate below). The route was orphaned — no UI/offline caller.
+router.delete(
+  '/components/:id',
+  requirePermission('pms-components', 'delete', { enforce: true, unconfigured: 'deny' }),
+  asyncHandler(componentCtrl.remove)
+);
 
-// POST /components/:id/inactivate — soft inactivate (preferred over delete)
+// POST /components/:id/inactivate — keep visible to Office but hide from Vessel users
 router.post('/components/:id/inactivate', asyncHandler(componentCtrl.inactivate));
 
 // ── Component Documents ──

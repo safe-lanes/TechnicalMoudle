@@ -3,8 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useVessels } from "@/hooks/useVessels";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase, Info, ArrowLeft, Ship, GripVertical, ChevronsUpDown, ChevronsDownUp, Save, RotateCcw } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase, Info, ArrowLeft, Ship, GripVertical, ChevronsUpDown, ChevronsDownUp, Save, RotateCcw, MoreVertical, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -306,6 +305,8 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
 
   const [isEditMode, setIsEditMode] = useState(false);
+  const [treeSearchQuery, setTreeSearchQuery] = useState("");
+  const [showAllSpares, setShowAllSpares] = useState(false);
   const [editTreeData, setEditTreeData] = useState<TreeNode[]>([]);
   const [dragSourceCode, setDragSourceCode] = useState<string | null>(null);
   const [dragSourceParent, setDragSourceParent] = useState<string | null | undefined>(null);
@@ -765,6 +766,23 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   };
 
   const activeTreeData = isEditMode ? editTreeData : treeData;
+
+  const filteredTreeData = useMemo(() => {
+    if (!treeSearchQuery.trim()) return activeTreeData;
+    const query = treeSearchQuery.toLowerCase();
+    const filterNodes = (nodes: TreeNode[]): TreeNode[] =>
+      nodes.flatMap(node => {
+        const selfMatch =
+          node.code.toLowerCase().includes(query) ||
+          (node.data?.fleetEquipmentName || "").toLowerCase().includes(query);
+        const filteredChildren = filterNodes(node.children || []);
+        if (selfMatch || filteredChildren.length > 0) {
+          return [{ ...node, children: filteredChildren }];
+        }
+        return [];
+      });
+    return filterNodes(activeTreeData);
+  }, [activeTreeData, treeSearchQuery]);
 
   const selectedComponent = selectedNode?.data;
 
@@ -1384,22 +1402,29 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
         <div className="flex gap-6 h-full min-h-0">
           <div className="w-[30%] min-w-0 shrink-0" data-testid="fleet-tree-panel">
-            <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
-              <div className="flex-1 overflow-auto">
-                <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2">
-                  <span>FLEET COMPONENTS</span>
-                  {onBack && (
-                    <button
-                      onClick={onBack}
-                      className="flex items-center gap-1 text-cyan-100 text-xs transition-colors"
-                      data-testid="button-back-to-dashboard"
-                    >
-                      <ArrowLeft className="h-3.5 w-3.5" />
-                      Back to Dashboard
-                    </button>
-                  )}
+            <div className="bg-white rounded-lg shadow-sm h-full flex flex-col border border-gray-200">
+              <div className="flex-1 overflow-auto flex flex-col min-h-0">
+                {/* Left panel header */}
+                <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
+                  <h2 className="text-sm font-bold text-gray-800 tracking-wide uppercase">Fleet Components</h2>
                 </div>
-                <div className="bg-gray-50 border-b border-gray-200 px-3 py-1.5 flex items-center gap-1.5">
+
+                {/* Search input */}
+                <div className="px-3 py-2 border-b border-gray-200 flex-shrink-0">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                    <input
+                      placeholder="Search components..."
+                      value={treeSearchQuery}
+                      onChange={e => setTreeSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      data-testid="input-tree-search"
+                    />
+                  </div>
+                </div>
+
+                {/* Control buttons */}
+                <div className="bg-gray-50 border-b border-gray-200 px-3 py-1.5 flex items-center gap-1.5 flex-shrink-0">
                   {isEditMode ? (
                     <>
                       <Button
@@ -1428,20 +1453,11 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={handleEnterEditMode}
-                        data-testid="button-edit-tree-order"
-                      >
-                        <Pencil className="h-3.5 w-3.5 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
                         onClick={handleExpandSelected}
                         data-testid="button-expand-selected"
                       >
                         <ChevronsUpDown className="h-3.5 w-3.5 mr-1" />
-                        Expand
+                        Expand All
                       </Button>
                       <Button
                         variant="outline"
@@ -1450,30 +1466,39 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                         data-testid="button-collapse-all"
                       >
                         <ChevronsDownUp className="h-3.5 w-3.5 mr-1" />
-                        Collapse
+                        Collapse All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 flex-shrink-0"
+                        onClick={handleEnterEditMode}
+                        title="Reorder components"
+                        data-testid="button-edit-tree-order"
+                      >
+                        <Filter className="h-3.5 w-3.5" />
                       </Button>
                     </>
                   )}
                 </div>
-                <div>
+
+                {/* Tree */}
+                <div className="flex-1 overflow-auto">
                   {isComponentsLoading ? (
                     <div className="p-4 space-y-2">
                       {[...Array(8)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="h-8 bg-gray-100 animate-pulse rounded"
-                        />
+                        <div key={i} className="h-8 bg-gray-100 animate-pulse rounded" />
                       ))}
                     </div>
                   ) : (
                     <div className="py-1">
-                      {activeTreeData.map((node) => (
+                      {filteredTreeData.map((node) => (
                         <TreeItem
                           key={node.code}
                           node={node}
                           selectedCode={selectedNode?.code || null}
                           onSelect={setSelectedNode}
-                          expandedNodes={expandedNodes}
+                          expandedNodes={treeSearchQuery.trim() ? new Set(filteredTreeData.flatMap(n => collectAllCodes(n))) : expandedNodes}
                           onToggle={handleToggle}
                           isEditMode={isEditMode}
                           dragOverCode={dragOverCode}
@@ -1492,223 +1517,217 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
           <div className="flex-1 min-w-0" data-testid="fleet-detail-panel">
         {selectedComponent ? (
-          <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
-            <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
+          <div className="bg-white rounded-lg shadow-sm h-full flex flex-col border border-gray-200">
+            {/* Right panel header */}
+            <div className="px-5 py-4 border-b border-gray-200 flex-shrink-0 bg-white">
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <h2 className="text-lg font-semibold text-[#15569e]" data-testid="text-selected-component-title">
+                <h2 className="text-lg font-bold text-gray-900" data-testid="text-selected-component-title">
                   {selectedComponent.fleetEquipmentCode}{" "}
                   {selectedComponent.fleetEquipmentName}
                 </h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-[#52baf3] border-[#52baf3]"
-                  onClick={() => setLocation(`/admin/fleet-component-editor/${selectedComponent.id}`)}
-                  data-testid="button-add-edit-fleet-component"
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  Edit Fleet Component
-                </Button>
+                <div className="flex items-center gap-2">
+                  {onBack && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onBack}
+                      data-testid="button-back-to-dashboard-right"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      Back to Dashboard
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLocation(`/admin/fleet-component-editor/${selectedComponent.id}`)}
+                    data-testid="button-add-edit-fleet-component"
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit Fleet Component
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="flex-1 overflow-auto p-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
 
-                <Card className="rounded-sm border border-gray-200" data-testid="section-card-component-info">
-                  <CardHeader
-                    className="py-3 cursor-pointer"
+                {/* Section A — Fleet Component Information */}
+                <div className="rounded-lg border border-gray-200 bg-white overflow-hidden" data-testid="section-card-component-info">
+                  <div
+                    className="flex items-center justify-between px-5 py-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
                     onClick={() => setCollapsedSections(prev => ({ ...prev, A: !prev.A }))}
                   >
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2">
-                        A. Fleet Component Information
-                      </CardTitle>
-                      <span>
-                        {collapsedSections.A ? (
-                          <ChevronRight className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                      </span>
-                    </div>
-                  </CardHeader>
+                    <h3 className="text-sm font-semibold text-[#1a5fa8]">A. Fleet Component Information</h3>
+                    <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-150 ${collapsedSections.A ? '-rotate-90' : ''}`} />
+                  </div>
                   {!collapsedSections.A && (
-                    <CardContent className="pt-4 border-t border-gray-100">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="border-t border-gray-100 px-5 py-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-4">
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Code</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.fleetEquipmentCode || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Fleet Equipment Code</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.fleetEquipmentCode || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Name</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.fleetEquipmentName || selectedComponent.name || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Fleet Equipment Name</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.fleetEquipmentName || selectedComponent.name || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Parent Code</label>
-                          <div className="text-sm text-gray-900">
+                          <p className="text-xs text-gray-500 mb-0.5">Parent Code</p>
+                          <p className="text-sm font-medium text-gray-900">
                             {selectedComponent.parentFleetEquipmentCode ||
                               selectedComponent.fleetEquipmentCode?.split(".")[0] ||
                               "—"}
-                          </div>
+                          </p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Component Category</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.componentCategory || selectedComponent.category || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Component Category</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.componentCategory || selectedComponent.category || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Maker</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.maker || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Maker</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.maker || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Maker Code</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.makerCode || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Maker Code</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.makerCode || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Model</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.model || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Model</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.model || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Model Code</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.modelCode || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Model Code</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.modelCode || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Location</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.location || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Location</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.location || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Rating</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.rating || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Rating</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.rating || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Eqpt / System Department</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.eqptSystemDept || selectedComponent.department || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Eqpt / System Department</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.eqptSystemDept || selectedComponent.department || "—"}</p>
                         </div>
                         <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Notes</label>
-                          <div className="text-sm text-gray-900">{selectedComponent.notes || "—"}</div>
+                          <p className="text-xs text-gray-500 mb-0.5">Notes</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedComponent.notes || "—"}</p>
                         </div>
                       </div>
-                    </CardContent>
-                  )}
-                </Card>
-
-                <Card className="rounded-sm border border-gray-200" data-testid="section-card-job-info">
-                  <CardHeader className="py-3 cursor-pointer" onClick={() => setCollapsedSections(prev => ({ ...prev, B: !prev.B }))}>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2" data-testid="btn-fleet-job-collapse">
-                        B. Fleet Job Information
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); setIsJobInfoDialogOpen(true); }}
-                          className="text-[#52baf3] border-[#52baf3]"
-                          data-testid="btn-fleet-job-info-header"
-                        >
-                          <Pencil className="h-3 w-3 mr-1" />
-                          Manage Jobs
-                        </Button>
-                        <span>
-                          {collapsedSections.B ? (
-                            <ChevronRight className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </span>
-                      </div>
                     </div>
-                  </CardHeader>
+                  )}
+                </div>
+
+                {/* Section B — Fleet Job Information */}
+                <div className="rounded-lg border border-gray-200 bg-white overflow-hidden" data-testid="section-card-job-info">
+                  <div
+                    className="flex items-center justify-between px-5 py-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+                    onClick={() => setCollapsedSections(prev => ({ ...prev, B: !prev.B }))}
+                  >
+                    <h3 className="text-sm font-semibold text-[#1a5fa8]" data-testid="btn-fleet-job-collapse">B. Fleet Job Information</h3>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); setIsJobInfoDialogOpen(true); }}
+                        data-testid="btn-fleet-job-info-header"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Manage Jobs
+                      </Button>
+                      <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-150 ${collapsedSections.B ? '-rotate-90' : ''}`} />
+                    </div>
+                  </div>
                   {!collapsedSections.B && (
-                    <CardContent className="pt-4 border-t border-gray-100">
+                    <div className="border-t border-gray-100 px-5 py-4">
                       {relatedJobs.length > 0 ? (
                         <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-gray-200">
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Job No.</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Job Title</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Task Type</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Frequency</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {relatedJobs.map((job: FleetJob, index: number) => (
-                              <tr 
-                                key={index} 
-                                className="border-b border-gray-100 last:border-0 cursor-pointer"
-                                onDoubleClick={() => {
-                                  setSelectedJobForDetail(job);
-                                  setIsJobDetailsDialogOpen(true);
-                                }}
-                                data-testid={`job-row-${index}`}
-                              >
-                                <td className="py-2 text-sm text-gray-900">{job.jobCode || job.id}</td>
-                                <td className="py-2 text-sm text-gray-900">{job.woTitle || "—"}</td>
-                                <td className="py-2 text-sm text-gray-900">{job.taskType || "—"}</td>
-                                <td className="py-2 text-sm text-gray-900">
-                                  {job.intervalValue && job.unit 
-                                    ? `${job.intervalValue} ${job.unit}` 
-                                    : "—"}
-                                </td>
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 text-xs font-medium text-gray-500">Job No.</th>
+                                <th className="text-left py-2 text-xs font-medium text-gray-500">Job Title</th>
+                                <th className="text-left py-2 text-xs font-medium text-gray-500">Task Type</th>
+                                <th className="text-left py-2 text-xs font-medium text-gray-500">Frequency</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {relatedJobs.map((job: FleetJob, index: number) => (
+                                <tr
+                                  key={index}
+                                  className="border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50"
+                                  onDoubleClick={() => {
+                                    setSelectedJobForDetail(job);
+                                    setIsJobDetailsDialogOpen(true);
+                                  }}
+                                  data-testid={`job-row-${index}`}
+                                >
+                                  <td className="py-2 text-sm text-gray-900">{job.jobCode || job.id}</td>
+                                  <td className="py-2 text-sm text-gray-900">{job.woTitle || "—"}</td>
+                                  <td className="py-2 text-sm text-gray-900">{job.taskType || "—"}</td>
+                                  <td className="py-2 text-sm text-gray-900">
+                                    {job.intervalValue && job.unit
+                                      ? `${job.intervalValue} ${job.unit}`
+                                      : "—"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       ) : (
                         <p className="text-gray-500 text-sm">No jobs linked to this component</p>
                       )}
-                    </CardContent>
-                  )}
-                </Card>
-
-                <Card className="rounded-sm border border-gray-200" data-testid="section-card-spare-info">
-                  <CardHeader className="py-3 cursor-pointer" onClick={() => setCollapsedSections(prev => ({ ...prev, C: !prev.C }))}>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2" data-testid="btn-fleet-spare-collapse">
-                        C. Fleet Spares Information
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); setIsSpareInfoDialogOpen(true); }}
-                          className="text-[#52baf3] border-[#52baf3]"
-                          data-testid="btn-fleet-spare-info-header"
-                        >
-                          <Pencil className="h-3 w-3 mr-1" />
-                          Manage Spares
-                        </Button>
-                        <span>
-                          {collapsedSections.C ? (
-                            <ChevronRight className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </span>
-                      </div>
                     </div>
-                  </CardHeader>
+                  )}
+                </div>
+
+                {/* Section C — Fleet Spares Information */}
+                <div className="rounded-lg border border-gray-200 bg-white overflow-hidden" data-testid="section-card-spare-info">
+                  <div
+                    className="flex items-center justify-between px-5 py-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+                    onClick={() => setCollapsedSections(prev => ({ ...prev, C: !prev.C }))}
+                  >
+                    <h3 className="text-sm font-semibold text-[#1a5fa8]" data-testid="btn-fleet-spare-collapse">C. Fleet Spares Information</h3>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); setIsSpareInfoDialogOpen(true); }}
+                        data-testid="btn-fleet-spare-info-header"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Manage Spares
+                      </Button>
+                      <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-150 ${collapsedSections.C ? '-rotate-90' : ''}`} />
+                    </div>
+                  </div>
                   {!collapsedSections.C && (
-                    <CardContent className="pt-4 border-t border-gray-100">
+                    <div className="border-t border-gray-100 px-5 py-4">
                       {relatedSpares.length > 0 ? (
+                        <>
                         <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-gray-200">
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Part Code</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Part Name</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Part Number</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Maker</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Unit Of Measurement</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-500">Part Code</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-500">Part Name</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-500">Part Number</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-500">Maker</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-500">Unit Of Measurement</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {relatedSpares.map((spare: FleetSpare, index: number) => (
-                              <tr 
-                                key={index} 
-                                className="border-b border-gray-100 last:border-0"
+                            {(showAllSpares ? relatedSpares : relatedSpares.slice(0, 5)).map((spare: FleetSpare, index: number) => (
+                              <tr
+                                key={index}
+                                className="border-b border-gray-100 last:border-0 hover:bg-gray-50"
                                 data-testid={`spare-row-${index}`}
                               >
                                 <td className="py-2">
@@ -1732,99 +1751,107 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                           </tbody>
                         </table>
                         </div>
+                        {relatedSpares.length > 5 && (
+                          <div className="mt-3 flex justify-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowAllSpares(v => !v)}
+                              data-testid="btn-view-all-spares"
+                            >
+                              {showAllSpares
+                                ? "Show Less ↑"
+                                : `View All Spares (${relatedSpares.length}) ↓`}
+                            </Button>
+                          </div>
+                        )}
+                        </>
                       ) : (
                         <p className="text-gray-500 text-sm">No spares linked to this component</p>
                       )}
-                    </CardContent>
-                  )}
-                </Card>
-
-                <Card className="rounded-sm border border-gray-200" data-testid="section-card-vessel-mapping">
-                  <CardHeader className="py-3 cursor-pointer" onClick={() => setCollapsedSections(prev => ({ ...prev, D: !prev.D }))}>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2" data-testid="btn-vessel-mapping-collapse">
-                        D. Vessel Mapping Overview
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleOpenMappingDialog(); }}
-                          className="text-[#52baf3] border-[#52baf3]"
-                          data-testid="btn-vessel-mapping-overview-header"
-                        >
-                          <Pencil className="h-3 w-3 mr-1" />
-                          Manage Mappings
-                        </Button>
-                        <span>
-                          {collapsedSections.D ? (
-                            <ChevronRight className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </span>
-                      </div>
                     </div>
-                  </CardHeader>
+                  )}
+                </div>
+
+                {/* Section D — Vessel Mapping Overview */}
+                <div className="rounded-lg border border-gray-200 bg-white overflow-hidden" data-testid="section-card-vessel-mapping">
+                  <div
+                    className="flex items-center justify-between px-5 py-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+                    onClick={() => setCollapsedSections(prev => ({ ...prev, D: !prev.D }))}
+                  >
+                    <h3 className="text-sm font-semibold text-[#1a5fa8]" data-testid="btn-vessel-mapping-collapse">D. Vessel Mapping Overview</h3>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleOpenMappingDialog(); }}
+                        data-testid="btn-vessel-mapping-overview-header"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Manage Mappings
+                      </Button>
+                      <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-150 ${collapsedSections.D ? '-rotate-90' : ''}`} />
+                    </div>
+                  </div>
                   {!collapsedSections.D && (
-                    <CardContent className="pt-4 border-t border-gray-100">
+                    <div className="border-t border-gray-100 px-5 py-4">
                       {relatedVessels.length > 0 ? (
                         <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-gray-200">
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Vessel Code</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Vessel Name</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {relatedVessels.map((vessel, index) => (
-                              <tr key={index} className="border-b border-gray-100 last:border-0">
-                                <td className="py-2 text-sm text-gray-900">{vessel.id}</td>
-                                <td 
-                                  className="py-2 cursor-pointer text-blue-600 underline text-sm"
-                                  onClick={() => {
-                                    if (vessel.mapping) {
-                                      setSelectedVesselForDetail(vessel.mapping);
-                                      setSelectedDetailMappingIds(new Set());
-                                      setDetailSearchQuery("");
-                                      setIsDetailDialogOpen(true);
-                                    }
-                                  }}
-                                  data-testid={`main-vessel-name-${vessel.id}`}
-                                >
-                                  {vessel.name}
-                                </td>
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 text-xs font-medium text-gray-500">Vessel Code</th>
+                                <th className="text-left py-2 text-xs font-medium text-gray-500">Vessel Name</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {relatedVessels.map((vessel, index) => (
+                                <tr key={index} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                                  <td className="py-2 text-sm text-gray-900">{vessel.id}</td>
+                                  <td
+                                    className="py-2 cursor-pointer text-blue-600 underline text-sm"
+                                    onClick={() => {
+                                      if (vessel.mapping) {
+                                        setSelectedVesselForDetail(vessel.mapping);
+                                        setSelectedDetailMappingIds(new Set());
+                                        setDetailSearchQuery("");
+                                        setIsDetailDialogOpen(true);
+                                      }
+                                    }}
+                                    data-testid={`main-vessel-name-${vessel.id}`}
+                                  >
+                                    {vessel.name}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       ) : (
                         <p className="text-gray-500 text-sm">No vessels mapped to this component</p>
                       )}
-                    </CardContent>
+                    </div>
                   )}
-                </Card>
+                </div>
 
               </div>
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
-            <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
-              <div className="flex items-center justify-end">
+          <div className="bg-white rounded-lg shadow-sm h-full flex flex-col border border-gray-200">
+            <div className="px-5 py-4 border-b border-gray-200 flex-shrink-0 flex items-center justify-between bg-white">
+              <span className="text-sm text-gray-400 italic">Select a component to view details</span>
+              {onBack && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-[#52baf3] border-[#52baf3]"
-                  onClick={() => setLocation("/admin/fleet-component-editor")}
-                  data-testid="button-add-edit-fleet-component"
+                  onClick={onBack}
+                  data-testid="button-back-to-dashboard-empty"
                 >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add / Edit Fleet Component
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back to Dashboard
                 </Button>
-              </div>
+              )}
             </div>
             <div className="flex-1 flex items-center justify-center text-gray-500">
               <div className="text-center">

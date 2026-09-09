@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import * as fs from "fs";
 import * as path from "path";
 import moduleRouter from "./modules";
-import { mockAuthMiddleware, initMockAuthRankId } from "./middleware/auth";
+import { mockAuthMiddleware, initMockAuthRankId, requireRole, type AuthenticatedRequest } from "./middleware/auth";
+import { z } from "zod";
 import { tenantMiddleware } from "./middleware/tenantMiddleware";
 import { requestContextMiddleware } from "./middleware/requestContext";
 import { ensureMaintenanceHistoryImmutability, ensureCertApplicabilityIndex } from "./initDb";
@@ -144,8 +145,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // scheduler persists the derived band. This removes the shore's every-minute
   // full-table scan AND the 'system' status writes that were the documented
   // source of false sync conflicts.
-  const { isShipInstance } = await import("./modules/sync/syncRole");
+  const { isShipInstance, isShipInstanceId } = await import("./modules/sync/syncRole");
   const isShip = await isShipInstance();
+
+  // Loud mismatch warning: DB sync_settings.instance_id wins over env, so a ship
+  // whose DB carries a stale non-SHIP value boots as "shore" and silently skips
+  // the ship schedulers (reproduced 2026-07-28). Name the disagreement at boot;
+  // the role watchdog below converges the schedulers once the DB is corrected.
+  const envInstanceId = process.env.SYNC_INSTANCE_ID || '';
+  if (!isShip && isShipInstanceId(envInstanceId)) {
+    console.warn(
+      `[Schedulers] ⚠️ Resolved role is SHORE but env SYNC_INSTANCE_ID ('${envInstanceId}') is a ship id — ` +
+        `DB sync_settings.instance_id wins and is NOT a ship value. If this box is a ship, fix the DB value; ` +
+        `the scheduler role watchdog will then start the ship schedulers without a restart.`,
+    );
+  }
 
   // Daily cadence (configurable). Calendar legs move at day granularity and RH
   // legs change only on running-hours entry, so a daily sweep is sufficient.
@@ -153,11 +167,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Start Job Due Scanner - scans jobs and auto-generates work orders when due
   const { jobDueScanner } = await import("./services/jobDueScanner");
+  // Dual-writer design (plan §9.7): shore runs its OWN daily generation+reconcile sweep
+  // over PROVISIONED vessels, so the office sees work orders even while a ship's sync
+  // lags on VSAT; the post-sync reconciler resolves the duplicates the two writers
+  // produce. Imported unconditionally so stopAllSchedulers can reference it either way;
+  // start() is role-gated here and re-converged by schedulerRoleWatchdog.
+  const { shoreWoDailyScheduler } = await import('./services/shoreWoDailyScheduler');
   if (isShip) {
     jobDueScanner.start(JOB_DUE_SCAN_INTERVAL_MS);
     console.log(`[JobDueScanner] Ship instance — scheduler started (interval: ${JOB_DUE_SCAN_INTERVAL_MS / 3600000}h)`);
   } else {
-    console.log('[JobDueScanner] Shore instance — auto scan NOT started (office uses on-demand "Generate Now")');
+    shoreWoDailyScheduler.start();
+    console.log('[JobDueScanner] Shore instance — ship scanner off; shore daily WO sweep started (generation + reconciler)');
   }
 
   // NOTE: the former every-minute Work Order Status Recalculator has been REMOVED
@@ -183,6 +204,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } else {
     console.log('[AutoSync] Shore instance detected — auto-sync scheduler not started (sync is ship-initiated)');
   }
+
+  // Shipskart b2b reconciler — SHORE-ONLY (ships never talk to Shipskart). Each tick is
+  // additionally gated by the per-tenant reconciler_enabled flag, default FALSE, so a
+  // fresh deploy never starts pushing to a partner API on its own.
+  const { shipskartReconcilerScheduler } = await import("./modules/shipskart/services/shipskartReconcilerScheduler");
+  await shipskartReconcilerScheduler.start();
+
+  // Role watchdog — the boot-time isShip decision above can be WRONG (stale DB
+  // instance_id at boot) and used to stay wrong until the next restart, leaving
+  // auto-sync + WO generation silently dead on a ship. The watchdog re-resolves
+  // the role periodically and starts/stops the two ship schedulers to match.
+  const { schedulerRoleWatchdog } = await import("./services/schedulerRoleWatchdog");
+  schedulerRoleWatchdog.start({
+    jobDueScanIntervalMs: JOB_DUE_SCAN_INTERVAL_MS,
+    initialRole: isShip ? 'ship' : 'shore',
+  });
 
   // Dev-only seed endpoint for recurring defects testing
   if (process.env.NODE_ENV === 'development') {
@@ -316,21 +353,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/technical/api/admin/approval-workflow-config', async (req, res) => {
-    try {
-      const { rows } = req.body;
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return res.status(400).json({ success: false, error: 'rows array required' });
+  // Phase 0 / P0.4 (defect D4): the approval matrix is office-owned config, synced shore→ship
+  // (ONE_WAY). Writes: office role (same guard as the other approval surfaces), shore instance
+  // only (a ship edit could never reach shore), zod-validated body, author stamped from the
+  // authenticated request. GET stays open: the matrix is read on ships too (Vessel Admin has the
+  // admin-approval-workflow view permission in the dev data).
+  const awcRowSchema = z.object({
+    moduleId: z.string().min(1),
+    subModuleId: z.string().min(1),
+    functionId: z.string().min(1),
+    variableName: z.string().min(1),
+    level1Enabled: z.boolean(),
+    level2Enabled: z.boolean(),
+  }).passthrough();
+  const awcPutSchema = z.object({ rows: z.array(awcRowSchema).min(1) });
+  app.put('/technical/api/admin/approval-workflow-config',
+    requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+    async (req, res) => {
+      try {
+        const { isShipInstance } = await import("./modules/sync/syncRole");
+        if (await isShipInstance()) {
+          return res.status(403).json({ success: false, error: 'shore_only', message: 'The approval workflow matrix is configured on the shore server and synced to ships.' });
+        }
+        const parsed = awcPutSchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: 'Invalid approval workflow config payload', details: parsed.error.errors });
+        }
+        const actor = (req as AuthenticatedRequest).user?.userUuid || (req as AuthenticatedRequest).user?.username || 'system';
+        const updated = await storage.upsertApprovalWorkflowConfig(parsed.data.rows, actor);
+        res.json({ success: true, data: updated });
+      } catch (err) {
+        console.error('[ApprovalWorkflowConfig] PUT error:', err);
+        res.status(500).json({ success: false, error: 'Failed to save approval workflow config' });
       }
-      const updated = await storage.upsertApprovalWorkflowConfig(rows);
-      res.json({ success: true, data: updated });
-    } catch (err) {
-      console.error('[ApprovalWorkflowConfig] PUT error:', err);
-      res.status(500).json({ success: false, error: 'Failed to save approval workflow config' });
-    }
-  });
+    });
 
   const httpServer = createServer(app);
+
+  // STARTUP SELF-HEAL (Task #417 + #427): recompute MASTER and INHERITED
+  // component display state from local audit history via the hardened winner
+  // selection. Idempotent (no-op on converged data → zero churn on restart).
+  // Gated on migration 167 readiness (safe_rh_reading_day + backup table): the
+  // heal's SQL depends on the parser function, and running it before the
+  // normalization migration would rank legacy rows by entry day again.
+  // Advisory lock guards multi-instance deployments (one healer at a time).
+  (async () => {
+    const RH_SELF_HEAL_LOCK_KEY = 427167001;
+    let lockClient: any = null;
+    try {
+      const { getPool } = await import('./db');
+      const pool = await getPool();
+      // READINESS GATE (Task #427): migration presence cannot be assumed on
+      // external builds (live 22007 crash proved a deployment missing 166).
+      const ready = await pool.query(`
+        SELECT
+          EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'safe_rh_reading_day') AS fn_ready,
+          EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'rh_date_normalization_backup') AS norm_ready
+      `);
+      if (!ready.rows[0]?.fn_ready || !ready.rows[0]?.norm_ready) {
+        console.error('❌ [RH-SelfHeal] SKIPPED — migration 167 not applied (safe_rh_reading_day/backup table missing). This build must include migrations 166 + 167; RH winner selection stays on legacy ranking until it runs.');
+        return;
+      }
+      lockClient = await pool.connect();
+      const lock = await lockClient.query('SELECT pg_try_advisory_lock($1) AS locked', [RH_SELF_HEAL_LOCK_KEY]);
+      if (!lock.rows[0]?.locked) {
+        console.log('ℹ️ [RH-SelfHeal] another instance holds the self-heal lock — skipping on this instance');
+        return;
+      }
+      try {
+        const { selfHealRhComponents } = await import('./modules/running-hours/rhEventComparator');
+        const m = await selfHealRhComponents(pool);
+        console.log(`✅ RH self-heal complete: masters ${m.mastersHealed}/${m.mastersScanned} healed, inherited ${m.childrenHealed}/${m.childrenScanned} healed, rhDecreases=${m.rhDecreases}, errors=${m.errors}, ${m.durationMs}ms${m.mastersHealed + m.childrenHealed === 0 ? ' (no-op — converged)' : ''}`);
+      } finally {
+        await lockClient.query('SELECT pg_advisory_unlock($1)', [RH_SELF_HEAL_LOCK_KEY]);
+      }
+    } catch (err) {
+      console.error('⚠️ Error during RH self-heal:', err);
+    } finally {
+      lockClient?.release?.();
+    }
+  })();
 
   // Recalculate recurring defects on startup (don't await - let it run in background)
   storage.recalculateAllRecurringDefects().then(() => {
@@ -600,9 +702,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CPU/heap. (The status recalculator scheduler has been removed entirely.)
   const stopAllSchedulers = () => {
     console.log('Cleaning up scheduled tasks...');
+    schedulerRoleWatchdog.stop(); // first, so it can't restart what we stop below
     jobDueScanner.stop();
+    shoreWoDailyScheduler.stop();
     maintenanceOrchestrator.stop(); // stops alerts + sync-health + sync-pruning timers
     syncAutoScheduler.stop();
+    shipskartReconcilerScheduler.stop();
   };
   process.on('SIGTERM', stopAllSchedulers);
   process.on('SIGINT', stopAllSchedulers);

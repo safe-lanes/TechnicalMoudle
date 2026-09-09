@@ -7,8 +7,18 @@ import {
 } from "react";
 import type { PublicUser, UserRole } from "@shared/schema";
 import type { UIRole } from "@shared/uiRoles";
-import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
-import { secureGetItem, secureClear } from "@/utils/secureStorage";
+import {
+  useViewModeResolution,
+  type ViewModeResolution,
+} from "@/hooks/useViewModeResolution";
+import {
+  secureGetItem,
+  secureClear,
+  setLoggedOutMarker,
+  clearLoggedOutMarker,
+  hasLoggedOutMarker,
+} from "@/utils/secureStorage";
+import { isReplit } from "@/lib/env";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 import {
   setActiveRank,
@@ -163,6 +173,8 @@ interface AuthContextType {
   canModifyData: () => boolean;
   canApproveChanges: () => boolean;
   userType: UIRole | null;
+  /** Full fail-closed resolution state (Task #324) — loading/error/blocked drives the app gate. */
+  uiRoleResolution: ViewModeResolution;
   login: (user: PublicUser) => void;
   logout: () => void;
 }
@@ -202,15 +214,88 @@ function toActiveIdentity(
   };
 }
 
+/**
+ * CAPTURE-AT-LOGIN — hand the decrypted SAILERP `myVessels` set to the server ONCE per
+ * page load. The server can never read the encrypted userProfile itself, so this is the
+ * only way user↔vessel assignments reach `master_user_vessels`, which is what the
+ * Shipskart reconciler uses to map users to vessels for Purchasing.
+ *
+ * Fire-and-forget by design: it must NEVER block login or surface an error to the user.
+ * The sessionStorage guard keeps it to one call per load (both the mount-hydration and
+ * the explicit login path call it). The user uuid is taken server-side from the
+ * x-user-id header — deliberately not sent in the body.
+ *
+ * ⚠️ THE GUARD MUST BE CLEARED ON LOGOUT — see clearVesselCaptureGuard below.
+ */
+const VESSEL_CAPTURE_GUARD = "pms.vesselAssignmentsPosted";
+
+/**
+ * Drop the once-per-session capture guard so the NEXT login re-posts the vessel list.
+ *
+ * WHY (bug found 2026-08-10): the guard lives in sessionStorage, which is scoped to the
+ * browser TAB and survives BOTH a logout and a hard refresh — only closing the tab ends
+ * it. `logout()` calls secureClear(), which touches localStorage only, and nothing else
+ * in the client cleared sessionStorage. So a same-tab logout→login skipped the POST
+ * entirely: a vessel reassignment made between the two logins never reached
+ * `master_user_vessels`, and therefore never reached Shipskart. The only cure was to
+ * close the browser, which no operator would ever guess.
+ *
+ * Clears EVERY user's guard, not just the current one: at logout the uuid may already be
+ * gone, and a shared machine can carry stale keys for whoever used the tab before.
+ */
+function clearVesselCaptureGuard(): void {
+  try {
+    // Object.keys returns a snapshot, so removing while iterating is safe.
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith(`${VESSEL_CAPTURE_GUARD}:`)) sessionStorage.removeItem(key);
+    }
+  } catch {
+    // private-mode / storage-disabled: there was no guard to clear either.
+  }
+}
+
+function captureVesselAssignments(assignments: MyVesselAssignment[], userUuid: string | null | undefined): void {
+  if (!userUuid) return; // no forwarded identity → the server would reject it anyway
+  // NEVER post an empty set: an absent/unreadable encrypted userProfile normalises to []
+  // and must not be mistaken for "this user has no vessels". The server no-ops on empty
+  // too (belt and braces); a real full revoke is an explicit admin action.
+  if (assignments.length === 0) return;
+  const guardKey = `${VESSEL_CAPTURE_GUARD}:${userUuid}`;
+  try {
+    if (sessionStorage.getItem(guardKey)) return;
+    sessionStorage.setItem(guardKey, String(assignments.length));
+  } catch {
+    // private-mode / storage-disabled: fall through and just post once per call site
+  }
+  void (async () => {
+    try {
+      await apiRequest("POST", "/technical/api/shipskart/vessel-assignments", {
+        myVessels: assignments,
+      });
+    } catch (err) {
+      // Never block the user — a failed capture just means the reconciler has no
+      // assignments for them yet; the next login retries.
+      console.error("[VesselAssignments] capture failed (non-blocking):", err);
+    }
+  })();
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [myVessels, setMyVessels] = useState<MyVesselAssignment[]>([]);
   const [domain, setDomain] = useState<string | null>(null);
-  const [userType, setUserType] = useState<UIRole | null>(null);
+
+  // Task #324 — view mode is resolved SERVER-SIDE (DB mapping, fail-closed with
+  // the Office/'Sail Admin' bypass), replacing the old synchronous
+  // mapLoggedRoleToUIRole call. Shared TanStack key with UIRoleContext.
+  const uiRoleResolution = useViewModeResolution(
+    currentUser?.userType ?? null,
+    currentUser?.role ?? null,
+  );
+  const userType = uiRoleResolution.uiRole;
 
   useEffect(() => {
     let resolvedUser: PublicUser | null = null;
-    let resolvedUserType: UIRole | null = null;
     let resolvedMyVessels: MyVesselAssignment[] = [];
 
     const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
@@ -239,11 +324,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     if (encryptedUserType && encryptedProfile?.role) {
-      resolvedUserType = mapLoggedRoleToUIRole(
-        encryptedUserType,
-        encryptedProfile.role,
-      );
-
       const role = (encryptedProfile.role as UserRole) || "Office";
       const resolved = resolveProfileName(encryptedProfile);
       resolvedUser = {
@@ -268,84 +348,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
         updatedAt: new Date(),
       };
       resolvedMyVessels = normalizeMyVessels(encryptedProfile);
-    } else {
-      const plainUserType = localStorage.getItem("userType");
-      let plainProfile: Record<string, any> | null = null;
-      try {
-        const raw = localStorage.getItem("userProfile");
-        if (raw) plainProfile = JSON.parse(raw);
-      } catch {
-        plainProfile = null;
-      }
-
-      if (plainProfile && import.meta.env.DEV) {
-        console.log(
-          "[AuthContext] plain userProfile keys:",
-          Object.keys(plainProfile),
-        );
-        console.log("[AuthContext] plain name-related fields:", {
-          fullName: plainProfile.fullName,
-          full_name: plainProfile.full_name,
-          name: plainProfile.name,
-          displayName: plainProfile.displayName,
-          userName: plainProfile.userName,
-          username: plainProfile.username,
-          firstname: plainProfile.firstname,
-          lastname: plainProfile.lastname,
-          firstName: plainProfile.firstName,
-          lastName: plainProfile.lastName,
-          first_name: plainProfile.first_name,
-          last_name: plainProfile.last_name,
-          userId: plainProfile.userId,
-        });
-      }
-
-      if (plainUserType && plainProfile?.role) {
-        resolvedUserType = mapLoggedRoleToUIRole(
-          plainUserType,
-          plainProfile.role,
-        );
-
-        const role = (plainProfile.role as UserRole) || "Office";
-        const resolved = resolveProfileName(plainProfile);
-        resolvedUser = {
-          id: plainProfile.id || 0,
-          username: resolved.username || "user",
-          fullName: resolved.fullName || resolved.username || "User",
-          email: plainProfile.email || null,
-          role: role,
-          userType:
-            plainUserType === "Office" || plainUserType === "Ship"
-              ? plainUserType
-              : undefined,
-          vesselId: plainProfile.vesselId || null,
-          department: plainProfile.department || null,
-          isActive: true,
-          crewDesignation: plainProfile.crewDesignation || null,
-          rank_name: plainProfile.rank_name || plainProfile.rankName || null,
-          userUuid: resolved.userUuid || undefined,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        resolvedMyVessels = normalizeMyVessels(plainProfile);
-      }
     }
+    // SECURITY: no plain-text localStorage fallback. Plain `userProfile`/
+    // `userType` values are attacker-editable and must never be trusted as
+    // identity inputs — only the encrypted keys written by the real login
+    // flow count. Absent/undecryptable keys fall through to DEFAULT_USER.
 
-    if (!resolvedUser) {
+    // Dev-only fallback (Task #422): the default user exists purely as a
+    // Replit-workspace convenience (VITE_APP_ENV=replit). In production /
+    // SAILERP-hosted / local builds, a missing or cleared profile ALWAYS means
+    // signed out — the token layer (`getAccessToken`) redirects to the parent
+    // app's /login on the first request with no credentials. Inside Replit, an
+    // explicit logout sets a marker that suppresses the fallback so logout
+    // sticks across reloads; fresh dev sessions that never logged in keep it.
+    if (!resolvedUser && isReplit() && !hasLoggedOutMarker()) {
       resolvedUser = DEFAULT_USER;
-      resolvedUserType = mapLoggedRoleToUIRole(
-        DEFAULT_USER.userType,
-        DEFAULT_USER.role,
-      );
     }
 
     setCurrentUser(resolvedUser);
     setMyVessels(resolvedMyVessels);
     setDomain(resolveDomain());
-    setUserType(resolvedUserType);
     const hydratedRankChanged = setActiveRank(resolvedUser?.rank_name ?? null);
     // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
     setActiveIdentity(toActiveIdentity(resolvedUser));
+    // Capture-at-login (hydration path: an already-logged-in session reloading the app).
+    // AFTER setActiveIdentity so the x-user-id header is on the request.
+    captureVesselAssignments(resolvedMyVessels, resolvedUser?.userUuid);
     if (hydratedRankChanged) {
       invalidateRankScopedQueries();
     }
@@ -407,26 +435,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
-    const derivedUIType = mapLoggedRoleToUIRole(user.userType, user.role);
+    // A real login supersedes any prior logout — clear the marker so the
+    // next hydration trusts the freshly stored profile (and, in Replit,
+    // restores the dev fallback convenience).
+    clearLoggedOutMarker();
 
+    // View mode resolves reactively from the server via useViewModeResolution
+    // once currentUser updates (Task #324) — no synchronous mapping here.
     setCurrentUser(sanitizedUser);
-    setUserType(derivedUIType);
 
     // Keep assigned-fleet ("My Vessel") scope in sync with the freshly
     // logged-in account. The vessel assignments live on the stored
-    // userProfile (encrypted preferred, plain fallback), so re-read it here
-    // rather than relying solely on the initial mount hydration.
+    // userProfile (ENCRYPTED ONLY — plain-text storage is untrusted), so
+    // re-read it here rather than relying solely on the initial mount hydration.
     let loginMyVessels: MyVesselAssignment[] = [];
     const encLoginProfile = secureGetItem<Record<string, any>>("userProfile");
     if (encLoginProfile) {
       loginMyVessels = normalizeMyVessels(encLoginProfile);
-    } else {
-      try {
-        const raw = localStorage.getItem("userProfile");
-        if (raw) loginMyVessels = normalizeMyVessels(JSON.parse(raw));
-      } catch {
-        loginMyVessels = [];
-      }
     }
     setMyVessels(loginMyVessels);
     setDomain(resolveDomain());
@@ -434,6 +459,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const rankChanged = setActiveRank(sanitizedUser.rank_name ?? null);
     // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
     setActiveIdentity(toActiveIdentity(sanitizedUser));
+    // Capture-at-login (fresh login path). AFTER setActiveIdentity so x-user-id is sent.
+    captureVesselAssignments(loginMyVessels, sanitizedUser.userUuid);
     if (rankChanged) {
       invalidateRankScopedQueries();
     }
@@ -461,12 +488,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // auth (it currently runs mock auth), also call its server logout endpoint
     // here to invalidate the server session. Today logout is client-side only.
 
-    // Wipe all auth-related localStorage so a reload cannot re-hydrate the
-    // previous user (otherwise AuthContext's mount effect re-authenticates).
+    // Wipe all auth-related storage (localStorage AND sessionStorage — the
+    // token reader checks sessionStorage first, so a leftover `credentials`
+    // blob there would keep authenticating requests after logout). Must run
+    // BEFORE any navigation/refetch so no request re-attaches a stale token.
     secureClear();
+    // The capture guard lives in sessionStorage under its own key. Without this
+    // the next login in the SAME TAB skips the vessel capture, so an assignment
+    // changed between the two logins never reaches the server.
+    clearVesselCaptureGuard();
+    // Suppress the Replit dev default-user fallback on the next hydration so
+    // an intentional logout sticks across reloads. Cleared by login().
+    setLoggedOutMarker();
 
     setCurrentUser(null);
-    setUserType(null);
     setMyVessels([]);
     setDomain(null);
     const rankChanged = setActiveRank(null);
@@ -474,6 +509,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setActiveIdentity(null);
     if (rankChanged) {
       invalidateRankScopedQueries();
+    }
+
+    // Drop ALL cached query data so the next user on this browser never sees
+    // the previous user's screens (rank-scoped invalidation above is not
+    // enough — it only covers rank-scoped keys).
+    queryClient.clear();
+
+    // Navigation: outside Replit, hard-redirect to the parent app's /login
+    // page (same convention as onTokenFailure/ViewModeGate — it is NOT an
+    // in-app route). Inside Replit there is no parent login page; the app
+    // renders its signed-out (no-user) state instead.
+    if (!isReplit() && typeof window !== "undefined") {
+      window.location.assign("/login");
     }
   };
 
@@ -491,6 +539,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     canModifyData,
     canApproveChanges,
     userType,
+    uiRoleResolution,
     login,
     logout,
   };

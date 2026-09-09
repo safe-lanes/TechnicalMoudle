@@ -75,21 +75,66 @@ export const EXTRA_AUTH_LOCAL_STORAGE_KEYS = [
 const FORM_VERSIONS_PREFIX = "form-versions-";
 
 /**
- * Wipe every authentication-related entry from localStorage. Clears the five
- * encrypted keys (`LOCAL_STORAGE_KEYS`), the extra auth keys, and any
- * `form-versions-*` cache entry. Used by logout so a reload cannot silently
- * re-hydrate the previous user.
+ * Wipe every authentication-related entry from BOTH localStorage and
+ * sessionStorage. Clears the encrypted keys (`LOCAL_STORAGE_KEYS`), the extra
+ * auth keys, and any `form-versions-*` cache entry. Used by logout so a reload
+ * cannot silently re-hydrate the previous user.
+ *
+ * sessionStorage matters: `authToken.peekAccessToken()` checks sessionStorage
+ * FIRST for the `credentials` blob, so a token left there would keep
+ * authenticating requests after logout and suppress the missing-token
+ * login redirect.
  */
 export function secureClear(): void {
   for (const key of LOCAL_STORAGE_KEYS) {
     localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
   }
   for (const key of EXTRA_AUTH_LOCAL_STORAGE_KEYS) {
     localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
   }
   for (const key of Object.keys(localStorage)) {
     if (key.startsWith(FORM_VERSIONS_PREFIX)) {
       localStorage.removeItem(key);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Explicit "logged out" marker (Replit dev preview only).
+//
+// In the Replit workspace, AuthContext falls back to a default dev user when
+// no stored profile exists — convenient for fresh dev sessions, but it would
+// silently re-login a user who just logged out and reloaded. This marker,
+// set on logout and cleared on a real login, suppresses that fallback so an
+// intentional logout sticks. Outside Replit the fallback never runs at all
+// (gated on isReplit()), so the marker is a dev-only concern.
+// ---------------------------------------------------------------------------
+
+const LOGGED_OUT_MARKER_KEY = "pms_logged_out";
+
+export function setLoggedOutMarker(): void {
+  try {
+    localStorage.setItem(LOGGED_OUT_MARKER_KEY, "1");
+  } catch {
+    // Storage unavailable — nothing to persist; fallback gating degrades to
+    // pre-marker behavior.
+  }
+}
+
+export function clearLoggedOutMarker(): void {
+  try {
+    localStorage.removeItem(LOGGED_OUT_MARKER_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function hasLoggedOutMarker(): boolean {
+  try {
+    return localStorage.getItem(LOGGED_OUT_MARKER_KEY) === "1";
+  } catch {
+    return false;
   }
 }

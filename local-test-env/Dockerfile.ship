@@ -1,0 +1,40 @@
+# PILOT ARTIFACT — ship node for the DEPLOY-NOTE-SYNC-STACK-2026-07 local pilot.
+# NOT a production image. Runs BOTH the app and its own Postgres inside one container so the
+# ship is fully isolated from the host DB, exactly like a real vessel.
+#
+# Same build as shore — configured as a ship purely by env (SYNC_INSTANCE_ID=SHIP-<code>).
+# Role is decided by syncRole.ts: instanceId.startsWith('SHIP-'), DB-first then env.
+FROM node:22-bookworm-slim
+
+# Postgres 15 (bookworm default) inside the container = the ship's own DB.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      postgresql postgresql-contrib curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PGBIN=/usr/lib/postgresql/15/bin \
+    PGDATA=/var/lib/postgresql/data \
+    NODE_ENV=development \
+    APP_ENV=local \
+    PORT=5000
+
+WORKDIR /app
+
+# Deps first so the layer caches across rebuilds.
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+# App source (see pilot/.dockerignore for what is excluded).
+COPY . .
+
+# The container has no .git — build identity must come from the env fallback.
+# This deliberately exercises the BUILD_COMMIT path (buildInfo.ts source='env').
+ARG BUILD_COMMIT=unknown
+ARG BUILD_BRANCH=unknown
+ENV BUILD_COMMIT=${BUILD_COMMIT} \
+    BUILD_BRANCH=${BUILD_BRANCH}
+
+COPY pilot/ship-entrypoint.sh /usr/local/bin/ship-entrypoint.sh
+RUN chmod +x /usr/local/bin/ship-entrypoint.sh
+
+EXPOSE 5000
+ENTRYPOINT ["/usr/local/bin/ship-entrypoint.sh"]

@@ -7,11 +7,12 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initStorage } from "./storage";
 import { initializeDatabase } from "./initDb";
 import { runBackupAndMigrations } from "./migrations";
+import { logBuildIdentity } from "./utils/buildInfo";
 import { tenantConnectionManager } from "./utils/tenantConnectionManager";
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -44,6 +45,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Build identity FIRST — before storage and migrations. If the migration run aborts, the log
+  // must still say which build attempted it; a marker printed after a failure point is useless.
+  logBuildIdentity();
+
   // Initialize PostgreSQL storage
   await initStorage();
   
