@@ -4066,6 +4066,8 @@ var init_schema = __esm({
       // Vessel name for display
       masterId: text2("master_id").notNull(),
       // References ship_certificates_master.master_id
+      certificateNumber: text2("certificate_number"),
+      // Vessel-specific free-text certificate number
       issueDate: text2("issue_date"),
       // Date certificate was issued
       expiryDate: text2("expiry_date"),
@@ -12151,6 +12153,16 @@ var init_conflictReviewRepository = __esm({
   }
 });
 
+// server/modules/sync/unknownColumnRetryPolicy.ts
+function shouldRetryUnknownSyncColumn(tableName, columnName) {
+  return tableName === "vessel_certificate_data" && columnName === "certificate_number";
+}
+var init_unknownColumnRetryPolicy = __esm({
+  "server/modules/sync/unknownColumnRetryPolicy.ts"() {
+    "use strict";
+  }
+});
+
 // server/modules/sync/service.ts
 var service_exports = {};
 __export(service_exports, {
@@ -12469,6 +12481,11 @@ async function receivePushData(batchUuid, vesselId, payload) {
             }
             const meta = await getColumnMeta(client, log2.tableName);
             if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+              if (shouldRetryUnknownSyncColumn(log2.tableName, fieldNameSnake)) {
+                droppedRowUuids.add(log2.rowUuid);
+                syncDiag(`UPDATE DEFER (unknown column): ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} \u2014 receiver is pre-migration; left unacked for retry`);
+                continue;
+              }
               syncDiag(`UPDATE SKIP (unknown column): ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} \u2014 column not in local schema (pre-migration instance); acked without apply`);
               fieldLogsApplied++;
               continue;
@@ -13231,6 +13248,7 @@ var init_service = __esm({
     init_syncDiagLogger();
     init_alertsRepository();
     init_conflictReviewRepository();
+    init_unknownColumnRetryPolicy();
     vesselCodeCache = /* @__PURE__ */ new Map();
   }
 });
@@ -17891,6 +17909,7 @@ var init_syncEngine = __esm({
     init_db();
     init_syncDiagLogger();
     init_syncRole();
+    init_unknownColumnRetryPolicy();
     CHUNK_SIZE = 200;
     MAX_RETRIES = 3;
     RETRY_DELAYS = [5e3, 15e3, 45e3];
@@ -18756,6 +18775,11 @@ var init_syncEngine = __esm({
         const conn = client || await getPool();
         const meta = await getColumnMeta(conn, log2.tableName);
         if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+          if (shouldRetryUnknownSyncColumn(log2.tableName, fieldNameSnake)) {
+            throw new Error(
+              `Retryable unknown column ${log2.tableName}.${fieldNameSnake}; receiver migration pending`
+            );
+          }
           syncDiag(`APPLY-FIELD-LOG SKIP unknown column ${log2.tableName}.${fieldNameSnake}`);
           return;
         }
@@ -54700,6 +54724,7 @@ async function getCertificates(filters) {
         vesselId: app2.vesselId,
         masterId: app2.masterId,
         companySequence: effectiveSequence,
+        certificateNumber: certData?.certificateNumber || "",
         issueDate: certData?.issueDate || "",
         expiryDate: certData?.expiryDate || "",
         lastAnnual: certData?.lastAnnual || "",
@@ -54730,6 +54755,10 @@ async function getCertificates(filters) {
         case "vessel":
           valA = a.vessel || "";
           valB = b.vessel || "";
+          break;
+        case "certificateNumber":
+          valA = a.certificateNumber || "";
+          valB = b.certificateNumber || "";
           break;
         case "type":
         case "companyGroup":
@@ -54819,6 +54848,7 @@ async function getCertificate(certId) {
     vessel: app2.vesselName,
     vesselId: app2.vesselId,
     masterId: app2.masterId,
+    certificateNumber: certData?.certificateNumber || "",
     issueDate: certData?.issueDate || "",
     expiryDate: certData?.expiryDate || "",
     lastAnnual: certData?.lastAnnual || "",
@@ -54930,6 +54960,7 @@ async function updateCertificate(certId, body) {
     vessel: vesselName,
     vesselId,
     masterId,
+    certificateNumber: result[0]?.certificateNumber || "",
     issueDate: result[0]?.issueDate || "",
     expiryDate: result[0]?.expiryDate || "",
     lastAnnual: result[0]?.lastAnnual || "",
