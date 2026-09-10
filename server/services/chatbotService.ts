@@ -143,7 +143,7 @@ Use maritime terminology naturally (Main Engine, Chief Engineer, ROB, running ho
 Crew are busy — get to the point fast, lead with what matters most.`;
 }
 
-const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
@@ -793,7 +793,7 @@ const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
-async function executeTool(
+export async function executeTool(
   toolName: string,
   args: any,
   storage: IStorage,

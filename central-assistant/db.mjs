@@ -41,6 +41,7 @@ export async function initSchema() {
       model           TEXT,
       conversation_id TEXT
     );
+    ALTER TABLE assistant_conversations ADD COLUMN IF NOT EXISTS tools_used JSONB;
     CREATE TABLE IF NOT EXISTS assistant_ratings (
       id              BIGSERIAL PRIMARY KEY,
       ts              TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -85,10 +86,11 @@ export async function logConversation(row) {
   await pool.query(
     `INSERT INTO assistant_conversations
        (tenant_domain, tuid, user_id, user_name, user_role, module, gate, question, answer,
-        citations, confidence, tokens_in, tokens_out, latency_ms, model, conversation_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+        citations, confidence, tokens_in, tokens_out, latency_ms, model, conversation_id, tools_used)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
     [row.tenantDomain, row.tuid, row.userId, row.userName, row.userRole, row.module, row.gate,
      row.question, row.answer, JSON.stringify(row.citations || []), row.confidence,
-     row.tokensIn, row.tokensOut, row.latencyMs, row.model, row.conversationId],
+     row.tokensIn, row.tokensOut, row.latencyMs, row.model, row.conversationId,
+     JSON.stringify(row.toolsUsed || [])],
   );
 }

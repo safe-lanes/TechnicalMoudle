@@ -19,6 +19,7 @@ import { verifyIdentity } from './identity.mjs';
 import { checkChatRateLimit } from './rateLimiter.mjs';
 import { initSchema, pool, resolvePair, logConversation } from './db.mjs';
 import { notifyNewPair } from './notify.mjs';
+import { runToolLoop, manifestFor } from './toolLoop.mjs';
 
 const PORT = parseInt(process.env.PORT || '8000', 10);
 const HOST = process.env.HOST || '0.0.0.0'; // container-internal; host binding stays 127.0.0.1
@@ -49,6 +50,31 @@ async function chromaCollectionId() {
   if (!col) throw new Error(`collection '${COLLECTION}' not found`);
   collectionId = col.id;
   return collectionId;
+}
+
+/** Shared LLM chat call — counts llmCalls, honors the per-call timeout. */
+async function chatCompletion(messages, tools, timeoutMs = LLM_TIMEOUT_MS) {
+  llmCalls++;
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+    body: JSON.stringify({ model: CHAT_MODEL, temperature: 0.2, messages, ...(tools ? { tools } : {}) }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!r.ok) throw new Error(`chat: HTTP ${r.status}`);
+  return r.json();
+}
+
+/** search_module_docs backing: Stage 1 retrieval reused, packaged for the tool loop. */
+async function searchDocsTool(query) {
+  const routed = route(await retrieve(await embed(query)));
+  if (routed.gate === 'not_documented') return { documented: false, note: 'This topic is not covered in the module documentation.' };
+  if (routed.gate === 'clarify') return { documented: false, ambiguous: true, candidates: routed.candidates, note: 'Ambiguous across modules — ask the user which module they mean.' };
+  return {
+    documented: true,
+    module: MODULE_LABELS[routed.module],
+    excerpts: routed.hits.map((h) => ({ manual: manualOf(h.meta), section: sectionOf(h.meta), text: h.text.slice(0, 3000) })),
+  };
 }
 
 async function embed(text) {
@@ -149,6 +175,7 @@ async function handleChat(body, identity) {
       tenantDomain, tuid: identity.tuid || null, userId: identity.userId, userName: identity.userName || null,
       userRole: identity.role, module: extra.module || uiModule, gate, question: message,
       answer: answerText, citations: extra.citations || [], confidence: extra.confidence ?? null,
+      toolsUsed: extra.toolsUsed || [],
       tokensIn: extra.usage?.prompt_tokens ?? null, tokensOut: extra.usage?.completion_tokens ?? null,
       latencyMs: Date.now() - startedAt, model: extra.model || null, conversationId: body?.conversationId || null,
     }).catch((e) => console.error('[assistant] log failed (non-fatal):', e?.message || e));
@@ -170,6 +197,19 @@ async function handleChat(body, identity) {
     const msg = `The assistant isn't enabled for ${MODULE_LABELS[uiModule] || uiModule} in your organization. Please contact your administrator.`;
     log('disabled', msg);
     return { status: 200, json: { response: msg, gate: 'disabled', citations: [] } };
+  }
+
+  // Stage 3: when this module has a configured Data API, full answers run the ported
+  // tool loop (data tools + search_module_docs). routeOnly and modules without a Data
+  // API keep the Stage 1 docs-only behavior unchanged.
+  if (body?.routeOnly !== true && (await manifestFor(uiModule))) {
+    const identityToken = body.__identityToken;
+    const result = await runToolLoop({
+      message, uiModule, identityToken,
+      deps: { chatCompletion, searchDocs: searchDocsTool },
+    });
+    log('answer', result.text, { module: uiModule, usage: result.usage, model: CHAT_MODEL, toolsUsed: result.toolsUsed });
+    return { status: 200, json: { response: result.text, gate: 'answer', module: MODULE_LABELS[uiModule] || uiModule, toolsUsed: result.toolsUsed, partial: result.partial || false, usage: result.usage } };
   }
 
   const routed = route(await retrieve(await embed(message)));
@@ -240,6 +280,7 @@ const server = http.createServer(async (req, res) => {
       // §5.3: signed identity verified BEFORE anything else; unsigned/tampered/expired → 401.
       const v = verifyIdentity(req.headers['x-assistant-identity'], IDENTITY_SIGNING_KEY);
       if (!v.ok) return send(401, { error: `identity rejected: ${v.reason}` });
+      body.__identityToken = req.headers['x-assistant-identity']; // forwarded unmodified to module APIs (§5.6)
       const out = await handleChat(body, v.identity);
       return send(out.status, out.json);
     }

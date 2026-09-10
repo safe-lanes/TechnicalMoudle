@@ -82,6 +82,7 @@ check('re-enabled → answers again', (await (await chat({})).json()).gate === '
 
 // ── 5. conversation log ──
 console.log('\n── 4. Conversation log (a row per turn) ──');
+await sleep(2500); // let prior sections' fire-and-forget rows land before baselining
 const c0 = await convCount();
 await chat({ message: 'how do I report a near miss', module: 'incident' });
 await chat({ message: 'what is the weather today' });
