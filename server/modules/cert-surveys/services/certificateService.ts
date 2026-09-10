@@ -108,6 +108,7 @@ export async function getCertificates(filters: CertificateFilters) {
         vesselId: app.vesselId,
         masterId: app.masterId,
         companySequence: effectiveSequence,
+        certificateNumber: certData?.certificateNumber || '',
         issueDate: certData?.issueDate || '',
         expiryDate: certData?.expiryDate || '',
         lastAnnual: certData?.lastAnnual || '',
@@ -140,6 +141,10 @@ export async function getCertificates(filters: CertificateFilters) {
         case 'vessel':
           valA = a.vessel || '';
           valB = b.vessel || '';
+          break;
+        case 'certificateNumber':
+          valA = a.certificateNumber || '';
+          valB = b.certificateNumber || '';
           break;
         case 'type':
         case 'companyGroup':
@@ -241,6 +246,7 @@ export async function getCertificate(certId: string) {
     vessel: app.vesselName,
     vesselId: app.vesselId,
     masterId: app.masterId,
+    certificateNumber: certData?.certificateNumber || '',
     issueDate: certData?.issueDate || '',
     expiryDate: certData?.expiryDate || '',
     lastAnnual: certData?.lastAnnual || '',
@@ -363,6 +369,7 @@ export async function updateCertificate(certId: string, body: any) {
     vessel: vesselName,
     vesselId,
     masterId,
+    certificateNumber: result[0]?.certificateNumber || '',
     issueDate: result[0]?.issueDate || '',
     expiryDate: result[0]?.expiryDate || '',
     lastAnnual: result[0]?.lastAnnual || '',

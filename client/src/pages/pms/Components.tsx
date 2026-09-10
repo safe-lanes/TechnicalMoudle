@@ -113,6 +113,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   const { isChangeRequestMode } = useChangeRequest();
   const { isChangeMode: contextChangeMode, collectDiff } = useChangeMode();
   const { isSailAdmin, isExternal } = useUIRole();
+  const { vessels } = useVessel();
   // isModifyMode prop controls inline editing behavior
   // contextChangeMode (from useChangeMode) is the secure way to enable non-admin visibility
   // For visibility gates, use contextChangeMode; for edit behavior, use isModifyMode
@@ -185,6 +186,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     noOfUnits: "",
     dimensionsSize: ""
   });
+  const vesselName = vessels.find(v => v.id === componentData.vesselCode || v.code === componentData.vesselCode)?.name || "";
   
   // Track original component data for modify mode
   const [originalComponentData, setOriginalComponentData] = useState<typeof componentData | null>(null);
@@ -341,46 +343,6 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.1"><Marker id="B7.A.1" /> Fleet Equipment Code</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.fleetEquipmentCode}
-              onChange={(e) => handleFieldChange('fleetEquipmentCode', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('fleetEquipmentCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-testid="B7.A.2"
-            />
-          ) : (
-            <div className="text-sm text-gray-900" data-testid="B7.A.2">
-              <Marker id="B7.A.2" /> {componentData.fleetEquipmentCode}
-            </div>
-          )}
-        </div>
-        )}
-        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.3"><Marker id="B7.A.3" /> Fleet Equipment Name</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.fleetEquipmentName}
-              onChange={(e) => handleFieldChange('fleetEquipmentName', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('fleetEquipmentName') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-testid="B7.A.4"
-            />
-          ) : (
-            <div className="text-sm text-gray-900" data-testid="B7.A.4">
-              <Marker id="B7.A.4" /> {componentData.fleetEquipmentName}
-            </div>
-          )}
-        </div>
-        )}
-        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
-        <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.5"><Marker id="B7.A.5" /> Parent Component Code</label>
           {isChangeMode ? (
             <input
@@ -447,26 +409,6 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.15"><Marker id="B7.A.15" /> Maker Code</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.makerCode}
-              onChange={(e) => handleFieldChange('makerCode', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('makerCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-testid="B7.A.16"
-            />
-          ) : (
-            <div className="text-sm text-gray-900" data-testid="B7.A.16">
-              <Marker id="B7.A.16" /> {componentData.makerCode}
-            </div>
-          )}
-        </div>
-        )}
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.17"><Marker id="B7.A.17" /> Model</label>
           {isChangeMode ? (
@@ -482,44 +424,6 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           ) : (
             <div className="text-sm text-gray-900" data-testid="B7.A.18">
               <Marker id="B7.A.18" /> {componentData.model}
-            </div>
-          )}
-        </div>
-        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.19"><Marker id="B7.A.19" /> Model Code</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.modelCode}
-              onChange={(e) => handleFieldChange('modelCode', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('modelCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-testid="B7.A.20"
-            />
-          ) : (
-            <div className="text-sm text-gray-900" data-testid="B7.A.20">
-              <Marker id="B7.A.20" /> {componentData.modelCode}
-            </div>
-          )}
-        </div>
-        )}
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.21"><Marker id="B7.A.21" /> Serial No</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.serialNo}
-              onChange={(e) => handleFieldChange('serialNo', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('serialNo') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-testid="B7.A.22"
-            />
-          ) : (
-            <div className="text-sm text-gray-900" data-testid="B7.A.22">
-              <Marker id="B7.A.22" /> {componentData.serialNo}
             </div>
           )}
         </div>
@@ -771,105 +675,78 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.41"><Marker id="B7.A.41" /> IS Active</label>
+        {/* Notes / Technical Information uses the remaining three columns beside Class Item. */}
+        <div className="sm:col-span-1 lg:col-span-3">
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.47"><Marker id="B7.A.47" /> Notes / Technical Information</label>
           {isChangeMode ? (
-            <select
-              value={componentData.isActive}
-              onChange={(e) => handleFieldChange('isActive', e.target.value)}
+            <textarea
+              value={componentData.notes}
+              onChange={(e) => handleFieldChange('notes', e.target.value)}
               className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('isActive') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+                changedFields.has('notes') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="B7.A.42"
-            >
-              <option value="">Select</option>
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          ) : (
-            <div className="text-sm text-gray-900" data-testid="B7.A.42">
-              <Marker id="B7.A.42" /> <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                componentData.isActive === "Yes" 
-                  ? "bg-green-100 text-green-800" 
-                  : "bg-gray-100 text-gray-800"
-              }`}>
-                {componentData.isActive}
-              </span>
-            </div>
-          )}
-        </div>
-        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.43"><Marker id="B7.A.43" /> Vessel Code</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.vesselCode}
-              onChange={(e) => handleFieldChange('vesselCode', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('vesselCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-testid="B7.A.44"
+              rows={3}
+              data-testid="B7.A.48"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="B7.A.44">
-              <Marker id="B7.A.44" /> {componentData.vesselCode}
+            <div className="text-sm text-gray-900 whitespace-pre-wrap" data-testid="B7.A.48">
+              <Marker id="B7.A.48" /> {componentData.notes}
             </div>
           )}
         </div>
-        )}
-        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.45"><Marker id="B7.A.45" /> IS Parent</label>
-          {isChangeMode ? (
-            <select
-              value={componentData.isParent}
-              onChange={(e) => handleFieldChange('isParent', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('isParent') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-testid="B7.A.46"
-            >
-              <option value="">Select</option>
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          ) : (
-            <div className="text-sm text-gray-900" data-testid="B7.A.46">
-              <Marker id="B7.A.46" /> <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                componentData.isParent === "Yes" 
-                  ? "bg-purple-100 text-purple-800" 
-                  : "bg-gray-100 text-gray-800"
-              }`}>
-                {componentData.isParent}
-              </span>
-            </div>
-          )}
-        </div>
-        )}
-      </div>
-
-      {/* Notes (full width) */}
-      <div>
-        <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.47"><Marker id="B7.A.47" /> Notes</label>
-        {isChangeMode ? (
-          <textarea
-            value={componentData.notes}
-            onChange={(e) => handleFieldChange('notes', e.target.value)}
-            className={`text-sm w-full px-2 py-1 border rounded ${
-              changedFields.has('notes') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-            }`}
-            rows={3}
-            data-testid="B7.A.48"
-          />
-        ) : (
-          <div className="text-sm text-gray-900 whitespace-pre-wrap" data-testid="B7.A.48">
-            <Marker id="B7.A.48" /> {componentData.notes}
-          </div>
-        )}
       </div>
     </div>
   );
+};
+
+const FleetComponentInformationSection: React.FC<{ selectedComponent: ComponentNode | null; isModifyMode?: boolean; onDataChange?: (data: any) => void }> = ({ selectedComponent, isModifyMode = false, onDataChange }) => {
+  const { vessels } = useVessel();
+  const { isSailAdmin, isExternal } = useUIRole();
+  const { isChangeRequestMode } = useChangeRequest();
+  const { isChangeMode } = useChangeMode();
+  const canViewFleetMasterFields = isSailAdmin || isExternal || isChangeRequestMode || isChangeMode;
+  const [data, setData] = useState<Record<string, string>>({});
+  const toYesNo = (value: unknown, defaultValue = "No") => {
+    if (value === true || String(value).toLowerCase() === "yes") return "Yes";
+    if (value === false || String(value).toLowerCase() === "no") return "No";
+    return defaultValue;
+  };
+  const updateField = (key: string, value: string) => {
+    const next = { ...data, [key]: value };
+    setData(next);
+    const { vesselName: _displayOnlyVesselName, ...editableData } = next;
+    onDataChange?.(editableData);
+  };
+  useEffect(() => {
+    const c: any = selectedComponent || {};
+    setData({
+      fleetEquipmentCode: c.fleetEquipmentCode || "", fleetEquipmentName: c.fleetEquipmentName || "",
+      makerCode: c.makerCode || "", modelCode: c.modelCode || "", serialNo: c.serialNo || "",
+      isActive: toYesNo(c.isActive, "Yes"), isParent: toYesNo(c.isParent),
+      vesselName: vessels.find(v => v.id === (c.vesselId || c.vesselCode) || v.code === (c.vesselId || c.vesselCode))?.name || "",
+    });
+  }, [selectedComponent, vessels]);
+  const field = (key: string, label: string, testId: string, options?: { restricted?: boolean; readOnly?: boolean }) => {
+    if (options?.restricted && !canViewFleetMasterFields) return null;
+    return (
+    <div key={key}>
+      <label className="text-xs font-medium text-gray-600 block mb-1">{label}</label>
+      {isModifyMode && key !== "vesselName" ? key === "isActive" || key === "isParent" ? <select className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]" value={data[key] || "No"} onChange={e => updateField(key, e.target.value)} data-testid={testId}><option value="Yes">Yes</option><option value="No">No</option></select> : <input readOnly={options?.readOnly} className={`text-sm w-full px-2 py-1 border rounded ${options?.readOnly ? "bg-gray-50 text-gray-700 cursor-not-allowed border-gray-300" : "text-[#52BAF3] border-[#52BAF3]"}`} value={data[key] || ""} onChange={e => updateField(key, e.target.value)} data-testid={testId} /> : <div className="text-sm text-gray-900" data-testid={testId}>{data[key] || "—"}</div>}
+    </div>
+    );
+  };
+  return <div className="space-y-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {field("fleetEquipmentCode", "Fleet Equipment Code", "B7.B.1", { restricted: true })}
+      {field("fleetEquipmentName", "Fleet Component Name", "B7.B.2", { restricted: true })}
+      {field("makerCode", "Maker Code", "B7.B.3", { restricted: true, readOnly: true })}
+      {field("modelCode", "Model Code", "B7.B.4", { restricted: true })}
+      {field("serialNo", "Serial No.", "B7.B.5")}
+      {field("isActive", "Is Active", "B7.B.6")}
+      {field("isParent", "Is Parent", "B7.B.7", { restricted: true })}
+      {field("vesselName", "Vessel Name", "B7.B.8", { restricted: true })}
+    </div>
+  </div>;
 };
 
 const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
@@ -2499,7 +2376,7 @@ const Components: React.FC = () => {
   const [criticalFilter, setCriticalFilter] = useState("all");
   const [selectedComponent, setSelectedComponent] = useState<ComponentNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A", "B", "C", "D", "E", "F", "G", "H"]));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A", "B", "C", "D", "E", "F", "G", "H", "I"]));
   const [isComponentFormOpen, setIsComponentFormOpen] = useState(false);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [editingComponentCode, setEditingComponentCode] = useState<string | null>(null);
@@ -3663,13 +3540,14 @@ const Components: React.FC = () => {
 
   const formSections = [
     { id: "A", title: "Component Information", marker: "B7.A" },
-    { id: "B", title: "Running Hours & Condition Monitoring", marker: "B7.B" },
-    { id: "C", title: "Jobs", marker: "B7.C" },
-    { id: "D", title: "Maintenance History", marker: "B7.D" },
-    { id: "E", title: "Spares", marker: "B7.E.1" },
-    { id: "F", title: "Drawings & Manuals", marker: "B7.F" },
-    ...(isClassItem ? [{ id: "G", title: "Classification & Regulatory Data", marker: "B7.G" }] : []),
-    { id: "H", title: "Requisitions", marker: "B7.H" }
+    { id: "B", title: "Fleet Component Information", marker: "B7.B" },
+    { id: "C", title: "Running Hours & Condition Monitoring", marker: "B7.C" },
+    { id: "D", title: "Jobs", marker: "B7.D" },
+    { id: "E", title: "Maintenance History", marker: "B7.E" },
+    { id: "F", title: "Spares", marker: "B7.F.1" },
+    { id: "G", title: "Drawings & Manuals", marker: "B7.G" },
+    ...(isClassItem ? [{ id: "H", title: "Classification & Regulatory Data", marker: "B7.H" }] : []),
+    { id: "I", title: "Requisitions", marker: "B7.I" }
   ];
 
   // Build proposed changes from tracked modifications
@@ -4171,23 +4049,31 @@ const Components: React.FC = () => {
                               }}
                             />
                           ) : section.id === "B" ? (
-                            <RunningHoursConditionSection selectedComponent={selectedComponent} />
+                            <FleetComponentInformationSection
+                              selectedComponent={selectedComponent}
+                              isModifyMode={isModifyMode || isPreviewMode}
+                              onDataChange={(data) => {
+                                if (isModifyMode) setModifiedComponentData((prev: any) => ({ ...(prev || {}), ...data }));
+                              }}
+                            />
                           ) : section.id === "C" ? (
+                            <RunningHoursConditionSection selectedComponent={selectedComponent} />
+                          ) : section.id === "D" ? (
                             <WorkOrdersSection 
                               componentCode={selectedComponent?.code || ""} 
                               componentName={selectedComponent?.name || ""} 
                               componentId={selectedComponent?.actualId}
                               isComponentActive={selectedComponent?.isActive}
                             />
-                          ) : section.id === "D" ? (
-                            <MaintenanceHistorySection selectedComponent={selectedComponent} />
                           ) : section.id === "E" ? (
-                            <SparesSection selectedComponent={selectedComponent} />
+                            <MaintenanceHistorySection selectedComponent={selectedComponent} />
                           ) : section.id === "F" ? (
-                            <DrawingsAndManualsSection selectedComponent={selectedComponent} />
+                            <SparesSection selectedComponent={selectedComponent} />
                           ) : section.id === "G" ? (
-                            <ClassificationRegulatorySection selectedComponent={selectedComponent} />
+                            <DrawingsAndManualsSection selectedComponent={selectedComponent} />
                           ) : section.id === "H" ? (
+                            <ClassificationRegulatorySection selectedComponent={selectedComponent} />
+                          ) : section.id === "I" ? (
                             <RequisitionsSection selectedComponent={selectedComponent} />
                           ) : (
                             <p className="text-sm text-gray-500">

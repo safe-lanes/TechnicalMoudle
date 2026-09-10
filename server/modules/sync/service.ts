@@ -23,6 +23,7 @@ import { syncDiag } from './syncDiagLogger';
 import * as alertsRepo from '../alerts/repositories/alertsRepository';
 import { getFieldDisplayName } from './conflictReviewRepository';
 import { safeParseDate } from '../running-hours/utils/rhValidation';
+import { shouldRetryUnknownSyncColumn } from './unknownColumnRetryPolicy';
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER — Vessel UUID ↔ vessel_code lookup
@@ -496,6 +497,11 @@ export async function receivePushData(
             // arrives later via full-row sync once this instance is migrated.
             // Fail-open when allCols is unknown (empty) — prior behaviour preserved.
             if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+              if (shouldRetryUnknownSyncColumn(log.tableName, fieldNameSnake)) {
+                droppedRowUuids.add(log.rowUuid);
+                syncDiag(`UPDATE DEFER (unknown column): ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} — receiver is pre-migration; left unacked for retry`);
+                continue;
+              }
               syncDiag(`UPDATE SKIP (unknown column): ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} — column not in local schema (pre-migration instance); acked without apply`);
               fieldLogsApplied++;
               continue;

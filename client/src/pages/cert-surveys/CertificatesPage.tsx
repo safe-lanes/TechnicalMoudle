@@ -17,6 +17,12 @@ import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
 import { pdfReportGenerator } from '@/lib/pdfReportGenerator';
 import type { TableColumn } from '@/lib/pdfReportGenerator';
+import {
+  createCertificateCompanyGroupLabelMap,
+  formatCertificateCompanyGroup,
+  type CertificateLabelConfig,
+} from '@shared/certificates/companyGroupLabels';
+import { shouldShowCertificateVesselColumn } from '@shared/certificates/vesselColumnVisibility';
 
 type DueInFilter = 'all' | '3months' | '2months' | '1month' | 'overdue';
 
@@ -215,6 +221,7 @@ interface CertificateData {
   vesselId?: string;
   masterId?: string;
   companySequence?: number;
+  certificateNumber: string;
   issueDate: string;
   expiryDate: string;
   lastAnnual: string;
@@ -357,6 +364,22 @@ export default function CertificatesPage() {
       return response.json();
     },
   });
+
+  const { data: certificateLabels } = useQuery<Record<string, CertificateLabelConfig[]>>({
+    queryKey: ['/technical/api/admin/ship-certificates-labels'],
+  });
+
+  const companyGroupLabelMap = useMemo(
+    () => createCertificateCompanyGroupLabelMap(certificateLabels?.company_group),
+    [certificateLabels],
+  );
+
+  const formatCompanyGroup = useCallback(
+    (value: unknown) => formatCertificateCompanyGroup(value, companyGroupLabelMap),
+    [companyGroupLabelMap],
+  );
+
+  const showVesselColumn = shouldShowCertificateVesselColumn(selectedVesselNames);
   
   const certificates = certificatesResponse?.certificates || [];
   const totalCertificates = certificatesResponse?.total || 0;
@@ -622,20 +645,32 @@ export default function CertificatesPage() {
       headerName: 'Company Group',
       field: 'type',
       width: 130,
+      valueFormatter: (params) => formatCompanyGroup(params.value),
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agSetColumnFilter',
       sortable: true,
       resizable: true,
     },
+    ...(showVesselColumn ? [{
+        headerName: 'Vessel',
+        field: 'vessel',
+        flex: 1,
+        minWidth: 150,
+        cellStyle: { fontSize: '13px', color: '#4f5863' },
+        filter: 'agSetColumnFilter',
+        sortable: true,
+        resizable: true,
+      } satisfies ColDef] : []),
     {
-      headerName: 'Vessel',
-      field: 'vessel',
-      flex: 1,
-      minWidth: 150,
+      headerName: 'Certificate No.',
+      field: 'certificateNumber',
+      width: 150,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
-      filter: 'agSetColumnFilter',
+      filter: 'agTextColumnFilter',
       sortable: true,
       resizable: true,
+      editable: canEditCert,
+      cellClass: canEditCert ? 'editable-date-cell' : undefined,
     },
     {
       headerName: 'Issue Date',
@@ -832,7 +867,7 @@ export default function CertificatesPage() {
       pinned: 'right',
       lockPosition: true,
     },
-  ], [canEditCert]);
+  ], [canEditCert, formatCompanyGroup, showVesselColumn]);
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     setGridApi(params.api);
@@ -862,6 +897,7 @@ export default function CertificatesPage() {
         'certificateName': 'certificateName',
         'type': 'companyGroup',
         'vessel': 'vessel',
+        'certificateNumber': 'certificateNumber',
         'issueDate': 'issueDate',
         'expiryDate': 'expiryDate',
         'lastAnnual': 'lastAnnual',
@@ -940,6 +976,7 @@ export default function CertificatesPage() {
       { header: 'Name of Certificate', field: 'certificateName', width: 35 },
       { header: 'Company Group', field: 'type', width: 20 },
       { header: 'Vessel', field: 'vessel', width: 22 },
+      { header: 'Certificate No.', field: 'certificateNumber', width: 22 },
       { header: 'Issue Date', field: 'issueDate', width: 20 },
       { header: 'Expiry Date', field: 'expiryDate', width: 20 },
       { header: 'Last Annual', field: 'lastAnnual', width: 20 },
@@ -955,8 +992,9 @@ export default function CertificatesPage() {
       const data = allCerts.map((cert: any) => ({
         id: cert.id || '-',
         certificateName: cert.certificateName || '-',
-        type: cert.type || '-',
+        type: formatCompanyGroup(cert.type) || '-',
         vessel: cert.vessel || '-',
+        certificateNumber: cert.certificateNumber || '-',
         issueDate: cert.issueDate || '-',
         expiryDate: cert.expiryDate || '-',
         lastAnnual: cert.lastAnnual || '-',
@@ -979,14 +1017,15 @@ export default function CertificatesPage() {
     } catch (error) {
       toast({ title: 'Export Failed', description: 'Could not fetch all certificates for export.', variant: 'destructive' });
     }
-  }, [fetchAllCertificates, toast]);
+  }, [fetchAllCertificates, formatCompanyGroup, toast]);
 
   const handleExportCsv = useCallback(async () => {
     try {
       const allCerts = await fetchAllCertificates();
-      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Issue Date', 'Expiry Date', 'Last Annual', 'Next Annual', 'Last Interm', 'Next Interim', 'Endorsement Date', 'Last Edit/ Upload'];
+      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Certificate No.', 'Issue Date', 'Expiry Date', 'Last Annual', 'Next Annual', 'Last Interm', 'Next Interim', 'Endorsement Date', 'Last Edit/ Upload'];
       const rows = allCerts.map((cert: any) => [
-        cert.id || '', cert.certificateName || '', cert.type || '', cert.vessel || '',
+        cert.id || '', cert.certificateName || '', formatCompanyGroup(cert.type), cert.vessel || '',
+        cert.certificateNumber || '',
         cert.issueDate || '', cert.expiryDate || '', cert.lastAnnual || '',
         cert.nextAnnual || '', cert.lastInterm || '', cert.nextInterm || '',
         cert.endorsementDate || '', cert.lastEditUpload || '',
@@ -1001,14 +1040,15 @@ export default function CertificatesPage() {
     } catch (error) {
       toast({ title: 'Export Failed', description: 'Could not fetch all certificates for CSV export.', variant: 'destructive' });
     }
-  }, [fetchAllCertificates, toast]);
+  }, [fetchAllCertificates, formatCompanyGroup, toast]);
 
   const handleExportExcel = useCallback(async () => {
     try {
       const allCerts = await fetchAllCertificates();
-      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Issue Date', 'Expiry Date', 'Last Annual', 'Next Annual', 'Last Interm', 'Next Interim', 'Endorsement Date', 'Last Edit/ Upload'];
+      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Certificate No.', 'Issue Date', 'Expiry Date', 'Last Annual', 'Next Annual', 'Last Interm', 'Next Interim', 'Endorsement Date', 'Last Edit/ Upload'];
       const rows = allCerts.map((cert: any) => [
-        cert.id || '', cert.certificateName || '', cert.type || '', cert.vessel || '',
+        cert.id || '', cert.certificateName || '', formatCompanyGroup(cert.type), cert.vessel || '',
+        cert.certificateNumber || '',
         cert.issueDate || '', cert.expiryDate || '', cert.lastAnnual || '',
         cert.nextAnnual || '', cert.lastInterm || '', cert.nextInterm || '',
         cert.endorsementDate || '', cert.lastEditUpload || '',
@@ -1023,7 +1063,7 @@ export default function CertificatesPage() {
     } catch (error) {
       toast({ title: 'Export Failed', description: 'Could not fetch all certificates for Excel export.', variant: 'destructive' });
     }
-  }, [fetchAllCertificates, toast]);
+  }, [fetchAllCertificates, formatCompanyGroup, toast]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">

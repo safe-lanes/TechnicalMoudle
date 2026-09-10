@@ -33,6 +33,7 @@ import {
 import { getPool } from '../../db';
 import { syncDiag } from './syncDiagLogger';
 import { isShipInstanceId } from './syncRole';
+import { shouldRetryUnknownSyncColumn } from './unknownColumnRetryPolicy';
 
 // ── Configuration ──
 
@@ -1262,6 +1263,11 @@ export class SyncEngine {
     // Defense-in-depth: skip a column that doesn't exist on this table rather than issuing an
     // UPDATE that throws 42703. Fail-open when allCols is unknown (empty).
     if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+      if (shouldRetryUnknownSyncColumn(log.tableName, fieldNameSnake)) {
+        throw new Error(
+          `Retryable unknown column ${log.tableName}.${fieldNameSnake}; receiver migration pending`,
+        );
+      }
       syncDiag(`APPLY-FIELD-LOG SKIP unknown column ${log.tableName}.${fieldNameSnake}`);
       return;
     }

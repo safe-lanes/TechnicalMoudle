@@ -98,7 +98,7 @@ export default function ComponentRegisterAddEdit({
   }, [propComponentCode, parentComponent?.code, componentId]);
 
   const [componentData, setComponentData] = useState({
-    // Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code
+    // Component and fleet information fields
     fleetEquipmentCode: "",
     fleetEquipmentName: "",
     parentComponent: parentComponent?.code || "",
@@ -124,16 +124,14 @@ export default function ComponentRegisterAddEdit({
     commissionedDate: "",
     rating: "",
     eqptSystemDept: "",
-    // Row 6: Running Hours, IS Active, Vessel Code, IS Parent
+    // Running hours and fleet status
     runningHours: "",
     isActive: "Yes",
     vesselCode: "",
     isParent: "No",
-    // Row 7: Class Item
     classItem: "No",
-    // Row 7: Notes (full width)
     notes: "",
-    // Section B: Running Hours & Condition Monitoring
+    // Section C: Running Hours & Condition Monitoring
     rhCounterType: "NOT_RH_DRIVEN",
     rhCounterSource: "",
     rhMasterComponentId: "",
@@ -496,7 +494,7 @@ export default function ComponentRegisterAddEdit({
         classItem: comp.classItem ? "Yes" : "No",
         // Row 7
         notes: comp.notes || "",
-        // Section B: Running Hours & Condition Monitoring
+        // Section C: Running Hours & Condition Monitoring
         rhCounterType: comp.rhCounterType || "NOT_RH_DRIVEN",
         rhCounterSource: comp.rhCounterSource || "",
         rhMasterComponentId: comp.rhMasterComponentId || "",
@@ -1062,7 +1060,7 @@ export default function ComponentRegisterAddEdit({
       classItem: comp.classItem ? "Yes" : "No",
       // Row 7
       notes: comp.notes || "",
-      // Section B: Running Hours & Condition Monitoring
+      // Section C: Running Hours & Condition Monitoring
       rhCounterType: comp.rhCounterType || "NOT_RH_DRIVEN",
       rhCounterSource: comp.rhCounterSource || "",
       rhMasterComponentId: comp.rhMasterComponentId || "",
@@ -1316,25 +1314,7 @@ export default function ComponentRegisterAddEdit({
                 </CardHeader>
                 {!collapsedSections['A'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Fleet Equipment Code</label>
-                    <Input
-                      value={componentData.fleetEquipmentCode}
-                      onChange={(e) => handleFieldChange('fleetEquipmentCode', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-fleet-equipment-code"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Fleet Equipment Name</label>
-                    <Input
-                      value={componentData.fleetEquipmentName}
-                      onChange={(e) => handleFieldChange('fleetEquipmentName', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-fleet-equipment-name"
-                    />
-                  </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Parent Component Code<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
@@ -1355,9 +1335,6 @@ export default function ComponentRegisterAddEdit({
                     />
                     {validationErrors.componentCode && <span className="text-xs text-red-500" data-testid="validation-error-componentCode">This field is required</span>}
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Component Name<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
@@ -1445,43 +1422,12 @@ export default function ComponentRegisterAddEdit({
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Maker Code</label>
-                    <Input
-                      value={componentData.makerCode}
-                      readOnly
-                      className="h-8 text-sm bg-gray-50 text-gray-700 cursor-not-allowed"
-                      data-testid="input-maker-code"
-                      title="Auto-populated from selected maker"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
-                  <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Model</label>
                     <Input
                       value={componentData.model}
                       onChange={(e) => handleFieldChange('model', e.target.value)}
                       className="h-8 text-sm"
                       data-testid="input-model"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Model Code</label>
-                    <Input
-                      value={componentData.modelCode}
-                      onChange={(e) => handleFieldChange('modelCode', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-model-code"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Serial No</label>
-                    <Input
-                      value={componentData.serialNo}
-                      onChange={(e) => handleFieldChange('serialNo', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-serial-no"
                     />
                   </div>
                   <div>
@@ -1493,9 +1439,6 @@ export default function ComponentRegisterAddEdit({
                       data-testid="input-drawing-no"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Location</label>
                     <Input
@@ -1532,16 +1475,6 @@ export default function ComponentRegisterAddEdit({
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Installation Date</label>
-                    <Input
-                      type="date"
-                      value={componentData.installationDate}
-                      onChange={(e) => handleFieldChange('installationDate', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-installation-date"
-                    />
-                  </div>
-                  <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Rotational Item</label>
                     <select
                       value={componentData.rotationalItem}
@@ -1574,9 +1507,16 @@ export default function ComponentRegisterAddEdit({
                       testId="input-stamp"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Installation Date</label>
+                    <Input
+                      type="date"
+                      value={componentData.installationDate}
+                      onChange={(e) => handleFieldChange('installationDate', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-installation-date"
+                    />
+                  </div>
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Commissioned Date</label>
                     <Input
@@ -1623,66 +1563,16 @@ export default function ComponentRegisterAddEdit({
                       <option value="Yes">Yes</option>
                     </select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Running Hours</label>
-                    <Input
-                      value={componentData.runningHours}
-                      onChange={(e) => handleFieldChange('runningHours', e.target.value)}
-                      className="h-8 text-sm"
-                      placeholder="20000"
-                      data-testid="input-running-hours"
+                  <div className="sm:col-span-1 lg:col-span-2 xl:col-span-3">
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Notes / Technical Information</label>
+                    <Textarea
+                      value={componentData.notes}
+                      onChange={(e) => handleFieldChange('notes', e.target.value)}
+                      className="min-h-[60px] bg-yellow-50 border-yellow-200 text-sm"
+                      placeholder="Notes / Technical Information"
+                      data-testid="textarea-notes"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Is Active<span className="text-red-500 ml-0.5">*</span></label>
-                    <select
-                      value={componentData.isActive}
-                      onChange={(e) => handleFieldChange('isActive', e.target.value)}
-                      className={`h-8 w-full text-sm px-2 border rounded ${validationErrors.isActive ? 'border-red-500' : 'border-gray-200'}`}
-                      data-testid="select-is-active"
-                    >
-                      <option value="Yes">Yes (Active)</option>
-                      <option value="No">No (Inactive)</option>
-                    </select>
-                    {validationErrors.isActive && <span className="text-xs text-red-500" data-testid="validation-error-isActive">This field is required</span>}
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Vessel Code</label>
-                    <Input
-                      value={componentData.vesselCode}
-                      onChange={(e) => handleFieldChange('vesselCode', e.target.value)}
-                      className="h-8 text-sm"
-                      placeholder="e.g., V001"
-                      data-testid="input-vessel-code"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Is Parent</label>
-                    <select
-                      value={componentData.isParent}
-                      onChange={(e) => handleFieldChange('isParent', e.target.value)}
-                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
-                      data-testid="select-is-parent"
-                    >
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Row 7: Notes (full width) */}
-                <div className="mb-4">
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Notes</label>
-                  <Textarea
-                    value={componentData.notes}
-                    onChange={(e) => handleFieldChange('notes', e.target.value)}
-                    className="min-h-[60px] bg-yellow-50 border-yellow-200 text-sm"
-                    placeholder="Notes"
-                    data-testid="textarea-notes"
-                  />
                 </div>
                 </CardContent>
                 )}
@@ -1694,10 +1584,68 @@ export default function ComponentRegisterAddEdit({
                   onClick={() => toggleSection('B')}
                   data-testid="section-header-b"
                 >
-                  <span className="text-sm font-medium text-[#16569e]">B. Running Hours & Condition Monitoring</span>
+                  <span className="text-sm font-medium text-[#16569e]">B. Fleet Component Information</span>
                   {collapsedSections['B'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
                 </CardHeader>
                 {!collapsedSections['B'] && (
+                <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Fleet Equipment Code</label>
+                      <Input value={componentData.fleetEquipmentCode} onChange={(e) => handleFieldChange('fleetEquipmentCode', e.target.value)} className="h-8 text-sm" data-testid="input-fleet-equipment-code" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Fleet Component Name</label>
+                      <Input value={componentData.fleetEquipmentName} onChange={(e) => handleFieldChange('fleetEquipmentName', e.target.value)} className="h-8 text-sm" data-testid="input-fleet-equipment-name" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Maker Code</label>
+                      <Input value={componentData.makerCode} readOnly className="h-8 text-sm bg-gray-50 text-gray-700 cursor-not-allowed" data-testid="input-maker-code" title="Auto-populated from selected maker" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Model Code</label>
+                      <Input value={componentData.modelCode} onChange={(e) => handleFieldChange('modelCode', e.target.value)} className="h-8 text-sm" data-testid="input-model-code" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Serial No</label>
+                      <Input value={componentData.serialNo} onChange={(e) => handleFieldChange('serialNo', e.target.value)} className="h-8 text-sm" data-testid="input-serial-no" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Is Active<span className="text-red-500 ml-0.5">*</span></label>
+                      <select value={componentData.isActive} onChange={(e) => handleFieldChange('isActive', e.target.value)} className={`h-8 w-full text-sm px-2 border rounded ${validationErrors.isActive ? 'border-red-500' : 'border-gray-200'}`} data-testid="select-is-active">
+                        <option value="Yes">Yes (Active)</option>
+                        <option value="No">No (Inactive)</option>
+                      </select>
+                      {validationErrors.isActive && <span className="text-xs text-red-500" data-testid="validation-error-isActive">This field is required</span>}
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Is Parent</label>
+                      <select value={componentData.isParent} onChange={(e) => handleFieldChange('isParent', e.target.value)} className="h-8 w-full text-sm px-2 border rounded border-gray-200" data-testid="select-is-parent">
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Vessel Name</label>
+                      <div className="h-8 flex items-center text-sm text-gray-900" data-testid="text-vessel-name">
+                        {vessels.find((v: any) => v.id === vesselId || v.code === componentData.vesselCode)?.name || "—"}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                )}
+              </Card>
+
+              <Card className="rounded-sm border border-gray-200 shadow-none">
+                <CardHeader
+                  className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
+                  onClick={() => toggleSection('C')}
+                  data-testid="section-header-c"
+                >
+                  <span className="text-sm font-medium text-[#16569e]">C. Running Hours & Condition Monitoring</span>
+                  {collapsedSections['C'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                </CardHeader>
+                {!collapsedSections['C'] && (
                 <CardContent className="pt-0 pb-0 px-0 border-t border-gray-100">
                 <div className="overflow-hidden">
                   <table className="w-full text-sm">
@@ -1812,7 +1760,7 @@ export default function ComponentRegisterAddEdit({
                             onChange={(e) => handleFieldChange('runningHours', e.target.value)}
                             className="h-8 text-sm"
                             placeholder=""
-                            data-testid="input-running-hours-b"
+                            data-testid="input-running-hours-c"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -1835,15 +1783,15 @@ export default function ComponentRegisterAddEdit({
               <Card className="rounded-sm border border-gray-200 shadow-none">
                 <CardHeader
                   className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
-                  onClick={() => toggleSection('C')}
-                  data-testid="section-header-c"
+                  onClick={() => toggleSection('D')}
+                  data-testid="section-header-d"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-[#16569e]">C. Jobs</span>
+                    <span className="text-sm font-medium text-[#16569e]">D. Jobs</span>
                   </div>
-                  {collapsedSections['C'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                  {collapsedSections['D'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
                 </CardHeader>
-                {!collapsedSections['C'] && (
+                {!collapsedSections['D'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
                 {(!isEditMode || isAddingNew) ? (
                   <>
@@ -1948,13 +1896,13 @@ export default function ComponentRegisterAddEdit({
               <Card className="rounded-sm border border-gray-200 shadow-none">
                 <CardHeader
                   className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
-                  onClick={() => toggleSection('D')}
-                  data-testid="section-header-d"
+                  onClick={() => toggleSection('E')}
+                  data-testid="section-header-e"
                 >
-                  <span className="text-sm font-medium text-[#16569e]">D. Maintenance History</span>
-                  {collapsedSections['D'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                  <span className="text-sm font-medium text-[#16569e]">E. Maintenance History</span>
+                  {collapsedSections['E'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
                 </CardHeader>
-                {!collapsedSections['D'] && (
+                {!collapsedSections['E'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
                 <div className="border rounded overflow-hidden">
                   <table className="w-full text-xs">
@@ -2003,18 +1951,18 @@ export default function ComponentRegisterAddEdit({
               <Card className="rounded-sm border border-gray-200 shadow-none">
                 <CardHeader
                   className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
-                  onClick={() => toggleSection('F')}
-                  data-testid="section-header-f"
+                  onClick={() => toggleSection('G')}
+                  data-testid="section-header-g"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-[#16569e]">F. Drawings & Manuals</span>
+                    <span className="text-sm font-medium text-[#16569e]">G. Drawings & Manuals</span>
                     {isLoadingDocuments && (
                       <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
                     )}
                   </div>
-                  {collapsedSections['F'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                  {collapsedSections['G'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
                 </CardHeader>
-                {!collapsedSections['F'] && (
+                {!collapsedSections['G'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
                   {!isEditMode ? (
                     <div className="text-sm text-gray-500 text-center py-4">
@@ -2089,13 +2037,13 @@ export default function ComponentRegisterAddEdit({
               <Card className="rounded-sm border border-gray-200 shadow-none">
                 <CardHeader
                   className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
-                  onClick={() => toggleSection('G')}
-                  data-testid="section-header-g"
+                  onClick={() => toggleSection('H')}
+                  data-testid="section-header-h"
                 >
-                  <span className="text-sm font-medium text-[#16569e]">G. Classification & Regulatory Data</span>
-                  {collapsedSections['G'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                  <span className="text-sm font-medium text-[#16569e]">H. Classification & Regulatory Data</span>
+                  {collapsedSections['H'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
                 </CardHeader>
-                {!collapsedSections['G'] && (
+                {!collapsedSections['H'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
                   <div className="grid grid-cols-4 gap-4">
                     <div>

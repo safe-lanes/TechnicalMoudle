@@ -299,9 +299,9 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   parentComponent,
 }) => {
   const { toast } = useToast();
-  const { vesselId } = useVessel();
+  const { vesselId, vessels } = useVessel();
   const { canViewDocument, canDownloadDocument } = useAuth();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A"]));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A", "B"]));
   const [isSaving, setIsSaving] = useState(false);
   const [draftJobs, setDraftJobs] = useState<DraftJob[]>([]);
   const [showAddJobModal, setShowAddJobModal] = useState(false);
@@ -950,13 +950,14 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
   const formSections = [
     { id: "A", title: "Component Information" },
-    { id: "B", title: "Running Hours & Condition Monitoring" },
-    { id: "C", title: "Jobs" },
-    { id: "D", title: "Maintenance History" },
-    { id: "E", title: "Spares" },
-    { id: "F", title: "Drawings & Manuals" },
-    ...(componentData.classItem === "Yes" ? [{ id: "G", title: "Classification & Regulatory Data" }] : []),
-    { id: "H", title: "Requisitions" }
+    { id: "B", title: "Fleet Component Information" },
+    { id: "C", title: "Running Hours & Condition Monitoring" },
+    { id: "D", title: "Jobs" },
+    { id: "E", title: "Maintenance History" },
+    { id: "F", title: "Spares" },
+    { id: "G", title: "Drawings & Manuals" },
+    ...(componentData.classItem === "Yes" ? [{ id: "H", title: "Classification & Regulatory Data" }] : []),
+    { id: "I", title: "Requisitions" }
   ];
 
   const getFileTypeIcon = (fileType: string) => {
@@ -1015,28 +1016,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                       {/* Section A: Component Information - EXACT REPLICA */}
                       {section.id === "A" && (
                         <div className="space-y-4">
-                          {/* Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code */}
+                          {/* Row 1: Parent Component Code, Component Code */}
                           <div className="grid grid-cols-4 gap-4">
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Code</label>
-                              <input
-                                type="text"
-                                value={componentData.fleetEquipmentCode}
-                                onChange={(e) => handleFieldChange('fleetEquipmentCode', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="input-fleet-equipment-code"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Name</label>
-                              <input
-                                type="text"
-                                value={componentData.fleetEquipmentName}
-                                onChange={(e) => handleFieldChange('fleetEquipmentName', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="input-fleet-equipment-name"
-                              />
-                            </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Parent Component Code<span className="text-red-500 ml-0.5">*</span></label>
                               <input
@@ -1068,7 +1049,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                           </div>
 
-                          {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
+                          {/* Row 2: Component Name, Component Category, Maker */}
                           <div className="grid grid-cols-4 gap-4">
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Component Name<span className="text-red-500 ml-0.5">*</span></label>
@@ -1157,20 +1138,9 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 )}
                               </div>
                             </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Maker Code</label>
-                              <input
-                                type="text"
-                                value={componentData.makerCode}
-                                readOnly
-                                className="text-sm w-full px-2 py-1 border rounded bg-gray-50 text-gray-700 cursor-not-allowed border-gray-300"
-                                data-testid="input-maker-code"
-                                title="Auto-populated from selected maker"
-                              />
-                            </div>
                           </div>
 
-                          {/* Row 3: Model, Model Code, Serial No, Drawing No */}
+                          {/* Row 3: Model, Drawing No */}
                           <div className="grid grid-cols-4 gap-4">
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Model</label>
@@ -1180,26 +1150,6 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 onChange={(e) => handleFieldChange('model', e.target.value)}
                                 className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
                                 data-testid="input-model"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Model Code</label>
-                              <input
-                                type="text"
-                                value={componentData.modelCode}
-                                onChange={(e) => handleFieldChange('modelCode', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="input-model-code"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Serial No</label>
-                              <input
-                                type="text"
-                                value={componentData.serialNo}
-                                onChange={(e) => handleFieldChange('serialNo', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="input-serial-no"
                               />
                             </div>
                             <div>
@@ -1339,8 +1289,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                           </div>
 
-                          {/* Row 6: Class Item, IS Active, Vessel Code, IS Parent */}
-                          <div className="grid grid-cols-4 gap-4">
+                          {/* Row 6: Class Item and Notes / Technical Information */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Class Item</label>
                               <select
@@ -1354,61 +1304,51 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 <option value="No">No</option>
                               </select>
                             </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">IS Active<span className="text-red-500 ml-0.5">*</span></label>
-                              <select
-                                value={componentData.isActive}
-                                onChange={(e) => handleFieldChange('isActive', e.target.value)}
-                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.isActive ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
-                                data-testid="select-is-active"
-                              >
-                                <option value="">Select</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                              </select>
-                              {validationErrors.isActive && <span className="text-xs text-red-500" data-testid="validation-error-isActive">This field is required</span>}
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Vessel Code</label>
-                              <input
-                                type="text"
-                                value={componentData.vesselCode}
-                                onChange={(e) => handleFieldChange('vesselCode', e.target.value)}
+                            <div className="sm:col-span-1 lg:col-span-3">
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Notes / Technical Information</label>
+                              <textarea
+                                value={componentData.notes}
+                                onChange={(e) => handleFieldChange('notes', e.target.value)}
                                 className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="input-vessel-code"
+                                rows={3}
+                                data-testid="input-notes"
                               />
                             </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">IS Parent</label>
-                              <select
-                                value={componentData.isParent}
-                                onChange={(e) => handleFieldChange('isParent', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="select-is-parent"
-                              >
-                                <option value="">Select</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          {/* Row 7: Notes (full width) */}
-                          <div>
-                            <label className="text-xs font-medium text-gray-600 block mb-1">Notes</label>
-                            <textarea
-                              value={componentData.notes}
-                              onChange={(e) => handleFieldChange('notes', e.target.value)}
-                              className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                              rows={3}
-                              data-testid="input-notes"
-                            />
                           </div>
                         </div>
                       )}
 
                       {/* Section B: Running Hours & Condition Monitoring - B7.B Panel */}
-                      {section.id === "B" && isEditMode && componentId && (
+                      {section.id === "B" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                          {[
+                            ["fleetEquipmentCode", "Fleet Equipment Code", "input-fleet-equipment-code"],
+                            ["fleetEquipmentName", "Fleet Component Name", "input-fleet-equipment-name"],
+                            ["makerCode", "Maker Code", "input-maker-code"],
+                            ["modelCode", "Model Code", "input-model-code"],
+                            ["serialNo", "Serial No.", "input-serial-no"],
+                          ].map(([key, label, testId]) => (
+                            <div key={key}>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">{label}</label>
+                              <input readOnly={key === "makerCode"} className={`text-sm w-full px-2 py-1 border rounded ${key === "makerCode" ? "bg-gray-50 text-gray-700 cursor-not-allowed border-gray-300" : "text-[#52BAF3] border-[#52BAF3]"}`} value={(componentData as any)[key]} onChange={e => handleFieldChange(key, e.target.value)} data-testid={testId} />
+                            </div>
+                          ))}
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Is Active<span className="text-red-500 ml-0.5">*</span></label>
+                            <select className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.isActive ? "border-red-500 text-red-700" : "text-[#52BAF3] border-[#52BAF3]"}`} value={componentData.isActive} onChange={e => handleFieldChange("isActive", e.target.value)} data-testid="select-is-active"><option value="">Select</option><option value="Yes">Yes</option><option value="No">No</option></select>
+                            {validationErrors.isActive && <span className="text-xs text-red-500" data-testid="validation-error-isActive">This field is required</span>}
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Is Parent</label>
+                            <select className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]" value={componentData.isParent} onChange={e => handleFieldChange("isParent", e.target.value)} data-testid="select-is-parent"><option value="">Select</option><option value="Yes">Yes</option><option value="No">No</option></select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Vessel Name</label>
+                            <div className="text-sm text-gray-900 py-1" data-testid="text-vessel-name">{vessels.find(v => v.id === vesselId || v.code === componentData.vesselCode)?.name || "—"}</div>
+                          </div>
+                        </div>
+                      )}
+                      {section.id === "C" && isEditMode && componentId && (
                         <div className="space-y-4" data-testid="section-b-rh-panel">
                           <RunningHoursConditionPanel
                             componentId={componentId}
@@ -1419,7 +1359,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           />
                         </div>
                       )}
-                      {section.id === "B" && !isEditMode && (
+                      {section.id === "C" && !isEditMode && (
                         <div className="space-y-4" data-testid="section-b-add-mode">
                           <div className="overflow-x-auto">
                             <table className="w-full border-collapse" data-testid="rh-table-add">
@@ -1543,7 +1483,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                       )}
 
                       {/* Section C: Jobs - EXACT REPLICA */}
-                      {section.id === "C" && (
+                      {section.id === "D" && (
                         <JobsSectionC
                           isEditMode={isEditMode}
                           isLoadingJobs={isLoadingJobs}
@@ -1563,7 +1503,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                       )}
 
                       {/* Section D: Maintenance History - EXACT REPLICA */}
-                      {section.id === "D" && (
+                      {section.id === "E" && (
                         <div>
                           {!isEditMode ? (
                             <div className="text-sm text-gray-500">
@@ -1648,7 +1588,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                       )}
 
                       {/* Section E: Spares - EXACT REPLICA */}
-                      {section.id === "E" && (
+                      {section.id === "F" && (
                         <div>
                           {!isEditMode ? (
                             <div className="text-sm text-gray-500">
@@ -1742,7 +1682,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                       )}
 
                       {/* Section F: Drawings & Manuals - EXACT REPLICA */}
-                      {section.id === "F" && (
+                      {section.id === "G" && (
                         <div>
                           {!isEditMode ? (
                             <div className="text-sm text-gray-500">
@@ -1822,7 +1762,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                       )}
 
                       {/* Section G: Classification & Regulatory Data - EXACT REPLICA */}
-                      {section.id === "G" && (
+                      {section.id === "H" && (
                         <div>
                           {!isEditMode ? (
                             <div className="text-sm text-gray-500">
@@ -1906,7 +1846,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                       )}
 
                       {/* Section H: Requisitions */}
-                      {section.id === "H" && (
+                      {section.id === "I" && (
                         <div>
                           {!isEditMode ? (
                             <div className="text-sm text-gray-500">

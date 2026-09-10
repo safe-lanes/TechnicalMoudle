@@ -3499,6 +3499,7 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // External vessel ID from Vessel Master API
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
+  certificateNumber: text("certificate_number"), // Vessel-specific free-text certificate number
   issueDate: text("issue_date"), // Date certificate was issued
   expiryDate: text("expiry_date"), // Date certificate expires
   lastAnnual: text("last_annual"), // Date of last annual survey
