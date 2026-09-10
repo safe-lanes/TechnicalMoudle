@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { resolveCentralUrl, sendToCentral } from "@/assistant-widget/assistantClient";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -67,35 +68,53 @@ export function useChat() {
           role: m.role,
           content: m.content,
         }));
+        const context = {
+          module: "technical",
+          vesselId,
+          vesselName: currentVessel?.name || "Unknown Vessel",
+          currentPage: window.location.pathname,
+        };
 
-        const response = await fetch("/technical/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: messageText.trim(),
-            conversationHistory,
-            context: {
-              vesselId,
-              vesselName: currentVessel?.name || "Unknown Vessel",
-              currentPage: window.location.pathname,
-            },
-          }),
-          signal: abortControllerRef.current.signal,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          throw new Error(
-            errorData?.message || `Request failed with status ${response.status}`
-          );
+        // Stage 4 flag: central assistant when configured, with per-request
+        // fallback to the embedded endpoint on any central failure (see
+        // assistant-widget/assistantClient.ts for the flag + identity design).
+        let data: { response: string; toolsUsed?: string[] } | null = null;
+        const centralUrl = resolveCentralUrl();
+        if (centralUrl) {
+          try {
+            data = await sendToCentral(centralUrl, messageText.trim(), conversationHistory, context);
+          } catch (centralErr: any) {
+            if (centralErr?.name === "AbortError") throw centralErr;
+            console.warn("[assistant] central path failed, falling back to embedded:", centralErr?.message || centralErr);
+            data = null; // fall through to the legacy endpoint below
+          }
         }
 
-        const data = await response.json();
+        if (!data) {
+          const response = await fetch("/technical/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: messageText.trim(),
+              conversationHistory,
+              context,
+            }),
+            signal: abortControllerRef.current.signal,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
+            throw new Error(
+              errorData?.message || `Request failed with status ${response.status}`
+            );
+          }
+          data = await response.json();
+        }
 
         const assistantMessage: ChatMessage = {
           role: "assistant",
-          content: data.response,
-          toolsUsed: data.toolsUsed,
+          content: data!.response,
+          toolsUsed: data!.toolsUsed,
           timestamp: new Date(),
         };
 

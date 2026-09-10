@@ -262,8 +262,26 @@ async function handleAdmin(req, url, body) {
   return { status: 404, json: { error: 'not found' } };
 }
 
+// CORS for the in-app widget (Stage 4): allowed origins from env, comma-separated;
+// '*' for pilot. No credentials are used — identity travels in the signed token header.
+const CORS_ORIGINS = (process.env.ASSISTANT_CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+function corsHeaders(req) {
+  const origin = req.headers.origin;
+  if (!origin || !CORS_ORIGINS.length) return {};
+  const allowed = CORS_ORIGINS.includes('*') || CORS_ORIGINS.includes(origin);
+  if (!allowed) return {};
+  return {
+    'Access-Control-Allow-Origin': CORS_ORIGINS.includes('*') ? '*' : origin,
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,x-assistant-identity,x-admin-token',
+    'Access-Control-Max-Age': '600',
+  };
+}
+
 const server = http.createServer(async (req, res) => {
-  const send = (status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+  const cors = corsHeaders(req);
+  const send = (status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json', ...cors }); res.end(JSON.stringify(obj)); };
+  if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
   try {
     let raw = '';
     if (req.method === 'POST') for await (const chunk of req) raw += chunk;
