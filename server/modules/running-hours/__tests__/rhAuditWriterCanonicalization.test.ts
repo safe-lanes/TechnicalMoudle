@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../repositories/runningHoursRepository', () => ({
   createRunningHoursAudit: vi.fn(async (d: any) => ({ id: 1, ...d })),
   getRunningHoursAudits: vi.fn(async () => []),
+  getPmsVesselSettings: vi.fn(async () => ({ rhValidationEnabled: true })),
   getComponent: vi.fn(async (id: string) => ({
     cuuid: id, id, vesselId: 'v-1', rhCounterType: 'INHERITED',
     currentCumulativeRH: '100.00', lastUpdated: '2026-08-01',

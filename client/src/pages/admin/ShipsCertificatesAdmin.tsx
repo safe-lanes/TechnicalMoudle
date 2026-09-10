@@ -33,6 +33,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { useVessels } from "@/hooks/useVessels";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { getNextCertificateCompanyGroupKey } from "@shared/certificates/companyGroupLabels";
+import { sortCertificateMasterGroupLabels } from "@shared/certificates/masterGroupLabels";
 
 // Interface for label configuration (used by Company Group, Master Category, Master Group)
 interface LabelConfig {
@@ -210,10 +212,6 @@ const companyGroups = ["A. Statutory", "B. Trading", "C. Class", "D. Other"];
 // TODO: Replace these dropdown options with actual values from backend/configuration
 // Master Tab - Category dropdown options (A-F for now, will be replaced later)
 const MASTER_CATEGORY_OPTIONS = ["A", "B", "C", "D", "E", "F"];
-
-// TODO: Replace these dropdown options with actual values from backend/configuration
-// Master Tab - Group dropdown options (1-10 for now, will be replaced later)
-const MASTER_GROUP_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
 // TODO: Replace these dropdown options with actual values from backend/configuration
 // Company Tab - Company Group dropdown options (A-I for now, will be replaced later)
@@ -927,6 +925,10 @@ export default function ShipsCertificatesAdmin() {
   const [masterGroupLabels, setMasterGroupLabels] = useState<LabelConfig[]>(INITIAL_MASTER_GROUP_LABELS);
   const [tempMasterCategoryLabels, setTempMasterCategoryLabels] = useState<LabelConfig[]>(INITIAL_MASTER_CATEGORY_LABELS);
   const [tempMasterGroupLabels, setTempMasterGroupLabels] = useState<LabelConfig[]>(INITIAL_MASTER_GROUP_LABELS);
+  const sortedMasterGroupLabels = useMemo(
+    () => sortCertificateMasterGroupLabels(masterGroupLabels),
+    [masterGroupLabels],
+  );
   
   // New Entry states
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -1016,10 +1018,8 @@ export default function ShipsCertificatesAdmin() {
   };
   
   const addCompanyGroupLabelRow = () => {
-    const nextLetter = getNextLetter(tempCompanyGroupLabels);
-    if (nextLetter <= "Z") {
-      setTempCompanyGroupLabels([...tempCompanyGroupLabels, { key: nextLetter, label: "" }]);
-    }
+    const nextKey = getNextCertificateCompanyGroupKey(tempCompanyGroupLabels);
+    setTempCompanyGroupLabels([...tempCompanyGroupLabels, { key: nextKey, label: "" }]);
   };
   
   const updateCompanyGroupLabel = (index: number, newLabel: string) => {
@@ -1443,8 +1443,8 @@ export default function ShipsCertificatesAdmin() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="All Groups">All Groups</SelectItem>
-              {MASTER_GROUP_OPTIONS.map((grp) => (
-                <SelectItem key={grp} value={grp}>{getFormattedMasterGroupLabel(grp)}</SelectItem>
+              {sortedMasterGroupLabels.map((grp) => (
+                <SelectItem key={grp.key} value={grp.key}>{getFormattedMasterGroupLabel(grp.key)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -1560,7 +1560,7 @@ export default function ShipsCertificatesAdmin() {
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
-                            {masterGroupLabels.map((grp: LabelConfig) => (
+                            {sortedMasterGroupLabels.map((grp: LabelConfig) => (
                               <SelectItem key={grp.key} value={grp.key}>
                                 {getFormattedMasterGroupLabel(grp.key)}
                               </SelectItem>
@@ -1688,7 +1688,7 @@ export default function ShipsCertificatesAdmin() {
                           <SelectValue placeholder="Select *" />
                         </SelectTrigger>
                         <SelectContent>
-                          {masterGroupLabels.map((grp: LabelConfig) => (
+                          {sortedMasterGroupLabels.map((grp: LabelConfig) => (
                             <SelectItem key={grp.key} value={grp.key}>
                               {getFormattedMasterGroupLabel(grp.key)}
                             </SelectItem>
@@ -2781,14 +2781,14 @@ export default function ShipsCertificatesAdmin() {
           <DialogHeader>
             <DialogTitle>Configure Group Labels</DialogTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Define custom labels for each company group. Leave blank to show just the letter.
+              Define custom labels for each company group. Leave blank to show just the key.
             </p>
           </DialogHeader>
           
           <div className="space-y-3 max-h-[400px] overflow-y-auto py-4">
             {tempCompanyGroupLabels.map((group: LabelConfig, index: number) => (
               <div key={group.key} className="flex items-center gap-3">
-                <span className="w-6 text-sm font-medium text-muted-foreground">{group.key}.</span>
+                <span className="w-10 shrink-0 text-right text-sm font-medium text-muted-foreground">{group.key}.</span>
                 <Input
                   value={group.label}
                   onChange={(e) => updateCompanyGroupLabel(index, e.target.value)}
@@ -2805,7 +2805,6 @@ export default function ShipsCertificatesAdmin() {
             size="sm"
             onClick={addCompanyGroupLabelRow}
             className="w-full gap-2"
-            disabled={tempCompanyGroupLabels.length >= 26}
             data-testid="button-add-group-row"
           >
             <Plus className="h-4 w-4" />

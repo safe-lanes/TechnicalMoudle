@@ -27,6 +27,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import PostponeWorkOrderDialog from "@/components/PostponeWorkOrderDialog";
 import RePostponeWorkOrderDialog from "@/components/RePostponeWorkOrderDialog";
 import PostponeApprovalDialog from "@/components/PostponeApprovalDialog";
@@ -218,6 +227,11 @@ const WorkOrders: React.FC = () => {
   const [overdueReasonWorkOrder, setOverdueReasonWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
+  const [rhLowerApprovalNotice, setRhLowerApprovalNotice] = useState<{
+    submittedRH: number;
+    latestRH: number;
+    latestRHDate: string | null;
+  } | null>(null);
   
   // Pagination state (persisted — see readListState note above)
   const [currentPage, setCurrentPage] = useState(() => readListState<number>('workOrdersPage', 1));
@@ -374,9 +388,19 @@ const WorkOrders: React.FC = () => {
       const response = await apiRequest('PATCH', `/technical/api/work-orders/${id}`, data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
-      toast({ title: "Success", description: "Work order updated successfully" });
+      const lowerRhSkipped = result?.rhUpdateSkipped || result?.rhUpdateOutcome === 'skipped_lower';
+      if (lowerRhSkipped) {
+        setRhLowerApprovalNotice({
+          submittedRH: Number(result.submittedRH),
+          latestRH: Number(result.latestRH),
+          latestRHDate: result.latestRHDate || null,
+        });
+        toast({ title: "Approved", description: "Work order approved without lowering the live Running Hours value." });
+      } else {
+        toast({ title: "Success", description: "Work order updated successfully" });
+      }
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to update work order" });
@@ -1079,7 +1103,8 @@ const WorkOrders: React.FC = () => {
     }
     
     const updateData: Record<string, any> = {
-      status: "Approved",
+      status: "Completed",
+      approvalAction: "approved",
       approver: resolvedUserName,
       approverRemarks,
       approvalDate: new Date().toISOString(),
@@ -1858,6 +1883,30 @@ const WorkOrders: React.FC = () => {
           invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
         }}
       />
+
+      <AlertDialog open={!!rhLowerApprovalNotice}>
+        <AlertDialogContent data-testid="dialog-list-rh-lower-approval">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Work Order Approved — Running Hours Unchanged</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>The Work Order was approved, but the lower submitted reading was not applied to live Running Hours.</p>
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <div><strong>Submitted reading:</strong> {rhLowerApprovalNotice?.submittedRH} RH</div>
+                  <div>
+                    <strong>Latest live reading:</strong> {rhLowerApprovalNotice?.latestRH} RH
+                    {rhLowerApprovalNotice?.latestRHDate ? ` (${rhLowerApprovalNotice.latestRHDate})` : ''}
+                  </div>
+                </div>
+                <p>The submitted value remains in the Work Order completion history.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setRhLowerApprovalNotice(null)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Unplanned Work Order Form */}
       <UnplannedWorkOrderForm

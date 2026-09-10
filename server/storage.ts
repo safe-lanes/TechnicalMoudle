@@ -332,7 +332,7 @@ export interface IStorage {
     lastUpdated: string;
     readingDateIso: string;
     userId: string | null;
-  }): Promise<{ previousRH: number }>;
+  }): Promise<{ previousRH: number; changed: boolean }>;
 
   updateMasterRunningHours(params: {
     componentId: string;
@@ -579,6 +579,12 @@ export interface IStorage {
   
   // Work Order methods
   getWorkOrders(vesselId?: string, vesselIds?: string[]): Promise<WorkOrder[]>;
+  /** Light projection for numbering: just work_order_no strings (optional — feature-detected by workOrderNumbering). */
+  getWorkOrderNumbers?(vesselId?: string): Promise<string[]>;
+  /** Alert-scan candidates: vessel WOs whose authored status can still compute to a derived band. */
+  getAlertCandidateWorkOrders(): Promise<any[]>;
+  /** Alert-scan candidates: critical spares already below minimum (SQL mirror of evaluateLowSpares). */
+  getLowCriticalSpareCandidates(): Promise<any[]>;
   getWorkOrder(id: string): Promise<WorkOrder | undefined>;
   getWorkOrderByCode(code: string): Promise<WorkOrder | undefined>;
   getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]>;

@@ -415,6 +415,11 @@ export async function getWorkOrderContext(workOrderId: string) {
     woCompletionRh: (correctedWorkOrder as any).woCompletionRh?.toString() || '',
     currentReadingDate: (correctedWorkOrder as any).currentReadingDate || '',
     rhBackdatedEntry: !!(correctedWorkOrder as any).rhBackdatedEntry,
+    rhUpdateOutcome: (correctedWorkOrder as any).rhUpdateOutcome || null,
+    rhSkipReason: (correctedWorkOrder as any).rhSkipReason || null,
+    rhSkipSubmittedRh: (correctedWorkOrder as any).rhSkipSubmittedRh?.toString() || null,
+    rhSkipLatestRh: (correctedWorkOrder as any).rhSkipLatestRh?.toString() || null,
+    rhSkipLatestRhDate: (correctedWorkOrder as any).rhSkipLatestRhDate || null,
     // B4 - Spare Parts Consumed
     consumedSpareParts: ensureArray(correctedWorkOrder.consumedSpareParts),
     // Metadata

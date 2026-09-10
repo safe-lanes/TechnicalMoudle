@@ -28,26 +28,26 @@ describe('cascade RH vessel-policy enforcement', () => {
     repo.cascadeRunningHoursUpdate.mockResolvedValue({ updated: 1 });
   });
 
-  it('honors an OFF vessel policy for a negative delta when the client omits the legacy flag', async () => {
+  it('rejects a negative delta even when vessel rate validation is OFF', async () => {
     repo.getPmsVesselSettings.mockResolvedValue({ vesselId: 'vessel-a', rhValidationEnabled: false });
 
-    await cascadeUpdate({ ...baseRequest, mode: 'addDelta', value: -10 }, 'Ship');
+    await expect(
+      cascadeUpdate({ ...baseRequest, mode: 'addDelta', value: -10 }, 'Ship')
+    ).rejects.toThrow('addDelta mode requires value > 0');
 
-    expect(repo.cascadeRunningHoursUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      rhValidationBypassed: true,
-      value: -10,
-    }));
+    expect(repo.cascadeRunningHoursUpdate).not.toHaveBeenCalled();
   });
 
-  it('honors an OFF vessel policy for a normal zero reset when the client omits the legacy flag', async () => {
+  it('rejects an ordinary zero reset when vessel rate validation is OFF', async () => {
     repo.getPmsVesselSettings.mockResolvedValue({ vesselId: 'vessel-a', rhValidationEnabled: false });
 
-    await cascadeUpdate({ ...baseRequest, mode: 'setTotal', value: 0 }, 'Ship');
+    await expect(
+      cascadeUpdate({ ...baseRequest, mode: 'setTotal', value: 0 }, 'Ship')
+    ).rejects.toMatchObject({
+      details: { code: 'LOWER_THAN_CURRENT_RH' },
+    });
 
-    expect(repo.cascadeRunningHoursUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      rhValidationBypassed: true,
-      value: 0,
-    }));
+    expect(repo.cascadeRunningHoursUpdate).not.toHaveBeenCalled();
   });
 
   it('does not let a Sail Admin forged-OFF flag bypass an ON vessel policy', async () => {

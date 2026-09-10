@@ -8,7 +8,7 @@ export function isRhValidationEnabledForVessel(settings?: { rhValidationEnabled?
 }
 
 import type { RHHistoryQuery, RHHistoryResult } from '../repositories/runningHoursRepository';
-import { validateRunningHoursIncrease, canAdminOverride, safeParseDate } from '../utils/rhValidation';
+import { validateRunningHoursIncrease, validateRHMonotonicity, canAdminOverride, safeParseDate } from '../utils/rhValidation';
 import { canonicalizeReadingDateInput, requireReadingDayInput, todayReadingDay } from '../utils/readingDate';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../shared/errors';
 import { z } from 'zod';
@@ -44,7 +44,7 @@ export function validateCascadePolicyRules(
   vesselValidationEnabled: boolean,
   validationBypassAuthorized: boolean,
 ): void {
-  if (data.mode === 'addDelta' && data.value <= 0 && (!validationBypassAuthorized || data.meterReplaced)) {
+  if (data.mode === 'addDelta' && data.value <= 0) {
     throw new ValidationError('addDelta mode requires value > 0');
   }
 
@@ -61,6 +61,28 @@ export function validateCascadePolicyRules(
   ) {
     throw new ValidationError('When setting RH to 0, renewal confirmation with action type and reason is required');
   }
+}
+
+function enforceRHMonotonicity(input: {
+  currentRH: number;
+  submittedRH: number;
+  currentRHDate?: string | null;
+  submittedRHDate?: string | null;
+  approvedReset?: boolean;
+}) {
+  const result = validateRHMonotonicity(input);
+  if (!result.allowed) {
+    throw new ValidationError(result.message, {
+      code: 'LOWER_THAN_CURRENT_RH',
+      currentRH: result.currentRH,
+      submittedRH: result.submittedRH,
+      delta: result.delta,
+      currentRHDate: result.currentRHDate,
+      submittedRHDate: result.submittedRHDate,
+      monotonicity: result,
+    });
+  }
+  return result;
 }
 
 // ── Helper: resolve last-updated date with fallback chain ──
@@ -167,6 +189,27 @@ export async function cascadeUpdate(body: unknown, authenticatedRole?: string) {
 
   if (!Number.isFinite(targetRH) || targetRH < 0) {
     throw new ValidationError('Resulting Running Hours cannot be negative.');
+  }
+
+  const monotonicity = enforceRHMonotonicity({
+    currentRH,
+    submittedRH: targetRH,
+    currentRHDate: resolveLastUpdated(parentComponent),
+    submittedRHDate: validatedData.dateUpdated,
+    approvedReset: validatedData.meterReplaced || validatedData.isRenewalReset,
+  });
+  if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+    return {
+      updatedComponents: 0,
+      auditsCreated: 0,
+      workOrdersGenerated: 0,
+      workOrders: [],
+      noChange: true,
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0,
+      },
+    };
   }
 
   // Skip daily-limit validation for meter replacements (physical device swap, not normal accumulation)
@@ -528,6 +571,26 @@ export async function updateChildRH(componentId: string, body: {
   // Absent → today; PRESENT-but-unparseable → reject (never silently 'today').
   const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
 
+  const monotonicity = enforceRHMonotonicity({
+    currentRH: currentRHValue,
+    submittedRH: newRHValue,
+    currentRHDate: componentLastUpdated,
+    submittedRHDate: canonicalDay,
+  });
+  if (monotonicity.reason === 'EQUAL_CURRENT_RH') {
+    return {
+      success: true,
+      noChange: true,
+      message: monotonicity.message,
+      previousRH,
+      newRH: newRHValue.toFixed(2),
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0,
+      },
+    };
+  }
+
   let validation: ReturnType<typeof validateRunningHoursIncrease> | null = null;
   if (!validationBypassAuthorized) {
     // Validate running hours increase against daily limits
@@ -578,6 +641,19 @@ export async function updateChildRH(componentId: string, body: {
     readingDateIso: canonicalDay,
     userId: userId || null,
   });
+  if (!atomicResult.changed) {
+    return {
+      success: true,
+      noChange: true,
+      message: `Running Hours is already ${newRHFormatted} for ${component.name}`,
+      previousRH: atomicResult.previousRH.toFixed(2),
+      newRH: newRHFormatted,
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0,
+      },
+    };
+  }
   // Audit the value that was actually committed as previous (fresh in-tx read),
   // not the possibly-stale pre-validation read.
   const committedPreviousRH = atomicResult.previousRH.toFixed(2);
@@ -812,7 +888,11 @@ export async function updateRHConfig(componentId: string, body: unknown) {
 // RH Config: Update Master RH with Cascade (from runningHoursRoutes.ts)
 // ══════════════════════════════════════════════════════════
 
-export async function updateMasterRH(componentId: string, body: unknown) {
+export async function updateMasterRH(
+  componentId: string,
+  body: unknown,
+  internalOptions?: { allowLowerWorkOrderApprovalSkip?: boolean },
+) {
   // Validate request body with Zod
   const parseResult = updateMasterRHSchema.safeParse(body);
   if (!parseResult.success) {
@@ -837,11 +917,45 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     throw new ValidationError('Running hours can only be updated for MASTER counter type components');
   }
 
+  const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+  const lastUpdate = resolveLastUpdated(component);
+  const monotonicity = validateRHMonotonicity({
+    currentRH: currentRHValue,
+    submittedRH: newRHValue,
+    currentRHDate: lastUpdate,
+    submittedRHDate: canonicalDay,
+  });
+  const lowerApprovalSkipAllowed =
+    internalOptions?.allowLowerWorkOrderApprovalSkip === true &&
+    updateSource === 'WORKORDER';
+  if (!monotonicity.allowed && !lowerApprovalSkipAllowed) {
+    enforceRHMonotonicity({
+      currentRH: currentRHValue,
+      submittedRH: newRHValue,
+      currentRHDate: lastUpdate,
+      submittedRHDate: canonicalDay,
+    });
+  }
+  // Approval calls continue into the locked repository transaction even when
+  // this pre-flight read is equal/lower. A concurrent RH update may have
+  // advanced the live value after this read.
+  if (monotonicity.reason === 'EQUAL_CURRENT_RH' && !lowerApprovalSkipAllowed) {
+    return {
+      success: true,
+      noChange: true,
+      message: monotonicity.message,
+      masterUpdated: component,
+      inheritedUpdated: 0,
+      woGeneration: { rhJobsChecked: 0, rhWOsGenerated: 0 },
+    };
+  }
+
   // Validate running hours increase against daily limits (MANUAL and WORKORDER updates).
   // IMPORT and AUTOMATION bypass this check — they carry pre-validated bulk data.
-  if (updateSource === 'MANUAL' || updateSource === 'WORKORDER') {
-    const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
-    const lastUpdate = resolveLastUpdated(component);
+  if (
+    (updateSource === 'MANUAL' || updateSource === 'WORKORDER') &&
+    !(lowerApprovalSkipAllowed && !monotonicity.allowed)
+  ) {
     const validation = validateRunningHoursIncrease({
       currentRH: currentRHValue,
       newRH: newRHValue,
@@ -875,8 +989,25 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     // Persist the reading date (WO completion date / RH Section "Date Updated") so the stored
     // reading and the component's last-updated reflect when the hours were observed, not "now".
     // Task #427: canonical YYYY-MM-DD only.
-    dateUpdated: canonicalDay
+    dateUpdated: canonicalDay,
+    allowLowerWorkOrderApprovalSkip: lowerApprovalSkipAllowed,
   });
+
+  if (result.rhSkipped) {
+    return {
+      success: true,
+      rhSkipped: true,
+      rhSkipReason: result.rhSkipped.reason,
+      submittedRH: result.rhSkipped.submittedRH,
+      currentRH: result.rhSkipped.currentRH,
+      currentRHDate: result.rhSkipped.currentRHDate,
+      submittedRHDate: result.rhSkipped.submittedRHDate,
+      message: `Work Order approved without updating Running Hours because ${result.rhSkipped.submittedRH} RH is lower than the latest live value of ${result.rhSkipped.currentRH} RH.`,
+      masterUpdated: result.masterUpdated,
+      inheritedUpdated: 0,
+      woGeneration: { rhJobsChecked: 0, rhWOsGenerated: 0 },
+    };
+  }
 
   // TRIGGER 1 HOOK: After MASTER RH is updated, scan for RH-based WO generation
   let woGenerationResult = { rhJobsChecked: 0, rhWOsGenerated: 0 };
@@ -905,6 +1036,7 @@ export async function updateMasterRH(componentId: string, body: unknown) {
 
   return {
     success: true,
+    noChange: result.noChange === true,
     message: `Master RH updated to ${newRHValue}. Cascaded to ${result.inheritedUpdated} inherited components.`,
     masterUpdated: result.masterUpdated,
     inheritedUpdated: result.inheritedUpdated,

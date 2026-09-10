@@ -213,8 +213,8 @@ export type RenewalActionType = typeof RENEWAL_ACTION_TYPES[number];
 export const cascadeRunningHoursSchema = z.object({
   parentComponentId: z.string(),
   mode: z.enum(['setTotal', 'addDelta']),
-  // Set Total remains non-negative. Add Delta may be negative only when the
-  // Sail Admin-authorized validation bypass is requested and approved server-side.
+  // Set Total remains non-negative. Add Delta represents accumulated operating
+  // time and must be positive; counter reductions use explicit reset/correction flows.
   value: z.number().finite(),
   dateUpdated: z.string(), // DD-MMM-YYYY HH:mm format
   dateUpdatedTZ: z.string().default('UTC'),
@@ -1393,6 +1393,14 @@ export const workOrders = pgTable("work_orders", {
   // master RH. In this case the RH module is NOT updated; the reading is saved to the
   // WO only for job scheduling / next-due calculation.
   rhBackdatedEntry: boolean("rh_backdated_entry"),
+
+  // Approval-time RH application outcome. A lower submitted reading can be
+  // retained on the WO while the authoritative live RH counter stays unchanged.
+  rhUpdateOutcome: text("rh_update_outcome"),
+  rhSkipReason: text("rh_skip_reason"),
+  rhSkipSubmittedRh: decimal("rh_skip_submitted_rh", { precision: 10, scale: 2 }),
+  rhSkipLatestRh: decimal("rh_skip_latest_rh", { precision: 10, scale: 2 }),
+  rhSkipLatestRhDate: text("rh_skip_latest_rh_date"),
 
   // === Save as Draft (migration 165, Task #402) ===
   // In-progress Part-B edits stashed as a JSON document. Draft saves write ONLY
@@ -3499,10 +3507,13 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // External vessel ID from Vessel Master API
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
+  certificateNumber: text("certificate_number"), // Vessel-specific free-text certificate number
   issueDate: text("issue_date"), // Date certificate was issued
   expiryDate: text("expiry_date"), // Date certificate expires
   lastAnnual: text("last_annual"), // Date of last annual survey
+  nextAnnual: text("next_annual"), // Date of next annual survey
   lastInterm: text("last_interm"), // Date of last intermediate survey
+  nextInterm: text("next_interm"), // Date of next intermediate survey
   endorsementDate: text("endorsement_date"), // Date of endorsement
   lastEditUpload: text("last_edit_upload"), // Date of last edit or file upload
   attachments: jsonb("attachments").$type<Array<{ name: string; size: number; key: string; uploadedAt: string }>>().default([]),

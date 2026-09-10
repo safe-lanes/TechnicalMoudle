@@ -108,10 +108,13 @@ export async function getCertificates(filters: CertificateFilters) {
         vesselId: app.vesselId,
         masterId: app.masterId,
         companySequence: effectiveSequence,
+        certificateNumber: certData?.certificateNumber || '',
         issueDate: certData?.issueDate || '',
         expiryDate: certData?.expiryDate || '',
         lastAnnual: certData?.lastAnnual || '',
+        nextAnnual: certData?.nextAnnual || '',
         lastInterm: certData?.lastInterm || '',
+        nextInterm: certData?.nextInterm || '',
         endorsementDate: certData?.endorsementDate || '',
         lastEditUpload: certData?.lastEditUpload || '',
         attachments: certData?.attachments || [],
@@ -139,6 +142,10 @@ export async function getCertificates(filters: CertificateFilters) {
           valA = a.vessel || '';
           valB = b.vessel || '';
           break;
+        case 'certificateNumber':
+          valA = a.certificateNumber || '';
+          valB = b.certificateNumber || '';
+          break;
         case 'type':
         case 'companyGroup':
           valA = a.type || '';
@@ -156,9 +163,17 @@ export async function getCertificates(filters: CertificateFilters) {
           valA = a.lastAnnual || '';
           valB = b.lastAnnual || '';
           break;
+        case 'nextAnnual':
+          valA = a.nextAnnual || '';
+          valB = b.nextAnnual || '';
+          break;
         case 'lastInterm':
           valA = a.lastInterm || '';
           valB = b.lastInterm || '';
+          break;
+        case 'nextInterm':
+          valA = a.nextInterm || '';
+          valB = b.nextInterm || '';
           break;
         case 'endorsementDate':
           valA = a.endorsementDate || '';
@@ -231,10 +246,13 @@ export async function getCertificate(certId: string) {
     vessel: app.vesselName,
     vesselId: app.vesselId,
     masterId: app.masterId,
+    certificateNumber: certData?.certificateNumber || '',
     issueDate: certData?.issueDate || '',
     expiryDate: certData?.expiryDate || '',
     lastAnnual: certData?.lastAnnual || '',
+    nextAnnual: certData?.nextAnnual || '',
     lastInterm: certData?.lastInterm || '',
+    nextInterm: certData?.nextInterm || '',
     endorsementDate: certData?.endorsementDate || '',
     lastEditUpload: certData?.lastEditUpload || '',
     attachments: certData?.attachments || [],
@@ -351,10 +369,13 @@ export async function updateCertificate(certId: string, body: any) {
     vessel: vesselName,
     vesselId,
     masterId,
+    certificateNumber: result[0]?.certificateNumber || '',
     issueDate: result[0]?.issueDate || '',
     expiryDate: result[0]?.expiryDate || '',
     lastAnnual: result[0]?.lastAnnual || '',
+    nextAnnual: result[0]?.nextAnnual || '',
     lastInterm: result[0]?.lastInterm || '',
+    nextInterm: result[0]?.nextInterm || '',
     endorsementDate: result[0]?.endorsementDate || '',
     lastEditUpload: result[0]?.lastEditUpload || '',
     attachments: result[0]?.attachments || [],
