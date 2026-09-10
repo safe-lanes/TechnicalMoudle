@@ -1,8 +1,9 @@
-# SAIL AI Assistant — Stage 1 central service (documentation answers only).
-# Zero npm dependencies: Node 20 built-ins only, so no install step and no lockfile.
+# SAIL AI Assistant — central service (Stage 2: own store + signed identity).
 FROM node:20-alpine
 WORKDIR /app
-COPY server.mjs .
+COPY package.json .
+RUN npm install --omit=dev --no-audit --no-fund
+COPY *.mjs ./
 ENV PORT=8000
 EXPOSE 8000
 USER node

@@ -1,0 +1,9 @@
+{
+  "name": "sail-assistant",
+  "private": true,
+  "type": "module",
+  "description": "SAIL AI Assistant central service (Stage 2: own store + signed identity + registration)",
+  "dependencies": {
+    "pg": "8.13.1"
+  }
+}

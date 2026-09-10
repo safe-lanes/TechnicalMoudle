@@ -10,6 +10,12 @@
  */
 const BASE = process.argv[2] || 'http://127.0.0.1:8012';
 
+// Stage 2: /chat requires a signed identity. Mint one when the key is available.
+import { signIdentity } from './identity.mjs';
+const KEY = process.env.IDENTITY_SIGNING_KEY;
+const IDENTITY = { userId: 'smoke-suite', userName: 'Smoke Suite', role: 'Sail Admin', tenantDomain: 'smoke-suite-tenant' };
+const authHeaders = () => (KEY ? { 'x-assistant-identity': signIdentity(IDENTITY, KEY, 60) } : {});
+
 // expectModule: routing target. expectManual: substring of the expected top-citation manual.
 const RETRIEVAL = [
   // Technical (existing store, previously proven + R3)
@@ -56,8 +62,8 @@ const OFF_TOPIC = [
 async function ask(q) {
   const r = await fetch(`${BASE}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: q, routeOnly: true }),
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ message: q, routeOnly: true, context: { module: 'technical' } }),
   });
   return r.json();
 }
