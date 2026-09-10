@@ -287,6 +287,30 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST') for await (const chunk of req) raw += chunk;
     const body = raw ? JSON.parse(raw) : {};
 
+    if (req.method === 'GET' && (req.url === '/' || req.url === '')) {
+      // A human opened the base URL in a browser — greet them properly.
+      const id = await chromaCollectionId().catch(() => null);
+      const dbOk = await pool.query('SELECT 1').then(() => true).catch(() => false);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...cors });
+      return res.end(`<!doctype html><html><head><title>SAIL AI Assistant</title>
+<style>body{font-family:system-ui,Segoe UI,Arial;max-width:640px;margin:8vh auto;padding:0 20px;color:#1a2b45}
+h1{font-size:1.6rem}code{background:#f0f3f8;padding:2px 6px;border-radius:4px}
+.ok{color:#0a7d33;font-weight:600}.bad{color:#b00020;font-weight:600}
+li{margin:6px 0}footer{margin-top:2rem;color:#667;font-size:.85rem}</style></head><body>
+<h1>SAIL AI Assistant</h1>
+<p>Status: <span class="${id && dbOk ? 'ok' : 'bad'}">${id && dbOk ? 'RUNNING' : 'DEGRADED'}</span>
+&nbsp;&middot;&nbsp; knowledge store: ${id ? 'connected' : 'unreachable'} &nbsp;&middot;&nbsp; database: ${dbOk ? 'connected' : 'unreachable'}</p>
+<p>This is an API service &mdash; it powers the chat window inside the SAIL applications.
+It answers from the official module user manuals (Technical, Audit, Safety, Incident, Crewing)
+and, where connected, live module data.</p>
+<ul>
+<li><code>POST /chat</code> &mdash; conversational endpoint (signed identity required)</li>
+<li><code>POST /rate</code> &mdash; answer feedback (signed identity required)</li>
+<li><code>GET /health</code> &mdash; machine-readable status</li>
+</ul>
+<footer>Safe Lanes &middot; internal enterprise service &middot; contract: docs/ASSISTANT-API.md</footer>
+</body></html>`);
+    }
     if (req.method === 'GET' && req.url === '/health') {
       const id = await chromaCollectionId().catch(() => null);
       const dbOk = await pool.query('SELECT 1').then(() => true).catch(() => false);
