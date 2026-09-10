@@ -35,7 +35,7 @@ not status codes, so a chat UI never breaks):
 ```json
 {
   "response": "…answer text…",
-  "gate": "answer | clarify | not_documented | disabled | rate_limited | error",
+  "gate": "answer | clarify | not_documented | disabled | rate_limited | masking_error | error",
   "module": "Incident",
   "citations": [ { "module": "Incident", "manual": "…", "section": "…" } ],
   "toolsUsed": ["get_fleet_overview"],
@@ -64,6 +64,31 @@ it (enabled by default) and records an admin notification; a pair switched off g
 clean "not enabled" reply with zero AI cost (fail-closed until re-enabled); per-user
 rate limit 30/min; per-tool budget 10 s, per-LLM-call 30 s, 90 s soft deadline → the
 answer says plainly it is partial.
+
+## 1a. Privacy — masking & the conversation log (Stage 5)
+
+**Nothing identifying reaches OpenAI.** Before any string leaves for the LLM or the
+embedding API, the service replaces real vessel names, person names, IMO numbers and DB
+UUIDs with per-request tokens (`[VESSEL_1]`, `[PERSON_1]`, `[IMO_1]`, `[ID_1]`). The model
+reasons over tokens only; the final answer is un-masked so the **user sees real names and
+OpenAI never did**. Both paths are covered — documentation retrieval (embedding input) and
+data-tool results (masked before they rejoin the prompt; LLM-produced tool arguments are
+un-masked before the module runs, so modules always work on real values).
+
+- Masking is whole-identifier and boundary-aware: a vessel named "Gas Mia" masks only the
+  full name, never the word "gas"; text that merely looks like a name is left alone.
+- **Failure policy:** if masking fails, the REQUEST IS REFUSED before any LLM call — a raw
+  name never leaks. If an answer contains a token that cannot be mapped back, the
+  placeholder stays **visible** (and is logged) rather than guessed — visible beats leak.
+- **Config:** on by default (`ASSISTANT_MASKING=off` to disable);
+  `ASSISTANT_MASKING_DISABLED_TENANTS` opts a tenant out.
+
+**Conversation log — what it stores:** the log lives in the assistant's own Postgres
+(admin-console only, never a tenant DB). By default it stores the **real** question/answer
+text for admin debuggability. A tenant listed in `ASSISTANT_MASKED_ONLY_LOG_TENANTS` has
+its log stored **tokenised** instead (privacy over debuggability) — this is the per-tenant
+audit switch. Retention: rolling 6-month purge, per-tenant configurable, erasable on
+request (the tenant key makes deletion a single operation).
 
 ## 2. The module-side Assistant Data API (what a MODULE implements)
 

@@ -15,6 +15,8 @@
  *   → fire-and-forget conversation log row.
  */
 import http from 'node:http';
+import { appendFileSync } from 'node:fs';
+import { createMasker } from './masking.mjs';
 import { verifyIdentity } from './identity.mjs';
 import { checkChatRateLimit } from './rateLimiter.mjs';
 import { initSchema, pool, resolvePair, logConversation } from './db.mjs';
@@ -30,6 +32,16 @@ const CHROMA_URL = process.env.CHROMA_URL || 'http://technical-chromadb:8000';
 const COLLECTION = process.env.CHROMA_COLLECTION || 'technical_docs';
 const EMBED_MODEL = process.env.EMBED_MODEL || 'text-embedding-3-large';
 const CHAT_MODEL = process.env.CHAT_MODEL || 'gpt-4o-mini';
+
+// Masking (Stage 5): ON by default. Per-tenant opt-out and masked-only-logging are
+// comma-separated tenant-domain lists (small deployments); the admin console will
+// manage these once built. tenantMaskedOnlyLog gates whether the conversation log
+// stores tokenised text (privacy) vs real text (admin debuggability, the default).
+const MASKING_ENABLED = process.env.ASSISTANT_MASKING !== 'off';
+const MASK_DISABLED_TENANTS = new Set((process.env.ASSISTANT_MASKING_DISABLED_TENANTS || '').split(',').map((s) => s.trim()).filter(Boolean));
+const MASKED_ONLY_LOG_TENANTS = new Set((process.env.ASSISTANT_MASKED_ONLY_LOG_TENANTS || '').split(',').map((s) => s.trim()).filter(Boolean));
+const tenantMaskingDisabled = (d) => MASK_DISABLED_TENANTS.has(d);
+const tenantMaskedOnlyLog = (d) => MASKED_ONLY_LOG_TENANTS.has(d);
 const SIM_FLOOR = parseFloat(process.env.ROUTE_SIM_FLOOR || '1.15');
 const ROUTE_MARGIN = parseFloat(process.env.ROUTE_MARGIN || '0.07');
 const TOP_K = parseInt(process.env.ROUTE_TOP_K || '10', 10);
@@ -52,13 +64,26 @@ async function chromaCollectionId() {
   return collectionId;
 }
 
-/** Shared LLM chat call — counts llmCalls, honors the per-call timeout. */
-async function chatCompletion(messages, tools, timeoutMs = LLM_TIMEOUT_MS) {
+/** Test-only capture of ACTUAL outbound OpenAI payloads (post-masking) — the
+ *  Stage 5 proof reads this file; unset in normal operation. */
+function captureOutbound(kind, payload) {
+  const f = process.env.ASSISTANT_CAPTURE_OUTBOUND;
+  if (!f) return;
+  try { appendFileSync(f, JSON.stringify({ kind, payload }) + '\n'); } catch { /* capture never breaks serving */ }
+}
+
+/** Shared LLM chat call — counts llmCalls, honors the per-call timeout.
+ *  MASKING CHOKE POINT (outbound): when a masker is supplied, every message
+ *  string is masked here — nothing reaches OpenAI unmasked. */
+async function chatCompletion(messages, tools, timeoutMs = LLM_TIMEOUT_MS, masker = null) {
+  const outMessages = masker ? masker.maskMessages(messages) : messages;
+  const body = { model: CHAT_MODEL, temperature: 0.2, messages: outMessages, ...(tools ? { tools } : {}) };
+  captureOutbound('chat', body);
   llmCalls++;
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: JSON.stringify({ model: CHAT_MODEL, temperature: 0.2, messages, ...(tools ? { tools } : {}) }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!r.ok) throw new Error(`chat: HTTP ${r.status}`);
@@ -66,8 +91,8 @@ async function chatCompletion(messages, tools, timeoutMs = LLM_TIMEOUT_MS) {
 }
 
 /** search_module_docs backing: Stage 1 retrieval reused, packaged for the tool loop. */
-async function searchDocsTool(query) {
-  const routed = route(await retrieve(await embed(query)));
+async function searchDocsTool(query, masker = null) {
+  const routed = route(await retrieve(await embed(query, masker)));
   if (routed.gate === 'not_documented') return { documented: false, note: 'This topic is not covered in the module documentation.' };
   if (routed.gate === 'clarify') return { documented: false, ambiguous: true, candidates: routed.candidates, note: 'Ambiguous across modules — ask the user which module they mean.' };
   return {
@@ -77,12 +102,14 @@ async function searchDocsTool(query) {
   };
 }
 
-async function embed(text) {
+async function embed(text, masker = null) {
+  const input = masker ? masker.maskText(text) : text;
+  captureOutbound('embeddings', { model: EMBED_MODEL, input });
   llmCalls++;
   const r = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: JSON.stringify({ model: EMBED_MODEL, input: text }),
+    body: JSON.stringify({ model: EMBED_MODEL, input }),
     signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   });
   if (!r.ok) throw new Error(`embeddings: HTTP ${r.status}`);
@@ -137,7 +164,7 @@ function sectionOf(meta) {
   return parts.length > 1 ? parts.slice(1).join(' > ') : parts[0] || 'Document';
 }
 
-async function answer(message, routed) {
+async function answer(message, routed, masker = null) {
   const context = routed.hits.map((h, i) => `[${i + 1}] (${manualOf(h.meta)} — ${sectionOf(h.meta)})\n${h.text}`).join('\n\n---\n\n');
   const system =
     `You are the SAIL Maritime PMS assistant. Answer the user's question using ONLY the manual excerpts provided. ` +
@@ -170,11 +197,27 @@ async function handleChat(body, identity) {
   const uiModule = String(body?.context?.module || 'technical').toLowerCase();
   const tenantDomain = identity.tenantDomain || 'single-tenant';
 
+  // ── Masking (Stage 5) ── one masker per request. Seeded with identifiers we
+  // already know (the user's name, the vessel named in context) so they never
+  // reach OpenAI even in the very first outbound call; more are learned from
+  // data-tool results inside the loop.
+  const maskingOn = MASKING_ENABLED && !tenantMaskingDisabled(tenantDomain);
+  const masker = maskingOn ? createMasker() : null;
+  if (masker) {
+    if (identity.userName) masker.register(identity.userName, 'PERSON');
+    if (body?.context?.vesselName) masker.register(body.context.vesselName, 'VESSEL');
+  }
+  // LOG POLICY: per-tenant. Default logs the REAL text (admin-console debuggability);
+  // a tenant set to masked-only logs the tokenised variant (privacy). Either way the
+  // log lives in the assistant's own store, admin-only, never a tenant DB.
+  const logMasked = maskingOn && tenantMaskedOnlyLog(tenantDomain);
+  const forLog = (t) => (logMasked && masker ? masker.maskText(t) : t);
+
   const log = (gate, answerText, extra = {}) =>
     void logConversation({
       tenantDomain, tuid: identity.tuid || null, userId: identity.userId, userName: identity.userName || null,
-      userRole: identity.role, module: extra.module || uiModule, gate, question: message,
-      answer: answerText, citations: extra.citations || [], confidence: extra.confidence ?? null,
+      userRole: identity.role, module: extra.module || uiModule, gate, question: forLog(message),
+      answer: answerText == null ? answerText : forLog(answerText), citations: extra.citations || [], confidence: extra.confidence ?? null,
       toolsUsed: extra.toolsUsed || [],
       tokensIn: extra.usage?.prompt_tokens ?? null, tokensOut: extra.usage?.completion_tokens ?? null,
       latencyMs: Date.now() - startedAt, model: extra.model || null, conversationId: body?.conversationId || null,
@@ -199,20 +242,26 @@ async function handleChat(body, identity) {
     return { status: 200, json: { response: msg, gate: 'disabled', citations: [] } };
   }
 
+  // MASKING FAIL-CLOSED: if any outbound masking throws, the request fails BEFORE
+  // reaching OpenAI — a raw name never leaves. (Un-mask failures are handled the
+  // opposite way, inside the masker: the placeholder stays visible, never leaks.)
+  try {
+
   // Stage 3: when this module has a configured Data API, full answers run the ported
   // tool loop (data tools + search_module_docs). routeOnly and modules without a Data
   // API keep the Stage 1 docs-only behavior unchanged.
   if (body?.routeOnly !== true && (await manifestFor(uiModule))) {
     const identityToken = body.__identityToken;
     const result = await runToolLoop({
-      message, uiModule, identityToken,
+      message, uiModule, identityToken, masker,
       deps: { chatCompletion, searchDocs: searchDocsTool },
     });
+    if (masker?.warnings.length) console.warn('[assistant] unmask warnings:', masker.warnings);
     log('answer', result.text, { module: uiModule, usage: result.usage, model: CHAT_MODEL, toolsUsed: result.toolsUsed });
     return { status: 200, json: { response: result.text, gate: 'answer', module: MODULE_LABELS[uiModule] || uiModule, toolsUsed: result.toolsUsed, partial: result.partial || false, usage: result.usage } };
   }
 
-  const routed = route(await retrieve(await embed(message)));
+  const routed = route(await retrieve(await embed(message, masker)));
 
   if (routed.gate === 'not_documented') {
     const msg = "That isn't covered in the module documentation I have. Please rephrase, or contact support if you believe it should be documented.";
@@ -231,9 +280,21 @@ async function handleChat(body, identity) {
     log('route_only', null, { module: routed.module, citations, confidence: routed.confidence });
     return { status: 200, json: { gate: 'answer', module: MODULE_LABELS[routed.module], confidence: Number(routed.confidence.toFixed(4)), citations, routeOnly: true } };
   }
-  const a = await answer(message, routed);
-  log('answer', a.text, { module: routed.module, citations, confidence: routed.confidence, usage: a.usage, model: CHAT_MODEL });
-  return { status: 200, json: { response: a.text, gate: 'answer', module: MODULE_LABELS[routed.module], citations, confidence: Number(routed.confidence.toFixed(4)), usage: a.usage } };
+  const a = await answer(message, routed, masker);
+  const answerText = masker ? masker.unmaskText(a.text) : a.text;
+  if (masker?.warnings.length) console.warn('[assistant] unmask warnings:', masker.warnings);
+  log('answer', answerText, { module: routed.module, citations, confidence: routed.confidence, usage: a.usage, model: CHAT_MODEL });
+  return { status: 200, json: { response: answerText, gate: 'answer', module: MODULE_LABELS[routed.module], citations, confidence: Number(routed.confidence.toFixed(4)), usage: a.usage } };
+
+  } catch (e) {
+    if (/masking self-test failure|mask/i.test(e?.message || '')) {
+      const msg = 'The assistant could not process your request safely right now. Please try again in a moment.';
+      log('masking_error', msg);
+      console.error('[assistant] MASKING fail-closed (request refused, nothing sent to LLM):', e?.message || e);
+      return { status: 200, json: { response: msg, gate: 'masking_error', citations: [] } };
+    }
+    throw e;
+  }
 }
 
 // ── admin surface (internal-only host binding + ADMIN_TOKEN header) ──

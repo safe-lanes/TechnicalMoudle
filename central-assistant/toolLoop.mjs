@@ -94,7 +94,7 @@ const SEARCH_DOCS_TOOL = {
  *   deps.searchDocs(query) -> {gate, module?, candidates?, chunks:[{manual,section,text}]}
  *   deps.chatCompletion(messages, tools?) -> OpenAI response json (counts llmCalls)
  */
-export async function runToolLoop({ message, uiModule, identityToken, deps }) {
+export async function runToolLoop({ message, uiModule, identityToken, deps, masker }) {
   const startedAt = Date.now();
   const manifest = await manifestFor(uiModule);
   const moduleTools = (manifest?.tools || []).map((t) => ({ type: 'function', function: t }));
@@ -115,20 +115,27 @@ export async function runToolLoop({ message, uiModule, identityToken, deps }) {
     { role: 'user', content: message },
   ];
 
+  // unmask the final answer if masking is active (tokens -> real names for the user).
+  const finish = (text, usage, isPartial) => ({
+    text: masker ? masker.unmaskText(text) : text,
+    toolsUsed, usage, partial: isPartial,
+  });
+
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const pastSoftDeadline = Date.now() - startedAt > SOFT_DEADLINE_MS;
-    const j = await deps.chatCompletion(messages, pastSoftDeadline ? undefined : tools, LLM_TIMEOUT_MS);
+    // chatCompletion masks outbound messages (the choke point); the assistant model
+    // therefore only ever reasons over tokens like [VESSEL_1].
+    const j = await deps.chatCompletion(messages, pastSoftDeadline ? undefined : tools, LLM_TIMEOUT_MS, masker);
     const choice = j.choices?.[0]?.message;
     if (!choice) throw new Error('empty LLM response');
 
     if (!choice.tool_calls?.length || pastSoftDeadline) {
       const text = choice.content || '';
-      return {
-        text: partial && pastSoftDeadline ? `${text}\n\n(Note: answered from partial data — some lookups did not complete in time.)` : text,
-        toolsUsed,
-        usage: j.usage || null,
-        partial: partial && pastSoftDeadline,
-      };
+      return finish(
+        partial && pastSoftDeadline ? `${text}\n\n(Note: answered from partial data — some lookups did not complete in time.)` : text,
+        j.usage || null,
+        partial && pastSoftDeadline,
+      );
     }
 
     messages.push(choice);
@@ -136,16 +143,26 @@ export async function runToolLoop({ message, uiModule, identityToken, deps }) {
       const name = tc.function?.name;
       let args = {};
       try { args = JSON.parse(tc.function?.arguments || '{}'); } catch { /* leave empty */ }
+      // LLM-produced args carry tokens — restore real values BEFORE the module runs.
+      if (masker) args = masker.unmaskJson(args);
       toolsUsed.push(name);
       let result;
       if (name === 'search_module_docs') {
-        result = await deps.searchDocs(String(args.query || message));
+        result = await deps.searchDocs(String(args.query || message), masker);
       } else {
         const out = await executeModuleTool(uiModule, name, args, identityToken, `${startedAt}-${i}`);
         if (out.ok === false) partial = partial || /timed out/.test(out.error || '');
         result = out.ok ? out.data : { error: out.error };
       }
-      messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result).slice(0, 24000) });
+      // Learn identifiers from the real data, THEN mask the tool result before it
+      // rejoins the message history that will be sent back to OpenAI next iteration.
+      if (masker) {
+        masker.learnFromJson(result);
+        const masked = JSON.parse(masker.maskText(JSON.stringify(result)));
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(masked).slice(0, 24000) });
+      } else {
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result).slice(0, 24000) });
+      }
     }
   }
   // Iteration cap reached — synthesize from what we have, no more tools.
@@ -153,6 +170,7 @@ export async function runToolLoop({ message, uiModule, identityToken, deps }) {
     [...messages, { role: 'user', content: 'Answer now from the information gathered above. If it is incomplete, say so plainly.' }],
     undefined,
     LLM_TIMEOUT_MS,
+    masker,
   );
-  return { text: final.choices?.[0]?.message?.content || '', toolsUsed, usage: final.usage || null, partial: true };
+  return finish(final.choices?.[0]?.message?.content || '', final.usage || null, true);
 }

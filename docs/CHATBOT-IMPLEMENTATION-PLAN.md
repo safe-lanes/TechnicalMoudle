@@ -167,7 +167,7 @@ token mint + attach S — several small pieces plus the browser-proven pilot and
 the measurement window. Nothing here needs SAILERP-repo work; the only SAILERP item left on
 this stage is the optional shell-mount slot, which is scheduling, not engineering.
 
-### Stage 5 — Masking *(old-path retirement already DONE — see note)*
+### Stage 5 — Masking ✅ BUILT (old-path retirement done earlier)
 **Server:** central service on the AI testing server.
 **Builds:** mask-out/un-mask-in (enterprise plan B3): vessel/person names → placeholders
 before the LLM, restored after, map surviving the whole tool loop; the optional masked-only
