@@ -6,12 +6,13 @@
 what moves vs what is new, the transition, and who is needed when.
 **Written:** 10-Sep-2026, from `replit_dev` @ `b2e2e6b20` and `feature/chatbot-enterprise`
 @ `7a958fc53`.
-**Servers:** the assistant is DEPLOYED as an enterprise app on the AI server —
-**https://graphai.sl-sail.com/assistant** (nginx + TLS, service internal behind the proxy,
-admin surface blocked publicly; decided + live 10-Sep-2026). The production RAG server
-(13.250.9.130) remains only a reference point. Whether the service later moves inside the
-main production boundary stays a §8 review item, but the enterprise exposure decision is
-made and operational. Full endpoint contract: `docs/ASSISTANT-API.md`.
+**Servers:** the assistant is deployed on the AI server (13.250.51.71) behind nginx + TLS
+with the admin surface blocked publicly — but its **public hostname is pending a DNS
+decision** (10-Sep: the configured name `graphai.sl-sail.com` proved to have NO public DNS
+record — corrected; recommendation `assistant.sl-sail.com`, record to be created by the
+owner). Until DNS exists the service is tunnel/pilot-reachable only. The production RAG
+server (13.250.9.130) remains only a reference point; moving inside the main production
+boundary stays a §8 review item. Full endpoint contract: `docs/ASSISTANT-API.md`.
 
 ---
 

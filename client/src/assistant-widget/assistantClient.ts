@@ -18,7 +18,11 @@
  * the minted token (x-assistant-identity).
  */
 
-export const DEFAULT_CENTRAL_URL = 'https://graphai.sl-sail.com/assistant';
+// The assistant's public address is configured per environment (VITE var or
+// tester localStorage). There is deliberately NO baked-in default: the public
+// hostname is pending a DNS decision (10-Sep) and publishing a dead URL as a
+// default caused a corrected mistake — unconfigured now fails loudly instead.
+export const DEFAULT_CENTRAL_URL: string | null = null;
 
 export interface AssistantContext {
   module: string;
@@ -50,7 +54,9 @@ export function resolveCentralUrl(): string {
     /* storage unavailable — fall through */
   }
   const env = (import.meta as any).env?.VITE_ASSISTANT_CENTRAL_URL as string | undefined;
-  return (env || DEFAULT_CENTRAL_URL).replace(/\/$/, '');
+  if (env) return env.replace(/\/$/, '');
+  if (DEFAULT_CENTRAL_URL) return DEFAULT_CENTRAL_URL.replace(/\/$/, '');
+  throw new Error('assistant address not configured (VITE_ASSISTANT_CENTRAL_URL)');
 }
 
 /** Mint a short-lived signed identity from the module (same-origin; wrapper adds identity headers). */

@@ -1,11 +1,14 @@
 # SAIL AI Assistant — API Contract & Embedding Guide
 
-**Base URL (enterprise deployment):** `https://graphai.sl-sail.com/assistant`
-(AI server, nginx + TLS, service bound to localhost behind the proxy; admin surface
-is NOT public — blocked at nginx, reachable only via SSH tunnel on the box.)
-**Status:** live since 10-Sep-2026. Documentation answers for all five modules are
-active; live-data answers activate per module once that module deploys its Data API
-and the service is configured to reach it (§4).
+**Base URL:** *pending DNS decision (10-Sep-2026)* — the service is deployed on the AI
+server (public IP 13.250.51.71) behind nginx + TLS with the admin surface blocked
+publicly, but **no public hostname currently resolves to it**; a DNS record is being
+requested (recommended: `assistant.sl-sail.com`). Until DNS exists, the service is
+reachable only via SSH tunnel / pilot configuration. This document previously published
+`graphai.sl-sail.com`, which turned out to have no public DNS record — corrected.
+**Status:** service functional (documentation answers for all five modules); live-data
+answers activate per module once that module deploys its Data API and the service is
+configured to reach it (§4).
 
 This is the complete surface. Anything not listed here does not exist.
 
@@ -108,7 +111,7 @@ and `server/modules/assistant-api/identityToken.ts` (TS) — same wire format.
 | | `ASSISTANT_MODULE_APIS` | `{"technical":{"url":"https://dev.sl-sail.com/technical/api","secret":"…"}}` — per-module data APIs; omit a module → docs-only for it |
 | Module backend (PM2 env, e.g. Technical dev) | `ASSISTANT_SERVICE_SECRET` | Locks manifest/execute to the central service |
 | | `ASSISTANT_IDENTITY_SIGNING_KEY` | SAME value as the service's signing key |
-| App client build | `VITE_ASSISTANT_CENTRAL_URL` | The assistant base URL (defaults to the enterprise URL above) |
+| App client build | `VITE_ASSISTANT_CENTRAL_URL` | The assistant base URL — REQUIRED (no baked-in default; unconfigured fails loudly) |
 
 To bring live-data answers to an environment: deploy the module build containing its
 Data API, set the two PM2 values, add the module to `ASSISTANT_MODULE_APIS`, restart
