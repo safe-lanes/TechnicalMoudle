@@ -6,12 +6,12 @@
 what moves vs what is new, the transition, and who is needed when.
 **Written:** 10-Sep-2026, from `replit_dev` @ `b2e2e6b20` and `feature/chatbot-enterprise`
 @ `7a958fc53`.
-**Servers:** every stage runs on infrastructure that already exists — the **AI testing
-server** (the box hosting the ChromaDB knowledge store used for the 09-Sep rebuild) for
-pilot/build, and the **production RAG server (13.250.9.130)** only as the production
-reference point. Production hosting for the central service remains the open decision in the
-architecture plan's §8 — this document does not resolve it, it only states where each stage
-runs during the build.
+**Servers:** the assistant is DEPLOYED as an enterprise app on the AI server —
+**https://graphai.sl-sail.com/assistant** (nginx + TLS, service internal behind the proxy,
+admin surface blocked publicly; decided + live 10-Sep-2026). The production RAG server
+(13.250.9.130) remains only a reference point. Whether the service later moves inside the
+main production boundary stays a §8 review item, but the enterprise exposure decision is
+made and operational. Full endpoint contract: `docs/ASSISTANT-API.md`.
 
 ---
 
@@ -166,12 +166,14 @@ token mint + attach S — several small pieces plus the browser-proven pilot and
 the measurement window. Nothing here needs SAILERP-repo work; the only SAILERP item left on
 this stage is the optional shell-mount slot, which is scheduling, not engineering.
 
-### Stage 5 — Masking + old-path retirement
+### Stage 5 — Masking *(old-path retirement already DONE — see note)*
 **Server:** central service on the AI testing server.
 **Builds:** mask-out/un-mask-in (enterprise plan B3): vessel/person names → placeholders
 before the LLM, restored after, map surviving the whole tool loop; the optional masked-only
-logging mode (§5.8); then — only once the §3 criteria are met — removal of the embedded
-`/chat` path from the Technical module in a normal Technical release.
+logging mode (§5.8). *(The old embedded `/chat` was REMOVED on 10-Sep by owner decision —
+never tested/grounded, so no transition period was warranted; the widget is central-only
+with an honest unavailable message on failure. §3's flag/fallback design is retired with
+it; the correctness criteria in §3 remain the quality bar for the central path itself.)*
 **Depends on:** Stage 4 running in front of pilot users (masking needs real traffic shapes;
 retirement needs the criteria clock).
 **Demo for Sahil:** the conversation log showing what the LLM actually received —

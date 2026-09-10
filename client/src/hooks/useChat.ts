@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { resolveCentralUrl, sendToCentral } from "@/assistant-widget/assistantClient";
+import { sendToAssistant, ASSISTANT_UNAVAILABLE_MESSAGE } from "@/assistant-widget/assistantClient";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -75,60 +75,33 @@ export function useChat() {
           currentPage: window.location.pathname,
         };
 
-        // Stage 4 flag: central assistant when configured, with per-request
-        // fallback to the embedded endpoint on any central failure (see
-        // assistant-widget/assistantClient.ts for the flag + identity design).
-        let data: { response: string; toolsUsed?: string[] } | null = null;
-        const centralUrl = resolveCentralUrl();
-        if (centralUrl) {
-          try {
-            data = await sendToCentral(centralUrl, messageText.trim(), conversationHistory, context);
-          } catch (centralErr: any) {
-            if (centralErr?.name === "AbortError") throw centralErr;
-            console.warn("[assistant] central path failed, falling back to embedded:", centralErr?.message || centralErr);
-            data = null; // fall through to the legacy endpoint below
-          }
-        }
-
-        if (!data) {
-          const response = await fetch("/technical/api/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              message: messageText.trim(),
-              conversationHistory,
-              context,
-            }),
-            signal: abortControllerRef.current.signal,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => null);
-            throw new Error(
-              errorData?.message || `Request failed with status ${response.status}`
-            );
-          }
-          data = await response.json();
-        }
+        // Central assistant only — the legacy embedded chatbot was removed
+        // (never tested/grounded; product decision 10-Sep-2026). Failures show
+        // an honest unavailable message instead of pretending to answer.
+        const data = await sendToAssistant(
+          messageText.trim(),
+          conversationHistory,
+          context,
+          abortControllerRef.current.signal,
+        );
 
         const assistantMessage: ChatMessage = {
           role: "assistant",
-          content: data!.response,
-          toolsUsed: data!.toolsUsed,
+          content: data.response,
+          toolsUsed: data.toolsUsed,
           timestamp: new Date(),
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
       } catch (err: any) {
         if (err.name === "AbortError") return;
-        const errorMsg =
-          err.message || "Failed to send message. Please try again.";
-        setError(errorMsg);
+        console.warn("[assistant] request failed:", err?.message || err);
+        setError(err?.message || "assistant unavailable");
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: `Sorry, something went wrong: ${errorMsg}`,
+            content: ASSISTANT_UNAVAILABLE_MESSAGE,
             timestamp: new Date(),
           },
         ]);
