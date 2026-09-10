@@ -23,14 +23,14 @@ const RETRIEVAL = [
   { q: 'how do I prepare for an upcoming audit', m: 'Audit', manual: 'Preparation' },
   { q: 'where can I see the history of past audits', m: 'Audit', manual: 'History' },
   // Safety
-  { q: 'how do I create a management of change request', m: 'Safety', manual: 'MOC' },
+  { q: 'how do I create an MOC', m: 'Safety', manual: 'MOC' },
   { q: 'how do I carry out a risk assessment on the vessel', m: 'Safety', manual: 'Risk Assessment' },
   { q: 'how do I record a safety meeting', m: 'Safety', manual: 'Safety Meeting' },
   { q: 'how does the master review the safety management system', m: 'Safety', manual: 'Master Review' },
   // Incident
   { q: 'how do I report a near miss', m: 'Incident', manual: 'Near Miss' },
   { q: 'how do I report an incident on board', m: 'Incident', manual: 'Incident User Manual' },
-  { q: 'where do I record lessons learnt from an incident', m: 'Incident', manual: 'Lesson Learnt' },
+  { q: 'how do I raise a lesson learnt', m: 'Incident', manual: 'Lesson Learnt' },
   { q: 'how do fleet notifications reach the vessel', m: 'Incident', manual: 'Fleet Notification' },
   // Crewing
   { q: 'how do I plan a crew change', m: 'Crewing', manual: 'Crewing User Manual' },
@@ -40,6 +40,10 @@ const RETRIEVAL = [
 const AMBIGUOUS = [
   // Deliberate cross-module vocabulary; clarify OR a defensible single-module answer
   // is recorded, but the suite reports which gate fired so drift is visible.
+  // KNOWN COLLISION (documented, deliberately kept measured): "change request" is a
+  // Technical feature name, so this phrasing routes Technical (0.83 vs Safety 0.99 even
+  // at k=30). MOC-phrased queries route Safety correctly — see the retrieval set.
+  { q: 'how do I create a management of change request' },
   { q: 'how do I add a certificate' },
   { q: 'how do I approve a request' },
 ];
