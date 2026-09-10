@@ -18,11 +18,11 @@
  * the minted token (x-assistant-identity).
  */
 
-// The assistant's public address is configured per environment (VITE var or
-// tester localStorage). There is deliberately NO baked-in default: the public
-// hostname is pending a DNS decision (10-Sep) and publishing a dead URL as a
-// default caused a corrected mistake — unconfigured now fails loudly instead.
-export const DEFAULT_CENTRAL_URL: string | null = null;
+// INTERIM public home (owner decision 10-Sep-2026): the assistant rides the
+// viqmap host until the assistant.sl-sail.com DNS record is created — then this
+// default, the nginx block, and the docs move together. Publicly verified over
+// real DNS (health + admin-block + grounded answer) before this default was set.
+export const DEFAULT_CENTRAL_URL: string | null = 'https://viqmap.sl-sail.com/assistant';
 
 export interface AssistantContext {
   module: string;
