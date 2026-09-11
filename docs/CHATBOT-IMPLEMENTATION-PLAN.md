@@ -16,6 +16,17 @@ endpoint contract: `docs/ASSISTANT-API.md`.
 
 ---
 
+**⚠️ REVISED 11-Sep-2026 (post Stage-5 audits, owner-decided):** the central service is being
+**rewritten in Python/FastAPI** (mirrors SMS RAG; the AI-quality roadmap is Python-first) — see
+`docs/CHATBOT-PYTHON-PORT-PLAN.md`. New order after Stage 5: **5-PORT** (Python rewrite) →
+**5-TOOLS** (per-tool coverage of all 30 — THE PRIORITY; only 6/30 were tested; any tool that
+can't restrict to the caller's vessel is must-fix-or-disable before pilot) → **5-SCALE**
+(pool 5→20, Postgres rate limiter, OpenAI 429 handling, load test) → then Stage 6 console (now
+built in Python) → Stage 7. Purchasing (Shipskart, third-party) and Noon Report (not live yet)
+are **deliberate exclusions**, not gaps — the assistant redirects rather than saying "not
+documented". The Node central service (`central-assistant/`) becomes reference-only once the
+Python cutover proves out; the Node module-side Data API in Technical is unaffected.
+
 ## ONE-PAGE SUMMARY (for Sahil / Vimal)
 
 **What we are building.** One AI assistant for all SAIL modules. Today's chatbot lives only
