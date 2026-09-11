@@ -129,9 +129,10 @@ Every existing suite must pass against the Python service on the pilot, plus the
 
 ## P4 — Keeping the service LIVE on the interim URL during the switch
 
-No blackout. The Python service is stood up on a **different local port (8013)** beside the
-running Node one (8012); nginx keeps pointing at 8012. When the Python service passes the full
-suite on 8013, a **one-line nginx `proxy_pass` change 8012 → 8013 + reload** cuts over
+No blackout. The Python service is stood up on a **different local port (8015 — not 8013/8014:
+`safelanes.conf` still routes the retired v1.5 bots' `/maran/*` and `/osm/*` paths there)**
+beside the running Node one (8012); nginx keeps pointing at 8012. When the Python service
+passes the full suite on 8015, a **one-line nginx `proxy_pass` change 8012 → 8015 + reload** cuts over
 atomically; the Node container stays warm for instant rollback (flip the line back). Once the
 Python service has run clean for the pilot window, the Node container is retired. Same
 lever-based approach we used for the graphai→viqmap move.
@@ -139,6 +140,13 @@ lever-based approach we used for the graphai→viqmap move.
 ## P5 — Sequence (owner-set order: port → coverage → pilot fixes → console)
 
 **Stage 5-PORT — Python/FastAPI rewrite** *(M, ~3–5 d)* — **as few simultaneous changes as possible**
+> **STATUS 11-Sep-2026 (PROVEN):** built (`central-assistant-py/`), running on the AI server at
+> `127.0.0.1:8015` beside Node on 8012. `sail-assistant-db` swapped to `pgvector/pgvector:pg16`
+> (restored from dump; alpine container kept stopped for rollback); 907/907 chunks migrated
+> (per-module tally identical). Re-proven on Python: smoke 18/18 (0 misrouted, matrix identical) ·
+> stage2 16/16 (Postgres limiter exact 5-of-35) · parity 22/22 · redirect gate 3/3 zero-LLM ·
+> captured OpenAI wire 0/18 real fleet names, 68 tokens · pytest 28 · ruff/mypy clean.
+> **Awaiting owner GO for the nginx cutover (8012 → 8015).** Dedicated key: not yet received.
 Day one: §S.1 spike → decision. Then port P2; carry P1; pgvector rides along (§S.2) because
 retrieval is rewritten anyway; **dedicated OpenAI key installed here, borrowed key retired**;
 stand up on :8013; all existing suites green on Python; nginx cutover; Node retired after the
