@@ -69,7 +69,8 @@ async def health() -> dict[str, Any]:
         chunks = await db.chunk_count()
     except Exception:
         chunks = None
-    return {"ok": True, "store": "pgvector", "chunks": chunks, "db": "connected" if db_ok else "unreachable", "llmCalls": llm.llm_calls}
+    return {"ok": True, "store": "pgvector", "indexSet": settings().assistant_index_set, "chunks": chunks,
+            "db": "connected" if db_ok else "unreachable", "llmCalls": llm.llm_calls}
 
 
 # ── admin (nginx denies publicly; tunnel-only) ─────────────────────────────────────

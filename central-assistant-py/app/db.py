@@ -134,7 +134,8 @@ class Hit:
 
 async def chunk_count() -> int:
     async with engine().connect() as c:
-        return int((await c.execute(text("SELECT count(*) FROM assistant_chunks"))).scalar_one())
+        return int((await c.execute(text("SELECT count(*) FROM assistant_chunks WHERE index_set=:s"),
+                                    {"s": settings().assistant_index_set})).scalar_one())
 
 
 async def search_chunks(embedding: list[float], top_k: int) -> list[Hit]:
@@ -148,7 +149,8 @@ async def search_chunks(embedding: list[float], top_k: int) -> list[Hit]:
         rows = await c.execute(text(
             "SELECT module, file, section_title, breadcrumb, metadata, content, "
             "power(embedding <-> CAST(:q AS vector), 2) AS distance "
-            "FROM assistant_chunks ORDER BY embedding <-> CAST(:q AS vector) LIMIT :k"), {"q": q, "k": top_k})
+            "FROM assistant_chunks WHERE index_set=:s ORDER BY embedding <-> CAST(:q AS vector) LIMIT :k"),
+            {"q": q, "k": top_k, "s": settings().assistant_index_set})
         out: list[Hit] = []
         for r in rows:
             m = dict(r._mapping)

@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     chat_model: str = "gpt-4o-mini"
     embed_model: str = "text-embedding-3-large"
 
+    # knowledge store: which index set the service reads ('migrated' = the 907 chunks moved
+    # from Chroma; the Python indexer writes named sets — switch here after a measured comparison)
+    assistant_index_set: str = "migrated"
+
     # routing (§4.2) — unchanged thresholds; distance semantics kept = Chroma squared-L2
     route_sim_floor: float = 1.15
     route_margin: float = 0.07

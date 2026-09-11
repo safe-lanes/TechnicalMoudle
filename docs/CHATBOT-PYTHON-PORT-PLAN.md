@@ -146,7 +146,22 @@ lever-based approach we used for the graphai→viqmap move.
 > (per-module tally identical). Re-proven on Python: smoke 18/18 (0 misrouted, matrix identical) ·
 > stage2 16/16 (Postgres limiter exact 5-of-35) · parity 22/22 · redirect gate 3/3 zero-LLM ·
 > captured OpenAI wire 0/18 real fleet names, 68 tokens · pytest 28 · ruff/mypy clean.
-> **Awaiting owner GO for the nginx cutover (8012 → 8015).** Dedicated key: not yet received.
+> **CUT OVER 11-Sep 10:13 UTC (owner GO):** nginx `/assistant/` → 8015 (conf backed up as
+> `safelanes.conf.bak-cutover-py-20260911-1013`), proven from the public URL over real DNS
+> (`/health` → `store: pgvector, 907 chunks`; admin 403; unsigned chat 401). Node container kept
+> warm on 8012 for instant flip-back. Dedicated key: not yet received.
+
+**§G — Stage 5 gap, on the record (found during the port, closed by it).** The Stage 5 claim
+"nothing identifying reaches OpenAI" was **narrower than it read** for the docs-only path: the
+Node service masked the *embedding* input, but `answer()` sent the **raw user question** (plus
+the manual excerpts) to the chat completion unmasked — only the tool-loop path went through the
+masking choke point. A question that named the context vessel or the user therefore left
+unmasked on the documentation path. Evidence class: READ (server.mjs `answer()` built its own
+fetch with no masker call). The Python service has ONE choke point for both paths
+(`MaskingModel.request`), so the docs path is masked by construction; the proof is
+`central-assistant/docs-masking-suite.mjs` — captured wire bodies for a docs-only turn (no module
+API) must show the embedding input AND the chat question masked, with the real name restored to
+the user. Node is not fixed (retires at cutover; nobody on the interim URL — owner decision).
 Day one: §S.1 spike → decision. Then port P2; carry P1; pgvector rides along (§S.2) because
 retrieval is rewritten anyway; **dedicated OpenAI key installed here, borrowed key retired**;
 stand up on :8013; all existing suites green on Python; nginx cutover; Node retired after the
