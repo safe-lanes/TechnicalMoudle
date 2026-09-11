@@ -33,6 +33,50 @@ vi.mock('../../modules/sync', () => ({ logFieldChanges: vi.fn(async () => {}) })
 describe('legacy WO Pending Approval — malformed supplied dates are rejected', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('rejects a date-less Completed transition before RH audit or Work Order writes', async () => {
+    const { workOrderService } = await import('../workOrderService');
+    const { storage } = await import('../../storage');
+    (storage as any).getWorkOrder.mockResolvedValueOnce({
+      id: 'wo-1', workOrderNo: 'WO-1', vesselId: 'v-1', status: 'Pending Approval',
+      dateCompleted: null, completionDateTime: null,
+    });
+
+    await expect(workOrderService.updateWorkOrder('wo-1', {
+      status: 'Completed',
+    } as any)).rejects.toThrow('completion date is required');
+
+    expect((storage as any).createRunningHoursAudit).not.toHaveBeenCalled();
+    expect((storage as any).updateWorkOrder).not.toHaveBeenCalled();
+  });
+
+  it('retains an existing final date for a status-only Completed update', async () => {
+    const { workOrderService } = await import('../workOrderService');
+    const { storage } = await import('../../storage');
+    (storage as any).getWorkOrder.mockResolvedValueOnce({
+      id: 'wo-1', workOrderNo: 'WO-1', vesselId: 'v-1', status: 'Pending Approval',
+      dateCompleted: '10-09-2026', completionDateTime: null,
+    });
+
+    await workOrderService.updateWorkOrder('wo-1', { status: 'Completed' } as any);
+
+    expect((storage as any).updateWorkOrder).toHaveBeenCalledWith('wo-1', {
+      status: 'Completed',
+      dateCompleted: '10-09-2026',
+    });
+  });
+
+  it('rejects an invalid numeric completion timestamp before persistence', async () => {
+    const { workOrderService } = await import('../workOrderService');
+    const { storage } = await import('../../storage');
+
+    await expect(workOrderService.updateWorkOrder('wo-1', {
+      status: 'Completed',
+      dateCompleted: '10-09-2026T99:99',
+    } as any)).rejects.toThrow('valid completion date');
+
+    expect((storage as any).updateWorkOrder).not.toHaveBeenCalled();
+  });
+
   it('rejects a malformed dateOfCompletion with NO audit write and NO WO update', async () => {
     const { workOrderService } = await import('../workOrderService');
     const { storage } = await import('../../storage');

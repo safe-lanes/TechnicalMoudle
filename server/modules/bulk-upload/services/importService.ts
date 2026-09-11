@@ -22,6 +22,7 @@ import { applyAssignmentSync } from '../../work-orders/services/workOrderService
 import * as woRepo from '../../work-orders/repositories/workOrderRepository';
 import { logFieldChangesBatch, logFieldChanges } from '../../sync';
 import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
+import { ensureCompletedWorkOrderDate } from '../../work-orders/utils/completedWorkOrderDate';
 
 
 export interface SpareInventoryResult {
@@ -1588,7 +1589,6 @@ export async function performImport(
           runningHours: rhAtCompletion || undefined,         // text("running_hours") — RH at completion
           dueRhSnapshot: dueRhSnapshot ? parseFloat(dueRhSnapshot) || undefined : undefined, // decimal
         };
-
         if (!existingWO) {
           if (mode === 'update') {
             // update-only mode: skip if WO doesn't exist
@@ -1597,6 +1597,7 @@ export async function performImport(
             _emitProgress('Processing WO History…');
             continue;
           }
+          ensureCompletedWorkOrderDate(null, woPayload);
           savedWO = await storage.createWorkOrder(woPayload);
           woByNumber.set(woNumber, savedWO);
           // Field-log the full-row CREATE so this bulk-imported WO syncs (direct logFieldChanges;
@@ -1615,6 +1616,7 @@ export async function performImport(
             _emitProgress('Processing WO History…');
             continue;
           }
+          ensureCompletedWorkOrderDate(existingWO, woPayload);
           savedWO = await storage.updateWorkOrder(existingWO.id, woPayload);
           woByNumber.set(woNumber, savedWO);
           result.updated++;

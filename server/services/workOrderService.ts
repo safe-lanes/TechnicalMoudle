@@ -8,6 +8,7 @@ import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from
 import { jobService } from "./jobService";
 import { logFieldChanges } from "../modules/sync";
 import { parseWorkOrderDate } from "@shared/workOrders/dateParse";
+import { ensureCompletedWorkOrderDate } from "../modules/work-orders/utils/completedWorkOrderDate";
 import { 
   isBlockingStatus, 
   isCompletedStatus,
@@ -254,6 +255,7 @@ export class WorkOrderService {
       workOrderData.templateCode = workOrderData.workOrderNo;
     }
 
+    ensureCompletedWorkOrderDate(null, workOrderData);
     const createdWO = await storage.createWorkOrder(workOrderData);
 
     // Sync field logging — log the INSERT so ship→shore sync picks up
@@ -286,6 +288,12 @@ export class WorkOrderService {
    */
   async updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder> {
     const updatesAny = updates as any;
+    const existingWO = await storage.getWorkOrder(id);
+
+    // Validate the final state before this legacy path performs any RH audit
+    // work. It also retains a valid stored final date if a partial Completed
+    // update omits it.
+    ensureCompletedWorkOrderDate(existingWO, updatesAny);
 
     // Layer 7: When transitioning to Pending Approval with RH data, apply isolation logic
     if (updatesAny.status === 'Pending Approval' && updatesAny.currentReading) {
@@ -304,7 +312,7 @@ export class WorkOrderService {
         }
 
         try {
-          const wo = await storage.getWorkOrder(id);
+          const wo = existingWO;
           if (wo) {
             const { validateRHEntry, getCurrentRH } = await import('../modules/running-hours/services/rhTimelineValidationService');
             const allComponents = wo.vesselId ? await storage.getComponents(wo.vesselId) : [];

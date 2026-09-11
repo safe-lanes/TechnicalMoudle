@@ -12,6 +12,10 @@ import { getPool } from '../../db';
 import { getTableSyncConfig, getIdentityColumn } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
 import { safeParseDate } from '../running-hours/utils/rhValidation';
+import {
+  isCompletedWorkOrderStatus,
+  isValidCompletedWorkOrderDate,
+} from '../work-orders/utils/completedWorkOrderDate';
 
 interface ApplyResult {
   inserted: number;
@@ -992,6 +996,27 @@ export async function applyFieldLogInserts(
         rowData['id'] = `WO-SYNC-${rowUuid}`;
       }
 
+      // A complete-row sync insert must never introduce Completed without a
+      // reliable final date. Preserve the sender's final date; only fall back
+      // to its existing execution timestamp when date_completed is absent.
+      if (tableName === 'work_orders' && isCompletedWorkOrderStatus(rowData['status'])) {
+        if (!isValidCompletedWorkOrderDate(rowData['date_completed'])) {
+          if (isValidCompletedWorkOrderDate(rowData['completion_date_time'])) {
+            rowData['date_completed'] = rowData['completion_date_time'];
+          } else {
+            const msg = `${tableName}.${rowUuid}: Completed row has no valid date_completed or completion_date_time`;
+            errors.push(msg);
+            needsFullRows.push({ tableName, rowUuid });
+            failedRowUuids.push(rowUuid);
+            syncDiag(`FIELD-LOG-INSERT DEFER COMPLETED: ${msg}`);
+            if (externalClient) {
+              try { await pool.query(`RELEASE SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+            }
+            continue;
+          }
+        }
+      }
+
       // ── NOT-NULL guard + full-row self-heal trigger (ALL row-absent INSERT builds) ──
       // Every path that reaches this INSERT build has already proven the row is ABSENT on the
       // receiver (exist-checks above). If the fabricated rowData is missing (or explicitly null
@@ -1425,7 +1450,8 @@ export async function applyFullRowsIfAbsent(
   const pool = await getPool();
   const meta = await getColumnMeta(pool, tableName);
 
-  for (const row of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+  for (const incomingRow of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+    let row = incomingRow;
     const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
     if (!identity) { out.errors.push(`${tableName}: row missing identity ${identityCol}`); continue; }
     try {
@@ -1437,6 +1463,17 @@ export async function applyFullRowsIfAbsent(
         out.skipped++;
         syncDiag(`SELF-HEAL SKIP (already present): ${tableName}.${identity}`);
         continue;
+      }
+      if (tableName === 'work_orders' && isCompletedWorkOrderStatus(row.status)) {
+        if (!isValidCompletedWorkOrderDate(row.date_completed ?? row.dateCompleted)) {
+          const executionDate = row.completion_date_time ?? row.completionDateTime;
+          if (!isValidCompletedWorkOrderDate(executionDate)) {
+            out.errors.push(`${tableName}.${identity}: Completed full row has no valid completion date`);
+            syncDiag(`SELF-HEAL DEFER COMPLETED: ${tableName}.${identity} has no valid completion date`);
+            continue;
+          }
+          row = { ...row, date_completed: executionDate };
+        }
       }
       // Build the INSERT column-name-mapped (order-safe); skip serial/identity integer PKs so
       // the receiver assigns its own (buildInsertParts also coerces json/array values).

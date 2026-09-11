@@ -21,6 +21,7 @@ import {
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { classifyApprovalTransition } from '../utils/approvalTransition';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
+import { ensureCompletedWorkOrderDate } from '../utils/completedWorkOrderDate';
 
 async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Promise<string | null> {
   if (!assignedTo) return null;
@@ -974,6 +975,7 @@ export async function createWorkOrder(body: any) {
 
   workOrderData = await applyAssignmentSync({ ...workOrderData });
 
+  ensureCompletedWorkOrderDate(null, workOrderData);
   const workOrder = await repo.create(workOrderData);
 
   // Sync field logging — log INSERT
@@ -1742,6 +1744,12 @@ export async function updateWorkOrder(id: string, body: any) {
       { code: 'OTHER_REASON_REMARKS_REQUIRED' }
     );
   }
+
+  // This is deliberately after an optional Level 2 review interception, so a
+  // request redirected to Pending Office Review retains the prior behavior.
+  // It is deliberately before the completion RH/audit work below, so a
+  // date-less final transition cannot leave those side effects behind.
+  ensureCompletedWorkOrderDate(existingWO, updateData);
 
   // === Task #240: MASTER RH Reading Sync (live completion path) ===
   // The web UI completes a WO via this PATCH approval transition (not POST /complete), so the

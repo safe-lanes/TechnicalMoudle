@@ -9,6 +9,7 @@ import { logFieldChanges } from '../../sync';
 import { isShipInstance } from '../../sync/syncRole';
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
+import { ensureCompletedWorkOrderDate } from '../utils/completedWorkOrderDate';
 
 // ── Complete Work Order ──
 
@@ -66,6 +67,14 @@ export async function completeWorkOrder(
   if (!workOrder) {
     throw new NotFoundError('Work order not found');
   }
+  // Validate the final state before component lookup, RH processing, claims,
+  // or audits. The date chosen here is reused in the eventual update, so a
+  // rejected completion cannot leave operational RH side effects behind.
+  const finalCompletionDate = ensureCompletedWorkOrderDate(workOrder, {
+    status: 'Completed',
+    dateCompleted: dateOfCompletion,
+  }).dateCompleted;
+
   const vesselCode = workOrder.vesselId
     ? (await repo.getStorage().getVessel(workOrder.vesselId))?.vCode
     : undefined;
@@ -554,10 +563,10 @@ export async function completeWorkOrder(
 
   const originalDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
 
-  const updatedWorkOrder = await repo.update(workOrderId, {
+  const completionUpdate = {
     ...executionData,
     runningHoursAtCompletion: runningHours ? parseInt(runningHours) : undefined,
-    dateCompleted: dateOfCompletion,
+    dateCompleted: finalCompletionDate,
     status: 'Completed',
     missedCycles,
     originalDueDate,
@@ -577,7 +586,8 @@ export async function completeWorkOrder(
     rhBackdatedEntry: rhBackdatedSkipped ? true : undefined,
     // Save as Draft (Task #402): completion supersedes any stashed draft.
     draftExecutionData: null
-  });
+  };
+  const updatedWorkOrder = await repo.update(workOrderId, completionUpdate);
 
   // Sync field logging — log completion UPDATE
   try {

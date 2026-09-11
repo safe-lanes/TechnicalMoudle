@@ -34,6 +34,7 @@ import { getPool } from '../../db';
 import { syncDiag } from './syncDiagLogger';
 import { isShipInstanceId } from './syncRole';
 import { shouldRetryUnknownSyncColumn } from './unknownColumnRetryPolicy';
+import { ensureDateBeforeSyncedCompletedStatus } from './completedWorkOrderDateSync';
 
 // ── Configuration ──
 
@@ -1083,6 +1084,11 @@ export class SyncEngine {
               }
             }
             } // end !dualBypassGuardsPull
+            await ensureDateBeforeSyncedCompletedStatus(
+              client,
+              log,
+              dualCtxPull.incomingCompletionDateByRow.get(log.rowUuid) ?? null,
+            );
             await this.applyFieldLog(log, client);
             try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
             totalPulled++;

@@ -6,6 +6,7 @@ import { invalidateComplianceCache } from './complianceAnomalyService';
 import { logFieldChanges } from '../../sync';
 import { finalizeWorkOrderCompletion } from './workOrderCompletionService';
 import { isSuperintendentLockEnabled } from './workOrderService';
+import { ensureCompletedWorkOrderDate } from '../utils/completedWorkOrderDate';
 
 // ── Bulk Approve Work Orders ──
 
@@ -178,6 +179,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         updateData.dateCompleted = actualCompletionDate;
       }
 
+      ensureCompletedWorkOrderDate(existingWO, updateData);
       await repo.update(workOrderId, updateData);
 
       // Sync field logging — bulk approve
@@ -291,6 +293,7 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     updateData.dateCompleted = actualCompletionDate;
   }
 
+  ensureCompletedWorkOrderDate(existingWO, updateData);
   await repo.update(workOrderId, updateData);
 
   try {

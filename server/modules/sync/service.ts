@@ -24,6 +24,10 @@ import * as alertsRepo from '../alerts/repositories/alertsRepository';
 import { getFieldDisplayName } from './conflictReviewRepository';
 import { safeParseDate } from '../running-hours/utils/rhValidation';
 import { shouldRetryUnknownSyncColumn } from './unknownColumnRetryPolicy';
+import {
+  COMPLETED_DATE_SYNC_ERROR,
+  ensureDateBeforeSyncedCompletedStatus,
+} from './completedWorkOrderDateSync';
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER — Vessel UUID ↔ vessel_code lookup
@@ -517,6 +521,12 @@ export async function receivePushData(
               }
             }
 
+            await ensureDateBeforeSyncedCompletedStatus(
+              client,
+              log,
+              dualCtxPush.incomingCompletionDateByRow.get(log.rowUuid) ?? null,
+            );
+
             // Use the log's changedAt for updated_at — trigger bypass ensures it sticks.
             const updateResult = await client.query(
               `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
@@ -612,6 +622,9 @@ export async function receivePushData(
               syncDiag(`RECEIVE UPDATE IMMUTABLE-ACK (terminal): ${log.tableName}.${log.fieldName} row=${log.rowUuid} — ${(err.message || '').substring(0, 120)}`);
               console.warn(`[Sync Push] Immutable-table UPDATE rejected — acked as terminal (not retried): ${log.tableName}.${log.fieldName} row=${log.rowUuid}`);
             } else {
+              if (err.code === COMPLETED_DATE_SYNC_ERROR) {
+                droppedRowUuids.add(log.rowUuid);
+              }
               console.error(`[Sync Push] Failed to apply field log ${log.tableName}.${log.fieldName} for ${log.rowUuid}: ${err.message}`);
             }
           }
