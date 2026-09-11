@@ -1,12 +1,14 @@
 # SAIL AI Assistant — API Contract & Embedding Guide
 
-**Base URL (INTERIM):** `https://viqmap.sl-sail.com/assistant` — live and publicly
-verified over real DNS (10-Sep-2026): TLS, health, admin surface blocked, grounded
-answers. This rides the viqmap host **temporarily by owner decision**; the permanent
-home is `assistant.sl-sail.com` (A record → 13.250.51.71, to be created by the owner),
-at which point the nginx block, this Base URL, and the widget default move together.
-(An earlier revision published `graphai.sl-sail.com`, which has no public DNS record —
-retracted and corrected.)
+**Base URL:** `https://assistant.sl-sail.com` — the permanent home, live and publicly
+verified over real DNS (11-Sep-2026): Let's Encrypt TLS (auto-renew verified), health,
+admin surface blocked (403), unsigned chat refused (401). The interim
+`https://viqmap.sl-sail.com/assistant` still answers during the transition and will be
+removed once no client build references it. (An earlier revision published
+`graphai.sl-sail.com`, which has no public DNS record — retracted and corrected.)
+**Service:** Python/FastAPI on Pydantic AI with the knowledge store in pgvector
+(`docs/CHATBOT-PYTHON-PORT-PLAN.md` §S) — same contract as the Node original it replaced
+on 11-Sep-2026; nothing below changed shape.
 **Status:** service functional (documentation answers for all five modules); live-data
 answers activate per module once that module deploys its Data API and the service is
 configured to reach it (§4).
@@ -137,7 +139,7 @@ and `server/modules/assistant-api/identityToken.ts` (TS) — same wire format.
 | | `ASSISTANT_MODULE_APIS` | `{"technical":{"url":"https://dev.sl-sail.com/technical/api","secret":"…"}}` — per-module data APIs; omit a module → docs-only for it |
 | Module backend (PM2 env, e.g. Technical dev) | `ASSISTANT_SERVICE_SECRET` | Locks manifest/execute to the central service |
 | | `ASSISTANT_IDENTITY_SIGNING_KEY` | SAME value as the service's signing key |
-| App client build | `VITE_ASSISTANT_CENTRAL_URL` | The assistant base URL (optional — defaults to the interim URL above) |
+| App client build | `VITE_ASSISTANT_CENTRAL_URL` | The assistant base URL (optional — defaults to `https://assistant.sl-sail.com`) |
 
 To bring live-data answers to an environment: deploy the module build containing its
 Data API, set the two PM2 values, add the module to `ASSISTANT_MODULE_APIS`, restart

@@ -18,11 +18,11 @@
  * the minted token (x-assistant-identity).
  */
 
-// INTERIM public home (owner decision 10-Sep-2026): the assistant rides the
-// viqmap host until the assistant.sl-sail.com DNS record is created — then this
-// default, the nginx block, and the docs move together. Publicly verified over
-// real DNS (health + admin-block + grounded answer) before this default was set.
-export const DEFAULT_CENTRAL_URL: string | null = 'https://viqmap.sl-sail.com/assistant';
+// Permanent public home (A record created by the owner 11-Sep-2026). Publicly
+// verified over real DNS — TLS chain, health, admin blocked, unsigned chat refused —
+// before this default was set. The interim viqmap.sl-sail.com/assistant path still
+// answers during the transition; VITE_ASSISTANT_CENTRAL_URL / localStorage override.
+export const DEFAULT_CENTRAL_URL: string | null = 'https://assistant.sl-sail.com';
 
 export interface AssistantContext {
   module: string;

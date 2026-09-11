@@ -66,6 +66,57 @@ Today the indexer is a *copy* of SMS RAG's `indexer_unified_refactored.py`, env-
 2. **Ongoing indexing:** parse (LlamaParse agentic) + chunk + embed stages are unchanged; the Chroma `upsert` becomes a Postgres `INSERT … ON CONFLICT (chunk_id) DO UPDATE`. `tag-modules.py` (prefix-derived module tag) becomes one `UPDATE`.
 3. **Retire:** `technical-chromadb` container + `technical_chroma_data` volume, only after the smoke set passes on pgvector and the Node service is gone (Node still reads Chroma until cutover).
 
+**S.2 as built (11-Sep, owner ask "the port is not done until new documents can be added"):**
+
+- **What produced the current 907 chunks (PROVEN from `rag/dev/tools/indexer_unified_refactored.py`
+  + the stored chunk metadata `llamaparse_tier=agentic, llamaparse_version=latest`):** LlamaParse
+  **v2** (`/api/v2/parse/upload`, tier *agentic*, markdown output with page map) for PDF **and**
+  DOCX, then a custom chunker — split each page's markdown by headings (text before the first
+  heading = "Preamble"), cut sections into ~1200-char windows with 150 overlap, content-derived
+  sha1 ids, metadata `file/slug_url/breadcrumb/section_title/page_number/chunk_index` — then
+  OpenAI `text-embedding-3-large`. Not basic extraction. The Python indexer keeps exactly this.
+- **Schema (Alembic 0002 + 0004):** `assistant_chunks(index_set, id) PK · module · file ·
+  section_title · breadcrumb · page_number · chunk_index · content · metadata jsonb ·
+  embedding vector(3072) · tsv tsvector (generated, unused for ranking yet)`; b-tree on
+  `(index_set, file)` and `module`, GIN on `tsv`. `assistant_documents(index_set, file) PK ·
+  sha256 · chunks · pages · stub · parser tier/version · embed_model · indexed_at` = the manifest.
+- **Vector index:** none, deliberately. 907 rows scan in <1 ms; pgvector's HNSW/IVFFlat cap the
+  `vector` type at 2000 dims and ours are 3072. If the corpus ever grows into the tens of
+  thousands, the route is a `halfvec(3072)` expression index (HNSW, cosine) — a one-line
+  migration, no re-embed.
+- **Single-manual re-index — yes:** `index_documents.py --index-set <set> --only "<file>"`
+  replaces that file's rows inside one transaction (DELETE file-in-set → INSERT → UPSERT manifest);
+  nothing else is touched; unchanged files (same sha256) are skipped unless `--force`. Adding the
+  Noon Report manual when the module ships = drop the file in `documents/`, run with `--only`.
+- **Index sets:** the service reads ONE set (`ASSISTANT_INDEX_SET`, default `migrated`). A fresh
+  re-index lands in a named set beside it; `compare_sets.py` measures both (per-document chunk
+  counts, <100-char chunks, pages; the 18 smoke queries routed against a service instance per
+  set); the switch is an env change after the measurement, not before.
+
+**S.2 re-index comparison — MEASURED 11-Sep-2026 (PROVEN), verdict: STAY ON `migrated`.**
+Full fresh re-index of all 25 manuals through the Python indexer (LlamaParse v2 *agentic*,
+`latest`, LlamaCloud cache bypassed) → set `py-llamaparse`: 25/25 parsed, 0 failures, **908
+chunks vs 907**, per-document counts within ±3 except Risk Assessment Office (+8) — parse
+structurally the same (same page counts everywhere; <100-char chunks 86 vs 90).
+*Retrieval, same 18 smoke queries, routeOnly, one service instance per set:* **migrated 18/18 ·
+py-llamaparse 15/18.** The new set drops two Audit queries into the *clarify* gate ("prepare for
+an upcoming audit" margin 0.004 Audit/Technical; "history of past audits" margin 0.032
+Audit/Technical/Crewing), cites the wrong Incident manual once, and its routing margins collapse
+on three more queries (fleet sharing 1.00→0.20, fleet notifications 1.00→0.17, add crew member
+1.00→0.14). Off-topic gates unchanged. Canonical `smoke-suite.mjs` on the new set: 2/18
+misrouted, 3 failures (0/18, 0 failures on migrated).
+*Why (INFERRED):* same tier and same chunker, but LlamaParse `latest` moved between July and
+September — the new markdown carries more inline HTML (416 vs 360 chunks contain tags) and
+slightly different section boundaries, which shifts embeddings enough to blur the Audit vs
+Technical margin. The indexer is not at fault (chunk-for-chunk parity tests pass); the parser
+output drifted.
+*Decision:* the live service stays on `migrated` (the owner's rule: switch only when the new set
+proves at least equal — it does not). The `py-llamaparse` set is kept in the DB for the follow-up.
+*Follow-up (own measured step, not now):* pin a LlamaParse `version` instead of `latest`, and/or
+strip inline HTML before chunking; re-run the same comparison; switch only on ≥ 18/18. New
+manuals (e.g. Noon Report) index into `migrated` via `--only` with the current pipeline — the
+indexer path itself is proven end to end.
+
 **What this does NOT change:** the module-side Data API (Node, in Technical), the HTTP contracts,
 the identity token format, nginx/TLS/URL, the masking design and its captured-payload proof
 standard, the 30-tool coverage priority. The stack is chosen *for* those, not instead of them.
@@ -150,6 +201,11 @@ lever-based approach we used for the graphai→viqmap move.
 > `safelanes.conf.bak-cutover-py-20260911-1013`), proven from the public URL over real DNS
 > (`/health` → `store: pgvector, 907 chunks`; admin 403; unsigned chat 401). Node container kept
 > warm on 8012 for instant flip-back. Dedicated key: not yet received.
+> **PERMANENT HOME LIVE 11-Sep 11:02 UTC:** owner created the A record; `assistant.sl-sail.com`
+> now serves the service (own nginx conf `conf.d/assistant.conf`, Let's Encrypt cert to
+> 2026-12-10, renewal dry-run OK), proven from the public internet: health, landing 200, admin
+> 403, unsigned 401, http→https 301, TLS chain valid. Widget default + API doc moved to it; the
+> interim viqmap path stays up during the transition.
 
 **§G — Stage 5 gap, on the record (found during the port, closed by it).** The Stage 5 claim
 "nothing identifying reaches OpenAI" was **narrower than it read** for the docs-only path: the

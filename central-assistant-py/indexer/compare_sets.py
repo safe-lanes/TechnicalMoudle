@@ -75,8 +75,14 @@ async def db_part(a: str, b: str) -> None:
     print(f"  {'TOTAL':<62} {ta:>4} / {sa:>2}                 |  {tb:>4} / {sb:>2}")
 
 
+_n = 0
+
+
 async def ask(client: httpx.AsyncClient, base: str, key: str, q: str) -> dict:
-    tok = sign_identity({"userId": "compare", "userName": "Compare", "role": "Sail Admin", "tenantDomain": "smoke-suite-tenant"}, key, 60)
+    # unique user per request: the per-user limiter (30/min) would otherwise clip a 40-request comparison
+    global _n
+    _n += 1
+    tok = sign_identity({"userId": f"compare-{_n}", "userName": "Compare", "role": "Sail Admin", "tenantDomain": "smoke-suite-tenant"}, key, 60)
     r = await client.post(f"{base}/chat", headers={"x-assistant-identity": tok}, json={"message": q, "routeOnly": True, "context": {"module": "technical"}})
     return r.json()
 
@@ -86,7 +92,10 @@ def _fmt(j: dict, em: str, eman: str) -> tuple[str, bool]:
     top = (j.get("citations") or [{}])[0] if j.get("citations") else {}
     man, dist = top.get("manual", "-"), top.get("distance", "-")
     good = j.get("gate") == "answer" and mod == em and eman in man
-    return f"{'✓' if mod == em else '✗'}{'✓' if eman in man else '✗'} m={j.get('confidence', '-')} d={dist}", good
+    conf = j.get("confidence", "-")
+    conf = f"{conf:.3f}" if isinstance(conf, float) else conf
+    extra = f" clarify:{'/'.join(j.get('candidates', []))}" if j.get("gate") == "clarify" else ""
+    return f"{'✓' if mod == em else '✗'}{'✓' if eman in man else '✗'} m={conf} d={dist}{extra}", good
 
 
 async def retrieval_part(a: str, b: str, sa: str, sb: str) -> None:
