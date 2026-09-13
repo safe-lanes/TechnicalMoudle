@@ -130,6 +130,7 @@ import {
   type CompanyStandardGraceSettings,
   type InsertCompanyStandardGraceSettings,
   type CompanyApprovalSettings,
+  type DefectApprovalSettings,
   makerList,
   type MakerList,
   type InsertMakerList,
@@ -790,6 +791,15 @@ export interface IStorage {
   // Company Approval Settings - Singleton approval policy (superintendent lock toggle)
   getCompanyApprovalSettings(): Promise<CompanyApprovalSettings | undefined>;
   upsertCompanyApprovalSettings(settings: { superintendentLockEnabled: boolean; updatedBy?: string | null }): Promise<CompanyApprovalSettings>;
+
+  // Defects Approval Settings - shore-side singleton routing settings
+  getDefectApprovalSettings(): Promise<DefectApprovalSettings | undefined>;
+  upsertDefectApprovalSettings(settings: {
+    longExtensionDays: number;
+    showRejectedClosuresOnReport: boolean;
+    updatedByUuid?: string | null;
+  }): Promise<DefectApprovalSettings>;
+  hasActiveUserVesselAssignment(userUuid: string, vesselId: string): Promise<boolean>;
   
   // Maker List - Master data for manufacturers
   getMakerList(): Promise<MakerList[]>;

@@ -21,13 +21,15 @@
 import { AppError } from '../../shared/errors';
 import * as defectsRepo from '../repositories/defectsRepository';
 import {
-  DEFECTS_MODULE_ID, DEFECTS_EXTENSION_SCREEN, DEFECTS_VERIFICATION_SCREEN,
-  deciderIdentity, type DefectSubject,
+  DEFECTS_MODULE_ID, DEFECTS_EXTENSION_SCREEN, DEFECTS_REPEAT_EXTENSION_SCREEN,
+  DEFECTS_VERIFICATION_SCREEN, DEFECT_CLASS_CRITICAL, DEFECT_CLASS_NORMAL,
+  defectClassificationFactors, deciderIdentity, type DefectSubject,
 } from '../approvalCard';
 import {
-  scopeFor, engineSubmitOutcome, maybeEngineSubmitScoped,
-  maybeEngineDecideScoped, pendingEngineRequestScoped,
+  scopeFor, engineSubmitOutcome, maybeEngineSubmitScoped, activeWorkflowExistsScoped,
+  maybeEngineDecideScoped, pendingEngineRequestScoped, pendingEngineRequestInScopes,
 } from '../../approvals/engineGateway';
+import type { Scope } from '../../approval-engine';
 
 export interface DefectActor {
   userUuid?: string | null;
@@ -36,7 +38,9 @@ export interface DefectActor {
 }
 
 const extScope = () => scopeFor(DEFECTS_MODULE_ID, DEFECTS_EXTENSION_SCREEN);
+const repeatExtScope = () => scopeFor(DEFECTS_MODULE_ID, DEFECTS_REPEAT_EXTENSION_SCREEN);
 const verScope = () => scopeFor(DEFECTS_MODULE_ID, DEFECTS_VERIFICATION_SCREEN);
+const extensionScopes = (): Scope[] => [extScope(), repeatExtScope()];
 
 type ExtensionEntry = {
   id: string; existingTargetDate: string; newTargetDate: string; reasonForExtension: string;
@@ -45,6 +49,116 @@ type ExtensionEntry = {
   approved?: boolean; approvalDate: string; approverComments: string;
   electronicConfirmation?: string; requestedAt: string;
 };
+
+export interface DefectApprovalRouting {
+  scope: Scope;
+  classification: string;
+  factors: {
+    isCoC: boolean;
+    isCriticalComponent: boolean;
+    approvedExtensionCount: number;
+    currentTargetDate: string | null;
+    newTargetDate: string | null;
+    extensionDays: number | null;
+    longExtensionThreshold: number;
+    exceedsThreshold: boolean;
+  };
+  activeWorkflowExists: boolean;
+  fellBackFromRepeatScope: boolean;
+}
+
+const calendarDayNumber = (value: string): number => {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const display = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(value);
+  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const year = iso ? Number(iso[1]) : display ? Number(display[3]) : NaN;
+  const month = iso ? Number(iso[2]) : display ? months.indexOf(display[2].toLowerCase()) + 1 : NaN;
+  const day = iso ? Number(iso[3]) : display ? Number(display[1]) : NaN;
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day) || month < 1) {
+    throw new AppError(400, `Invalid date '${value}'; expected YYYY-MM-DD or DD-MMM-YYYY`);
+  }
+  const utc = Date.UTC(year, month - 1, day);
+  const check = new Date(utc);
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    throw new AppError(400, `Invalid calendar date '${value}'`);
+  }
+  return Math.floor(utc / 86_400_000);
+};
+
+/**
+ * Production and diagnostic routing share this function. It is called only when a request
+ * is about to be submitted; existing requests use their persisted apprv_requests scope.
+ */
+export async function resolveDefectApprovalRouting(
+  duuid: string,
+  action: 'extension' | 'verification',
+  newTargetDate: string | null,
+  actorUserId?: string | null,
+  options: { auditFallback?: boolean } = {},
+): Promise<DefectApprovalRouting> {
+  const defect: any = await defectsRepo.getDefect(duuid);
+  if (!defect) throw new AppError(404, `Defect ${duuid} not found`);
+  const subjectRef: string = defect.duuid;
+  const settings = await defectsRepo.getDefectApprovalSettings();
+  const threshold = settings?.longExtensionDays ?? 90;
+  const base = await defectClassificationFactors(subjectRef);
+  const entries: any[] = Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : [];
+  const approvedExtensionCount = entries.filter((entry) => (entry?.status ?? entry?.state) === 'Approved').length;
+  const currentTargetDate = defect.targetCloseDate || null;
+  let extensionDays: number | null = null;
+  if (action === 'extension') {
+    if (!currentTargetDate) throw new AppError(400, 'Current target date is required to route an extension');
+    if (!newTargetDate) throw new AppError(400, 'newTargetDate is required when action=extension');
+    extensionDays = calendarDayNumber(newTargetDate) - calendarDayNumber(currentTargetDate);
+  }
+  const exceedsThreshold = extensionDays !== null && extensionDays > threshold;
+  const classification = base.isCoC || base.isCriticalComponent || exceedsThreshold
+    ? DEFECT_CLASS_CRITICAL
+    : DEFECT_CLASS_NORMAL;
+  let scope = action === 'verification'
+    ? verScope()
+    : approvedExtensionCount > 0 ? repeatExtScope() : extScope();
+  let activeWorkflowExists = await activeWorkflowExistsScoped(scope, classification);
+  let fellBackFromRepeatScope = false;
+
+  if (scope.screenId === DEFECTS_REPEAT_EXTENSION_SCREEN && !activeWorkflowExists) {
+    fellBackFromRepeatScope = true;
+    const reason = `No active ${DEFECTS_REPEAT_EXTENSION_SCREEN} workflow for classification '${classification}'; using ${DEFECTS_EXTENSION_SCREEN}`;
+    console.warn(`[approvals] ${reason} (${subjectRef})`);
+    if (options.auditFallback !== false) {
+      await defectsRepo.createAuditLog({
+        userId: actorUserId || 'system',
+        entityType: 'defect_approval_routing',
+        entityId: subjectRef,
+        actionType: 'fallback',
+        fieldName: 'scope',
+        oldValue: DEFECTS_REPEAT_EXTENSION_SCREEN,
+        newValue: DEFECTS_EXTENSION_SCREEN,
+        source: 'system',
+        payload: { reason, classification },
+      });
+    }
+    scope = extScope();
+    activeWorkflowExists = await activeWorkflowExistsScoped(scope, classification);
+  }
+
+  return {
+    scope,
+    classification,
+    factors: {
+      isCoC: base.isCoC,
+      isCriticalComponent: base.isCriticalComponent,
+      approvedExtensionCount,
+      currentTargetDate,
+      newTargetDate: action === 'extension' ? newTargetDate : null,
+      extensionDays,
+      longExtensionThreshold: threshold,
+      exceedsThreshold,
+    },
+    activeWorkflowExists,
+    fellBackFromRepeatScope,
+  };
+}
 
 /** Part C1 closeout fields — writing/changing ANY of these is "performing closure". */
 const C1_FIELDS = [
@@ -90,14 +204,16 @@ export async function gateDefectUpdate(
       const pending = await pendingEngineRequestScoped(verScope(), duuid);
       if (pending) {
         // Approver's Verify click = the decision. Engine refuses non-approvers (403).
-        await maybeEngineDecideScoped(verScope(), duuid, 'approve', actor.userUuid || 'anonymous', out.approverComments ?? null);
+        const decided = await maybeEngineDecideScoped(verScope(), duuid, 'approve', actor.userUuid || 'anonymous', out.approverComments ?? null);
+        if (!decided) throw new AppError(409, 'The pending verification request changed; refresh and try again.', { code: 'APPROVAL_REQUEST_CHANGED' });
         stripVerifyFields(); // onDecision already wrote the verified fields (synced path)
       } else {
         const outcome = await engineSubmitOutcome(verScope(), duuid, subject, vesselId, actor.userUuid);
         if (outcome === 'STARTED' || outcome === 'ALREADY_PENDING') {
           // One-click for an authorised approver: decide the fresh chain immediately.
           try {
-            await maybeEngineDecideScoped(verScope(), duuid, 'approve', actor.userUuid || 'anonymous', out.approverComments ?? null);
+            const decided = await maybeEngineDecideScoped(verScope(), duuid, 'approve', actor.userUuid || 'anonymous', out.approverComments ?? null);
+            if (!decided) throw new AppError(409, 'The pending verification request changed; refresh and try again.', { code: 'APPROVAL_REQUEST_CHANGED' });
             stripVerifyFields();
           } catch (e: any) {
             if (e?.statusCode === 403) {
@@ -142,12 +258,24 @@ export async function gateDefectUpdate(
           continue; // engine is shore-only; the arrival sweep submits after sync
         }
         if (e.status === 'Requested') {
-          const subject: DefectSubject = { kind: 'defect-extension', duuid, extensionId: e.id };
-          postSave.push(async () => { await maybeEngineSubmitScoped(extScope(), duuid, subject, vesselId, actor.userUuid); });
+          const routing = await resolveDefectApprovalRouting(duuid, 'extension', e.newTargetDate, actor.userUuid);
+          if (routing.activeWorkflowExists && currentEntries.some((entry) => entry.status === 'Requested')) {
+            throw new AppError(409, 'An extension approval is already pending for this defect.', { code: 'EXTENSION_PENDING' });
+          }
+          const subject: DefectSubject = {
+            kind: 'defect-extension', duuid, extensionId: e.id, classification: routing.classification,
+          };
+          postSave.push(async () => { await maybeEngineSubmitScoped(routing.scope, duuid, subject, vesselId, actor.userUuid); });
         } else {
           // Created-and-self-approved in one save. Chain configured → force submit-only.
-          const subject: DefectSubject = { kind: 'defect-extension', duuid, extensionId: e.id };
-          const outcome = await engineSubmitOutcome(extScope(), duuid, subject, vesselId, actor.userUuid);
+          const routing = await resolveDefectApprovalRouting(duuid, 'extension', e.newTargetDate, actor.userUuid);
+          if (routing.activeWorkflowExists && currentEntries.some((entry) => entry.status === 'Requested')) {
+            throw new AppError(409, 'An extension approval is already pending for this defect.', { code: 'EXTENSION_PENDING' });
+          }
+          const subject: DefectSubject = {
+            kind: 'defect-extension', duuid, extensionId: e.id, classification: routing.classification,
+          };
+          const outcome = await engineSubmitOutcome(routing.scope, duuid, subject, vesselId, actor.userUuid);
           if (outcome === 'STARTED' || outcome === 'ALREADY_PENDING') downgradeToRequested(e);
           // fallback outcomes → legacy self-approve passes through byte-identically
         }
@@ -157,18 +285,28 @@ export async function gateDefectUpdate(
       if (!isDecision) continue; // non-status edits pass through
 
       if (onShip) throw new AppError(403, 'Extension approvals are decided ashore.', { code: 'EXTENSION_DECIDED_ASHORE' });
+      const governedEntry = currentEntries.find((entry) => entry.status === 'Requested');
+      if (governedEntry?.id !== e.id) {
+        throw new AppError(409, 'This extension is not the pending approval entry; refresh and decide the oldest pending extension.', { code: 'APPROVAL_REQUEST_CHANGED' });
+      }
 
       const decideAs = e.status === 'Approved' ? 'approve' as const : 'reject' as const;
-      const pending = await pendingEngineRequestScoped(extScope(), duuid);
-      if (pending) {
-        await maybeEngineDecideScoped(extScope(), duuid, decideAs, actor.userUuid || 'anonymous', e.approverComments ?? null);
+      const existing = await pendingEngineRequestInScopes(extensionScopes(), duuid);
+      if (existing) {
+        // Use the request's persisted scope. Never recompute from the now-mutable extension count.
+        const decided = await maybeEngineDecideScoped(existing.scope, duuid, decideAs, actor.userUuid || 'anonymous', e.approverComments ?? null);
+        if (!decided) throw new AppError(409, 'The pending extension request changed; refresh and try again.', { code: 'APPROVAL_REQUEST_CHANGED' });
         decisionApplied = true; // onDecision wrote the entry + side effects
       } else {
-        const subject: DefectSubject = { kind: 'defect-extension', duuid, extensionId: e.id };
-        const outcome = await engineSubmitOutcome(extScope(), duuid, subject, vesselId, actor.userUuid);
+        const routing = await resolveDefectApprovalRouting(duuid, 'extension', e.newTargetDate, actor.userUuid);
+        const subject: DefectSubject = {
+          kind: 'defect-extension', duuid, extensionId: e.id, classification: routing.classification,
+        };
+        const outcome = await engineSubmitOutcome(routing.scope, duuid, subject, vesselId, actor.userUuid);
         if (outcome === 'STARTED' || outcome === 'ALREADY_PENDING') {
           try {
-            await maybeEngineDecideScoped(extScope(), duuid, decideAs, actor.userUuid || 'anonymous', e.approverComments ?? null);
+            const decided = await maybeEngineDecideScoped(routing.scope, duuid, decideAs, actor.userUuid || 'anonymous', e.approverComments ?? null);
+            if (!decided) throw new AppError(409, 'The pending extension request changed; refresh and try again.', { code: 'APPROVAL_REQUEST_CHANGED' });
             decisionApplied = true;
           } catch (err: any) {
             if (err?.statusCode === 403) {
@@ -288,8 +426,15 @@ export async function sweepDefectsForApproval(vesselId: string): Promise<number>
   for (const d of rows) {
     const hasRequested = Array.isArray(d.targetDateExtensions) && d.targetDateExtensions.some((e: any) => e?.status === 'Requested');
     if (hasRequested) {
-      const extensionId = d.targetDateExtensions.find((e: any) => e?.status === 'Requested')?.id;
-      const requuid = await maybeEngineSubmitScoped(extScope(), d.duuid, { kind: 'defect-extension', duuid: d.duuid, extensionId } as DefectSubject, d.vesselId, null);
+      const extension = d.targetDateExtensions.find((e: any) => e?.status === 'Requested');
+      const routing = await resolveDefectApprovalRouting(d.duuid, 'extension', extension?.newTargetDate ?? null, null);
+      const subject: DefectSubject = {
+        kind: 'defect-extension',
+        duuid: d.duuid,
+        extensionId: extension?.id,
+        classification: routing.classification,
+      };
+      const requuid = await maybeEngineSubmitScoped(routing.scope, d.duuid, subject, d.vesselId, null);
       if (requuid) submitted++;
     }
     if (d.confirmCompleted === true && d.verified !== true) {

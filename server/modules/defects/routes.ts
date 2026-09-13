@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import { requirePermission } from '../../middleware/permissions';
+import { requireRole, requireVesselAccess } from '../../middleware/auth';
 import * as defectsCtrl from './controllers/defectsController';
 import * as adminCtrl from './controllers/defectAdminController';
 
@@ -36,6 +37,14 @@ router.get('/defects/count', asyncHandler(defectsCtrl.getDefectsCount));
 // GET  /defects/count/recurring — recurring defects count
 router.get('/defects/count/recurring', asyncHandler(defectsCtrl.getRecurringDefectsCount));
 
+// GET/PUT /defects/approval-settings — shore-side routing configuration
+router.get('/defects/approval-settings',
+  requireRole(['PMS Admin', 'Sail Admin', 'Super Admin']),
+  asyncHandler(defectsCtrl.getDefectApprovalSettings));
+router.put('/defects/approval-settings',
+  requireRole(['PMS Admin', 'Sail Admin', 'Super Admin']),
+  asyncHandler(defectsCtrl.updateDefectApprovalSettings));
+
 // POST /defects — create new defect
 router.post('/defects', asyncHandler(defectsCtrl.createDefect));
 
@@ -56,6 +65,13 @@ router.delete('/defects/actions/:actionId', asyncHandler(defectsCtrl.deleteDefec
 router.delete('/defects/attachments/:attachmentId', asyncHandler(defectsCtrl.deleteDefectAttachment));
 
 // ── Defects: Parameterized routes (CATCH-ALL — must be last) ──
+
+// GET /defects/:id/approval-routing — read-only preview used by the later form stage
+router.get('/defects/:id/approval-routing',
+  asyncHandler(defectsCtrl.loadDefectVesselAccess),
+  asyncHandler(defectsCtrl.enforceDefectVesselIdentity),
+  requireVesselAccess,
+  asyncHandler(defectsCtrl.getDefectApprovalRouting));
 
 // GET    /defects/:id — get single defect
 router.get('/defects/:id', asyncHandler(defectsCtrl.getDefect));

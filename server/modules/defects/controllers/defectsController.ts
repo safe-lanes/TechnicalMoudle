@@ -1,4 +1,6 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
+import { z } from 'zod';
+import { getRbacIdentity, type AuthenticatedRequest } from '../../../middleware/auth';
 import * as defectsService from '../services/defectsService';
 import type { DefectActor } from '../services/defectsApprovalHooks';
 
@@ -29,6 +31,20 @@ function sendDefectError(res: Response, error: any, fallback: string) {
   console.error(fallback, error);
   return res.status(500).json({ error: fallback });
 }
+
+const approvalSettingsBodySchema = z.object({
+  long_extension_days: z.number().int().min(1).max(3650),
+  show_rejected_closures_on_report: z.boolean(),
+});
+
+const approvalRoutingQuerySchema = z.object({
+  action: z.enum(['extension', 'verification']),
+  newTargetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).superRefine((value, ctx) => {
+  if (value.action === 'extension' && !value.newTargetDate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['newTargetDate'], message: 'newTargetDate is required for extension routing' });
+  }
+});
 
 // ── GET /defects ──
 
@@ -151,6 +167,73 @@ export async function getDefect(req: Request, res: Response) {
     res.json(defect);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch defect" });
+  }
+}
+
+export async function loadDefectVesselAccess(req: Request, res: Response, next: NextFunction) {
+  const defect: any = await defectsService.getDefect(req.params.id);
+  if (!defect) return res.status(404).json({ error: 'Defect not found' });
+  req.params.vesselId = defect.vesselId;
+  next();
+}
+
+/** Enforce the forwarded identity before the legacy requireVesselAccess compatibility guard. */
+export async function enforceDefectVesselIdentity(req: Request, res: Response, next: NextFunction) {
+  const identity = getRbacIdentity(req as AuthenticatedRequest);
+  if (identity.userType === 'Office' || ['PMS Admin', 'Sail Admin', 'Super Admin'].includes(identity.role ?? '')) {
+    return next();
+  }
+  if (identity.userType !== 'Ship') {
+    return res.status(403).json({ error: 'Forbidden - Vessel access requires a forwarded identity' });
+  }
+  const userUuid = (req as any).user?.userUuid;
+  const vesselId = req.params.vesselId;
+  if (!userUuid || !vesselId || !(await defectsService.hasActiveUserVesselAssignment(userUuid, vesselId))) {
+    return res.status(403).json({ error: 'Forbidden - Can only access data for assigned vessel' });
+  }
+  next();
+}
+
+export async function getDefectApprovalSettings(_req: Request, res: Response) {
+  try {
+    res.json(await defectsService.getDefectApprovalSettings());
+  } catch (error: any) {
+    return sendDefectError(res, error, 'Failed to fetch defect approval settings');
+  }
+}
+
+export async function updateDefectApprovalSettings(req: Request, res: Response) {
+  try {
+    const body = approvalSettingsBodySchema.parse(req.body);
+    const actor = (req as any).user?.userUuid ?? null;
+    res.json(await defectsService.updateDefectApprovalSettings({
+      longExtensionDays: body.long_extension_days,
+      showRejectedClosuresOnReport: body.show_rejected_closures_on_report,
+    }, actor));
+  } catch (error: any) {
+    return sendDefectError(res, error, 'Failed to update defect approval settings');
+  }
+}
+
+export async function getDefectApprovalRouting(req: Request, res: Response) {
+  try {
+    const query = approvalRoutingQuerySchema.parse(req.query);
+    const actor = (req as any).user?.userUuid ?? null;
+    const result = await defectsService.getDefectApprovalRouting(
+      req.params.id,
+      query.action,
+      query.newTargetDate ?? null,
+      actor,
+    );
+    res.json({
+      scope: result.scope.screenId,
+      classification: result.classification,
+      factors: result.factors,
+      activeWorkflowExists: result.activeWorkflowExists,
+      fellBackFromRepeatScope: result.fellBackFromRepeatScope,
+    });
+  } catch (error: any) {
+    return sendDefectError(res, error, 'Failed to resolve defect approval routing');
   }
 }
 

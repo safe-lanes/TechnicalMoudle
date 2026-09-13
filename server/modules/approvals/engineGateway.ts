@@ -103,6 +103,26 @@ export async function pendingEngineRequestScoped(scope: Scope, subjectRef: strin
   return rows.find((r) => r.status === 'pending') ?? null;
 }
 
+/** Read-only workflow existence check for module routing decisions. */
+export async function activeWorkflowExistsScoped(scope: Scope, classification: string): Promise<boolean> {
+  if (!engine) return false;
+  const rows = await engine.listWorkflows(engineCtx(null), scope);
+  return rows.some((row) => row.status === 'active' && row.classification === classification);
+}
+
+/**
+ * Find an existing pending request across known scopes. The returned request carries the
+ * scope persisted at submission time; callers must use that scope for decisions instead of
+ * recomputing routing from mutable subject data.
+ */
+export async function pendingEngineRequestInScopes(scopes: readonly Scope[], subjectRef: string) {
+  for (const scope of scopes) {
+    const pending = await pendingEngineRequestScoped(scope, subjectRef);
+    if (pending) return { scope: pending.scope, request: pending };
+  }
+  return null;
+}
+
 /**
  * Decide on the pending engine request for a subject, if one exists. Returns null when the
  * engine does not own this subject (caller runs the legacy path). The engine's own refusals

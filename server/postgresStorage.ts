@@ -12,6 +12,9 @@ import {
   companyStandardGraceSettings,
   companyApprovalSettings,
   type CompanyApprovalSettings,
+  defectApprovalSettings,
+  type DefectApprovalSettings,
+  masterUserVessels,
   makers,
   masterLists,
   masterListTypes,
@@ -9010,6 +9013,52 @@ export class PostgresStorage {
         .returning();
       return result[0];
     }
+  }
+
+  async getDefectApprovalSettings(): Promise<DefectApprovalSettings | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(defectApprovalSettings)
+      .where(eq(defectApprovalSettings.singletonKey, 'default'))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertDefectApprovalSettings(settings: {
+    longExtensionDays: number;
+    showRejectedClosuresOnReport: boolean;
+    updatedByUuid?: string | null;
+  }): Promise<DefectApprovalSettings> {
+    const db = await getDb();
+    const values = {
+      longExtensionDays: settings.longExtensionDays,
+      showRejectedClosuresOnReport: settings.showRejectedClosuresOnReport,
+      updatedByUuid: settings.updatedByUuid ?? null,
+      updatedAt: new Date(),
+    };
+    const result = await db.insert(defectApprovalSettings)
+      .values({
+        singletonKey: 'default',
+        ...values,
+        createdByUuid: settings.updatedByUuid ?? null,
+      })
+      .onConflictDoUpdate({
+        target: defectApprovalSettings.singletonKey,
+        set: values,
+      })
+      .returning();
+    return result[0];
+  }
+
+  async hasActiveUserVesselAssignment(userUuid: string, vesselId: string): Promise<boolean> {
+    const db = await getDb();
+    const result = await db.select({ id: masterUserVessels.id }).from(masterUserVessels)
+      .where(and(
+        eq(masterUserVessels.userUuid, userUuid),
+        eq(masterUserVessels.vesselId, vesselId),
+        eq(masterUserVessels.isActive, true),
+      ))
+      .limit(1);
+    return result.length > 0;
   }
 
   // ============= FLEET MANAGEMENT =============

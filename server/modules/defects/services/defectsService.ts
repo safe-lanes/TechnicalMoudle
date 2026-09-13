@@ -28,6 +28,54 @@ export async function getDefect(id: string) {
   return defectsRepo.getDefect(id);
 }
 
+export async function getDefectApprovalSettings() {
+  const settings = await defectsRepo.getDefectApprovalSettings();
+  if (!settings) {
+    throw Object.assign(new Error('Defect approval settings row not found; run the generated migration'), { statusCode: 500 });
+  }
+  return settings;
+}
+
+export async function updateDefectApprovalSettings(
+  values: { longExtensionDays: number; showRejectedClosuresOnReport: boolean },
+  actorUserId?: string | null,
+) {
+  const previous = await getDefectApprovalSettings();
+  const updated = await defectsRepo.upsertDefectApprovalSettings({
+    ...values,
+    updatedByUuid: actorUserId ?? null,
+  });
+  await defectsRepo.createAuditLog({
+    userId: actorUserId || 'system',
+    entityType: 'defect_approval_settings',
+    entityId: updated.dasuuid,
+    actionType: 'update',
+    fieldName: 'approval_settings',
+    oldValue: JSON.stringify({
+      longExtensionDays: previous.longExtensionDays,
+      showRejectedClosuresOnReport: previous.showRejectedClosuresOnReport,
+    }),
+    newValue: JSON.stringify(values),
+    source: 'api',
+    payload: { actor: actorUserId ?? null },
+  });
+  return updated;
+}
+
+export async function getDefectApprovalRouting(
+  id: string,
+  action: 'extension' | 'verification',
+  newTargetDate: string | null,
+  actorUserId?: string | null,
+) {
+  const { resolveDefectApprovalRouting } = await import('./defectsApprovalHooks');
+  return resolveDefectApprovalRouting(id, action, newTargetDate, actorUserId, { auditFallback: false });
+}
+
+export async function hasActiveUserVesselAssignment(userUuid: string, vesselId: string) {
+  return defectsRepo.hasActiveUserVesselAssignment(userUuid, vesselId);
+}
+
 export async function createDefect(body: any) {
   const validatedData = insertDefectSchema.parse(body);
 

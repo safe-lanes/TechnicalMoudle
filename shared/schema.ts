@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum, serial, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -2478,6 +2478,36 @@ export const companyApprovalSettings = pgTable("company_approval_settings", {
 });
 
 export type CompanyApprovalSettings = typeof companyApprovalSettings.$inferSelect;
+
+// Shore-side Defects approval-routing settings. This table is intentionally
+// instance-local (NO_SYNC handover tracked separately); the ship never classifies
+// approval requests because the approval engine is mounted only on shore.
+export const defectApprovalSettings = pgTable("defect_approval_settings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  dasuuid: text("dasuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  singletonKey: text("singleton_key").notNull().unique().default("default"),
+  longExtensionDays: integer("long_extension_days").notNull().default(90),
+  showRejectedClosuresOnReport: boolean("show_rejected_closures_on_report").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+}, (table) => ({
+  singletonKeyCheck: check("defect_approval_settings_singleton_key_check", sql`${table.singletonKey} = 'default'`),
+  longExtensionDaysCheck: check("defect_approval_settings_long_extension_days_check", sql`${table.longExtensionDays} BETWEEN 1 AND 3650`),
+}));
+
+export const insertDefectApprovalSettingsSchema = createInsertSchema(defectApprovalSettings).omit({
+  id: true,
+  dasuuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDefectApprovalSettings = z.infer<typeof insertDefectApprovalSettingsSchema>;
+export type DefectApprovalSettings = typeof defectApprovalSettings.$inferSelect;
 
 // =====================================================
 // MAKER LIST - Master data for equipment manufacturers
