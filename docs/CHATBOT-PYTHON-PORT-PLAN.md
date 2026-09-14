@@ -452,6 +452,52 @@ code change: nginx `map $http_origin` → upstream 8017 only for the pilot front
 Origin is browser-set for the widget and only selects which container answers; (c) a small service
 change that picks the index set per tenant domain (prompt would still be per container).
 
+**S.6.4 — DEPLOYED to the shared endpoint, 14-Sep-2026 10:58 UTC (owner GO; replaces the
+pilot-tenant-only restriction on the basis of verified test-only usage). Wider rollout still needs
+the owner's separate approval.**
+*What changed:* exactly two lines — the `proxy_pass` inside `assistant.conf` `location /`
+(`assistant.sl-sail.com`) and inside `safelanes.conf` `location /assistant/`
+(`viqmap.sl-sail.com/assistant/`), both `127.0.0.1:8015` → `127.0.0.1:8017`; `diff` against the
+backups shows only those lines; `nginx -t` passed; graceful `systemctl reload nginx`. Backups:
+`/etc/nginx/conf.d/assistant.conf.bak-8015-20260914105757`, `…/safelanes.conf.bak-8015-20260914105757`.
+No other nginx rule, SSL setting, container, port or database was touched; a before/after snapshot
+of every server_name (https + http status), the retired `/osm/` `/maran/` routes, SMS RAG on 8010,
+every container's state and nginx's service state was byte-identical (`deploy-switch.txt`).
+*Deployed identities (the run-D combination, together):* container `sail-assistant-py-cand` on
+127.0.0.1:8017, image `sail-assistant-py:prompt-v2` = sha256 8db669090d3690111867ece75b868001bb6ee311e866456949a9f41618c133b9;
+index set `repaired`, 911 chunks, 25 documents, one build key
+`clean=off|xrefs=2026-09-14.4|repairs=2026-09-14.1|chunker=2026-03-17.original|1200/150|embed=llamaindex-meta9|model=text-embedding-3-large:3072`;
+prompt `v2-xref-hardrule-2026-09-14` (docs b37172f6122a0257 · tool-loop f8e5a8f86bede638 ·
+combined ebfd83a623e41173) — all three visible in the public `/health`. Signed-identity tenant
+handling unchanged; no Origin routing, no per-tenant URLs.
+*Post-deployment checks through the public endpoints (`postdeploy-*.txt`, dumps):*
+
+| check | result |
+|---|---|
+| health, both public paths | `indexSet=repaired`, 911 chunks, db connected, prompt v2 hashes |
+| authentication | no token 401 · malformed 401 · expired 401 · wrong-key 401; `/admin/` 403 publicly |
+| tenant isolation | two fresh tenants self-register and answer; tenant A disabled via the tunnel-only admin API → gate `disabled` for A, B unaffected; conversations logged under their own tenant; A re-enabled |
+| retrieval, 18 queries | 18/18 via assistant.sl-sail.com and 18/18 via viqmap…/assistant |
+| frozen 12-case suite (.3), 3 runs | 11/12 — identical per case to run D; case 05 clarify (known) |
+| corrected Technical claims (.2), 3 runs | 13/14 — identical per case to run D; case 04 = correct answer, citation-filename limitation kept as reported |
+| clarification outcomes vs run D | per-case gates identical (12-case: 3 clarify runs = case 05 ×3; 14-case: 0) |
+| logs since switch | service: 0 errors in 57 lines; nginx assistant error log: only the deliberate `/admin/pairs` 403 probe; global error log: only the snapshot probes of the retired `/osm/`/`/maran/` paths (404 before and after) |
+| run-to-run splits | none |
+
+*Observation outside the suites (not a regression, recorded):* "How do I create a work order?" with
+Technical context answers with the unplanned-work-order steps on both old and new (the smoke suite
+only checks routing/manual for that query).
+*Remaining limitations:* case 05 (repaired content, routing clarify gate — routing change proposed
+in §S.6, not made); corrected-claims case 04 kept at 13/14 until the Ship-Side citation is verified
+against its supporting text; generated documents are code-derived and say so; official manuals'
+"Vessel Admin" / "Level 2 Reviewer role" wording untouched.
+*Rollback (immediate, one edit, nothing else moves):* the old container `sail-assistant-py`
+(image e12c0b916d4c = `sail-assistant-py:prompt-v1-rollback`, index `migrated`, 907 chunks) is
+still running on 127.0.0.1:8015 and the `migrated` set is untouched in the database.
+`sudo cp /etc/nginx/conf.d/assistant.conf.bak-8015-20260914105757 /etc/nginx/conf.d/assistant.conf && sudo cp /etc/nginx/conf.d/safelanes.conf.bak-8015-20260914105757 /etc/nginx/conf.d/safelanes.conf && sudo nginx -t && sudo systemctl reload nginx`
+(or `sed` 8017→8015 on the same two lines). Verify with `curl https://assistant.sl-sail.com/health`
+→ `indexSet=migrated`, no `prompt` field.
+
 **What this does NOT change:** the module-side Data API (Node, in Technical), the HTTP contracts,
 the identity token format, nginx/TLS/URL, the masking design and its captured-payload proof
 standard, the 30-tool coverage priority. The stack is chosen *for* those, not instead of them.

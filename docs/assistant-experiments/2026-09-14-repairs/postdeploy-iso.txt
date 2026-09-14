@@ -1,0 +1,25 @@
+A first ask: 200 answer Technical To create an unplanned work order, follow these steps:
+
+1. G
+B first ask: 200 answer Technical To create an unplanned work order, follow these steps:
+
+1. G
+admin toggle A off (tunnel-only path): 200 False
+A after disable: 200 disabled The assistant isn't enabled for Technical in your organization. Please contact your admini
+B still: 200 answer To create an unplanned work order, follow these steps:
+
+1. G
+expired token: 401
+wrong-key token: 401
+A re-enabled: True
+TENANTS deploy-iso-a-1789383575 deploy-iso-b-1789383575
+== conversations logged per tenant ==
+deploy-iso-a-1789383575|answer|1
+deploy-iso-a-1789383575|disabled|1
+deploy-iso-b-1789383575|answer|2
+== service log since switch (errors) ==
+log lines since switch: 57
+== nginx assistant error log (last 5) ==
+2026/09/14 10:58:00 [error] 3567896#3567896: *6545 access forbidden by rule, client: 13.250.51.71, server: assistant.sl-sail.com, request: "GET /admin/pairs HTTP/1.1", host: "assistant.sl-sail.com"
+== nginx global error log since switch ==
+4

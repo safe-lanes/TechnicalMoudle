@@ -1,0 +1,51 @@
+== BEFORE ==
+https 127.0.0.1 200
+http 127.0.0.1 200
+https 13.250.51.71 200
+http 13.250.51.71 200
+https assistant.sl-sail.com 200
+http assistant.sl-sail.com 301
+https devsmsragai.com 200
+http devsmsragai.com 200
+https localhost 200
+http localhost 200
+https viqmap.sl-sail.com 200
+http viqmap.sl-sail.com 301
+viqmap-osm 404
+viqmap-maran 404
+smsrag-8010 200
+crew_api Up
+crew_db Up
+crew_ui Up
+graphagent_new Up
+safe-lanes-v19-auditgraphai Up
+safe-lanes-v19-dev-auditgraphai Up
+safe-lanes-v19-erp-auditgraphai Up
+sail-assistant Up
+sail-assistant-db Up
+sail-assistant-py Up
+sail-assistant-py-cand Up
+sms-rag-app Up
+technical-chromadb Up
+viq-rag-system-embedded Up
+viq-rag-system-new Up
+active
+backups: assistant.conf.bak-8015-20260914105757 safelanes.conf.bak-8015-20260914105757
+== diff vs backups (must be exactly the two upstream lines) ==
+21c21
+<         proxy_pass http://127.0.0.1:8015;
+---
+>         proxy_pass http://127.0.0.1:8017;
+375c375
+<         proxy_pass http://127.0.0.1:8015;
+---
+>         proxy_pass http://127.0.0.1:8017;
+nginx reloaded (graceful)
+== AFTER ==
+OTHER SITES: identical before/after
+== public health (both paths) ==
+{"ok":true,"store":"pgvector","indexSet":"repaired","chunks":911,"db":"connected","llmCalls":525,"prompt":{"version":"v2-xref-hardrule-2026-09-14","docsPromptSha":"b37172f6122a0257","toolLoopPromptSha":"f8e5a8f86bede638","combined":"ebfd83a623e41173"}}
+{"ok":true,"store":"pgvector","indexSet":"repaired","chunks":911,"db":"connected","llmCalls":525,"prompt":{"version":"v2
+
+== admin still denied publicly: 403 ==
+== auth: no token 401 · bad token 401 ==

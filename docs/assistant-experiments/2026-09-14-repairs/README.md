@@ -20,6 +20,10 @@ changed. No secrets (the configuration record lists environment key NAMES only).
 | `final-run-c.txt`, `acceptance-*-dump.jsonl` (run C) | run C on the R3 candidate: frozen suite retained 11/12; corrected-claims suite .1 showed 5 judge defects (fixed as .2, reported) and 2 official-manual wording conflicts (R3.1) |
 | `final-run-d.txt`, `acceptance-final-dump.jsonl`, `acceptance-generated-dump.jsonl` | **run D (final)**: retrieval, frozen 12-case suite, corrected-claims suite .2 — live · same-prompt baseline · candidate (R3.1, 911 chunks) |
 
+| `deploy-switch.txt` | the switch itself (14-Sep 10:58 UTC): before/after snapshot of every other site and container (identical), the two-line diff, nginx -t, public health/admin/auth checks |
+| `postdeploy-run.txt`, `postdeploy-answers-dump.jsonl`, `postdeploy-generated-dump.jsonl` | post-deployment suites through the PUBLIC endpoints: retrieval 18/18 on both paths, frozen suite 11/12, corrected claims 13/14 (identical per case to run D) |
+| `postdeploy-iso.txt` | tenant isolation + auth through the public endpoint (disabled tenant refused, other unaffected, expired/wrong-key 401), per-tenant conversation log, service + nginx error logs since the switch |
+
 Generated-document corrections: `central-assistant-py/generated-docs/` (build_r3.py = source of the R3
 documents, R2/ originals, R3/ corrected, PROVENANCE.md = every claim with disposition and file:line
 evidence at repository revision 27a40b2ce).
