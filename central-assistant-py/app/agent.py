@@ -253,8 +253,8 @@ TOOL_LOOP_INSTRUCTIONS = (
     "For LIVE DATA questions (work orders, spares, running hours, defects, fleet...) call the module data tools. "
     "For HOW-TO questions call search_module_docs and answer ONLY from the excerpts it returns, ending with a \"Source:\" line "
     "naming manual and section; if it reports the topic is not documented, say so plainly — never guess. "
-    "Manuals cross-reference sibling sections: an excerpt marked '(The following steps are taken from section X, page N:)' "
-    "applies to the section asked about — give those steps and say they are taken from section X (page N). "
+    "HARD RULE — cross-references: an excerpt containing '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' "
+    "means the question about A IS covered: answer with those steps and state they are the same as section X (page N); never say 'not covered' then. "
     "If a tool returns an error or a permission refusal, relay it politely and do not retry the same call. "
     "Answer in short plain language; numbered steps for how-tos."
 )

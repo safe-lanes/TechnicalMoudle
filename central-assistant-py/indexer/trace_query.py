@@ -23,6 +23,7 @@ def main() -> None:
     ap.add_argument("--set", action="append", required=True)
     ap.add_argument("-q", action="append", required=True)
     ap.add_argument("--module", default="technical")
+    ap.add_argument("--answer", action="store_true", help="run the full answer path too and print the response text + tools used")
     a = ap.parse_args()
     key = os.environ["IDENTITY_SIGNING_KEY"]
     n = 0
@@ -37,6 +38,12 @@ def main() -> None:
             print(f"   {name:<14} gate={j.get('gate'):<14} module={str(j.get('module')):<10} margin={j.get('confidence')} candidates={j.get('candidates')}")
             for h in hits:
                 print(f"        {h}")
+            if a.answer:
+                n += 1
+                tok = sign_identity({"userId": f"trace-{n}", "userName": "Trace", "role": "Sail Admin", "tenantDomain": "smoke-suite-tenant"}, key, 60)
+                f = httpx.post(f"{url}/chat", headers={"x-assistant-identity": tok}, json={"message": q, "context": {"module": a.module}}, timeout=150).json()
+                print(f"        ANSWER gate={f.get('gate')} tools={f.get('toolsUsed')} cites={[(c.get('section') or '')[-30:] for c in (f.get('citations') or [])[:3]]}")
+                print("        " + (f.get("response") or "").replace("\n", "\n        ")[:900])
 
 
 if __name__ == "__main__":

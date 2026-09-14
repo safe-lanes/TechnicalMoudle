@@ -32,7 +32,10 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 # Bump whenever a rule changes — recorded per document so a cleanup change invalidates the index.
-CLEANUP_VERSION = "2026-09-14.5"  # .4: genuine tables kept in zones · .5: a callout unique on its page is KEPT (only duplicates of page text go)
+CLEANUP_VERSION = "2026-09-14.6"  # .4 genuine tables kept in zones · .5 unique callouts kept · .6 instruction inside agentic captions salvaged
+# Markers inside agentic captions after which the LLM transcribed on-screen text (callouts, note
+# boxes). Each segment after a marker is judged on its own: kept if unique on the page.
+CAPTION_MARKER_RE = re.compile(r"(?:a (?:red |yellow |blue )?note box states:|notes?:|annotated with:|with (?:the )?callouts?:|callouts?:|with (?:an overlay|the) text)\s*", re.I)
 
 IMG_LINE_RE = re.compile(r"^\s*(!\[[^\]]*\]\([^)]*\)|(photograph|logo|screenshot|screenshot_from_computer|image|icon|illustration|picture|diagram)\s*:.*|screenshot of .*|[\w-]+\s+logo|\*?(blue|green|dark|light)\s+\w+\s+(texture|surface|background)\*?)\s*$", re.I)
 FIGURE_CAPTION_RE = re.compile(r"^\s*(#{1,6}\s*)?(<u>|\*\*|\*|_)?\s*figure\s*\d+[a-z]?\s*(\.|:)?\s*(</u>|\*\*|\*|_)?\s*$", re.I)
@@ -164,7 +167,8 @@ def _table_is_toc(t: str) -> bool:
 def _canon_words(s: str) -> set[str]:
     s = re.sub(r"<[^>]+>", " ", s)
     s = re.sub(r"[*_`#|'‘’\"“”]+", "", s).lower()  # quotes stripped so 'Audit' and Audit are the same word
-    return {w for w in re.findall(r"[a-z0-9]+", s) if len(w) > 2 and w not in ("the", "and", "for", "here", "click", "this")}
+    stop = {"the", "and", "for", "here", "click", "this", "can", "use", "will", "from", "with", "into", "onto", "via", "any", "all", "that", "then", "user", "users"}
+    return {w for w in re.findall(r"[a-z0-9]+", s) if len(w) > 2 and w not in stop}
 
 
 def _zone_line_is_noise(s: str, page_words: set[str] | None = None) -> bool:
@@ -234,8 +238,8 @@ def clean_page(pn: int, md: str, header_line: str | None, rep: CleanReport, *, c
     # reference for deciding whether a callout merely duplicates it
     page_words: set[str] = set()
     for kind, t in blocks:
-        if kind == "line" and t.strip() and not FIGURE_CAPTION_RE.match(t) and not CALLOUT_NOISE_RE.match(t):
-            page_words |= _canon_words(t)
+        if kind == "line" and t.strip() and not FIGURE_CAPTION_RE.match(t) and not CALLOUT_NOISE_RE.match(t) and not IMG_LINE_RE.match(t):
+            page_words |= _canon_words(t)  # image/caption lines are NOT author text — they must not vouch for themselves
     caption_idx = [k for k, (kind, t) in enumerate(blocks) if kind == "line" and FIGURE_CAPTION_RE.match(t)]
     in_zone = [False] * n
     for c in caption_idx:
@@ -297,8 +301,22 @@ def clean_page(pn: int, md: str, header_line: str | None, rep: CleanReport, *, c
             rep.log(pn, "figure-caption", s)
             continue
         if IMG_LINE_RE.match(s):
+            # agentic captions can CARRY instruction ("… A red note box states: Note: A new component can
+            # also be added …", "Annotated with: 1. Click here to …"). Salvage that part; keep it when it
+            # is not already on the page as a bullet/sentence; drop only the descriptive prefix.
+            markers = list(CAPTION_MARKER_RE.finditer(s))
+            kept_segments: list[str] = []
+            for i, mk in enumerate(markers):
+                seg = s[mk.end(): markers[i + 1].start() if i + 1 < len(markers) else len(s)].strip(" .")
+                words = _canon_words(seg)
+                covered = sum(1 for w in words if w in page_words) / len(words) if words else 1.0
+                if len(words) >= 2 and covered < 0.75:  # stricter than zone callouts: a caption is the LAST copy of that text
+                    kept_segments.append(seg if re.match(r"^\s*(\*\*)?\s*note", seg, re.I) else f"Note (from figure): {seg}")
             rep.image_lines += 1
-            rep.log(pn, "image-line", s)
+            rep.log(pn, "image-line", s if not markers else s[: markers[0].start()])
+            for seg in kept_segments:
+                rep.log(pn, "caption-salvaged", seg)
+                out.append(seg)
             continue
         if in_zone[k] and CALLOUT_NOISE_RE.match(s) and not (NOTE_RE.match(s) or BULLET_RE.match(s) or HEADING_RE.match(s)):
             if _zone_line_is_noise(s, page_words):

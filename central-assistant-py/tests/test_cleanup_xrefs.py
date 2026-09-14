@@ -78,6 +78,20 @@ def test_unique_callout_is_kept_duplicate_callout_is_removed():
     assert any(r.rule == "KEPT-unique-callout" for r in rep.removed)
 
 
+def test_instruction_inside_agentic_caption_is_salvaged_duplicate_callouts_are_not():
+    md = ("## 1.1.4.3 HOW TO ADD COMPONENTS\n\n* Click on the 'Add Component' button. (Ref Figure 34)\n\n"
+          "Screenshot of the Components screen showing the Add Component button. Annotated with: 1. Click here for the Add Component button.\n\nFigure 34\n\n"
+          "* Click the 'Save' button to save the component information. (Ref Figure 35)\n\n"
+          "Screenshot of the Add Component screen showing the Save button. Annotated with: 1. Click here to save the component information. "
+          "A red note box states: Note: A new component can also be added by clicking the '+ Add Component' button.\n\nFigure 35")
+    pages, rep = clean_pages({24: md})
+    p = pages[24]
+    assert "can also be added by clicking the '+ Add Component' button" in p   # instruction inside the caption survives
+    assert "Screenshot of the Components screen" not in p                        # the description itself does not
+    assert "Click here for the Add Component button" not in p                   # duplicate of the bullet → not salvaged
+    assert any(r.rule == "caption-salvaged" for r in rep.removed)
+
+
 def test_struck_through_content_is_removed_not_unwrapped():
     pages, rep = clean_pages({1: "## Steps\n\n* Click Save. <s>Then click Submit twice.</s>\n* ~~Old rule: approve without review.~~ New rule: review first."})
     p = pages[1]
@@ -114,7 +128,7 @@ def test_resolves_appends_target_steps_and_reports_edges():
     assert resolved["1.1.8.2 HOW TO APPLY FILTER"] == "1.1.7.2 HOW TO APPLY FILTER"
     assert resolved["1.1.8.6 HOW TO EXPORT STORE ITEMS"] == "1.1.7.6 HOW TO EXPORT SPARES"
     assert "Choose the criteria and click 'Apply'." in out[9]
-    assert "(The following steps are taken from section 1.1.7.2 'How To Apply Filter', page 5:)" in out[9]  # honest attribution
+    assert "(Cross-reference resolved: the steps for Stores › How To Apply Filter are the same as section 1.1.7.2 'How To Apply Filter' under Spares, page 5. They are:)" in out[9]  # honest attribution, both sides named
     # the pointer's own sentence is kept, and the appended text lands inside the pointer section (before the next heading)
     assert out[9].index("Refer to the 'Spares'") < out[9].index("Choose the criteria") < out[9].index("### 1.1.8.6")
     # dead end: no 'Warehouse' section

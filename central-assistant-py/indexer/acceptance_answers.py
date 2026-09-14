@@ -85,7 +85,7 @@ def judge(j: dict, manual: str, page: int | None, must: list[str], must_not: lis
     ok_cite = manual.lower() in str(top.get("manual", "")).lower() and (page is None or page_of(top) == page)
     ok_attr = True
     if cls == "xref" and ok_answer:
-        ok_attr = bool(re.search(r"(taken from|from section|section \d+(\.\d+)+|see (the )?'?[\w &-]+'? (sub-)?(sub-)?module)", raw, re.I))
+        ok_attr = bool(re.search(r"(taken from|same as|from section|section \d+(\.\d+)+|see (the )?'?[\w &-]+'? (sub-)?(sub-)?module)", raw, re.I))
     detail = f"gate={j.get('gate')} cite={str(top.get('manual', '-'))[:26]} p{page_of(top)} | {raw[:64]!r}"
     return ok_answer, ok_cite, ok_attr, detail
 

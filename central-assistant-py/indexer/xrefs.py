@@ -94,6 +94,16 @@ def is_pointer(body: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
+def _parent_title(sections: list[Section], s: Section) -> str:
+    """Title of the heading whose number is the prefix of s (e.g. '1.1.8 STORES' for '1.1.8.2 …')."""
+    num = number_of(s.title)
+    parent = num.rsplit(".", 1)[0] if "." in num else ""
+    for c in sections:
+        if parent and number_of(c.title) == parent:
+            return title_words(c.title).title()
+    return ""
+
+
 def _children(sections: list[Section], container: Section) -> list[Section]:
     cnum = number_of(container.title)
     if cnum:
@@ -189,10 +199,13 @@ def resolve_xrefs(pages: dict[int, str], max_depth: int = 3) -> tuple[dict[int, 
         if len(chain) > 2:
             rep.chained.append((s.title, " → ".join(chain)))
         rep.resolved.append((s.title, target.title))
-        # Honest attribution: the pulled-in text names its real source section AND page, so an
-        # answer built from it can cite where it actually came from.
-        src = f"section {number_of(target.title)} '{title_words(target.title).title()}'" + (f", page {target.page}" if target.page else "")
-        inserts[(s.page, s.end)] = f"\n\n(The following steps are taken from {src}:)\n{target.body}\n"
+        # Honest attribution, stated for BOTH sides: which section the steps apply to (the
+        # pointer, named with its parent sub-module) and where they actually come from (the
+        # target section + page), so an answer can say "for Stores, same as Spares (1.1.7.7, p.47)".
+        here = _parent_title(sections, s)
+        src = f"section {number_of(target.title)} '{title_words(target.title).title()}'" + (f" under {_parent_title(sections, target)}" if _parent_title(sections, target) else "") + (f", page {target.page}" if target.page else "")
+        inserts[(s.page, s.end)] = (f"\n\n(Cross-reference resolved: the steps for {here + ' › ' if here else ''}{title_words(s.title).title()} "
+                                    f"are the same as {src}. They are:)\n{target.body}\n")
     out = dict(pages)
     for (pn, off), text in sorted(inserts.items(), key=lambda kv: (kv[0][0], -kv[0][1])):
         md = out[pn]
