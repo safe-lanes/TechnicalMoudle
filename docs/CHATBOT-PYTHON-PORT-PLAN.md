@@ -139,6 +139,44 @@ stays `migrated`.** The gains are attributable to cleanup + cross-refs, not to t
 *Proposed next (needs owner GO):* `agentic-clean` — the live set's own cached parses + cleanup +
 cross-refs (zero parse cost), to isolate the cleanup effect on the 18/18 baseline.
 
+**S.4 — Controlled experiment on the live set's own parses (14-Sep-2026, MEASURED; live unchanged).**
+*Baseline proof:* rebuilding from the cached parses first gave 907/907 identical chunk ids but
+**16/18**, because the live set was embedded by LlamaIndex on **metadata + text** (9 keys prepended:
+file, slug_url, breadcrumb, section_title, source_type, chunk_index, page_number, llamaparse_tier,
+llamaparse_version — PROVEN from the node record in Chroma and by cosine against the stored
+vectors). With that input the rebuild (`ag-base`) reproduces **18/18**; the embedding mode is now
+part of the build key. Residual distance shifts (+0.03–0.05) are OpenAI embedding drift over time.
+*Four builds from the same parses, all embedded like the live set:*
+
+| set | retrieval (18) | joint answers (12, 3-run majority) | regressions vs live | gains |
+|---|---|---|---|---|
+| live `migrated` | 18/18 | 7/12 | — | — |
+| live + new prompt (`migrated-np`) | 18/18 | **9/12** | none | xref 08, 09 |
+| `ag-base` (rebuild, nothing else) | 18/18 | 8/12 | none | xref 08 |
+| `ag-xref` (cross-refs on) | **18/18** | **9/12** | none | xref 07, 09 |
+| `ag-clean` (cleanup on) | 17/18 | 9/12 | none | xref 08, 09 |
+| `ag-both` (cleanup + cross-refs) | 17/18 | 9/12 | none | xref 07, 09 |
+| `ce-clean` (cost_effective + both) | 16/18 | 7/12 | callout 03 | xref 07 |
+
+*Attribution (proven, not inferred):* the one retrieval case cleanup loses ("raise a lesson
+learnt") is NOT chunk size — the Incident manual's own "Part H: Lessons Learnt" chunk (1.0556)
+edges the Lesson Learnt manual's p9 chunk (1.0675) after cleanup changed that chunk's text and
+removed the TOC chunk that used to rank second; both manuals are legitimately about lessons
+learnt. The earlier "smaller chunks" explanation is withdrawn. Cross-reference resolution
+retrieves correctly (the resolved chunk is the top excerpt) but the answer model refused to use
+steps that name another sub-module until the prompt got a hard rule and the resolved text names
+both sections ("the steps for Stores › How To Apply Filter are the same as section 1.1.7.7 … under
+Spares, page 47"). Two cases fail on every set: 01 (the instruction lives only in a screenshot
+callout that the agentic parse never transcribed) and 05 (the hazard-category table exists only
+as a caption in the agentic parse) — evidence absent, not routing. Answers vary run to run at
+temperature 0.2 (3-run majority used; see disagreement list in the report).
+*Conclusion:* nothing here justifies leaving LlamaParse or the agentic tier. The improvements that
+help the existing baseline are (1) the answer-prompt rule and (2) cross-reference resolution;
+cleanup is neutral on answers and costs one retrieval case on this corpus — its value is churn
+reduction for future re-parses, not accuracy today. Recommendation put to the owner: deploy the
+prompt rule; adopt `ag-xref` as the served set (18/18, no regression, +2 cross-ref cases, honest
+attribution); keep cleanup as an option for new documents, not for the live corpus.
+
 **What this does NOT change:** the module-side Data API (Node, in Technical), the HTTP contracts,
 the identity token format, nginx/TLS/URL, the masking design and its captured-payload proof
 standard, the 30-tool coverage priority. The stack is chosen *for* those, not instead of them.

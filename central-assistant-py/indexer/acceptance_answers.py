@@ -93,26 +93,39 @@ def judge(j: dict, manual: str, page: int | None, must: list[str], must_not: lis
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--set", action="append", required=True, help="NAME=SERVICE_URL (repeatable)")
+    ap.add_argument("--repeat", type=int, default=1, help="ask each case N times per set; a case passes when the MAJORITY of runs pass (LLM answers vary run to run)")
     args = ap.parse_args()
     key = os.environ["IDENTITY_SIGNING_KEY"]
     sets = [(s.partition("=")[0], s.partition("=")[2]) for s in args.set]
     score = {n: [0, 0, 0, 0] for n, _ in sets}  # answer, cite, attribution, JOINT
     matrix: list[tuple[str, dict[str, bool]]] = []
+    flaky: list[str] = []
     async with httpx.AsyncClient(timeout=150.0) as c:
         for i, (cls, q, module, manual, page, must, must_not) in enumerate(CASES, 1):
             print(f"\n[{i:02d} {cls}] {q}")
-            res = await asyncio.gather(*(ask(c, u, key, q, module) for _, u in sets))
+            runs = [await asyncio.gather(*(ask(c, u, key, q, module) for _, u in sets)) for _ in range(args.repeat)]
             row: dict[str, bool] = {}
-            for (n, _), j in zip(sets, res, strict=True):
-                a, ct, at, d = judge(j, manual, page, must, must_not, cls)
-                joint = a and ct and at
+            for si, (n, _) in enumerate(sets):
+                verdicts = [judge(runs[r][si], manual, page, must, must_not, cls) for r in range(args.repeat)]
+                votes = [(a and ct and at) for a, ct, at, _ in verdicts]
+                joint = sum(votes) * 2 > len(votes)
+                a = sum(v[0] for v in verdicts) * 2 > len(verdicts)
+                ct = sum(v[1] for v in verdicts) * 2 > len(verdicts)
+                at = sum(v[2] for v in verdicts) * 2 > len(verdicts)
                 score[n][0] += a
                 score[n][1] += ct
                 score[n][2] += at
                 score[n][3] += joint
                 row[n] = joint
-                print(f"   {n:<14} answer {'✓' if a else '✗'}  cite {'✓' if ct else '✗'}  attrib {'✓' if at else '✗'}  JOINT {'✓' if joint else '✗'}  {d}")
+                agree = f"{sum(votes)}/{len(votes)}"
+                if 0 < sum(votes) < len(votes):
+                    flaky.append(f"{i:02d} {cls} · {n} ({agree})")
+                print(f"   {n:<14} answer {'✓' if a else '✗'}  cite {'✓' if ct else '✗'}  attrib {'✓' if at else '✗'}  JOINT {'✓' if joint else '✗'} [{agree}]  {verdicts[0][3]}")
             matrix.append((f"{i:02d} {cls}", row))
+    if args.repeat > 1:
+        print(f"\n== run-to-run disagreement (cases where runs split, {args.repeat} runs) ==")
+        for f in flaky or ["none"]:
+            print(f"   {f}")
     print(f"\n== per-case JOINT (answer ∧ citation ∧ attribution) — out of {len(CASES)} ==")
     print("   case          " + " ".join(f"{n[:12]:>12}" for n, _ in sets))
     for label, row in matrix:
