@@ -312,15 +312,26 @@ omitted the Export step; run B, resolver .4, includes it in 3/3 runs). 09 — "+
 Part A/B/C, Submit, stated as "the same as section 1.1.4.3 under Defects Logs, page 15", cited
 p19. Run A (resolver .3, suite .2) gave the same 11/12 / 7/12 / 7/12 split and is kept for the
 record (`*-runA-*`).
-*Remaining gap — case 05, NOT extraction:* the hazard-category text is now in the index, but the
-question never reaches it: the docs-path router ranks modules across the whole corpus and asks to
-clarify when the two best modules are within `ROUTE_MARGIN` 0.07 — here Safety vs Incident at
-0.010, identical on live and candidate (`trace_query`). The module the question was sent from
-(`context.module = safety`) is used for the client×module pair and the tool loop, not for routing.
-That is a routing-design decision inherited unchanged from the Node service (§4.2 thresholds);
-changing it (e.g. prefer the sending module when it is among the candidates) is a separate
-measured step, not part of this candidate. One run-to-run split was observed (live, case 11,
-2/3) — the majority rule absorbed it.
+*Remaining gap — case 05 (owner's wording, 14-Sep):* "Missing category content was repaired, but
+the question still fails because the routing clarification gate stops it before the repaired
+evidence can be used." Two problems existed: an extraction gap (the six category tabs lived only
+in the screenshot — now repaired, the text is in the `repaired` index) AND a routing problem (the
+docs-path router ranks modules across the whole corpus and asks to clarify when the two best
+modules are within `ROUTE_MARGIN` 0.07 — here Safety vs Incident at 0.010, identical on live and
+candidate per `trace_query`). The module the question was sent from (`context.module = safety`)
+is used for the client×module pair and the tool loop, not for routing — inherited unchanged from
+the Node service (§4.2 thresholds). One run-to-run split was observed (live, case 11, 2/3) — the
+majority rule absorbed it.
+*Proposed routing approach (documented, NOT implemented in this candidate; a separate measured
+step):* the widget always supplies the originating module (`context.module`, one of the five
+labels, set by the host page, not by the user), so it is a reliable signal. Proposal: when the
+router's clarify condition fires and the originating module is among the top candidates within the
+margin, answer from the originating module and say so in one line ("Answering for Safety; say
+'Incident' if you meant that module"); when the question explicitly names another module or manual
+("in the Incident module…", "Near Miss manual"), route by the named module instead of the
+originating one; keep clarify for the remaining case (originating module not among the close
+candidates, no explicit module named). No threshold change. Measure on the 18-query and 12-case
+suites plus a small set of deliberately cross-module questions before adopting.
 *What this does NOT establish:* the 12 cases probe callouts, tables, cross-references and notes
 that this thread touched; they are not a general accuracy measure of the assistant. The
 corrected suite re-establishes an improvement ONLY for the four repaired/resolved cases; the
@@ -329,6 +340,95 @@ earlier withdrawn claims (§S.5) stay withdrawn.
 left running on `127.0.0.1:8017` for the owner's own checks; nothing public changed. Promotion
 would be: nginx 8015 → 8017 (or recreate `sail-assistant-py` on `:prompt-v2` with
 `ASSISTANT_INDEX_SET=repaired`); rollback = flip back (old container stays).
+
+**S.6.1 — Generated Technical documents corrected (R3), 14-Sep-2026 (owner-authorised; candidate
+corpus only).** The five code-derived .docx files were rewritten as revision R3 from the audit
+evidence: `central-assistant-py/generated-docs/build_r3.py` is the source (the documents are built
+from it, so the wording is reproducible), `generated-docs/R2/` holds the 10-Sep originals unchanged
+(hashes as in `source-inventory.md`), `generated-docs/R3/` the corrected files, and
+`generated-docs/PROVENANCE.md` records every claim with its disposition and repository evidence
+(file:line at revision `27a40b2ce`): 58 claims — 6 REMOVED (the four confirmed errors plus the two
+invented role names "Vessel Admin" / "Level 2 Reviewer" and the contradictory "only HOD / only
+Vessel Admin" toggle rule), 24 CORRECTED, 13 NARROWED, 14 KEPT, 1 ADDED (the in-code 24 h badge vs
+48 h "Stale" card inconsistency, stated so a reader is not misled). Rules applied: nothing is
+described as a UI step unless the UI element was found (the whole-import Undo IS in the UI —
+`UniformBulkUpload.tsx:200-202,640-642` — so it stays; the backend-only permission enforcement claim
+was reduced to the routes that actually check roles); every R3 file opens with a "code-derived
+documentation, revision R3, repository revision 27a40b2ce" note. The server's live corpus
+(`~/central-assistant-py/documents/`) is untouched; the candidate was rebuilt from an isolated
+copy (`documents-candidate/` = the 20 unchanged PDFs + the 5 R3 files). Rebuild
+(`index-run-repaired-r3.txt`): 20 parses reused from the parse store, 5 new LlamaParse jobs for the
+R3 files (job ids recorded; `metadata.version` still absent), repairs 3/3 applied, 41/41 xrefs,
+855 vectors reused / 53 new, 908 chunks. Focused checks for the corrected claims:
+`indexer/acceptance_generated.py` (`GEN_SUITE_VERSION 2026-09-14.1`, 14 cases, each requiring
+the corrected statement and failing on the withdrawn wording, with a citation to the generated
+document). Results: §S.6.2.
+
+**S.6.2 — Final candidate verification (run D, 14-Sep-2026). DEPLOYMENT ON HOLD — owner's
+explicit authorisation required.**
+*Exact candidate:* index set `repaired` (911 chunks, 25 documents: 20 original manuals from the
+saved parses + repairs 2026-09-14.1 + resolver 2026-09-14.4, and the 5 R3.1 generated documents,
+sha256 prefixes bffa8828d516ab84 · d10f3027834959ef · e845a51f00a291ce · 0bb3e4225ed74fda ·
+25f4a49ef951ccee), image `sail-assistant-py:prompt-v2` (8db669090d36), prompt
+`v2-xref-hardrule-2026-09-14` (docs b37172f6122a0257 · tool-loop f8e5a8f86bede638 · combined
+ebfd83a623e41173), embed `text-embedding-3-large:3072`, chunker `2026-03-17.original` 1200/150,
+cleanup OFF, running as `sail-assistant-py-cand` on `127.0.0.1:8017`. Comparators: live 8015 (old
+prompt, `migrated`, 907) and `sail-assistant-py-base` on 8016 (same image + prompt as the
+candidate, `migrated`). Suites: 18-query retrieval; frozen 12-case suite `2026-09-14.3` (unchanged
+since §S.6); corrected-claims suite `acceptance_generated.py 2026-09-14.2`. 3-run majority
+everywhere. Raw outputs: `docs/assistant-experiments/2026-09-14-repairs/final-run-d.txt` + dumps.
+
+| suite | live 8015 | base-v2 8016 | candidate 8017 |
+|---|---|---|---|
+| retrieval, 18 queries | 18/18 | 18/18 | **18/18** (identical distances) |
+| frozen 12 cases, joint | 7/12 | 7/12 | **11/12** — no regression, gains 01/07/08/09 (each 3/3), same as §S.6 run B |
+| corrected Technical claims, 14 cases | 5/14 | 2/14 | **13/14** |
+
+*Corrected-claims suite, read against the sources (full answers in `acceptance-generated-dump.jsonl`):*
+the four confirmed errors now answer correctly on the candidate and wrongly on live — Job Code
+optional/auto-generated (live: "you must fill in the Job Code column, and it must be unique");
+vessel code reaches a ship only through provisioning (live: refresh via master sync); Head of Dept
+cannot do everything an office user can (live: "Yes"); amber = no sync for more than 24 hours,
+time-based only (live: "or has changes waiting"). Narrowed claims answer with the R3 wording:
+only a Sail Admin generates from the office and is told the switch is not enabled; one Sync Now
+stops at 20 cycles / ~60 s / no progress; re-provision from Admin → Ship Provisioning; a lower
+reading is refused with the back-dated exception (2/3 — one run gave the exception first); the
+per-vessel switches live on 'Lead Time & Grace Period Settings'; Level 2 Reviewer is a per-job
+rank field, not an assignable role (passes only with the R3.1 wording that names the PMS manual's
+own section). **Test changes after run C, reported:** suite .1 → .2 fixed five judge defects of my
+own (the must_not phrase for cases 07 and 10 was matched inside the correct negated answer; cases
+02/04/14 demanded a citation to one generated document although the official PMS manual p63 or a
+second R3 document carries the same statement; case 09 is answered by the official PMS manual
+§1.1.3.4, which uses the term "Vessel Admin", so the case now requires the manual's answer). Run C
+under suite .1: live 3/14, candidate 7/14 — kept in `final-run-c.txt`.
+*Regression on the new suite, reported as measured:* case 04 (work-order number format) is ✓ on
+live and ✗ on the candidate. The candidate's answer is correct and complete
+(`<VESSELCODE>-<JOBCODE>-<COMPONENTCODE>-<YEAR>-<NNN>` / `<VESSELCODE>-UWO-…`, 3/3) but its top
+citation is the Ship-Side notes, whose file name lacks the "(Operational)" substring the test
+accepts — a test-string defect, left unchanged after the run rather than redefined; the Ship-Side
+R3 text is itself a corrected source carrying that statement.
+*R3.1 (post-audit wording change, reported):* run C showed the official PMS Office manual itself
+says "Only Vessel Admin users can view and use the 'My Team' toggle" (p11) and titles §1.1.3.5 "How
+to Approve Work Orders (Level 2 Reviewer Role)" (p12). Two R3 Roles sentences ("there is no
+separate Vessel Admin role", "Level 2 review is not a role") were code-true but read as
+contradicting the manual; R3.1 reconciles them (Vessel Admin profile role = treated as Head of
+Dept; Level 2 Reviewer = the PMS manual's per-job rank field, not a user-assignable role). Only
+the Roles document was rebuilt and re-parsed (job pjb-gr04veoal2e0upxc9k5sg9z6lkf4).
+*Remaining limitations:* case 05 of the frozen suite (routing clarify gate, §S.6 — routing change
+proposed, not made); the corrected-claims suite is a targeted check of the 14 corrected statements,
+not a general measure; generated documents remain code-derived and say so in their first
+paragraph; the official manuals still contain the "Vessel Admin" / "Level 2 Reviewer role" wording
+(product-team documents, not touched).
+*Recommendation:* verification passed (18/18 retained, 11/12 retained, no frozen-suite regression,
+13/14 on the corrected claims). Recommend a **controlled rollout**: switch the public URL to the
+candidate for the pilot tenant during working hours with the old container left running; watch
+the assistant log (`gate`, `citations`) for one day; rollback = one nginx edit back to 8015.
+*Rollback procedure (verified path):* `sudo sed -i 's#127.0.0.1:8017;#127.0.0.1:8015;#'
+/etc/nginx/conf.d/assistant.conf` (and line 375 of `safelanes.conf`), `sudo nginx -t && sudo
+systemctl reload nginx`; the old container `sail-assistant-py` (image e12c0b916d4c =
+`sail-assistant-py:prompt-v1-rollback`, index `migrated`) never stops, and the `migrated` set stays
+in the database untouched. Promotion = the same edits 8015 → 8017 (or recreate
+`sail-assistant-py` from `:prompt-v2` with `ASSISTANT_INDEX_SET=repaired` and the same env file).
 
 **What this does NOT change:** the module-side Data API (Node, in Technical), the HTTP contracts,
 the identity token format, nginx/TLS/URL, the masking design and its captured-payload proof

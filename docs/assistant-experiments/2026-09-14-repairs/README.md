@@ -16,6 +16,13 @@ changed. No secrets (the configuration record lists environment key NAMES only).
 | `compare-repaired-v4.txt` | **run B (final)**: retrieval 18/18 ×3; joint answers live 7/12 · base-v2 7/12 · candidate 11/12; no regressions |
 | `acceptance-repaired-runA-dump.jsonl`, `acceptance-repaired-v4-dump.jsonl` | every full response (case, set, run, verdict, response JSON) |
 | `config-record.txt` | images, containers, index sets, env key names at the time of the earlier teardown |
+| `index-run-repaired-r3.txt` | candidate rebuild from the isolated corpus with the R3 generated documents (20 parses reused, 5 new LlamaParse jobs, 855 vectors reused) |
+| `final-run-c.txt`, `acceptance-*-dump.jsonl` (run C) | run C on the R3 candidate: frozen suite retained 11/12; corrected-claims suite .1 showed 5 judge defects (fixed as .2, reported) and 2 official-manual wording conflicts (R3.1) |
+| `final-run-d.txt`, `acceptance-final-dump.jsonl`, `acceptance-generated-dump.jsonl` | **run D (final)**: retrieval, frozen 12-case suite, corrected-claims suite .2 — live · same-prompt baseline · candidate (R3.1, 911 chunks) |
+
+Generated-document corrections: `central-assistant-py/generated-docs/` (build_r3.py = source of the R3
+documents, R2/ originals, R3/ corrected, PROVENANCE.md = every claim with disposition and file:line
+evidence at repository revision 27a40b2ce).
 
 Repair records themselves live in the code: `central-assistant-py/indexer/repairs/<sha16>.json`
 (document sha256, page, figure, method, version, transcribed text) and are applied by

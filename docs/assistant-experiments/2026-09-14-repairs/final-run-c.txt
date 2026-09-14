@@ -1,0 +1,207 @@
+instances: live 8015 {"ok":true,"store":"pgvector","indexSet":"migrated","chunks":907,"db": | base 8016 ":"migrated","chunks":907,"db":"conn | cand 8017 ":"repaired","chunks":908,"db":"conn
+===== FINAL RUN C (candidate = repaired + R3 docs; resolver .4, repairs .1, suite .3, gen-suite .1) =====
+--- RETRIEVAL ---
+== Part 2: retrieval — live-8015 (http://127.0.0.1:8015) | base-v2-8016 (http://127.0.0.1:8016) | cand-8017 (http://127.0.0.1:8017)   [module ✓/✗, manual ✓/✗, margin, top-distance]
+  how do I create a work order                 ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8084           
+  how to upload data in bulk data import       ✓✓ m=1.000 d=0.8458            | ✓✓ m=1.000 d=0.8458            | ✓✓ m=1.000 d=0.8458           
+  why did the running hours not go down after  ✓✓ m=1.000 d=0.9962            | ✓✓ m=1.000 d=0.9962            | ✓✓ m=1.000 d=1.0186           
+  how do I raise a defect on equipment         ✓✓ m=1.000 d=0.9056            | ✓✓ m=1.000 d=0.9056            | ✓✓ m=1.000 d=0.9056           
+  how do vessels sync their data with the offi ✓✓ m=1.000 d=0.7174            | ✓✓ m=1.000 d=0.7174            | ✓✓ m=1.000 d=0.7657           
+  how do I share an audit with the fleet from  ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.7533           
+  how do I prepare for an upcoming audit       ✓✓ m=1.000 d=0.9558            | ✓✓ m=1.000 d=0.9558            | ✓✓ m=1.000 d=0.9558           
+  where can I see the history of past audits   ✓✓ m=1.000 d=0.889             | ✓✓ m=1.000 d=0.889             | ✓✓ m=1.000 d=0.889            
+  how do I create an MOC                       ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441           
+  how do I carry out a risk assessment on the  ✓✓ m=1.000 d=0.7233            | ✓✓ m=1.000 d=0.7233            | ✓✓ m=1.000 d=0.7233           
+  how do I record a safety meeting             ✓✓ m=1.000 d=0.8213            | ✓✓ m=1.000 d=0.8213            | ✓✓ m=1.000 d=0.8213           
+  how does the master review the safety manage ✓✓ m=1.000 d=0.7683            | ✓✓ m=1.000 d=0.7683            | ✓✓ m=1.000 d=0.7683           
+  how do I report a near miss                  ✓✓ m=1.000 d=0.8269            | ✓✓ m=1.000 d=0.8269            | ✓✓ m=1.000 d=0.8269           
+  how do I report an incident on board         ✓✓ m=1.000 d=0.968             | ✓✓ m=1.000 d=0.968             | ✓✓ m=1.000 d=0.968            
+  how do I raise a lesson learnt               ✓✓ m=1.000 d=1.0127            | ✓✓ m=1.000 d=1.0127            | ✓✓ m=1.000 d=1.0127           
+  how do fleet notifications reach the vessel  ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7342           
+  how do I plan a crew change                  ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7967           
+  how do I add a new crew member to a vessel   ✓✓ m=1.000 d=0.7845            | ✓✓ m=1.000 d=0.7845            | ✓✓ m=1.000 d=0.7845           
+  what is the weather in Singapore today       gate=not_documented            | gate=not_documented            | gate=not_documented           
+  how do I change my payroll bank account      gate=not_documented            | gate=not_documented            | gate=not_documented           
+
+  routing+manual correct: live-8015 18/18   base-v2-8016 18/18   cand-8017 18/18
+
+--- FROZEN 12-CASE SUITE, 3 runs ---
+acceptance suite 2026-09-14.3 · 12 cases · repeat=3
+
+[01 callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   live-8015      answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   base-v2-8016   answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p15 | 'To export the data and manage vessel comments in the audit prepa'
+
+[02 callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   live-8015      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. The Email Notification icon notifies the Office that the prep'
+   base-v2-8016   answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+
+[03 callout] How do I upload a document for the first time in the SMS module?
+   live-8015      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click on the **+New Document** tab to initiate the SMS change'
+   base-v2-8016   answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | 'To upload a document for the first time in the SMS module, follo'
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | 'To upload a document for the first time in the SMS module, follo'
+
+[04 table] In the Master Review module, what do the grey and red icons mean?
+   live-8015      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '1. The **grey circle with slash** icon indicates that a response'
+   base-v2-8016   answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+
+[05 table] What are the hazard categories in a risk assessment?
+   live-8015      answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   base-v2-8016   answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   cand-8017      answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+
+[06 table] What actions can I take on a near miss record from the list — what do the icons do?
+   live-8015      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | '1. **View Record**: Click the eye icon to view, edit, or export '
+   base-v2-8016   answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | '1. **View Record**: Click the eye icon to view, edit, or export '
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | 'You can take the following actions on a near miss record from th'
+
+[07 xref] How do I apply a filter in the Stores sub-module of PMS?
+   live-8015      answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+   base-v2-8016   answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 | 'To apply a filter in the Stores sub-module of PMS, follow these '
+
+[08 xref] How do I export crew details from the Waitlist in Crewing?
+   live-8015      answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Waitlist is not '
+   base-v2-8016   answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Waitlist is not '
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Crewing - Crewing User Man p22 | 'To export crew details from the Waitlist in Crewing, follow thes'
+
+[09 xref] How do I create a COC defect record?
+   live-8015      answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+   base-v2-8016   answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record, follow these steps:\n\n1. Click on '
+
+[10 note] When filling MoC Part B, what happens if I select No for further assessment?
+   live-8015      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+   base-v2-8016   answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+
+[11 note] In PMS, is there another way to add a component besides the components panel?
+   live-8015      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'The documentation states that a new component can also be added '
+   base-v2-8016   answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | "Yes, a new component can also be added by clicking the '+ Add Co"
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | "Yes, a new component can also be added by clicking the '+ Add Co"
+
+[12 note] What should I review after deleting an implication in a vessel MoC?
+   live-8015      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+   base-v2-8016   answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+   cand-8017      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+
+== run-to-run disagreement (cases where runs split, 3 runs) ==
+   none
+
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case             live-8015 base-v2-8016    cand-8017
+   01 callout               ✗            ✗            ✓
+   02 callout               ✓            ✓            ✓
+   03 callout               ✓            ✓            ✓
+   04 table                 ✓            ✓            ✓
+   05 table                 ✗            ✗            ✗
+   06 table                 ✓            ✓            ✓
+   07 xref                  ✗            ✗            ✓
+   08 xref                  ✗            ✗            ✓
+   09 xref                  ✗            ✗            ✓
+   10 note                  ✓            ✓            ✓
+   11 note                  ✓            ✓            ✓
+   12 note                  ✓            ✓            ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   live-8015      7/12  9/12  12/12  JOINT 7/12
+   base-v2-8016   7/12  9/12  12/12  JOINT 7/12
+   cand-8017      11/12  11/12  12/12  JOINT 11/12
+   base-v2-8016   vs live-8015: regressions none | gains none
+   cand-8017      vs live-8015: regressions none | gains ['01 callout', '07 xref', '08 xref', '09 xref']
+
+--- CORRECTED TECHNICAL CLAIMS SUITE, 3 runs ---
+generated-docs suite 2026-09-14.1 · 14 cases · repeat=3
+
+[01 gen] In Bulk Data Import for jobs, do I have to fill in the Job Code column?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone | 'Yes, you must fill in the Job Code column, and it must be unique'
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone | 'Yes, you must fill in the Job Code column, and the job codes mus'
+   cand-8017      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. The Job Code column is optional.\n2. A blank Job Code is accep'
+
+[02 gen] Where do I find Bulk Data Import in the application?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. Go to **Admin → Bulk Data Import**.\n\nSource: Technical - Bulk'
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. Go to **Admin → Bulk Data Import**.\n2. Select the **Vessel** '
+   cand-8017      answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p63 | "1. In the PMS module, open Admin.\n2. Select the 'Bulk Data Imp' "
+
+[03 gen] What does the dry-run show for each row in a bulk import, and when do I see the created and updated counts?
+   live-8015      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. The dry-run shows for each row whether it would be:\n   - Crea'
+   base-v2-8016   answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. The dry-run shows the following for each row:\n   - **Created*'
+   cand-8017      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. The dry-run shows each row as marked ok, warning, or error.\n2'
+
+[04 gen] In work-order numbers, what do the vessel code and the segment after it mean, and what does an unplanned work order number look like?
+   live-8015      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | '1. The vessel code is a prefix in the work order number.\n2. For '
+   base-v2-8016   answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'The vessel code is a prefix in the work-order numbers that ident'
+   cand-8017      answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | '1. The vessel code is a prefix in work-order numbers that identi'
+
+[05 gen] A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?
+   live-8015      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | '1. Vessel master records, including the vessel code, are maintai'
+   base-v2-8016   answer ✓  cite ✓  PASS ✓ [2/3]  gate=answer cite=Technical - Recent Updates pNone | '1. Vessel master records, including the vessel code, are maintai'
+   cand-8017      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'The vessel code reaches a ship only through provisioning. If a s'
+
+[06 gen] Who can generate work orders from the office, and what happens if the vessel's switch is off?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Recent Updates pNone | '1. Only office users can generate work orders from the office if'
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Recent Updates pNone | '1. Only a Sail Admin can enable the "office work-order generatio'
+   cand-8017      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | '1. Only a Sail Admin can generate work orders directly from the '
+
+[07 gen] Can a Head of Department do everything an office user can do for their department?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Roles & Permis pNone | 'Yes, a Head of Department can do everything an office user can d'
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Roles & Permis pNone | 'Yes, a Head of Department can do everything an office user can d'
+   cand-8017      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No, a Head of Department cannot do everything an office user can'
+
+[08 gen] Is Level 2 Reviewer a user role I can assign?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Roles & Permis pNone | 'The information provided does not cover whether the Level 2 Revi'
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Roles & Permis pNone | 'The information regarding whether the Level 2 Reviewer is a user'
+   cand-8017      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p12 | 'The information about assigning user roles is not covered in the'
+
+[09 gen] Where is the Me / My Team toggle and who can use it?
+   live-8015      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p11 | "1. The 'Me / My Team' toggle is located in the 'Operation' tab i"
+   base-v2-8016   answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p11 | "The 'Me / My Team' toggle is located in the Operation tab in the"
+   cand-8017      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p11 | "The 'Me / My Team' toggle is located in the Operation tab in the"
+
+[10 gen] On the Fleet Sync Overview, what does an amber status mean?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'An amber status on the Fleet Sync Overview means that the vessel'
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'An amber status on the Fleet Sync Overview means that the vessel'
+   cand-8017      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'An amber status means that there has been no sync for more than '
+
+[11 gen] Does one press of Sync Now clear a long backlog on the ship?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'Yes, one press of "Sync Now" keeps repeating cycles until the ba'
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'Yes, one press of "Sync Now" keeps repeating cycles until the ba'
+   cand-8017      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | "One press of 'Sync Now' does not clear a long backlog on the shi"
+
+[12 gen] If a ship's vessel master data changes, how is the ship refreshed?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Sync (Operatio pNone | "1. Contact support to refresh the ship's vessel master data.\n2. "
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [1/3]  gate=answer cite=Technical - Sync (Operatio pNone | "1. Contact support about refreshing the ship's vessel master dat"
+   cand-8017      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | '1. A Sail Admin re-provisions the ship from Admin → Ship Provisi'
+
+[13 gen] On the ship, what happens if I enter a running-hours reading lower than the component's current hours when completing a work order?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | '1. The completion of the work order will still be saved.\n2. The '
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | '1. The completion of the work order will still be saved, and the'
+   cand-8017      answer ✓  cite ✓  PASS ✓ [2/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | '1. The lower reading you entered will be refused with the messag'
+
+[14 gen] Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+   live-8015      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Roles & Permis pNone | 'The information regarding which office screen holds the per-vess'
+   base-v2-8016   answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Roles & Permis pNone | 'The information about the office screen that holds the per-vesse'
+   cand-8017      answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - Recent Updates pNone | "1. Access the 'Lead Time & Grace Period Settings' screen.\n2. Her"
+
+== per-case (answer ∧ citation), out of 14 ==
+   case     live-8015 base-v2-8016    cand-8017
+   01               ✗            ✗            ✓
+   02               ✗            ✗            ✗
+   03               ✓            ✓            ✓
+   04               ✓            ✓            ✗
+   05               ✓            ✓            ✓
+   06               ✗            ✗            ✓
+   07               ✗            ✗            ✗
+   08               ✗            ✗            ✗
+   09               ✗            ✗            ✗
+   10               ✗            ✗            ✗
+   11               ✗            ✗            ✓
+   12               ✗            ✗            ✓
+   13               ✗            ✗            ✓
+   14               ✗            ✗            ✗
+   live-8015      3/14
+   base-v2-8016   3/14
+   cand-8017      7/14
