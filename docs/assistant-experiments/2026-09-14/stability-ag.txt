@@ -1,0 +1,13 @@
+
+== Audit - Preparation  (run1 pjb-r2hkseqtkfzqidr39apyqfhvy6zn vs run2 pjb-p1dpo2welbesmet0a9kwocrwtmqh)
+   RAW      pages run1=33 run2=33 compared=33 (by original page no.) | identical 1 | formatting-only 4 | REAL text diffs 28 | word similarity 0.906
+      p1: 4 word changes — e.g. -water +textured -water +textured
+      p4: 17 word changes — e.g. -with +showing +captcha -captcha -with +login +button +an +orange -pointing
+      p6: 66 word changes — e.g. +select +an +inspection +type +to +display +the +corresponding +preparation +records
+      p7: 38 word changes — e.g. -screenshotfromcomputer +screenshot -the +checklist -of -a -preparation -checklist -a -callout
+   CLEANED  pages run1=32 run2=32 compared=32 (by original page no.) | identical 16 | formatting-only 8 | REAL text diffs 8 | word similarity 0.968
+      p4: 1 word changes — e.g. -note
+      p6: 76 word changes — e.g. +2 +preparation +sub +module +overview +select +an +inspection +type +to
+      p9: 12 word changes — e.g. +click +this +icon +to +send +preparation +completion +email +notification +to
+      p11: 9 word changes — e.g. -pointing -right +pointer -pointing -right +pointer -pointing -right +pointer
+   removed run1/run2: tables 1/2, callouts 0/0, struck 0/0

@@ -1,0 +1,97 @@
+===== RETRIEVAL: old-prompt 8015 vs new-prompt 8016 (both index set migrated) =====
+== Part 2: retrieval — old-8015 (http://127.0.0.1:8015) | new-8016 (http://127.0.0.1:8016)   [module ✓/✗, manual ✓/✗, margin, top-distance]
+  how do I create a work order                 ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8084           
+  how to upload data in bulk data import       ✓✓ m=1.000 d=0.8458            | ✓✓ m=1.000 d=0.8458           
+  why did the running hours not go down after  ✓✓ m=1.000 d=0.9962            | ✓✓ m=1.000 d=0.9962           
+  how do I raise a defect on equipment         ✓✓ m=1.000 d=0.9056            | ✓✓ m=1.000 d=0.9056           
+  how do vessels sync their data with the offi ✓✓ m=1.000 d=0.7174            | ✓✓ m=1.000 d=0.7174           
+  how do I share an audit with the fleet from  ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.7533           
+  how do I prepare for an upcoming audit       ✓✓ m=1.000 d=0.9558            | ✓✓ m=1.000 d=0.9558           
+  where can I see the history of past audits   ✓✓ m=1.000 d=0.889             | ✓✓ m=1.000 d=0.889            
+  how do I create an MOC                       ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441           
+  how do I carry out a risk assessment on the  ✓✓ m=1.000 d=0.7233            | ✓✓ m=1.000 d=0.7233           
+  how do I record a safety meeting             ✓✓ m=1.000 d=0.8213            | ✓✓ m=1.000 d=0.8213           
+  how does the master review the safety manage ✓✓ m=1.000 d=0.7683            | ✓✓ m=1.000 d=0.7683           
+  how do I report a near miss                  ✓✓ m=1.000 d=0.8269            | ✓✓ m=1.000 d=0.8269           
+  how do I report an incident on board         ✓✓ m=1.000 d=0.968             | ✓✓ m=1.000 d=0.968            
+  how do I raise a lesson learnt               ✓✓ m=1.000 d=1.0127            | ✓✓ m=1.000 d=1.0127           
+  how do fleet notifications reach the vessel  ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7342           
+  how do I plan a crew change                  ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7967           
+  how do I add a new crew member to a vessel   ✓✓ m=1.000 d=0.7845            | ✓✓ m=1.000 d=0.7845           
+  what is the weather in Singapore today       gate=not_documented            | gate=not_documented           
+  how do I change my payroll bank account      gate=not_documented            | gate=not_documented           
+
+  routing+manual correct: old-8015 18/18   new-8016 18/18
+
+===== ANSWERS: acceptance --repeat 3, old-prompt 8015 vs new-prompt 8016 =====
+
+[01 callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   old-8015       answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   new-8016       answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+
+[02 callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   old-8015       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. The Email Notification icon notifies the Office that the prep'
+   new-8016       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+
+[03 callout] How do I upload a document for the first time in the SMS module?
+   old-8015       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click on the **+New Document** tab to initiate the SMS change'
+   new-8016       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | 'To upload a document for the first time in the SMS module, follo'
+
+[04 table] In the Master Review module, what do the grey and red icons mean?
+   old-8015       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '1. The **grey icon** indicates that a response is due.\n2. The **'
+   new-8016       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+
+[05 table] What are the hazard categories in a risk assessment?
+   old-8015       answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   new-8016       answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+
+[06 table] What actions can I take on a near miss record from the list — what do the icons do?
+   old-8015       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | '1. **View Record**: Click the eye icon to view, edit, or export '
+   new-8016       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | '1. **View Record**: Click the eye icon to view, edit, or export '
+
+[07 xref] How do I apply a filter in the Stores sub-module of PMS?
+   old-8015       answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+   new-8016       answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+
+[08 xref] How do I export crew details from the Onboard list in Crewing?
+   old-8015       answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Onboard list is '
+   new-8016       answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Crewing - Crewing User Man p28 | 'The steps to export crew details from the Onboard list are not c'
+
+[09 xref] How do I create a COC defect record?
+   old-8015       answer ✓  cite ✓  attrib ✗  JOINT ✗ [0/3]  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+   new-8016       answer ✓  cite ✓  attrib ✓  JOINT ✓ [2/3]  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+
+[10 note] When filling MoC Part B, what happens if I select No for further assessment?
+   old-8015       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+   new-8016       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+
+[11 note] In PMS, is there another way to add a component besides the components panel?
+   old-8015       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'The manual states that a new component can also be added by clic'
+   new-8016       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'Yes, there is another way to add a component. You can also add a'
+
+[12 note] What should I review after deleting an implication in a vessel MoC?
+   old-8015       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+   new-8016       answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+
+== run-to-run disagreement (cases where runs split, 3 runs) ==
+   09 xref · new-8016 (2/3)
+
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case              old-8015     new-8016
+   01 callout               ✗            ✗
+   02 callout               ✓            ✓
+   03 callout               ✓            ✓
+   04 table                 ✓            ✓
+   05 table                 ✗            ✗
+   06 table                 ✓            ✓
+   07 xref                  ✗            ✗
+   08 xref                  ✗            ✗
+   09 xref                  ✗            ✓
+   10 note                  ✓            ✓
+   11 note                  ✓            ✓
+   12 note                  ✓            ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   old-8015       8/12  10/12  11/12  JOINT 7/12
+   new-8016       8/12  10/12  12/12  JOINT 8/12
+   new-8016       vs old-8015: regressions none | gains ['09 xref']

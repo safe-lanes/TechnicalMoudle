@@ -145,7 +145,8 @@ cross-refs (zero parse cost), to isolate the cleanup effect on the 18/18 baselin
 file, slug_url, breadcrumb, section_title, source_type, chunk_index, page_number, llamaparse_tier,
 llamaparse_version — PROVEN from the node record in Chroma and by cosine against the stored
 vectors). With that input the rebuild (`ag-base`) reproduces **18/18**; the embedding mode is now
-part of the build key. Residual distance shifts (+0.03–0.05) are OpenAI embedding drift over time.
+part of the build key. Residual distance shifts (+0.03–0.05) were first labelled "OpenAI embedding
+drift" — NOT established; corrected in §S.5 ("unexplained embedding variation", measured).
 *Four builds from the same parses, all embedded like the live set:*
 
 | set | retrieval (18) | joint answers (12, 3-run majority) | regressions vs live | gains |
@@ -176,6 +177,73 @@ cleanup is neutral on answers and costs one retrieval case on this corpus — it
 reduction for future re-parses, not accuracy today. Recommendation put to the owner: deploy the
 prompt rule; adopt `ag-xref` as the served set (18/18, no regression, +2 cross-ref cases, honest
 attribution); keep cleanup as an option for new documents, not for the live corpus.
+
+**S.5 — Prompt-rule deployment attempt, 14-Sep-2026 (owner decision: "deploy the prompt rule only,
+hold ag-xref"). Outcome: deployed, measured, ROLLED BACK by the owner's own rule; the reported
+9/12 is RETRACTED.** Artefacts: `docs/assistant-experiments/2026-09-14/` (every comparison
+output, the per-case response dump, index-run logs, configuration record).
+*What was deployed:* the exact tested wording (no change since commit `2e16829e1`), labelled
+`PROMPT_VERSION = v2-xref-hardrule-2026-09-14`, content hashes docs-path `b37172f6122a0257` ·
+tool-loop `f8e5a8f86bede638` · combined `ebfd83a623e41173`, now reported by `/health.prompt`.
+Image `sail-assistant-py:prompt-v2` (8db669090d36) on `127.0.0.1:8016`, index set `migrated`, no
+reindex. The previously live image (untagged `e12c0b916d4c`, 11-Sep — NOT `:port` as earlier notes
+said) was tagged `sail-assistant-py:prompt-v1-rollback` and kept running on 8015; nginx was
+switched 8015→8016 (backups `*.bak-8015-*`), then back.
+*Measured, comparator = old prompt on 8015, same index, same day, 3-run majority:*
+
+| measurement | index | prompt | joint (12) | vs comparator |
+|---|---|---|---|---|
+| S.4 table row "migrated" | migrated | old | 7/12 | — |
+| S.4 table row "migrated-np" (8023) | migrated | v2 | 9/12 | +08, +09 — **both invalid, see below** |
+| S.4 rows ag-base / ag-xref | ag-base / ag-xref | v2 (same prompt on both) | 8/12 · 9/12 | 08 (invalid) · 07+09 |
+| deploy check 1 (`deploy-verify-8016.txt`) | migrated | old vs v2 | 7/12 vs 8/12 | +09 (2/3, wording only) |
+| deploy check 2, corrected suite (`acceptance-live-final.txt`) | migrated | old vs v2 | **7/12 vs 7/12** | none, no regression |
+| retrieval, both checks | migrated | — | 18/18 vs 18/18 | identical distances |
+
+*Why the 9/12 was wrong (PROVEN from the manual chunks and the response dump):*
+- Case 08 asked about "the Onboard list in Crewing". The Crewing manual's Recruitment area has
+  In-Progress (1.2.1), Recruited (1.2.2), Waitlist (1.2.3), Rejected (1.2.4) — there is **no
+  Onboard list**; "Onboard" is only a crew status (1.4.1.7). Every "pass" on this case was the
+  model asserting that the steps are "the same as" Crew Database export (1.3.1.4, p.28) — an
+  equivalence the manual never states — and the judge accepted it because the answer contained
+  "export". The case is rewritten to the Waitlist (whose manual pointer 1.2.3.3 says "Refer to the
+  In-Progress sub-sub-module", i.e. 1.2.1.5 on p.19: Edit icon → Export button) and rejects
+  "Crew Database". The resolver's target (In-Progress) matches the manual; that part stands.
+- Case 09's "pass" was the attribution regex matching the phrase "same as" in a run that merely
+  restated the manual's pointer ("Refer to the 'Defect Log' sub-submodule. Follow the same
+  procedure"). All 6 final runs on both prompts give that identical non-answer. The judge now
+  rejects a pointer restated without any concrete step; with it, 09 fails on both prompts.
+- Consequence: on the live index the cross-reference sections contain only the pointer, so the
+  prompt rule has nothing to apply — the rule only helps when the resolved steps are in the
+  retrieved chunk (`ag-xref`). Prompt-only deployment has **no measurable effect** on the served
+  set: it neither gains nor regresses (9 runs per case across three measurements).
+*State after rollback:* public URL → 8015 (old prompt, `/health` has no `prompt` field);
+`sail-assistant-py-v2` left running on 8016 for the owner's decision (delete or promote); the
+eight comparison instances 8017–8024 are removed; all index sets stay in the DB (`migrated`,
+`ag-base`, `ag-xref`, `ag-clean`, `ag-both`, `ce-clean`, `py-llamaparse`, `ag-reuse`).
+*Embedding record (owner ask; replaces the "drift" label):* model `text-embedding-3-large`,
+3072 dims, OpenAI direct (no Azure deployment), vectors stored in pgvector `vector(3072)` as a
+full-precision text literal, no normalisation, squared L2 at query time. Measured
+(`probe_determinism.py`, 3 chunks): same input embedded twice now → cosine 1.000000; now vs our
+14-Sep vectors → 0.9997–0.9999; now vs the live `migrated` vectors → 0.980–0.984. Our
+reconstructed LlamaIndex input is byte-identical for 907/907 chunks (`embed_sha` match), so the
+provider is deterministic and the residual is on the INPUT side of the original July/September
+embedding (some difference between LlamaIndex's actual request and the documented template, or
+a model snapshot change) — **"unexplained embedding variation"**, bounded at cosine ≈ 0.98, and
+now irrelevant in practice: **stored-vector reuse** (`embed_sha` = sha256(model + exact input) in
+chunk metadata; backfilled into `migrated` and `ag-base`, additive metadata only) makes a rebuild
+of unchanged chunks reuse the served set's vectors verbatim — PROVEN: `ag-reuse` rebuilt 907/907
+with 0 embedding calls and identical retrieval distances to `migrated` (17/18 equal, one query
+differs 0.7847 vs 0.7845 = the live-computed *question* embedding).
+*Reproducibility record now stored per document* (`clean_report.build`): parser + full request
+configuration, cleanup version, resolver version `XREF_VERSION` + settings, chunker version,
+chunk params, embedding input mode, model + dimensions, vector handling; the resolver version
+and model:dims are part of the build key. The answer-prompt version is a serving property,
+recorded by `/health.prompt` (version + hashes), not in the index.
+*Next priority (owner-set):* targeted extraction repair for cases 01 (Audit Preparation p.15
+export callout) and 05 (Risk Assessment hazard-category table), verified against the source
+manuals; cleanup stays experimental. `ag-xref` remains on hold pending the owner's read of this
+section.
 
 **What this does NOT change:** the module-side Data API (Node, in Technical), the HTTP contracts,
 the identity token format, nginx/TLS/URL, the masking design and its captured-payload proof

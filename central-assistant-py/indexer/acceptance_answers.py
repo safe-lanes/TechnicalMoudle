@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import re
 import sys
@@ -45,8 +46,14 @@ CASES: list[tuple[str, str, str, str, int | None, list[str], list[str]]] = [
      "incident", "Near Miss", 5, ["view"], []),
     ("xref", "How do I apply a filter in the Stores sub-module of PMS?",
      "technical", "PMS User Manual", None, ["filter"], ["not covered", "isn't covered", "not documented"]),
-    ("xref", "How do I export crew details from the Onboard list in Crewing?",
-     "crewing", "Crewing", None, ["export"], ["not covered", "isn't covered", "not documented"]),
+    # Case 08 corrected 14-Sep-2026 against the manual (PROVEN from the indexed Crewing chunks):
+    # the Recruitment area has In-Progress / Recruited / Waitlist / Rejected — there is NO "Onboard
+    # list"; "Onboard" is only a crew status (1.4.1.7). The old wording could only "pass" when the
+    # model invented an equivalence with Crew Database export (1.3.1.4). The pointer sections
+    # 1.2.2.3 / 1.2.3.3 / 1.2.4.3 say "Refer to the In-Progress sub-sub-module" whose steps are
+    # 1.2.1.5 on page 19 (Edit icon → Export button).
+    ("xref", "How do I export crew details from the Waitlist in Crewing?",
+     "crewing", "Crewing", None, ["export", "edit"], ["not covered", "isn't covered", "not documented", "crew database"]),
     ("xref", "How do I create a COC defect record?",
      "technical", "Defects", None, ["defect"], ["not covered", "isn't covered", "not documented"]),
     ("note", "When filling MoC Part B, what happens if I select No for further assessment?",
@@ -80,6 +87,8 @@ def judge(j: dict, manual: str, page: int | None, must: list[str], must_not: lis
     raw = j.get("response") or ""
     ans = raw.lower()
     ok_answer = all(p.lower() in ans for p in must) and not any(p.lower() in ans for p in must_not) and j.get("gate") == "answer"
+    if cls == "xref" and re.search(r"refer to the ['‘\"]?[\w &-]+['’\"]? (sub-)?(sub-)?module", ans) and not re.search(r"^\s*\d+\.\s+(click|go to|select|open|use|enter)", ans, re.M):
+        ok_answer = False  # judge tightened 14-Sep-2026: parroting the manual's pointer ("Refer to the X sub-module, follow the same procedure") is NOT an answer
     cits = j.get("citations") or []
     top = cits[0] if cits else {}
     ok_cite = manual.lower() in str(top.get("manual", "")).lower() and (page is None or page_of(top) == page)
@@ -94,9 +103,11 @@ async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--set", action="append", required=True, help="NAME=SERVICE_URL (repeatable)")
     ap.add_argument("--repeat", type=int, default=1, help="ask each case N times per set; a case passes when the MAJORITY of runs pass (LLM answers vary run to run)")
+    ap.add_argument("--dump", default=None, help="write every full response (case, set, run, verdict, response JSON) as JSON lines to this file")
     args = ap.parse_args()
     key = os.environ["IDENTITY_SIGNING_KEY"]
     sets = [(s.partition("=")[0], s.partition("=")[2]) for s in args.set]
+    dump = open(args.dump, "w", encoding="utf-8") if args.dump else None  # noqa: SIM115
     score = {n: [0, 0, 0, 0] for n, _ in sets}  # answer, cite, attribution, JOINT
     matrix: list[tuple[str, dict[str, bool]]] = []
     flaky: list[str] = []
@@ -107,6 +118,11 @@ async def main() -> int:
             row: dict[str, bool] = {}
             for si, (n, _) in enumerate(sets):
                 verdicts = [judge(runs[r][si], manual, page, must, must_not, cls) for r in range(args.repeat)]
+                if dump:
+                    for r in range(args.repeat):
+                        dump.write(json.dumps({"case": i, "class": cls, "question": q, "set": n, "run": r + 1,
+                                               "verdict": {"answer": verdicts[r][0], "citation": verdicts[r][1], "attribution": verdicts[r][2]},
+                                               "response": runs[r][si]}, ensure_ascii=False) + "\n")
                 votes = [(a and ct and at) for a, ct, at, _ in verdicts]
                 joint = sum(votes) * 2 > len(votes)
                 a = sum(v[0] for v in verdicts) * 2 > len(verdicts)
@@ -140,6 +156,8 @@ async def main() -> int:
         lost = [lbl for lbl, row in matrix if row[base] and not row[n]]
         gained = [lbl for lbl, row in matrix if not row[base] and row[n]]
         print(f"   {n:<14} vs {base}: regressions {lost or 'none'} | gains {gained or 'none'}")
+    if dump:
+        dump.close()
     return 0
 
 

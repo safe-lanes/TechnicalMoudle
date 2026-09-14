@@ -1,0 +1,121 @@
+manual                                               pg cover  toc  hdr  ftr zones tbl rm/kept merm callout susp xref ok/un
+Audit - Fleet Sharing Manual- Office_R1_30.06.2026.p  9     -    1    0    0     7     0/1        0       0    0     0/0   
+Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.p  6     -    1    0    0     4     0/0        0       0    0     0/0   
+Audit - History Manual_R1_30.06.2026.pdf             16     -    1    0    0    19     0/1        0       0    1     0/0   
+Audit - Preparation Manual_Office_R1_30.06.2026.pdf  33     Y    1    0    0    45     0/2        2       0    0     0/0   
+Crewing - Crewing User Manual R2_10.06.2026.pdf     111     -    3    0    0   135     0/0        0       0    1    26/0   
+Incident - Fleet Notification User Manual_Vessel_ R0  8     Y    1    0    0     7     0/3        0       0    1     0/0   
+Incident - Incident User Manual R0_20.05.2026.pdf    19     -    1    0    0    21     0/4        1       1    1     0/0   
+Incident - Lesson Learnt User Manual_Vessel_R0_30.05  9     Y    1    0    0     7     0/0        0       0    1     0/0   
+Incident - Near Miss User Manual R1_30.05.2026.pdf   11     Y    1    0    0     9     0/3        0       1    3     0/0   
+Safety - MOC User Manual_Office_R0_31.03.2026.pdf    19     Y    1   15    0    20     0/1        0       6    0     0/0   
+Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf    15     -    1    0    0    17     0/2        0       8    1     0/0   
+Safety - Master Review Manual R1_10.06.2026.pdf      11     -    1    0    0    11     0/3        0       0    1     0/0   
+Safety - Risk Assessment User Manual_Office_R1_30.05 25     -    1    0    0    35     0/3        0       0    0     0/0   
+Safety - Risk Assessment User Manual_Vessel_R1_30.05 16     -    1    0    0    21     0/2        0       2    1     0/0   
+Safety - SMS User Manual_Office_R0_31.01.2026.pdf    22     -    1    0    0    36     0/0        0       0    1     0/0   
+Safety - Safety Meeting User Manual_R1_31.05.2026.pd 18     -    1    0    0    16     0/0        0       0    1     0/0   
+Technical - Bulk Data Import (Operational) User Manu  2     -    0    0    0     0     0/0        0       0    0     0/0   
+Technical - Cert. & Surveys User Manual For Office_S 21     -    1    0    1    25     0/0        0       0    1     3/0   
+Technical - Defects User Manual For Office_Sail Admi 20     -    1    9    1    27     0/0        0       0    1     6/0   
+Technical - PMS User Manual For Office_Sail Admin_R2 64     Y    2   36    9    98     0/0        0       0    1     3/0   
+Technical - PMS User Manual_Vessel Specific_R3_08.07 54     Y    1    0    0    82     0/0        0       0    1     3/0   
+Technical - Recent Updates & Changed Behaviours (Ope  2     -    0    0    0     0     0/0        0       0    0     0/0   
+Technical - Roles & Permissions (Operational) User M  3     -    0    0    0     0     0/0        0       0    0     0/0   
+Technical - Ship-Side (Vessel Crew) Operational Note  2     -    0    0    0     0     0/0        0       0    0     0/0   
+Technical - Sync (Operational) User Manual.docx       3     -    0    0    0     0     0/0        0       0    0     0/0   
+
+TOTAL tables removed 0 · kept 25 · mermaid removed 3 · suspicious removed lines 17 · xrefs resolved 41 / unresolved 0
+
+== KEPT tables (asserted genuine) — header cells ==
+  Audit - Fleet Sharing Manual- Office_R1_ p5: Icon | Action | Description | [icon: paperclip] | Upload &#x26; View Attachment | Upload a
+  Audit - History Manual_R1_30.06.2026.pdf p6: Icon | Action | Description | [icon: paperclip] | View Attachment | Upload and view suppor
+  Audit - Preparation Manual_Office_R1_30. p6: Above Bar | Below Bar | • | Indicates the percentage of Time elapsed. | [icon: blue dot] |
+  Audit - Preparation Manual_Office_R1_30. p24: Repeated Observations [icon: close] Company Vessel Pool | Date | Port | Oil Major | Inspec
+  Incident - Fleet Notification User Manua p5: Notification Id | Notification Tit. | Issue Date | Confirmation Sent | Discussion Date
+  Incident - Fleet Notification User Manua p8: S.No. | Nature Of Action | Due Date | Date Completed | Status | 1
+  Incident - Fleet Notification User Manua p8: Notification Id | Notification Title | Issue Date | Confirmation Sent | Discussion Date | 
+  Incident - Incident User Manual R0_20.05 p5: Icon | Action | Description | [icon: paperclip] | Add Attachment | Upload and attach suppo
+  Incident - Incident User Manual R0_20.05 p7: Severity Level | Personnel Injury | Assets/Process Loss | 5 - Catastrophic | Fatality | Fi
+  Incident - Incident User Manual R0_20.05 p11: Guidance On What Needs To Be Investigated | Work Environment | Equipment | Programs (Proce
+  Incident - Incident User Manual R0_20.05 p19: Report Id | Date | Vessel | Incident Category | Sub Category | Incident Title
+  Incident - Near Miss User Manual R1_30.0 p4: VESSEL | INSPECTION | PROGRESS | DUE DATE | PORT | ACTION
+  Incident - Near Miss User Manual R1_30.0 p5: Icon | Action | Description | [icon: eye] | View Record | View, edit, or export the select
+  Incident - Near Miss User Manual R1_30.0 p11: Report ID | Date | Report Type | Description | Task | Risk
+  Safety - MOC User Manual_Office_R0_31.03 p7: Icon | Action | Description | [icon: paperclip] | Add Attachment | Upload and attach suppo
+  Safety - MOC User Manual_Vessel_R0_31.03 p4: Moc. No. | Date Init | Subject | Cat | Type of Change | Risk
+  Safety - MOC User Manual_Vessel_R0_31.03 p5: Icon | Action | Description | [icon: paperclip] | Add Attachment | Upload and attach suppo
+  Safety - Master Review Manual R1_10.06.2 p6: Icon | Action | Description | [icon: paperclip] | Add Attachment | Upload and attach suppo
+  Safety - Master Review Manual R1_10.06.2 p6: Icon | Description | [icon: grey circle with slash] | Grey Icon – Response Due | [icon: re
+  Safety - Master Review Manual R1_10.06.2 p8: Manuals | Last Revision | Type | Description | Status | Office Action
+  Safety - Risk Assessment User Manual_Off p8: Icon | Action | Description | [icon: curved arrow] | Review GRA | Opens the selected GRA f
+  Safety - Risk Assessment User Manual_Off p10: Icon | Action | Description | [icon: duplicate] | Duplicate RA | To create Duplicate RA fo
+  Safety - Risk Assessment User Manual_Off p17: Icon | Action | Description | [icon: duplicate] | Duplicate RA | To create Duplicate RA fo
+  Safety - Risk Assessment User Manual_Ves p9: Report Id | Date Assessed | RA Name | RA Type | Sub Group | Initial Risk
+  Safety - Risk Assessment User Manual_Ves p9: Icon | Action | Description | [icon: duplicate] | Duplicate Record | To create Duplicate R
+
+== REMOVED material UNIQUE on its page (the risk set, every rule) — review each ==
+  Audit - History Manual_R1_30.06.2026.pdf [toc-entry] p3: '## Table of Contents'
+  Crewing - Crewing User Manual R2_10.06.2 [toc-entry] p2: '## TABLE OF CONTENTS'
+  Incident - Fleet Notification User Manua [toc-entry] p2: '## Table of Contents'
+  Incident - Incident User Manual R0_20.05 [toc-entry] p2: '## Table of Contents'
+  Incident - Lesson Learnt User Manual_Ves [toc-entry] p2: '## Table of Contents'
+  Incident - Near Miss User Manual R1_30.0 [toc-entry] p2: '## Table of Contents'
+  Incident - Near Miss User Manual R1_30.0 [toc-entry] p2: '6. **OFFICE CLOSEOUT** **11**'
+  Incident - Near Miss User Manual R1_30.0 [toc-entry] p2: '7. **STATUS INDICATORS** **11**'
+  Safety - MOC User Manual_Vessel_R0_31.03 [toc-entry] p2: '## Table of Contents'
+  Safety - Master Review Manual R1_10.06.2 [toc-entry] p2: '## Table of Contents'
+  Safety - Risk Assessment User Manual_Ves [toc-entry] p2: '## Table of Contents'
+  Safety - SMS User Manual_Office_R0_31.01 [toc-entry] p2: '## TABLE OF CONTENTS'
+  Safety - Safety Meeting User Manual_R1_3 [toc-entry] p2: '## Table of Contents'
+  Technical - Cert. & Surveys User Manual  [toc-entry] p2: '# Table of Contents'
+  Technical - Defects User Manual For Offi [toc-entry] p2: '## Table of Contents'
+  Technical - PMS User Manual For Office_S [toc-entry] p2: '## Table of Contents'
+  Technical - PMS User Manual_Vessel Speci [toc-entry] p2: '## Table of Contents'
+
+== UNRESOLVED cross-references ==
+
+== REMOVED tables — header cells (first 12 per manual) ==
+
+== RESOLVED cross-references ==
+  Crewing - Crewing User Manual R2_10.06.2 1.2.2.2 HOW TO EDIT OR DELETE A CREW RECORD   → 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD
+  Crewing - Crewing User Manual R2_10.06.2 1.2.2.3 HOW TO EXPORT CREW DETAILS            → 1.2.1.5 HOW TO EXPORT CREW DETAILS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.2.4 HOW TO APPLY FILTER                   → 1.2.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.3.2 HOW TO EDIT OR DELETE A CREW RECORD   → 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD
+  Crewing - Crewing User Manual R2_10.06.2 1.2.3.3 HOW TO EXPORT CREW DETAILS            → 1.2.1.5 HOW TO EXPORT CREW DETAILS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.3.4 HOW TO APPLY FILTER                   → 1.2.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.4.2 HOW TO EDIT OR DELETE A CREW RECORD   → 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD
+  Crewing - Crewing User Manual R2_10.06.2 1.2.4.3 HOW TO EXPORT CREW DETAILS            → 1.2.1.5 HOW TO EXPORT CREW DETAILS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.4.4 HOW TO APPLY FILTER                   → 1.2.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.7.1.2 HOW TO APPLY FILTER                   → 1.6.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.7.1.3 HOW TO EXPORT ALL CREW APPRAISALS     → 1.6.1.6 HOW TO EXPORT ALL PROMOTIONAL RECORDS
+  Crewing - Crewing User Manual R2_10.06.2 1.8.1.3 HOW TO APPLY FILTER                   → 1.6.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.8.2.2 HOW TO CREATE AND DELETE PERIODIC ALC → 1.8.1.2 HOW TO CREATE AND DELETE ANNUAL D&A R
+  Crewing - Crewing User Manual R2_10.06.2 1.8.2.3 HOW TO APPLY FILTER                   → 1.6.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.8.2.4 HOW TO REVIEW AND EXPORT PERIODIC ALC → 1.8.1.4 HOW TO REVIEW AND EXPORT ANNUAL D & A
+  Crewing - Crewing User Manual R2_10.06.2 1.8.3.2 HOW TO CREATE AND DELETE MONTHLY ALCO → 1.8.1.2 HOW TO CREATE AND DELETE ANNUAL D&A R
+  Crewing - Crewing User Manual R2_10.06.2 1.8.3.3 HOW TO APPLY FILTER                   → 1.6.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.8.3.4 HOW TO REVIEW AND EXPORT MONTHLY ALCO → 1.8.1.4 HOW TO REVIEW AND EXPORT ANNUAL D & A
+  Crewing - Crewing User Manual R2_10.06.2 1.8.4.2 HOW TO APPLY FILTER                   → 1.6.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.8.5.2 HOW TO CREATE A NEW OTHER TEST RECORD → 1.8.4.3 HOW TO CREATE A NEW POST INCIDENT TES
+  Crewing - Crewing User Manual R2_10.06.2 1.8.5.3 HOW TO EDIT OTHER TEST RECORD         → 1.8.4.4 HOW TO EDIT A POST INCIDENT TEST RECO
+  Crewing - Crewing User Manual R2_10.06.2 1.8.5.4 HOW TO EXPORT OTHER TEST RECORD       → 1.8.4.5 HOW TO EXPORT POST INCIDENT TEST RECO
+  Crewing - Crewing User Manual R2_10.06.2 1.8.5.5 HOW TO APPLY FILTER                   → 1.6.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.8.6.3 HOW TO CREATE AND DELETE SUMMARY RECO → 1.8.1.2 HOW TO CREATE AND DELETE ANNUAL D&A R
+  Crewing - Crewing User Manual R2_10.06.2 1.8.6.4 HOW TO REVIEW AND EXPORT SUMMARY RECO → 1.8.1.4 HOW TO REVIEW AND EXPORT ANNUAL D & A
+  Crewing - Crewing User Manual R2_10.06.2 1.10.1.5 HOW TO EXPORT ALL TRAINING NEEDS REC → 1.6.1.6 HOW TO EXPORT ALL PROMOTIONAL RECORDS
+  Technical - Cert. & Surveys User Manual  1.1.4.2 HOW TO APPLY FILTER                   → 1.1.3.2 HOW TO APPLY FILTER
+  Technical - Cert. & Surveys User Manual  1.1.4.3 HOW TO EXPORT SURVEYS                 → 1.1.3.3 HOW TO EXPORT CERTIFICATES
+  Technical - Cert. & Surveys User Manual  1.1.4.4 HOW TO EDIT A SURVEYS                 → 1.1.3.4 HOW TO EDIT A CERTIFICATE
+  Technical - Defects User Manual For Offi 1.1.3.6 HOW TO APPLY FILTER                   → 1.1.3.3 HOW TO APPLY FILTER
+  Technical - Defects User Manual For Offi 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD → 1.1.4.3 HOW TO CREATE A NEW DEFECT
+  Technical - Defects User Manual For Offi 1.1.5.3 HOW TO APPLY FILTER                   → 1.1.4.2 HOW TO APPLY FILTER
+  Technical - Defects User Manual For Offi 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECOR → 1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT
+  Technical - Defects User Manual For Offi 1.1.5.5 HOW TO EXPORT ALL COC RECORDS         → 1.1.4.5 HOW TO EXPORT ALL DEFECT REPORT
+  Technical - Defects User Manual For Offi 1.1.5.6 HOW TO EXPORT AN INDIVIDUAL COC RECOR → 1.1.4.6 HOW TO EXPORT AN INDIVIDUAL DEFECT RE
+  Technical - PMS User Manual For Office_S 1.1.8.2 HOW TO APPLY FILTER                   → 1.1.7.7 HOW TO APPLY FILTER
+  Technical - PMS User Manual For Office_S 1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTORY → 1.1.7.3 HOW TO UPDATE & TRACK SPARE INVENTORY
+  Technical - PMS User Manual For Office_S 1.1.8.6 HOW TO EXPORT STORE ITEMS             → 1.1.7.9 HOW TO EXPORT SPARES RECORDS
+  Technical - PMS User Manual_Vessel Speci 1.1.8.2 HOW TO APPLY FILTER                   → 1.1.7.5 HOW TO APPLY FILTER
+  Technical - PMS User Manual_Vessel Speci 1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTORY → 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY
+  Technical - PMS User Manual_Vessel Speci 1.1.8.6 HOW TO EXPORT STORE ITEMS             → 1.1.7.7 HOW TO EXPORT SPARES RECORDS

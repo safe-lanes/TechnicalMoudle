@@ -38,6 +38,11 @@ docker build -t sail-assistant-py:<tag> .
 docker run -d --name sail-assistant-py --restart unless-stopped --network technical-rag-net \
   -p 127.0.0.1:8015:8000 --env-file ~/central-assistant/assistant.env sail-assistant-py:<tag>
 ```
+`GET /health` reports `prompt` = `PROMPT_VERSION` (app/agent.py) + sha256 prefixes of the two
+answer prompts, so what is running is always verifiable; bump the label on any wording change.
+14-Sep-2026 state: live = 8015 (old prompt, image tagged `prompt-v1-rollback`); candidate
+`sail-assistant-py-v2` (`:prompt-v2`) on 8016, measured no better on the served index — see plan
+§S.5; owner to delete or promote.
 Port **8015**, not 8013/8014: `safelanes.conf` still carries stale `/maran/*` and `/osm/*`
 locations pointing at 8013/8014 (the retired v1.5 chat bots) — binding there would put the
 assistant behind those dead public paths. The container runs `alembic upgrade head` then uvicorn. `sail-assistant-db` must be the

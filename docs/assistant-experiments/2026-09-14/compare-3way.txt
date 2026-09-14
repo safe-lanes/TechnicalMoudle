@@ -1,0 +1,53 @@
+
+== Part 1: documents — per set: chunks / <100-char / avg len / html-tagged chunks
+  manual                                      migrated          |       py-llamaparse        |          ce-clean         
+  Audit - Fleet Sharing Manual- Offi     11 /  2 /  484 /   8   |     11 /  2 /  504 /   8   |      8 /  2 /  472 /   1  
+  Audit - Fleet Sharing Manual- Vess     10 /  2 /  287 /   6   |     10 /  2 /  278 /   7   |      9 /  0 /  325 /   3  
+  Audit - History Manual_R1_30.06.20     24 /  2 /  531 /  17   |     24 /  2 /  568 /  17   |     22 /  1 /  366 /   3  
+  Audit - Preparation Manual_Office_     64 /  3 /  582 /  45   |     65 /  3 /  597 /  43   |     51 /  8 /  414 /   5  
+  Crewing - Crewing User Manual R2_1    213 / 24 /  491 /  85   |    214 / 25 /  490 /  95   |    187 / 16 /  385 /  23  
+  Incident - Fleet Notification User     15 /  3 /  653 /   9   |     12 /  3 /  544 /   7   |      9 /  2 /  488 /   2  
+  Incident - Incident User Manual R0     37 /  5 /  618 /  22   |     36 /  3 /  638 /  17   |     23 /  2 /  487 /   4  
+  Incident - Lesson Learnt User Manu      9 /  2 /  483 /   4   |     10 /  2 /  527 /   3   |      9 /  0 /  561 /   4  
+  Incident - Near Miss User Manual R     17 /  2 /  623 /  12   |     19 /  2 /  598 /  12   |     14 /  1 /  600 /   7  
+  Safety - MOC User Manual_Office_R0     31 /  4 /  583 /  16   |     28 /  2 /  717 /  17   |     23 /  1 /  588 /   4  
+  Safety - MOC User Manual_Vessel_R0     25 /  2 /  757 /  15   |     24 /  2 /  740 /  14   |     17 /  1 /  520 /   2  
+  Safety - Master Review Manual R1_1     16 /  4 /  525 /   5   |     15 /  3 /  531 /   5   |     11 /  2 /  441 /   2  
+  Safety - Risk Assessment User Manu     40 /  4 /  583 /  16   |     48 /  3 /  725 /  28   |     41 /  4 /  510 /  13  
+  Safety - Risk Assessment User Manu     21 /  2 /  635 /  15   |     21 /  2 /  501 /  13   |     14 /  2 /  406 /   1  
+  Safety - SMS User Manual_Office_R0     38 /  4 /  495 /  12   |     37 /  6 /  451 /  13   |     32 /  5 /  335 /   3  
+  Safety - Safety Meeting User Manua     18 /  3 /  414 /  12   |     17 /  2 /  459 /  12   |     17 /  5 /  320 /   2  
+  Technical - Bulk Data Import (Oper      9 /  0 /  329 /   0   |      9 /  0 /  329 /   0   |      9 /  0 /  329 /   0  
+  Technical - Cert. & Surveys User M     42 /  5 /  520 /  12   |     43 /  4 /  507 /  28   |     35 /  5 /  319 /   0  
+  Technical - Defects User Manual Fo     34 /  7 /  454 /   7   |     34 /  8 /  431 /  14   |     31 /  6 /  308 /   0  
+  Technical - PMS User Manual For Of     98 /  5 /  613 /  20   |     98 /  4 /  593 /  47   |     85 /  5 /  351 /   1  
+  Technical - PMS User Manual_Vessel     87 /  2 /  669 /  45   |     85 /  3 /  662 /  43   |     78 /  4 /  466 /   9  
+  Technical - Recent Updates & Chang     14 /  1 /  315 /   1   |     14 /  1 /  319 /   1   |     14 /  1 /  323 /   1  
+  Technical - Roles & Permissions (O     14 /  1 /  349 /   0   |     14 /  1 /  351 /   0   |     14 /  1 /  347 /   0  
+  Technical - Ship-Side (Vessel Crew      7 /  0 /  455 /   1   |      7 /  0 /  454 /   1   |      7 /  0 /  455 /   1  
+  Technical - Sync (Operational) Use     13 /  1 /  488 /   0   |     13 /  1 /  488 /   0   |     13 /  1 /  489 /   0  
+  TOTAL                                 907 / 90 /      / 385   |    908 / 86 /      / 445   |    773 / 75 /      /  91  
+
+== Part 2: retrieval — migrated (http://127.0.0.1:8015) | py-llamaparse (http://127.0.0.1:8017) | ce-clean (http://127.0.0.1:8018)   [module ✓/✗, manual ✓/✗, margin, top-distance]
+  how do I create a work order                 ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8036            | ✓✓ m=1.000 d=0.7833           
+  how to upload data in bulk data import       ✓✓ m=1.000 d=0.8458            | ✓✓ m=1.000 d=0.6662            | ✓✓ m=0.451 d=0.6664           
+  why did the running hours not go down after  ✓✓ m=1.000 d=0.9962            | ✓✓ m=1.000 d=1.0342            | ✓✓ m=1.000 d=1.0342           
+  how do I raise a defect on equipment         ✓✓ m=1.000 d=0.9056            | ✓✓ m=1.000 d=0.9165            | ✓✓ m=1.000 d=0.9163           
+  how do vessels sync their data with the offi ✓✓ m=1.000 d=0.7174            | ✓✓ m=1.000 d=0.6483            | ✓✓ m=1.000 d=0.6483           
+  how do I share an audit with the fleet from  ✓✓ m=1.000 d=0.7533            | ✓✓ m=0.199 d=0.7575            | ✓✓ m=0.153 d=0.8363           
+  how do I prepare for an upcoming audit       ✓✓ m=1.000 d=0.9558            | ✗✗ m=0.004 d=- clarify:Audit/Technical | ✓✓ m=1.000 d=1.0739           
+  where can I see the history of past audits   ✓✓ m=1.000 d=0.889             | ✗✗ m=0.032 d=- clarify:Audit/Technical/Crewing | ✓✓ m=0.085 d=0.9319           
+  how do I create an MOC                       ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8944            | ✓✓ m=1.000 d=0.8814           
+  how do I carry out a risk assessment on the  ✓✓ m=1.000 d=0.7233            | ✓✓ m=1.000 d=0.7749            | ✓✓ m=1.000 d=0.905            
+  how do I record a safety meeting             ✓✓ m=1.000 d=0.8213            | ✓✓ m=1.000 d=0.8654            | ✓✓ m=1.000 d=0.8512           
+  how does the master review the safety manage ✓✓ m=1.000 d=0.7683            | ✓✓ m=1.000 d=0.9532            | ✓✓ m=1.000 d=0.9885           
+  how do I report a near miss                  ✓✓ m=1.000 d=0.8269            | ✓✓ m=1.000 d=0.7261            | ✓✓ m=1.000 d=0.774            
+  how do I report an incident on board         ✓✓ m=1.000 d=0.968             | ✓✗ m=1.000 d=0.9897            | ✓✗ m=1.000 d=1.0254           
+  how do I raise a lesson learnt               ✓✓ m=1.000 d=1.0127            | ✓✓ m=1.000 d=0.8922            | ✓✗ m=1.000 d=0.9772           
+  how do fleet notifications reach the vessel  ✓✓ m=1.000 d=0.7342            | ✓✓ m=0.165 d=0.7517            | ✓✓ m=0.101 d=0.7558           
+  how do I plan a crew change                  ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7802            | ✓✓ m=1.000 d=0.7538           
+  how do I add a new crew member to a vessel   ✓✓ m=1.000 d=0.7845            | ✓✓ m=0.137 d=0.8264            | ✓✓ m=0.139 d=0.8026           
+  what is the weather in Singapore today       gate=not_documented            | gate=not_documented            | gate=not_documented           
+  how do I change my payroll bank account      gate=not_documented            | gate=not_documented            | gate=not_documented           
+
+  routing+manual correct: migrated 18/18   py-llamaparse 15/18   ce-clean 16/18

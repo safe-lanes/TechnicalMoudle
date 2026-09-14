@@ -1,0 +1,138 @@
+
+[01 callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   migrated       answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   migrated-np    answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ag-base        answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ag-clean       answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ag-xref        answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ag-both        answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ce-clean       answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+
+[02 callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   migrated       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Audit - Preparation Manual p9 | '1. The Email Notification icon notifies the Office that the prep'
+   migrated-np    answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+   ag-base        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+   ag-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+   ag-xref        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+   ag-both        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+   ce-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon is used to notify the Office '
+
+[03 callout] How do I upload a document for the first time in the SMS module?
+   migrated       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click on the **+New Document** tab to initiate the SMS change'
+   migrated-np    answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click on the **+New Document** tab to initiate the SMS change'
+   ag-base        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click on the **+New Document** tab to initiate the SMS change'
+   ag-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click on the **+New Document** tab to initiate the SMS change'
+   ag-xref        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click on the **+New Document** tab to initiate the SMS change'
+   ag-both        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click on the **+New Document** tab to initiate the SMS change'
+   ce-clean       answer ✓  cite ✗  attrib ✓  JOINT ✗  gate=answer cite=Safety - SMS User Manual_O p18 | 'To upload a document for the first time in the SMS module, follo'
+
+[04 table] In the Master Review module, what do the grey and red icons mean?
+   migrated       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+   migrated-np    answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+   ag-base        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+   ag-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+   ag-xref        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+   ag-both        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+   ce-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - Master Review Man p6 | '1. The grey icon (⭕) indicates that a response is due.\n2. The re'
+
+[05 table] What are the hazard categories in a risk assessment?
+   migrated       answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   migrated-np    answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ag-base        answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ag-clean       answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ag-xref        answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ag-both        answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   ce-clean       answer ✗  cite ✗  attrib ✓  JOINT ✗  gate=answer cite=Incident - Incident User M p7 | 'The hazard categories in a risk assessment are not covered in th'
+
+[06 table] What actions can I take on a near miss record from the list — what do the icons do?
+   migrated       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Incident - Near Miss User  p5 | '1. **View Record**: Click the eye icon to view, edit, or export '
+   migrated-np    answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Incident - Near Miss User  p5 | 'You can take the following actions on a near miss record from th'
+   ag-base        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Incident - Near Miss User  p5 | '1. Click the **eye** icon to **View Record**: This allows you to'
+   ag-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Incident - Near Miss User  p5 | '1. Click the **eye** icon to **View Record**: This allows you to'
+   ag-xref        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Incident - Near Miss User  p5 | 'You can take the following actions on a near miss record from th'
+   ag-both        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Incident - Near Miss User  p5 | '1. Click the **eye** icon to **View Record** - This allows you t'
+   ce-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Incident - Near Miss User  p5 | '1. Click the **👁️** icon to **View Record**: View, edit, or expo'
+
+[07 xref] How do I apply a filter in the Stores sub-module of PMS?
+   migrated       answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+   migrated-np    answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+   ag-base        answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+   ag-clean       answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Technical - PMS User Manua p49 | 'The steps to apply a filter in the Stores sub-module of PMS are '
+   ag-xref        answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+   ag-both        answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Technical - PMS User Manua p43 | 'The process for applying a filter in the Stores sub-module is no'
+   ce-clean       answer ✓  cite ✓  attrib ✗  JOINT ✗  gate=answer cite=Technical - PMS User Manua p43 | 'To apply a filter in the Stores sub-module of PMS, follow these '
+
+[08 xref] How do I export crew details from the Onboard list in Crewing?
+   migrated       answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Onboard list is '
+   migrated-np    answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Onboard list is '
+   ag-base        answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Onboard list is '
+   ag-clean       answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Crewing - Crewing User Man p28 | 'The process to export crew details from the Onboard list is not '
+   ag-xref        answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Onboard list is '
+   ag-both        answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Onboard list is '
+   ce-clean       answer ✓  cite ✓  attrib ✗  JOINT ✗  gate=answer cite=Crewing - Crewing User Man p28 | 'To export crew details from the Onboard list in Crewing, follow '
+
+[09 xref] How do I create a COC defect record?
+   migrated       answer ✓  cite ✓  attrib ✗  JOINT ✗  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+   migrated-np    answer ✓  cite ✓  attrib ✗  JOINT ✗  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+   ag-base        answer ✓  cite ✓  attrib ✗  JOINT ✗  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+   ag-clean       answer ✓  cite ✓  attrib ✗  JOINT ✗  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+   ag-xref        answer ✓  cite ✓  attrib ✗  JOINT ✗  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record, follow these steps:\n\n1. Refer to '
+   ag-both        answer ✓  cite ✓  attrib ✗  JOINT ✗  gate=answer cite=Technical - Defects User M p19 | "1. Click the '+ New Defect' button to create a new defect record"
+   ce-clean       answer ✓  cite ✓  attrib ✗  JOINT ✗  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record, follow these steps:\n\n1. Refer to '
+
+[10 note] When filling MoC Part B, what happens if I select No for further assessment?
+   migrated       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+   migrated-np    answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+   ag-base        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+   ag-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If **“No”** is selected for further assessment, the MoC will '
+   ag-xref        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+   ag-both        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If **“No”** is selected for further assessment, the MoC will '
+   ce-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_O p11 | 'If you select "No" for further assessment in MoC Part B, the MoC'
+
+[11 note] In PMS, is there another way to add a component besides the components panel?
+   migrated       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Technical - PMS User Manua p24 | 'The documentation states that a new component can also be added '
+   migrated-np    answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Technical - PMS User Manua p24 | "Yes, a new component can also be added by clicking the '+ Add Co"
+   ag-base        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Technical - PMS User Manua p24 | "Yes, a new component can also be added by clicking the '+ Add Co"
+   ag-clean       answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Technical - PMS User Manua p24 | 'The information provided does not cover whether there is another'
+   ag-xref        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Technical - PMS User Manua p24 | 'Yes, there is another way to add a component. You can also add a'
+   ag-both        answer ✗  cite ✓  attrib ✓  JOINT ✗  gate=answer cite=Technical - PMS User Manua p24 | 'The information provided does not cover whether there is another'
+   ce-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Technical - PMS User Manua p24 | "Yes, a new component can also be added by clicking the '+ Add Co"
+
+[12 note] What should I review after deleting an implication in a vessel MoC?
+   migrated       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+   migrated-np    answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+   ag-base        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication in a vessel MoC, you should review'
+   ag-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication in a vessel MoC, you should review'
+   ag-xref        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication in a vessel MoC, you should review'
+   ag-both        answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication in a vessel MoC, you should review'
+   ce-clean       answer ✓  cite ✓  attrib ✓  JOINT ✓  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication in a vessel MoC, you should review'
+
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case              migrated  migrated-np      ag-base     ag-clean      ag-xref      ag-both     ce-clean
+   01 callout               ✗            ✗            ✗            ✗            ✗            ✗            ✗
+   02 callout               ✓            ✓            ✓            ✓            ✓            ✓            ✓
+   03 callout               ✓            ✓            ✓            ✓            ✓            ✓            ✗
+   04 table                 ✓            ✓            ✓            ✓            ✓            ✓            ✓
+   05 table                 ✗            ✗            ✗            ✗            ✗            ✗            ✗
+   06 table                 ✓            ✓            ✓            ✓            ✓            ✓            ✓
+   07 xref                  ✗            ✗            ✗            ✗            ✗            ✗            ✗
+   08 xref                  ✗            ✗            ✗            ✗            ✗            ✗            ✗
+   09 xref                  ✗            ✗            ✗            ✗            ✗            ✗            ✗
+   10 note                  ✓            ✓            ✓            ✓            ✓            ✓            ✓
+   11 note                  ✓            ✓            ✓            ✗            ✓            ✗            ✓
+   12 note                  ✓            ✓            ✓            ✓            ✓            ✓            ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   migrated       8/12  10/12  11/12  JOINT 7/12
+   migrated-np    8/12  10/12  11/12  JOINT 7/12
+   ag-base        8/12  10/12  11/12  JOINT 7/12
+   ag-clean       7/12  10/12  11/12  JOINT 6/12
+   ag-xref        8/12  10/12  11/12  JOINT 7/12
+   ag-both        7/12  10/12  11/12  JOINT 6/12
+   ce-clean       10/12  9/12  9/12  JOINT 6/12
+   migrated-np    vs migrated: regressions none | gains none
+   ag-base        vs migrated: regressions none | gains none
+   ag-clean       vs migrated: regressions ['11 note'] | gains none
+   ag-xref        vs migrated: regressions none | gains none
+   ag-both        vs migrated: regressions ['11 note'] | gains none
+   ce-clean       vs migrated: regressions ['03 callout'] | gains none

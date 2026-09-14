@@ -36,7 +36,14 @@ from openai import OpenAI
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from chunking import CHUNKER_VERSION, Chunk, chunks_from_markdown, title_stub  # noqa: E402
 from clean_markdown import CLEANUP_VERSION, clean_pages  # noqa: E402
-from xrefs import resolve_xrefs  # noqa: E402
+from xrefs import XREF_SETTINGS, XREF_VERSION, resolve_xrefs  # noqa: E402
+
+# Embedding record (owner ask 14-Sep-2026: name the exact model, dimensions and vector handling
+# instead of the unproven "embedding drift"). Vectors are stored in pgvector `vector(3072)` as a
+# text literal built with repr(float) — full double precision, no rounding on our side.
+EMBED_MODEL_DEFAULT = "text-embedding-3-large"
+EMBED_DIMS = 3072
+VECTOR_HANDLING = "pgvector vector(3072); literal '[repr(float),…]'; no normalisation; squared L2 at query time"
 
 MODULES = {"technical", "audit", "safety", "incident", "crewing"}
 LP_UPLOAD = "https://api.cloud.llamaindex.ai/api/v2/parse/upload"
@@ -78,12 +85,21 @@ def parse_key_for(sha: str, tier: str, version: str) -> str:
 
 
 def build_key_for(parse_key: str, cleanup_version: str | None, chunker_version: str, max_chunk: int, overlap: int, resolve_xrefs: bool,
-                  embed_mode: str = "meta") -> str:
-    """The index-build key: parse + cleanup code version + chunker code version + chunk params +
-    embedding input mode. A change in any of these invalidates the built index even when the
-    parse is still valid."""
-    return (f"{parse_key}|clean={cleanup_version or 'off'}|xrefs={'on' if resolve_xrefs else 'off'}|chunker={chunker_version}|{max_chunk}/{overlap}"
-            f"|embed={EMBED_INPUT_VERSION if embed_mode == 'meta' else 'text'}")
+                  embed_mode: str = "meta", embed_model: str = EMBED_MODEL_DEFAULT) -> str:
+    """The index-build key: parse + cleanup code version + resolver code version + chunker code
+    version + chunk params + embedding input mode + embedding model/dimensions. A change in any
+    of these invalidates the built index even when the parse is still valid."""
+    return (f"{parse_key}|clean={cleanup_version or 'off'}|xrefs={XREF_VERSION if resolve_xrefs else 'off'}|chunker={chunker_version}|{max_chunk}/{overlap}"
+            f"|embed={EMBED_INPUT_VERSION if embed_mode == 'meta' else 'text'}|model={embed_model}:{EMBED_DIMS}")
+
+
+def build_record(*, tier: str, version: str, cleaned: bool, resolve: bool, max_chunk: int, overlap: int, embed_mode: str, embed_model: str) -> dict[str, Any]:
+    """Everything needed to reproduce a build, stored with each document (clean_report.build)."""
+    return {"parser": "llamaparse-v2", "tier": tier, "requested_version": version, "request_configuration": request_configuration(tier, version),
+            "cleanup_version": CLEANUP_VERSION if cleaned else None, "xref_version": XREF_VERSION if resolve else None,
+            "xref_settings": XREF_SETTINGS if resolve else None, "chunker_version": CHUNKER_VERSION, "max_chunk": max_chunk, "overlap": overlap,
+            "embed_input": EMBED_INPUT_VERSION if embed_mode == "meta" else "text", "embed_model": embed_model, "embed_dims": EMBED_DIMS,
+            "vector_handling": VECTOR_HANDLING}
 
 
 def version_evidence(result: dict[str, Any]) -> tuple[bool, str | None]:
@@ -187,6 +203,23 @@ def embed_input(chunk: Chunk, mode: str) -> str:
     return f"{md}\n\n{chunk.text}"
 
 
+def embed_sha(text: str, model: str) -> str:
+    """Identity of an embedding request: exact input text + model. Same sha ⇒ the stored vector
+    is reused verbatim (owner rule 14-Sep-2026: never re-embed an unchanged input)."""
+    return hashlib.sha256(f"{model}\n{text}".encode()).hexdigest()
+
+
+async def stored_vectors(conn: asyncpg.Connection | None, shas: list[str]) -> dict[str, str]:
+    """sha → vector literal, from ANY index set that already holds that exact embedding input."""
+    if conn is None or not shas:
+        return {}
+    served = os.environ.get("ASSISTANT_INDEX_SET", "migrated")  # the served set's vector wins when several sets hold the input
+    rows = await conn.fetch("SELECT DISTINCT ON (metadata->>'embed_sha') metadata->>'embed_sha' AS s, embedding::text AS v "
+                            "FROM assistant_chunks WHERE metadata->>'embed_sha' = ANY($1::text[]) "
+                            "ORDER BY metadata->>'embed_sha', (index_set <> $2), index_set", shas, served)
+    return {r["s"]: r["v"] for r in rows}
+
+
 def embed_all(client: OpenAI, model: str, texts: list[str], batch: int, log) -> list[list[float]]:
     out: list[list[float]] = []
     for i in range(0, len(texts), batch):
@@ -196,18 +229,34 @@ def embed_all(client: OpenAI, model: str, texts: list[str], batch: int, log) -> 
     return out
 
 
+def vector_literal(e: list[float]) -> str:
+    return "[" + ",".join(repr(float(x)) for x in e) + "]"
+
+
+async def embed_or_reuse(conn: asyncpg.Connection, client: OpenAI, model: str, texts: list[str], batch: int, reuse: bool, log) -> tuple[list[str], int]:
+    """Vector literal per input; reuses stored vectors whose embed_sha matches. Returns (vectors, reused count)."""
+    shas = [embed_sha(t, model) for t in texts]
+    have = await stored_vectors(conn, list(set(shas))) if reuse else {}
+    todo = [i for i, s in enumerate(shas) if s not in have]
+    fresh = embed_all(client, model, [texts[i] for i in todo], batch, log) if todo else []
+    new = {shas[i]: vector_literal(e) for i, e in zip(todo, fresh, strict=True)}
+    log(f"   vectors: reused {len(texts) - len(todo)} stored, embedded {len(todo)} new")
+    return [have.get(s) or new[s] for s in shas], len(texts) - len(todo)
+
+
 async def store_document(conn: asyncpg.Connection, *, index_set: str, file: str, module: str, sha: str, source_type: str,
-                         chunks: list[Chunk], embeddings: list[list[float]], pages: int | None, stub: bool, tier: str, version: str,
+                         chunks: list[Chunk], vectors: list[str], embed_inputs: list[str], pages: int | None, stub: bool, tier: str, version: str,
                          embed_model: str, job_id: str | None = None, cleaned: bool = False, xrefs_resolved: int = 0,
                          xrefs_unresolved: int = 0, clean_report: dict[str, Any] | None = None) -> None:
     rows = []
-    for c, e in zip(chunks, embeddings, strict=True):
+    for c, v, inp in zip(chunks, vectors, embed_inputs, strict=True):
         m = dict(c.metadata)
         m["module"] = module
+        m["embed_sha"] = embed_sha(inp, embed_model)  # identity of the embedding request → later builds reuse the vector
+        m["embed_model"] = embed_model
         pn = m.get("page_number")
         rows.append((index_set, c.id, module, file, m.get("section_title"), m.get("breadcrumb"),
-                     str(pn) if pn is not None else None, int(m.get("chunk_index") or 0), c.text, json.dumps(m),
-                     "[" + ",".join(repr(float(x)) for x in e) + "]"))
+                     str(pn) if pn is not None else None, int(m.get("chunk_index") or 0), c.text, json.dumps(m), v))
     async with conn.transaction():
         await conn.execute("DELETE FROM assistant_chunks WHERE index_set=$1 AND file=$2", index_set, file)
         await conn.executemany(
@@ -245,11 +294,12 @@ async def main() -> int:
     ap.add_argument("--resolve-xrefs", action="store_true", help="append the target section's text to cross-reference-only sections")
     ap.add_argument("--reparse", action="store_true", help="ignore the accepted parse in the parse store and parse again (normally never needed)")
     ap.add_argument("--embed-input", choices=["meta", "text"], default="meta", help="what is embedded: metadata+text (LlamaIndex-compatible, the live set) or text only")
+    ap.add_argument("--no-reuse-vectors", action="store_true", help="always call the embedding API, even when a stored vector exists for the identical input")
     a = ap.parse_args()
 
     docs = Path(a.documents)
     cache_dir = Path(a.cache_dir) if a.cache_dir else docs.parent / "llamaparse_cache"
-    embed_model = os.environ.get("EMBED_MODEL", "text-embedding-3-large")
+    embed_model = os.environ.get("EMBED_MODEL", EMBED_MODEL_DEFAULT)
     log = lambda s: print(s, flush=True)  # noqa: E731
 
     files = sorted([*docs.glob("*.pdf"), *docs.glob("*.docx")], key=lambda p: p.name)
@@ -271,7 +321,7 @@ async def main() -> int:
             source_type = "pdf" if f.suffix.lower() == ".pdf" else "docx"
             module = module_of(f.name)
             bkey = build_key_for(parse_key_for(sha, a.tier, a.version), CLEANUP_VERSION if a.clean else None, CHUNKER_VERSION,
-                                 a.max_chunk, a.overlap, a.resolve_xrefs, a.embed_input)
+                                 a.max_chunk, a.overlap, a.resolve_xrefs, a.embed_input, embed_model)
             if conn is not None and not a.force:
                 prev = await conn.fetchrow("SELECT sha256, chunks, build_key FROM assistant_documents WHERE index_set=$1 AND file=$2", a.index_set, f.name)
                 if prev and prev["sha256"] == sha and prev["chunks"] > 0 and prev["build_key"] == bkey:
@@ -295,7 +345,9 @@ async def main() -> int:
                 await parse_store_put(conn, key=pkey, file=f.name, sha=sha, tier=a.tier, version=a.version,
                                       options={**request_configuration(a.tier, a.version), "disable_cache": bool(a.fresh_parse)},
                                       result=result, pages=len(page_map) if page_map else None)
-                clean_report: dict[str, Any] = {"parse_key": pkey}
+                clean_report: dict[str, Any] = {"parse_key": pkey, "build_key": bkey,
+                                                "build": build_record(tier=a.tier, version=a.version, cleaned=a.clean, resolve=a.resolve_xrefs, max_chunk=a.max_chunk,
+                                                                      overlap=a.overlap, embed_mode=a.embed_input, embed_model=embed_model)}
                 xres = xun = 0
                 if a.clean or a.resolve_xrefs:
                     pm = page_map if page_map else {1: md}
@@ -327,10 +379,13 @@ async def main() -> int:
                 short = sum(1 for c in chunks if len(c.text) < 100)
                 log(f"   {len(chunks)} chunks, pages={pages}, <100-char chunks={short}")
                 if conn is not None and oai is not None:
-                    embs = embed_all(oai, embed_model, [embed_input(c, a.embed_input) for c in chunks], a.embed_batch, log)
+                    inputs = [embed_input(c, a.embed_input) for c in chunks]
+                    vecs, reused = await embed_or_reuse(conn, oai, embed_model, inputs, a.embed_batch, not a.no_reuse_vectors, log)
+                    clean_report["vectors_reused"] = reused
                     await store_document(conn, index_set=a.index_set, file=f.name, module=module, sha=sha, source_type=source_type,
-                                         chunks=chunks, embeddings=embs, pages=pages, stub=stub, tier=a.tier, version=a.version, embed_model=embed_model,
-                                         job_id=job_id, cleaned=bool(a.clean), xrefs_resolved=xres, xrefs_unresolved=xun, clean_report=clean_report)
+                                         chunks=chunks, vectors=vecs, embed_inputs=inputs, pages=pages, stub=stub, tier=a.tier, version=a.version,
+                                         embed_model=embed_model, job_id=job_id, cleaned=bool(a.clean), xrefs_resolved=xres, xrefs_unresolved=xun,
+                                         clean_report=clean_report)
                     await conn.execute("UPDATE assistant_documents SET parse_key=$1, build_key=$2, cleanup_version=$3, chunker_version=$4 "
                                        "WHERE index_set=$5 AND file=$6", pkey, bkey, CLEANUP_VERSION if a.clean else None, CHUNKER_VERSION, a.index_set, f.name)
                     log(f"   stored ({a.index_set})")

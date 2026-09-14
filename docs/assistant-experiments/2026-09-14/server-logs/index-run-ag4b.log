@@ -1,0 +1,109 @@
+##### ag-clean #####
+index set 'ag-clean': 25 files in /app/documents; tier=agentic version=latest fresh=False dry_run=False
+> Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key b5252752ffc1…) — parser not called
+> Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key c2494d2156bc…) — parser not called
+> Audit - History Manual_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key efe75238c622…) — parser not called
+> Audit - Preparation Manual_Office_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key 35a2d511a21a…) — parser not called
+> Crewing - Crewing User Manual R2_10.06.2026.pdf [crewing/pdf]
+   accepted parse from the parse store (key e6149f9b2aab…) — parser not called
+> Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key 3201171579f4…) — parser not called
+> Incident - Incident User Manual R0_20.05.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key ceb3e31b6e6e…) — parser not called
+> Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key 525ce802dbcc…) — parser not called
+> Incident - Near Miss User Manual R1_30.05.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key 5cd0d392035a…) — parser not called
+> Safety - MOC User Manual_Office_R0_31.03.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key ab160ffe1a14…) — parser not called
+> Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key a10cd79a2fa5…) — parser not called
+> Safety - Master Review Manual R1_10.06.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 16a8d99022a9…) — parser not called
+> Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 70475a998ceb…) — parser not called
+> Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key a3e1ab92590d…) — parser not called
+> Safety - SMS User Manual_Office_R0_31.01.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 182b93c99791…) — parser not called
+> Safety - Safety Meeting User Manual_R1_31.05.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 2fbae044792f…) — parser not called
+> Technical - Bulk Data Import (Operational) User Manual.docx [technical/docx]
+   accepted parse from the parse store (key ba200e864d3c…) — parser not called
+> Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key c4c026beb21b…) — parser not called
+> Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key 996227bf0fff…) — parser not called
+> Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key ef0e35d1df7f…) — parser not called
+> Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key c93598108979…) — parser not called
+> Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx [technical/docx]
+   accepted parse from the parse store (key 6a93bd238306…) — parser not called
+> Technical - Roles & Permissions (Operational) User Manual.docx [technical/docx]
+   accepted parse from the parse store (key 97a3fedab09b…) — parser not called
+> Technical - Ship-Side (Vessel Crew) Operational Notes.docx [technical/docx]
+   accepted parse from the parse store (key 69857b38989d…) — parser not called
+> Technical - Sync (Operational) User Manual.docx [technical/docx]
+   accepted parse from the parse store (key 083e08c13944…) — parser not called
+index set 'ag-clean' now holds 787 chunks across 25 documents
+DONE
+##### ag-both #####
+index set 'ag-both': 25 files in /app/documents; tier=agentic version=latest fresh=False dry_run=False
+> Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key b5252752ffc1…) — parser not called
+> Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key c2494d2156bc…) — parser not called
+> Audit - History Manual_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key efe75238c622…) — parser not called
+> Audit - Preparation Manual_Office_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key 35a2d511a21a…) — parser not called
+> Crewing - Crewing User Manual R2_10.06.2026.pdf [crewing/pdf]
+   accepted parse from the parse store (key e6149f9b2aab…) — parser not called
+> Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key 3201171579f4…) — parser not called
+> Incident - Incident User Manual R0_20.05.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key ceb3e31b6e6e…) — parser not called
+> Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key 525ce802dbcc…) — parser not called
+> Incident - Near Miss User Manual R1_30.05.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key 5cd0d392035a…) — parser not called
+> Safety - MOC User Manual_Office_R0_31.03.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key ab160ffe1a14…) — parser not called
+> Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key a10cd79a2fa5…) — parser not called
+> Safety - Master Review Manual R1_10.06.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 16a8d99022a9…) — parser not called
+> Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 70475a998ceb…) — parser not called
+> Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key a3e1ab92590d…) — parser not called
+> Safety - SMS User Manual_Office_R0_31.01.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 182b93c99791…) — parser not called
+> Safety - Safety Meeting User Manual_R1_31.05.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 2fbae044792f…) — parser not called
+> Technical - Bulk Data Import (Operational) User Manual.docx [technical/docx]
+   accepted parse from the parse store (key ba200e864d3c…) — parser not called
+> Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key c4c026beb21b…) — parser not called
+> Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key 996227bf0fff…) — parser not called
+> Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key ef0e35d1df7f…) — parser not called
+> Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key c93598108979…) — parser not called
+> Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx [technical/docx]
+   accepted parse from the parse store (key 6a93bd238306…) — parser not called
+> Technical - Roles & Permissions (Operational) User Manual.docx [technical/docx]
+   accepted parse from the parse store (key 97a3fedab09b…) — parser not called
+> Technical - Ship-Side (Vessel Crew) Operational Notes.docx [technical/docx]
+   accepted parse from the parse store (key 69857b38989d…) — parser not called
+> Technical - Sync (Operational) User Manual.docx [technical/docx]
+   accepted parse from the parse store (key 083e08c13944…) — parser not called
+index set 'ag-both' now holds 787 chunks across 25 documents
+DONE
+ALL FOUR DONE

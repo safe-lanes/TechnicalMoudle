@@ -1,0 +1,355 @@
+index set 'py-llamaparse': 25 files in /app/documents; tier=agentic version=latest fresh=True dry_run=False
+> Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf [audit/pdf]
+   uploading Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-ghhukdx2e10u3wllsd0dbobnsn3s: RUNNING
+   job pjb-ghhukdx2e10u3wllsd0dbobnsn3s: COMPLETED
+   11 chunks, pages=9, <100-char chunks=2
+   embedded 11/11
+   stored (py-llamaparse)
+> Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf [audit/pdf]
+   uploading Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-1pp395li719ftn8z0b3lao9bjska: RUNNING
+   job pjb-1pp395li719ftn8z0b3lao9bjska: COMPLETED
+   10 chunks, pages=6, <100-char chunks=2
+   embedded 10/10
+   stored (py-llamaparse)
+> Audit - History Manual_R1_30.06.2026.pdf [audit/pdf]
+   uploading Audit - History Manual_R1_30.06.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-jh20dc5yne1fyivcg9pmjuselamk: RUNNING
+   job pjb-jh20dc5yne1fyivcg9pmjuselamk: COMPLETED
+   24 chunks, pages=16, <100-char chunks=2
+   embedded 24/24
+   stored (py-llamaparse)
+> Audit - Preparation Manual_Office_R1_30.06.2026.pdf [audit/pdf]
+   uploading Audit - Preparation Manual_Office_R1_30.06.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-p1dpo2welbesmet0a9kwocrwtmqh: RUNNING
+   job pjb-p1dpo2welbesmet0a9kwocrwtmqh: COMPLETED
+   65 chunks, pages=33, <100-char chunks=3
+   embedded 65/65
+   stored (py-llamaparse)
+> Crewing - Crewing User Manual R2_10.06.2026.pdf [crewing/pdf]
+   uploading Crewing - Crewing User Manual R2_10.06.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-vm4ier6jjnx2c91oa0t8oocf2art: RUNNING
+   job pjb-vm4ier6jjnx2c91oa0t8oocf2art: COMPLETED
+   214 chunks, pages=111, <100-char chunks=25
+   embedded 128/214
+   embedded 214/214
+   stored (py-llamaparse)
+> Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf [incident/pdf]
+   uploading Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-5my3tzug250swiogd0817lvovvo5: RUNNING
+   job pjb-5my3tzug250swiogd0817lvovvo5: COMPLETED
+   12 chunks, pages=8, <100-char chunks=3
+   embedded 12/12
+   stored (py-llamaparse)
+> Incident - Incident User Manual R0_20.05.2026.pdf [incident/pdf]
+   uploading Incident - Incident User Manual R0_20.05.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-chveuq34sxpvz0ea4xl0xkt2c7rf: RUNNING
+   job pjb-chveuq34sxpvz0ea4xl0xkt2c7rf: COMPLETED
+   36 chunks, pages=19, <100-char chunks=3
+   embedded 36/36
+   stored (py-llamaparse)
+> Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf [incident/pdf]
+   cached LlamaParse result for Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf (Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026__b47081ac1cde45a829cbf7e4.result.json)
+   10 chunks, pages=9, <100-char chunks=2
+   embedded 10/10
+   stored (py-llamaparse)
+> Incident - Near Miss User Manual R1_30.05.2026.pdf [incident/pdf]
+   uploading Incident - Near Miss User Manual R1_30.05.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-qae0a5thk7yor2xdquribcomew1m: RUNNING
+   job pjb-qae0a5thk7yor2xdquribcomew1m: COMPLETED
+   19 chunks, pages=11, <100-char chunks=2
+   embedded 19/19
+   stored (py-llamaparse)
+> Safety - MOC User Manual_Office_R0_31.03.2026.pdf [safety/pdf]
+   uploading Safety - MOC User Manual_Office_R0_31.03.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-ttsilghy77gxu8ub5bwhs8tgt1ia: RUNNING
+   job pjb-ttsilghy77gxu8ub5bwhs8tgt1ia: COMPLETED
+   28 chunks, pages=19, <100-char chunks=2
+   embedded 28/28
+   stored (py-llamaparse)
+> Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf [safety/pdf]
+   uploading Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-4xeb39afbllqeoi1ezbvo9yvy4qz: RUNNING
+   job pjb-4xeb39afbllqeoi1ezbvo9yvy4qz: COMPLETED
+   24 chunks, pages=15, <100-char chunks=2
+   embedded 24/24
+   stored (py-llamaparse)
+> Safety - Master Review Manual R1_10.06.2026.pdf [safety/pdf]
+   uploading Safety - Master Review Manual R1_10.06.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-cytbsp6fdtbrvvwh3ru99keevebx: RUNNING
+   job pjb-cytbsp6fdtbrvvwh3ru99keevebx: COMPLETED
+   15 chunks, pages=11, <100-char chunks=3
+   embedded 15/15
+   stored (py-llamaparse)
+> Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf [safety/pdf]
+   uploading Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-yxwuhgn13aqlc9taa68ko5ksg5ws: RUNNING
+   job pjb-yxwuhgn13aqlc9taa68ko5ksg5ws: COMPLETED
+   48 chunks, pages=25, <100-char chunks=3
+   embedded 48/48
+   stored (py-llamaparse)
+> Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf [safety/pdf]
+   uploading Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-epk17p0nd53rhksqpx0q24igw36l: RUNNING
+   job pjb-epk17p0nd53rhksqpx0q24igw36l: COMPLETED
+   21 chunks, pages=16, <100-char chunks=2
+   embedded 21/21
+   stored (py-llamaparse)
+> Safety - SMS User Manual_Office_R0_31.01.2026.pdf [safety/pdf]
+   uploading Safety - SMS User Manual_Office_R0_31.01.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-03ve6em8i57n8mb379i6k8cl5d1h: RUNNING
+   job pjb-03ve6em8i57n8mb379i6k8cl5d1h: COMPLETED
+   37 chunks, pages=22, <100-char chunks=6
+   embedded 37/37
+   stored (py-llamaparse)
+> Safety - Safety Meeting User Manual_R1_31.05.2026.pdf [safety/pdf]
+   uploading Safety - Safety Meeting User Manual_R1_31.05.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-9y0or4cswn62jtdv6u4ki0xi5ufk: RUNNING
+   job pjb-9y0or4cswn62jtdv6u4ki0xi5ufk: COMPLETED
+   17 chunks, pages=18, <100-char chunks=2
+   embedded 17/17
+   stored (py-llamaparse)
+> Technical - Bulk Data Import (Operational) User Manual.docx [technical/docx]
+   uploading Technical - Bulk Data Import (Operational) User Manual.docx to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-ovyr8uxljt9jgoejcg0hu5au0z68: RUNNING
+   job pjb-ovyr8uxljt9jgoejcg0hu5au0z68: COMPLETED
+   9 chunks, pages=2, <100-char chunks=0
+   embedded 9/9
+   stored (py-llamaparse)
+> Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   uploading Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-jxzigooowsw8rp3qpb8kw1ambxht: RUNNING
+   job pjb-jxzigooowsw8rp3qpb8kw1ambxht: COMPLETED
+   43 chunks, pages=21, <100-char chunks=4
+   embedded 43/43
+   stored (py-llamaparse)
+> Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf [technical/pdf]
+   uploading Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-l6rkeao7nf5xr1wqu43xqg50op4p: RUNNING
+   job pjb-l6rkeao7nf5xr1wqu43xqg50op4p: COMPLETED
+   34 chunks, pages=20, <100-char chunks=8
+   embedded 34/34
+   stored (py-llamaparse)
+> Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   uploading Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-afhmnqsjyac2pf8ml33pjr61hc4q: RUNNING
+   job pjb-afhmnqsjyac2pf8ml33pjr61hc4q: COMPLETED
+   98 chunks, pages=64, <100-char chunks=4
+   embedded 98/98
+   stored (py-llamaparse)
+> Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf [technical/pdf]
+   uploading Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-fh8v7ntc9p95n3h2t2mhf8xskddd: RUNNING
+   job pjb-fh8v7ntc9p95n3h2t2mhf8xskddd: COMPLETED
+   85 chunks, pages=54, <100-char chunks=3
+   embedded 85/85
+   stored (py-llamaparse)
+> Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx [technical/docx]
+   uploading Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-3f9cndoy659k6z72yqavmu3200hs: RUNNING
+   job pjb-3f9cndoy659k6z72yqavmu3200hs: COMPLETED
+   14 chunks, pages=2, <100-char chunks=1
+   embedded 14/14
+   stored (py-llamaparse)
+> Technical - Roles & Permissions (Operational) User Manual.docx [technical/docx]
+   uploading Technical - Roles & Permissions (Operational) User Manual.docx to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-gi50samddvdkxhm3222oqk8kc0ic: RUNNING
+   job pjb-gi50samddvdkxhm3222oqk8kc0ic: COMPLETED
+   14 chunks, pages=3, <100-char chunks=1
+   embedded 14/14
+   stored (py-llamaparse)
+> Technical - Ship-Side (Vessel Crew) Operational Notes.docx [technical/docx]
+   uploading Technical - Ship-Side (Vessel Crew) Operational Notes.docx to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-cqdfuoce7a4awlkqd5t9y27hiekm: RUNNING
+   job pjb-cqdfuoce7a4awlkqd5t9y27hiekm: COMPLETED
+   7 chunks, pages=2, <100-char chunks=0
+   embedded 7/7
+   stored (py-llamaparse)
+> Technical - Sync (Operational) User Manual.docx [technical/docx]
+   uploading Technical - Sync (Operational) User Manual.docx to LlamaParse v2 (tier=agentic, fresh=True)
+   job pjb-j2h70i6g49ducqdrwib5s093hwbv: RUNNING
+   job pjb-j2h70i6g49ducqdrwib5s093hwbv: COMPLETED
+   13 chunks, pages=3, <100-char chunks=1
+   embedded 13/13
+   stored (py-llamaparse)
+
+index set 'py-llamaparse' now holds 908 chunks across 25 documents
+[
+ {
+  "file": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf",
+  "chunks": 11,
+  "pages": 9,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf",
+  "chunks": 10,
+  "pages": 6,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Audit - History Manual_R1_30.06.2026.pdf",
+  "chunks": 24,
+  "pages": 16,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf",
+  "chunks": 65,
+  "pages": 33,
+  "short": 3,
+  "stub": false
+ },
+ {
+  "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "chunks": 214,
+  "pages": 111,
+  "short": 25,
+  "stub": false
+ },
+ {
+  "file": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf",
+  "chunks": 12,
+  "pages": 8,
+  "short": 3,
+  "stub": false
+ },
+ {
+  "file": "Incident - Incident User Manual R0_20.05.2026.pdf",
+  "chunks": 36,
+  "pages": 19,
+  "short": 3,
+  "stub": false
+ },
+ {
+  "file": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf",
+  "chunks": 10,
+  "pages": 9,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Incident - Near Miss User Manual R1_30.05.2026.pdf",
+  "chunks": 19,
+  "pages": 11,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf",
+  "chunks": 28,
+  "pages": 19,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf",
+  "chunks": 24,
+  "pages": 15,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Safety - Master Review Manual R1_10.06.2026.pdf",
+  "chunks": 15,
+  "pages": 11,
+  "short": 3,
+  "stub": false
+ },
+ {
+  "file": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf",
+  "chunks": 48,
+  "pages": 25,
+  "short": 3,
+  "stub": false
+ },
+ {
+  "file": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf",
+  "chunks": 21,
+  "pages": 16,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf",
+  "chunks": 37,
+  "pages": 22,
+  "short": 6,
+  "stub": false
+ },
+ {
+  "file": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf",
+  "chunks": 17,
+  "pages": 18,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Technical - Bulk Data Import (Operational) User Manual.docx",
+  "chunks": 9,
+  "pages": 2,
+  "short": 0,
+  "stub": false
+ },
+ {
+  "file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "chunks": 43,
+  "pages": 21,
+  "short": 4,
+  "stub": false
+ },
+ {
+  "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+  "chunks": 34,
+  "pages": 20,
+  "short": 8,
+  "stub": false
+ },
+ {
+  "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "chunks": 98,
+  "pages": 64,
+  "short": 4,
+  "stub": false
+ },
+ {
+  "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "chunks": 85,
+  "pages": 54,
+  "short": 3,
+  "stub": false
+ },
+ {
+  "file": "Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx",
+  "chunks": 14,
+  "pages": 2,
+  "short": 1,
+  "stub": false
+ },
+ {
+  "file": "Technical - Roles & Permissions (Operational) User Manual.docx",
+  "chunks": 14,
+  "pages": 3,
+  "short": 1,
+  "stub": false
+ },
+ {
+  "file": "Technical - Ship-Side (Vessel Crew) Operational Notes.docx",
+  "chunks": 7,
+  "pages": 2,
+  "short": 0,
+  "stub": false
+ },
+ {
+  "file": "Technical - Sync (Operational) User Manual.docx",
+  "chunks": 13,
+  "pages": 3,
+  "short": 1,
+  "stub": false
+ }
+]
+DONE

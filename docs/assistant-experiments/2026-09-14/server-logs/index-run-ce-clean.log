@@ -1,0 +1,382 @@
+index set 'ce-clean': 25 files in /app/documents; tier=cost_effective version=2026-08-19 fresh=True dry_run=False
+> Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf [audit/pdf]
+   on-disk LlamaParse result for Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf (Audit - Fleet Sharing Manual- Office_R1_30.06.2026__b2ca4778739bb9c861c46c7f.result.json)
+   job=pjb-cqwxemm4kbit47ynd5fnaqiokvee tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[3] header=0 footer=6 zones=7 tables rm/kept=7/1 mermaid=0 callouts=0 struck=0 carried_headings=2 removals_logged=30
+   xrefs: resolved=0 unresolved=0 chained=0
+   8 chunks, pages=8, <100-char chunks=2
+   embedded 8/8
+   stored (ce-clean)
+> Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf [audit/pdf]
+   on-disk LlamaParse result for Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf (Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026__cb85746eeaa8e73bd8aa40a0.result.json)
+   job=pjb-01550sze4m4maebp5hxk2ezsru2e tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[3] header=0 footer=4 zones=3 tables rm/kept=3/3 mermaid=0 callouts=0 struck=0 carried_headings=0 removals_logged=18
+   xrefs: resolved=0 unresolved=0 chained=0
+   9 chunks, pages=5, <100-char chunks=0
+   embedded 9/9
+   stored (ce-clean)
+> Audit - History Manual_R1_30.06.2026.pdf [audit/pdf]
+   on-disk LlamaParse result for Audit - History Manual_R1_30.06.2026.pdf (Audit - History Manual_R1_30.06.2026__c297f9d5b996d803f5ccbc42.result.json)
+   job=pjb-lyenmpqljdrbrkparli7efpdmj0l tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[] header=0 footer=11 zones=21 tables rm/kept=7/2 mermaid=2 callouts=0 struck=0 carried_headings=5 removals_logged=42
+   xrefs: resolved=0 unresolved=0 chained=0
+   22 chunks, pages=16, <100-char chunks=1
+   embedded 22/22
+   stored (ce-clean)
+> Audit - Preparation Manual_Office_R1_30.06.2026.pdf [audit/pdf]
+   on-disk LlamaParse result for Audit - Preparation Manual_Office_R1_30.06.2026.pdf (Audit - Preparation Manual_Office_R1_30.06.2026__03e0f2dca96d11165249fef7.result.json)
+   job=pjb-wz1f7c3eitcfdvpiqfdpe1y92xo0 tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[3] header=0 footer=27 zones=50 tables rm/kept=44/3 mermaid=0 callouts=10 struck=0 carried_headings=6 removals_logged=175
+   xrefs: resolved=0 unresolved=0 chained=0
+   51 chunks, pages=33, <100-char chunks=8
+   embedded 51/51
+   stored (ce-clean)
+> Crewing - Crewing User Manual R2_10.06.2026.pdf [crewing/pdf]
+   on-disk LlamaParse result for Crewing - Crewing User Manual R2_10.06.2026.pdf (Crewing - Crewing User Manual R2_10.06.2026__2007c43d8ba13b8fcd8ca3a9.result.json)
+   job=pjb-r4y9qsepp8403epigndnho86iimi tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2, 3, 4] header=0 footer=83 zones=160 tables rm/kept=134/7 mermaid=20 callouts=8 struck=2 carried_headings=16 removals_logged=555
+   xrefs: resolved=26 unresolved=0 chained=4
+   187 chunks, pages=110, <100-char chunks=16
+   embedded 128/187
+   embedded 187/187
+   stored (ce-clean)
+> Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf [incident/pdf]
+   on-disk LlamaParse result for Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf (Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026__b2ac2189212ea0a84b7addcd.result.json)
+   job=pjb-m34m1xft3fa6dvr6z6gksh14xz8f tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=6 zones=7 tables rm/kept=7/1 mermaid=0 callouts=4 struck=4 carried_headings=1 removals_logged=34
+   xrefs: resolved=0 unresolved=0 chained=0
+   9 chunks, pages=7, <100-char chunks=2
+   embedded 9/9
+   stored (ce-clean)
+> Incident - Incident User Manual R0_20.05.2026.pdf [incident/pdf]
+   on-disk LlamaParse result for Incident - Incident User Manual R0_20.05.2026.pdf (Incident - Incident User Manual R0_20.05.2026__c5a58ad3c4f6997ee4121ced.result.json)
+   job=pjb-ne0cb210buk1xkurkqxmy0hvcx3q tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=15 zones=20 tables rm/kept=18/2 mermaid=2 callouts=0 struck=1 carried_headings=0 removals_logged=72
+   xrefs: resolved=0 unresolved=0 chained=0
+   23 chunks, pages=19, <100-char chunks=2
+   embedded 23/23
+   stored (ce-clean)
+> Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf [incident/pdf]
+   on-disk LlamaParse result for Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf (Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026__1e1bd241a61867b17971f12d.result.json)
+   job=pjb-uvnkklrp6sidq8tnyt2z2h37b2vf tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=9 zones=7 tables rm/kept=5/3 mermaid=0 callouts=4 struck=6 carried_headings=0 removals_logged=34
+   xrefs: resolved=0 unresolved=0 chained=0
+   9 chunks, pages=9, <100-char chunks=0
+   embedded 9/9
+   stored (ce-clean)
+> Incident - Near Miss User Manual R1_30.05.2026.pdf [incident/pdf]
+   on-disk LlamaParse result for Incident - Near Miss User Manual R1_30.05.2026.pdf (Incident - Near Miss User Manual R1_30.05.2026__14570abbb50ac74c9617f433.result.json)
+   job=pjb-7yfd9wjtdi5lgvrend7za7fmmo33 tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=11 zones=8 tables rm/kept=7/5 mermaid=0 callouts=0 struck=0 carried_headings=1 removals_logged=29
+   xrefs: resolved=0 unresolved=0 chained=0
+   14 chunks, pages=11, <100-char chunks=1
+   embedded 14/14
+   stored (ce-clean)
+> Safety - MOC User Manual_Office_R0_31.03.2026.pdf [safety/pdf]
+   on-disk LlamaParse result for Safety - MOC User Manual_Office_R0_31.03.2026.pdf (Safety - MOC User Manual_Office_R0_31.03.2026__7afe9e493b8f049e91392bef.result.json)
+   job=pjb-nfuwoqkl5emhu7occ9m4t2pjh7tn tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=19 footer=16 zones=19 tables rm/kept=27/2 mermaid=2 callouts=1 struck=0 carried_headings=3 removals_logged=98
+   xrefs: resolved=0 unresolved=0 chained=0
+   23 chunks, pages=16, <100-char chunks=1
+   embedded 23/23
+   stored (ce-clean)
+> Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf [safety/pdf]
+   on-disk LlamaParse result for Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf (Safety - MOC User Manual_Vessel_R0_31.03.2026__a3a901fa1a3458e1f8e6e798.result.json)
+   job=pjb-nkg6p0voh413jxb5cikf7pmleccy tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=14 zones=13 tables rm/kept=13/2 mermaid=2 callouts=1 struck=0 carried_headings=0 removals_logged=46
+   xrefs: resolved=0 unresolved=0 chained=0
+   17 chunks, pages=15, <100-char chunks=1
+   embedded 17/17
+   stored (ce-clean)
+> Safety - Master Review Manual R1_10.06.2026.pdf [safety/pdf]
+   on-disk LlamaParse result for Safety - Master Review Manual R1_10.06.2026.pdf (Safety - Master Review Manual R1_10.06.2026__8bbc90f449b278df0ae528c0.result.json)
+   job=pjb-us562pm92oxz260sq3sq5cix5gbp tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=9 zones=12 tables rm/kept=12/3 mermaid=1 callouts=4 struck=0 carried_headings=0 removals_logged=42
+   xrefs: resolved=0 unresolved=0 chained=0
+   11 chunks, pages=11, <100-char chunks=2
+   embedded 11/11
+   stored (ce-clean)
+> Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf [safety/pdf]
+   on-disk LlamaParse result for Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf (Safety - Risk Assessment User Manual_Office_R1_30.05.2026__eb5dc4f75ed181c97525afe7.result.json)
+   job=pjb-y1fg3qw215h7m45rxzl41nw1sam1 tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=24 zones=36 tables rm/kept=30/8 mermaid=2 callouts=14 struck=0 carried_headings=5 removals_logged=108
+   xrefs: resolved=0 unresolved=0 chained=0
+   41 chunks, pages=25, <100-char chunks=4
+   embedded 41/41
+   stored (ce-clean)
+> Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf [safety/pdf]
+   on-disk LlamaParse result for Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf (Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026__0e09986615cfabb51a03e881.result.json)
+   job=pjb-odz2fgwo8rppgz0wyslzzuudjdil tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=15 zones=23 tables rm/kept=17/1 mermaid=0 callouts=5 struck=0 carried_headings=4 removals_logged=72
+   xrefs: resolved=0 unresolved=0 chained=0
+   14 chunks, pages=15, <100-char chunks=2
+   embedded 14/14
+   stored (ce-clean)
+> Safety - SMS User Manual_Office_R0_31.01.2026.pdf [safety/pdf]
+   on-disk LlamaParse result for Safety - SMS User Manual_Office_R0_31.01.2026.pdf (Safety - SMS User Manual_Office_R0_31.01.2026__792a234123329b2173dc7ba3.result.json)
+   job=pjb-podgil9ikp3zn5xm7739lxdjftlo tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=16 zones=40 tables rm/kept=33/2 mermaid=0 callouts=12 struck=0 carried_headings=8 removals_logged=126
+   xrefs: resolved=0 unresolved=0 chained=0
+   32 chunks, pages=21, <100-char chunks=5
+   embedded 32/32
+   stored (ce-clean)
+> Safety - Safety Meeting User Manual_R1_31.05.2026.pdf [safety/pdf]
+   on-disk LlamaParse result for Safety - Safety Meeting User Manual_R1_31.05.2026.pdf (Safety - Safety Meeting User Manual_R1_31.05.2026__e72830b74f1ac82c065dcc19.result.json)
+   job=pjb-ibsf0putpgstb4jl6mskwjazxafv tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=0 footer=17 zones=16 tables rm/kept=14/2 mermaid=2 callouts=11 struck=0 carried_headings=0 removals_logged=62
+   xrefs: resolved=0 unresolved=0 chained=0
+   17 chunks, pages=18, <100-char chunks=5
+   embedded 17/17
+   stored (ce-clean)
+> Technical - Bulk Data Import (Operational) User Manual.docx [technical/docx]
+   on-disk LlamaParse result for Technical - Bulk Data Import (Operational) User Manual.docx (Technical - Bulk Data Import (Operational) User Manual__a52018db1d83ddfd7be460fb.result.json)
+   job=pjb-kqvhrzomzw6h6f4h9n8rbs0cydt7 tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=False toc=[] header=0 footer=0 zones=0 tables rm/kept=0/0 mermaid=0 callouts=0 struck=0 carried_headings=1 removals_logged=0
+   xrefs: resolved=0 unresolved=0 chained=0
+   9 chunks, pages=2, <100-char chunks=0
+   embedded 9/9
+   stored (ce-clean)
+> Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   on-disk LlamaParse result for Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf (Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026__b33c84a345c701654591dca4.result.json)
+   job=pjb-aj3gsjnx03c5tts9rjswitmduuxp tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=False toc=[2] header=0 footer=13 zones=28 tables rm/kept=20/0 mermaid=4 callouts=0 struck=0 carried_headings=1 removals_logged=90
+   xrefs: resolved=3 unresolved=0 chained=0
+   35 chunks, pages=20, <100-char chunks=5
+   embedded 35/35
+   stored (ce-clean)
+> Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf [technical/pdf]
+   on-disk LlamaParse result for Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf (Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026__42994853a5d3ed2da5571681.result.json)
+   job=pjb-5pjlwia5ts2tthjfo3vdje0c9xir tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=9 footer=16 zones=33 tables rm/kept=30/0 mermaid=0 callouts=3 struck=0 carried_headings=4 removals_logged=120
+   xrefs: resolved=6 unresolved=0 chained=0
+   31 chunks, pages=18, <100-char chunks=6
+   embedded 31/31
+   stored (ce-clean)
+> Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   on-disk LlamaParse result for Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026__5f18becc35f3c6d1a214e506.result.json)
+   job=pjb-ox6c3yj6mk0b969j6g8n1ljbhuiv tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=39 footer=60 zones=117 tables rm/kept=80/1 mermaid=24 callouts=12 struck=0 carried_headings=22 removals_logged=390
+   xrefs: resolved=3 unresolved=0 chained=0
+   85 chunks, pages=62, <100-char chunks=5
+   embedded 85/85
+   stored (ce-clean)
+> Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf [technical/pdf]
+   on-disk LlamaParse result for Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026__23c6072067d0ffdef053ac9d.result.json)
+   job=pjb-ul60dcqqtedkufhttxl8svueoj8h tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=True toc=[2] header=27 footer=41 zones=90 tables rm/kept=76/6 mermaid=10 callouts=16 struck=0 carried_headings=19 removals_logged=314
+   xrefs: resolved=3 unresolved=0 chained=0
+   78 chunks, pages=53, <100-char chunks=4
+   embedded 78/78
+   stored (ce-clean)
+> Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx [technical/docx]
+   on-disk LlamaParse result for Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx (Technical - Recent Updates & Changed Behaviours (Operational) Notes__90b824e522218b1f0a6d189a.result.json)
+   job=pjb-2b5lpb6qd0b5gxas78l027f0yt78 tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=False toc=[] header=0 footer=0 zones=0 tables rm/kept=0/0 mermaid=0 callouts=0 struck=0 carried_headings=1 removals_logged=0
+   xrefs: resolved=0 unresolved=0 chained=0
+   14 chunks, pages=2, <100-char chunks=1
+   embedded 14/14
+   stored (ce-clean)
+> Technical - Roles & Permissions (Operational) User Manual.docx [technical/docx]
+   on-disk LlamaParse result for Technical - Roles & Permissions (Operational) User Manual.docx (Technical - Roles & Permissions (Operational) User Manual__aaf9c8cc8c65dddbe1c0d406.result.json)
+   job=pjb-bal70lsevvxfnzrw6mwgxolycgpe tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=False toc=[] header=0 footer=0 zones=0 tables rm/kept=0/0 mermaid=0 callouts=0 struck=0 carried_headings=2 removals_logged=0
+   xrefs: resolved=0 unresolved=0 chained=0
+   14 chunks, pages=3, <100-char chunks=1
+   embedded 14/14
+   stored (ce-clean)
+> Technical - Ship-Side (Vessel Crew) Operational Notes.docx [technical/docx]
+   on-disk LlamaParse result for Technical - Ship-Side (Vessel Crew) Operational Notes.docx (Technical - Ship-Side (Vessel Crew) Operational Notes__8f7e2c57a54f0627e1ea98a3.result.json)
+   job=pjb-q2fvm5gaavt2aa1big0bhmegrc2w tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=False toc=[] header=0 footer=0 zones=0 tables rm/kept=0/0 mermaid=0 callouts=0 struck=0 carried_headings=1 removals_logged=0
+   xrefs: resolved=0 unresolved=0 chained=0
+   7 chunks, pages=2, <100-char chunks=0
+   embedded 7/7
+   stored (ce-clean)
+> Technical - Sync (Operational) User Manual.docx [technical/docx]
+   on-disk LlamaParse result for Technical - Sync (Operational) User Manual.docx (Technical - Sync (Operational) User Manual__84a7e9d23abdf6a3797ee764.result.json)
+   job=pjb-kzwh4cun9fm0hbujrj49hucsmblu tier=cost_effective requested_version=2026-08-19 response.metadata.version=ABSENT
+   cleaned: cover=False toc=[] header=0 footer=0 zones=0 tables rm/kept=0/0 mermaid=0 callouts=0 struck=0 carried_headings=2 removals_logged=0
+   xrefs: resolved=0 unresolved=0 chained=0
+   13 chunks, pages=3, <100-char chunks=1
+   embedded 13/13
+   stored (ce-clean)
+
+index set 'ce-clean' now holds 773 chunks across 25 documents
+[
+ {
+  "file": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf",
+  "chunks": 8,
+  "pages": 8,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf",
+  "chunks": 9,
+  "pages": 5,
+  "short": 0,
+  "stub": false
+ },
+ {
+  "file": "Audit - History Manual_R1_30.06.2026.pdf",
+  "chunks": 22,
+  "pages": 16,
+  "short": 1,
+  "stub": false
+ },
+ {
+  "file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf",
+  "chunks": 51,
+  "pages": 33,
+  "short": 8,
+  "stub": false
+ },
+ {
+  "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "chunks": 187,
+  "pages": 110,
+  "short": 16,
+  "stub": false
+ },
+ {
+  "file": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf",
+  "chunks": 9,
+  "pages": 7,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Incident - Incident User Manual R0_20.05.2026.pdf",
+  "chunks": 23,
+  "pages": 19,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf",
+  "chunks": 9,
+  "pages": 9,
+  "short": 0,
+  "stub": false
+ },
+ {
+  "file": "Incident - Near Miss User Manual R1_30.05.2026.pdf",
+  "chunks": 14,
+  "pages": 11,
+  "short": 1,
+  "stub": false
+ },
+ {
+  "file": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf",
+  "chunks": 23,
+  "pages": 16,
+  "short": 1,
+  "stub": false
+ },
+ {
+  "file": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf",
+  "chunks": 17,
+  "pages": 15,
+  "short": 1,
+  "stub": false
+ },
+ {
+  "file": "Safety - Master Review Manual R1_10.06.2026.pdf",
+  "chunks": 11,
+  "pages": 11,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf",
+  "chunks": 41,
+  "pages": 25,
+  "short": 4,
+  "stub": false
+ },
+ {
+  "file": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf",
+  "chunks": 14,
+  "pages": 15,
+  "short": 2,
+  "stub": false
+ },
+ {
+  "file": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf",
+  "chunks": 32,
+  "pages": 21,
+  "short": 5,
+  "stub": false
+ },
+ {
+  "file": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf",
+  "chunks": 17,
+  "pages": 18,
+  "short": 5,
+  "stub": false
+ },
+ {
+  "file": "Technical - Bulk Data Import (Operational) User Manual.docx",
+  "chunks": 9,
+  "pages": 2,
+  "short": 0,
+  "stub": false
+ },
+ {
+  "file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "chunks": 35,
+  "pages": 20,
+  "short": 5,
+  "stub": false
+ },
+ {
+  "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+  "chunks": 31,
+  "pages": 18,
+  "short": 6,
+  "stub": false
+ },
+ {
+  "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "chunks": 85,
+  "pages": 62,
+  "short": 5,
+  "stub": false
+ },
+ {
+  "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "chunks": 78,
+  "pages": 53,
+  "short": 4,
+  "stub": false
+ },
+ {
+  "file": "Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx",
+  "chunks": 14,
+  "pages": 2,
+  "short": 1,
+  "stub": false
+ },
+ {
+  "file": "Technical - Roles & Permissions (Operational) User Manual.docx",
+  "chunks": 14,
+  "pages": 3,
+  "short": 1,
+  "stub": false
+ },
+ {
+  "file": "Technical - Ship-Side (Vessel Crew) Operational Notes.docx",
+  "chunks": 7,
+  "pages": 2,
+  "short": 0,
+  "stub": false
+ },
+ {
+  "file": "Technical - Sync (Operational) User Manual.docx",
+  "chunks": 13,
+  "pages": 3,
+  "short": 1,
+  "stub": false
+ }
+]
+DONE

@@ -26,6 +26,12 @@ import difflib
 import re
 from dataclasses import dataclass, field
 
+# Resolver version — part of the build key and of every reproducibility record. Bump on ANY
+# change to the matching rules, the settings below or the label wording.
+XREF_VERSION = "2026-09-14.2"
+XREF_SETTINGS = {"title_match_min_ratio": 0.6, "max_chain_depth": 3, "process_words": "fallback",
+                 "label": "(Cross-reference resolved: the steps for <parent › section> are the same as section <n> '<title>' under <parent>, page <p>. They are:)"}
+
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$", re.M)
 NUM_RE = re.compile(r"^\s*((?:\d+\.)*\d+)\.?\s*(.*)$")
 XREF_RE = re.compile(r"refer\s+to\s+(?:the\s+)?[\"'‘’“”<u>]*\s*([^'\"‘’“”<>]{2,60}?)\s*[\"'‘’“”</u>]*\s*(sub-?sub-?module|sub-?module|module|tab|section|sub-?menu)", re.I)

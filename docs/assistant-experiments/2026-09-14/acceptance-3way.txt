@@ -1,0 +1,65 @@
+
+[callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   migrated       answer ✗  cite ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this about Aud'
+   py-llamaparse  answer ✗  cite ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this about Tec'
+   ce-clean       answer ✗  cite ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this about Tec'
+
+[callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   migrated       answer ✓  cite ✓  gate=answer cite=Audit - Preparation Manual_O p9 | '1. The Email Notification icon notifies the Office that the preparatio'
+   py-llamaparse  answer ✓  cite ✓  gate=answer cite=Audit - Preparation Manual_O p9 | '1. The **Email Notification** icon is used to notify the Office that t'
+   ce-clean       answer ✓  cite ✓  gate=answer cite=Audit - Preparation Manual_O p9 | '1. The **Email Notification** icon notifies the Office that the prepar'
+
+[callout] How do I upload a document for the first time in the SMS module?
+   migrated       answer ✓  cite ✓  gate=answer cite=Safety - SMS User Manual_Off p14 | '1. Click on the **+New Document** tab to initiate the SMS change reque'
+   py-llamaparse  answer ✓  cite ✗  gate=answer cite=Safety - SMS User Manual_Off p18 | '1. Click on the **+New Document** tab to initiate the SMS change reque'
+   ce-clean       answer ✓  cite ✗  gate=answer cite=Safety - SMS User Manual_Off p18 | '1. Click on the **+New Document** tab to initiate the SMS change reque'
+
+[table] In the Master Review module, what do the grey and red icons mean?
+   migrated       answer ✓  cite ✓  gate=answer cite=Safety - Master Review Manua p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **Red Ic'
+   py-llamaparse  answer ✓  cite ✓  gate=answer cite=Safety - Master Review Manua p6 | '1. The **grey icon** indicates that a response is due.\n2. The **red ic'
+   ce-clean       answer ✓  cite ✓  gate=answer cite=Safety - Master Review Manua p6 | '1. The grey icon (⭕) indicates that a response is due.\n2. The red icon'
+
+[table] What are the hazard categories in a risk assessment?
+   migrated       answer ✗  cite ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this about Saf'
+   py-llamaparse  answer ✗  cite ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this about Inc'
+   ce-clean       answer ✗  cite ✗  gate=answer cite=Incident - Incident User Man p7 | 'The hazard categories in a risk assessment are not covered in the Inci'
+
+[table] What actions can I take on a near miss record from the list — what do the icons do?
+   migrated       answer ✓  cite ✓  gate=answer cite=Incident - Near Miss User Ma p5 | '1. **View Record**: Click the eye icon to view, edit, or export the se'
+   py-llamaparse  answer ✓  cite ✓  gate=answer cite=Incident - Near Miss User Ma p5 | '1. **View Record**: Click the eye icon to view, edit, or export the se'
+   ce-clean       answer ✓  cite ✓  gate=answer cite=Incident - Near Miss User Ma p5 | '1. **View Record (👁️)**: View, edit, or export the selected Near Miss '
+
+[xref] How do I apply a filter in the Stores sub-module of PMS?
+   migrated       answer ✗  cite ✓  gate=answer cite=Technical - PMS User Manual  p49 | 'The process for applying a filter in the Stores sub-module is not cove'
+   py-llamaparse  answer ✗  cite ✗  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this about Cre'
+   ce-clean       answer ✓  cite ✓  gate=answer cite=Technical - PMS User Manual_ p43 | "1. Click on the 'Spares' sub-sub-module; the system will open the 'Inv"
+
+[xref] How do I export crew details from the Onboard list in Crewing?
+   migrated       answer ✗  cite ✓  gate=answer cite=Crewing - Crewing User Manua p28 | 'The process for exporting crew details from the Onboard list is not co'
+   py-llamaparse  answer ✓  cite ✓  gate=answer cite=Crewing - Crewing User Manua p28 | "1. Go to the 'Crew Database' sub – submodule.\n2. Click 'Export CSV' or"
+   ce-clean       answer ✓  cite ✓  gate=answer cite=Crewing - Crewing User Manua p28 | "1. Go to the 'Crew Database' sub – submodule.\n2. Click 'Export CSV' or"
+
+[xref] How do I create a COC defect record?
+   migrated       answer ✓  cite ✓  gate=answer cite=Technical - Defects User Man p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same procedu"
+   py-llamaparse  answer ✓  cite ✓  gate=answer cite=Technical - Defects User Man p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same procedu"
+   ce-clean       answer ✓  cite ✓  gate=answer cite=Technical - Defects User Man p19 | "1. Go to the 'Defect Log' sub-submodule.\n2. Click the '+ New Defect' b"
+
+[note] When filling MoC Part B, what happens if I select No for further assessment?
+   migrated       answer ✓  cite ✓  gate=answer cite=Safety - MOC User Manual_Off p11 | '1. If you select **“No”** for further assessment, the MoC will be mark'
+   py-llamaparse  answer ✓  cite ✗  gate=answer cite=Safety - MOC User Manual_Ves p7 | '1. If you select **"No"** for further assessment, the MoC will be mark'
+   ce-clean       answer ✓  cite ✓  gate=answer cite=Safety - MOC User Manual_Off p11 | '1. If you select "**No**" for further assessment, the MoC will be mark'
+
+[note] In PMS, is there another way to add a component besides the components panel?
+   migrated       answer ✓  cite ✓  gate=answer cite=Technical - PMS User Manual  p24 | 'The documentation states that a new component can also be added by cli'
+   py-llamaparse  answer ✗  cite ✗  gate=answer cite=Technical - PMS User Manual  p26 | 'The information provided does not cover whether there is another way t'
+   ce-clean       answer ✓  cite ✓  gate=answer cite=Technical - PMS User Manual  p24 | "Yes, you can also add a new component by clicking the '+ Add Component"
+
+[note] What should I review after deleting an implication in a vessel MoC?
+   migrated       answer ✓  cite ✓  gate=answer cite=Safety - MOC User Manual_Ves p9 | '1. Review the **Part E – Action table** to ensure data consistency.\n\nS'
+   py-llamaparse  answer ✓  cite ✓  gate=answer cite=Safety - MOC User Manual_Ves p9 | 'After deleting an implication in a vessel MoC, you should review the *'
+   ce-clean       answer ✓  cite ✓  gate=answer cite=Safety - MOC User Manual_Ves p9 | 'After deleting an implication in a vessel MoC, you should review the *'
+
+== answer-level acceptance (answer correct / citation correct, out of 12) ==
+   migrated       8/12   10/12
+   py-llamaparse  8/12   6/12
+   ce-clean       10/12   9/12

@@ -1,0 +1,26 @@
+
+== Audit - Preparation Manual_Office_R1_30.06.2026  (run1 pjb-wz1f7c3eitcfdvpiqfdpe1y92xo0 vs run2 pjb-31zy8lp3l7n1unwzj69r9hk3r7ai)
+   RAW      pages run1=33 run2=33 compared=33 (by original page no.) | identical 3 | formatting-only 11 | REAL text diffs 19 | word similarity 0.928
+      p3: 279 word changes — e.g. -contents -1 -login -4 -1 -1 -login -section -4 -1
+      p4: 4 word changes — e.g. -enter -your -login -credentials
+      p6: 2 word changes — e.g. +80 +73
+      p8: 6 word changes — e.g. +revision +notes +page +8 +of +33
+   CLEANED  pages run1=33 run2=33 compared=33 (by original page no.) | identical 19 | formatting-only 4 | REAL text diffs 10 | word similarity 0.974
+      p4: 4 word changes — e.g. -enter -your -login -credentials
+      p6: 2 word changes — e.g. +80 +73
+      p8: 2 word changes — e.g. +revision +notes
+      p10: 1 word changes  ⚠ negation/modality flip: +no — e.g. +no
+   removed run1/run2: tables 44/37, callouts 10/8, struck 0/0
+
+== Safety - Safety Meeting User Manual_R1_31.05.2026  (run1 pjb-ibsf0putpgstb4jl6mskwjazxafv vs run2 pjb-3m5g7300to9tsetmunamq8r93amq)
+   RAW      pages run1=18 run2=18 compared=18 (by original page no.) | identical 4 | formatting-only 8 | REAL text diffs 6 | word similarity 0.954
+      p5: 6 word changes — e.g. +welcome +to +sail +select +sub +menu
+      p9: 3 word changes — e.g. -sm -' +sm'
+      p11: 18 word changes — e.g. +b1 +2 +presentation +discussion +of +information +and +proposals +regarding +improvements
+      p12: 4 word changes — e.g. -upload +'upload' -save +'save'
+   CLEANED  pages run1=18 run2=18 compared=18 (by original page no.) | identical 10 | formatting-only 4 | REAL text diffs 4 | word similarity 0.952
+      p9: 3 word changes — e.g. -sm -' +sm'
+      p11: 18 word changes — e.g. +b1 +2 +presentation +discussion +of +information +and +proposals +regarding +improvements
+      p12: 4 word changes — e.g. -upload +'upload' -save +'save'
+      p13: 36 word changes — e.g. -add -action -if -required -add -action -1 -add -comments -in
+   removed run1/run2: tables 14/15, callouts 11/7, struck 0/0

@@ -1,0 +1,716 @@
+manual                                               pg cover  toc  hdr  ftr zones tbl rm/kept merm callout susp xref ok/un
+Audit - Fleet Sharing Manual- Office_R1_30.06.2026.p  9     Y    1    0    6     7     6/2        0       0    5     0/0   
+Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.p  6     Y    1    0    4     3     1/5        0       0    0     0/0   
+Audit - History Manual_R1_30.06.2026.pdf             16     Y    0    0   11    21     4/5        2       0    4     0/0   
+Audit - Preparation Manual_Office_R1_30.06.2026.pdf  33     Y    1    0   27    50    13/34       0       7    2     0/0   
+Crewing - Crewing User Manual R2_10.06.2026.pdf     111     Y    3    0   83   160    82/59      20       7   17    26/0   
+Incident - Fleet Notification User Manual_Vessel_ R0  8     Y    1    0    6     7     4/4        0       2    3     0/0   
+Incident - Incident User Manual R0_20.05.2026.pdf    19     Y    1    0   15    20     5/15       2       0    3     0/0   
+Incident - Lesson Learnt User Manual_Vessel_R0_30.05  9     Y    1    0    9     7     3/5        0       2    1     0/0   
+Incident - Near Miss User Manual R1_30.05.2026.pdf   11     Y    1    0   11     8     2/10       0       0    2     0/0   
+Safety - MOC User Manual_Office_R0_31.03.2026.pdf    19     Y    1   19   16    19    11/18       2       0    7     0/0   
+Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf    15     Y    1    0   14    13     2/13       2       1    1     0/0   
+Safety - Master Review Manual R1_10.06.2026.pdf      11     Y    1    0    9    12     7/8        1       1    3     0/0   
+Safety - Risk Assessment User Manual_Office_R1_30.05 25     Y    1    0   24    36     8/30       2       9    4     0/0   
+Safety - Risk Assessment User Manual_Vessel_R1_30.05 16     Y    1    0   15    23     2/16       0       4    2     0/0   
+Safety - SMS User Manual_Office_R0_31.01.2026.pdf    22     Y    1    0   16    40    12/23       0       4    7     0/0   
+Safety - Safety Meeting User Manual_R1_31.05.2026.pd 18     Y    1    0   17    16     9/7        2      10    8     0/0   
+Technical - Bulk Data Import (Operational) User Manu  2     -    0    0    0     0     0/0        0       0    0     0/0   
+Technical - Cert. & Surveys User Manual For Office_S 21     -    1    0   13    28     6/14       4       0    4     3/0   
+Technical - Defects User Manual For Office_Sail Admi 20     Y    1    9   16    33    21/9        0       3    7     6/0   
+Technical - PMS User Manual For Office_Sail Admin_R2 64     Y    1   39   60   117    23/58      24       9   11     3/0   
+Technical - PMS User Manual_Vessel Specific_R3_08.07 54     Y    1   27   41    90    25/57      10      14    8     3/0   
+Technical - Recent Updates & Changed Behaviours (Ope  2     -    0    0    0     0     0/0        0       0    0     0/0   
+Technical - Roles & Permissions (Operational) User M  3     -    0    0    0     0     0/0        0       0    0     0/0   
+Technical - Ship-Side (Vessel Crew) Operational Note  2     -    0    0    0     0     0/0        0       0    0     0/0   
+Technical - Sync (Operational) User Manual.docx       3     -    0    0    0     0     0/0        0       0    0     0/0   
+
+TOTAL tables removed 246 · kept 392 · mermaid removed 71 · suspicious removed lines 99 · xrefs resolved 41 / unresolved 0
+
+== KEPT tables (asserted genuine) — header cells ==
+  Audit - Fleet Sharing Manual- Office_R1_ p5: Icon | Action | Description | 📎 | Upload &amp; View Attachment | Upload and view supportin
+  Audit - Fleet Sharing Manual- Office_R1_ p8: Step | Description | 1 | Description | 2 | Actions
+  Audit - Fleet Sharing Manual- Vessel_R1_ p4: Click "New Fleet Sharing" | Report Id | Title | Date | Confirmation Sent | Actions Complet
+  Audit - Fleet Sharing Manual- Vessel_R1_ p5: Report Id | Title | Issue Date | Confirmation Sent | Actions Completed | Date Actions Comp
+  Audit - Fleet Sharing Manual- Vessel_R1_ p6: Section | Description | 1 | Description | 2 | Discussion Record
+  Audit - Fleet Sharing Manual- Vessel_R1_ p6: Field | Value | Title | Safety | Date | 02 Jul 2026
+  Audit - Fleet Sharing Manual- Vessel_R1_ p6: Field | Value | Vessel 1 | Select the Discussion Date.
+  Audit - History Manual_R1_30.06.2026.pdf p3: &lt;span style="color:#2f5496"&gt;Table of Contents&lt;/span&gt; | &lt;span style="color:#
+  Audit - History Manual_R1_30.06.2026.pdf p6: Icon | Action | Description | View Attachment | Upload and view supporting documents for t
+  Audit - History Manual_R1_30.06.2026.pdf p7: Category | Selection | Manual Data Entry | -- Vessel -- | SIRE/ CDI Upload | SIRE 2.0 JSON
+  Audit - History Manual_R1_30.06.2026.pdf p13: Section | Message | SIRE 2.0 BETA | Arrebol
+  Audit - History Manual_R1_30.06.2026.pdf p15: Label | Action | Save | Click "Save" to save the details. | Dropdown | Select deviation fr
+  Audit - Preparation Manual_Office_R1_30. p5: VESSEL | INSPECTION | DUE DATE | Progress | PORT | ACTION
+  Audit - Preparation Manual_Office_R1_30. p6: VESEL | INSPECTION | START DATE | PROGRESS | DUE DATE
+  Audit - Preparation Manual_Office_R1_30. p6: VESEL | INSPECTION | START DATE | PROGRESS | DUE DATE | PORT
+  Audit - Preparation Manual_Office_R1_30. p6: Above Bar | Below Bar | • Indicates the percentage of Time elapsed. | • Indicates the perc
+  Audit - Preparation Manual_Office_R1_30. p7: Click the expand (>) icon to display the preparation checklist in an expanded view. | VESE
+  Audit - Preparation Manual_Office_R1_30. p8: File Name | Action | save.pdf | View, download &#x26;/or delete the attachment
+  Audit - Preparation Manual_Office_R1_30. p8: VESSEL | INSPECTION | START DATE | PROGRESS | DUE DATE | PORT
+  Audit - Preparation Manual_Office_R1_30. p9: VESSEL ↓ | INSPECTION ↓ | START DATE | PROGRESS ↑ | DUE DATE ↓ | PORT ↓
+  Audit - Preparation Manual_Office_R1_30. p12: PREPARATION | PLANNED VESSELS | ALL | SEARCH
+          Vessels | VESEL ↓ | INSPECTION ↓
+  Audit - Preparation Manual_Office_R1_30. p13: Label | Description | Click to create New preparation. | Pointing to the "+ New Preparatio
+  Audit - Preparation Manual_Office_R1_30. p14: VESEL | INSPECTION | START DATE | PROGRESS | ACTION
+  Audit - Preparation Manual_Office_R1_30. p15: Inspector Observation Date | Q. NO | QUESTION TEXT | OBSERVATION | CA | SOC
+  Audit - Preparation Manual_Office_R1_30. p19: Vessel 1 | 2. Certification and Documentation | SIRE 2.0 - Questionnaire | Online | Go Off
+  Audit - Preparation Manual_Office_R1_30. p20: VIQ No. | Short Text | Cat. | Nature of Check | Answer | Assigned To
+  Audit - Preparation Manual_Office_R1_30. p20: Icon | Label | PDF icon with delete and download buttons | Delete and Download icon | Pape
+  Audit - Preparation Manual_Office_R1_30. p20: VIQ No. | Short Text | Cat. | Nature of Check | Answer | Assigned To
+  Audit - Preparation Manual_Office_R1_30. p21: Vessel 1 | 2. Certification and Documentation | SIRE 2.0 - Questionnaire | Online | Go Off
+  Audit - Preparation Manual_Office_R1_30. p22: VIQ No. | Short Text | Cat. | Nature of Check | Answer | Assigned To
+  Audit - Preparation Manual_Office_R1_30. p24: Date | Port | Oil Major | Inspector | Observation | Cat
+  Audit - Preparation Manual_Office_R1_30. p26: Vessel 1 | 2. Certification and Documentation ▼ SIRE 2.0 - Questionnaire | VIQ No. | Short
+  Audit - Preparation Manual_Office_R1_30. p26: Vessel 1 | 2. Certification and Documentation ▼ SIRE 2.0 - Questionnaire | VIQ No. | Short
+  Audit - Preparation Manual_Office_R1_30. p27: Vessel 1 | 2. Certification and Documentation v SIRE 2.0 - Questionnaire Online Go Offline
+  Audit - Preparation Manual_Office_R1_30. p27: Preparation  PLANNED VESSELS | ALL v | VESSEL ↓ | INSPECTION ↓ | START DATE ↑ | PROGRESS ↓
+  Audit - Preparation Manual_Office_R1_30. p28: VIQ No. | Question | A | Answer | Review | 5.2.4
+  Audit - Preparation Manual_Office_R1_30. p28: VIQ No. | Question | A | Answer | Review | 2.1.1
+  Audit - Preparation Manual_Office_R1_30. p29: Item | Vessel 1 | 5. Safety Management | All | 1. General Information | 2. Certification a
+  Audit - Preparation Manual_Office_R1_30. p30: 1.1.1 Vessel Type | A. Vessel Type | Crude / Products Tanker
+        Products / Chemical T
+  Audit - Preparation Manual_Office_R1_30. p30: Option | ☑ Generate Filled | ☐ Generate Blank | Continue
+  Audit - Preparation Manual_Office_R1_30. p30: Instruction | Click 'Back' to return to the Preparation screen. | Click 'Save' to save the
+  Audit - Preparation Manual_Office_R1_30. p30: Vessel 1 | 1. General Information | SIRE 2.0 - PIQ | Buttons | VIQ No.
+  Audit - Preparation Manual_Office_R1_30. p31: Element | Description | Saving | Status changes to 'Saving' while data is being saved and 
+  Audit - Preparation Manual_Office_R1_30. p32: Element | Status | Progress Bar | 0% | Message | Please Wait Data Saving In Progress...
+  Audit - Preparation Manual_Office_R1_30. p32: Vessel 1 | 2. Certification and Documentation | SIRE 2.0 - Questionnaire | VIQ No.
+  Audit - Preparation Manual_Office_R1_30. p33: VIQ No. | Short Text | Cat. | Nature of Check | Answer | Assigned To
+  Crewing - Crewing User Manual R2_10.06.2 p13: File No | First Name | Family Name | Middle Name | DOB | Nationality
+  Crewing - Crewing User Manual R2_10.06.2 p14: File No | First Name | Family Name | Middle Name | DOB | Nationality
+  Crewing - Crewing User Manual R2_10.06.2 p14: Section | Description | A1 | Seafarer's Particulars | A2 | Travel &#x26; ID Documents
+  Crewing - Crewing User Manual R2_10.06.2 p15: Step | Description | 1 | From here, the user can fetch data from the database. | 2 | Click
+  Crewing - Crewing User Manual R2_10.06.2 p16: Step | Action | 1. | Click here to redirect to Part B after submitting Part A. | 2. | Clic
+  Crewing - Crewing User Manual R2_10.06.2 p18: Step | Description | 1. | Redirects to Part C after Part B submission. | 2. | Click here t
+  Crewing - Crewing User Manual R2_10.06.2 p26: 1. Click here to activate filters. | Filters button | 2. Use the search field and filters 
+  Crewing - Crewing User Manual R2_10.06.2 p26: 1. Click on the 'Crew Database'. | Crew Database button | 2. Click here to view or edit th
+  Crewing - Crewing User Manual R2_10.06.2 p27: Section | Description | 1 | From this section, users can overview crew information. | 2 | 
+  Crewing - Crewing User Manual R2_10.06.2 p27: Category | Value | Status | On Leave | Experience | Company (Yrs): 0.6, Rank (Yrs): 1, Tan
+  Crewing - Crewing User Manual R2_10.06.2 p28: 1. Click on the 'Crew Database'.
+  Crewing - Crewing User Manual R2_10.06.2 p28: 1. From here, the user can export the report.
+  Crewing - Crewing User Manual R2_10.06.2 p33: Step | Action | 2. | Choose the vessel. | 1. | Select the Training Matrix to overview Trai
+  Crewing - Crewing User Manual R2_10.06.2 p33: Company ID | Training Label | Master | Chief Officer | 2nd Officer | 3rd Officer
+  Crewing - Crewing User Manual R2_10.06.2 p35: Field | Value | Rank | Chief Officer | Name | WEI LI
+  Crewing - Crewing User Manual R2_10.06.2 p36: Field | Value | Name: | IVAN JURIC | Nationality: | CROATIA
+  Crewing - Crewing User Manual R2_10.06.2 p40: Draft ID | Last Edited | Vessel | Ranks | Plan from/To
+  Crewing - Crewing User Manual R2_10.06.2 p40: Draft ID | Last Edited | Vessel | Ranks | Plan from/To
+  Crewing - Crewing User Manual R2_10.06.2 p41: Step | Action | 1. | From here, the user can select the Vessel, Ranks, and date range to s
+  Crewing - Crewing User Manual R2_10.06.2 p43: Step | Action | 1. | Click on the 'Approval' sub-sub | 2. | Click on the checkbox.
+  Crewing - Crewing User Manual R2_10.06.2 p45: Step | Action | 1. | Click the 'Promotions' sub-module to open the 'All' sub-submodule by 
+  Crewing - Crewing User Manual R2_10.06.2 p45: Step | Action | 1. | Click here to activate the filter. | 2. | Click here to enter or sele
+  Crewing - Crewing User Manual R2_10.06.2 p47: Item | Current Value | Target Value | Status | Options | Checkbox
+  Crewing - Crewing User Manual R2_10.06.2 p47: Item | Current Value | A2.3c Company Service? | 12 Months | A2.3d Minimum Tanker Experienc
+  Crewing - Crewing User Manual R2_10.06.2 p48: Step | Action | 1 | Click here to open the 'Part B' section and enter the required details
+  Crewing - Crewing User Manual R2_10.06.2 p48: Step | Action | 1 | Click here to open the 'Part C' section and enter the required details
+  Crewing - Crewing User Manual R2_10.06.2 p52: 1. Click here to view appraisal form.
+  Crewing - Crewing User Manual R2_10.06.2 p52: 1. Click here to edit appraisal form.
+  Crewing - Crewing User Manual R2_10.06.2 p53: Step | Action | 1. | Select the required fields. | 2. | From here, the user can add traini
+  Crewing - Crewing User Manual R2_10.06.2 p53: Note | The Competence Score, Behavioural Score, and Overall Score in Part F are automatica
+  Crewing - Crewing User Manual R2_10.06.2 p53: Step | Action | 1. | Enter the required information in Part C through Part F. | 2. | Use '
+  Crewing - Crewing User Manual R2_10.06.2 p54: Step | Action | 1. | Click here to access Part G. | 2. | Click here to save or submit the 
+  Crewing - Crewing User Manual R2_10.06.2 p58: Step | Action | 1. | Click here to view any associated Violations and the Last, Second—Las
+  Crewing - Crewing User Manual R2_10.06.2 p58: Step | Action | 1. | Click here to open new records.
+  Crewing - Crewing User Manual R2_10.06.2 p59: Section | Instruction | 1. | Click here to select the type of test. | 2. | After selecting
+  Crewing - Crewing User Manual R2_10.06.2 p60: 1. | Click here to download the form.
+  Crewing - Crewing User Manual R2_10.06.2 p64: Section | Description | Part A: Basic Information | Enter details as applicable | A1. Gene
+  Crewing - Crewing User Manual R2_10.06.2 p66: Vessel | Test Date &#x26; Time | Test Type | Reason for Testing | Description | Initiated 
+  Crewing - Crewing User Manual R2_10.06.2 p70: Category | Value | PERFORMANCE OVERVIEW | Total Violations | 64 | PERFORMANCE OVERVIEW | T
+  Crewing - Crewing User Manual R2_10.06.2 p73: Year | NCs per Vessel | Violations per Vessel | 2024 | 0 | 25
+  Crewing - Crewing User Manual R2_10.06.2 p76: Category | Value | Total Violations | 138 | Total NCs | 6
+  Crewing - Crewing User Manual R2_10.06.2 p79: Plan/Rec | Date | Day | 00 | 01 | 02
+  Crewing - Crewing User Manual R2_10.06.2 p79: Plan/Rec | Date | Day | 00 | 01 | 02
+  Crewing - Crewing User Manual R2_10.06.2 p82: Step | Action | 1. | From here, the user can switch between fixed and variable tasks. | 2.
+  Crewing - Crewing User Manual R2_10.06.2 p83: Rank | Name | Watch/Duty | 00 | 01 | 02
+  Crewing - Crewing User Manual R2_10.06.2 p84: Date &#x26; Time | Start Time | Start Date | dd-YYYY | HHMM (e.g. 14:30) | Finish Date
+  Crewing - Crewing User Manual R2_10.06.2 p85: Start Date/ Time | Finish Date/ Time | Task | Status | Crew Involved | Remarks
+  Crewing - Crewing User Manual R2_10.06.2 p85: Field | Value | Start Date | 04-May-2026 | Start Time | 14:30
+  Crewing - Crewing User Manual R2_10.06.2 p91: Crew Retention | Criteria | Description | Values | S
+  Crewing - Crewing User Manual R2_10.06.2 p91: Crew Retention | Criteria | Description | Values | S
+  Crewing - Crewing User Manual R2_10.06.2 p94: 1. Click here to export the current table data in the selected format. | Export CSV | Expo
+  Crewing - Crewing User Manual R2_10.06.2 p98: Button | Action | Hide Field | Click here to hide the selected section from the form. | Sa
+  Crewing - Crewing User Manual R2_10.06.2 p99: Form | Rank Group | Version No | Version Date | Actions | Crew Appraisal Form
+  Crewing - Crewing User Manual R2_10.06.2 p104: Instruction | Target Element | 1. Enter and select the required rank. | Group Name input f
+  Crewing - Crewing User Manual R2_10.06.2 p109: # | ID | Training Name | Category | Group | Requirement/Ref
+  Crewing - Crewing User Manual R2_10.06.2 p109: # | ID | Training Name | Category | Group | Requirement/Ref
+  Crewing - Crewing User Manual R2_10.06.2 p110: # | ID | Training Name | Category | Group | Requirement/Ref
+  Crewing - Crewing User Manual R2_10.06.2 p111: # | ID | Training Name | Category | Group | Requirement/Ref
+  Crewing - Crewing User Manual R2_10.06.2 p111: # | ID | Training Name | Category | Group | Requirement/Ref
+  Incident - Fleet Notification User Manua p4: VESEL | INSPECTION | DUE DATE | PROGRESS | PORT | ACTION
+  Incident - Fleet Notification User Manua p5: Fleet Notifications shared by the Office are displayed here. | Notification Id | Notificat
+  Incident - Fleet Notification User Manua p6: Field | Value | Notification Title | office sync test - Lorem ipsum dolor sit amet consect
+  Incident - Fleet Notification User Manua p6: Step | Action | 1. | Select the checkbox once the notification is discussed onboard. | 2. 
+  Incident - Incident User Manual R0_20.05 p5: Icon | Action | Description | 📎 | Add Attachment | Upload and attach supporting documents 
+  Incident - Incident User Manual R0_20.05 p5: Report Id | Date | Incident Category | Sub Category | Incident Title | Task
+  Incident - Incident User Manual R0_20.05 p6: Section | Content | 1 | Description | 2 | Severity Assessment
+  Incident - Incident User Manual R0_20.05 p7: 1. Select the applicable impact category (multiple selections allowed). | The event/ incid
+  Incident - Incident User Manual R0_20.05 p8: Enter details under Part - C. | C. Investigation Team | Who investigate the incident | SAV
+  Incident - Incident User Manual R0_20.05 p9: Enter details under Part - D. | METHOD 1 | Enter text here... | DATE* | HH : MM | DESCRIPT
+  Incident - Incident User Manual R0_20.05 p9: &#x3C; &#x3C; Back | View | SAVE | Click to Save Part D details | D. Sequence of EventsEnt
+  Incident - Incident User Manual R0_20.05 p11: F. Conditions Surrounding the incidentEnter background data | Click here to add conditions
+  Incident - Incident User Manual R0_20.05 p13: G. Analysis of available information | Analysis why this happened | G1. Summary of availab
+  Incident - Incident User Manual R0_20.05 p14: Label | Content | Add Cause analysis details. | + ADD NEW / EDIT
+  Incident - Incident User Manual R0_20.05 p14: Map causes and actions for the selected event | Types of Contact or event | Immediate Caus
+  Incident - Incident User Manual R0_20.05 p15: G2. Type of contact or event | Selected Causes and actions are displayed here. | + ADD NEW
+  Incident - Incident User Manual R0_20.05 p17: Section | Field 1 | Field 2 | Field 3 | Report Prepared by : | NAME*
+  Incident - Incident User Manual R0_20.05 p18: L. All AttachmentsAttachments related to this Report | Attachments: | • Statement 1.pdf | 
+  Incident - Incident User Manual R0_20.05 p19: Report Id | Date | Vessel | Incident Category | Sub Category | Incident Title
+  Incident - Lesson Learnt User Manual_Ves p2: LESSON LEARNT | 3 | 1. HOW TO ACCESS LESSON LEARNT | 4 | 2. LESSON LEARNT – OVERVIEW | 5
+  Incident - Lesson Learnt User Manual_Ves p5: Lesson Learnt shared by the Office are displayed here. | Lessons ID | Notification Title |
+  Incident - Lesson Learnt User Manual_Ves p6: Section | Description | Report ID | Date of Issue | 1. Description | Discuss the details o
+  Incident - Lesson Learnt User Manual_Ves p7: Step | Action | 1. | Select the checkbox once the notification is discussed onboard. | 2. 
+  Incident - Lesson Learnt User Manual_Ves p8: Section 3: Record the completion status of actions as per the Lesson Learnt. | 3. Actions 
+  Incident - Near Miss User Manual R1_30.0 p2: No. | Topic | Page | 1. | GETTING STARTED – NEAR MISS SUB-MODULE | 4
+  Incident - Near Miss User Manual R1_30.0 p4: VESSEL | INSPECTION | DATE | PROGRESS | DUE DATE
+  Incident - Near Miss User Manual R1_30.0 p5: Annotation | Action | 1. | Click "Filters" to apply filtering options. | 2. | Select the d
+  Incident - Near Miss User Manual R1_30.0 p5: Annotation | Action | Click to export the report list. | Show Pending Actions
+  Incident - Near Miss User Manual R1_30.0 p5: Icon | Action | Description | 👁️ | View Record | View, edit, or export the selected Near M
+  Incident - Near Miss User Manual R1_30.0 p6: Report ID | Date | Report Type | Description | Task | Risk
+  Incident - Near Miss User Manual R1_30.0 p7: Step | Action | 1 | Select "Report Type" | 2 | Complete the required information in Part -
+  Incident - Near Miss User Manual R1_30.0 p8: VESEL* | Vessel 5 | DATE OF NEAR MISS* | 18/03/2026 | OBSERVER NAME
+  Incident - Near Miss User Manual R1_30.0 p9: Section | Instruction | 1. | Select the applicable impact category (multiple selections al
+  Incident - Near Miss User Manual R1_30.0 p11: Report ID | Date | Report Type | Description | Task | Risk
+  Safety - MOC User Manual_Office_R0_31.03 p4: Moc Subject | Risk | Days to go | Stage | Test Syncing vessel - Lorem ipsum dolor sitquisq
+  Safety - MOC User Manual_Office_R0_31.03 p5: Tab | Approved MoC in Progress | Moc Subject | Type | Risk | Days to go
+  Safety - MOC User Manual_Office_R0_31.03 p7: Icon | Action | Description | 📎 | Add Attachment | Upload and attach supporting documents 
+  Safety - MOC User Manual_Office_R0_31.03 p7: Moc. No. | Date Init | Vessel/ Dept. | Subject | Cat | Type of Change
+  Safety - MOC User Manual_Office_R0_31.03 p8: Option | Description | Option 1. | Click "+ New MoC" button in the top right corner | Opti
+  Safety - MOC User Manual_Office_R0_31.03 p8: Moc Subject | Type | Risk | Days to go | Stage | Test Syncing vessel - Lorem ipsum dolor s
+  Safety - MOC User Manual_Office_R0_31.03 p8: Moc Subject | Type | Date | Days Overdue | Stbd side box cooler vertical plate temporary r
+  Safety - MOC User Manual_Office_R0_31.03 p8: Proposed Actions | Due Date | Responsibility | Days to go | test action | 18 May 2025
+  Safety - MOC User Manual_Office_R0_31.03 p9: Step | Action | 1 | Select MoC type. | 2 | Complete Part A fields.
+  Safety - MOC User Manual_Office_R0_31.03 p10: A2 - Nature of Proposed Change | A3 - Reasons for Proposed Change | A4 - Type of Change
+  Safety - MOC User Manual_Office_R0_31.03 p12: Section | Question | Yes | No | Additional Details | C1. Details of changes
+  Safety - MOC User Manual_Office_R0_31.03 p12: Section | Question | Yes | No | Action | C1. Details of changes
+  Safety - MOC User Manual_Office_R0_31.03 p13: Step | Action | Click "+ Add Implication" | to add an additional implication. | Upload or 
+  Safety - MOC User Manual_Office_R0_31.03 p13: Section | Item | Option | Status | C2.22 Impact on Ch
+  Safety - MOC User Manual_Office_R0_31.03 p16: Implementation of Action Plan | Part E - To be completed by the MOC Coordinator in the Coo
+  Safety - MOC User Manual_Office_R0_31.03 p17: Manage actions added in Sections C2 and E3. | S.No. | Nature Of Action | Ref | Due Date | 
+  Safety - MOC User Manual_Office_R0_31.03 p17: E3. Implementation Review | Review Date : | E3.1 Action being completed as per the timesca
+  Safety - MOC User Manual_Office_R0_31.03 p18: E4.1 | Change Process Completed | ● Yes ○ No | Add date | E4.2 | Personal/ Parties affecte
+  Safety - MOC User Manual_Vessel_R0_31.03 p2: Item | Title | Page | 1. | OPENING SCREEN | 4
+  Safety - MOC User Manual_Vessel_R0_31.03 p4: Moc. No. | Date Init | Subject | Cat | Type of Change | Risk
+  Safety - MOC User Manual_Vessel_R0_31.03 p5: Icon | Action | Description | 📎 | Add Attachment | Upload and attach supporting documents 
+  Safety - MOC User Manual_Vessel_R0_31.03 p5: Moc. No. | Date Init | Vessel/ Dept. | Subject | Cat | Type of Change
+  Safety - MOC User Manual_Vessel_R0_31.03 p6: Step | Action | 1 | Propose MOC | 2 | Initial Review
+  Safety - MOC User Manual_Vessel_R0_31.03 p8: Section | Question | Selection | Additional Details | Action Plan | C1. Details of changes
+  Safety - MOC User Manual_Vessel_R0_31.03 p8: Section | Question | Selection | Remarks | Action Plan | C1. Details of changes
+  Safety - MOC User Manual_Vessel_R0_31.03 p9: C2.22 Impact on Ch | Yes | No | C3. Risk Assessment | C3. 1 Risk Assessment Completed | Ye
+  Safety - MOC User Manual_Vessel_R0_31.03 p10: Section | Option | Status | C4. Personnel/ Parties affected by the change | C4. 1 Identifi
+  Safety - MOC User Manual_Vessel_R0_31.03 p12: Implementation of Action Plan | Part E - To be completed by the MOC Coordinator in the Coo
+  Safety - MOC User Manual_Vessel_R0_31.03 p13: S.No. | Nature Of Action | Ref | Due Date | Responsibility | Date Completed
+  Safety - MOC User Manual_Vessel_R0_31.03 p13: DATE | REMARKS | 20/03/2026 | Remarks added here. | REMARKS
+  Safety - MOC User Manual_Vessel_R0_31.03 p15: Label | Selection | Comments | G1. Change completed within time scale? | Yes | Add comment
+  Safety - Master Review Manual R1_10.06.2 p6: Icon | Action | Description | 📎 | Add Attachment | Upload and attach supporting documents 
+  Safety - Master Review Manual R1_10.06.2 p6: Icon | Description | ⭕ | Grey Icon – Response Due | 🚫 | Red Icon – Response Overdue
+  Safety - Master Review Manual R1_10.06.2 p7: Master SMS Review Form | 1 Overview
+      2 SMS Content &#x26; Structure
+      3 Implement
+  Safety - Master Review Manual R1_10.06.2 p8: Safety Management System (SMS) Content &#x26; StructurePart B - Review the SMS manuals and
+  Safety - Master Review Manual R1_10.06.2 p8: Manuals | Last Revision | Type | Description | Status | **sms**sec 6
+  Safety - Master Review Manual R1_10.06.2 p9: Safety Management System (SMS) Implementation &#x26; Additional Review PointsPart C - Acce
+  Safety - Master Review Manual R1_10.06.2 p9: Select from Existing | × | Improvement Suggestion | General Remarks | IMPROVEMENT SUGGESTI
+  Safety - Master Review Manual R1_10.06.2 p10: Step | Label | Description | 1 | Overview
+  Safety - Risk Assessment User Manual_Off p2: Section | Title | Page | 1. | Opening Screen | 4
+  Safety - Risk Assessment User Manual_Off p4: VESSEL | INSPECTION | START DATE | PROGRESS | DUE DATE | PORT
+  Safety - Risk Assessment User Manual_Off p5: Report Id | Department | Date | Description | RA Type | Sub Group
+  Safety - Risk Assessment User Manual_Off p6: Report Id | Department | Date Assessed | RA Name | RA Type | RA Group
+  Safety - Risk Assessment User Manual_Off p8: Icon | Action | Description | 🔄 | Review GRA | Opens the selected GRA for review. Upon app
+  Safety - Risk Assessment User Manual_Off p10: Risk Assessment | Report Id | Department | Date Assessed | Description | Sub Group
+  Safety - Risk Assessment User Manual_Off p10: Icon | Action | Description | 📄 | Duplicate RA | To create Duplicate RA form.
+  Safety - Risk Assessment User Manual_Off p11: Report Id | Department | Date Assessed | RA Name | RA Type | Sub Group
+  Safety - Risk Assessment User Manual_Off p11: Report Id | Department | Date Assessed | RA Name | RA Type | Sub Group
+  Safety - Risk Assessment User Manual_Off p12: Risk Assessment Office | Risk Assessment Office | Enter basic information of Office Risk A
+  Safety - Risk Assessment User Manual_Off p13: Category | 1. Work Environment | 2. Equipment | 3. Programs/ Procedures | 4. Processes (Ac
+  Safety - Risk Assessment User Manual_Off p13: Hazard | Threat | Existing Controls | Possible Incident | S | L
+  Safety - Risk Assessment User Manual_Off p14: Element | Label | Overlay Text | Enter details in Part - B, accordingly. | Button | Add ha
+  Safety - Risk Assessment User Manual_Off p14: Hazard | Controls | Possible Incident | S | L | Risk
+  Safety - Risk Assessment User Manual_Off p15: Risk Assessment | Additional Controls/ Actions | + ADD ACTION
+  Safety - Risk Assessment User Manual_Off p15: Enter action details manually or select an existing action using 'Select from Existing'. |
+  Safety - Risk Assessment User Manual_Off p16: Risk Assessment Office | Link Related Risk Assessment | Actions added in Part B are displa
+  Safety - Risk Assessment User Manual_Off p17: Report Id | Vessel | Date Assessed | RA Name | RA Type | Sub Group
+  Safety - Risk Assessment User Manual_Off p17: Icon | Action | Description | 📄 | Duplicate RA | To create Duplicate RA form.
+  Safety - Risk Assessment User Manual_Off p18: Report Id | Vessel | Date Assessed | RA Name | RA Type | Sub Group
+  Safety - Risk Assessment User Manual_Off p18: Report Id | Date | Type Risk Assessment Name as per information | Routine | Cyber Security
+  Safety - Risk Assessment User Manual_Off p19: Risk Assessment Vessel | Enter Risk Assessment basic information | A.1 Basic Information |
+  Safety - Risk Assessment User Manual_Off p20: Category | 1. Work Environment | 2. Equipment | 3. Programs/ Procedures | 4. Processes (Ac
+  Safety - Risk Assessment User Manual_Off p20: Hazard | Threat | Existing Controls | Possible Incident | S | L
+  Safety - Risk Assessment User Manual_Off p21: Section | Instruction | Risk Assessment Vessel | Enter details in Part - B, accordingly. |
+  Safety - Risk Assessment User Manual_Off p21: Element | Instruction | Further Description | Add further description, as applicable. | De
+  Safety - Risk Assessment User Manual_Off p22: Section | Action | Top Right Buttons | &#x3C; Back >, View, SAVE | Additional Controls/ Ac
+  Safety - Risk Assessment User Manual_Off p22: Element | Description | Modal Title | Add Action | Button | Select from Existing
+  Safety - Risk Assessment User Manual_Off p24: S.No. | Nature | Due Date | Responsibility | Date Completed | Status
+  Safety - Risk Assessment User Manual_Off p25: Position/Rank | Approver Level | Actions | Electrical Officer | Level 1 | edit delete
+  Safety - Risk Assessment User Manual_Ves p5: Report Id | Date Assessed | RA Name | RA Group | RA Sub Group | Final Risk
+  Safety - Risk Assessment User Manual_Ves p6: Report Id | Date Assessed | RA Name | RA Type | Sub Group | Residual Risk
+  Safety - Risk Assessment User Manual_Ves p7: Report Id | Date Assessed | RA Name | RA Group | RA Sub Group | Final Risk
+  Safety - Risk Assessment User Manual_Ves p7: Report Id | Date Assessed | RA Name | RA Group | RA Sub Group | Final Risk
+  Safety - Risk Assessment User Manual_Ves p8: Section | Label | Value | Overview
+  Safety - Risk Assessment User Manual_Ves p9: Risk Assessment | Vessel Risk Assessment | Report Id | Date Assessed | RA Name | RA Type
+  Safety - Risk Assessment User Manual_Ves p9: Icon | Action | Description | 📄 | Duplicate Record | To create Duplicate RA form.
+  Safety - Risk Assessment User Manual_Ves p10: Report Id | Date Assessed | RA Name | RA Type | Sub Group | Residual
+  Safety - Risk Assessment User Manual_Ves p11: Section | Label | Field/Option | A.1 Basic Information | Originated by | ● Vessel ○ Office
+  Safety - Risk Assessment User Manual_Ves p12: Step | Action | 1. | Click to open Hazards database. | 2. | Click 'AUTOFILL' to automatica
+  Safety - Risk Assessment User Manual_Ves p12: Select Applicable Hazards
+  Safety - Risk Assessment User Manual_Ves p13: Hazard | Threat | Existing Controls | Possible Incident | S | L
+  Safety - Risk Assessment User Manual_Ves p14: Hazard | Adding Controls | Adding existing control(s), as applicable. | Add Possible incid
+  Safety - Risk Assessment User Manual_Ves p14: Additional Controls/ Actions | Offline Manual 1 | Offline Manual 1 | × Offline Manual 1 | 
+  Safety - Risk Assessment User Manual_Ves p15: Element | Description | Enter action details manually or select an existing action using '
+  Safety - Risk Assessment User Manual_Ves p15: Element | Description | Select an existing action or enter the action details manually and
+  Safety - SMS User Manual_Office_R0_31.01 p4: Item | Click here to view the list of modules | Audit | Dashboard | Planning | Preparation
+  Safety - SMS User Manual_Office_R0_31.01 p4: Item | Safety | Risk Assessment | Safety Meeting | Master Review | SMS
+  Safety - SMS User Manual_Office_R0_31.01 p5: Item | Manuals | 1. Management, Leadership &#x26; Accountability | 2. Management of Shore 
+  Safety - SMS User Manual_Office_R0_31.01 p6: Manuals | 1. Management, Leadership &#x26; Accountability | 2. Management of Shore Based P
+  Safety - SMS User Manual_Office_R0_31.01 p6: Manuals | 99. Checklists &#x26; Forms | 1. Management Leadership &#x26; Accountability | 2
+  Safety - SMS User Manual_Office_R0_31.01 p6: Action | Download
+  Safety - SMS User Manual_Office_R0_31.01 p9: Search Result | Action | 5.7 Under Keel Clearance | Clear | 5.6 Passage Planning
+  Safety - SMS User Manual_Office_R0_31.01 p9: Search Result | Action | 5.7 Under Keel Clearance | Clear | 5.6 Passage Planning
+  Safety - SMS User Manual_Office_R0_31.01 p10: Search Result | Action | 5.7 Under Keel Clearance | 5.6 Passage Planning
+  Safety - SMS User Manual_Office_R0_31.01 p10: Manuals | Content | Manuals | 3. Crew Management
+  Safety - SMS User Manual_Office_R0_31.01 p11: Element | Label | Tab | Print | Tooltip | Click here to export the SMS document you are cu
+  Safety - SMS User Manual_Office_R0_31.01 p14: Manuals | 1. Management, Leadership &#x26; Accountability | 2. Management of Shore Based P
+  Safety - SMS User Manual_Office_R0_31.01 p14: Step | Label | 1 | Proposal | 2 | Approval
+  Safety - SMS User Manual_Office_R0_31.01 p15: A2. Justification (To be reviewed by Process Owner / Dept. Head) | Basis review of informa
+  Safety - SMS User Manual_Office_R0_31.01 p15: A3. Document Details (To be completed by Change Coordinator) | Manual/Forms | Rev. Date | 
+  Safety - SMS User Manual_Office_R0_31.01 p16: Element | Action/Description | Manuals + | Click here to add a new main folder | S.No | En
+  Safety - SMS User Manual_Office_R0_31.01 p16: Element | Action/Description | 3. Crew Management + | Click on the chapter name under whic
+  Safety - SMS User Manual_Office_R0_31.01 p17: Manual/Forms | Rev. No. | Rev. Date | Incident Reporting &#x26; Investigation8.00 Table of
+  Safety - SMS User Manual_Office_R0_31.01 p17: Manual/Forms | Need Impr. | Approved | Rejected | Incident Reporting &#x26; Investigation8
+  Safety - SMS User Manual_Office_R0_31.01 p18: Field | ReleasePart C - Enter Details | COMMENTS | Confirm Change Communicated to the Prop
+  Safety - SMS User Manual_Office_R0_31.01 p21: Rev. No. | Rev. Date | Author | 1 | 16-10-2025 | John
+  Safety - SMS User Manual_Office_R0_31.01 p21: Item | Click here to use Chat AI option | Revision No. 0 | Revision Date: 1 May 2024 | App
+  Safety - SMS User Manual_Office_R0_31.01 p22: SITUATION | MINIMUM (NET)* UKC REQUIRED | a. > Sea Passage | > Where UKC exceeds 50% of st
+  Safety - Safety Meeting User Manual_R1_3 p2: Section | Title | Page | 1. | MONTHLY SAFETY MEETING | 3
+  Safety - Safety Meeting User Manual_R1_3 p4: 1. | This screen is seen upon Login credentials. | 2. | Click on Audit module.
+  Safety - Safety Meeting User Manual_R1_3 p10: 1. Fill all required details in Part A related to Safety Meeting. | 2. Enter participants 
+  Safety - Safety Meeting User Manual_R1_3 p12: Element | Content | + ADD ACTION | Button | Toolbar | Undo, Redo, U, S, xe, x2, Align Left
+  Safety - Safety Meeting User Manual_R1_3 p13: Label | Date | Subject | Description | Actions | Status
+  Safety - Safety Meeting User Manual_R1_3 p14: S.No. | Nature Of Action | Ref | Due Date | Responsibility | Date Completed
+  Safety - Safety Meeting User Manual_R1_3 p18: Step | Action | 1. | Fill and select all information in Part A related to Safety Meeting. 
+  Technical - Cert. & Surveys User Manual  p5: Category | Value | Internal Audit - Time | 25% | Internal Audit - % Audit Completed | (Ple
+  Technical - Cert. & Surveys User Manual  p6: Company ID | Name of Certificate | Company Group | Vessel | Issue Date | Expiry Date
+  Technical - Cert. & Surveys User Manual  p7: Annotation | Description | 1. | Click here to activate filters. | 2. | From here, the user
+  Technical - Cert. & Surveys User Manual  p7: Annotation | Description | 1. | From here, the user can select the vessel. | 2. | Click he
+  Technical - Cert. & Surveys User Manual  p13: # | Master ID | Certificate Name | Category | Group | Requirement/Ref
+  Technical - Cert. & Surveys User Manual  p14: Step | Action | 1. | Click on the 'Ship's Certificates'. | 2. | Click on the 'Master' tab.
+  Technical - Cert. & Surveys User Manual  p15: Applicable # | Master ID | Company ID | Certificate Label | Requirement/Ref | Company Grou
+  Technical - Cert. & Surveys User Manual  p15: # | Master ID | Certificate Name | Category | Group | Requirement/Ref
+  Technical - Cert. & Surveys User Manual  p16: Sequence | # | Master ID | Certificate Name | Category | Group
+  Technical - Cert. & Surveys User Manual  p16: Applicable | # | Master ID | Company ID | Certificate Label | Requirement/Ref
+  Technical - Cert. & Surveys User Manual  p17: Step | Action | 1. | Click here to choose the Multi-select vessel dropdown. | 2. | Click h
+  Technical - Cert. & Surveys User Manual  p17: Step | Action | 1. | Click on the 'Ship's Certificates'. | 2. | Click here to edit.
+  Technical - Cert. & Surveys User Manual  p18: Sequence # | Master ID | Certificate Name | Category | Group | Requirement/Ref
+  Technical - Cert. & Surveys User Manual  p20: Step | Action | 1. | Click on the 'Admin'. | 2. | Click on the 'Sync Dashboard'.
+  Technical - Defects User Manual For Offi p5: Metric | Value | OVERDUE W.O - ALL EQPT. | 71% (1590 out of 2253) | WO STATUS - ALL EQPT |
+  Technical - Defects User Manual For Offi p6: Category | Value | Overdue Defects | 8 | Critical Equipment Defects | 9
+  Technical - Defects User Manual For Offi p8: Category | Count | Condition of Class (CoC) Related | 5 | Ballast / Cargo / Tank Systems |
+  Technical - Defects User Manual For Offi p9: Category | Count | Navigation / Communication System Fault | 5 | Safety Equipment Deficien
+  Technical - Defects User Manual For Offi p9: Field | Value | All Vessels | 01 Jan 2026 - 01 Jun 2026
+  Technical - Defects User Manual For Offi p10: ID | Vessel | Issue Date | Category | Component | Description
+  Technical - Defects User Manual For Offi p13: Basic | Equipment / Hardware | Timeline | Vessel*GOD GRACE | CategoryMachinery Spaces | Da
+  Technical - Defects User Manual For Offi p15: ID | Vessel | Issue Date | Category | Component | Description
+  Technical - Defects User Manual For Offi p15: Step | Action | 1. | Modify the report accordingly. | 2. | Click here to submit Part A.
+  Technical - PMS User Manual For Office_S p3: Section | Description | Page | 1.1.9.3 | How To Apply Filter | 53
+  Technical - PMS User Manual For Office_S p7: Category | Value | Total | ACTIVE O/D W.O (TODAY) - ALL EQPT | 93% | 5544 out of 5988
+  Technical - PMS User Manual For Office_S p9: Category | Value | Details | ACTIVE O/D W.O (TODAY) - ALL EQPT | 89% | 144 out of 162
+  Technical - PMS User Manual For Office_S p10: Step | Action | 1. | Select the Operation tab. | 2. | Switch data view here.
+  Technical - PMS User Manual For Office_S p10: Step | Action | 1. | Select any card to see related details. | 2. | Use icons to view or e
+  Technical - PMS User Manual For Office_S p12: Field | Value | Work Order ID | MKR-IN-00085-652.003.05-2026-001 | Component | AE2 Cylinde
+  Technical - PMS User Manual For Office_S p12: Type | WO No | Component | Job Title | Due Date | Actions
+  Technical - PMS User Manual For Office_S p13: Step | Action | 1. | Review the information and enter comments, if required. | 2. | Click 
+  Technical - PMS User Manual For Office_S p15: Component | Work Order No | Job Title | Assigned to | Due Date | Status
+  Technical - PMS User Manual For Office_S p16: Label | Description | 1. Click here to view all Components. | Points to the 'Components' b
+  Technical - PMS User Manual For Office_S p17: Step | Action | 1. | Select a vessel from here. | 2. | Select any component from the Compo
+  Technical - PMS User Manual For Office_S p17: B. Running Hours &#x26; Condition Monitoring | RH Counter Type | RH Counter Source | Runni
+  Technical - PMS User Manual For Office_S p18: 1. | Here, the user can view all associated jobs and their details. | 2. | Click here to i
+  Technical - PMS User Manual For Office_S p18: Option | Planning - Scheduled ahead of time | Breakdown - Emergency repair needed | Other 
+  Technical - PMS User Manual For Office_S p19: Job Code | Job Title | Task Type | Frequency | Last Done Date | Next Due Date
+  Technical - PMS User Manual For Office_S p19: Field | Value | Job Title | Rudder, Visual Check - 1M | Component Name | Rudders W/Nozzle
+  Technical - PMS User Manual For Office_S p20: Job Title | Component Name | Component Code | ALTERNATOR, ROUTINE - 250H | EMERGENCY EL. G
+  Technical - PMS User Manual For Office_S p21: Category | Description | 1. | From here user can download the Work History using the Excel
+  Technical - PMS User Manual For Office_S p22: Category | Value | Part Code | SP-02616 | Part Name | ELECTRIC MOTOR
+  Technical - PMS User Manual For Office_S p23: Item | Action | 1. Upload button | Click here to upload related documents. | 2. Eye icon |
+  Technical - PMS User Manual For Office_S p23: Section | Description | G. Classification &#x26; Regulatory Data | From here, the user can
+  Technical - PMS User Manual For Office_S p26: Step | Action | 1. | From here, choose the components. | 2. | Click here to edit the compo
+  Technical - PMS User Manual For Office_S p26: Step | Action | 1. | From here, drag to reorder components. | 2. | Click here to save upda
+  Technical - PMS User Manual For Office_S p28: Component | Work Order No | Job Title | Assigned to | Due Date | Planned Date
+  Technical - PMS User Manual For Office_S p28: Category | Description | Scheduled | Jobs that have been planned and have a future due dat
+  Technical - PMS User Manual For Office_S p29: Step | Action | 1. | Click here to access the 'Work Orders'. | 2. | Click here to select a
+  Technical - PMS User Manual For Office_S p29: Action | Description | Click the Save button | to save it as a draft. | After filling the 
+  Technical - PMS User Manual For Office_S p30: S... | Component | Job Title | Basis | Frequ... | Due Date / ..
+  Technical - PMS User Manual For Office_S p31: S... | Component | Job Title | Basis | Freque... | Due Date /...
+  Technical - PMS User Manual For Office_S p32: Component | Order No | Job Title | Assigned to | Due Date | Planned Date
+  Technical - PMS User Manual For Office_S p32: Section | Description | 1 | Click here to open the 'Part B' section and enter the required
+  Technical - PMS User Manual For Office_S p33: Select Spare Parts for Component: 702.005.01 | Select | Part Code | Description | ROB (Loc
+  Technical - PMS User Manual For Office_S p34: Step | Action | 1. | Click on the 'Work Order'. | 2. | Click here to select a vessel.
+  Technical - PMS User Manual For Office_S p35: Section | Title | Figure 55 | PENDING APPROVAL — Awaiting Chief Engineer review. | B4. Spa
+  Technical - PMS User Manual For Office_S p37: Option | Description | Export Component Jobs | All jobs linked to components for this vess
+  Technical - PMS User Manual For Office_S p38: Running Hours | Component Name | Component Code | Component Category | Running Hours | Las
+  Technical - PMS User Manual For Office_S p38: Running Hours | Component Name | Component Code | Component Category | Running Hours | Las
+  Technical - PMS User Manual For Office_S p39: Component Name | Component Code | Previous Running Hours | Present Running Hours | Meter R
+  Technical - PMS User Manual For Office_S p40: Component Name | Component Code | Component Category | Running Hours | S-Band Radar | 411.
+  Technical - PMS User Manual For Office_S p41: Component Name | Component Code | Component Category | Running Hours | Last Updated | Acti
+  Technical - PMS User Manual For Office_S p42: Component Name | Component Code | Component Category | Running Hours | Last Updated | Acti
+  Technical - PMS User Manual For Office_S p43: Instruction | Action | 1. | Click here to enter the Spares sub-sub module. | 2. | Click he
+  Technical - PMS User Manual For Office_S p43: Instruction | Action | 1. | Click here to enter the Spares sub-sub module. | 2. | Click he
+  Technical - PMS User Manual For Office_S p45: Step | Action | 1. | Choose a location and click + Create New Location to create a new ent
+  Technical - PMS User Manual For Office_S p45: Part Code | Part Name | Component | Part Number | Criticality | ROB
+  Technical - PMS User Manual For Office_S p46: 1. Click here to enter the Spares sub-sub module.
+  Technical - PMS User Manual For Office_S p46: 1. Click here to enter the Spares sub-sub module.
+  Technical - PMS User Manual For Office_S p47: Step | Action | 1. | Click here to enter the Spares sub-sub module. | 2. | From here user 
+  Technical - PMS User Manual For Office_S p48: Part Code | Part Name | Part Number | Current Stock (2nd Engineer L... | Current Stock (Bo
+  Technical - PMS User Manual For Office_S p50: 1. Click here to enter the Store sub-sub module.
+  Technical - PMS User Manual For Office_S p55: Request Title | Requested By | Date | Status | Spare Change: MV0001-05001 - Rudder Blade |
+  Technical - PMS User Manual For Office_S p55: Module | Description | Components | Modify component hierarchy, specifications, and config
+  Technical - PMS User Manual For Office_S p56: Module | Description | Components | Modify component hierarchy, specifications, and config
+  Technical - PMS User Manual For Office_S p57: Job No | Job Title | Component | Department | Status | Action
+  Technical - PMS User Manual For Office_S p57: Job Title | Component Name | Component Code | ME Thrust Bearing Clearance, Measurement - t
+  Technical - PMS User Manual For Office_S p59: Section | Field | Value | Basic Information | Part Code * | MV0001-05001
+  Technical - PMS User Manual For Office_S p61: Field | Value | Item Code | IT-0001
+  Technical - PMS User Manual For Office_S p64: Step | Action | 1. | Click here to choose the vessel. | 2. | From here, the user can selec
+  Technical - PMS User Manual_Vessel Speci p7: Category | Percentage | Count | OVERDUE W.O - ALL EQPT. | 71% | 1590 out of 2253
+  Technical - PMS User Manual_Vessel Speci p9: Filter | Value | Vessel: | All Vessels | Scope: | All Vessel
+  Technical - PMS User Manual_Vessel Speci p10: Component | Work Order No | Job Title | Assigned to | Due Date | Status
+  Technical - PMS User Manual_Vessel Speci p11: Component | Work Order No | Job Title | Assigned to | Due Date | Status
+  Technical - PMS User Manual_Vessel Speci p12: Component | Work Order No | Job Title | Assigned to | Due Date | Status
+  Technical - PMS User Manual_Vessel Speci p12: Component | Work Order No | Due Date | Actions | 1 work order awaiting your approval
+  Technical - PMS User Manual_Vessel Speci p13: Component | Work Order No | Job Title | Assigned to | Due Date | Status
+  Technical - PMS User Manual_Vessel Speci p15: Component Code | Component Name | Component Category | Maker | 404.001 | TUNNEL THRUSTER N
+  Technical - PMS User Manual_Vessel Speci p15: RH Counter Type | RH Counter Source | Running Hours | Last Updated | Master | Self
+  Technical - PMS User Manual_Vessel Speci p15: B. Running Hours &#x26; Condition Monitoring | RH Counter Type | RH Counter Source | Runni
+  Technical - PMS User Manual_Vessel Speci p16: Option | Planning - Scheduled ahead of time | Breakdown - Emergency repair needed | Other 
+  Technical - PMS User Manual_Vessel Speci p17: Part A - Job Details | Job template details and configuration | A1. Job InformationBasic d
+  Technical - PMS User Manual_Vessel Speci p18: Field | Value | Job Title | ALTERNATOR, ROUTINE - 250H | Component Name | EMERGENCY EL. GE
+  Technical - PMS User Manual_Vessel Speci p19: Step | Description | 1. | From here user can download the Work History using the Excel or 
+  Technical - PMS User Manual_Vessel Speci p20: Label | Value | Part Code | SP-02616 | Part Name | ELECTRIC MOTOR
+  Technical - PMS User Manual_Vessel Speci p21: Step | Action | 1. | Click here to upload related documents. | 2. | Click here to view &#x
+  Technical - PMS User Manual_Vessel Speci p21: From here, the user can enter and manage classification and regulatory details. | G. Class
+  Technical - PMS User Manual_Vessel Speci p23: Component | Work Order No | Job Title | Assigned to | Due Date | Planned Date
+  Technical - PMS User Manual_Vessel Speci p24: 1. | Click here to access the 'Work Orders'. | 2. | Click here to open an unplanned work o
+  Technical - PMS User Manual_Vessel Speci p24: Annotation | Description | Save button | Click the Save button to save it as a draft. | Su
+  Technical - PMS User Manual_Vessel Speci p25: Component | Work Order No | Job Title | Assigned to | Due Date | Planned Date
+  Technical - PMS User Manual_Vessel Speci p25: S... | Component | Job Title | Basis | Freque... | Due Date / ..
+  Technical - PMS User Manual_Vessel Speci p26: S... | Component | Job Title | Basis | Freque... | Due Date /...
+  Technical - PMS User Manual_Vessel Speci p26: S... | Component | Job Title | Basis | Freque... | Due Date /...
+  Technical - PMS User Manual_Vessel Speci p28: Select | Part Code | Description | ROB (Loc A) | ROB (Loc B) | Qty to Use
+  Technical - PMS User Manual_Vessel Speci p30: 1. Click on the 'Work Order'
+  Technical - PMS User Manual_Vessel Speci p30: 2. Choose the Status tab from here.
+  Technical - PMS User Manual_Vessel Speci p30: 3. Click here to edit the pending Work Order.
+  Technical - PMS User Manual_Vessel Speci p30: Here the user can enter the remark accordingly.
+  Technical - PMS User Manual_Vessel Speci p30: Here the user can 'Approve' or 'Reject' accordingly.
+  Technical - PMS User Manual_Vessel Speci p31: Component | Work Order No | Job Title | Assigned to | Due Date | Planned Date
+  Technical - PMS User Manual_Vessel Speci p31: Option | Description | Export Component Jobs | All jobs linked to components for this vess
+  Technical - PMS User Manual_Vessel Speci p33: 1. Click here to access the 'Running Hrs'.
+  Technical - PMS User Manual_Vessel Speci p34: Component Name | Component Code | Component Category | Running Hours | S-Band Radar | 411.
+  Technical - PMS User Manual_Vessel Speci p35: Component Name | Component Code | Component Category | Running Hours | Last Updated | Acti
+  Technical - PMS User Manual_Vessel Speci p35: Date/Time | Component Code | Component Name | Previous RH | New RH | Change
+  Technical - PMS User Manual_Vessel Speci p36: 1. Click on the 'Running Hrs.' | 2. From here user can export the report.
+  Technical - PMS User Manual_Vessel Speci p36: 1. Click on the 'History' tab. | 2. Click here to view the running hour history details.
+  Technical - PMS User Manual_Vessel Speci p36: 2. From here user can export all the report.
+  Technical - PMS User Manual_Vessel Speci p38: 1. Click here to enter the Spares sub-sub module. | Figure 62 | 2. Click here to view spar
+  Technical - PMS User Manual_Vessel Speci p38: 1. Choose a location and click '+ Create New Location' to create a new entry. | Figure 63 
+  Technical - PMS User Manual_Vessel Speci p39: 1. | Click here to enter the Spares sub-sub module. | 2. | Click here to view spare histor
+  Technical - PMS User Manual_Vessel Speci p41: Part Code | Part Name | Part Number | Current Stock (ROB) | Consumed | New ROB
+  Technical - PMS User Manual_Vessel Speci p42: Step | Description | 1. | Click here to enter the Store sub-sub module. | 2. | Select a ca
+  Technical - PMS User Manual_Vessel Speci p43: 1. Click here to enter the Store sub-sub module.
+  Technical - PMS User Manual_Vessel Speci p43: 1. Click here to enter the Store sub-sub module.
+  Technical - PMS User Manual_Vessel Speci p45: Step | Action | 1. | Click here to enter the Report sub-sub module. | 2. | Select the repo
+  Technical - PMS User Manual_Vessel Speci p46: Step | Action | 1. | Select the desired report from the available list to proceed. | 2. | 
+  Technical - PMS User Manual_Vessel Speci p46: METRIC | AUG 25 | SEP 25 | OCT 25 | NOV 25 | DEC 25
+  Technical - PMS User Manual_Vessel Speci p47: CATEGORY | Request Title | Requested By | Date | Status | 1. Components
+  Technical - PMS User Manual_Vessel Speci p48: Category | Request Title | Requested By | Date | Status | 1. Components
+  Technical - PMS User Manual_Vessel Speci p48: Option | Description | Components | Modify component hierarchy, specifications, and config
+  Technical - PMS User Manual_Vessel Speci p49: Step | Action | 1. | Choose the component from here. | 2. | Edit or modify the component f
+  Technical - PMS User Manual_Vessel Speci p49: Module | Description | Components | Modify component hierarchy, specifications, and config
+  Technical - PMS User Manual_Vessel Speci p50: Job No | Job Title | Component | Department | Status | Action
+  Technical - PMS User Manual_Vessel Speci p50: Label | Value | Job Title | ME Thrust Bearing Clearance, Measurement - | Component Name | 
+  Technical - PMS User Manual_Vessel Speci p52: 1. From here, the user can edit or modify the Spare details. | Edit Spare Part | Basic Inf
+
+== REMOVED material UNIQUE on its page (the risk set, every rule) — review each ==
+  Audit - Fleet Sharing Manual- Office_R1_ [figure-zone-table] p4: 'Category | 2022 | 2023 | 2024 | 2025 | 2026 | SIRE 2.0 | 0.54'
+  Audit - Fleet Sharing Manual- Office_R1_ [figure-zone-table] p5: 'Report Id | Title | Issue Date | Due Date | Status | Confirmation Received | Actions Completed | Actions'
+  Audit - Fleet Sharing Manual- Office_R1_ [figure-zone-table] p7: 'S.No. | Nature Of Action | Due Date | 1 | jhbv | 24 Jul 2026'
+  Audit - Fleet Sharing Manual- Office_R1_ [figure-zone-table] p7: 'Field | Label | NATURE OF ACTION* | Add "Nature of Action" | DUE DATE* | Select "Due Date" Accordingly | SAVE | Click Sa'
+  Audit - Fleet Sharing Manual- Office_R1_ [figure-zone-table] p9: 'Report Id | Title | Issue Date | Due Date | Status | Confirmation Received | Actions Completed | Actions'
+  Audit - History Manual_R1_30.06.2026.pdf [figure-zone-table] p5: 'Insp. Id | Date | vessel | Oil Major | Port | Status | Inspector | Pos Obs'
+  Audit - History Manual_R1_30.06.2026.pdf [figure-zone-table] p7: 'Insp. Id | Date | vessel | Oil Major | Port | Status | Inspector | Pos Obs'
+  Audit - History Manual_R1_30.06.2026.pdf [figure-zone-table] p11: 'Insp. Id | Date | vessel | Oil Major | Port | Status | Inspector | Pos Obs'
+  Audit - History Manual_R1_30.06.2026.pdf [figure-zone-table] p11: 'Date | vessel | Oil Major | Port | Status | Inspector | Pos Obs | Neg Obs'
+  Audit - Preparation Manual_Office_R1_30. [figure-zone-table] p4: 'Username | sailuploads4@safe-lanes.com | Password | ********* | Domain | Captcha | LIB$23 | Remember me'
+  Audit - Preparation Manual_Office_R1_30. [figure-zone-table] p7: 'PreparationPLANNED VESSELS | ALL ↓ | ARCHIVE ACTIVE | Filters | + New Preparation | VESEL ↓ | INSPECTION ↓ | START DATE'
+  Crewing - Crewing User Manual R2_10.06.2 [toc-entry] p2: '# TABLE OF CONTENTS'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p20: 'Section | First Name | Middle Name | Family Name | Gender | Nationality | Present Rank | Date of birth'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p32: 'S. No. | Rank | Surname, Given Name | Nationality | Signed On | Relieving | Appraisal | Handover'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p34: "Rank | Rank, Name &#x26; Nationality | Certification &#x26; Qualification | Years in Service (Today's Date) | Language E"
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p34: 'S.N | Rank | On Board Status | Reliever Status | Surname, Given Name | Relief Due | S/OFF Date | S/OFF Port'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p46: 'Name | Nationality | Next Promotion Rank | Vessel/ Leave | Licence | Age | Service | Records'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p55: 'TRAINING | EVALUATION | COMMENT | Safety Management System Familiarization | — | — | Human factors &#x26; Error Manageme'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p65: 'Field | Value | Vessel* | Vessel 6 | Place / Location | Singapore | Type of Test* | Post incident Test'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p72: 'Item | Percentage | Count | O/Due Vessel Review | 6% | (1/16) | O/Due Office Response | 0%'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p98: "Section | Field | Value | Part A: Seafarer's Information | Seafarer's Name | James Michael | Seafarer's Rank | Select ra"
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p102: 'Rank ID | Rank | Check | Label | 1. Fill all required information. | R013 | Engine Cadet | ✓'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p102: 'Rank ID | Rank | Applicable to Company | Label | Actions | R001 | Master | ✓'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p103: 'Rank ID | Rank | Checkbox | Editable Field | R014 | Bosun | ✓ | R013'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p103: 'Rank ID | Rank | Applicable to Company | Rank Label | Actions | R001 | Master | ✓'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p106: 'Rank | Master | Chief Officer | 2nd Officer | 3rd Officer | Bosun | Pumpman | AB'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p107: 'Rank | Actual Manning | Safe Manning | Optimum Manning | High Workload Manning | Safety Officer | SSO | Medical Officer'
+  Crewing - Crewing User Manual R2_10.06.2 [figure-zone-table] p108: 'Rank | Actual Manning | Safe Manning | Optimum Manning | High Workload Manning | Safety Officer | SSO | Medical Officer'
+  Incident - Fleet Notification User Manua [toc-entry] p2: '## Table of Contents'
+  Incident - Fleet Notification User Manua [figure-zone-table] p4: 'Module | Incident | Near Miss | Incident | Fleet Notification | Lesson Learnt'
+  Incident - Fleet Notification User Manua [figure-zone-table] p7: 'S.No. | Nature Of Action | Due Date | Date Completed | Status | 1 | test action | 01 Mar 2026'
+  Incident - Incident User Manual R0_20.05 [toc-entry] p2: '## Table of Contents'
+  Incident - Incident User Manual R0_20.05 [figure-zone-table] p4: 'Tab | Label | Sail | Incident | Near Miss | Incident | Incident | Fleet Notification'
+  Incident - Incident User Manual R0_20.05 [figure-zone-table] p11: 'Category | Item | Selected | Work Environment | Navigational Area | [ ] | Seabed conditions | [ ]'
+  Incident - Lesson Learnt User Manual_Ves [toc-entry] p2: '## Table of Contents'
+  Incident - Near Miss User Manual R1_30.0 [toc-entry] p2: '## Table of Contents'
+  Incident - Near Miss User Manual R1_30.0 [figure-zone-table] p9: 'Category | Status | Personnel Injury | ✓ | Environmental Impact / Spill | ✓ | Assets/Process Loss | Reputation'
+  Safety - MOC User Manual_Office_R0_31.03 [figure-zone-table] p4: 'Incident Investigation | Audit Inspection | Safety | Vessel 5 | Vessel 5 | SIRE 2.0 | 20 Jun 2025 | 100%35%'
+  Safety - MOC User Manual_Office_R0_31.03 [figure-zone-table] p6: 'Year | Completed | Extended | Overdue | 2022 | 1 | 0 | 0'
+  Safety - MOC User Manual_Office_R0_31.03 [figure-zone-table] p6: 'Category | Count | 7... | 5 | 11... | 1'
+  Safety - MOC User Manual_Office_R0_31.03 [figure-zone-table] p6: 'Category | Count | Equipment... | 2 | New... | 3'
+  Safety - MOC User Manual_Office_R0_31.03 [figure-zone-table] p6: 'Year | Low | Medium | High | 2022 | 1 | 0 | 0'
+  Safety - MOC User Manual_Office_R0_31.03 [figure-zone-table] p6: 'Category | Percentage | Permanent | 100%'
+  Safety - MOC User Manual_Office_R0_31.03 [figure-zone-table] p15: 'Section | Field | Value | D1. Approved | Option | Yes | DATE* | 18/02/2026'
+  Safety - MOC User Manual_Vessel_R0_31.03 [toc-entry] p2: '## Table of Contents'
+  Safety - Master Review Manual R1_10.06.2 [toc-entry] p2: '## Table of Contents'
+  Safety - Master Review Manual R1_10.06.2 [figure-zone-table] p5: 'Report Id | Review Date | Review Type | Status | Completion Date | MR/024/26/012/V | 0 | ❌'
+  Safety - Master Review Manual R1_10.06.2 [figure-zone-table] p6: 'Report Id | Review Date | Review Type | Office Response | Date Responded | Actions | MR/024/26/012/V | 09 Apr 2026'
+  Safety - Risk Assessment User Manual_Off [figure-zone-table] p4: 'Module | Audit | Preparation | History | Fleet'
+  Safety - Risk Assessment User Manual_Off [figure-zone-table] p4: 'Dropdown Item | Incident Investigation | Audit Inspection | Safety'
+  Safety - Risk Assessment User Manual_Off [figure-zone-table] p5: 'Icon | Label | sail logo | Safety | Grid icon | Safety | Risk icon | Risk Assessment'
+  Safety - Risk Assessment User Manual_Off [figure-zone-callout] p4: '**This screen is seen upon Login credentials.**'
+  Safety - Risk Assessment User Manual_Ves [toc-entry] p2: '# Table of Contents'
+  Safety - Risk Assessment User Manual_Ves [figure-zone-callout] p4: 'This screen is seen upon Login credentials.'
+  Safety - SMS User Manual_Office_R0_31.01 [figure-zone-table] p7: 'Field | Value | Revision No. 0 | Revision Date : | 1 Sep 2025 | Approved by : | CEO'
+  Safety - SMS User Manual_Office_R0_31.01 [figure-zone-table] p7: 'Option | Value | Revision No. 1 | Revision No. 0'
+  Safety - SMS User Manual_Office_R0_31.01 [figure-zone-table] p12: 'Category | ID | Date | New Revision | SMSR/0081/2025 | 17 Nov 2025 | New Revision | SMSR/0080/2025'
+  Safety - SMS User Manual_Office_R0_31.01 [figure-zone-table] p13: 'Amendment Type | Type | Chapter No | Document No | Title | Rev No | Rev Date | Amendment Details'
+  Safety - SMS User Manual_Office_R0_31.01 [figure-zone-table] p13: 'Doc No | Document No | Title | Rev No | Rev Date | Amendment Details | 10.01 | Introduction &#x26; Responsibilities'
+  Safety - SMS User Manual_Office_R0_31.01 [figure-zone-table] p15: 'Step | Section | Instruction | 1 | Proposal | 2 | Approval | 3'
+  Safety - SMS User Manual_Office_R0_31.01 [figure-zone-table] p15: 'Step | Section | Instruction | 1 | Proposal | 2 | Approval | 3'
+  Safety - Safety Meeting User Manual_R1_3 [toc-entry] p2: '## Table of Contents'
+  Safety - Safety Meeting User Manual_R1_3 [figure-zone-table] p5: 'Item | Audit | Incident Investigation | Audit Inspection | Safety'
+  Safety - Safety Meeting User Manual_R1_3 [figure-zone-table] p5: 'Item | Safety | Risk Assessment | Safety Meeting | Master Review | SMS | Circulars | MOC'
+  Safety - Safety Meeting User Manual_R1_3 [figure-zone-table] p6: 'Report Id | Date of Meeting | Type | Office Response | Date Responded | Meeting Status | Actions | SM/024/26/036/V'
+  Safety - Safety Meeting User Manual_R1_3 [figure-zone-table] p7: 'Report Id | Date of Meeting | Type | Office Response | Actions | SM/024/26/036/V | Draft | 📎 👁 ✏ 🗑'
+  Safety - Safety Meeting User Manual_R1_3 [figure-zone-table] p8: 'Report Id | Date of Meeting | Type | Office Response | Date Responded | Meeting Status | Actions | SM/024/26/036/V'
+  Safety - Safety Meeting User Manual_R1_3 [figure-zone-table] p9: 'Report Id | Date of Meeting | Type | Office Response | Status | Actions | SM/024/26/036/V | 16 May 2026'
+  Safety - Safety Meeting User Manual_R1_3 [figure-zone-table] p17: 'Report Id | Date of Meeting | Type | Office Response | Date Responded | Actions | SM/024/26/036/V | 16 May 2026'
+  Technical - Cert. & Surveys User Manual  [toc-entry] p2: '# Table of Contents'
+  Technical - Cert. & Surveys User Manual  [toc-entry] p2: '**1.1.1** OPENING SCREEN 4'
+  Technical - Cert. & Surveys User Manual  [figure-zone-table] p5: 'Category | Value | OVERDUE W.O - ALL EQPT. | 71% | 1590 out of 2253 | WO STATUS - ALL EQPT | Scheduled | 331'
+  Technical - Cert. & Surveys User Manual  [figure-zone-table] p21: 'Date/Time | Status | Pushed | Pulled | Conflicts | Files | Duration | Jun 3, 11:50:26 AM'
+  Technical - Defects User Manual For Offi [toc-entry] p2: '## Table of Contents'
+  Technical - Defects User Manual For Offi [figure-zone-table] p4: 'Section | Audits | Findings | Avg | Internal Audit | 11 | 57 | 5.18'
+  Technical - Defects User Manual For Offi [figure-zone-table] p4: 'Year | SIRE 2.0 | NONSIRE | CDI | PSC | Terminal | 2022 | 0'
+  Technical - Defects User Manual For Offi [figure-zone-table] p5: 'Year | SIRE 2.0 | NONSIRE | CDI | PSC | Terminal | 2022 | 0'
+  Technical - Defects User Manual For Offi [figure-zone-table] p12: 'Label | Value | Vessel* | GOD GRACE | Source | SIRE 2.0 | Defect Category | Machinery Failure (Main &#x26; Auxiliary)'
+  Technical - Defects User Manual For Offi [figure-zone-table] p12: 'Label | Value | Vessel* | GOD GRACE | Source | SIRE 2.0 | Defect Category | Machinery Failure (Main &#x26; Auxiliary)'
+  Technical - Defects User Manual For Offi [figure-zone-table] p16: 'Reporting | Analysis &#x26; Actions | Closeout | A | Reporting | B | Analysis &#x26; Actions | C'
+  Technical - PMS User Manual For Office_S [toc-entry] p2: '## Table of Contents'
+  Technical - PMS User Manual For Office_S [figure-zone-table] p5: 'Year | SIRE 2.0 | NONSIRE | CDI | PSC | Terminal | 2022 | 0'
+  Technical - PMS User Manual For Office_S [figure-zone-table] p8: 'Category | OK | At Min | Low | Spares Stock Status (Today) | 48579 | 15229 | 882'
+  Technical - PMS User Manual For Office_S [figure-zone-table] p33: 'Section | Label | Previous reading | Component Actual RH | Current Reading * | B3. Running Hours | 0 | 0 hrs'
+  Technical - PMS User Manual For Office_S [figure-zone-table] p35: 'Component | Work Order No | Job Title | Assigned to | Created Date | Status | Actions | No.1 Lifebuoy (Pcs 6)'
+  Technical - PMS User Manual For Office_S [struck-through] p14: 'Awaiting Acknowledgment'
+  Technical - PMS User Manual For Office_S [struck-through] p14: 'Awaiting Acknowledgment'
+  Technical - PMS User Manual For Office_S [struck-through] p14: 'Awaiting Acknowledgment'
+  Technical - PMS User Manual For Office_S [struck-through] p14: 'Awaiting Acknowledgment'
+  Technical - PMS User Manual For Office_S [struck-through] p14: 'Awaiting Acknowledgment'
+  Technical - PMS User Manual For Office_S [struck-through] p14: 'Awaiting Acknowledgment'
+  Technical - PMS User Manual_Vessel Speci [toc-entry] p2: '## Table of Contents'
+  Technical - PMS User Manual_Vessel Speci [figure-zone-table] p5: 'Year | SIRE 2.0 | NONSIRE | CDI | PSC | Terminal | 2022 | 0'
+  Technical - PMS User Manual_Vessel Speci [figure-zone-table] p7: 'Category | OK | At Min | Low | SPARES STOCK STATUS | 3444 | 788 | 165'
+  Technical - PMS User Manual_Vessel Speci [figure-zone-table] p8: 'Category | OK | At Min | Low | SPARES STOCK STATUS | 1144 | 788 | 1045'
+  Technical - PMS User Manual_Vessel Speci [figure-zone-table] p16: 'Job Code | Job Title | Task Type | Frequency | Last Done Date | Next Due Date | Actions | MKR-IN-00064'
+  Technical - PMS User Manual_Vessel Speci [figure-zone-table] p18: 'WO No | Job Title | Type | Date Completed | Running Hours | Performed By | Approved By | Status'
+  Technical - PMS User Manual_Vessel Speci [figure-zone-table] p39: 'Date | Part Code | Part Name | Component | Part Number | Event | Qty Change | ROB After'
+  Technical - PMS User Manual_Vessel Speci [figure-zone-table] p54: 'Item Code | Item Name | IT-0001 | Safety Gloves - Cotton | IT-0002 | Safety Gloves - Leather | IT-0003 | Grinding Wheel '
+
+== UNRESOLVED cross-references ==
+
+== REMOVED tables — header cells (first 12 per manual) ==
+  Audit - Fleet Sharing Manual- Office_R1_ p4: Category | 2022 | 2023 | 2024 | 2025 | 2026
+  Audit - Fleet Sharing Manual- Office_R1_ p5: Report Id | Title | Issue Date | Due Date | Status | Confirmation Received
+  Audit - Fleet Sharing Manual- Office_R1_ p7: S.No. | Nature Of Action | Due Date | 1 | jhbv | 24 Jul 2026
+  Audit - Fleet Sharing Manual- Office_R1_ p7: Field | Label | NATURE OF ACTION* | Add "Nature of Action" | DUE DATE* | Select "Due Date"
+  Audit - Fleet Sharing Manual- Office_R1_ p8: 3. Submission | Select the recipient | Send to: | All Vessel | Vessel | Fleet Group
+  Audit - Fleet Sharing Manual- Office_R1_ p9: Report Id | Title | Issue Date | Due Date | Status | Confirmation Received
+  Audit - Fleet Sharing Manual- Vessel_R1_ p6: S.No. | Nature Of Action | Due Date | Date Completed | Status | 1
+  Audit - History Manual_R1_30.06.2026.pdf p5: Insp. Id | Date | vessel | Oil Major | Port | Status
+  Audit - History Manual_R1_30.06.2026.pdf p7: Insp. Id | Date | vessel | Oil Major | Port | Status
+  Audit - History Manual_R1_30.06.2026.pdf p11: Insp. Id | Date | vessel | Oil Major | Port | Status
+  Audit - History Manual_R1_30.06.2026.pdf p11: Date | vessel | Oil Major | Port | Status | Inspector
+  Audit - Preparation Manual_Office_R1_30. p4: Username | sailuploads4@safe-lanes.com | Password | ********* | Domain
+  Audit - Preparation Manual_Office_R1_30. p7: PreparationPLANNED VESSELS | ALL ↓ | ARCHIVE ACTIVE | Filters
+  Audit - Preparation Manual_Office_R1_30. p11: Preparation | PLANNED VESSELS | ALL | ARCHIVE | ACTIVE
+  Audit - Preparation Manual_Office_R1_30. p15: Preparation PLANNED VESSELS | ALL | ARCHIVE | ACTIVE | Filters | + New Preparation
+  Audit - Preparation Manual_Office_R1_30. p17: Chapter | All | 2. Certification and Documentation | 3. Crew Management | 4. Navigation an
+  Audit - Preparation Manual_Office_R1_30. p18: Label | Answer | Binary Response | Y, N, NA | Graduated Response | Largely as Expected
+  Audit - Preparation Manual_Office_R1_30. p18: VIQ No. | Short Text | Cat. | Nature of Check | Answer | Assigned To
+  Audit - Preparation Manual_Office_R1_30. p18: VIQ No. | Short Text | Cat. | Nature of Check | Answer | Assigned To
+  Audit - Preparation Manual_Office_R1_30. p25: Vessel 1 | 2. Certification and Documentation | SIRE 2.0 - Questionnaire | Online | Go Off
+  Audit - Preparation Manual_Office_R1_30. p25: Vessel 1 | 2. Certification and Documentation | SIRE 2.0 - Questionnaire | Online | Go Off
+  Audit - Preparation Manual_Office_R1_30. p30: Instruction | Click on "View"
+  Audit - Preparation Manual_Office_R1_30. p30: Section | Label | Answer | 1.1.1 | Vessel Type | A
+  Crewing - Crewing User Manual R2_10.06.2 p8: Category | Label | Value | CREW RECRUITMENT | Electrical Officer | 3
+  Crewing - Crewing User Manual R2_10.06.2 p9: Category | Rank | Value | CREW RECRUITMENT | Electrical Officer | 3
+  Crewing - Crewing User Manual R2_10.06.2 p10: Category | Rank | Value | CREW RETENTION | Senior Officers | 93.5%
+  Crewing - Crewing User Manual R2_10.06.2 p10: Category | Rank | Value | CREW POOL | OP Chief | 15
+  Crewing - Crewing User Manual R2_10.06.2 p12: Module | Recruitment | In Progress
+  Crewing - Crewing User Manual R2_10.06.2 p13: File No | First Name | Family Name | Middle Name | DOB | Nationality
+  Crewing - Crewing User Manual R2_10.06.2 p19: File No | First Name | Family Name | Middle Name | DOB | Nationality
+  Crewing - Crewing User Manual R2_10.06.2 p19: File No | First Name | Family Name | Middle Name | DOB | Nationality
+  Crewing - Crewing User Manual R2_10.06.2 p20: Section | First Name | Middle Name | Family Name | Gender
+  Crewing - Crewing User Manual R2_10.06.2 p22: File No | First Name | Family Name | DOB | Nationality | Rank Applied
+  Crewing - Crewing User Manual R2_10.06.2 p23: File No | First Name | Family Name | DOB | Nationality | Rank Applied
+  Crewing - Crewing User Manual R2_10.06.2 p25: ID | General Particulars of Seafarer | Current Assignment | Previous Assignment | First Na
+  Incident - Fleet Notification User Manua p4: Module | Incident | Near Miss | Incident | Fleet Notification | Lesson Learnt
+  Incident - Fleet Notification User Manua p7: S.No. | Nature Of Action | Due Date | Date Completed | Status | 1
+  Incident - Fleet Notification User Manua p8: S.No. | Nature Of Action | Due Date | Date Completed | Status | 1
+  Incident - Fleet Notification User Manua p8: Notification Id | Notification Title | Issue Date | Confirmation Sent | Discussion Date | 
+  Incident - Incident User Manual R0_20.05 p4: Tab | Label | Audit | Audit | Planning | Planning
+  Incident - Incident User Manual R0_20.05 p4: Tab | Label | Sail | Incident | Near Miss
+  Incident - Incident User Manual R0_20.05 p6: Report Id | Date | Incident Category | Sub Category | Incident Title | Task
+  Incident - Incident User Manual R0_20.05 p10: Category | Name (Optional) | Designation* | Statement | Persons involved in the incident |
+  Incident - Incident User Manual R0_20.05 p11: Category | Item | Selected | Work Environment | Navigational Area | [ ]
+  Incident - Lesson Learnt User Manual_Ves p9: S.No. | Nature Of Action | Due Date | Date Completed | Status | 1
+  Incident - Lesson Learnt User Manual_Ves p9: NATURE OF ACTION* | test action | DUE DATE* | 01/03/2026 | DATE CLOSED* | 04/03/2026
+  Incident - Lesson Learnt User Manual_Ves p9: Lessons ID | Notification Title | Issue Date | Confirmation Sent | Discussion Date | Actio
+  Incident - Near Miss User Manual R1_30.0 p9: Category | Status | Personnel Injury | ✓ | Environmental Impact / Spill | ✓
+  Incident - Near Miss User Manual R1_30.0 p10: Section | Field | Content | B2. Cause analysis | Immediate Cause | Select
+  Safety - MOC User Manual_Office_R0_31.03 p4: Incident Investigation | Audit Inspection | Safety | Vessel 5
+  Safety - MOC User Manual_Office_R0_31.03 p6: Category | Value | IN PROGRESS | 2 | EXTENDED | 0
+  Safety - MOC User Manual_Office_R0_31.03 p6: Year | Completed | Extended | Overdue | 2022 | 1
+  Safety - MOC User Manual_Office_R0_31.03 p6: Category | Count | 7... | 5 | 11... | 1
+  Safety - MOC User Manual_Office_R0_31.03 p6: Category | Count | Equipment... | 2 | New... | 3
+  Safety - MOC User Manual_Office_R0_31.03 p6: Year | Low | Medium | High | 2022 | 1
+  Safety - MOC User Manual_Office_R0_31.03 p6: Category | Percentage | Permanent | 100%
+  Safety - MOC User Manual_Office_R0_31.03 p8: Moc Subject | Type | Risk | Previous Target | New Target | Stage
+  Safety - MOC User Manual_Office_R0_31.03 p15: Section | Field | Value | D1. Approved | Option | Yes
+  Safety - MOC User Manual_Office_R0_31.03 p17: DATE | 20/03/2026 | REMARKS | Remarks added here. | REMARKS
+  Safety - MOC User Manual_Office_R0_31.03 p19: Moc. No. | Date Init | Vessel/ Dept. | Subject | Cat | Type of Change
+  Safety - MOC User Manual_Vessel_R0_31.03 p4: PROGRESS ↓ | DUE DATE ↓ | PORT ↓ | Vessel 5 | 35%
+  Safety - MOC User Manual_Vessel_R0_31.03 p15: Moc. No. | Date Init | Vessel/ Dept. | Subject | Cat | Type of Change
+  Safety - Master Review Manual R1_10.06.2 p5: Report Id | Review Date | Review Type | Status | Completion Date | MR/024/26/012/V
+  Safety - Master Review Manual R1_10.06.2 p6: Report Id | Review Date | Review Type | Office Response | Date Responded | Actions
+  Safety - Master Review Manual R1_10.06.2 p7: Master's Review | All Reports | Report Id | Review Date | Review Type | Office Response
+  Safety - Master Review Manual R1_10.06.2 p8: Step | Label | 1 | Overview | 2 | SMS Content &#x26; Structure
+  Safety - Master Review Manual R1_10.06.2 p9: Step | Section | 1 | Overview | 2 | SMS Content &#x26; Structure
+  Safety - Master Review Manual R1_10.06.2 p11: Step | Label | 1 | Overview | 2 | SMS Content &#x26; Structure
+  Safety - Master Review Manual R1_10.06.2 p11: Reviewed | Comments: | Toolbar: [Undo] [Redo] U ^ sub x x2 [Align Left] [Align Center] [Al
+  Safety - Risk Assessment User Manual_Off p4: Module | Audit | Preparation | History | Fleet
+  Safety - Risk Assessment User Manual_Off p4: Dropdown Item | Incident Investigation | Audit Inspection | Safety
+  Safety - Risk Assessment User Manual_Off p5: Icon | Label | sail logo | Safety | Grid icon | Safety
+  Safety - Risk Assessment User Manual_Off p9: Report Id | Date Assessed | RA Name | RA Type | RA Group | RA Sub Group
+  Safety - Risk Assessment User Manual_Off p9: Report Id | Date Assessed | RA Name | RA Type | RA Group | RA Sub Group
+  Safety - Risk Assessment User Manual_Off p13: Hazard | Threat | Existing Controls | Possible Incident | S | L
+  Safety - Risk Assessment User Manual_Off p20: Hazard | Threat | Existing Controls | Possible Incident | S | L
+  Safety - Risk Assessment User Manual_Off p25: Position/Rank | Approver Level | Electrical Officer | 2nd Engineer
+  Safety - Risk Assessment User Manual_Ves p10: Option | Generic Library | Vessel Library | Vessel RA Database | Create Fresh RA
+  Safety - Risk Assessment User Manual_Ves p16: S.No. | Nature Of Action | Due Date | Responsibility | Date Completed | Status
+  Safety - SMS User Manual_Office_R0_31.01 p5: Tab | SMS | Dashboard | Change Log
+  Safety - SMS User Manual_Office_R0_31.01 p7: Field | Value | Revision No. 0 | Revision Date : | 1 Sep 2025
+  Safety - SMS User Manual_Office_R0_31.01 p7: Option | Value | Revision No. 1 | Revision No. 0
+  Safety - SMS User Manual_Office_R0_31.01 p9: Search Type | Any Words | Exact Match
+  Safety - SMS User Manual_Office_R0_31.01 p12: Category | ID | Date | New Revision | SMSR/0081/2025 | 17 Nov 2025
+  Safety - SMS User Manual_Office_R0_31.01 p13: Amendment Type | Type | Chapter No | Document No | Title | Rev No
+  Safety - SMS User Manual_Office_R0_31.01 p13: Doc No | Document No | Title | Rev No | Rev Date | Amendment Details
+  Safety - SMS User Manual_Office_R0_31.01 p15: Step | Section | Instruction | 1 | Proposal
+  Safety - SMS User Manual_Office_R0_31.01 p15: Step | Section | Instruction | 1 | Proposal
+  Safety - SMS User Manual_Office_R0_31.01 p17: DATE* | APPROVER*
+  Safety - SMS User Manual_Office_R0_31.01 p18: Tab | Risk Assessment | Safety Meeting | Master Review | SMS | Circulars
+  Safety - SMS User Manual_Office_R0_31.01 p19: Button | Label | EDIT | REPLACE
+  Safety - Safety Meeting User Manual_R1_3 p5: Item | Audit | Incident Investigation | Audit Inspection | Safety
+  Safety - Safety Meeting User Manual_R1_3 p5: Item | Safety | Risk Assessment | Safety Meeting | Master Review | SMS
+  Safety - Safety Meeting User Manual_R1_3 p6: Report Id | Date of Meeting | Type | Office Response | Date Responded | Meeting Status
+  Safety - Safety Meeting User Manual_R1_3 p7: Report Id | Date of Meeting | Type | Office Response | Actions | SM/024/26/036/V
+  Safety - Safety Meeting User Manual_R1_3 p8: Report Id | Date of Meeting | Type | Office Response | Date Responded | Meeting Status
+  Safety - Safety Meeting User Manual_R1_3 p9: Report Id | Date of Meeting | Type | Office Response | Status | Actions
+  Safety - Safety Meeting User Manual_R1_3 p13: File Type | Actions | PDF | ❌ ⬇️
+  Safety - Safety Meeting User Manual_R1_3 p15: Office Closeout | Part E - Review report &#x26; close if satisfaction | Reviewed | Comment
+  Safety - Safety Meeting User Manual_R1_3 p17: Report Id | Date of Meeting | Type | Office Response | Date Responded | Actions
+  Technical - Cert. & Surveys User Manual  p5: Category | Value | OVERDUE W.O - ALL EQPT. | 71% | 1590 out of 2253
+  Technical - Cert. & Surveys User Manual  p8: Company ID | Name of Certificate | Company Group | Vessel | Issue Date | Expiry Date
+  Technical - Cert. & Surveys User Manual  p8: Company ID | Name of Certificate | Company Group | Vessel | Issue Date | Expiry Date
+  Technical - Cert. & Surveys User Manual  p18: Sequence # | Master ID | Certificate Name | Category | Group | Requirement/Ref
+  Technical - Cert. & Surveys User Manual  p19: Master ID | Survey Name | Category | Group | Requirement Ref
+  Technical - Cert. & Surveys User Manual  p21: Date/Time | Status | Pushed | Pulled | Conflicts | Files
+  Technical - Defects User Manual For Offi p4: Category | Value | Ins | Obs | SIRE 2.0 | 6.92
+  Technical - Defects User Manual For Offi p4: Section | Audits | Findings | Avg | Internal Audit | 11
+  Technical - Defects User Manual For Offi p4: Year | SIRE 2.0 | NONSIRE | CDI | PSC | Terminal
+  Technical - Defects User Manual For Offi p5: Year | SIRE 2.0 | NONSIRE | CDI | PSC | Terminal
+  Technical - Defects User Manual For Offi p7: Category | Count | Overdue Defects | 8 | Critical Equipment Defects | 9
+  Technical - Defects User Manual For Offi p7: Category | Count | Overdue Defects | 8 | Critical Equipment Defects | 9
+  Technical - Defects User Manual For Offi p7: Status | Count | Reported | 25 | In Progress | 3
+  Technical - Defects User Manual For Offi p8: Vessel | Reported | In Progress | Overdue | Closed | Verified
+  Technical - Defects User Manual For Offi p11: 1. Select the Operation tab. | ID | Vessel | Description | Issue Date | Target Date
+  Technical - Defects User Manual For Offi p11: ID | Vessel | Description | Issue Date | Target Date | Status
+  Technical - Defects User Manual For Offi p11: ID | Vessel | Description | Issue Date | Target Date | Status
+  Technical - Defects User Manual For Offi p12: Label | Value | Vessel* | GOD GRACE | Source | SIRE 2.0
+  Technical - PMS User Manual For Office_S p5: Year | SIRE 2.0 | NONSIRE | CDI | PSC | Terminal
+  Technical - PMS User Manual For Office_S p8: Category | Jan | Feb | Mar | Apr | May
+  Technical - PMS User Manual For Office_S p8: Category | OK | At Min | Low | Spares Stock Status (Today) | 48579
+  Technical - PMS User Manual For Office_S p9: Filter Field | Value | Period | APR - 2026 | Vessel | vessel 04
+  Technical - PMS User Manual For Office_S p14: Work Order Code | Vessel | Job Title | Component | Days Late | Missed Cyl...
+  Technical - PMS User Manual For Office_S p15: Card | Value | Overdue WO | 4 | Overdue WO - Critical Eqpt | 0
+  Technical - PMS User Manual For Office_S p20: Job Code | Job Title | Task Type | Frequency | Last Done Date | Next Due Date
+  Technical - PMS User Manual For Office_S p20: WO No | Job Title | Type | Date Completed | Running Hours | Performed By
+  Technical - PMS User Manual For Office_S p21: E. Spares | Part Code | Part Name | Component | Part Number | Critical
+  Technical - PMS User Manual For Office_S p22: Part Code | Part Name | Component | Part Number | Critical | ROB
+  Technical - PMS User Manual For Office_S p33: Section | Label | Previous reading | Component Actual RH | Current Reading * | B3. Running
+  Technical - PMS User Manual For Office_S p35: Component | Work Order No | Job Title | Assigned to | Created Date | Status
+  Technical - PMS User Manual_Vessel Speci p5: Year | SIRE 2.0 | NONSIRE | CDI | PSC | Terminal
+  Technical - PMS User Manual_Vessel Speci p7: Month | Completed % | Outstanding % | Overdue % | Nov | 0%
+  Technical - PMS User Manual_Vessel Speci p7: Category | OK | At Min | Low | SPARES STOCK STATUS | 3444
+  Technical - PMS User Manual_Vessel Speci p8: Month | Completed % | Outstanding % | Overdue % | Nov | 0%
+  Technical - PMS User Manual_Vessel Speci p8: Category | OK | At Min | Low | SPARES STOCK STATUS | 1144
+  Technical - PMS User Manual_Vessel Speci p9: Category | Value | POSTPONED WORK ORDERS | 3 | UNPLANNED MAINTENANCE % | 6
+  Technical - PMS User Manual_Vessel Speci p10: Card Title | Value | Overdue WO | 4 | Overdue WO – Critical Eqpt | 0
+  Technical - PMS User Manual_Vessel Speci p11: Category | Value | Overdue WO | 3 | Overdue WO – Critical Eqpt | 0
+  Technical - PMS User Manual_Vessel Speci p11: Category | Value | Overdue WO | 4 | Overdue WO – Critical Eqpt | 0
+  Technical - PMS User Manual_Vessel Speci p13: Card Name | Value | Overdue WO | 4 | Overdue WO – Critical Eqpt | 0
+  Technical - PMS User Manual_Vessel Speci p16: Job Code | Job Title | Task Type | Frequency | Last Done Date | Next Due Date
+  Technical - PMS User Manual_Vessel Speci p17: Job Code | Job Title | Task Type | Frequency | Last Done Date | Next Due Date
+
+== RESOLVED cross-references ==
+  Crewing - Crewing User Manual R2_10.06.2 1.2.2.2 HOW TO EDIT OR DELETE A CREW RECORD   → 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD
+  Crewing - Crewing User Manual R2_10.06.2 1.2.2.3 HOW TO EXPORT CREW DETAILS            → 1.2.1.5 HOW TO EXPORT CREW DETAILS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.2.4 HOW TO APPLY FILTER                   → 1.2.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.3.2 **HOW TO EDIT OR DELETE A CREW RECORD → 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD
+  Crewing - Crewing User Manual R2_10.06.2 1.2.3.3 **HOW TO EXPORT CREW DETAILS**        → 1.2.1.5 HOW TO EXPORT CREW DETAILS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.3.4 **HOW TO APPLY FILTER**               → 1.2.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.4.2 HOW TO EDIT OR DELETE A CREW RECORD   → 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD
+  Crewing - Crewing User Manual R2_10.06.2 1.2.4.3 HOW TO EXPORT CREW DETAILS            → 1.2.1.5 HOW TO EXPORT CREW DETAILS
+  Crewing - Crewing User Manual R2_10.06.2 1.2.4.4 HOW TO APPLY FILTER                   → 1.2.1.2 HOW TO APPLY FILTERS
+  Crewing - Crewing User Manual R2_10.06.2 1.7.1.2 **HOW TO APPLY FILTER**               → 1.6.1.2 **HOW TO APPLY FILTERS**
+  Crewing - Crewing User Manual R2_10.06.2 1.7.1.3 **HOW TO EXPORT ALL CREW APPRAISALS** → 1.6.1.6 HOW TO EXPORT ALL PROMOTIONAL RECORDS
+  Crewing - Crewing User Manual R2_10.06.2 1.8.1.3 HOW TO APPLY FILTER                   → 1.6.1.2 **HOW TO APPLY FILTERS**
+  Crewing - Crewing User Manual R2_10.06.2 1.8.2.2 HOW TO CREATE AND DELETE PERIODIC ALC → 1.8.1.2 HOW TO CREATE AND DELETE ANNUAL D&A R
+  Crewing - Crewing User Manual R2_10.06.2 1.8.2.3 HOW TO APPLY FILTER                   → 1.6.1.2 **HOW TO APPLY FILTERS**
+  Crewing - Crewing User Manual R2_10.06.2 1.8.2.4 HOW TO REVIEW AND EXPORT PERIODIC ALC → 1.8.1.4 HOW TO REVIEW AND EXPORT ANNUAL D & A
+  Crewing - Crewing User Manual R2_10.06.2 1.8.3.2 HOW TO CREATE AND DELETE MONTHLY ALCO → 1.8.1.2 HOW TO CREATE AND DELETE ANNUAL D&A R
+  Crewing - Crewing User Manual R2_10.06.2 1.8.3.3 HOW TO APPLY FILTER                   → 1.6.1.2 **HOW TO APPLY FILTERS**
+  Crewing - Crewing User Manual R2_10.06.2 1.8.3.4 HOW TO REVIEW AND EXPORT MONTHLY ALCO → 1.8.1.4 HOW TO REVIEW AND EXPORT ANNUAL D & A
+  Crewing - Crewing User Manual R2_10.06.2 1.8.4.2 HOW TO APPLY FILTER                   → 1.6.1.2 **HOW TO APPLY FILTERS**
+  Crewing - Crewing User Manual R2_10.06.2 1.8.5.2 HOW TO CREATE A NEW OTHER TEST RECORD → 1.8.4.3 **HOW TO CREATE A NEW POST INCIDENT T
+  Crewing - Crewing User Manual R2_10.06.2 1.8.5.3 HOW TO EDIT OTHER TEST RECORD         → 1.8.4.4 HOW TO EDIT A POST INCIDENT TEST RECO
+  Crewing - Crewing User Manual R2_10.06.2 1.8.5.4 HOW TO EXPORT OTHER TEST RECORD       → 1.8.4.5 HOW TO EXPORT POST INCIDENT TEST RECO
+  Crewing - Crewing User Manual R2_10.06.2 1.8.5.5 HOW TO APPLY FILTER                   → 1.6.1.2 **HOW TO APPLY FILTERS**
+  Crewing - Crewing User Manual R2_10.06.2 1.8.6.3 **HOW TO CREATE AND DELETE SUMMARY RE → 1.8.1.2 HOW TO CREATE AND DELETE ANNUAL D&A R
+  Crewing - Crewing User Manual R2_10.06.2 1.8.6.4 **HOW TO REVIEW AND EXPORT SUMMARY RE → 1.8.1.4 HOW TO REVIEW AND EXPORT ANNUAL D & A
+  Crewing - Crewing User Manual R2_10.06.2 1.10.1.5 HOW TO EXPORT ALL TRAINING NEEDS REC → 1.6.1.6 HOW TO EXPORT ALL PROMOTIONAL RECORDS
+  Technical - Cert. & Surveys User Manual  1.1.4.2 HOW TO APPLY FILTER                   → 1.1.3.2 HOW TO APPLY FILTER
+  Technical - Cert. & Surveys User Manual  1.1.4.3 HOW TO EXPORT SURVEYS                 → 1.1.3.3 HOW TO EXPORT CERTIFICATES
+  Technical - Cert. & Surveys User Manual  1.1.4.4 HOW TO EDIT A SURVEYS                 → 1.1.3.4 HOW TO EDIT A CERTIFICATE
+  Technical - Defects User Manual For Offi 1.1.3.6 HOW TO APPLY FILTER                   → 1.1.3.3 HOW TO APPLY FILTER
+  Technical - Defects User Manual For Offi 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD → 1.1.4.3 HOW TO CREATE A NEW DEFECT
+  Technical - Defects User Manual For Offi 1.1.5.3 HOW TO APPLY FILTER                   → 1.1.4.2 HOW TO APPLY FILTER
+  Technical - Defects User Manual For Offi 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECOR → 1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT
+  Technical - Defects User Manual For Offi 1.1.5.5 HOW TO EXPORT ALL COC RECORDS         → 1.1.4.5 HOW TO EXPORT ALL DEFECT REPORT
+  Technical - Defects User Manual For Offi 1.1.5.6 HOW TO EXPORT AN INDIVIDUAL COC RECOR → 1.1.4.6 HOW TO EXPORT AN INDIVIDUAL DEFECT RE
+  Technical - PMS User Manual For Office_S 1.1.8.2 HOW TO APPLY FILTER                   → 1.1.7.7 HOW TO APPLY FILTER
+  Technical - PMS User Manual For Office_S 1.1.8.5 **HOW TO UPDATE & TRACK STORE INVENTO → 1.1.7.3 HOW TO UPDATE & TRACK SPARE INVENTORY
+  Technical - PMS User Manual For Office_S 1.1.8.6 **HOW TO EXPORT STORE ITEMS**         → 1.1.7.9 HOW TO EXPORT SPARES RECORDS
+  Technical - PMS User Manual_Vessel Speci 1.1.8.2 HOW TO APPLY FILTER                   → 1.1.7.5 HOW TO APPLY FILTER
+  Technical - PMS User Manual_Vessel Speci 1.1.8.5 **HOW TO UPDATE & TRACK STORE INVENTO → 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY
+  Technical - PMS User Manual_Vessel Speci 1.1.8.6 **HOW TO EXPORT STORE ITEMS**         → 1.1.7.7 HOW TO EXPORT SPARES RECORDS

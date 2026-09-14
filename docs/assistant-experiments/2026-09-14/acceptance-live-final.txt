@@ -1,0 +1,71 @@
+
+[01 callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   old-prompt-8015 answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   live-prompt-v2-8016 answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+
+[02 callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   old-prompt-8015 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. The Email Notification icon notifies the Office that the prep'
+   live-prompt-v2-8016 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+
+[03 callout] How do I upload a document for the first time in the SMS module?
+   old-prompt-8015 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click on the **+New Document** tab to initiate the SMS change'
+   live-prompt-v2-8016 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | 'To upload a document for the first time in the SMS module, follo'
+
+[04 table] In the Master Review module, what do the grey and red icons mean?
+   old-prompt-8015 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '1. The **grey circle with slash** icon indicates that a response'
+   live-prompt-v2-8016 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+
+[05 table] What are the hazard categories in a risk assessment?
+   old-prompt-8015 answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   live-prompt-v2-8016 answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+
+[06 table] What actions can I take on a near miss record from the list — what do the icons do?
+   old-prompt-8015 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | '1. **View Record**: Click the eye icon to view, edit, or export '
+   live-prompt-v2-8016 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | 'You can take the following actions on a near miss record from th'
+
+[07 xref] How do I apply a filter in the Stores sub-module of PMS?
+   old-prompt-8015 answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+   live-prompt-v2-8016 answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The process for applying a filter in the Stores sub-module is no'
+
+[08 xref] How do I export crew details from the Waitlist in Crewing?
+   old-prompt-8015 answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Waitlist is not '
+   live-prompt-v2-8016 answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Crewing - Crewing User Man p28 | 'The process for exporting crew details from the Waitlist is not '
+
+[09 xref] How do I create a COC defect record?
+   old-prompt-8015 answer ✓  cite ✓  attrib ✗  JOINT ✗ [0/3]  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+   live-prompt-v2-8016 answer ✓  cite ✓  attrib ✗  JOINT ✗ [0/3]  gate=answer cite=Technical - Defects User M p19 | "1. Refer to the 'Defect Log' sub-submodule.\n2. Follow the same p"
+
+[10 note] When filling MoC Part B, what happens if I select No for further assessment?
+   old-prompt-8015 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+   live-prompt-v2-8016 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+
+[11 note] In PMS, is there another way to add a component besides the components panel?
+   old-prompt-8015 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'The excerpts do not mention any alternative methods to add a com'
+   live-prompt-v2-8016 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | "Yes, a new component can also be added by clicking the '+ Add Co"
+
+[12 note] What should I review after deleting an implication in a vessel MoC?
+   old-prompt-8015 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+   live-prompt-v2-8016 answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+
+== run-to-run disagreement (cases where runs split, 3 runs) ==
+   none
+
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case          old-prompt-8 live-prompt-
+   01 callout               ✗            ✗
+   02 callout               ✓            ✓
+   03 callout               ✓            ✓
+   04 table                 ✓            ✓
+   05 table                 ✗            ✗
+   06 table                 ✓            ✓
+   07 xref                  ✗            ✗
+   08 xref                  ✗            ✗
+   09 xref                  ✗            ✗
+   10 note                  ✓            ✓
+   11 note                  ✓            ✓
+   12 note                  ✓            ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   old-prompt-8015 8/12  10/12  11/12  JOINT 7/12
+   live-prompt-v2-8016 8/12  10/12  11/12  JOINT 7/12
+   live-prompt-v2-8016 vs old-prompt-8015: regressions none | gains none

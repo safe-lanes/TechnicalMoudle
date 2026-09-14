@@ -1,0 +1,25 @@
+{"ok":true,"store":"pgvector","indexSet":"ag-reuse","chunks":907,"db":"connected
+
+== Part 2: retrieval — migrated (http://127.0.0.1:8016) | ag-reuse (http://127.0.0.1:8024)   [module ✓/✗, manual ✓/✗, margin, top-distance]
+  how do I create a work order                 ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8084           
+  how to upload data in bulk data import       ✓✓ m=1.000 d=0.8458            | ✓✓ m=1.000 d=0.8458           
+  why did the running hours not go down after  ✓✓ m=1.000 d=0.9962            | ✓✓ m=1.000 d=0.9962           
+  how do I raise a defect on equipment         ✓✓ m=1.000 d=0.9056            | ✓✓ m=1.000 d=0.9056           
+  how do vessels sync their data with the offi ✓✓ m=1.000 d=0.7174            | ✓✓ m=1.000 d=0.7174           
+  how do I share an audit with the fleet from  ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.7533           
+  how do I prepare for an upcoming audit       ✓✓ m=1.000 d=0.9558            | ✓✓ m=1.000 d=0.9558           
+  where can I see the history of past audits   ✓✓ m=1.000 d=0.889             | ✓✓ m=1.000 d=0.889            
+  how do I create an MOC                       ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441           
+  how do I carry out a risk assessment on the  ✓✓ m=1.000 d=0.7233            | ✓✓ m=1.000 d=0.7233           
+  how do I record a safety meeting             ✓✓ m=1.000 d=0.8213            | ✓✓ m=1.000 d=0.8213           
+  how does the master review the safety manage ✓✓ m=1.000 d=0.7683            | ✓✓ m=1.000 d=0.7683           
+  how do I report a near miss                  ✓✓ m=1.000 d=0.8269            | ✓✓ m=1.000 d=0.8269           
+  how do I report an incident on board         ✓✓ m=1.000 d=0.968             | ✓✓ m=1.000 d=0.968            
+  how do I raise a lesson learnt               ✓✓ m=1.000 d=1.0127            | ✓✓ m=1.000 d=1.0127           
+  how do fleet notifications reach the vessel  ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7342           
+  how do I plan a crew change                  ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7967           
+  how do I add a new crew member to a vessel   ✓✓ m=1.000 d=0.7847            | ✓✓ m=1.000 d=0.7845           
+  what is the weather in Singapore today       gate=not_documented            | gate=not_documented           
+  how do I change my payroll bank account      gate=not_documented            | gate=not_documented           
+
+  routing+manual correct: migrated 18/18   ag-reuse 18/18
