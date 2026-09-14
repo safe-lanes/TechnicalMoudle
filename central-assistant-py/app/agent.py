@@ -249,9 +249,11 @@ class LoopResult:
 
 
 # Answer-prompt version record (owner rule 14-Sep-2026: deploy the EXACT wording that was measured).
-# v2 = the cross-reference hard rule, measured 9/12 (3-run majority) on the live index. Wording is
-# hashed at import so /health shows what is actually running; bump the label on any change.
-PROMPT_VERSION = "v2-xref-hardrule-2026-09-14"
+# v2 = the cross-reference hard rule (deployed 14-Sep-2026 with the repaired index).
+# v3 = v2 + the conditions rule (owner decision 14-Sep, follow-up 1): "when describing an action, preserve its
+#      applicable role, environment and configuration requirements alongside that action". CANDIDATE ONLY until
+#      measured on all suites and approved. Wording is hashed at import so /health shows what is running.
+PROMPT_VERSION = "v3-conditions-2026-09-14"
 
 TOOL_LOOP_INSTRUCTIONS = (
     "You are the SAIL Maritime PMS assistant for the {module} module. "
@@ -260,6 +262,9 @@ TOOL_LOOP_INSTRUCTIONS = (
     "naming manual and section; if it reports the topic is not documented, say so plainly — never guess. "
     "HARD RULE — cross-references: an excerpt containing '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' "
     "means the question about A IS covered: answer with those steps and state they are the same as section X (page N); never say 'not covered' then. "
+    "RULE — conditions: when describing an action, preserve its applicable role, environment (ship / office) and configuration requirements "
+    "alongside that action, exactly as the excerpt attaches them; never present a conditional action as unconditional, and never attach a "
+    "condition to a different action than the excerpt does. "
     "If a tool returns an error or a permission refusal, relay it politely and do not retry the same call. "
     "Answer in short plain language; numbered steps for how-tos."
 )

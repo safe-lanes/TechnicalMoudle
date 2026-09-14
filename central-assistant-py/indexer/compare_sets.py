@@ -25,6 +25,13 @@ import httpx2 as httpx
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.identity import sign_identity  # noqa: E402
 
+# Retrieval-suite expectation versions (owner rule 14-Sep-2026: version and document corrections; keep the original
+# result alongside the revised one; do not change unrelated expectations).
+#   1 (original, 11-Sep): every query expects the official manual as the top source.
+#   2 (14-Sep, follow-up 1): "how do I create a work order" ALSO accepts the code-derived "Recent Updates" note
+#     (§1.1.14.13, implementation-specific, revision recorded in generated-docs/PROVENANCE.md) as the top source.
+#     Nothing else changes. Both versions are run and reported.
+EXPECT_VERSIONS = {1: {}, 2: {"how do I create a work order": ("PMS User Manual", "Recent Updates")}}
 SMOKE = [
     ("how do I create a work order", "Technical", "PMS User Manual"),
     ("how to upload data in bulk data import", "Technical", "PMS User Manual"),
@@ -90,39 +97,48 @@ async def ask(client: httpx.AsyncClient, base: str, key: str, q: str) -> dict:
     return r.json()
 
 
-def _fmt(j: dict, em: str, eman: str) -> tuple[str, bool]:
+def _fmt(j: dict, em: str, eman: str | tuple[str, ...]) -> tuple[str, bool]:
+    eman = tuple(eman) if isinstance(eman, tuple) else (eman,)
     mod = j.get("module") or j.get("gate")
     top = (j.get("citations") or [{}])[0] if j.get("citations") else {}
     man, dist = top.get("manual", "-"), top.get("distance", "-")
-    good = j.get("gate") == "answer" and mod == em and eman in man
+    man_ok = any(e in man for e in eman)
+    good = j.get("gate") == "answer" and mod == em and man_ok
     conf = j.get("confidence", "-")
     conf = f"{conf:.3f}" if isinstance(conf, float) else conf
     extra = f" clarify:{'/'.join(j.get('candidates', []))}" if j.get("gate") == "clarify" else ""
-    return f"{'✓' if mod == em else '✗'}{'✓' if eman in man else '✗'} m={conf} d={dist}{extra}", good
+    return f"{'✓' if mod == em else '✗'}{'✓' if man_ok else '✗'} m={conf} d={dist}{extra}", good
 
 
-async def retrieval_part(sets: list[str], services: list[str]) -> None:
+async def retrieval_part(sets: list[str], services: list[str], expect_version: int = 1) -> None:
     key = os.environ["IDENTITY_SIGNING_KEY"]
-    print("\n== Part 2: retrieval — " + " | ".join(f"{s} ({u})" for s, u in zip(sets, services, strict=True)) + "   [module ✓/✗, manual ✓/✗, margin, top-distance]")
+    alt = EXPECT_VERSIONS[expect_version]
+    print("\n== Part 2: retrieval — " + " | ".join(f"{s} ({u})" for s, u in zip(sets, services, strict=True)) + f"   [module ✓/✗, manual ✓/✗, margin, top-distance]  expectations v{expect_version}")
     ok = {s: 0 for s in sets}
+    ok_alt = {s: 0 for s in sets}  # the other expectation version, computed from the same responses (both are always reported)
+    other = EXPECT_VERSIONS[2 if expect_version == 1 else 1]
     async with httpx.AsyncClient(timeout=60.0) as c:
         for q, em, eman in SMOKE:
             res = await asyncio.gather(*(ask(c, u, key, q) for u in services))
             cells = []
             for s, j in zip(sets, res, strict=True):
-                f, g = _fmt(j, em, eman)
+                f, g = _fmt(j, em, alt.get(q, eman))
+                _, g_other = _fmt(j, em, other.get(q, eman))
                 ok[s] += g
+                ok_alt[s] += g_other
                 cells.append(f)
             print(f"  {q[:44]:<44} " + " | ".join(f"{x:<30}" for x in cells))
         for q in OFF_TOPIC:
             res = await asyncio.gather(*(ask(c, u, key, q) for u in services))
             print(f"  {q[:44]:<44} " + " | ".join(f"{'gate=' + str(j.get('gate')):<30}" for j in res))
-    print("\n  routing+manual correct: " + "   ".join(f"{s} {ok[s]}/{len(SMOKE)}" for s in sets))
+    print(f"\n  routing+manual correct (expectations v{expect_version}): " + "   ".join(f"{s} {ok[s]}/{len(SMOKE)}" for s in sets))
+    print(f"  routing+manual correct (expectations v{2 if expect_version == 1 else 1}, same responses): " + "   ".join(f"{s} {ok_alt[s]}/{len(SMOKE)}" for s in sets))
 
 
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--set", action="append", required=True, help="NAME=SERVICE_URL (repeatable); URL optional for DB-only")
+    ap.add_argument("--expect-version", type=int, choices=sorted(EXPECT_VERSIONS), default=1, help="retrieval expectation version (1 = original; 2 = accepts the code-derived note for the work-order query); the other version is always reported too")
     args = ap.parse_args()
     sets, services = [], []
     for spec in args.set:
@@ -131,7 +147,7 @@ async def main() -> int:
         services.append(url)
     await db_part(sets)
     if all(services):
-        await retrieval_part(sets, services)
+        await retrieval_part(sets, services, args.expect_version)
     return 0
 
 

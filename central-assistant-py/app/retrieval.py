@@ -128,6 +128,9 @@ def docs_prompt(message: str, routed: Routed) -> tuple[str, str]:
               "contains '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' followed by steps, then "
               "the question about A IS covered: answer with those steps, and state that they are the same as section X (page N). "
               "Never answer 'not covered' when such a resolved cross-reference is present. "
+              "RULE — conditions: when describing an action, preserve its applicable role, environment (ship / office) and configuration "
+              "requirements alongside that action, exactly as the excerpt attaches them; never present a conditional action as unconditional, "
+              "and never attach a condition to a different action than the excerpt does. "
               "Answer in short plain language, as numbered steps when the question is a how-to. "
               'End with a "Source:" line naming the manual and section(s) you used.')
     return system, f"Manual excerpts:\n\n{context}\n\nQuestion: {message}"

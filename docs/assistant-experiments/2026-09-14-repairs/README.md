@@ -32,6 +32,7 @@ order" question. No secrets (the configuration record lists environment key NAME
 | `note-generate-now-ui-mismatch.md` | standalone note for the domain team: 'Generate Now' shown to Client Admin / Head of Dept, server allows Sail Admin only (path:line) |
 | `item1-run-e.txt`, `runE-*-dump.jsonl` | follow-up 1 run E: baseline (live's index) vs candidate `repaired-r32` (first R3.2 wording) — retrieval, frozen 12, corrected 14, work-order suite .1 (§S.7) |
 | `item1-run-f.txt`, `runF-wo-dump.jsonl` | follow-up 1 run F: restructured section, rank probe, work-order suite .2 (body-only judge), retrieval |
+| `item1-run-h.txt`, `runH-*-dump.jsonl` | follow-up 1 run H: live config vs prompt-v3 + R3.2 candidate — retrieval v1 17/18 · v2 18/18, frozen 10/12 (case 09 attribution regression), corrected 12/14, work-order suite .3 all-runs 2/3 · 3/3 · 0/3 (§S.7.1) |
 | `item1-run-g.txt`, `runG-*-dump.jsonl` | follow-up 1 run G: frozen 12 + corrected 14 on the final candidate build (11/12 · 13/14, same cases as run D) |
 
 Generated-document corrections: `central-assistant-py/generated-docs/` (build_r3.py = source of the R3

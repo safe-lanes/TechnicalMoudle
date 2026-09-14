@@ -26,7 +26,11 @@ from acceptance_answers import ask, judge  # noqa: E402
 # .2 (after run E, reported): .1 was satisfied by "Sail Admin" inside the manual's FILE NAME in the Source line while the
 #     answer body stated no office condition at all (3/3 runs). The judge now checks the answer BODY (text before the
 #     "Source" line) and requires the office condition words there; run E's 2/2 under .1 is therefore NOT a true pass.
-WO_SUITE_VERSION = "2026-09-14.2"
+# .3 (owner decisions 14-Sep): PER-ACTION pairing — the block that describes 'Generate Now' must carry BOTH the Sail Admin
+#     role and the vessel switch; the block that describes the per-job 'Generate WO' must carry the vessel switch and must
+#     NOT attach the Sail Admin role (the code has no role check on that path); a role attached to the wrong action fails.
+#     Added wo-generic-03 = the phrasing that ranked the new section 6th ("How to create work order in PMS?").
+WO_SUITE_VERSION = "2026-09-14.3"
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -35,7 +39,10 @@ CASES = [
      "PMS Office p28 §1.1.5.1 (Scheduled = jobs planned with a future due date), p18 (Components Part C 'Generate WO' with a reason), p29 §1.1.5.2 ('+ Unplanned W.O'); Recent Updates R3.2 §1.1.14.13 (ship daily scan; office = Sail Admin AND vessel switch, for Generate Now and per-job Generate WO)."),
     ("wo-generic-02", "How are planned work orders created in PMS — do I have to create them myself?", "technical", "Technical", None,
      ["job"], NOT_COVERED, "planned-auto",
-     "Recent Updates R3.2 §1.1.14.13: generated from the job schedule by the ship's daily scan; office generation only by a Sail Admin with the vessel switch on; per-job Generate WO from Components (p18) under the same office conditions."),
+     "Recent Updates R3.2 §1.1.14.13: generated from the job schedule by the ship's daily scan; office generation only by a Sail Admin with the vessel switch on."),
+    ("wo-generic-03", "How to create work order in PMS?", "technical", "Technical", None,
+     ["unplanned w.o", "generate wo"], NOT_COVERED, "three-paths",
+     "Same expectation as wo-generic-01; this phrasing ranked the new section 6th (outside the 5 excerpts) in the rank probe of 14-Sep."),
 ]
 
 
@@ -44,17 +51,53 @@ def body_of(text: str) -> str:
     return re.split(r"\n\s*\*{0,2}source\*{0,2}\s*:", text, flags=re.I)[0].lower()
 
 
+def blocks_of(body: str) -> list[str]:
+    """Split the answer body into per-action blocks: numbered/bold headings or blank-line paragraphs."""
+    parts = re.split(r"\n(?=\s*(?:\d+\.\s*\*\*|\*\*|\d+\.\s+\*\*|- \*\*|#{1,4}\s)|\n\s*\n)", body)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def block_for(body: str, keyword_re: str) -> str:
+    """The block(s) that describe one action (joined), or '' if the action is not described."""
+    return "\n".join(b for b in blocks_of(body) if re.search(keyword_re, b))
+
+
+def check_pairing(body: str) -> tuple[bool, str]:
+    """Per-action permission pairing (suite .3):
+       Generate Now  → must state Sail Admin AND the vessel switch in ITS block
+       Generate WO   → must state the vessel switch in ITS block and must NOT attach Sail Admin there"""
+    gn = block_for(body, r"generate now")
+    gw = block_for(body, r"generate wo\b|generate wo'|'generate wo|generate work order for|specific job")
+    notes: list[str] = []
+    if not gn:
+        notes.append("Generate Now not described")
+    else:
+        if "sail admin" not in gn:
+            notes.append("Generate Now block lacks Sail Admin")
+        if "switch" not in gn:
+            notes.append("Generate Now block lacks the vessel switch")
+    if not gw:
+        notes.append("per-job Generate WO not described")
+    else:
+        if "switch" not in gw:
+            notes.append("Generate WO block lacks the vessel switch")
+        if "sail admin" in gw and "generate now" not in gw:
+            notes.append("Sail Admin wrongly attached to Generate WO")
+    ok = not notes
+    return ok, ("pairing ✓" if ok else "pairing ✗: " + "; ".join(notes))
+
+
 def extra_rule(rule: str, text: str) -> tuple[bool, str]:
     t = body_of(text)
     if rule == "three-paths":
         auto = bool(re.search(r"(generated automatically|automatically generat|daily scan|from the job schedule|job schedule|from the job'?s schedule|scheduled work orders? (are|is) (generated|created))", t))
-        office = ("sail admin" in t) and ("switch" in t)  # the office conditions for generation, stated in the body
-        why = ("automatic generation " + ("✓" if auto else "MISSING") + "; office conditions (Sail Admin + vessel switch) in body " + ("✓" if office else "MISSING"))
-        return auto and office, why
+        pair_ok, pair_why = check_pairing(t)
+        return auto and pair_ok, ("automatic generation " + ("✓" if auto else "MISSING") + "; " + pair_why)
     if rule == "planned-auto":
         auto = bool(re.search(r"(automatic|daily scan|generated (by|from)|from the job)", t))
-        office = ("sail admin" in t) and ("switch" in t)
-        return auto and office, "automatic generation " + ("✓" if auto else "MISSING") + "; office conditions in body " + ("✓" if office else "MISSING")
+        gn = block_for(t, r"generate now") or t
+        office = ("sail admin" in gn) and ("switch" in gn)
+        return auto and office, "automatic generation " + ("✓" if auto else "MISSING") + "; Generate Now conditions (Sail Admin + switch) " + ("✓" if office else "MISSING")
     return True, ""
 
 
@@ -83,9 +126,9 @@ async def main() -> int:
                         dump.write(json.dumps({"suite": "wo", "case": cid, "set": n, "run": r + 1, "verdict": {"answer": a, "citation": ct, "rule": ok_extra, "why": why}, "response": runs[r][si]}, ensure_ascii=False) + "\n")
                     if r == 0:
                         print(f"   {n:<14} answer {'✓' if a else '✗'}  cite {'✓' if ct else '✗'}  rule {'✓' if ok_extra else '✗'} ({why})  {detail}")
-                ok = sum(votes) * 2 > len(votes)
+                ok = sum(votes) == len(votes)  # owner rule (.3): required conditions must survive ALL runs — no majority vote here
                 score[n] += ok
-                print(f"   {n:<14} PASS {'✓' if ok else '✗'} [{sum(votes)}/{len(votes)}]")
+                print(f"   {n:<14} PASS {'✓' if ok else '✗'} [{sum(votes)}/{len(votes)} — all runs required]")
     print("\n== totals ==")
     for n, _ in sets:
         print(f"   {n:<14} {score[n]}/{len(CASES)}")

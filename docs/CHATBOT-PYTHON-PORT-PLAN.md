@@ -572,6 +572,61 @@ work-order suites before any deployment. Alternative without a prompt change: ac
 *Not changed:* live (`repaired`, 911), prompt, routing, `answer_chunks`. Candidate instance
 `sail-assistant-py-exp2` left on 127.0.0.1:8018 for the owner's own checks.
 
+**S.7.1 — Owner decisions applied (14-Sep, later) and run H.**
+*Definitive route trace (item 5):* 'Generate Now' → `WorkOrders.tsx:429` → `POST /work-orders/generate-now`
+(`routes.ts:91`) → `workOrderController.ts:131-148` `evaluateDirectGeneration(role, isShip)` →
+`workOrderGenerationGate.ts:114-161`: on shore **Sail Admin AND vessel switch**. Per-job 'Generate WO'
+→ `Components.tsx:916` → `POST /jobs/:id/generate-wo` (`jobs/routes.ts:40`, deliberately without
+`requireRole` — `:11` "LEFT OPEN") → `jobController.generateWorkOrder` (no role check) →
+`jobService.ts:570-590` (on shore: `isOfficeWoGenerationEnabled` only) → `jobDueScanner.generateWorkOrderForJob`
+(no gate). `evaluateDirectGeneration` has exactly ONE caller (`workOrderController.ts:133`). So:
+**Generate Now = Sail Admin + switch; per-job Generate WO = switch only, no role.** My earlier
+"passes through the same gate" statement rested on the gate file's own comment (`:150-152`, which
+claims to cover per-job generation) and was wrong — retracted; the R3.2 text and PROVENANCE row
+carry the definitive pairing.
+*Deployed-revision verification (item 1):* branch equivalence with `origin/replit_dev` cf5241ad6 is
+established (seven files byte-identical); the running dev revision itself is NOT verifiable from
+here (no access to the dev shore's PM2 folder; the July incident showed that folder can lag). The
+note is therefore worded as implementation-specific ("read from the application code, revision
+recorded in PROVENANCE.md"), not as superseding the manual.
+*Retrieval-suite correction (versioned):* `compare_sets.py --expect-version {1,2}`; v1 = original
+expectations, v2 = the work-order query also accepts the code-derived note; both totals are always
+printed from the same responses. Run H: v1 **17/18**, v2 **18/18** (baseline 18/18 on both).
+*Prompt rule (item 2) tested as `PROMPT_VERSION v3-conditions-2026-09-14`* (docs 92de006366f19a40 ·
+tool-loop 8be3bb06dd3d4648 · combined a705b137aa3b7074; image `sail-assistant-py:prompt-v3`
+e20209ba6238): "when describing an action, preserve its applicable role, environment (ship/office)
+and configuration requirements alongside that action … never attach a condition to a different
+action than the excerpt does".
+*Judge .3 (item 3):* per-action pairing — the Generate Now block must carry Sail Admin AND the
+switch; the Generate WO block must carry the switch and must NOT carry Sail Admin; all three runs
+must pass (no majority vote). Re-judging run F's answers with .3: 0/3 (all lacked the per-job
+switch condition), so the earlier "2/3" is withdrawn.
+*Item 4:* the sixth-ranked phrasing is "How to create work order in PMS?"; added as wo-generic-03.
+
+| run H (baseline = live config: prompt v2 + `repaired`; candidate = prompt v3 + `repaired-r32`) | baseline | candidate |
+|---|---|---|
+| retrieval v1 / v2 expectations | 18/18 · 18/18 | **17/18 · 18/18** |
+| frozen 12-case (.3) | 11/12 | **10/12 — REGRESSION on case 09** |
+| corrected claims (.2) | 12/14 | 12/14 (04 citation, 13 phrase judge — both sets) |
+| wo-generic-01 (generic), all 3 runs required | 0/3 | **2/3** — run 2 omits the office switch for the per-job path |
+| wo-generic-02 (explicit planned) | 0/3 | **3/3** |
+| wo-generic-03 ("How to create work order in PMS?") | 0/3 | **0/3** — the five excerpts are the manual's work-order chunks; the note ranks 6th |
+
+*Case 09 regression, read in full:* the candidate's steps are correct and cite the right sections
+in 3/3 runs, but in runs 1–2 it drops the sentence "these steps are the same as section 1.1.4.3
+… page 15" — the honest-attribution behaviour the cross-reference HARD RULE requires. The added
+conditions rule competes with that rule in the same prompt. v3 as worded is therefore NOT
+acceptable.
+*Where this leaves follow-up 1 (owner decisions needed):* (a) prompt: either reword v3 so the
+conditions rule is subordinate to the cross-reference rule (e.g. one sentence appended to the
+existing rule block, re-measured), or drop the prompt rule and rely on content — in which case the
+generic answer's completeness on conditions remains run-dependent; (b) retrieval for phrasings
+that rank the note 6th: a real retrieval change is required — proposal: collapse duplicate
+Office/Vessel PMS sections (identical text under the same section title) so the five excerpts are
+five distinct sections rather than three plus two copies; alternative: `answer_chunks` 5 → 6. Both
+must be measured on all suites; neither is applied. (c) `repaired-r32` + v3 does not qualify for
+deployment as measured. Live remains prompt v2 + `repaired`.
+
 **What this does NOT change:** the module-side Data API (Node, in Technical), the HTTP contracts,
 the identity token format, nginx/TLS/URL, the masking design and its captured-payload proof
 standard, the 30-tool coverage priority. The stack is chosen *for* those, not instead of them.
