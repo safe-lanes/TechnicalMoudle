@@ -53,6 +53,31 @@ def test_notes_in_figure_zone_and_sentence_after_caption_are_kept():
     assert "mermaid" not in p and "Click here to save" not in p and "Figure 8" not in p
 
 
+def test_genuine_table_inside_figure_zone_is_kept_but_screenshot_grid_is_removed():
+    md = ("## 3. Severity\n\n* Classify the incident using the matrix below. (See Figure 7)\n\n"
+          "<table>\n<tr><th>Severity Level</th><th>Personnel Injury</th></tr>\n"
+          "<tr><td>5 - Catastrophic</td><td>Fatality or permanent total disability of one or more persons</td></tr>\n</table>\n\n"
+          "<table>\n<tr><th>Report Id</th><th>Date</th><th>Vessel</th></tr>\n<tr><td>NM-0012</td><td>18/03/2026</td><td>Vessel 5</td></tr>\n</table>\n\n"
+          "Figure 7")
+    pages, rep = clean_pages({7: md})
+    p = pages[7]
+    assert "permanent total disability" in p          # genuine matrix (sentence cells) survives the zone
+    assert "NM-0012" not in p                          # screenshot grid (short cells) goes
+    assert rep.tables_kept == 1 and rep.tables_removed == 1
+
+
+def test_unique_callout_is_kept_duplicate_callout_is_removed():
+    md = ("## Figure 20\n\n**Use the available filters to refine the displayed observations**\n\n**Click here to export the data**\n\n"
+          "<table>\n<tr><td>Obs</td><td>Q1</td></tr>\n</table>\n\n**Click 'Save' to save the updates.**\n\nFigure 20\n\n"
+          "* Click 'Save' to save the updates after entering vessel comments.")
+    pages, rep = clean_pages({15: md})
+    p = pages[15]
+    assert "export the data" in p                       # unique on the page → kept
+    assert "refine the displayed observations" in p     # unique → kept
+    assert "Click 'Save' to save the updates.\n" not in p and p.count("save the updates") == 1  # duplicate of the bullet → removed
+    assert any(r.rule == "KEPT-unique-callout" for r in rep.removed)
+
+
 def test_struck_through_content_is_removed_not_unwrapped():
     pages, rep = clean_pages({1: "## Steps\n\n* Click Save. <s>Then click Submit twice.</s>\n* ~~Old rule: approve without review.~~ New rule: review first."})
     p = pages[1]
@@ -88,7 +113,8 @@ def test_resolves_appends_target_steps_and_reports_edges():
     resolved = dict(rep.resolved)
     assert resolved["1.1.8.2 HOW TO APPLY FILTER"] == "1.1.7.2 HOW TO APPLY FILTER"
     assert resolved["1.1.8.6 HOW TO EXPORT STORE ITEMS"] == "1.1.7.6 HOW TO EXPORT SPARES"
-    assert "Choose the criteria and click 'Apply'." in out[9] and "(Steps from 'How To Apply Filter':)" in out[9]
+    assert "Choose the criteria and click 'Apply'." in out[9]
+    assert "(The following steps are taken from section 1.1.7.2 'How To Apply Filter', page 5:)" in out[9]  # honest attribution
     # the pointer's own sentence is kept, and the appended text lands inside the pointer section (before the next heading)
     assert out[9].index("Refer to the 'Spares'") < out[9].index("Choose the criteria") < out[9].index("### 1.1.8.6")
     # dead end: no 'Warehouse' section

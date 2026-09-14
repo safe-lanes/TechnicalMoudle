@@ -19,6 +19,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# Bump whenever chunking changes — recorded per document so a chunker change invalidates the index.
+CHUNKER_VERSION = "2026-03-17.original"  # the algorithm that produced the live set, unchanged
+
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)\s*$", re.MULTILINE)
 _TAG_RE = re.compile(r"<[^>]+>")
 

@@ -31,6 +31,9 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+# Bump whenever a rule changes — recorded per document so a cleanup change invalidates the index.
+CLEANUP_VERSION = "2026-09-14.5"  # .4: genuine tables kept in zones · .5: a callout unique on its page is KEPT (only duplicates of page text go)
+
 IMG_LINE_RE = re.compile(r"^\s*(!\[[^\]]*\]\([^)]*\)|(photograph|logo|screenshot|screenshot_from_computer|image|icon|illustration|picture|diagram)\s*:.*|screenshot of .*|[\w-]+\s+logo|\*?(blue|green|dark|light)\s+\w+\s+(texture|surface|background)\*?)\s*$", re.I)
 FIGURE_CAPTION_RE = re.compile(r"^\s*(#{1,6}\s*)?(<u>|\*\*|\*|_)?\s*figure\s*\d+[a-z]?\s*(\.|:)?\s*(</u>|\*\*|\*|_)?\s*$", re.I)
 REF_FIGURE_RE = re.compile(r"\s*\(?\s*(<u>)?\s*(\*)?\s*(ref\.?|see)\s*(figures?|fig\.?)\s*[\d, ]+[a-z]?\s*(\*)?\s*(</u>)?\s*\)?\.?", re.I)
@@ -126,12 +129,31 @@ def _table_cells(t: str) -> list[str]:
 
 
 def _table_is_callout(t: str) -> bool:
+    """A 'table' that is really screenshot annotation. Never true for a genuine table (sentence
+    cells / legend headers) — those outrank every callout signal."""
     cells = _table_cells(t)
     if not cells:
-        return True
+        return False  # unparseable → keep (never drop what we cannot read)
+    if _table_is_genuine(t):
+        return False
     if any(FIGURE_CAPTION_RE.match(c) for c in cells):
         return True
     return len(cells) <= 2 and all(CALLOUT_RE.match(c) for c in cells)
+
+
+GENUINE_HEADER_RE = re.compile(r"^(description|guidance|meaning|definition|criteria|severity|level|action|purpose)\b", re.I)
+
+
+def _table_is_genuine(t: str) -> bool:
+    """A table that carries reference content, not a screenshot of a data grid: any cell is a
+    sentence (≥ 6 words), or a header cell is a legend/definition column. Screenshot grids have
+    short cells (ids, dates, statuses). Such tables are KEPT even inside a figure zone."""
+    cells = _table_cells(t)
+    if not cells:
+        return False
+    if any(len(c.split()) >= 6 for c in cells):
+        return True
+    return any(GENUINE_HEADER_RE.match(c) for c in cells[:8])
 
 
 def _table_is_toc(t: str) -> bool:
@@ -139,10 +161,28 @@ def _table_is_toc(t: str) -> bool:
     return bool(cells) and (any(TOC_TITLE_RE.match(c) for c in cells) or sum(1 for c in cells if TOC_ENTRY_RE.search(c)) >= max(3, len(cells) // 2))
 
 
-def _zone_line_is_noise(s: str) -> bool:
+def _canon_words(s: str) -> set[str]:
+    s = re.sub(r"<[^>]+>", " ", s)
+    s = re.sub(r"[*_`#|'‘’\"“”]+", "", s).lower()  # quotes stripped so 'Audit' and Audit are the same word
+    return {w for w in re.findall(r"[a-z0-9]+", s) if len(w) > 2 and w not in ("the", "and", "for", "here", "click", "this")}
+
+
+def _zone_line_is_noise(s: str, page_words: set[str] | None = None) -> bool:
+    """A screenshot annotation is noise only when it is content-free AND, for anything that
+    names an action/object, its words already appear elsewhere on the page (a duplicate of a
+    bullet). A callout whose content is UNIQUE on the page is kept — it may be the only place
+    that instruction exists ("Click here to export the data")."""
     if NOTE_RE.match(s) or BULLET_RE.match(s) or HEADING_RE.match(s):
         return False
-    return bool(CALLOUT_NOISE_RE.match(s))
+    if not CALLOUT_NOISE_RE.match(s):
+        return False
+    if page_words is None:
+        return True
+    words = _canon_words(s)
+    if len(words) <= 1:
+        return True  # "Yes", "Save", "Req No" — labels carry nothing on their own
+    covered = sum(1 for w in words if w in page_words)
+    return covered / len(words) >= 0.6
 
 
 def _is_cover_page(md: str) -> bool:
@@ -190,6 +230,12 @@ def _strip_struck(s: str, page: int, rep: CleanReport) -> str:
 def clean_page(pn: int, md: str, header_line: str | None, rep: CleanReport, *, cover: bool, toc: bool) -> str:
     blocks = _blocks(md)
     n = len(blocks)
+    # the page's own author text (bullets, notes, headings, sentences outside tables) — the
+    # reference for deciding whether a callout merely duplicates it
+    page_words: set[str] = set()
+    for kind, t in blocks:
+        if kind == "line" and t.strip() and not FIGURE_CAPTION_RE.match(t) and not CALLOUT_NOISE_RE.match(t):
+            page_words |= _canon_words(t)
     caption_idx = [k for k, (kind, t) in enumerate(blocks) if kind == "line" and FIGURE_CAPTION_RE.match(t)]
     in_zone = [False] * n
     for c in caption_idx:
@@ -199,7 +245,7 @@ def clean_page(pn: int, md: str, header_line: str | None, rep: CleanReport, *, c
         e = c
         while e + 1 < n:
             kind, t = blocks[e + 1]
-            if kind in ("table", "mermaid") or (kind == "line" and (not t.strip() or IMG_LINE_RE.match(t) or _zone_line_is_noise(t) or FIGURE_CAPTION_RE.match(t))):
+            if kind in ("table", "mermaid") or (kind == "line" and (not t.strip() or IMG_LINE_RE.match(t) or _zone_line_is_noise(t, page_words) or FIGURE_CAPTION_RE.match(t))):
                 e += 1
             else:
                 break
@@ -212,7 +258,7 @@ def clean_page(pn: int, md: str, header_line: str | None, rep: CleanReport, *, c
             if toc and _table_is_toc(t):
                 rep.log(pn, "toc-table", _table_cells(t)[0] if _table_cells(t) else t)
                 continue
-            if in_zone[k]:
+            if in_zone[k] and not _table_is_genuine(t):
                 rep.tables_removed += 1
                 rep.log(pn, "figure-zone-table", " | ".join(_table_cells(t)[:8]))
                 continue
@@ -254,10 +300,12 @@ def clean_page(pn: int, md: str, header_line: str | None, rep: CleanReport, *, c
             rep.image_lines += 1
             rep.log(pn, "image-line", s)
             continue
-        if in_zone[k] and _zone_line_is_noise(s):
-            rep.callout_lines += 1
-            rep.log(pn, "figure-zone-callout", s)
-            continue
+        if in_zone[k] and CALLOUT_NOISE_RE.match(s) and not (NOTE_RE.match(s) or BULLET_RE.match(s) or HEADING_RE.match(s)):
+            if _zone_line_is_noise(s, page_words):
+                rep.callout_lines += 1
+                rep.log(pn, "figure-zone-callout", s)
+                continue
+            rep.log(pn, "KEPT-unique-callout", s)  # logged but NOT removed: no duplicate of it on the page
         s = _strip_struck(s, pn, rep)
         s = REF_FIGURE_RE.sub("", s)
         s = INLINE_TAG_RE.sub("", s)

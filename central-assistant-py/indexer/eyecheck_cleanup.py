@@ -58,6 +58,34 @@ def removed_material(pages: dict[int, str], cleaned: dict[int, str]) -> tuple[li
     return removed_t, kept_t, suspicious
 
 
+def _canon(s: str) -> str:
+    s = re.sub(r"<[^>]+>", " ", s)
+    s = re.sub(r"[*_`#|]+", "", s)
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9' ]+", " ", s.lower())).strip()
+
+
+def removed_unique_review(pages: dict[int, str], cleaned: dict[int, str], rep) -> dict[str, list[str]]:  # noqa: ANN001
+    """The real risk set: removed material whose text does NOT survive anywhere on the same page
+    (or the whole cleaned document) — sampled across EVERY rule, not just tables. A removed
+    'Click here to export' whose page still carries an export bullet is duplicate noise; one whose
+    page does not is potential instruction loss and is listed for review."""
+    doc_text = _canon("\n".join(cleaned.values()))
+    out: dict[str, list[str]] = {}
+    for r in rep.removed:
+        if r.rule in ("page-footer", "page-header", "figure-caption", "cover-image", "image-line", "mermaid"):
+            continue  # structurally content-free by construction
+        c = _canon(r.text)
+        words = [w for w in c.split() if len(w) > 3]
+        if len(words) < 2:
+            continue
+        page_text = _canon(cleaned.get(r.page, ""))
+        # unique = fewer than 60 % of its content words appear on the cleaned page
+        hits = sum(1 for w in set(words) if w in page_text)
+        if hits / max(1, len(set(words))) < 0.6 and not all(w in doc_text for w in set(words)):
+            out.setdefault(r.rule, []).append(f"p{r.page}: {r.text[:120]!r}")
+    return out
+
+
 def main() -> None:
     cache = sys.argv[1]
     full = "--full" in sys.argv
@@ -72,6 +100,8 @@ def main() -> None:
         cleaned, rep = clean_pages(pages)
         _, xr = resolve_xrefs(cleaned)
         rm, kp, sus = removed_material(pages, cleaned)
+        uniq = removed_unique_review(pages, cleaned, rep)
+        sus = [f"[{rule}] {t}" for rule, items in uniq.items() for t in items]  # replace the crude heuristic with the uniqueness review
         tot["removed"] += len(rm)
         tot["kept"] += len(kp)
         tot["mermaid"] += rep.mermaid_removed
@@ -87,7 +117,7 @@ def main() -> None:
             print(f"  {r}")
 
     section("KEPT tables (asserted genuine) — header cells", [f"{n[:40]:<40} {h}" for n, _rm, kp, _s, _x in details for h in kp])
-    section("SUSPICIOUS removed lines (bullet-shaped or > 70 chars, outside tables) — review each", [f"{n[:40]:<40} {s}" for n, _rm, _kp, sus, _x in details for s in sus])
+    section("REMOVED material UNIQUE on its page (the risk set, every rule) — review each", [f"{n[:40]:<40} {s}" for n, _rm, _kp, sus, _x in details for s in sus])
     section("UNRESOLVED cross-references", [f"{n[:40]:<40} {t[:45]:<45} → {r}" for n, _rm, _kp, _s, xr in details for t, r in xr.unresolved])
     if full:
         section("REMOVED tables — header cells (first 12 per manual)", [f"{n[:40]:<40} {h}" for n, rm, _kp, _s, _x in details for h in rm[:12]])

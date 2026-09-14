@@ -189,7 +189,10 @@ def resolve_xrefs(pages: dict[int, str], max_depth: int = 3) -> tuple[dict[int, 
         if len(chain) > 2:
             rep.chained.append((s.title, " → ".join(chain)))
         rep.resolved.append((s.title, target.title))
-        inserts[(s.page, s.end)] = f"\n\n(Steps from '{title_words(target.title).title()}':)\n{target.body}\n"
+        # Honest attribution: the pulled-in text names its real source section AND page, so an
+        # answer built from it can cite where it actually came from.
+        src = f"section {number_of(target.title)} '{title_words(target.title).title()}'" + (f", page {target.page}" if target.page else "")
+        inserts[(s.page, s.end)] = f"\n\n(The following steps are taken from {src}:)\n{target.body}\n"
     out = dict(pages)
     for (pn, off), text in sorted(inserts.items(), key=lambda kv: (kv[0][0], -kv[0][1])):
         md = out[pn]

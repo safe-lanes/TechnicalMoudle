@@ -34,8 +34,8 @@ import httpx2 as httpx
 from openai import OpenAI
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from chunking import Chunk, chunks_from_markdown, title_stub  # noqa: E402
-from clean_markdown import clean_pages  # noqa: E402
+from chunking import CHUNKER_VERSION, Chunk, chunks_from_markdown, title_stub  # noqa: E402
+from clean_markdown import CLEANUP_VERSION, clean_pages  # noqa: E402
 from xrefs import resolve_xrefs  # noqa: E402
 
 MODULES = {"technical", "audit", "safety", "incident", "crewing"}
@@ -63,11 +63,24 @@ OUTPUT_OPTIONS: dict[str, Any] = {"markdown": {"annotate_links": True, "tables":
 PROCESSING_CONTROL: dict[str, Any] = {"timeouts": {"base_in_seconds": 300, "extra_time_per_page_in_seconds": 30}}
 
 
+def request_configuration(tier: str, version: str) -> dict[str, Any]:
+    """EVERY output-affecting request setting we send (add here whenever a new one is used:
+    custom prompts, OCR/language options, page selection/cropping, processing control)."""
+    return {"tier": tier, "version": version, "output_options": OUTPUT_OPTIONS, "processing_control": PROCESSING_CONTROL,
+            "parsing_instruction": None, "target_pages": None, "language": None, "ocr": None}
+
+
 def parse_key_for(sha: str, tier: str, version: str) -> str:
-    """The accepted-parse key: source-file hash + parsing configuration (tier, REQUESTED version,
-    output options). Same key ⇒ same parse is reused and the parser is never called again."""
-    opts = hashlib.sha256(json.dumps(OUTPUT_OPTIONS, sort_keys=True).encode()).hexdigest()[:12]
-    return f"{sha}|{tier}|{version}|{opts}"
+    """The accepted-parse key: source-file hash + a hash of the COMPLETE request configuration.
+    Same key ⇒ same parse is reused and the parser is never called again."""
+    cfg = hashlib.sha256(json.dumps(request_configuration(tier, version), sort_keys=True).encode()).hexdigest()[:16]
+    return f"{sha}|{cfg}"
+
+
+def build_key_for(parse_key: str, cleanup_version: str | None, chunker_version: str, max_chunk: int, overlap: int, resolve_xrefs: bool) -> str:
+    """The index-build key: parse + cleanup code version + chunker code version + chunk params.
+    A change in any of these invalidates the built index even when the parse is still valid."""
+    return f"{parse_key}|clean={cleanup_version or 'off'}|xrefs={'on' if resolve_xrefs else 'off'}|chunker={chunker_version}|{max_chunk}/{overlap}"
 
 
 def version_evidence(result: dict[str, Any]) -> tuple[bool, str | None]:
@@ -237,11 +250,15 @@ async def main() -> int:
             sha = sha256_file(f)
             source_type = "pdf" if f.suffix.lower() == ".pdf" else "docx"
             module = module_of(f.name)
+            bkey = build_key_for(parse_key_for(sha, a.tier, a.version), CLEANUP_VERSION if a.clean else None, CHUNKER_VERSION,
+                                 a.max_chunk, a.overlap, a.resolve_xrefs)
             if conn is not None and not a.force:
-                prev = await conn.fetchrow("SELECT sha256, chunks FROM assistant_documents WHERE index_set=$1 AND file=$2", a.index_set, f.name)
-                if prev and prev["sha256"] == sha and prev["chunks"] > 0:
-                    log(f"= {f.name}: unchanged ({prev['chunks']} chunks) — skip (use --force to redo)")
+                prev = await conn.fetchrow("SELECT sha256, chunks, build_key FROM assistant_documents WHERE index_set=$1 AND file=$2", a.index_set, f.name)
+                if prev and prev["sha256"] == sha and prev["chunks"] > 0 and prev["build_key"] == bkey:
+                    log(f"= {f.name}: unchanged file + same build key — skip (use --force to redo)")
                     continue
+                if prev and prev["sha256"] == sha and prev["build_key"] != bkey:
+                    log(f"~ {f.name}: file unchanged but build key differs (cleanup/chunker/params changed) — rebuilding")
             log(f"> {f.name} [{module}/{source_type}]")
             try:
                 pkey = parse_key_for(sha, a.tier, a.version)
@@ -256,7 +273,7 @@ async def main() -> int:
                 present, vfield = version_evidence(result)
                 log(f"   job={job_id} tier={a.tier} requested_version={a.version} response.metadata.version={'present: ' + str(vfield) if present else 'ABSENT'}")
                 await parse_store_put(conn, key=pkey, file=f.name, sha=sha, tier=a.tier, version=a.version,
-                                      options={"output_options": OUTPUT_OPTIONS, "processing_control": PROCESSING_CONTROL, "disable_cache": bool(a.fresh_parse)},
+                                      options={**request_configuration(a.tier, a.version), "disable_cache": bool(a.fresh_parse)},
                                       result=result, pages=len(page_map) if page_map else None)
                 clean_report: dict[str, Any] = {"parse_key": pkey}
                 xres = xun = 0
@@ -278,7 +295,8 @@ async def main() -> int:
                             log(f"      UNRESOLVED {t[:50]} → {r}")
                     page_map = pm if page_map else None
                     md = "\n\n".join(pm[k] for k in sorted(pm))
-                extra = {"llamaparse_tier": a.tier, "llamaparse_version": a.version, "llamaparse_job_id": job_id, "cleaned": bool(a.clean)}
+                extra = {"llamaparse_tier": a.tier, "llamaparse_version": a.version, "llamaparse_job_id": job_id, "cleaned": bool(a.clean),
+                         "cleanup_version": CLEANUP_VERSION if a.clean else None, "chunker_version": CHUNKER_VERSION, "xrefs_resolved": bool(a.resolve_xrefs)}
                 chunks = chunks_from_markdown(md=md, source_file=f.name, source_type=source_type, max_chunk_size=a.max_chunk,
                                               chunk_overlap=a.overlap, page_map=page_map, extra_metadata=extra)
                 stub = False
@@ -293,7 +311,8 @@ async def main() -> int:
                     await store_document(conn, index_set=a.index_set, file=f.name, module=module, sha=sha, source_type=source_type,
                                          chunks=chunks, embeddings=embs, pages=pages, stub=stub, tier=a.tier, version=a.version, embed_model=embed_model,
                                          job_id=job_id, cleaned=bool(a.clean), xrefs_resolved=xres, xrefs_unresolved=xun, clean_report=clean_report)
-                    await conn.execute("UPDATE assistant_documents SET parse_key=$1 WHERE index_set=$2 AND file=$3", pkey, a.index_set, f.name)
+                    await conn.execute("UPDATE assistant_documents SET parse_key=$1, build_key=$2, cleanup_version=$3, chunker_version=$4 "
+                                       "WHERE index_set=$5 AND file=$6", pkey, bkey, CLEANUP_VERSION if a.clean else None, CHUNKER_VERSION, a.index_set, f.name)
                     log(f"   stored ({a.index_set})")
                 summary.append({"file": f.name, "chunks": len(chunks), "pages": pages, "short": short, "stub": stub})
             except Exception as e:

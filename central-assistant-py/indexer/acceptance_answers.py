@@ -73,14 +73,21 @@ def page_of(citation: dict) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def judge(j: dict, manual: str, page: int | None, must: list[str], must_not: list[str]) -> tuple[bool, bool, str]:
-    ans = (j.get("response") or "").lower()
+def judge(j: dict, manual: str, page: int | None, must: list[str], must_not: list[str], cls: str) -> tuple[bool, bool, bool, str]:
+    """(answer ok, citation ok, attribution ok, detail). Attribution matters for xref cases:
+    an answer built from another section's text must name where it came from (the resolver
+    labels pulled-in text with its source section and page)."""
+    raw = j.get("response") or ""
+    ans = raw.lower()
     ok_answer = all(p.lower() in ans for p in must) and not any(p.lower() in ans for p in must_not) and j.get("gate") == "answer"
     cits = j.get("citations") or []
     top = cits[0] if cits else {}
     ok_cite = manual.lower() in str(top.get("manual", "")).lower() and (page is None or page_of(top) == page)
-    detail = f"gate={j.get('gate')} cite={str(top.get('manual', '-'))[:28]} p{page_of(top)} | {(j.get('response') or '')[:70]!r}"
-    return ok_answer, ok_cite, detail
+    ok_attr = True
+    if cls == "xref" and ok_answer:
+        ok_attr = bool(re.search(r"(taken from|from section|section \d+(\.\d+)+|see (the )?'?[\w &-]+'? (sub-)?(sub-)?module)", raw, re.I))
+    detail = f"gate={j.get('gate')} cite={str(top.get('manual', '-'))[:26]} p{page_of(top)} | {raw[:64]!r}"
+    return ok_answer, ok_cite, ok_attr, detail
 
 
 async def main() -> int:
@@ -89,19 +96,37 @@ async def main() -> int:
     args = ap.parse_args()
     key = os.environ["IDENTITY_SIGNING_KEY"]
     sets = [(s.partition("=")[0], s.partition("=")[2]) for s in args.set]
-    score = {n: [0, 0] for n, _ in sets}
+    score = {n: [0, 0, 0, 0] for n, _ in sets}  # answer, cite, attribution, JOINT
+    matrix: list[tuple[str, dict[str, bool]]] = []
     async with httpx.AsyncClient(timeout=150.0) as c:
-        for cls, q, module, manual, page, must, must_not in CASES:
-            print(f"\n[{cls}] {q}")
+        for i, (cls, q, module, manual, page, must, must_not) in enumerate(CASES, 1):
+            print(f"\n[{i:02d} {cls}] {q}")
             res = await asyncio.gather(*(ask(c, u, key, q, module) for _, u in sets))
+            row: dict[str, bool] = {}
             for (n, _), j in zip(sets, res, strict=True):
-                a, ct, d = judge(j, manual, page, must, must_not)
+                a, ct, at, d = judge(j, manual, page, must, must_not, cls)
+                joint = a and ct and at
                 score[n][0] += a
                 score[n][1] += ct
-                print(f"   {n:<14} answer {'✓' if a else '✗'}  cite {'✓' if ct else '✗'}  {d}")
-    print(f"\n== answer-level acceptance (answer correct / citation correct, out of {len(CASES)}) ==")
+                score[n][2] += at
+                score[n][3] += joint
+                row[n] = joint
+                print(f"   {n:<14} answer {'✓' if a else '✗'}  cite {'✓' if ct else '✗'}  attrib {'✓' if at else '✗'}  JOINT {'✓' if joint else '✗'}  {d}")
+            matrix.append((f"{i:02d} {cls}", row))
+    print(f"\n== per-case JOINT (answer ∧ citation ∧ attribution) — out of {len(CASES)} ==")
+    print("   case          " + " ".join(f"{n[:12]:>12}" for n, _ in sets))
+    for label, row in matrix:
+        print(f"   {label:<13} " + " ".join(f"{('✓' if row[n] else '✗'):>12}" for n, _ in sets))
+    print("\n== totals: answer / citation / attribution / JOINT ==")
     for n, _ in sets:
-        print(f"   {n:<14} {score[n][0]}/{len(CASES)}   {score[n][1]}/{len(CASES)}")
+        s = score[n]
+        print(f"   {n:<14} {s[0]}/{len(CASES)}  {s[1]}/{len(CASES)}  {s[2]}/{len(CASES)}  JOINT {s[3]}/{len(CASES)}")
+    # regression view: cases the FIRST set gets right that any other set gets wrong
+    base = sets[0][0]
+    for n, _ in sets[1:]:
+        lost = [lbl for lbl, row in matrix if row[base] and not row[n]]
+        gained = [lbl for lbl, row in matrix if not row[base] and row[n]]
+        print(f"   {n:<14} vs {base}: regressions {lost or 'none'} | gains {gained or 'none'}")
     return 0
 
 
