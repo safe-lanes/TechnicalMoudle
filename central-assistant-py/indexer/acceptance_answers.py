@@ -30,38 +30,49 @@ import httpx2 as httpx
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.identity import sign_identity  # noqa: E402
 
-# (class, question, module, expected manual substring, expected page (None = any), must phrases, must_not phrases)
-CASES: list[tuple[str, str, str, str, int | None, list[str], list[str]]] = [
+# SUITE FROZEN 14-Sep-2026 (SUITE_VERSION below) after every expected answer was checked against the
+# source manuals (page renders + the saved parses; see docs/assistant-experiments/2026-09-14-repairs/).
+# Any later change to a case must be reported explicitly and bumps SUITE_VERSION.
+SUITE_VERSION = "2026-09-14.3"  # .3 (post-freeze, reported): case 08 also requires the final step "download" (Export button, p20)
+NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
+# (class, question, module, expected manual substring, accepted pages (None = any), must phrases, must_not phrases, source note)
+CASES: list[tuple[str, str, str, str, tuple[int, ...] | None, list[str], list[str], str]] = [
     ("callout", "In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?",
-     "audit", "Preparation", 15, ["export"], []),
+     "audit", "Preparation", (15,), ["export", "vessel comments", "yes", "save"], NOT_COVERED,
+     "Audit Preparation Office R1 p15 Figure 20 callouts: Excel icon top-right exports the data; enter vessel comments and select compliance Yes/No; click Save. (Callouts exist only in the screenshot — extraction repair.)"),
     ("callout", "In Audit Preparation, what does the email notification icon do and is it configurable?",
-     "audit", "Preparation", 9, ["email", "client"], []),
+     "audit", "Preparation", (9,), ["email notification", "office", "client"], NOT_COVERED,
+     "Audit Preparation Office R1 p9 §2.5: click the icon to notify the Office that the checklist has been completed; optional, client-specific/configurable."),
     ("callout", "How do I upload a document for the first time in the SMS module?",
-     "safety", "SMS", 14, ["new document"], []),
+     "safety", "SMS", (14,), ["new document"], NOT_COVERED,
+     "SMS Office R0 p14 §4.1: click the +New Document tab (starts the change request: Proposal, Approval, Release)."),
     ("table", "In the Master Review module, what do the grey and red icons mean?",
-     "safety", "Master Review", 6, ["due", "overdue"], []),
+     "safety", "Master Review", (6,), ["due", "overdue"], NOT_COVERED,
+     "Master Review R1 p6 Office Response table: grey = Response Due, red = Response Overdue (green tick = completed)."),
     ("table", "What are the hazard categories in a risk assessment?",
-     "safety", "Risk Assessment", None, ["work environment", "equipment"], []),
+     "safety", "Risk Assessment", (13, 12), ["work environment", "equipment", "programs", "processes", "people", "organization"], NOT_COVERED,
+     "RA Office R1 p13 Figure 15 / RA Vessel R1 p12 Figure 14 'Select Applicable Hazards' tabs: 1 Work Environment, 2 Equipment, 3 Programs/Procedures, 4 Processes (Act), 5 People, 6 Organization. (Tabs exist only in the screenshot — extraction repair.)"),
     ("table", "What actions can I take on a near miss record from the list — what do the icons do?",
-     "incident", "Near Miss", 5, ["view"], []),
+     "incident", "Near Miss", (5,), ["view", "edit", "delete"], NOT_COVERED,
+     "Near Miss R1 p5 action-icon table: eye = View Record (view/edit/export), pencil = Edit Record, bin = Delete Record."),
     ("xref", "How do I apply a filter in the Stores sub-module of PMS?",
-     "technical", "PMS User Manual", None, ["filter"], ["not covered", "isn't covered", "not documented"]),
-    # Case 08 corrected 14-Sep-2026 against the manual (PROVEN from the indexed Crewing chunks):
-    # the Recruitment area has In-Progress / Recruited / Waitlist / Rejected — there is NO "Onboard
-    # list"; "Onboard" is only a crew status (1.4.1.7). The old wording could only "pass" when the
-    # model invented an equivalence with Crew Database export (1.3.1.4). The pointer sections
-    # 1.2.2.3 / 1.2.3.3 / 1.2.4.3 say "Refer to the In-Progress sub-sub-module" whose steps are
-    # 1.2.1.5 on page 19 (Edit icon → Export button).
+     "technical", "PMS User Manual", (49, 47), ["spares", "vessel", "filter"], NOT_COVERED,
+     "PMS Office R2 p49 §1.1.8.2 says 'Refer to the Spares sub-sub-module for the filter process and apply the same steps' → §1.1.7.7 p47: open Spares (Inventory tab by default), select the Vessel, search for parts/components, apply filters such as Criticality, Rotation Item and Stock. Answer must name the Spares section as the source."),
     ("xref", "How do I export crew details from the Waitlist in Crewing?",
-     "crewing", "Crewing", None, ["export", "edit"], ["not covered", "isn't covered", "not documented", "crew database"]),
+     "crewing", "Crewing", (22, 19, 20), ["in-progress", "edit", "export", "download"], NOT_COVERED + ["crew database"],
+     "Crewing R2 p22 §1.2.3.3 says 'Refer to the In-Progress sub-sub-module for the export process and apply the same steps' → §1.2.1.5 p19–20: open the record with the Edit icon, then click the Export button to download the crew form. There is no 'Onboard list' in Crewing (Recruitment = In-Progress / Recruited / Waitlist / Rejected); Crew Database export (§1.3.1.4 p28) is a different sub-module and must not be used."),
     ("xref", "How do I create a COC defect record?",
-     "technical", "Defects", None, ["defect"], ["not covered", "isn't covered", "not documented"]),
+     "technical", "Defects", (19, 15), ["new defect", "submit"], NOT_COVERED,
+     "Defects Office R2 p19 §1.1.5.2 says 'Refer to the Defect Log sub-submodule and follow the same procedure' → §1.1.4.3 p15: click '+ New Defect', fill Part A, B and C, click Submit."),
     ("note", "When filling MoC Part B, what happens if I select No for further assessment?",
-     "safety", "MOC", 11, ["not processed"], []),
+     "safety", "MOC", (11,), ["not processed"], NOT_COVERED,
+     "MOC Office R0 p11 §6 note: if 'No' is selected the MoC is marked 'Not Processed'."),
     ("note", "In PMS, is there another way to add a component besides the components panel?",
-     "technical", "PMS User Manual", 24, ["add component"], []),
+     "technical", "PMS User Manual", (24,), ["add component"], NOT_COVERED,
+     "PMS Office R2 p24 §1.1.4.3 note inside Figure 35: a new component can also be added by clicking the '+ Add Component' button."),
     ("note", "What should I review after deleting an implication in a vessel MoC?",
-     "safety", "MOC", 9, ["action"], []),
+     "safety", "MOC", (9,), ["part e", "action"], NOT_COVERED,
+     "MOC Vessel R0 p9 note: after deletion review the Part E – Action table to ensure data consistency."),
 ]
 
 _n = 0
@@ -80,7 +91,7 @@ def page_of(citation: dict) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def judge(j: dict, manual: str, page: int | None, must: list[str], must_not: list[str], cls: str) -> tuple[bool, bool, bool, str]:
+def judge(j: dict, manual: str, page: tuple[int, ...] | int | None, must: list[str], must_not: list[str], cls: str) -> tuple[bool, bool, bool, str]:
     """(answer ok, citation ok, attribution ok, detail). Attribution matters for xref cases:
     an answer built from another section's text must name where it came from (the resolver
     labels pulled-in text with its source section and page)."""
@@ -91,7 +102,8 @@ def judge(j: dict, manual: str, page: int | None, must: list[str], must_not: lis
         ok_answer = False  # judge tightened 14-Sep-2026: parroting the manual's pointer ("Refer to the X sub-module, follow the same procedure") is NOT an answer
     cits = j.get("citations") or []
     top = cits[0] if cits else {}
-    ok_cite = manual.lower() in str(top.get("manual", "")).lower() and (page is None or page_of(top) == page)
+    pages = (page,) if isinstance(page, int) else page
+    ok_cite = manual.lower() in str(top.get("manual", "")).lower() and (pages is None or page_of(top) in pages)
     ok_attr = True
     if cls == "xref" and ok_answer:
         ok_attr = bool(re.search(r"(taken from|same as|from section|section \d+(\.\d+)+|see (the )?'?[\w &-]+'? (sub-)?(sub-)?module)", raw, re.I))
@@ -112,7 +124,8 @@ async def main() -> int:
     matrix: list[tuple[str, dict[str, bool]]] = []
     flaky: list[str] = []
     async with httpx.AsyncClient(timeout=150.0) as c:
-        for i, (cls, q, module, manual, page, must, must_not) in enumerate(CASES, 1):
+        print(f"acceptance suite {SUITE_VERSION} · {len(CASES)} cases · repeat={args.repeat}")
+        for i, (cls, q, module, manual, page, must, must_not, _src) in enumerate(CASES, 1):
             print(f"\n[{i:02d} {cls}] {q}")
             runs = [await asyncio.gather(*(ask(c, u, key, q, module) for _, u in sets)) for _ in range(args.repeat)]
             row: dict[str, bool] = {}

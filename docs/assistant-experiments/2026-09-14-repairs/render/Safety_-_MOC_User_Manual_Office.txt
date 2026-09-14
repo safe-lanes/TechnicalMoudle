@@ -1,0 +1,30 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+===== Safety - MOC User Manual_Office · parse page_number=11 (array index 10) =====
+  [page_number] 11
+  [header] MOC USER MANUAL
+  [footer] Revision No. 00 / Date: 31.03.2026 Page 11 of 19
+  [success] True
+--- md ---
+## 6. HOW TO FILL MOC FORM – PART B
+
+* Complete the required information in Part B.
+
+* Select **“No”** if no further assessment is required. *(See Figure 8)*
+
+* Select **“Yes”** if the proposed MoC requires further assessment. *(See Figure 9)*
+
+☞ **Note:** If **“No”** is selected, the MoC will be marked as **“Not Processed.”**
+
+screenshot: Initial Review section showing 'No' selected with justification field
+
+<u>Figure 8</u>
+
+screenshot: Initial Review section showing 'Yes' selected with MOC Team assignment fields
+
+<u>Figure 9</u>
+
+PDF: ['C:/tmp/trag/documents\\Safety - MOC User Manual_Office_R0_31.03.2026.pdf', 'D:/manuals/SAIL - User Manuals\\Safety module\\MOC User Manual_Office_R0_31.03.2026.pdf']
+pdf pages: 19
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_MOC_User_Manu_p11_idx11.png  text-head: MOC USER MANUAL  | Revision No. 00 / Date: 31.03.2026  | Page 11 of 19  |   |   | 6. HOW TO FILL MOC FORM – PART B  |  Complete the required information in Par
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_MOC_User_Manu_p11_idx12.png  text-head: MOC USER MANUAL  | Revision No. 00 / Date: 31.03.2026  | Page 12 of 19  |   |   |   | 7. HOW TO FILL MOC FORM – PART C  |  Complete the required information in

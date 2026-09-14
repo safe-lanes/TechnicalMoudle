@@ -1,0 +1,81 @@
+index set 'repaired': 25 files in /app/documents; tier=agentic version=latest fresh=False dry_run=False
+> Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf [audit/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 11 stored, embedded 0 new
+> Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf [audit/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 10 stored, embedded 0 new
+> Audit - History Manual_R1_30.06.2026.pdf [audit/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 24 stored, embedded 0 new
+> Audit - Preparation Manual_Office_R1_30.06.2026.pdf [audit/pdf]
+   repairs: applied=['p15 Figure 20'] not_found=[] sha_mismatch=[]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 65 stored, embedded 0 new
+> Crewing - Crewing User Manual R2_10.06.2026.pdf [crewing/pdf]
+   xrefs: resolved=26 unresolved=0 chained=4
+   vectors: reused 207 stored, embedded 6 new
+> Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf [incident/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 15 stored, embedded 0 new
+> Incident - Incident User Manual R0_20.05.2026.pdf [incident/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 37 stored, embedded 0 new
+> Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf [incident/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 9 stored, embedded 0 new
+> Incident - Near Miss User Manual R1_30.05.2026.pdf [incident/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 17 stored, embedded 0 new
+> Safety - MOC User Manual_Office_R0_31.03.2026.pdf [safety/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 31 stored, embedded 0 new
+> Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf [safety/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 25 stored, embedded 0 new
+> Safety - Master Review Manual R1_10.06.2026.pdf [safety/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 16 stored, embedded 0 new
+> Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf [safety/pdf]
+   repairs: applied=['p13 Figure 15'] not_found=[] sha_mismatch=[]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 41 stored, embedded 0 new
+> Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf [safety/pdf]
+   repairs: applied=['p12 Figure 14'] not_found=[] sha_mismatch=[]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 22 stored, embedded 0 new
+> Safety - SMS User Manual_Office_R0_31.01.2026.pdf [safety/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 38 stored, embedded 0 new
+> Safety - Safety Meeting User Manual_R1_31.05.2026.pdf [safety/pdf]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 18 stored, embedded 0 new
+> Technical - Bulk Data Import (Operational) User Manual.docx [technical/docx]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 9 stored, embedded 0 new
+> Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   xrefs: resolved=3 unresolved=0 chained=0
+   vectors: reused 42 stored, embedded 0 new
+> Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf [technical/pdf]
+   xrefs: resolved=6 unresolved=0 chained=0
+   vectors: reused 35 stored, embedded 0 new
+> Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   xrefs: resolved=3 unresolved=0 chained=0
+   vectors: reused 98 stored, embedded 0 new
+> Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf [technical/pdf]
+   xrefs: resolved=3 unresolved=0 chained=0
+   vectors: reused 88 stored, embedded 0 new
+> Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx [technical/docx]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 14 stored, embedded 0 new
+> Technical - Roles & Permissions (Operational) User Manual.docx [technical/docx]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 14 stored, embedded 0 new
+> Technical - Ship-Side (Vessel Crew) Operational Notes.docx [technical/docx]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 7 stored, embedded 0 new
+> Technical - Sync (Operational) User Manual.docx [technical/docx]
+   xrefs: resolved=0 unresolved=0 chained=0
+   vectors: reused 13 stored, embedded 0 new
+index set 'repaired' now holds 912 chunks across 25 documents
+DONE

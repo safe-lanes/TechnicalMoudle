@@ -1,0 +1,131 @@
+index set 'repaired': 25 files in /app/documents; tier=agentic version=latest fresh=False dry_run=False
+> Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key b5252752ffc1…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   11 chunks, pages=9, <100-char chunks=2
+   vectors: reused 11 stored, embedded 0 new
+> Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key c2494d2156bc…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   10 chunks, pages=6, <100-char chunks=2
+   vectors: reused 10 stored, embedded 0 new
+> Audit - History Manual_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key efe75238c622…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   24 chunks, pages=16, <100-char chunks=2
+   vectors: reused 24 stored, embedded 0 new
+> Audit - Preparation Manual_Office_R1_30.06.2026.pdf [audit/pdf]
+   accepted parse from the parse store (key 35a2d511a21a…) — parser not called
+   repairs: applied=['p15 Figure 20'] not_found=[] sha_mismatch=[]
+   xrefs: resolved=0 unresolved=0 chained=0
+   65 chunks, pages=33, <100-char chunks=3
+   vectors: reused 63 stored, embedded 2 new
+> Crewing - Crewing User Manual R2_10.06.2026.pdf [crewing/pdf]
+   accepted parse from the parse store (key e6149f9b2aab…) — parser not called
+   xrefs: resolved=26 unresolved=0 chained=4
+   213 chunks, pages=111, <100-char chunks=2
+   vectors: reused 187 stored, embedded 26 new
+> Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key 3201171579f4…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   15 chunks, pages=8, <100-char chunks=3
+   vectors: reused 15 stored, embedded 0 new
+> Incident - Incident User Manual R0_20.05.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key ceb3e31b6e6e…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   37 chunks, pages=19, <100-char chunks=5
+   vectors: reused 37 stored, embedded 0 new
+> Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key 525ce802dbcc…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   9 chunks, pages=9, <100-char chunks=2
+   vectors: reused 9 stored, embedded 0 new
+> Incident - Near Miss User Manual R1_30.05.2026.pdf [incident/pdf]
+   accepted parse from the parse store (key 5cd0d392035a…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   17 chunks, pages=11, <100-char chunks=2
+   vectors: reused 17 stored, embedded 0 new
+> Safety - MOC User Manual_Office_R0_31.03.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key ab160ffe1a14…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   31 chunks, pages=19, <100-char chunks=4
+   vectors: reused 31 stored, embedded 0 new
+> Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key a10cd79a2fa5…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   25 chunks, pages=15, <100-char chunks=2
+   vectors: reused 25 stored, embedded 0 new
+> Safety - Master Review Manual R1_10.06.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 16a8d99022a9…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   16 chunks, pages=11, <100-char chunks=4
+   vectors: reused 16 stored, embedded 0 new
+> Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 70475a998ceb…) — parser not called
+   repairs: applied=['p13 Figure 15'] not_found=[] sha_mismatch=[]
+   xrefs: resolved=0 unresolved=0 chained=0
+   41 chunks, pages=25, <100-char chunks=4
+   vectors: reused 39 stored, embedded 2 new
+> Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key a3e1ab92590d…) — parser not called
+   repairs: applied=['p12 Figure 14'] not_found=[] sha_mismatch=[]
+   xrefs: resolved=0 unresolved=0 chained=0
+   22 chunks, pages=16, <100-char chunks=2
+   vectors: reused 20 stored, embedded 2 new
+> Safety - SMS User Manual_Office_R0_31.01.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 182b93c99791…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   38 chunks, pages=22, <100-char chunks=4
+   vectors: reused 38 stored, embedded 0 new
+> Safety - Safety Meeting User Manual_R1_31.05.2026.pdf [safety/pdf]
+   accepted parse from the parse store (key 2fbae044792f…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   18 chunks, pages=18, <100-char chunks=3
+   vectors: reused 18 stored, embedded 0 new
+> Technical - Bulk Data Import (Operational) User Manual.docx [technical/docx]
+   accepted parse from the parse store (key ba200e864d3c…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   9 chunks, pages=2, <100-char chunks=0
+   vectors: reused 9 stored, embedded 0 new
+> Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key c4c026beb21b…) — parser not called
+   xrefs: resolved=3 unresolved=0 chained=0
+   42 chunks, pages=21, <100-char chunks=2
+   vectors: reused 39 stored, embedded 3 new
+> Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key 996227bf0fff…) — parser not called
+   xrefs: resolved=6 unresolved=0 chained=0
+   35 chunks, pages=20, <100-char chunks=1
+   vectors: reused 28 stored, embedded 7 new
+> Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key ef0e35d1df7f…) — parser not called
+   xrefs: resolved=3 unresolved=0 chained=0
+   98 chunks, pages=64, <100-char chunks=3
+   vectors: reused 95 stored, embedded 3 new
+> Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf [technical/pdf]
+   accepted parse from the parse store (key c93598108979…) — parser not called
+   xrefs: resolved=3 unresolved=0 chained=0
+   88 chunks, pages=54, <100-char chunks=0
+   vectors: reused 84 stored, embedded 4 new
+> Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx [technical/docx]
+   accepted parse from the parse store (key 6a93bd238306…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   14 chunks, pages=2, <100-char chunks=1
+   vectors: reused 14 stored, embedded 0 new
+> Technical - Roles & Permissions (Operational) User Manual.docx [technical/docx]
+   accepted parse from the parse store (key 97a3fedab09b…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   14 chunks, pages=3, <100-char chunks=1
+   vectors: reused 14 stored, embedded 0 new
+> Technical - Ship-Side (Vessel Crew) Operational Notes.docx [technical/docx]
+   accepted parse from the parse store (key 69857b38989d…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   7 chunks, pages=2, <100-char chunks=0
+   vectors: reused 7 stored, embedded 0 new
+> Technical - Sync (Operational) User Manual.docx [technical/docx]
+   accepted parse from the parse store (key 083e08c13944…) — parser not called
+   xrefs: resolved=0 unresolved=0 chained=0
+   13 chunks, pages=3, <100-char chunks=1
+   vectors: reused 13 stored, embedded 0 new
+index set 'repaired' now holds 912 chunks across 25 documents
+DONE

@@ -1,0 +1,70 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+===== Technical - Defects · parse page_number=19 (array index 18) =====
+  [page_number] 19
+  [header] TECHNICAL USER MANUAL
+  [footer] Revision No. 02 / Date: 13 June 2026 Page 19 of 20
+  [success] True
+--- md ---
+# 1.1.5 CONDITION OF CLASS (COC)
+
+**Introduction**
+
+* The '**Condition of Class (COC)**' sub-sub-module provides a centralized view of all CoC-related defects across the fleet. It enables users to create, monitor, search, filter, and manage defect records, track their status and target dates, record corrective actions, and perform activities such as viewing, editing, verifying, linking, and exporting defect information to support class compliance and vessel safety.
+
+## 1.1.5.1 HOW TO ACCESS CONDITION OF CLASS (COC)
+
+* Click on the 'COC' sub—submodule to view the all COC defect records. (Ref Figure 29)
+
+Screenshot of the Condition of Class (CoC) Defects dashboard showing a list of defect records with columns for ID, Vessel, Issue Date, Category, Description, Action Taken / Requested, Target Date, Status, and Actions. A yellow callout box points to the 'CoC' icon in the sidebar with the text "1. Click on the 'CoC'."
+
+Figure 29
+
+## 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD
+
+* Refer to the 'Defect Log' sub-submodule and follow the same procedure to create a new record.
+
+## 1.1.5.3 HOW TO APPLY FILTER
+
+* Refer to the 'Defect Log' sub-submodule for the filter process and follow the same steps.
+
+## 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS
+
+* Refer to the 'Defect Log' sub-submodule for the view and edit process and follow the same steps.
+
+===== Technical - Defects · parse page_number=15 (array index 14) =====
+  [page_number] 15
+  [header] TECHNICAL USER MANUAL
+  [footer] Revision No. 02 / Date: 13 June 2026
+  [success] True
+--- md ---
+## 1.1.4.3 HOW TO CREATE A NEW DEFECT
+
+* Click the '+ New Defect' button to create a new defect record. (Ref Figure 22)
+
+Screenshot of Defects Log showing the '+ New Defect' button highlighted with an arrow and a callout box saying "1. Click here to create the report."
+
+<a id="figure-22"></a>
+Figure 22
+
+* The screen below appears after clicking the '+ New Defect' button. (Ref Figure 23)
+
+* Fill all the required information in Part A, Part B and Part C. (Ref Figure 23)
+
+* Click 'Submit' button to save the updated reporting details. (Ref Figure 23)
+
+Screenshot of New Defect Report form with callout boxes: "1. Modify the report accordingly.", "2. Click here to submit Part A.", "Click here to add attachments.", and "Click here to save the report."
+
+<a id="figure-23"></a>
+Figure 23
+
+☞ Clicking 'Submit' button, the updated defect report is forwarded to the next stage of the configured defect management workflow.
+
+Page 15 of 20
+
+PDF: ['C:/tmp/trag/documents\\Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf', 'D:/manuals/SAIL - User Manuals\\Technical module\\Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf']
+pdf pages: 20
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_Defects_p19_idx19.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 13 June 2026  |   | Page 19 of 20  |   |   | 1.1.5 CONDITION OF CLASS (COC)  | Introduction
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_Defects_p19_idx20.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 13 June 2026  |   | Page 20 of 20  |   |   | 1.1.5.5 HOW TO EXPORT ALL COC RECORDS  |   | 
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_Defects_p15_idx15.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 13 June 2026  |   | Page 15 of 20  |   |   | 1.1.4.3 HOW TO CREATE A NEW DEFECT  |   | Cli
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_Defects_p15_idx16.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 13 June 2026  |   | Page 16 of 20  |   |   | 1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT  | 

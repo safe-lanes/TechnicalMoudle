@@ -1,0 +1,34 @@
+cleanlogs: 25 ag, 25 ce
+== config record ==
+images:
+prompt-v2 8db669090d36 2026-09-14 07:06:25 +0000 UTC
+xrefprompt 3b71b4f1c2f0 2026-09-14 06:29:30 +0000 UTC
+port 920ed5a1ab4b 2026-09-14 05:41:55 +0000 UTC
+prompt-v1-rollback e12c0b916d4c 2026-09-11 10:30:06 +0000 UTC
+containers:
+sail-assistant-py-i sail-assistant-py:prompt-v2 127.0.0.1:8024->8000/tcp Up 6 minutes
+sail-assistant-py-v2 sail-assistant-py:prompt-v2 127.0.0.1:8016->8000/tcp Up 19 minutes
+sail-assistant-py-c sail-assistant-py:xrefprompt 127.0.0.1:8018->8000/tcp Up 53 minutes
+sail-assistant-py-g sail-assistant-py:xrefprompt 127.0.0.1:8022->8000/tcp Up 53 minutes
+sail-assistant-py-f sail-assistant-py:xrefprompt 127.0.0.1:8021->8000/tcp Up 53 minutes
+sail-assistant-py-e sail-assistant-py:xrefprompt 127.0.0.1:8020->8000/tcp Up 53 minutes
+sail-assistant-py-d sail-assistant-py:xrefprompt 127.0.0.1:8019->8000/tcp Up 53 minutes
+sail-assistant-py-h sail-assistant-py:xrefprompt 127.0.0.1:8023->8000/tcp Up 53 minutes
+sail-assistant-py-b 62a9aeb5724a 127.0.0.1:8017->8000/tcp Up 3 hours
+sail-assistant-py e12c0b916d4c 127.0.0.1:8015->8000/tcp Up 2 days
+sail-assistant-db pgvector/pgvector:pg16 127.0.0.1:5434->5432/tcp Up 2 days
+sail-assistant sail-assistant:stage5 127.0.0.1:8012->8000/tcp Up 3 days
+sail-assistant-db-alpine postgres:16-alpine  Exited (0) 2 days ago
+technical-chromadb chromadb/chroma:0.6.3 127.0.0.1:8011->8000/tcp Up 2 months
+index sets:
+ag-base  907  25  
+ag-both  787  25  
+ag-clean  787  25  
+ag-reuse  907  25  
+ag-xref  909  25  
+ce-clean  773  25  
+migrated  907  25  
+py-llamaparse  908  25  
+env keys (values withheld):
+OPENAI_API_KEY CHROMA_URL ROUTE_MARGIN CHAT_MODEL DATABASE_URL IDENTITY_SIGNING_KEY ADMIN_TOKEN ASSISTANT_ADMIN_EMAIL ASSISTANT_CORS_ORIGINS 
+CHAT_MODEL=gpt-4o-mini  ROUTE_MARGIN=0.07

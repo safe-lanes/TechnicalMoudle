@@ -1,0 +1,18 @@
+{
+ "file": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf",
+ "sha256": "a3e1ab92590df9f77324924f6e02783852e40ffb9c00d631d46a7b064f83fc59",
+ "source_copy": "D:/manuals/SAIL - User Manuals/Safety module/Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf",
+ "source_date": "D:\\manuals, hashes identical to the ingested copies (verified 2026-09-14)",
+ "repair_version": "2026-09-14.1",
+ "method": "vision transcription: the source page rendered at 200 dpi (PyMuPDF) and the screenshot callouts read by Claude Fable 5.1; every label re-checked against the render before saving. Not OCR; not from the LlamaParse output.",
+ "verified_on": "2026-09-14",
+ "entries": [
+  {
+   "page": 12,
+   "figure": "Figure 14",
+   "section": "8. How to fill Vessel Risk Assessment form – Part B, Method 1: Add Hazards from Database",
+   "what_the_parse_missed": "the six hazard category tabs and the three callouts of the 'Select Applicable Hazards' pop-up; the saved agentic parse kept only 'categories like Work Environment, Equipment, and People'.",
+   "text": "Figure 14 — 'Select Applicable Hazards' pop-up (multiple selection; the selections are added to the RA form):\n* Hazard categories (tabs): 1. Work Environment · 2. Equipment · 3. Programs/ Procedures · 4. Processes (Act) · 5. People · 6. Organization.\n* Under a category the hazards are listed in groups (for example '1. Weather & Sea Conditions' under Work Environment: Vessel's Motion – Rolling & Pitching, Pounding; Sea Spray/ Shipping seas on deck; Strong winds; Low Ambient Temperatures).\n* Select the applicable hazard(s), then select the Possible Incident(s) for them.\n* Click 'Save' to add the selections to the RA form ('Back' returns without adding)."
+  }
+ ]
+}

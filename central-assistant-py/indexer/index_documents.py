@@ -36,6 +36,7 @@ from openai import OpenAI
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from chunking import CHUNKER_VERSION, Chunk, chunks_from_markdown, title_stub  # noqa: E402
 from clean_markdown import CLEANUP_VERSION, clean_pages  # noqa: E402
+from repairs import REPAIR_VERSION, apply_repairs, load_repairs  # noqa: E402
 from xrefs import XREF_SETTINGS, XREF_VERSION, resolve_xrefs  # noqa: E402
 
 # Embedding record (owner ask 14-Sep-2026: name the exact model, dimensions and vector handling
@@ -85,19 +86,21 @@ def parse_key_for(sha: str, tier: str, version: str) -> str:
 
 
 def build_key_for(parse_key: str, cleanup_version: str | None, chunker_version: str, max_chunk: int, overlap: int, resolve_xrefs: bool,
-                  embed_mode: str = "meta", embed_model: str = EMBED_MODEL_DEFAULT) -> str:
-    """The index-build key: parse + cleanup code version + resolver code version + chunker code
-    version + chunk params + embedding input mode + embedding model/dimensions. A change in any
-    of these invalidates the built index even when the parse is still valid."""
-    return (f"{parse_key}|clean={cleanup_version or 'off'}|xrefs={XREF_VERSION if resolve_xrefs else 'off'}|chunker={chunker_version}|{max_chunk}/{overlap}"
-            f"|embed={EMBED_INPUT_VERSION if embed_mode == 'meta' else 'text'}|model={embed_model}:{EMBED_DIMS}")
+                  embed_mode: str = "meta", embed_model: str = EMBED_MODEL_DEFAULT, repairs: bool = False) -> str:
+    """The index-build key: parse + cleanup code version + resolver code version + repair version +
+    chunker code version + chunk params + embedding input mode + embedding model/dimensions. A
+    change in any of these invalidates the built index even when the parse is still valid."""
+    return (f"{parse_key}|clean={cleanup_version or 'off'}|xrefs={XREF_VERSION if resolve_xrefs else 'off'}|repairs={REPAIR_VERSION if repairs else 'off'}"
+            f"|chunker={chunker_version}|{max_chunk}/{overlap}|embed={EMBED_INPUT_VERSION if embed_mode == 'meta' else 'text'}|model={embed_model}:{EMBED_DIMS}")
 
 
-def build_record(*, tier: str, version: str, cleaned: bool, resolve: bool, max_chunk: int, overlap: int, embed_mode: str, embed_model: str) -> dict[str, Any]:
+def build_record(*, tier: str, version: str, cleaned: bool, resolve: bool, max_chunk: int, overlap: int, embed_mode: str, embed_model: str,
+                 repairs: bool = False) -> dict[str, Any]:
     """Everything needed to reproduce a build, stored with each document (clean_report.build)."""
     return {"parser": "llamaparse-v2", "tier": tier, "requested_version": version, "request_configuration": request_configuration(tier, version),
             "cleanup_version": CLEANUP_VERSION if cleaned else None, "xref_version": XREF_VERSION if resolve else None,
-            "xref_settings": XREF_SETTINGS if resolve else None, "chunker_version": CHUNKER_VERSION, "max_chunk": max_chunk, "overlap": overlap,
+            "xref_settings": XREF_SETTINGS if resolve else None, "repair_version": REPAIR_VERSION if repairs else None,
+            "chunker_version": CHUNKER_VERSION, "max_chunk": max_chunk, "overlap": overlap,
             "embed_input": EMBED_INPUT_VERSION if embed_mode == "meta" else "text", "embed_model": embed_model, "embed_dims": EMBED_DIMS,
             "vector_handling": VECTOR_HANDLING}
 
@@ -254,6 +257,7 @@ async def store_document(conn: asyncpg.Connection, *, index_set: str, file: str,
         m["module"] = module
         m["embed_sha"] = embed_sha(inp, embed_model)  # identity of the embedding request → later builds reuse the vector
         m["embed_model"] = embed_model
+        m["embed_sha_source"] = "recorded"  # written at embedding time (vs "reconstructed" for backfilled sets)
         pn = m.get("page_number")
         rows.append((index_set, c.id, module, file, m.get("section_title"), m.get("breadcrumb"),
                      str(pn) if pn is not None else None, int(m.get("chunk_index") or 0), c.text, json.dumps(m), v))
@@ -295,7 +299,9 @@ async def main() -> int:
     ap.add_argument("--reparse", action="store_true", help="ignore the accepted parse in the parse store and parse again (normally never needed)")
     ap.add_argument("--embed-input", choices=["meta", "text"], default="meta", help="what is embedded: metadata+text (LlamaIndex-compatible, the live set) or text only")
     ap.add_argument("--no-reuse-vectors", action="store_true", help="always call the embedding API, even when a stored vector exists for the identical input")
+    ap.add_argument("--apply-repairs", action="store_true", help="insert the verified extraction repairs (indexer/repairs/*.json, matched by source sha256) on their pages")
     a = ap.parse_args()
+    repairs = load_repairs() if a.apply_repairs else {}
 
     docs = Path(a.documents)
     cache_dir = Path(a.cache_dir) if a.cache_dir else docs.parent / "llamaparse_cache"
@@ -321,7 +327,7 @@ async def main() -> int:
             source_type = "pdf" if f.suffix.lower() == ".pdf" else "docx"
             module = module_of(f.name)
             bkey = build_key_for(parse_key_for(sha, a.tier, a.version), CLEANUP_VERSION if a.clean else None, CHUNKER_VERSION,
-                                 a.max_chunk, a.overlap, a.resolve_xrefs, a.embed_input, embed_model)
+                                 a.max_chunk, a.overlap, a.resolve_xrefs, a.embed_input, embed_model, a.apply_repairs)
             if conn is not None and not a.force:
                 prev = await conn.fetchrow("SELECT sha256, chunks, build_key FROM assistant_documents WHERE index_set=$1 AND file=$2", a.index_set, f.name)
                 if prev and prev["sha256"] == sha and prev["chunks"] > 0 and prev["build_key"] == bkey:
@@ -347,10 +353,15 @@ async def main() -> int:
                                       result=result, pages=len(page_map) if page_map else None)
                 clean_report: dict[str, Any] = {"parse_key": pkey, "build_key": bkey,
                                                 "build": build_record(tier=a.tier, version=a.version, cleaned=a.clean, resolve=a.resolve_xrefs, max_chunk=a.max_chunk,
-                                                                      overlap=a.overlap, embed_mode=a.embed_input, embed_model=embed_model)}
+                                                                      overlap=a.overlap, embed_mode=a.embed_input, embed_model=embed_model, repairs=a.apply_repairs)}
                 xres = xun = 0
-                if a.clean or a.resolve_xrefs:
+                if a.clean or a.resolve_xrefs or a.apply_repairs:
                     pm = page_map if page_map else {1: md}
+                    if a.apply_repairs:  # before cleanup/xrefs: the transcription is page content like any other
+                        pm, rrep = apply_repairs(pm, sha, f.name, repairs)
+                        clean_report["repairs"] = {"version": REPAIR_VERSION, "applied": rrep.applied, "not_found": rrep.not_found, "sha_mismatch": rrep.sha_mismatch}
+                        if rrep.applied or rrep.not_found or rrep.sha_mismatch:
+                            log(f"   repairs: applied={rrep.applied} not_found={rrep.not_found} sha_mismatch={rrep.sha_mismatch}")
                     if a.clean:
                         pm, crep = clean_pages(pm)
                         clean_report.update(crep.as_dict())
@@ -368,7 +379,8 @@ async def main() -> int:
                     page_map = pm if page_map else None
                     md = "\n\n".join(pm[k] for k in sorted(pm))
                 extra = {"llamaparse_tier": a.tier, "llamaparse_version": a.version, "llamaparse_job_id": job_id, "cleaned": bool(a.clean),
-                         "cleanup_version": CLEANUP_VERSION if a.clean else None, "chunker_version": CHUNKER_VERSION, "xrefs_resolved": bool(a.resolve_xrefs)}
+                         "cleanup_version": CLEANUP_VERSION if a.clean else None, "chunker_version": CHUNKER_VERSION, "xrefs_resolved": bool(a.resolve_xrefs),
+                         "repair_version": REPAIR_VERSION if a.apply_repairs else None}
                 chunks = chunks_from_markdown(md=md, source_file=f.name, source_type=source_type, max_chunk_size=a.max_chunk,
                                               chunk_overlap=a.overlap, page_map=page_map, extra_metadata=extra)
                 stub = False

@@ -1,0 +1,39 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+===== Safety - SMS · parse page_number=14 (array index 13) =====
+  [page_number] 14
+  [footer] Revision No. 00 / Date: 31.01.2026
+
+Page 14 of 22 14
+  [success] True
+--- md ---
+## 4. How to upload Documents or forms in SAIL
+
+### 4.1 UPLOADING A DOCUMENT FOR THE FIRST TIME IN SAIL
+
+* Click on the **+New Document** tab to initiate the SMS change request (**Ref Fig 20**).
+
+screenshot: SAIL SMS Procedures interface showing the +New Document button
+
+Figure 20
+
+ⓘ Clicking on the New Document tab redirects the user to the Change request form, which consists of three stages:
+
+* Proposal,
+
+* Approval, &
+
+* Release
+
+### 4.1.1 Proposal
+
+* Proposer fills the Change details in Part A1 as shown in **Fig 21**.
+
+screenshot: SAIL New Document Proposal form showing Part A.1 Change Details
+
+Figure 21
+
+PDF: ['C:/tmp/trag/documents\\Safety - SMS User Manual_Office_R0_31.01.2026.pdf', 'D:/manuals/SAIL - User Manuals\\Safety module\\SMS User Manual_Office_R0_31.01.2026.pdf']
+pdf pages: 22
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_SMS_p14_idx14.png  text-head: Revision No. 00 / Date: 31.01.2026  |   | Page 14 of 22  |   |   |   | 4.  | How to upload Documents or forms in SAIL  |   | 4.1 UPLOADING A DOCUMENT FOR THE FI
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_SMS_p14_idx15.png  text-head: Revision No. 00 / Date: 31.01.2026  |   | Page 15 of 22  |   |   |  Process Owner/Dept. Head will review the Part A2 (Ref Fig. 22)  |   | Figure 22  |   |  SM

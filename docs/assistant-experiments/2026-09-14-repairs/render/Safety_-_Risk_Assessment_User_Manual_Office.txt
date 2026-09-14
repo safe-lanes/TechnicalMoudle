@@ -1,0 +1,105 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+===== Safety - Risk Assessment User Manual_Office · parse page_number=12 (array index 11) =====
+  [page_number] 12
+  [header] RISK ASSESSMENT USER MANUAL
+  [footer] Revision No. 01 / Date: 30.05.2026 Page 12 of 25
+  [success] True
+--- md ---
+## 6.3 COMPLETING OFFICE RA - PART A (OVERVIEW)
+
+I. Enter the required details under **A.1 Basic Information**.
+
+II. Select the applicable **RA Type** using the available radio buttons.
+
+III. Complete the task-related information under **A.2 Task Related Information** and **A.3 Alternative Method of Carrying Out the Task**, as applicable.
+
+IV. Click **Save** to store the **Risk Assessment** details.
+(See Figure 13)
+
+screenshot: Risk Assessment Office software interface showing Part A - Overview with callouts for entering basic information, selecting RA type, entering task related information, and saving details.
+
+Figure 13
+
+☞ A **Report ID** is generated automatically once **Part–A** has been saved.
+
+☞ **Part B** remains locked until Part A has been completed and saved.
+
+## 6.4 COMPLETING OFFICE RA - PART B (HAZARD ASSESSMENT)
+
+* Fill in all required fields in **Part—B** accordingly.
+
+➢ <u>**Method 1**: Add Hazards from Database. (See Figure 14)</u>
+
+I. Click **+ Add Hazards From Database** and select the required hazards and associated possible incidents.*(See Figure 15)*
+
+II. Click **AUTOFILL** to automatically populate the mapped Threats and Existing Controls for all hazards. *(See Figure 16)*
+
+III. Add Initial and final Risk ratings manually, as applicable.
+
+IV. Click **Auto Arrange Hazards**, to automatically rearrange the selected hazards.
+
+===== Safety - Risk Assessment User Manual_Office · parse page_number=13 (array index 12) =====
+  [page_number] 13
+  [header] RISK ASSESSMENT USER MANUAL
+  [footer] Revision No. 01 / Date: 30.05.2026
+
+Page 13 of 25
+  [success] True
+--- md ---
+screenshot: Risk Assessment Office interface showing buttons for adding hazards from database and autofilling threats and controls
+
+<u>Figure 14</u>
+
+screenshot: Select Applicable Hazards pop-up window with categories like Work Environment and Equipment, and a list of hazards and possible incidents with checkboxes
+
+<u>Figure 15</u>
+
+screenshot: B-Assessment form showing a hazard entry with populated threat, existing control, and possible incident after using the autofill function
+
+<u>Figure 16</u>
+
+===== Safety - Risk Assessment User Manual_Office · parse page_number=14 (array index 13) =====
+  [page_number] 14
+  [header] # RISK ASSESSMENT USER MANUAL
+  [footer] Revision No. 01 / Date: 30.05.2026
+
+Page 14 of 25
+  [success] True
+--- md ---
+* Multiple hazards can be selected and added simultaneously using **'+Add Hazards From Database.'**
+
+* The **Autofill** function automatically populates the mapped Threats and Existing Controls from the database, provided a Possible Incident has been selected for the corresponding hazard.
+
+Ø **<u>Method 2</u>: Add Manually** *(See Figure 17)*
+
+I. Click '+Add Manually' button.
+
+II. Add Hazards, Threats, Existing Controls, Possible Incidents and Initial & final risks manually. *(See Figure 18)*
+
+screenshot: Risk Assessment interface showing 'Add Manually' button with annotation 'Enter details in Part - B, accordingly.' and 'Add hazards manually'
+
+Figure 17
+
+screenshot: Risk Assessment interface showing manual entry fields with annotations 'Add further description, as applicable.', 'Delete the entry', and 'Click "+ Add" to open the Risk Matrix and select the required Risk value.'
+
+Figure 18
+
+## ⓘ <u>SELECTING RISKS</u>:
+
+Select the required **Risk Value (S × L)** from the Risk Matrix.
+
+The corresponding Severity (S), Likelihood (L), and Risk Level are populated automatically.
+
+* **Initial and Final Risk ratings to be added manually.**
+
+* **Entries in this section are automatically saved. No manual save action is required.**
+
+PDF: ['C:/tmp/trag/documents\\Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf', 'D:/manuals/SAIL - User Manuals\\Safety module\\Risk Assessment User Manual_Office_R1_30.05.2026.pdf']
+pdf pages: 25
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p12_idx12.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 12 of 25  |   |   | 6.3   | COMPLETING OFFICE RA - PART A  (OV
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p12_idx13.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 13 of 25  |   |   |   | Figure 14  |   |   | Figure 15  |   | 
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p13_idx13.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 13 of 25  |   |   |   | Figure 14  |   |   | Figure 15  |   | 
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p13_idx14.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 14 of 25  |   |   |  Multiple hazards can be selected and add
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p14_idx14.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 14 of 25  |   |   |  Multiple hazards can be selected and add
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p14_idx15.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 15 of 25  |   |   | 6.5   | ADDING ADDITIONAL CONTROLS / ACTIO

@@ -1,0 +1,88 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+===== Crewing - Crewing · parse page_number=19 (array index 18) =====
+  [page_number] 19
+  [header] SAIL - CREWING MODULE USER MANUAL
+  [footer] Revision No. 02 / Date: 10 June 2026
+
+Page 19 of 111
+  [success] True
+--- md ---
+### 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD
+
+* Click on ‘In-Progress’ sub-sub module. (Ref Figure 17)
+
+* Then, select the crew record by clicking the ‘Edit’ icon to modify it or the ‘Bin’ icon to delete it in the table row. (Ref Figure 17)
+
+screenshot_from_computer: Screenshot of the In Progress crew record table with annotations. Step 1: Click on the 'In-Progress' module. Step 2: Click Edit/Bin icons for actions.
+
+Figure 17
+
+### 1.2.1.5 HOW TO EXPORT CREW DETAILS
+
+* Click on the ‘In-Progress’ sub—sub module. (Ref Figure 18)
+
+* Then, select the crew record by clicking the ‘Edit’ icon. (Ref Figure 18)
+
+screenshot_from_computer: Screenshot of the In Progress crew record table with annotations. Step 1: Click on the 'In-Progress' module. Step 2: Click here to open the form.
+
+Figure 18
+
+===== Crewing - Crewing · parse page_number=20 (array index 19) =====
+  [page_number] 20
+  [header] SAIL - CREWING MODULE USER MANUAL
+  [footer] Revision No. 02 / Date: 10 June 2026
+
+Page 20 of 111
+  [success] True
+--- md ---
+* The screen below appears after clicking the ‘Edit’ button. (<u>Ref Figure 19</u>)
+
+* Click the ‘Export’ button to download the crew form. (<u>Ref Figure 19</u>)
+
+screenshot_from_computer: Recruitment Application - New Candidate interface showing the Seafarers' Particulars section with an orange callout box pointing to the Export button that says "Click here to download."
+
+<u>Figure 19</u>
+
+===== Crewing - Crewing · parse page_number=22 (array index 21) =====
+  [page_number] 22
+  [header] SAIL - CREWING MODULE USER MANUAL
+  [footer] Revision No. 02 / Date: 10 June 2026
+
+Page 22 of 111
+  [success] True
+--- md ---
+## 1.2.3 WAITLIST
+
+### <u>Introduction</u>
+
+* The Waitlist sub-submodule displays candidates who have been shortlisted but are currently on hold for recruitment. It provides detailed information to support tracking and management of candidates for upcoming opportunities.
+
+### 1.2.3.1 HOW TO ACCESS THE WAITLIST
+
+* Click the ‘Waitlist’ sub—submodule to view the list of shortlisted candidates who are currently on hold for future vacancies. <u>(Ref Figure 21)</u>
+
+screenshot_from_computer: Waitlist interface showing a table of candidates with a yellow callout box pointing to the Waitlist icon in the sidebar that says "Click on the 'Waitlist'"
+
+<u>Figure 21</u>
+
+### 1.2.3.2 HOW TO EDIT OR DELETE A CREW RECORD
+
+* Refer to the ‘In—Progress’ sub-sub-module for edit and delete process and apply the same steps.
+
+### 1.2.3.3 HOW TO EXPORT CREW DETAILS
+
+* Refer to the ‘In—Progress’ sub-sub-module for the export process and apply the same steps.
+
+### 1.2.3.4 HOW TO APPLY FILTER
+
+* Refer to the ‘In—Progress’ sub-sub-module for the filter process and apply the same steps.
+
+PDF: ['C:/tmp/trag/documents\\Crewing - Crewing User Manual R2_10.06.2026.pdf', 'D:/manuals/SAIL - User Manuals\\Crewing module\\Crewing User Manual R2_10.06.2026.pdf']
+pdf pages: 111
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Crewing_-_Crewing_p19_idx19.png  text-head: SAIL - CREWING MODULE USER MANUAL  |   |   |   |   | Revision No. 02 / Date: 10 June 2026  |   | Page 19 of 111  |   | 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECO
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Crewing_-_Crewing_p19_idx20.png  text-head: SAIL - CREWING MODULE USER MANUAL  |   |   |   |   | Revision No. 02 / Date: 10 June 2026  |   | Page 20 of 111  |   |  The screen below appears after clicking
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Crewing_-_Crewing_p20_idx20.png  text-head: SAIL - CREWING MODULE USER MANUAL  |   |   |   |   | Revision No. 02 / Date: 10 June 2026  |   | Page 20 of 111  |   |  The screen below appears after clicking
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Crewing_-_Crewing_p20_idx21.png  text-head: SAIL - CREWING MODULE USER MANUAL  |   |   |   |   | Revision No. 02 / Date: 10 June 2026  |   | Page 21 of 111  |   | 1.2.2 RECRUITED  | Introduction  |  The 
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Crewing_-_Crewing_p22_idx22.png  text-head: SAIL - CREWING MODULE USER MANUAL  |   |   |   |   | Revision No. 02 / Date: 10 June 2026  |   | Page 22 of 111  |   | 1.2.3 WAITLIST  | Introduction  |  The W
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Crewing_-_Crewing_p22_idx23.png  text-head: SAIL - CREWING MODULE USER MANUAL  |   |   |   |   | Revision No. 02 / Date: 10 June 2026  |   | Page 23 of 111  |   | 1.2.4 REJECTED  | Introduction  |  The R

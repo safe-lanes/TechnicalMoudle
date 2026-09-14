@@ -1,0 +1,63 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+===== Incident - Near Miss · parse page_number=5 (array index 4) =====
+  [page_number] 5
+  [header] NEAR MISS USER MANUAL
+  [footer] Revision No. 01 / Date: 30.05.2026 Page 5 of 11
+  [success] True
+--- md ---
+## 2. NEAR MISS - OVERVIEW
+
+* Upon entering the Near Miss sub-module, the *All Reports* screen is displayed. (See Figure 3)
+
+  1. Click **Filters** to access filtering options.
+
+  2. Select the required **Time Period**.
+
+  3. Click **Apply** to filter the records or **Clear** to reset the filters.
+
+screenshot: Near Miss All Reports screen with callouts for Filters, Time Period, and Apply/Clear buttons
+
+<u>Figure 3</u>
+
+* Click the **Export** icon to download the report list. (See Figure 4)
+
+* Click **Show Pending Actions** to view records with pending actions. (See Figure 4)
+
+screenshot: Near Miss All Reports screen with callouts for Export icon, Show Pending Actions button, and action icons
+
+Figure 4
+
+* The following action icons are available in the Near Miss records as shown in Figure 4
+
+<table>
+  <thead>
+    <tr>
+        <th>Icon</th>
+        <th>Action</th>
+        <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+        <td>[icon: eye]</td>
+        <td>View Record</td>
+        <td>View, edit, or export the selected Near Miss record.</td>
+    </tr>
+    <tr>
+        <td>[icon: pencil]</td>
+        <td>Edit Record</td>
+        <td>Open and edit the selected Near Miss record.</td>
+    </tr>
+    <tr>
+        <td>[icon: trash can]</td>
+        <td>Delete Record</td>
+        <td>Delete the selected record from the system.</td>
+    </tr>
+  </tbody>
+</table>
+
+PDF: ['C:/tmp/trag/documents\\Incident - Near Miss User Manual R1_30.05.2026.pdf', 'D:/manuals/SAIL - User Manuals\\Incident module\\Near Miss User Manual R1_30.05.2026.pdf']
+pdf pages: 11
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Incident_-_Near_Miss_p5_idx5.png  text-head: NEAR MISS USER MANUAL  |   |   |   |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 5 of 11  |   |   | 2.  NEAR MISS - OVERVIEW  |  Upon en
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Incident_-_Near_Miss_p5_idx6.png  text-head: NEAR MISS USER MANUAL  |   |   |   |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 6 of 11  |   |   |   | 3.  HOW TO CREATE A NEW NEAR MISS

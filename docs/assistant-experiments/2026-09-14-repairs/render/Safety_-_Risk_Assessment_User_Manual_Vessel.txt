@@ -1,0 +1,60 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+===== Safety - Risk Assessment User Manual_Vessel · parse page_number=12 (array index 11) =====
+  [page_number] 12
+  [header] RISK ASSESSMENT USER MANUAL
+  [footer] Revision No. 01 / Date: 30.05.2026 Page 12 of 16
+  [success] True
+--- md ---
+## 8. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART B
+
+* Fill in all required fields in **Part—B** accordingly.
+
+⮚ <u>**Method 1**</u>: **Add Hazards from Database.** (*See Figure 13*)
+
+I. Click **+ Add Hazards From Database** and select the required *hazards* and associated *possible incidents*.(*See Figure 14*)
+
+II. Click **AUTOFILL** to automatically populate the mapped *Threats* and *Existing Controls* for all hazards. (*See Figure 15*)
+
+III. Add Initial and final Risk ratings manually, as applicable.
+
+IV. Click **Auto Arrange Hazards**, to automatically rearrange the selected hazards.
+
+screenshot_from_computer: Risk Assessment Vessel interface showing 'AUTOFILL', 'AUTO ARRANGE HAZARDS', and '+ ADD HAZARDS FROM DATABASE' buttons with instructional callouts.
+
+Figure 13
+
+screenshot_from_computer: 'Select Applicable Hazards' pop-up window showing categories like 'Work Environment', 'Equipment', and 'People', with checkboxes for specific hazards and possible incidents.
+
+Figure 14
+
+===== Safety - Risk Assessment User Manual_Vessel · parse page_number=13 (array index 12) =====
+  [page_number] 13
+  [header] RISK ASSESSMENT USER MANUAL
+  [footer] Revision No. 01 / Date: 30.05.2026 Page 13 of 16
+  [success] True
+--- md ---
+screenshot: Risk Assessment interface showing Autofill functionality
+
+<u>Figure 15</u>
+
+☞ Multiple hazards can be selected and added simultaneously using ‘+Add Hazards From Database.’
+
+☞ The Autofill function automatically populates the mapped Threats and Existing Controls from the database, provided a Possible Incident has been selected for the corresponding hazard.
+
+⮚ <u>**Method</u> 2: Add Manually** *(See Figure 16)*
+
+I. Click **‘+Add Manually’** button.
+
+II. Add *Hazards, Threats, Existing Controls, Possible Incidents* and *Initial & final risks* manually. *(See Figure 17)*
+
+screenshot: Risk Assessment interface showing Add Manually button
+
+Figure 16
+
+PDF: ['C:/tmp/trag/documents\\Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf', 'D:/manuals/SAIL - User Manuals\\Safety module\\Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf']
+pdf pages: 16
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p12_idx12.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 12 of 16  |   |   | 8. HOW TO FILL VESSEL RISK ASSESSMENT FORM
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p12_idx13.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 13 of 16  |   |   |   | Figure 15  |  Multiple hazards can be
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p13_idx13.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 13 of 16  |   |   |   | Figure 15  |  Multiple hazards can be
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_Risk_Assessme_p13_idx14.png  text-head: RISK ASSESSMENT USER MANUAL  |   |   |   |   |   | Revision No. 01 / Date: 30.05.2026  |   | Page 14 of 16  |   |   |   | Figure 17  |  SELECTING RISKS:    | S

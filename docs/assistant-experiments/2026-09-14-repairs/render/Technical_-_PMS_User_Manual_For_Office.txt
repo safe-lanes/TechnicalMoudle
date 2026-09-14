@@ -1,0 +1,113 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+===== Technical - PMS User Manual For Office · parse page_number=47 (array index 46) =====
+  [page_number] 47
+  [header] TECHNICAL USER MANUAL
+  [footer] Revision No. 02 / Date: 08 June 2026 Page 47 of 64
+  [success] True
+--- md ---
+## 1.1.7.7 HOW TO APPLY FILTER
+
+* Click on the 'Spares' sub – sub module, and the system will open the 'Inventory' tab by default. (Ref Figure 80)
+
+* The user can select the Vessel, search for parts/components, and apply filters such as Criticality, Rotation Item, and Stock to refine the displayed records. (Ref Figure 80)
+
+Screenshot of Spares Inventory interface showing how to apply filters. Annotation 1 points to the Spares sub-sub module in the sidebar. Annotation 2 points to the vessel, search, and filter dropdowns at the top of the inventory list.
+
+Figure 80
+
+☞ **Location tab** – View spares organized by their physical storage location.
+
+☞ **History tab** – View the complete transaction history for all spares.
+
+## 1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK
+
+* Click on the 'Spares' sub – sub module. (Ref Figure 81)
+
+* Click on the 'Bulk Update Spares' button to update multiple spares at once. (Ref Figure 81)
+
+Screenshot of Spares Inventory interface showing the bulk update feature. Annotation 1 points to the Spares sub-sub module in the sidebar. Annotation 2 points to the 'Bulk Update Spares' button at the top right of the inventory list.
+
+Figure 81
+
+===== Technical - PMS User Manual For Office · parse page_number=49 (array index 48) =====
+  [page_number] 49
+  [footer] Revision No. 02 / Date: 08 June 2026
+
+Page 49 of 64
+49
+  [success] True
+--- md ---
+# TECHNICAL USER MANUAL
+
+# 1.1.8 STORES
+
+## Introduction
+
+* The Stores module manages consumable inventory: general stores, lubricating oils (lubes), chemicals, and other on-board consumables. It is distinct from Spares — stores items that are not component-specific and are consumed through day-to-day operations rather than specific maintenance jobs.
+
+## 1.1.8.1 HOW TO ACCESS THE STORE
+
+* Click the ‘Store’ sub-sub-module to manage consumable items; the default landing page is ‘Stores Inventory’. (Ref Figure 84)
+
+* Choose the required category (Stores, Lubes, Chemicals, or Others), then select ‘Inventory, Location, or History’ to view the information. (Ref Figure 84)
+
+* In the Actions column of the table, click the ‘i’ icon to view the item details, the ‘Edit’ icon to modify the record details, and the ‘Bin’ icon to delete the record. (Ref Figure 84)
+
+Screenshot of the Stores Inventory interface showing the navigation to the Store sub-module, category selection, and action icons for viewing, editing, and deleting records.
+
+<a id="figure-84"></a>
+Figure 84
+
+☞ Items are **categorized** as Stores, Lubes, Chemicals, and Others.
+
+* **Lubes:** Displays lubricants and oils only.
+
+* **Chemicals:** Displays onboard chemicals with fields such as Hazard Classification, UN Number, and Flash Point.
+
+* **Others:** Displays miscellaneous items outside the defined categories.
+
+☞ **View Modes** – Inventory, Location, History.
+
+## 1.1.8.2 HOW TO APPLY FILTER
+
+* Refer to the ‘Spares’ sub-sub-module for the filter process and apply the same steps.
+
+===== Technical - PMS User Manual For Office · parse page_number=24 (array index 23) =====
+  [page_number] 24
+  [header] TECHNICAL USER MANUAL
+  [footer] Revision No. 02 / Date: 08 June 2026 Page 24 of 64
+  [success] True
+--- md ---
+## 1.1.4.3 HOW TO ADD COMPONENTS
+
+* Select the required vessel from the 'Vessel' dropdown. (Ref Figure 34)
+
+* Click on the 'Add Component' button. (Ref Figure 34)
+
+Screenshot of the Components screen showing the vessel selection dropdown and the Add Component button. Annotated with: 1. Click here to select the vessel. 2. Click here to add a new component.
+
+<a id="figure-34"></a>
+Figure 34
+
+* The screen below appears after clicking the 'Add Component' button. (Ref Figure 35)
+
+* After entering the required details, click the 'Save' button to save the component information. (Ref Figure 35)
+
+* Click on the 'Submit' button to add a component to the components panel. (Ref Figure 35)
+
+Screenshot of the Component Register - Add Component screen showing the Save and Submit buttons. Annotated with: 1. Click here to save the component information. 2. Click here to submit the record. A red note box states: Note: A new component can also be added by clicking the '+ Add Component' button.
+
+<a id="figure-35"></a>
+Figure 35
+
+☞ All mandatory fields must be completed before the record can be saved or submitted.
+
+PDF: ['C:/tmp/trag/documents\\Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf', 'D:/manuals/SAIL - User Manuals\\Technical module\\Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf']
+pdf pages: 64
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_PMS_User_M_p47_idx47.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 08 June 2026  |   | Page 47 of 64  |   |   | 1.1.7.7 HOW TO APPLY FILTER  |   | Click on t
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_PMS_User_M_p47_idx48.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 08 June 2026  |   | Page 48 of 64  |   |   |   | The screen below appears after clicking t
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_PMS_User_M_p49_idx49.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 08 June 2026  |   | Page 49 of 64  |   |   | 1.1.8 STORES  | Introduction  |   | The Store
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_PMS_User_M_p49_idx50.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 08 June 2026  |   | Page 50 of 64  |   |   | 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A 
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_PMS_User_M_p24_idx24.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 08 June 2026  |   | Page 24 of 64  |   |   | 1.1.4.3 HOW TO ADD COMPONENTS   |   | Select 
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Technical_-_PMS_User_M_p24_idx25.png  text-head: TECHNICAL USER MANUAL  |   |   |   |   |   | Revision No. 02 / Date: 08 June 2026  |   | Page 25 of 64  |   |   | 1.1.4.4 HOW TO EDIT COMPONENTS  |   | Select 

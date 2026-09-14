@@ -1,0 +1,18 @@
+{
+ "file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf",
+ "sha256": "35a2d511a21a42638d47bc232cd3f53d62874fb1853100a92635e1e15abf6e88",
+ "source_copy": "D:/manuals/SAIL - User Manuals/Audit module/Preparation Manual_Office_R1_30.06.2026.pdf",
+ "source_date": "D:\\manuals, hashes identical to the ingested copies (verified 2026-09-14)",
+ "repair_version": "2026-09-14.1",
+ "method": "vision transcription: the source page rendered at 200 dpi (PyMuPDF) and the screenshot callouts read by Claude Fable 5.1; every label re-checked against the render before saving. Not OCR; not from the LlamaParse output.",
+ "verified_on": "2026-09-14",
+ "entries": [
+  {
+   "page": 15,
+   "figure": "Figure 20",
+   "section": "3. Method 1 — Inspector Observation Data (checklist observations view)",
+   "what_the_parse_missed": "the eight instruction callouts drawn on the Figure 20 screenshot; the saved agentic parse reduced them to 'screenshot: Inspector Observation Data interface with callouts explaining various features like filters, grouping, and saving.'",
+   "text": "Figure 20 callouts (Inspector Observation Data screen):\n* The header shows the Inspector name, the 'Due Date to Complete' and the Office 'Instructions to Vessel'.\n* Use the available filters (Compliance, Applicable To, Source, Type, Status) to refine the displayed observations; 'Clear' resets them.\n* Click the Excel icon at the top right of the toolbar to export the data.\n* Observations are grouped by Question No. / Ref no.\n* Use the column filters to narrow down the displayed records.\n* Click the counters (Total Observations / Pending / Verified) to display Verified or Pending observations.\n* Enter vessel comments in the 'Vessel Comments' column and select the applicable compliance status (Yes / No).\n* Click 'Save' to save the updates ('Cancel' discards them)."
+  }
+ ]
+}

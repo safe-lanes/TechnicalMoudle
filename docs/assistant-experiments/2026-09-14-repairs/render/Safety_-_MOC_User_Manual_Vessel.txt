@@ -1,0 +1,31 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+===== Safety - MOC User Manual_Vessel · parse page_number=9 (array index 8) =====
+  [page_number] 9
+  [footer] Revision No. 00 / Date: 31.03.2026 Page 9 of 15
+  [success] True
+--- md ---
+# MOC USER MANUAL
+
+* To add any additional **Implication**, click on the **"+Add Implication"** icon.
+
+* Proceed to **Section C3 – Risk Assessment**, where you can either upload an existing RA file using the **Upload** icon or link/create a new RA using the **Link** icon.
+
+* After clicking the Link icon, it will re-direct you to the Vessel Risk Assesment page. (See Figure 9)
+
+☞ **Note:** Any additional implication can be deleted using the **Delete** icon.
+All actions linked to that implication will also be deleted.
+After deletion, review the **Part E – Action table** to ensure data consistency.
+
+☞ **Note:** After selecting the relevant **RA option**, the user will be redirected to the **VRA form**.
+Once the details are saved, the RA will be stored in the appropriate **RA sub-module**.
+Click the **Back** icon on the RA form to return to the MoC form.
+
+screenshot: MoC form interface showing Section C3 Risk Assessment and C4 Personnel affected, with callout boxes explaining the "+ ADD IMPLICATION" button, the "UPLOAD" button, and the link icon.
+
+<u>Figure 9</u>
+
+PDF: ['C:/tmp/trag/documents\\Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf', 'D:/manuals/SAIL - User Manuals\\Safety module\\MOC User Manual_Vessel_R0_31.03.2026.pdf']
+pdf pages: 15
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_MOC_User_Manu_p9_idx9.png  text-head: MOC USER MANUAL  |   |   |   |   |   | Revision No. 00 / Date: 31.03.2026  |   | Page 9 of 15  |   |   |  To add any additional Implication, click on the “+Add
+rendered C:\Users\GHAZIA~1\AppData\Local\Temp\claude\C--Users-GhaziAnwer-TechnicalMoudle\30fdf03a-3981-4021-81d2-f5384fe9e7b5\scratchpad\render\Safety_-_MOC_User_Manu_p9_idx10.png  text-head: MOC USER MANUAL  |   |   |   |   |   | Revision No. 00 / Date: 31.03.2026  |   | Page 10 of 15  |   |   |  Proceed to complete Section C4, C5 and C6 as appplic

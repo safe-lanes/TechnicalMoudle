@@ -5,8 +5,12 @@ unchanged). Additive metadata only — content and vectors are never touched.
 
 The sha is computed over the embedding input our indexer would produce for the chunk
 (EMBED_INPUT_VERSION metadata+text, or text only) and the model recorded in assistant_documents.
-For the `migrated` set (embedded by LlamaIndex) that input is the PROVEN metadata+text form, so a
-later rebuild that yields the identical chunk reuses the live vector verbatim.
+For sets embedded before this identity existed (`migrated`, embedded by LlamaIndex) the sha is
+DERIVED FROM A RECONSTRUCTED INPUT — it is not a verified record of the original embedding
+request (those requests were never captured). It is stamped as `embed_sha_source = "reconstructed"`
+so a later reader can tell it apart from identities written at embedding time ("recorded").
+Reuse still works as intended: a later rebuild that yields the identical chunk reuses the stored
+vector verbatim (proven: ag-reuse, 907/907, 0 embedding calls, identical retrieval distances).
 
   DATABASE_URL=... python indexer/backfill_embed_sha.py --index-set migrated [--embed-input meta] [--dry-run]
 """
@@ -52,6 +56,7 @@ async def main() -> int:
             model = models.get(r["file"]) or EMBED_MODEL_DEFAULT
             meta["embed_sha"] = embed_sha(input_for(meta, r["content"], a.embed_input), model)
             meta["embed_model"] = model
+            meta["embed_sha_source"] = "reconstructed"  # see module docstring
             if not a.dry_run:
                 await conn.execute("UPDATE assistant_chunks SET metadata=$1::jsonb WHERE index_set=$2 AND id=$3", json.dumps(meta), a.index_set, r["id"])
             done += 1

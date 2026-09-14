@@ -139,6 +139,19 @@ def test_resolves_appends_target_steps_and_reports_edges():
     assert "Choose the criteria" in out[12]
 
 
+def test_target_body_includes_its_continuation_on_the_next_page():
+    # Crewing 1.2.1.5: the section starts on one page, its last step is the first paragraph of the next page
+    pages = {
+        19: "## 1.2.1 IN-PROGRESS\n\n### 1.2.1.5 HOW TO EXPORT CREW DETAILS\n\n* Click on the 'In-Progress' sub-sub module.\n* Then, select the crew record by clicking the 'Edit' icon.",
+        20: "* The screen below appears after clicking the 'Edit' button.\n\n* Click the 'Export' button to download the crew form.",
+        22: "## 1.2.3 WAITLIST\n\n### 1.2.3.3 HOW TO EXPORT CREW DETAILS\n\n* Refer to the 'In-Progress' sub-sub-module for the export process and apply the same steps.",
+    }
+    out, rep = resolve_xrefs(pages)
+    assert rep.resolved == [("1.2.3.3 HOW TO EXPORT CREW DETAILS", "1.2.1.5 HOW TO EXPORT CREW DETAILS")]
+    assert "Click the 'Export' button to download the crew form." in out[22]
+    assert out[19] == pages[19] and out[20] == pages[20]  # continuation is copied, the source pages are untouched
+
+
 def test_cycle_is_unresolved_not_infinite():
     pages = {1: "## 1.1 ALPHA\n\n### 1.1.1 HOW TO FILTER\n\n* Refer to the 'Bravo' sub-module for the filter process.\n\n## 1.2 BRAVO\n\n### 1.2.1 HOW TO FILTER\n\n* Refer to the 'Alpha' sub-module for the filter process."}
     out, rep = resolve_xrefs(pages)

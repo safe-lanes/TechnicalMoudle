@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 
 # Resolver version — part of the build key and of every reproducibility record. Bump on ANY
 # change to the matching rules, the settings below or the label wording.
-XREF_VERSION = "2026-09-14.2"
+XREF_VERSION = "2026-09-14.4"  # .3: chained resolutions name the intermediate pointer(s); .4: target body includes its next-page continuation
 XREF_SETTINGS = {"title_match_min_ratio": 0.6, "max_chain_depth": 3, "process_words": "fallback",
                  "label": "(Cross-reference resolved: the steps for <parent › section> are the same as section <n> '<title>' under <parent>, page <p>. They are:)"}
 
@@ -79,10 +79,18 @@ class XrefReport:
 
 
 def sections_of(pages: dict[int, str]) -> list[Section]:
+    """Document-level heading tree. Text at the top of a page BEFORE its first heading (or a whole
+    page without headings) is the continuation of the previous page's last section — e.g. Crewing
+    1.2.1.5 'How to export crew details' starts on p19 and its final step ("Click the 'Export'
+    button…") is the first paragraph of p20. It is appended to that section's body (the body is
+    what a resolved cross-reference copies); start/end offsets stay on the heading's own page."""
     out: list[Section] = []
     for pn in sorted(pages):
         md = pages[pn]
         heads = list(HEADING_RE.finditer(md))
+        lead = md[:heads[0].start()].strip() if heads else md.strip()
+        if lead and out:
+            out[-1].body = (out[-1].body + "\n\n" + lead).strip()
         for i, h in enumerate(heads):
             start = h.start()
             body_start = h.end()
@@ -210,8 +218,11 @@ def resolve_xrefs(pages: dict[int, str], max_depth: int = 3) -> tuple[dict[int, 
         # target section + page), so an answer can say "for Stores, same as Spares (1.1.7.7, p.47)".
         here = _parent_title(sections, s)
         src = f"section {number_of(target.title)} '{title_words(target.title).title()}'" + (f" under {_parent_title(sections, target)}" if _parent_title(sections, target) else "") + (f", page {target.page}" if target.page else "")
+        via = ""
+        if len(chain) > 2:  # the manual's own chain of pointers, stated so the reader can verify it
+            via = " (reached via " + ", ".join(f"section {number_of(t)}" for t in chain[1:-1]) + ", which itself refers onward)"
         inserts[(s.page, s.end)] = (f"\n\n(Cross-reference resolved: the steps for {here + ' › ' if here else ''}{title_words(s.title).title()} "
-                                    f"are the same as {src}. They are:)\n{target.body}\n")
+                                    f"are the same as {src}{via}. They are:)\n{target.body}\n")
     out = dict(pages)
     for (pn, off), text in sorted(inserts.items(), key=lambda kv: (kv[0][0], -kv[0][1])):
         md = out[pn]
