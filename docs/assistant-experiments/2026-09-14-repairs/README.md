@@ -1,7 +1,12 @@
 # Assistant — source-backed evaluation and targeted extraction repairs (14-Sep-2026)
 
-Raw evidence behind `docs/CHATBOT-PYTHON-PORT-PLAN.md` §S.6. Deployment on hold; nothing public
-changed. No secrets (the configuration record lists environment key NAMES only).
+Raw evidence behind `docs/CHATBOT-PYTHON-PORT-PLAN.md` §S.6–§S.6.4. Deployment COMPLETED and
+accepted by the owner on 14-Sep-2026 (10:58 UTC): the shared endpoint `assistant.sl-sail.com` (and
+`viqmap.sl-sail.com/assistant/`) serves the run-D combination — image `sail-assistant-py:prompt-v2`,
+index set `repaired` (911 chunks), prompt v2 — with the old container and `migrated` index retained
+for rollback (§S.6.4). Separate follow-ups, not part of this closeout: case 05 routing (§S.6
+proposal), verification of the corrected-claims case 04 citation, and the generic "create a work
+order" question. No secrets (the configuration record lists environment key NAMES only).
 
 | file | what |
 |---|---|

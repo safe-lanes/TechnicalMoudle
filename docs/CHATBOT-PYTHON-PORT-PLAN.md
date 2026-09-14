@@ -503,9 +503,13 @@ the identity token format, nginx/TLS/URL, the masking design and its captured-pa
 standard, the 30-tool coverage priority. The stack is chosen *for* those, not instead of them.
 **Nothing merges to replit_dev; the module-side Data API (Node, inside Technical) is unaffected.**
 
-The permanent name `assistant.sl-sail.com` (A record → 13.250.51.71) is still owner-pending;
-the interim `https://viqmap.sl-sail.com/assistant` stands and the port keeps that URL working
-throughout (§P4).
+The permanent name `assistant.sl-sail.com` (A record → 13.250.51.71, created by the owner
+11-Sep-2026) is the approved shared endpoint for all tenants — one URL, tenant taken from the
+signed identity (owner confirmation 14-Sep-2026); since 14-Sep 10:58 UTC it serves the deployed
+combination of §S.6.4. The interim `https://viqmap.sl-sail.com/assistant` still works and points
+at the same container (§P4). Open follow-ups, kept separate from the deployment: case 05 routing
+(§S.6 proposal, not implemented), verification of the corrected-claims case 04 citation against
+its supporting text, and the generic "How do I create a work order?" answer (§S.6.4 observation).
 
 ---
 
