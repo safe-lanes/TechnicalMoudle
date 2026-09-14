@@ -19,6 +19,10 @@ function defectActor(req: Request): DefectActor {
 /** Gate refusals (403 Master-only / engine not-your-turn, 409 pending) must surface with
  *  their own status + message, not collapse into a generic 500. */
 function sendDefectError(res: Response, error: any, fallback: string) {
+  if (error?.statusCode === 503) {
+    console.error(fallback, error);
+    return res.status(503).json({ error: error.message, code: error.code });
+  }
   if (error?.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
     return res.status(error.statusCode).json({ error: error.message, code: error.code });
   }
@@ -44,6 +48,10 @@ const approvalRoutingQuerySchema = z.object({
   if (value.action === 'extension' && !value.newTargetDate) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['newTargetDate'], message: 'newTargetDate is required for extension routing' });
   }
+});
+
+const approvalChainQuerySchema = z.object({
+  action: z.enum(['extension', 'verification']),
 });
 
 // ── GET /defects ──
@@ -234,6 +242,22 @@ export async function getDefectApprovalRouting(req: Request, res: Response) {
     });
   } catch (error: any) {
     return sendDefectError(res, error, 'Failed to resolve defect approval routing');
+  }
+}
+
+export async function getDefectApprovalChain(req: Request, res: Response) {
+  try {
+    const query = approvalChainQuerySchema.parse(req.query);
+    const identity = getRbacIdentity(req as AuthenticatedRequest);
+    const result = await defectsService.getDefectApprovalChain(
+      req.params.id,
+      query.action,
+      (req as any).user?.userUuid ?? null,
+      identity.role,
+    );
+    res.json(result);
+  } catch (error: any) {
+    return sendDefectError(res, error, 'Failed to fetch defect approval chain');
   }
 }
 

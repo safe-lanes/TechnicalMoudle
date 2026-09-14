@@ -73,6 +73,13 @@ router.get('/defects/:id/approval-routing',
   requireVesselAccess,
   asyncHandler(defectsCtrl.getDefectApprovalRouting));
 
+// GET /defects/:id/approval-chain?action=extension|verification — read-only chain progress
+router.get('/defects/:id/approval-chain',
+  asyncHandler(defectsCtrl.loadDefectVesselAccess),
+  asyncHandler(defectsCtrl.enforceDefectVesselIdentity),
+  requireVesselAccess,
+  asyncHandler(defectsCtrl.getDefectApprovalChain));
+
 // GET    /defects/:id — get single defect
 router.get('/defects/:id', asyncHandler(defectsCtrl.getDefect));
 

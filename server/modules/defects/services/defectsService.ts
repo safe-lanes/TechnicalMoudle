@@ -2,6 +2,15 @@ import * as defectsRepo from '../repositories/defectsRepository';
 import { insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema } from '@shared/schema';
 import { generateDefectNumber } from '../../../utils/defectNumbering';
 import { storage } from '../../../storage';
+import {
+  DEFECTS_EXTENSION_SCREEN, DEFECTS_REPEAT_EXTENSION_SCREEN, DEFECTS_VERIFICATION_SCREEN,
+  classifyDefect, deciderIdentity,
+} from '../approvalCard';
+import {
+  activeWorkflowScoped, approvalActorCanDecide, approvalRequestsInScopes,
+  isApprovalEngineAvailable, scopeFor,
+} from '../../approvals/engineGateway';
+import type { RequestRow, RequestSlotRow, StoredWorkflow } from '../../approval-engine';
 
 // ── Core Defects ──
 
@@ -70,6 +79,177 @@ export async function getDefectApprovalRouting(
 ) {
   const { resolveDefectApprovalRouting } = await import('./defectsApprovalHooks');
   return resolveDefectApprovalRouting(id, action, newTargetDate, actorUserId, { auditFallback: false });
+}
+
+export type DefectApprovalChainAction = 'extension' | 'verification';
+
+type DefectApprovalChain = {
+  hasActiveWorkflow: boolean;
+  scope: string;
+  classification: string;
+  requestStatus: 'pending' | 'approved' | 'returned' | 'none';
+  requestUuid: string | null;
+  currentStepKey: string | null;
+  steps: Array<{
+    nodeKey: string;
+    label: string;
+    ordinal: number;
+    quorumRule: string;
+    status: 'pending' | 'active' | 'approved' | 'rejected' | 'skipped';
+    slots: Array<{
+      slotId: string;
+      roleLabel: string;
+      status: 'pending' | 'active' | 'approved' | 'rejected' | 'skipped';
+      decidedByName: string | null;
+      decidedByPosition: string | null;
+      decidedAt: string | null;
+      remarks: string | null;
+    }>;
+  }>;
+  currentUserCanDecide: boolean;
+  currentUserSlotId: string | null;
+};
+
+const requestDateForExtension = (defect: any): string | null => {
+  const entries = Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : [];
+  const requested = entries.find((entry: any) => entry?.status === 'Requested');
+  return requested?.newTargetDate ?? null;
+};
+
+const extensionScopeForDefect = (defect: any) => {
+  const entries = Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : [];
+  return entries.some((entry: any) => entry?.status === 'Approved')
+    ? scopeFor('defects', DEFECTS_REPEAT_EXTENSION_SCREEN)
+    : scopeFor('defects', DEFECTS_EXTENSION_SCREEN);
+};
+
+const slotViewStatus = (status: RequestSlotRow['status'] | undefined): DefectApprovalChain['steps'][number]['slots'][number]['status'] => {
+  if (status === 'superseded') return 'skipped';
+  return status ?? 'pending';
+};
+
+/**
+ * Read-only approval chain projection for Defects. Existing requests are selected from the
+ * engine's persisted request history first; only a subject with no request is routed through
+ * the same Stage 1 classification/scope resolver used by submission.
+ */
+export async function getDefectApprovalChain(
+  id: string,
+  action: DefectApprovalChainAction,
+  actorUserId?: string | null,
+  actorRole?: string | null,
+): Promise<DefectApprovalChain> {
+  const defect: any = await defectsRepo.getDefect(id);
+  if (!defect) throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
+  if (!isApprovalEngineAvailable()) {
+    throw Object.assign(new Error('Approval status is unavailable on this instance'), { statusCode: 503 });
+  }
+
+  const candidateScopes = action === 'verification'
+    ? [scopeFor('defects', DEFECTS_VERIFICATION_SCREEN)]
+    : [
+      scopeFor('defects', DEFECTS_EXTENSION_SCREEN),
+      scopeFor('defects', DEFECTS_REPEAT_EXTENSION_SCREEN),
+    ];
+  const requests = await approvalRequestsInScopes(candidateScopes, defect.duuid);
+  const sortedRequests = requests.slice().sort((a, b) =>
+    new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  // A pending request always wins over terminal history, even if a clock or scope causes
+  // submittedAt ordering to be surprising.
+  const request = sortedRequests.find((row) => row.status === 'pending') ?? sortedRequests[0] ?? null;
+
+  let classification: string;
+  let scope = candidateScopes[0];
+  let workflow: Pick<StoredWorkflow, 'nodes'> | null = null;
+  if (request) {
+    // The request snapshot is immutable and is authoritative for an existing chain.
+    classification = request.classification;
+    scope = request.scope;
+    workflow = request.snapshot;
+  } else {
+    const { resolveDefectApprovalRouting } = await import('./defectsApprovalHooks');
+    const extensionDate = action === 'extension' ? requestDateForExtension(defect) : null;
+    if (action === 'verification' || extensionDate) {
+      const routing = await resolveDefectApprovalRouting(id, action, extensionDate, actorUserId, { auditFallback: false });
+      classification = routing.classification;
+      scope = routing.scope;
+    } else {
+      // There is no extension request to supply a new date yet. Keep Stage 1's
+      // classification predicate authoritative, while selecting its initial/repeat scope.
+      classification = await classifyDefect(defect.duuid);
+      scope = extensionScopeForDefect(defect);
+    }
+    workflow = await activeWorkflowScoped(scope, classification);
+  }
+
+  const activeRequest = request?.status === 'pending' ? request : null;
+  const actorDecision = activeRequest
+    ? approvalActorCanDecide(activeRequest, actorUserId, actorRole)
+    : { canDecide: false, slotId: null };
+  const requestSlots = request?.slots ?? [];
+  const nodes = (workflow?.nodes ?? [])
+    .filter((node) => node.type === 'approval-step')
+    .slice()
+    .sort((a, b) => a.ordinal - b.ordinal);
+  const currentOrdinal = request?.currentNodeKey == null
+    ? null
+    : nodes.find((node) => node.key === request.currentNodeKey)?.ordinal ?? null;
+
+  const decidedByIds = Array.from(new Set(requestSlots.map((slot) => slot.decidedBy).filter((id): id is string => !!id)));
+  const identities = new Map<string, { name: string; roleLabel: string }>();
+  await Promise.all(decidedByIds.map(async (userUuid) => identities.set(userUuid, await deciderIdentity(userUuid))));
+
+  const steps = nodes.map((node) => {
+    const nodeSlots = requestSlots.filter((slot) => slot.nodeKey === node.key);
+    let status: DefectApprovalChain['steps'][number]['status'] = 'pending';
+    if (request) {
+      if (request.status === 'pending') {
+        if (request.currentNodeKey === node.key || nodeSlots.some((slot) => slot.status === 'active')) {
+          status = 'active';
+        } else if (nodeSlots.some((slot) => slot.status === 'approved') ||
+                   (currentOrdinal !== null && node.ordinal < currentOrdinal)) {
+          status = 'approved';
+        }
+      } else {
+        if (nodeSlots.some((slot) => slot.status === 'rejected')) status = 'rejected';
+        else if (nodeSlots.some((slot) => slot.status === 'approved')) status = 'approved';
+        else status = 'skipped';
+      }
+    }
+    const slots = (node.slots ?? []).map((slot, slotOrdinal) => {
+      const persisted = nodeSlots.find((candidate) => candidate.slotOrdinal === slotOrdinal);
+      const identity = persisted?.decidedBy ? identities.get(persisted.decidedBy) : undefined;
+      return {
+        slotId: `${node.key}:${slotOrdinal}`,
+        roleLabel: persisted?.roleLabel ?? slot.roleLabel,
+        status: slotViewStatus(persisted?.status),
+        decidedByName: identity?.name ?? null,
+        decidedByPosition: identity?.roleLabel ?? null,
+        decidedAt: persisted?.decidedAt ?? null,
+        remarks: persisted?.remarks ?? null,
+      };
+    });
+    return {
+      nodeKey: node.key,
+      label: node.label || node.key,
+      ordinal: node.ordinal,
+      quorumRule: node.quorum?.rule ?? 'all',
+      status,
+      slots,
+    };
+  });
+
+  return {
+    hasActiveWorkflow: !!workflow || !!request,
+    scope: scope.screenId,
+    classification,
+    requestStatus: request?.status ?? 'none',
+    requestUuid: request?.requuid ?? null,
+    currentStepKey: request?.currentNodeKey ?? null,
+    steps,
+    currentUserCanDecide: actorDecision.canDecide,
+    currentUserSlotId: actorDecision.slotId,
+  };
 }
 
 export async function hasActiveUserVesselAssignment(userUuid: string, vesselId: string) {

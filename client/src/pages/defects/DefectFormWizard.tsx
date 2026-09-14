@@ -23,16 +23,32 @@ import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
 import { FileAttachmentDialog, FileAttachment } from "@/components/FileAttachmentDialog";
 import { useVessels } from "@/hooks/useVessels";
-import { useExternalUsers } from "@/hooks/useExternalMasterData";
 import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
 import { defectSources, findSourceById } from "@/data/defectSources";
 import { getSireReferencesByVersion } from "@/data/sireReferences";
 import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
 import { VesselComponentCombobox, type VesselComponentSelection } from "@/components/VesselComponentCombobox";
-import { useAuth } from "@/contexts/AuthContext";
-import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { getActiveRank } from "@/lib/activeRank";
-import { useUIRole } from "@/contexts/UIRoleContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import {
+  ApprovalChainProgress,
+  defectApprovalChainQueryKey,
+  useDefectApprovalChain,
+  type DefectApprovalChain,
+} from "@/components/approvals/ApprovalChainProgress";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  approvalDecisionApplyError,
+  resolveDefectApprovalPresentation,
+  resolveVerificationDisplay,
+} from "./defectApprovalPresentation";
 
 const defectFormSchema = insertDefectSchema.extend({
   critical: z.boolean().optional(),
@@ -44,6 +60,156 @@ const defectFormSchema = insertDefectSchema.extend({
 });
 
 type DefectFormData = z.infer<typeof defectFormSchema>;
+
+const decisionSchema = z.object({
+  decision: z.enum(["approve", "reject"], { required_error: "Choose Approve or Reject." }),
+  remarks: z.string().optional(),
+}).superRefine((value, context) => {
+  if (value.decision === "reject" && !value.remarks?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["remarks"], message: "A rejection comment is required." });
+  }
+});
+type DecisionFormData = z.infer<typeof decisionSchema>;
+
+function ApprovalDecisionPanel({
+  chain,
+  defectId,
+  action,
+  canEdit,
+  onDecided,
+}: {
+  chain: DefectApprovalChain;
+  defectId: string | number;
+  action: "extension" | "verification";
+  canEdit: boolean;
+  onDecided: () => void;
+}) {
+  const decisionForm = useForm<DecisionFormData>({
+    resolver: zodResolver(decisionSchema),
+    defaultValues: { decision: undefined, remarks: "" },
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  const submitDecision = async (values: DecisionFormData) => {
+    if (!chain.requestUuid) return;
+    setIsSubmitting(true);
+    try {
+      const response = await apiRequest("POST", `/technical/api/approval-engine/requests/${encodeURIComponent(chain.requestUuid)}/decide`, {
+        decision: values.decision,
+        remarks: values.remarks?.trim() || undefined,
+      });
+      const result = await response.json().catch(() => ({}));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: defectApprovalChainQueryKey(defectId, action) }),
+        queryClient.invalidateQueries({ queryKey: ["defects"] }),
+        queryClient.invalidateQueries({ queryKey: ["/technical/api/defects"] }),
+      ]);
+      onDecided();
+      const applyError = approvalDecisionApplyError(result);
+      if (applyError) {
+        toast({
+          title: "Approval recorded, but the defect was not updated",
+          description: `${applyError} Retry the defect update or contact your administrator.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: values.decision === "approve" ? "Approval recorded" : "Request rejected" });
+    } catch (error) {
+      toast({ title: "Could not record approval decision", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!canEdit || !chain.currentUserCanDecide || !chain.requestUuid || String(chain.requestStatus).toLowerCase() !== "pending") return null;
+  return (
+    <Form {...decisionForm}>
+      <form className="mt-3 space-y-3 rounded border border-blue-200 bg-blue-50/40 p-3" data-testid={`approval-decision-${action}`} onSubmit={(event) => event.preventDefault()}>
+        <FormField
+          control={decisionForm.control}
+          name="remarks"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Remarks {decisionForm.watch("decision") === "reject" ? "(required for rejection)" : "(optional)"}</FormLabel>
+              <FormControl>
+                <Textarea {...field} placeholder="Add remarks for this decision..." className="min-h-[64px] bg-white" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="flex gap-2 justify-end">
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isSubmitting}
+            onClick={() => {
+              decisionForm.setValue("decision", "reject", { shouldValidate: true });
+              void decisionForm.handleSubmit(submitDecision)();
+            }}
+            data-testid={`button-reject-${action}`}
+          >
+            Reject
+          </Button>
+          <Button
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => {
+              decisionForm.setValue("decision", "approve", { shouldValidate: true });
+              void decisionForm.handleSubmit(submitDecision)();
+            }}
+            data-testid={`button-approve-${action}`}
+          >
+            Approve
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}
+
+export function DefectApprovalStatus({
+  action,
+  defectId,
+  approval,
+  canEdit,
+}: {
+  action: "extension" | "verification";
+  defectId: string | number | null;
+  approval: ReturnType<typeof useDefectApprovalChain>;
+  canEdit: boolean;
+}) {
+  const actionLabel = action === "extension" ? "Defect Target Date Extension" : "Defect Verification";
+  const presentation = resolveDefectApprovalPresentation(approval, canEdit);
+  if (presentation.state === "idle") return null;
+  if (presentation.state === "loading") {
+    return <div className="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600" data-testid={`approval-status-loading-${action}`}>Loading approval status...</div>;
+  }
+  if (presentation.state === "error") {
+    return (
+      <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700" data-testid={`approval-status-error-${action}`}>
+        <div>{presentation.message}</div>
+        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void approval.refetch()} data-testid={`button-retry-approval-${action}`}>Retry</Button>
+      </div>
+    );
+  }
+  const chain = approval.data;
+  if (presentation.state === "no-workflow") {
+    return (
+      <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" data-testid={`approval-status-no-workflow-${action}`}>
+        No approval workflow is configured for {actionLabel}{chain?.classification ? ` (${chain.classification})` : ""}. Contact your administrator.
+      </div>
+    );
+  }
+  if (!chain) return null;
+  return (
+    <>
+      <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} />
+      {presentation.showDecisionControls && defectId !== null && <ApprovalDecisionPanel chain={chain} defectId={defectId} action={action} canEdit={canEdit} onDecided={() => void approval.refetch()} />}
+    </>
+  );
+}
 
 interface Action {
   id: string;
@@ -75,12 +241,7 @@ export default function DefectFormWizard({
 }: DefectFormWizardProps = {}) {
   console.log('[DefectFormWizard] Rendering with mode:', mode, 'defect:', defect?.id);
   const { toast } = useToast();
-  const { currentUser } = useAuth();
-  const { isSailAdmin, isClientAdmin, isTechSuperintendent } = useUIRole();
-  // Approval workflow (03-Sep-2026): extension approvals are decided ASHORE — on ship the
-  // B5 "Approved?" controls are not rendered (submit-only; product-approved deviation).
-  // Part C1 Closeout is a Master-only action, mirrored client-side (server enforces too).
-  const { isShore } = useSyncInstanceInfo();
+  const { canEdit } = usePermissions();
   const isMasterRank = (getActiveRank() || '').trim() === 'Master';
   const { data: vessels = [] } = useVessels();
   
@@ -125,43 +286,20 @@ export default function DefectFormWizard({
     existingTargetDate: string;
     newTargetDate: string;
     reasonForExtension: string;
-    submitForApprovalTo: string;
-    submitForApprovalToName: string;
+    submitForApprovalTo?: string;
+    submitForApprovalToName?: string;
     status: 'Requested' | 'Approved' | 'Rejected';
     approved?: boolean;
-    approvalDate: string;
-    approverComments: string;
+    approvalDate?: string;
+    approverComments?: string;
     electronicConfirmation?: string;
     requestedAt: string;
   }>>([]);
   const [currentExtension, setCurrentExtension] = useState({
     newTargetDate: '',
     reasonForExtension: '',
-    submitForApprovalTo: '',
-    approved: undefined as boolean | undefined,
-    approvalDate: '',
-    approverComments: ''
   });
   const [isSubmittingExtension, setIsSubmittingExtension] = useState(false);
-  
-  // Fetch office users for approval dropdown from Admin > Masters > Users
-  const { data: externalUsersData = [] } = useExternalUsers();
-  
-  // Filter for Office users and map to display format (User Name - Designation)
-  const officeUsers = externalUsersData.filter((user: any) => {
-    const userType = user.user_type || user.userType || user.type || '';
-    return userType.toLowerCase() === 'office';
-  }).map((user: any) => {
-    const fullName = user.fullname || user.userName || user.name || user.username || user.full_name || '';
-    const designation = user.designation || user.position || user.title || user.job_title || '';
-    const uuid = user.uuid || user.id || user.userId || '';
-    return {
-      id: uuid,
-      fullName: fullName,
-      designation: designation,
-      displayName: designation ? `${fullName} - ${designation}` : fullName
-    };
-  });
   
   // Section refs for scroll tracking
   const partARef = useRef<HTMLDivElement>(null);
@@ -189,6 +327,14 @@ export default function DefectFormWizard({
   });
   
   const currentDefect = defect || fetchedDefect;
+  const approvalDefectId = currentDefect?.id ?? params.id ?? createdDefectId ?? null;
+  const extensionApproval = useDefectApprovalChain(approvalDefectId, "extension");
+  const verificationApproval = useDefectApprovalChain(approvalDefectId, "verification");
+  const canEditDefect = canEdit("defects-active");
+  const verificationDisplay = resolveVerificationDisplay(
+    verificationApproval.data?.requestStatus,
+    currentDefect,
+  );
   
   // Compute the correct is_coc default: use existing defect value if available, otherwise use isCoc prop for new defects
   const defaultIsCoc = currentDefect?.is_coc ?? isCoc;
@@ -268,16 +414,13 @@ export default function DefectFormWizard({
       if (currentDefect.targetDateExtensions && Array.isArray(currentDefect.targetDateExtensions)) {
         setTargetDateExtensions(currentDefect.targetDateExtensions);
         
-        // Restore currentExtension display fields from the last saved extension
+        // Restore only the editable request fields; approver/decision fields are
+        // owned by the approval workflow and are never manually edited here.
         if (currentDefect.targetDateExtensions.length > 0) {
           const lastExt = currentDefect.targetDateExtensions[currentDefect.targetDateExtensions.length - 1];
           setCurrentExtension({
             newTargetDate: lastExt.newTargetDate || '',
             reasonForExtension: lastExt.reasonForExtension || '',
-            submitForApprovalTo: lastExt.submitForApprovalTo || '',
-            approved: lastExt.approved,
-            approvalDate: lastExt.approvalDate || '',
-            approverComments: lastExt.approverComments || ''
           });
         }
       }
@@ -353,50 +496,12 @@ export default function DefectFormWizard({
       return false;
     }
 
-    // Part B5 (Target Date Extension) dirty-state guard:
-    // If the user typed into the B5 form (currentExtension) but did NOT click
-    // the section-level Submit (which is what pushes the entry into
-    // targetDateExtensions), block the save and explain what to do. Comparing
-    // against the last committed extension avoids false positives in edit mode,
-    // where currentExtension is prefilled from the latest saved extension.
-    // Use the same extensions source that will actually be persisted so that
-    // when the B5 section-Submit calls saveDefect(..., updatedExtensions)
-    // right after setTargetDateExtensions (state still stale), the guard
-    // sees the just-added entry and matchesLast becomes true.
     const effectiveExtensions = extensionsOverride ?? targetDateExtensions;
     const lastExt = effectiveExtensions[effectiveExtensions.length - 1];
-    // Detect any B5 field touch (mandatory OR auxiliary). If the user filled
-    // only auxiliary fields (approver, approved, approval date, approver
-    // comments) and left the two mandatory ones empty, the guard must still
-    // fire so we don't silently drop their input with a false "submitted
-    // successfully" toast. `approved` is tri-state — undefined means
-    // untouched; both true and false count as touched.
-    //
-    // Also treat the case where the user clicked "+ Extend Target Date" to
-    // open the extension form but didn't type anything yet as touched, so
-    // long as no prior extension is committed. Opening the form is itself a
-    // declaration of intent to add an extension; the red-`*` mandatories
-    // must be enforced. In edit mode the form is rendered automatically
-    // whenever `targetDateExtensions.length > 0`, so we exclude that case to
-    // avoid a false-positive block on every Submit/SAVE of a defect that
-    // already has a saved extension (the `matchesLast` short-circuit below
-    // handles that path).
-    const b5Touched = !!(
-      currentExtension.newTargetDate ||
-      currentExtension.reasonForExtension?.trim() ||
-      currentExtension.submitForApprovalTo ||
-      currentExtension.approved !== undefined ||
-      currentExtension.approvalDate ||
-      currentExtension.approverComments?.trim() ||
-      (showExtensionForm && effectiveExtensions.length === 0)
-    );
+    const b5Touched = !!(currentExtension.newTargetDate || currentExtension.reasonForExtension?.trim() || (showExtensionForm && effectiveExtensions.length === 0));
     const matchesLast = !!lastExt &&
       (lastExt.newTargetDate || '') === (currentExtension.newTargetDate || '') &&
-      (lastExt.reasonForExtension || '') === (currentExtension.reasonForExtension || '') &&
-      (lastExt.submitForApprovalTo || '') === (currentExtension.submitForApprovalTo || '') &&
-      (lastExt.approved ?? null) === (currentExtension.approved ?? null) &&
-      (lastExt.approvalDate || '') === (currentExtension.approvalDate || '') &&
-      (lastExt.approverComments || '') === (currentExtension.approverComments || '');
+      (lastExt.reasonForExtension || '') === (currentExtension.reasonForExtension || '');
     if (b5Touched && !matchesLast) {
       const missingB5: string[] = [];
       if (!currentExtension.newTargetDate) missingB5.push('New Target Date');
@@ -443,47 +548,6 @@ export default function DefectFormWizard({
       toast({
         title: "Part C incomplete",
         description: `Once started, all Part C fields are required: ${missingPartC.join(', ')}`,
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    // Part D (C2. Verification) validation: can only be filled if Part C is complete
-    const partDFields = {
-      verified: data.verified || false,
-      dateVerified: data.dateVerified?.trim() || '',
-      verifiedByName: data.verifiedByName?.trim() || '',
-      verifiedByOfficePosition: data.verifiedByOfficePosition?.trim() || '',
-    };
-    
-    const partDFilled = Object.values(partDFields).some(val => 
-      typeof val === 'boolean' ? val : val !== ''
-    );
-
-    const partDComplete = partDFields.verified
-      && partDFields.dateVerified !== ''
-      && partDFields.verifiedByName !== ''
-      && partDFields.verifiedByOfficePosition !== '';
-
-    if (partDFilled && !partCComplete) {
-      toast({
-        title: "Part D cannot be saved",
-        description: "Part C (Closeout) must be fully completed before filling Part D (Verification)",
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    if (partDFilled && !partDComplete) {
-      const missingPartD: string[] = [];
-      if (!partDFields.verified) missingPartD.push('Verified');
-      if (!partDFields.dateVerified) missingPartD.push('Date Verified');
-      if (!partDFields.verifiedByName) missingPartD.push('Verified By (Name)');
-      if (!partDFields.verifiedByOfficePosition) missingPartD.push('Verified By (Office Position)');
-
-      toast({
-        title: "Part C2 incomplete",
-        description: `Once started, all C2 Verification fields are required: ${missingPartD.join(', ')}`,
         variant: "destructive"
       });
       return false;
@@ -614,40 +678,6 @@ export default function DefectFormWizard({
 
   const toggleViewMode = () => {
     setIsViewMode(!isViewMode);
-  };
-
-  // Roles permitted to verify defects (must match DefectsLogWithTabs canVerify)
-  const canVerify = isSailAdmin || isClientAdmin || isTechSuperintendent;
-
-  // C2 Verification auto-fill handler for Office, PMS Admin, Sail Admin, Client Admin, and Superintendent users
-  const handleVerifiedChange = (checked: boolean | "indeterminate", fieldOnChange: (value: boolean) => void) => {
-    const isChecked = checked === true;
-    fieldOnChange(isChecked);
-    
-    console.log('[C2 Auto-fill] Checkbox changed:', { 
-      checked: isChecked, 
-      userRole: currentUser?.role, 
-      userName: currentUser?.fullName,
-      crewDesignation: currentUser?.crewDesignation 
-    });
-    
-    // Auto-fill for Sail Admin, Client Admin, and Superintendent users when checkbox is checked
-    const canAutoFill = isSailAdmin || isClientAdmin || isTechSuperintendent;
-    if (isChecked && canAutoFill) {
-      const today = new Date().toISOString().split('T')[0];
-      console.log('[C2 Auto-fill] Applying auto-fill values:', { 
-        dateVerified: today, 
-        verifiedByName: currentUser?.fullName, 
-        verifiedByOfficePosition: currentUser?.crewDesignation || currentUser?.role
-      });
-      
-      form.setValue('dateVerified', today);
-      if (currentUser?.fullName) {
-        form.setValue('verifiedByName', currentUser.fullName);
-      }
-      // Use crewDesignation if available, otherwise fall back to role
-      form.setValue('verifiedByOfficePosition', currentUser?.crewDesignation || currentUser?.role || '');
-    }
   };
 
   const handleClose = async () => {
@@ -1788,6 +1818,12 @@ export default function DefectFormWizard({
                         </Button>
                       )}
                     </div>
+                    <DefectApprovalStatus
+                      action="extension"
+                      defectId={approvalDefectId}
+                      approval={extensionApproval}
+                      canEdit={canEditDefect && !isViewMode}
+                    />
 
                     {(showExtensionForm || targetDateExtensions.length > 0) && (
                       <div className="border border-amber-300 rounded-lg p-6 bg-amber-50/30 space-y-6">
@@ -1860,97 +1896,13 @@ export default function DefectFormWizard({
                               placeholder="Enter reason for extension..."
                             />
                           </div>
-                          <div className="flex flex-col">
-                            <label className="text-sm text-gray-600 mb-1.5">Submit for Approval to:</label>
-                            <Select
-                              value={currentExtension.submitForApprovalTo}
-                              onValueChange={(value) => setCurrentExtension(prev => ({ ...prev, submitForApprovalTo: value }))}
-                              disabled={isViewMode}
-                            >
-                              <SelectTrigger data-testid="select-approval-to" className="h-10 text-sm border-gray-300">
-                                <SelectValue placeholder="Select approver" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {officeUsers.map((user: any) => (
-                                  <SelectItem key={user.id} value={user.id.toString()}>
-                                    {user.displayName}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
                         </div>
 
-                        {/* Approval decision — decided ASHORE (03-Sep-2026): ship = submit-only (product-approved); server enforces regardless */}
-                        {isShore && (<>
-                        <div className="grid grid-cols-2 gap-6">
-                          <div className="flex items-center gap-6">
-                            <span className="text-sm text-gray-600">Approved?</span>
-                            <div className="flex items-center gap-4">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="approved"
-                                  checked={currentExtension.approved === true}
-                                  onChange={() => setCurrentExtension(prev => ({ ...prev, approved: true }))}
-                                  disabled={isViewMode}
-                                  className="w-4 h-4 text-blue-600"
-                                  data-testid="radio-approved-yes"
-                                />
-                                <span className="text-sm">Yes</span>
-                              </label>
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="approved"
-                                  checked={currentExtension.approved === false}
-                                  onChange={() => setCurrentExtension(prev => ({ ...prev, approved: false }))}
-                                  disabled={isViewMode}
-                                  className="w-4 h-4 text-blue-600"
-                                  data-testid="radio-approved-no"
-                                />
-                                <span className="text-sm">No</span>
-                              </label>
-                            </div>
+                        {targetDateExtensions[targetDateExtensions.length - 1]?.submitForApprovalToName && (
+                          <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="legacy-approver-warning">
+                            This entry recorded {targetDateExtensions[targetDateExtensions.length - 1].submitForApprovalToName} as the intended approver before an approval workflow was configured. It does not determine who approves this request. The configured workflow below is authoritative.
                           </div>
-                          <div className="flex flex-col">
-                            <label className="text-sm text-gray-600 mb-1.5">Approval Date</label>
-                            <Input 
-                              type="date"
-                              value={currentExtension.approvalDate}
-                              max={(() => {
-                                const today = new Date();
-                                return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                              })()}
-                              onChange={(e) => {
-                                const selectedDate = e.target.value;
-                                const today = new Date();
-                                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                                if (selectedDate && selectedDate > todayStr) {
-                                  toast({ title: "Approval Date cannot be in the future", variant: "destructive" });
-                                  return;
-                                }
-                                setCurrentExtension(prev => ({ ...prev, approvalDate: selectedDate }));
-                              }}
-                              disabled={isViewMode}
-                              data-testid="input-approval-date"
-                              className="h-10 text-sm border-gray-300"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col">
-                          <label className="text-sm text-gray-600 mb-1.5">Approver Comments (if any):</label>
-                          <Textarea 
-                            value={currentExtension.approverComments}
-                            onChange={(e) => setCurrentExtension(prev => ({ ...prev, approverComments: e.target.value }))}
-                            disabled={isViewMode}
-                            data-testid="input-approver-comments"
-                            className="text-sm border-gray-300 min-h-[60px]"
-                            placeholder="Enter approver comments..."
-                          />
-                        </div>
-                        </>)}
+                        )}
 
                         {targetDateExtensions.length > 0 && targetDateExtensions[targetDateExtensions.length - 1]?.electronicConfirmation && (
                           <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -2002,41 +1954,18 @@ export default function DefectFormWizard({
                                     return;
                                   }
                                   
-                                  // Validate Approval Date cannot be in the future
-                                  const todayLocal = new Date();
-                                  const todayStr = `${todayLocal.getFullYear()}-${String(todayLocal.getMonth() + 1).padStart(2, '0')}-${String(todayLocal.getDate()).padStart(2, '0')}`;
-                                  if (currentExtension.approvalDate && currentExtension.approvalDate > todayStr) {
-                                    toast({ title: "Approval Date cannot be in the future", variant: "destructive" });
-                                    return;
-                                  }
-                                  const approverUser = officeUsers.find((u: any) => u.id.toString() === currentExtension.submitForApprovalTo);
                                   const newExtension = {
                                     id: `EXT-${Date.now()}`,
                                     existingTargetDate,
                                     newTargetDate: currentExtension.newTargetDate,
                                     reasonForExtension: currentExtension.reasonForExtension,
-                                    submitForApprovalTo: currentExtension.submitForApprovalTo,
-                                    submitForApprovalToName: approverUser?.fullName || '',
-                                    // Ship = submit-only (03-Sep-2026): the decision is made ashore, so a ship
-                                    // submission is always 'Requested' (server enforces this regardless).
-                                    status: (isShore && currentExtension.approved === true ? 'Approved' : isShore && currentExtension.approved === false ? 'Rejected' : 'Requested') as 'Requested' | 'Approved' | 'Rejected',
-                                    approved: isShore ? currentExtension.approved : undefined,
-                                    approvalDate: isShore ? currentExtension.approvalDate : '',
-                                    approverComments: isShore ? currentExtension.approverComments : '',
-                                    electronicConfirmation: isShore && currentExtension.approved !== undefined
-                                      ? `Approved by System User on ${new Date().toLocaleDateString()}`
-                                      : undefined,
+                                    status: 'Requested' as const,
                                     requestedAt: new Date().toISOString(),
                                   };
                                   
                                   // Update the extensions array
                                   const updatedExtensions = [...targetDateExtensions, newExtension];
                                   setTargetDateExtensions(updatedExtensions);
-                                  
-                                  if (newExtension.status === 'Approved' && newExtension.newTargetDate) {
-                                    form.setValue('targetCloseDate', newExtension.newTargetDate);
-                                    form.setValue('isDeferred', true);
-                                  }
                                   
                                   // Don't clear currentExtension - keep the values visible in the form
                                   
@@ -2045,7 +1974,10 @@ export default function DefectFormWizard({
                                   const success = await saveDefect(formData, false, false, updatedExtensions);
                                   
                                   if (success) {
-                                    toast({ title: newExtension.status === 'Requested' ? "Extension request submitted and saved" : `Extension ${newExtension.status.toLowerCase()} and saved` });
+                                    if (approvalDefectId !== null) {
+                                      await queryClient.invalidateQueries({ queryKey: defectApprovalChainQueryKey(approvalDefectId, "extension") });
+                                    }
+                                    toast({ title: "Extension request submitted and saved" });
                                   } else {
                                     toast({ title: "Extension added but save failed. Please click SAVE.", variant: "destructive" });
                                   }
@@ -2185,75 +2117,26 @@ export default function DefectFormWizard({
                   {/* C2. Verification Section */}
                   <div className="space-y-6 pt-4">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C2. Verification</h3>
-                    
                     <div className="grid grid-cols-2 gap-6">
-                      <div className="flex items-center gap-3">
-                        <Controller
-                          name="verified"
-                          control={form.control}
-                          render={({ field }) => (
-                            <Checkbox
-                              id="verified"
-                              checked={field.value || false}
-                              onCheckedChange={(checked) => handleVerifiedChange(checked, field.onChange)}
-                              disabled={isViewMode || !canVerify}
-                              data-testid="checkbox-verified"
-                            />
-                          )}
-                        />
-                        <Label htmlFor="verified" className="text-sm text-gray-700">Verified</Label>
-                      </div>
                       <div className="flex flex-col">
                         <label className="text-sm text-gray-600 mb-1.5">Date Verified</label>
-                        <Input 
-                          {...form.register("dateVerified")} 
-                          type="date"
-                          data-testid="input-date-verified"
-                          className="h-10 text-sm border-gray-300"
-                          disabled={isViewMode}
-                        />
+                        <Input value={verificationDisplay.date ? String(verificationDisplay.date).slice(0, 10) : ""} readOnly data-testid="input-date-verified" className="h-10 text-sm border-gray-300 bg-gray-100" />
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-6">
                       <div className="flex flex-col">
                         <label className="text-sm text-gray-600 mb-1.5">Verified By (Name)</label>
-                        <Input 
-                          {...form.register("verifiedByName")} 
-                          data-testid="input-verified-by-name"
-                          className="h-10 text-sm border-gray-300"
-                          placeholder="Enter name"
-                          disabled={true}
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="text-sm text-gray-600 mb-1.5">Verified By (Office Position)</label>
-                        <Input 
-                          {...form.register("verifiedByOfficePosition")} 
-                          data-testid="input-verified-by-office-position"
-                          className="h-10 text-sm border-gray-300"
-                          placeholder="Enter office position"
-                          disabled={true}
-                        />
+                        <Input value={verificationDisplay.name} readOnly data-testid="input-verified-by-name" className="h-10 text-sm border-gray-300 bg-gray-100" />
                       </div>
                     </div>
-
-                    {/* Submit Button for C2 */}
-                    {!isViewMode && (
-                      <div className="flex justify-end pt-4">
-                        <Button
-                          type="button"
-                          onClick={async () => {
-                            const data = form.getValues();
-                            await saveDefect(data, true, false);
-                          }}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-6"
-                          data-testid="button-submit-c2"
-                        >
-                          Submit
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex flex-col">
+                      <label className="text-sm text-gray-600 mb-1.5">Verified By (Office Position)</label>
+                      <Input value={verificationDisplay.position} readOnly data-testid="input-verified-by-office-position" className="h-10 text-sm border-gray-300 bg-gray-100" />
+                    </div>
+                    <DefectApprovalStatus
+                      action="verification"
+                      defectId={approvalDefectId}
+                      approval={verificationApproval}
+                      canEdit={canEditDefect && !isViewMode}
+                    />
                   </div>
                 </div>
               </div>

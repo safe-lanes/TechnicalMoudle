@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getDefectApprovalRouting: vi.fn(),
+  getDefectApprovalChain: vi.fn(),
   updateDefectApprovalSettings: vi.fn(),
   getDefectApprovalSettings: vi.fn(),
   requireRole: vi.fn(() => (_req: any, _res: any, next: () => void) => next()),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../services/defectsService', () => ({
   getDefectApprovalRouting: mocks.getDefectApprovalRouting,
+  getDefectApprovalChain: mocks.getDefectApprovalChain,
   updateDefectApprovalSettings: mocks.updateDefectApprovalSettings,
   getDefectApprovalSettings: mocks.getDefectApprovalSettings,
   getDefect: vi.fn(),
@@ -19,6 +21,7 @@ vi.mock('../services/defectsService', () => ({
 
 import {
   enforceDefectVesselIdentity,
+  getDefectApprovalChain,
   getDefectApprovalRouting,
   updateDefectApprovalSettings,
 } from '../controllers/defectsController';
@@ -88,6 +91,56 @@ describe('Defects approval API controllers', () => {
     }));
   });
 
+  it('returns the read-only approval-chain projection and forwards the actor', async () => {
+    mocks.getDefectApprovalChain.mockResolvedValue({
+      hasActiveWorkflow: true,
+      scope: 'defects-verification',
+      classification: 'Normal',
+      requestStatus: 'pending',
+      requestUuid: 'request-1',
+      currentStepKey: 'verify',
+      steps: [],
+      currentUserCanDecide: true,
+      currentUserSlotId: 'verify:0',
+    });
+    const res = response();
+    await getDefectApprovalChain({
+      params: { id: 'DEF-1' },
+      query: { action: 'verification' },
+      rbac: { role: 'Vessel User', userType: 'Ship', source: 'forwarded' },
+      user: { userUuid: 'user-1' },
+    } as any, res);
+
+    expect(mocks.getDefectApprovalChain).toHaveBeenCalledWith(
+      'DEF-1', 'verification', 'user-1', 'Vessel User',
+    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      requestStatus: 'pending',
+      requestUuid: 'request-1',
+      currentUserCanDecide: true,
+    }));
+  });
+
+  it('preserves approval-engine unavailability as HTTP 503', async () => {
+    mocks.getDefectApprovalChain.mockRejectedValue(
+      Object.assign(new Error('Approval status is unavailable on this instance'), { statusCode: 503 }),
+    );
+    const res = response();
+
+    await getDefectApprovalChain({
+      params: { id: 'DEF-1' },
+      query: { action: 'extension' },
+      rbac: { role: 'Vessel User', userType: 'Ship', source: 'forwarded' },
+      user: { userUuid: 'user-1' },
+    } as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Approval status is unavailable on this instance',
+      code: undefined,
+    });
+  });
+
   it('uses forwarded RBAC and vessel assignments instead of the legacy mock role', async () => {
     mocks.hasActiveUserVesselAssignment.mockResolvedValue(false);
     const denied = response();
@@ -130,12 +183,16 @@ describe('Defects approval API route guards', () => {
       layer.route?.path === '/defects/approval-settings' && layer.route.methods.put);
     const diagnostic = stack.find((layer: any) =>
       layer.route?.path === '/defects/:id/approval-routing' && layer.route.methods.get);
+    const chain = stack.find((layer: any) =>
+      layer.route?.path === '/defects/:id/approval-chain' && layer.route.methods.get);
 
     expect(getSettings).toBeDefined();
     expect(putSettings).toBeDefined();
     expect(diagnostic).toBeDefined();
+    expect(chain).toBeDefined();
     expect(mocks.requireRole).toHaveBeenCalledTimes(2);
     expect(mocks.requireRole).toHaveBeenCalledWith(['PMS Admin', 'Sail Admin', 'Super Admin']);
     expect(diagnostic.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);
+    expect(chain.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);
   });
 });
