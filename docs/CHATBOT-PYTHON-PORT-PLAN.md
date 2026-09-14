@@ -117,6 +117,28 @@ strip inline HTML before chunking; re-run the same comparison; switch only on �
 manuals (e.g. Noon Report) index into `migrated` via `--only` with the current pipeline — the
 indexer path itself is proven end to end.
 
+**S.3 — Parser thread, 14-Sep-2026 (MEASURED; live set unchanged).** Facts that changed the
+plan: the 907 live chunks were parsed on THREE dates (2-Jul / 9-Sep / 10-Sep), not July; the
+API returns no parser version (`metadata.version` documented but ABSENT in 25/25 tested
+responses — evidence retained per parse, owner raising with support); **no tier is
+deterministic** — same file, same pinned version, one day apart: agentic 1/33 identical pages,
+cost_effective 3/33. The churn lives in screenshot-derived content (captions / OCR'd tables /
+callout graphs); once that is stripped the instruction text is ≈97 % word-stable (still not
+byte-stable). Built: content-checked pre-chunk cleanup with a per-block removal log
+(`indexer/clean_markdown.py`), cross-reference resolution (`xrefs.py`, 41/41), a durable
+**parse store** (`assistant_parses`, key = file sha256 + tier + requested version + output
+options, raw response retained; unchanged file+config ⇒ rebuild from the saved parse, parser
+never called), answer-level acceptance (`acceptance_answers.py`, 12 cases on callouts / tables /
+cross-refs / notes), stability by original page (`stability_report.py`). Third set `ce-clean`
+(cost_effective pinned 2026-08-19 + cleanup + xrefs) = 773 chunks.
+*Result:* 18-query retrieval migrated **18/18** · py-llamaparse 15/18 · ce-clean **16/18**;
+answer-level (12) answers 8 · 8 · **10**, citations 10 · 6 · 9. ce-clean answers the
+cross-referenced sections the live set cannot, but misses two retrieval cases (Incident vs Near
+Miss manual, Lesson Learnt) and its margins are thinner. **Bar (≥ 18/18) not met → the live set
+stays `migrated`.** The gains are attributable to cleanup + cross-refs, not to the tier.
+*Proposed next (needs owner GO):* `agentic-clean` — the live set's own cached parses + cleanup +
+cross-refs (zero parse cost), to isolate the cleanup effect on the 18/18 baseline.
+
 **What this does NOT change:** the module-side Data API (Node, in Technical), the HTTP contracts,
 the identity token format, nginx/TLS/URL, the masking design and its captured-payload proof
 standard, the 30-tool coverage priority. The stack is chosen *for* those, not instead of them.
