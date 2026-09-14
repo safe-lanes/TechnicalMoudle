@@ -40,10 +40,11 @@ docker run -d --name sail-assistant-py --restart unless-stopped --network techni
 ```
 `GET /health` reports `prompt` = `PROMPT_VERSION` (app/agent.py) + sha256 prefixes of the two
 answer prompts, so what is running is always verifiable; bump the label on any wording change.
-14-Sep-2026 state: live = 8015 (old prompt, image tagged `prompt-v1-rollback`); candidate
-`sail-assistant-py-v2` (`:prompt-v2`) on 8016, measured no better on the served index — see plan
-§S.5; owner to delete or promote.
-Port **8015**, not 8013/8014: `safelanes.conf` still carries stale `/maran/*` and `/osm/*`
+14-Sep-2026 state (deployed, owner-accepted): nginx → **8017** = `sail-assistant-py-cand`
+(`:prompt-v2`, `ASSISTANT_INDEX_SET=repaired`, 911 chunks, prompt v2) — plan §S.6.4. Rollback: the
+old `sail-assistant-py` (image tagged `prompt-v1-rollback`, index `migrated`) stays on 8015; copy
+the two nginx backups `*.bak-8015-20260914105757` back and reload.
+Ports 8015/8017, not 8013/8014: `safelanes.conf` still carries stale `/maran/*` and `/osm/*`
 locations pointing at 8013/8014 (the retired v1.5 chat bots) — binding there would put the
 assistant behind those dead public paths. The container runs `alembic upgrade head` then uvicorn. `sail-assistant-db` must be the
 `pgvector/pgvector:pg16` image (swapped 11-Sep-2026; the old alpine container is kept
