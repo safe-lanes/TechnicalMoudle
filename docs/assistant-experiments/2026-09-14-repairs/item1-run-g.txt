@@ -1,0 +1,36 @@
+===== RUN G: final R3.2 candidate (repaired-r32 @ sha 3d4a838ae015c06f build) — frozen 12 + corrected 14, 3 runs, candidate 8018 only (baseline = run D/E values for repaired) =====
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case             cand-8018
+   01 callout               ✓
+   02 callout               ✓
+   03 callout               ✓
+   04 table                 ✓
+   05 table                 ✗
+   06 table                 ✓
+   07 xref                  ✓
+   08 xref                  ✓
+   09 xref                  ✓
+   10 note                  ✓
+   11 note                  ✓
+   12 note                  ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   cand-8018      11/12  11/12  12/12  JOINT 11/12
+
+== per-case (answer ∧ citation), out of 14 ==
+   case     cand-8018
+   01               ✓
+   02               ✓
+   03               ✓
+   04               ✗
+   05               ✓
+   06               ✓
+   07               ✓
+   08               ✓
+   09               ✓
+   10               ✓
+   11               ✓
+   12               ✓
+   13               ✓
+   14               ✓
+   cand-8018      13/14

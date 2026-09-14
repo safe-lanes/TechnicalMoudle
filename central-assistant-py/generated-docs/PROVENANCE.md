@@ -6,7 +6,7 @@ Repository revision read: `27a40b2ce` (branch feature/chatbot-enterprise). R2 = 
 |---|---|---|
 | Technical - Bulk Data Import (Operational) User Manual.docx | ba200e864d3caf26 | bffa8828d516ab84 |
 | Technical - Ship-Side (Vessel Crew) Operational Notes.docx | 69857b38989de51b | 0bb3e4225ed74fda |
-| Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx | 6a93bd2383064b27 | d10f3027834959ef |
+| Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx | 6a93bd2383064b27 | 3d4a838ae015c06f |
 | Technical - Roles & Permissions (Operational) User Manual.docx | 97a3fedab09bf22a | e845a51f00a291ce |
 | Technical - Sync (Operational) User Manual.docx | 083e08c13944c1a7 | 25f4a49ef951ccee |
 
@@ -44,6 +44,10 @@ Repository revision read: `27a40b2ce` (branch feature/chatbot-enterprise). R2 = 
 | Recent Updates | Superintendent lock switch; postponements no auto-revert; rotational stamp identity | KEPT | shared/schema.ts:2383-2385,375-380,408-422; server/routes.ts:687-694 |
 | Recent Updates | Certificates Next Annual / Next Interim; empty shows a dash | NARROWED | shared/schema.ts:3506,3508; client/src/pages/cert-surveys/CertificatesPage.tsx:775,812-813,1001-1003 |
 | Recent Updates | Two approval levels enabled per function; approvers maintained separately | CORRECTED | client/src/pages/admin/ApprovalWorkflow.tsx:148,155-156,197-198,626-629; server/routes.ts:361-369; server/postgresStorage.ts:5785,5946-5950 |
+| Recent Updates | R3.2 §1.1.14.13 way 1: planned WOs generated from job schedule; ship daily scan, ship-only | ADDED (R3.2) | server/services/jobDueScanner.ts:122-135,163-195 (ship-only, interval scan), :493-535 (creates WOs per due job); PMS manual p18 (Part C frequency/next due), p28 §1.1.5.1 (Scheduled tab) |
+| Recent Updates | R3.2 §1.1.14.13 way 1: office 'Generate Now' = Sail Admin AND vessel switch; other roles refused; button on Work Orders screen | ADDED (R3.2) | server/modules/work-orders/services/workOrderGenerationGate.ts:44,64-87,141-161; client/src/pages/pms/WorkOrders.tsx:429,1487-1499; routes.ts:91 |
+| Recent Updates | R3.2 §1.1.14.13 way 2: per-job 'Generate WO' (Components Part C, reason Planning/Breakdown/Other, duplicate refused); office condition = vessel switch only (no Sail-Admin-only check on this path); ship always | ADDED (R3.2) | client/src/pages/pms/Components.tsx:916,1016-1018; server/modules/jobs/routes.ts:40; jobService.ts:570-590 (isShipInstance / isOfficeWoGenerationEnabled; reason union type); PMS manual p18 Office / p16 Vessel |
+| Recent Updates | R3.2 §1.1.14.13 way 3: unplanned WO via '+ Unplanned W.O', Part A save, Part B submit | ADDED (R3.2) | PMS manual §1.1.5.2 p29 Office / p24 Vessel; client/src/pages/pms/WorkOrders.tsx:1533; WorkOrderFormPage.tsx:82-111 (mode unplanned-create); routes.ts:103 (POST /work-orders) |
 | Roles | Role list = Sail Admin, Superintendent, Client Admin, Head of Dept, Vessel, External; 'Admin' → Superintendent; 'Vessel Admin' → Head of Dept | CORRECTED | shared/uiRoles.ts:1-33 |
 | Roles | R2: 'Level 2 Reviewer' and 'Vessel Admin' as assignable roles | CORRECTED (R3.1) → Level 2 Reviewer = per-job rank field (PMS manual §1.1.3.5 uses the term); 'Vessel Admin' = profile role treated as Head of Dept (PMS manual §1.1.3.4 uses the term) | shared/uiRoles.ts:32; shared/schema.ts:1204,2578; client/src/pages/pms/JobsFormPage.tsx:1346; workOrderService.ts:1720-1724; work-orders/routes.ts:113-123; workOrderBulkService.ts:143-156,227; official PMS Office manual p11-12 |
 | Roles | My Vessel scope | KEPT | client/src/contexts/VesselContext.tsx:13-60; AuthContext.tsx:447 |

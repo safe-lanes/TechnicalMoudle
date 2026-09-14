@@ -29,6 +29,11 @@ order" question. No secrets (the configuration record lists environment key NAME
 | `postdeploy-run.txt`, `postdeploy-answers-dump.jsonl`, `postdeploy-generated-dump.jsonl` | post-deployment suites through the PUBLIC endpoints: retrieval 18/18 on both paths, frozen suite 11/12, corrected claims 13/14 (identical per case to run D) |
 | `postdeploy-iso.txt` | tenant isolation + auth through the public endpoint (disabled tenant refused, other unaffected, expired/wrong-key 401), per-tenant conversation log, service + nginx error logs since the switch |
 
+| `note-generate-now-ui-mismatch.md` | standalone note for the domain team: 'Generate Now' shown to Client Admin / Head of Dept, server allows Sail Admin only (path:line) |
+| `item1-run-e.txt`, `runE-*-dump.jsonl` | follow-up 1 run E: baseline (live's index) vs candidate `repaired-r32` (first R3.2 wording) — retrieval, frozen 12, corrected 14, work-order suite .1 (§S.7) |
+| `item1-run-f.txt`, `runF-wo-dump.jsonl` | follow-up 1 run F: restructured section, rank probe, work-order suite .2 (body-only judge), retrieval |
+| `item1-run-g.txt`, `runG-*-dump.jsonl` | follow-up 1 run G: frozen 12 + corrected 14 on the final candidate build (11/12 · 13/14, same cases as run D) |
+
 Generated-document corrections: `central-assistant-py/generated-docs/` (build_r3.py = source of the R3
 documents, R2/ originals, R3/ corrected, PROVENANCE.md = every claim with disposition and file:line
 evidence at repository revision 27a40b2ce).

@@ -1,0 +1,19 @@
+index set 'repaired-r32' now holds 914 chunks across 25 documents
+DONE
+--- rank ---
+'How do I create a work order?': NEW section ranks [1, 3]; top5 distances [0.7804, 0.7927, 0.8098, 0.8108, 0.8375]; new=[0.7804, 0.8098]
+'how do I create a work order': NEW section ranks [1, 3]; top5 distances [0.7937, 0.8084, 0.8244, 0.8262, 0.8359]; new=[0.7937, 0.8244]
+'How to create work order in PMS?': NEW section ranks [6, 10]; top5 distances [0.7326, 0.7513, 0.773, 0.7876, 0.793]; new=[0.8031, 0.8276]
+'How are planned work orders created in PMS — do I have to create them myself?': NEW section ranks [1, 6]; top5 distances [0.7838, 0.8312, 0.8348, 0.8365, 0.8426]; new=[0.7838, 0.8656]
+--- WO suite .2, 3 runs, candidate 8018 ---
+[wo-generic-01] How do I create a work order?
+   cand-8018      answer ✓  cite ✓  rule ✓ (automatic generation ✓; office conditions (Sail Admin + vessel switch) in body ✓)  gate=answer cite=Technical - Recent Updates pNone | 'To create 
+   cand-8018      PASS ✓ [2/3]
+[wo-generic-02] How are planned work orders created in PMS — do I have to create them myself?
+   cand-8018      answer ✓  cite ✓  rule ✓ (automatic generation ✓; office conditions in body ✓)  gate=answer cite=Technical - Recent Updates pNone | '1. Planned work orders are generated au
+   cand-8018      PASS ✓ [3/3]
+== totals ==
+   cand-8018      2/2
+--- retrieval ---
+  how do I create a work order                 ✓✗ m=1.000 d=0.7937           
+  routing+manual correct: cand-8018 17/18
