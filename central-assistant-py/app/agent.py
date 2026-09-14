@@ -248,6 +248,11 @@ class LoopResult:
     partial: bool
 
 
+# Answer-prompt version record (owner rule 14-Sep-2026: deploy the EXACT wording that was measured).
+# v2 = the cross-reference hard rule, measured 9/12 (3-run majority) on the live index. Wording is
+# hashed at import so /health shows what is actually running; bump the label on any change.
+PROMPT_VERSION = "v2-xref-hardrule-2026-09-14"
+
 TOOL_LOOP_INSTRUCTIONS = (
     "You are the SAIL Maritime PMS assistant for the {module} module. "
     "For LIVE DATA questions (work orders, spares, running hours, defects, fleet...) call the module data tools. "

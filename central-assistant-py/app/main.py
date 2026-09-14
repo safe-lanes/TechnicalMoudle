@@ -5,6 +5,7 @@ Same HTTP surface, byte-for-byte contract (docs/ASSISTANT-API.md):
 """
 from __future__ import annotations
 
+import hashlib
 import html
 from typing import Any
 
@@ -12,9 +13,18 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from . import chat, db, llm
+from . import agent, chat, db, llm, retrieval
 from .config import settings
 from .identity import verify_identity
+
+
+def prompt_record() -> dict[str, str]:
+    """What answer prompts are running: label + content hashes (docs path system prompt for a
+    fixed dummy routing, and the tool-loop instructions). Any wording change changes the hash."""
+    sys_text, _ = retrieval.docs_prompt("Q", retrieval.Routed("answer", hits=[db.Hit(meta={"file": "F.pdf", "breadcrumb": "F > S"}, text="T", distance=0.5, module="technical")], module="technical"))
+    h1 = hashlib.sha256(sys_text.encode()).hexdigest()[:16]
+    h2 = hashlib.sha256(agent.TOOL_LOOP_INSTRUCTIONS.encode()).hexdigest()[:16]
+    return {"version": agent.PROMPT_VERSION, "docsPromptSha": h1, "toolLoopPromptSha": h2, "combined": hashlib.sha256((h1 + h2).encode()).hexdigest()[:16]}
 
 app = FastAPI(title="SAIL AI Assistant", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -70,7 +80,7 @@ async def health() -> dict[str, Any]:
     except Exception:
         chunks = None
     return {"ok": True, "store": "pgvector", "indexSet": settings().assistant_index_set, "chunks": chunks,
-            "db": "connected" if db_ok else "unreachable", "llmCalls": llm.llm_calls}
+            "db": "connected" if db_ok else "unreachable", "llmCalls": llm.llm_calls, "prompt": prompt_record()}
 
 
 # ── admin (nginx denies publicly; tunnel-only) ─────────────────────────────────────
