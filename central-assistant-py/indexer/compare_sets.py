@@ -1,13 +1,15 @@
 """
-Compare two index sets, measured — not by impression.
+Compare index sets, measured — not by impression. Any number of sets.
 
   DATABASE_URL=... IDENTITY_SIGNING_KEY=... python indexer/compare_sets.py \
-      --a migrated --b py-llamaparse --service-a http://127.0.0.1:8015 --service-b http://127.0.0.1:8017
+      --set migrated=http://127.0.0.1:8015 --set py-llamaparse=http://127.0.0.1:8017 --set ce-clean=http://127.0.0.1:8018
 
-Part 1 (DB): per-document chunk counts, <100-char chunks, avg length, pages — side by side.
+Part 1 (DB): per-document chunk counts, <100-char chunks, avg length, inline-HTML-tagged
+chunks — side by side per set.
 Part 2 (retrieval): the 18 smoke-suite queries in routeOnly mode against a service instance
-serving each set — routed module, top manual, confidence margin, top distance — side by side,
-with the expected module/manual so a regression is visible per query.
+per set — routed module, top manual, confidence margin, top distance — with the expected
+module/manual so a regression is visible per query. Unique user per request (the per-user
+limiter would otherwise clip the run).
 """
 from __future__ import annotations
 
@@ -46,40 +48,41 @@ SMOKE = [
 OFF_TOPIC = ["what is the weather in Singapore today", "how do I change my payroll bank account"]
 
 
-async def db_part(a: str, b: str) -> None:
+async def db_part(sets: list[str]) -> None:
     conn = await asyncpg.connect(os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://"))
     try:
         rows = await conn.fetch(
             "SELECT file, index_set, count(*) AS chunks, sum(case when length(content)<100 then 1 else 0 end) AS short, "
-            "round(avg(length(content))) AS avg_len, max(case when page_number ~ '^[0-9]+$' then page_number::int end) AS pages "
-            "FROM assistant_chunks WHERE index_set = ANY($1::text[]) GROUP BY file, index_set ORDER BY file", [a, b])
+            "round(avg(length(content))) AS avg_len, sum(case when content ~ '<[a-zA-Z/][^>]*>' then 1 else 0 end) AS html "
+            "FROM assistant_chunks WHERE index_set = ANY($1::text[]) GROUP BY file, index_set ORDER BY file", sets)
     finally:
         await conn.close()
     by: dict[str, dict[str, dict]] = {}
     for r in rows:
         by.setdefault(r["file"], {})[r["index_set"]] = dict(r)
-    print(f"\n== Part 1: documents — {a} | {b}  (chunks / <100-char / avg len / pages)")
-    ta = tb = sa = sb = 0
+    w = 34
+    print("\n== Part 1: documents — per set: chunks / <100-char / avg len / html-tagged chunks")
+    print(f"  {'manual':<{w}} " + " | ".join(f"{s[:26]:^26}" for s in sets))
+    tot = {s: [0, 0, 0] for s in sets}
     for f in sorted(by):
-        ra, rb = by[f].get(a), by[f].get(b)
-        fa = f"{ra['chunks']:>4} / {ra['short']:>2} / {int(ra['avg_len']):>4} / {ra['pages'] or '-':>3}" if ra else "   (missing)"
-        fb = f"{rb['chunks']:>4} / {rb['short']:>2} / {int(rb['avg_len']):>4} / {rb['pages'] or '-':>3}" if rb else "   (missing)"
-        delta = f"{(rb['chunks'] - ra['chunks']):+d}" if ra and rb else ""
-        print(f"  {f[:62]:<62} {fa}   |  {fb}  {delta}")
-        if ra:
-            ta += ra["chunks"]
-            sa += ra["short"]
-        if rb:
-            tb += rb["chunks"]
-            sb += rb["short"]
-    print(f"  {'TOTAL':<62} {ta:>4} / {sa:>2}                 |  {tb:>4} / {sb:>2}")
+        cells = []
+        for s in sets:
+            r = by[f].get(s)
+            if r:
+                cells.append(f"{r['chunks']:>4} / {r['short']:>2} / {int(r['avg_len']):>4} / {r['html']:>3}")
+                tot[s][0] += r["chunks"]
+                tot[s][1] += r["short"]
+                tot[s][2] += r["html"]
+            else:
+                cells.append(f"{'(missing)':^26}")
+        print(f"  {f[:w]:<{w}} " + " | ".join(f"{c:^26}" for c in cells))
+    print(f"  {'TOTAL':<{w}} " + " | ".join(f"{t[0]:>4} / {t[1]:>2} /      / {t[2]:>3}".center(26) for t in tot.values()))
 
 
 _n = 0
 
 
 async def ask(client: httpx.AsyncClient, base: str, key: str, q: str) -> dict:
-    # unique user per request: the per-user limiter (30/min) would otherwise clip a 40-request comparison
     global _n
     _n += 1
     tok = sign_identity({"userId": f"compare-{_n}", "userName": "Compare", "role": "Sail Admin", "tenantDomain": "smoke-suite-tenant"}, key, 60)
@@ -98,34 +101,37 @@ def _fmt(j: dict, em: str, eman: str) -> tuple[str, bool]:
     return f"{'✓' if mod == em else '✗'}{'✓' if eman in man else '✗'} m={conf} d={dist}{extra}", good
 
 
-async def retrieval_part(a: str, b: str, sa: str, sb: str) -> None:
+async def retrieval_part(sets: list[str], services: list[str]) -> None:
     key = os.environ["IDENTITY_SIGNING_KEY"]
-    print(f"\n== Part 2: retrieval — {a} ({sa}) | {b} ({sb})   [module ✓/✗, manual ✓/✗, margin, top-distance]")
-    ok_a = ok_b = 0
+    print("\n== Part 2: retrieval — " + " | ".join(f"{s} ({u})" for s, u in zip(sets, services, strict=True)) + "   [module ✓/✗, manual ✓/✗, margin, top-distance]")
+    ok = {s: 0 for s in sets}
     async with httpx.AsyncClient(timeout=60.0) as c:
         for q, em, eman in SMOKE:
-            ja, jb = await asyncio.gather(ask(c, sa, key, q), ask(c, sb, key, q))
-            fa, ga = _fmt(ja, em, eman)
-            fb, gb = _fmt(jb, em, eman)
-            ok_a += ga
-            ok_b += gb
-            print(f"  {q[:50]:<50} {fa:<34} | {fb}")
+            res = await asyncio.gather(*(ask(c, u, key, q) for u in services))
+            cells = []
+            for s, j in zip(sets, res, strict=True):
+                f, g = _fmt(j, em, eman)
+                ok[s] += g
+                cells.append(f)
+            print(f"  {q[:44]:<44} " + " | ".join(f"{x:<30}" for x in cells))
         for q in OFF_TOPIC:
-            ja, jb = await asyncio.gather(ask(c, sa, key, q), ask(c, sb, key, q))
-            print(f"  {q[:50]:<50} gate={ja.get('gate'):<26} | gate={jb.get('gate')}")
-    print(f"\n  routing+manual correct: {a} {ok_a}/{len(SMOKE)}   {b} {ok_b}/{len(SMOKE)}")
+            res = await asyncio.gather(*(ask(c, u, key, q) for u in services))
+            print(f"  {q[:44]:<44} " + " | ".join(f"{'gate=' + str(j.get('gate')):<30}" for j in res))
+    print("\n  routing+manual correct: " + "   ".join(f"{s} {ok[s]}/{len(SMOKE)}" for s in sets))
 
 
 async def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--a", default="migrated")
-    ap.add_argument("--b", required=True)
-    ap.add_argument("--service-a", default=None)
-    ap.add_argument("--service-b", default=None)
+    ap.add_argument("--set", action="append", required=True, help="NAME=SERVICE_URL (repeatable); URL optional for DB-only")
     args = ap.parse_args()
-    await db_part(args.a, args.b)
-    if args.service_a and args.service_b:
-        await retrieval_part(args.a, args.b, args.service_a, args.service_b)
+    sets, services = [], []
+    for spec in args.set:
+        name, _, url = spec.partition("=")
+        sets.append(name)
+        services.append(url)
+    await db_part(sets)
+    if all(services):
+        await retrieval_part(sets, services)
     return 0
 
 

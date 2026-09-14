@@ -35,6 +35,8 @@ from openai import OpenAI
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from chunking import Chunk, chunks_from_markdown, title_stub  # noqa: E402
+from clean_markdown import clean_pages  # noqa: E402
+from xrefs import resolve_xrefs  # noqa: E402
 
 MODULES = {"technical", "audit", "safety", "incident", "crewing"}
 LP_UPLOAD = "https://api.cloud.llamaindex.ai/api/v2/parse/upload"
@@ -55,23 +57,61 @@ def module_of(file: str) -> str:
     return prefix if prefix in MODULES else "unknown"
 
 
-# ── LlamaParse v2 ───────────────────────────────────────────────────────────────────
+# ── LlamaParse v2 + the parse store ─────────────────────────────────────────────────
+API_ENDPOINT = "api.cloud.llamaindex.ai/api/v2/parse"
+OUTPUT_OPTIONS: dict[str, Any] = {"markdown": {"annotate_links": True, "tables": {"merge_continued_tables": True}}, "extract_printed_page_number": True}
+PROCESSING_CONTROL: dict[str, Any] = {"timeouts": {"base_in_seconds": 300, "extra_time_per_page_in_seconds": 30}}
+
+
+def parse_key_for(sha: str, tier: str, version: str) -> str:
+    """The accepted-parse key: source-file hash + parsing configuration (tier, REQUESTED version,
+    output options). Same key ⇒ same parse is reused and the parser is never called again."""
+    opts = hashlib.sha256(json.dumps(OUTPUT_OPTIONS, sort_keys=True).encode()).hexdigest()[:12]
+    return f"{sha}|{tier}|{version}|{opts}"
+
+
+def version_evidence(result: dict[str, Any]) -> tuple[bool, str | None]:
+    """The current LlamaParse docs say to read metadata.version; our tested responses do not carry it.
+    Record presence/value as evidence (owner is raising the discrepancy with support)."""
+    md = result.get("metadata") or {}
+    v = md.get("version") if isinstance(md, dict) else None
+    return (v is not None), (str(v) if v is not None else None)
+
+
+async def parse_store_get(conn: asyncpg.Connection | None, key: str) -> dict[str, Any] | None:
+    if conn is None:
+        return None
+    row = await conn.fetchrow("SELECT raw_response FROM assistant_parses WHERE parse_key=$1 AND accepted", key)
+    return json.loads(row["raw_response"]) if row else None
+
+
+async def parse_store_put(conn: asyncpg.Connection | None, *, key: str, file: str, sha: str, tier: str, version: str,
+                          options: dict[str, Any], result: dict[str, Any], pages: int | None) -> None:
+    if conn is None:
+        return
+    present, value = version_evidence(result)
+    await conn.execute(
+        "INSERT INTO assistant_parses (parse_key, file, sha256, tier, requested_version, options, api_endpoint, job_id, "
+        "response_version_field, version_field_present, raw_response, pages) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11::jsonb,$12) "
+        "ON CONFLICT (parse_key) DO UPDATE SET raw_response=EXCLUDED.raw_response, job_id=EXCLUDED.job_id, pages=EXCLUDED.pages, "
+        "response_version_field=EXCLUDED.response_version_field, version_field_present=EXCLUDED.version_field_present, parsed_at=now(), accepted=TRUE",
+        key, file, sha, tier, version, json.dumps(options), API_ENDPOINT, (result.get("job") or {}).get("id"), value, present,
+        json.dumps(result, ensure_ascii=False), pages)
+
+
 def llamaparse(path: Path, *, api_key: str, tier: str, version: str, fresh: bool, cache_dir: Path, log) -> dict[str, Any]:
+    """Call LlamaParse v2 (or reuse the on-disk copy of an identical request). The DB parse store
+    is consulted BEFORE this in main(); this is the last resort that actually parses."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     key = hashlib.sha256(f"{sha256_file(path)}|tier={tier}|ver={version}|nocache={int(fresh)}".encode()).hexdigest()[:24]
     result_f = cache_dir / f"{path.stem}__{key}.result.json"
-    # The on-disk cache key includes the fresh flag, so a --fresh-parse result is reused by a
-    # later --fresh-parse run (a failed/dry run never costs a second LlamaCloud parse).
     if result_f.exists():
-        log(f"   cached LlamaParse result for {path.name} ({result_f.name})")
+        log(f"   on-disk LlamaParse result for {path.name} ({result_f.name})")
         return json.loads(result_f.read_text(encoding="utf-8"))
     if not api_key:
         raise RuntimeError("LLAMA_CLOUD_API_KEY missing")
-    configuration = {
-        "tier": tier, "version": version, "disable_cache": bool(fresh),
-        "output_options": {"markdown": {"annotate_links": True, "tables": {"merge_continued_tables": True}}, "extract_printed_page_number": True},
-        "processing_control": {"timeouts": {"base_in_seconds": 300, "extra_time_per_page_in_seconds": 30}},
-    }
+    configuration = {"tier": tier, "version": version, "disable_cache": bool(fresh),
+                     "output_options": OUTPUT_OPTIONS, "processing_control": PROCESSING_CONTROL}
     headers = {"Authorization": f"Bearer {api_key}"}
     with httpx.Client(timeout=120.0) as c:
         log(f"   uploading {path.name} to LlamaParse v2 (tier={tier}, fresh={fresh})")
@@ -126,7 +166,8 @@ def embed_all(client: OpenAI, model: str, texts: list[str], batch: int, log) -> 
 
 async def store_document(conn: asyncpg.Connection, *, index_set: str, file: str, module: str, sha: str, source_type: str,
                          chunks: list[Chunk], embeddings: list[list[float]], pages: int | None, stub: bool, tier: str, version: str,
-                         embed_model: str) -> None:
+                         embed_model: str, job_id: str | None = None, cleaned: bool = False, xrefs_resolved: int = 0,
+                         xrefs_unresolved: int = 0, clean_report: dict[str, Any] | None = None) -> None:
     rows = []
     for c, e in zip(chunks, embeddings, strict=True):
         m = dict(c.metadata)
@@ -140,13 +181,18 @@ async def store_document(conn: asyncpg.Connection, *, index_set: str, file: str,
         await conn.executemany(
             "INSERT INTO assistant_chunks (index_set, id, module, file, section_title, breadcrumb, page_number, chunk_index, content, metadata, embedding) "
             "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::vector)", rows)
+        # parser_version = the REQUESTED version. The API does not return the effective one
+        # (unverifiable from our side — owner informed 14-Sep-2026); job_id is the audit handle.
         await conn.execute(
-            "INSERT INTO assistant_documents (index_set, file, module, sha256, source_type, chunks, pages, stub, parser, parser_tier, parser_version, embed_model, indexed_at) "
-            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'llamaparse-v2',$9,$10,$11,now()) "
+            "INSERT INTO assistant_documents (index_set, file, module, sha256, source_type, chunks, pages, stub, parser, parser_tier, parser_version, "
+            "embed_model, indexed_at, job_id, cleaned, xrefs_resolved, xrefs_unresolved, clean_report) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'llamaparse-v2',$9,$10,$11,now(),$12,$13,$14,$15,$16::jsonb) "
             "ON CONFLICT (index_set, file) DO UPDATE SET module=EXCLUDED.module, sha256=EXCLUDED.sha256, source_type=EXCLUDED.source_type, "
             "chunks=EXCLUDED.chunks, pages=EXCLUDED.pages, stub=EXCLUDED.stub, parser=EXCLUDED.parser, parser_tier=EXCLUDED.parser_tier, "
-            "parser_version=EXCLUDED.parser_version, embed_model=EXCLUDED.embed_model, indexed_at=now()",
-            index_set, file, module, sha, source_type, len(chunks), pages, stub, tier, version, embed_model)
+            "parser_version=EXCLUDED.parser_version, embed_model=EXCLUDED.embed_model, indexed_at=now(), job_id=EXCLUDED.job_id, "
+            "cleaned=EXCLUDED.cleaned, xrefs_resolved=EXCLUDED.xrefs_resolved, xrefs_unresolved=EXCLUDED.xrefs_unresolved, clean_report=EXCLUDED.clean_report",
+            index_set, file, module, sha, source_type, len(chunks), pages, stub, tier, version, embed_model,
+            job_id, cleaned, xrefs_resolved, xrefs_unresolved, json.dumps(clean_report or {}))
 
 
 async def main() -> int:
@@ -163,6 +209,9 @@ async def main() -> int:
     ap.add_argument("--overlap", type=int, default=150)
     ap.add_argument("--embed-batch", type=int, default=128)
     ap.add_argument("--dry-run", action="store_true", help="parse + chunk only; no embedding, no DB writes")
+    ap.add_argument("--clean", action="store_true", help="pre-chunk cleanup: cover, TOC, page header/footer, screenshot figure zones, inline tags")
+    ap.add_argument("--resolve-xrefs", action="store_true", help="append the target section's text to cross-reference-only sections")
+    ap.add_argument("--reparse", action="store_true", help="ignore the accepted parse in the parse store and parse again (normally never needed)")
     a = ap.parse_args()
 
     docs = Path(a.documents)
@@ -195,12 +244,43 @@ async def main() -> int:
                     continue
             log(f"> {f.name} [{module}/{source_type}]")
             try:
-                result = llamaparse(f, api_key=os.environ.get("LLAMA_CLOUD_API_KEY", ""), tier=a.tier, version=a.version,
-                                    fresh=a.fresh_parse, cache_dir=cache_dir, log=log)
+                pkey = parse_key_for(sha, a.tier, a.version)
+                result = None if a.reparse else await parse_store_get(conn, pkey)
+                if result is not None:
+                    log(f"   accepted parse from the parse store (key {pkey[:12]}…) — parser not called")
+                else:
+                    result = llamaparse(f, api_key=os.environ.get("LLAMA_CLOUD_API_KEY", ""), tier=a.tier, version=a.version,
+                                        fresh=a.fresh_parse, cache_dir=cache_dir, log=log)
                 md, page_map = markdown_and_pages(result)
+                job_id = (result.get("job") or {}).get("id")
+                present, vfield = version_evidence(result)
+                log(f"   job={job_id} tier={a.tier} requested_version={a.version} response.metadata.version={'present: ' + str(vfield) if present else 'ABSENT'}")
+                await parse_store_put(conn, key=pkey, file=f.name, sha=sha, tier=a.tier, version=a.version,
+                                      options={"output_options": OUTPUT_OPTIONS, "processing_control": PROCESSING_CONTROL, "disable_cache": bool(a.fresh_parse)},
+                                      result=result, pages=len(page_map) if page_map else None)
+                clean_report: dict[str, Any] = {"parse_key": pkey}
+                xres = xun = 0
+                if a.clean or a.resolve_xrefs:
+                    pm = page_map if page_map else {1: md}
+                    if a.clean:
+                        pm, crep = clean_pages(pm)
+                        clean_report.update(crep.as_dict())
+                        (cache_dir / f"{f.stem}.cleanlog.json").write_text(json.dumps(crep.as_dict(), ensure_ascii=False, indent=1), encoding="utf-8")
+                        log(f"   cleaned: cover={crep.cover_dropped} toc={crep.toc_pages} header={crep.header_lines} footer={crep.footer_lines} "
+                            f"zones={crep.figure_zones} tables rm/kept={crep.tables_removed}/{crep.tables_kept} mermaid={crep.mermaid_removed} "
+                            f"callouts={crep.callout_lines} struck={crep.struck_spans} carried_headings={crep.carried_headings} removals_logged={len(crep.removed)}")
+                    if a.resolve_xrefs:
+                        pm, xrep = resolve_xrefs(pm)
+                        xres, xun = len(xrep.resolved), len(xrep.unresolved)
+                        clean_report["xrefs"] = {"resolved": xrep.resolved, "unresolved": xrep.unresolved, "chained": xrep.chained}
+                        log(f"   xrefs: resolved={xres} unresolved={xun} chained={len(xrep.chained)}")
+                        for t, r in xrep.unresolved:
+                            log(f"      UNRESOLVED {t[:50]} → {r}")
+                    page_map = pm if page_map else None
+                    md = "\n\n".join(pm[k] for k in sorted(pm))
+                extra = {"llamaparse_tier": a.tier, "llamaparse_version": a.version, "llamaparse_job_id": job_id, "cleaned": bool(a.clean)}
                 chunks = chunks_from_markdown(md=md, source_file=f.name, source_type=source_type, max_chunk_size=a.max_chunk,
-                                              chunk_overlap=a.overlap, page_map=page_map,
-                                              extra_metadata={"llamaparse_tier": a.tier, "llamaparse_version": a.version})
+                                              chunk_overlap=a.overlap, page_map=page_map, extra_metadata=extra)
                 stub = False
                 if not chunks:
                     chunks, stub = [title_stub(f.name, source_type)], True
@@ -211,7 +291,9 @@ async def main() -> int:
                 if conn is not None and oai is not None:
                     embs = embed_all(oai, embed_model, [c.text for c in chunks], a.embed_batch, log)
                     await store_document(conn, index_set=a.index_set, file=f.name, module=module, sha=sha, source_type=source_type,
-                                         chunks=chunks, embeddings=embs, pages=pages, stub=stub, tier=a.tier, version=a.version, embed_model=embed_model)
+                                         chunks=chunks, embeddings=embs, pages=pages, stub=stub, tier=a.tier, version=a.version, embed_model=embed_model,
+                                         job_id=job_id, cleaned=bool(a.clean), xrefs_resolved=xres, xrefs_unresolved=xun, clean_report=clean_report)
+                    await conn.execute("UPDATE assistant_documents SET parse_key=$1 WHERE index_set=$2 AND file=$3", pkey, a.index_set, f.name)
                     log(f"   stored ({a.index_set})")
                 summary.append({"file": f.name, "chunks": len(chunks), "pages": pages, "short": short, "stub": stub})
             except Exception as e:
