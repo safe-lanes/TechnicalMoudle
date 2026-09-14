@@ -1,5 +1,14 @@
 import { NotFoundError } from '../../shared/errors';
 import { resolveRoleApproverUserIds } from '../../approvals/approvalCard';
+import {
+  activeWorkflowScoped,
+  isApprovalEngineAvailable,
+  scopeFor,
+} from '../../approvals/engineGateway';
+import {
+  DEFECTS_MODULE_ID,
+  defectsApprovalCard,
+} from '../../defects/approvalCard';
 import * as repository from '../repositories/devTestUsersRepository';
 
 export interface DevTestUserResolution {
@@ -15,14 +24,112 @@ export interface DevTestUsersSnapshot {
   assignments: repository.DevTestAssignmentRow[];
   vessels: repository.DevTestVesselRow[];
   roles: repository.DevTestRoleRow[];
+  defectsWorkflowRoles: DevTestDefectsWorkflowStatus[];
+}
+
+export interface DevTestDefectsRoleUsage {
+  roleId: string;
+  roleLabel: string;
+  assignedRole: string | null;
+  roleStringsMatch: boolean;
+  matchingActiveUsers: number;
+  scopeScreenId: string;
+  scopeLabel: string;
+  classification: string;
+  stepNumber: number;
+  stepLabel: string;
+  slotNumber: number;
+}
+
+export interface DevTestDefectsWorkflowStatus {
+  scopeScreenId: string;
+  scopeLabel: string;
+  classification: string;
+  status: 'active' | 'no-active-workflow' | 'engine-unavailable';
+  usages: DevTestDefectsRoleUsage[];
+}
+
+async function getDefectsWorkflowRoles(
+  users: repository.DevTestUserRow[],
+  roleDefinitions: repository.DevTestResolverRoleRow[],
+): Promise<DevTestDefectsWorkflowStatus[]> {
+  const engineAvailable = isApprovalEngineAvailable();
+  const combinations = defectsApprovalCard.scopes.flatMap((scope) =>
+    scope.classifications.map((classification) => ({
+      scopeScreenId: scope.screenId,
+      scopeLabel: scope.label,
+      classification: classification.id,
+    })),
+  );
+  const workflows = engineAvailable
+    ? await Promise.all(combinations.map((entry) =>
+        activeWorkflowScoped(
+          scopeFor(DEFECTS_MODULE_ID, entry.scopeScreenId),
+          entry.classification,
+        ),
+      ))
+    : combinations.map(() => null);
+  const roleById = new Map(roleDefinitions.map((role) => [role.roleId, role]));
+
+  return combinations.map((entry, index) => {
+    const workflow = workflows[index];
+    if (!engineAvailable) {
+      return { ...entry, status: 'engine-unavailable' as const, usages: [] };
+    }
+    if (!workflow) {
+      return { ...entry, status: 'no-active-workflow' as const, usages: [] };
+    }
+    const usages: DevTestDefectsRoleUsage[] = [];
+    const seen = new Set<string>();
+    const steps = (workflow.nodes ?? [])
+      .filter((node) => node.type === 'approval-step')
+      .slice()
+      .sort((a, b) => a.ordinal - b.ordinal);
+    for (const step of steps) {
+      const slots = step.slots ?? [];
+      for (let slotIndex = 0; slotIndex < slots.length; slotIndex += 1) {
+        const slot = slots[slotIndex];
+        const role = roleById.get(slot.roleId);
+        const assignedRole = role?.roleName ?? null;
+        const usage: DevTestDefectsRoleUsage = {
+          roleId: slot.roleId,
+          roleLabel: slot.roleLabel,
+          assignedRole,
+          roleStringsMatch: assignedRole !== null && slot.roleLabel === assignedRole,
+          matchingActiveUsers: assignedRole === null
+            ? 0
+            : users.filter((user) => user.role === assignedRole).length,
+          ...entry,
+          stepNumber: step.ordinal + 1,
+          stepLabel: step.label || `Step ${step.ordinal + 1}`,
+          slotNumber: slotIndex + 1,
+        };
+        const key = [
+          usage.scopeScreenId,
+          usage.classification,
+          usage.stepNumber,
+          usage.slotNumber,
+          usage.roleId,
+          usage.roleLabel,
+          usage.assignedRole ?? '',
+        ].join('\u0000');
+        if (!seen.has(key)) {
+          seen.add(key);
+          usages.push(usage);
+        }
+      }
+    }
+    return { ...entry, status: 'active' as const, usages };
+  });
 }
 
 export async function getUsersSnapshot(): Promise<DevTestUsersSnapshot> {
-  const [users, assignments, vessels, roles] = await Promise.all([
+  const [users, assignments, vessels, roles, roleDefinitions] = await Promise.all([
     repository.getActiveUsers(),
     repository.getActiveAssignments(),
     repository.getActiveVessels(),
     repository.getActiveApprovalRoles(),
+    repository.getResolverRoleDefinitions(),
   ]);
   const byUser = new Map<string, Array<{ vuuid: string; name: string }>>();
   for (const assignment of assignments) {
@@ -38,6 +145,7 @@ export async function getUsersSnapshot(): Promise<DevTestUsersSnapshot> {
     assignments,
     vessels,
     roles,
+    defectsWorkflowRoles: await getDefectsWorkflowRoles(users, roleDefinitions),
   };
 }
 

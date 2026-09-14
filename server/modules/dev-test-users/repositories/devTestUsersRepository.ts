@@ -34,6 +34,10 @@ export interface DevTestRoleRow {
   roleType: string;
 }
 
+export interface DevTestResolverRoleRow extends DevTestRoleRow {
+  isActive: boolean | null;
+}
+
 export async function getActiveUsers(): Promise<DevTestUserRow[]> {
   const db = await getDb();
   return db.select({
@@ -104,6 +108,23 @@ export async function getActiveApprovalRoles(): Promise<DevTestRoleRow[]> {
       eq(admnRoleMaster.isDeleted, false),
     ))
     .orderBy(asc(admnRoleMaster.sortOrder), asc(admnRoleMaster.assignedRole), asc(admnRoleMaster.ruid));
+}
+
+/**
+ * Mirrors the resolver's role lookup boundary: deleted roles are excluded, but
+ * inactive roles remain visible because resolveRoleApproverUserIds currently
+ * resolves any non-deleted role referenced by a stable role id.
+ */
+export async function getResolverRoleDefinitions(): Promise<DevTestResolverRoleRow[]> {
+  const db = await getDb();
+  return db.select({
+    roleId: admnRoleMaster.ruid,
+    roleName: admnRoleMaster.assignedRole,
+    roleType: admnRoleMaster.roletype,
+    isActive: admnRoleMaster.isActive,
+  }).from(admnRoleMaster)
+    .where(eq(admnRoleMaster.isDeleted, false))
+    .orderBy(asc(admnRoleMaster.assignedRole), asc(admnRoleMaster.ruid));
 }
 
 export async function getActiveApprovalRolesForName(roleName: string): Promise<DevTestRoleRow[]> {
