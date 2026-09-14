@@ -430,6 +430,28 @@ systemctl reload nginx`; the old container `sail-assistant-py` (image e12c0b916d
 in the database untouched. Promotion = the same edits 8015 → 8017 (or recreate
 `sail-assistant-py` from `:prompt-v2` with `ASSISTANT_INDEX_SET=repaired` and the same env file).
 
+**S.6.3 — Pilot rollout GO (owner, 14-Sep) — pre-switch checks; STOPPED at check 2.**
+*Check 1 (PASSED, recorded before any switch):* run D's candidate instance served index set
+`repaired` with 911 chunks (`/health` at run start); DB: 25 documents, 911 chunk rows, one build
+key for all 25 — `…|clean=off|xrefs=2026-09-14.4|repairs=2026-09-14.1|chunker=2026-03-17.original|1200/150|embed=llamaindex-meta9|model=text-embedding-3-large:3072`,
+built 14-Sep 10:18–10:19 UTC; container image
+`sha256:8db669090d3690111867ece75b868001bb6ee311e866456949a9f41618c133b9` (`sail-assistant-py:prompt-v2`);
+prompt `v2-xref-hardrule-2026-09-14`, docs b37172f6122a0257 · tool-loop f8e5a8f86bede638 · combined ebfd83a623e41173.
+*Check 2 (FAILED the owner's condition → no change made):* the public endpoint has no per-tenant
+routing. `assistant.conf` is one `location /` → `127.0.0.1:8015` for `assistant.sl-sail.com`, and
+`safelanes.conf` routes `viqmap.sl-sail.com/assistant/` the same way; the tenant is known only
+inside the HMAC-signed identity header, which nginx does not decode. Flipping either `proxy_pass`
+switches every tenant that reaches the endpoint. Tenant registry at this moment: 26 pairs across
+11 tenant domains, all test identities from the build sessions (`smoke-suite-tenant`,
+`stage2-test-*`, `parity-tenant`, `audit-tenant`, `public-proof-tenant`); 2,568 conversations, none
+from a customer domain. No pilot tenant has used the assistant yet, so there is nothing in the
+data that identifies "the pilot tenant". Options for the owner (not chosen by me): (a) accept the
+global switch on the grounds that only test tenants exist today; (b) per-tenant routing without a
+code change: nginx `map $http_origin` → upstream 8017 only for the pilot front-end origin
+(`https://dev.sl-sail.com`, already the only non-local CORS origin), everything else → 8015 —
+Origin is browser-set for the widget and only selects which container answers; (c) a small service
+change that picks the index set per tenant domain (prompt would still be per container).
+
 **What this does NOT change:** the module-side Data API (Node, in Technical), the HTTP contracts,
 the identity token format, nginx/TLS/URL, the masking design and its captured-payload proof
 standard, the 30-tool coverage priority. The stack is chosen *for* those, not instead of them.
