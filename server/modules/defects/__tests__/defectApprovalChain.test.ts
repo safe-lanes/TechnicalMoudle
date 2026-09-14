@@ -98,7 +98,10 @@ describe('Defects approval chain projection', () => {
     mocks.isApprovalEngineAvailable.mockReturnValue(false);
 
     await expect(getDefectApprovalChain('DEF-1', 'extension', 'user-1', 'Vessel User'))
-      .rejects.toMatchObject({ statusCode: 503 });
+      .rejects.toMatchObject({
+        statusCode: 503,
+        code: 'APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE',
+      });
     expect(mocks.approvalRequestsInScopes).not.toHaveBeenCalled();
   });
 

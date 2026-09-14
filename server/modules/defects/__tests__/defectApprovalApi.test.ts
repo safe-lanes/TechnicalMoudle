@@ -123,7 +123,10 @@ describe('Defects approval API controllers', () => {
 
   it('preserves approval-engine unavailability as HTTP 503', async () => {
     mocks.getDefectApprovalChain.mockRejectedValue(
-      Object.assign(new Error('Approval status is unavailable on this instance'), { statusCode: 503 }),
+      Object.assign(new Error('Approval status is unavailable on this instance'), {
+        statusCode: 503,
+        code: 'APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE',
+      }),
     );
     const res = response();
 
@@ -137,7 +140,7 @@ describe('Defects approval API controllers', () => {
     expect(res.status).toHaveBeenCalledWith(503);
     expect(res.json).toHaveBeenCalledWith({
       error: 'Approval status is unavailable on this instance',
-      code: undefined,
+      code: 'APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE',
     });
   });
 

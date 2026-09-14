@@ -3,6 +3,7 @@ export type DefectApprovalAction = "extension" | "verification";
 export type DefectApprovalPresentation =
   | { state: "idle"; showDecisionControls: false }
   | { state: "loading"; showDecisionControls: false }
+  | { state: "ship-unavailable"; message: "Approval is handled ashore. This request will be reviewed after the next sync."; showDecisionControls: false }
   | { state: "error"; message: "Could not load approval status. Retry."; showDecisionControls: false }
   | { state: "no-workflow"; showDecisionControls: false }
   | { state: "loaded"; showDecisionControls: boolean };
@@ -29,6 +30,20 @@ export function resolveDefectApprovalPresentation(
 ): DefectApprovalPresentation {
   if (approval.isLoading) return { state: "loading", showDecisionControls: false };
   if (approval.error) {
+    if (
+      typeof approval.error === "object" &&
+      approval.error !== null &&
+      "code" in approval.error &&
+      approval.error.code === "APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE" &&
+      "status" in approval.error &&
+      approval.error.status === 503
+    ) {
+      return {
+        state: "ship-unavailable",
+        message: "Approval is handled ashore. This request will be reviewed after the next sync.",
+        showDecisionControls: false,
+      };
+    }
     return {
       state: "error",
       message: "Could not load approval status. Retry.",
@@ -57,22 +72,32 @@ export function resolveDefectApprovalPresentation(
 }
 
 export function resolveVerificationDisplay(
-  requestStatus: string | null | undefined,
+  chain: {
+    requestUuid?: string | null;
+    requestStatus?: string | null;
+  } | null | undefined,
   defect: {
+    verified?: boolean | null;
     dateVerified?: string | null;
     verifiedDate?: string | null;
     verifiedByName?: string | null;
     verifiedByOfficePosition?: string | null;
   } | null | undefined,
 ) {
-  const normalizedStatus = String(requestStatus ?? "").toLowerCase();
-  if (normalizedStatus !== "approved") {
+  if (!chain) {
     return { date: "", name: "", position: "" };
   }
+  const hasEngineRequest = Boolean(chain.requestUuid);
+  if (hasEngineRequest && String(chain.requestStatus ?? "").toLowerCase() !== "approved") {
+    return { date: "", name: "", position: "" };
+  }
+  const isLegacyVerification = !hasEngineRequest && defect?.verified === true;
+  if (!hasEngineRequest && !isLegacyVerification) return { date: "", name: "", position: "" };
   return {
     date: defect?.dateVerified || defect?.verifiedDate || "",
     name: defect?.verifiedByName || "",
     position: defect?.verifiedByOfficePosition || "",
+    isLegacyVerification,
   };
 }
 

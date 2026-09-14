@@ -12,6 +12,13 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 
+export class DefectApprovalChainFetchError extends Error {
+  constructor(message: string, public readonly code?: string, public readonly status?: number) {
+    super(message);
+    this.name = "DefectApprovalChainFetchError";
+  }
+}
+
 interface SlotView {
   nodeKey: string; slotOrdinal: number; roleId: string; roleLabel: string;
   status: "pending" | "active" | "approved" | "rejected" | "superseded";
@@ -82,7 +89,14 @@ export function useDefectApprovalChain(
       const response = await fetch(
         `/technical/api/defects/${encodeURIComponent(String(defectId))}/approval-chain?action=${action}`,
       );
-      if (!response.ok) throw new Error(`Could not load approval status (${response.status})`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new DefectApprovalChainFetchError(
+          typeof body?.error === "string" ? body.error : `Could not load approval status (${response.status})`,
+          typeof body?.code === "string" ? body.code : undefined,
+          response.status,
+        );
+      }
       return response.json();
     },
   });

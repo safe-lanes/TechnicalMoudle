@@ -194,6 +194,13 @@ export function DefectApprovalStatus({
       </div>
     );
   }
+  if (presentation.state === "ship-unavailable") {
+    return (
+      <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800" data-testid={`approval-status-ship-unavailable-${action}`}>
+        {presentation.message}
+      </div>
+    );
+  }
   const chain = approval.data;
   if (presentation.state === "no-workflow") {
     return (
@@ -332,7 +339,7 @@ export default function DefectFormWizard({
   const verificationApproval = useDefectApprovalChain(approvalDefectId, "verification");
   const canEditDefect = canEdit("defects-active");
   const verificationDisplay = resolveVerificationDisplay(
-    verificationApproval.data?.requestStatus,
+    verificationApproval.data,
     currentDefect,
   );
   
@@ -2117,6 +2124,11 @@ export default function DefectFormWizard({
                   {/* C2. Verification Section */}
                   <div className="space-y-6 pt-4">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C2. Verification</h3>
+                    {"isLegacyVerification" in verificationDisplay && verificationDisplay.isLegacyVerification && (
+                      <p className="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700" data-testid="legacy-verification-note">
+                        Verified before an approval workflow was configured.
+                      </p>
+                    )}
                     <div className="grid grid-cols-2 gap-6">
                       <div className="flex flex-col">
                         <label className="text-sm text-gray-600 mb-1.5">Date Verified</label>

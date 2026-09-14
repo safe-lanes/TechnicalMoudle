@@ -142,7 +142,10 @@ export async function getDefectApprovalChain(
   const defect: any = await defectsRepo.getDefect(id);
   if (!defect) throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
   if (!isApprovalEngineAvailable()) {
-    throw Object.assign(new Error('Approval status is unavailable on this instance'), { statusCode: 503 });
+    throw Object.assign(new Error('Approval status is unavailable on this instance'), {
+      statusCode: 503,
+      code: 'APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE',
+    });
   }
 
   const candidateScopes = action === 'verification'
