@@ -77,10 +77,13 @@ def parse_key_for(sha: str, tier: str, version: str) -> str:
     return f"{sha}|{cfg}"
 
 
-def build_key_for(parse_key: str, cleanup_version: str | None, chunker_version: str, max_chunk: int, overlap: int, resolve_xrefs: bool) -> str:
-    """The index-build key: parse + cleanup code version + chunker code version + chunk params.
-    A change in any of these invalidates the built index even when the parse is still valid."""
-    return f"{parse_key}|clean={cleanup_version or 'off'}|xrefs={'on' if resolve_xrefs else 'off'}|chunker={chunker_version}|{max_chunk}/{overlap}"
+def build_key_for(parse_key: str, cleanup_version: str | None, chunker_version: str, max_chunk: int, overlap: int, resolve_xrefs: bool,
+                  embed_mode: str = "meta") -> str:
+    """The index-build key: parse + cleanup code version + chunker code version + chunk params +
+    embedding input mode. A change in any of these invalidates the built index even when the
+    parse is still valid."""
+    return (f"{parse_key}|clean={cleanup_version or 'off'}|xrefs={'on' if resolve_xrefs else 'off'}|chunker={chunker_version}|{max_chunk}/{overlap}"
+            f"|embed={EMBED_INPUT_VERSION if embed_mode == 'meta' else 'text'}")
 
 
 def version_evidence(result: dict[str, Any]) -> tuple[bool, str | None]:
@@ -168,6 +171,22 @@ def markdown_and_pages(result: dict[str, Any]) -> tuple[str, dict[int, str] | No
 
 
 # ── embed + store ────────────────────────────────────────────────────────────────────
+# The live set was embedded by LlamaIndex, whose nodes embed METADATA + TEXT
+# ("file: …\nslug_url: …\nbreadcrumb: …\nsection_title: …\nsource_type: …\nchunk_index: …\n
+# page_number: …\nllamaparse_tier: …\nllamaparse_version: …\n\n<text>") — PROVEN 14-Sep by
+# cosine against the stored vectors (0.96–0.99 vs 0.36–0.90 for text only). The manual name
+# and section title in that prefix are part of what the live routing relies on.
+EMBED_META_KEYS = ["file", "slug_url", "breadcrumb", "section_title", "source_type", "chunk_index", "page_number", "llamaparse_tier", "llamaparse_version"]
+EMBED_INPUT_VERSION = "llamaindex-meta9"  # part of the build key
+
+
+def embed_input(chunk: Chunk, mode: str) -> str:
+    if mode == "text":
+        return chunk.text
+    md = "\n".join(f"{k}: {chunk.metadata[k]}" for k in EMBED_META_KEYS if k in chunk.metadata)
+    return f"{md}\n\n{chunk.text}"
+
+
 def embed_all(client: OpenAI, model: str, texts: list[str], batch: int, log) -> list[list[float]]:
     out: list[list[float]] = []
     for i in range(0, len(texts), batch):
@@ -225,6 +244,7 @@ async def main() -> int:
     ap.add_argument("--clean", action="store_true", help="pre-chunk cleanup: cover, TOC, page header/footer, screenshot figure zones, inline tags")
     ap.add_argument("--resolve-xrefs", action="store_true", help="append the target section's text to cross-reference-only sections")
     ap.add_argument("--reparse", action="store_true", help="ignore the accepted parse in the parse store and parse again (normally never needed)")
+    ap.add_argument("--embed-input", choices=["meta", "text"], default="meta", help="what is embedded: metadata+text (LlamaIndex-compatible, the live set) or text only")
     a = ap.parse_args()
 
     docs = Path(a.documents)
@@ -251,7 +271,7 @@ async def main() -> int:
             source_type = "pdf" if f.suffix.lower() == ".pdf" else "docx"
             module = module_of(f.name)
             bkey = build_key_for(parse_key_for(sha, a.tier, a.version), CLEANUP_VERSION if a.clean else None, CHUNKER_VERSION,
-                                 a.max_chunk, a.overlap, a.resolve_xrefs)
+                                 a.max_chunk, a.overlap, a.resolve_xrefs, a.embed_input)
             if conn is not None and not a.force:
                 prev = await conn.fetchrow("SELECT sha256, chunks, build_key FROM assistant_documents WHERE index_set=$1 AND file=$2", a.index_set, f.name)
                 if prev and prev["sha256"] == sha and prev["chunks"] > 0 and prev["build_key"] == bkey:
@@ -307,7 +327,7 @@ async def main() -> int:
                 short = sum(1 for c in chunks if len(c.text) < 100)
                 log(f"   {len(chunks)} chunks, pages={pages}, <100-char chunks={short}")
                 if conn is not None and oai is not None:
-                    embs = embed_all(oai, embed_model, [c.text for c in chunks], a.embed_batch, log)
+                    embs = embed_all(oai, embed_model, [embed_input(c, a.embed_input) for c in chunks], a.embed_batch, log)
                     await store_document(conn, index_set=a.index_set, file=f.name, module=module, sha=sha, source_type=source_type,
                                          chunks=chunks, embeddings=embs, pages=pages, stub=stub, tier=a.tier, version=a.version, embed_model=embed_model,
                                          job_id=job_id, cleaned=bool(a.clean), xrefs_resolved=xres, xrefs_unresolved=xun, clean_report=clean_report)

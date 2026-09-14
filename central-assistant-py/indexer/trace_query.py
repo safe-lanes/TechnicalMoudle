@@ -33,8 +33,10 @@ def main() -> None:
             n += 1
             tok = sign_identity({"userId": f"trace-{n}", "userName": "Trace", "role": "Sail Admin", "tenantDomain": "smoke-suite-tenant"}, key, 60)
             j = httpx.post(f"{url}/chat", headers={"x-assistant-identity": tok}, json={"message": q, "routeOnly": True, "context": {"module": a.module}}, timeout=90).json()
-            hits = [(c.get("manual", "")[:30], (c.get("section") or "")[-14:], c.get("distance")) for c in (j.get("citations") or [])[:3]]
-            print(f"   {name:<14} gate={j.get('gate'):<14} module={str(j.get('module')):<10} margin={j.get('confidence')} candidates={j.get('candidates')} hits={hits}")
+            hits = [(c.get("manual", "")[:22], (c.get("section") or "")[-34:], c.get("distance")) for c in (j.get("citations") or [])]
+            print(f"   {name:<14} gate={j.get('gate'):<14} module={str(j.get('module')):<10} margin={j.get('confidence')} candidates={j.get('candidates')}")
+            for h in hits:
+                print(f"        {h}")
 
 
 if __name__ == "__main__":
