@@ -70,6 +70,42 @@ export function setActiveIdentity(identity: ActiveIdentity | null | undefined): 
     : {};
 }
 
+/**
+ * Update rank and identity in one logical request context. The fetch
+ * interceptor reads both synchronously, so impersonation never exposes a
+ * half-updated identity to an API request.
+ */
+export function setActiveSession(
+  rank: string | null | undefined,
+  identity: ActiveIdentity | null | undefined,
+): boolean {
+  const nextRank = rank && rank.trim() ? rank.trim() : null;
+  const rankChanged = nextRank !== activeRank;
+  const norm = (v: unknown): string | null =>
+    typeof v === "string" && v.trim() ? v.trim() : null;
+  const nextIdentity: ActiveIdentity = identity
+    ? {
+        userId: norm(identity.userId),
+        name: norm(identity.name),
+        email: norm(identity.email),
+        userType: norm(identity.userType),
+        role: norm(identity.role),
+      }
+    : {};
+  activeRank = nextRank;
+  activeIdentity = nextIdentity;
+  if (rankChanged) {
+    for (const listener of Array.from(listeners)) {
+      try {
+        listener(activeRank);
+      } catch (err) {
+        console.error("[activeRank] listener error:", err);
+      }
+    }
+  }
+  return rankChanged;
+}
+
 export function subscribeActiveRank(listener: (rank: string | null) => void): () => void {
   listeners.add(listener);
   return () => {
@@ -116,15 +152,22 @@ export function installRankFetchInterceptor(): void {
       return originalFetch(input, init);
     }
 
-    // Inject auth/audit headers without overwriting any the caller already set.
+    // These are authoritative: an API request must not combine one user's
+    // rank with another user's identity.
     const applyAuthHeaders = (h: Headers) => {
-      if (rank && !h.has("x-rank")) h.set("x-rank", rank);                                   // (a) x-rank
+      h.delete("x-rank");
+      h.delete("x-user-id");
+      h.delete("x-user-name");
+      h.delete("x-user-email");
+      h.delete("x-user-type");
+      h.delete("x-user-role");
+      if (rank) h.set("x-rank", rank);                                                        // (a) x-rank
       if (token && !h.has("authorization")) h.set("Authorization", `Bearer ${token}`);        // (b) Bearer token
-      if (identity.userId && !h.has("x-user-id")) h.set("x-user-id", encodeURIComponent(identity.userId)); // (c) x-user-*
-      if (identity.name && !h.has("x-user-name")) h.set("x-user-name", encodeURIComponent(identity.name));
-      if (identity.email && !h.has("x-user-email")) h.set("x-user-email", encodeURIComponent(identity.email));
-      if (identity.userType && !h.has("x-user-type")) h.set("x-user-type", encodeURIComponent(identity.userType));
-      if (identity.role && !h.has("x-user-role")) h.set("x-user-role", encodeURIComponent(identity.role));
+      if (identity.userId) h.set("x-user-id", encodeURIComponent(identity.userId)); // (c) x-user-*
+      if (identity.name) h.set("x-user-name", encodeURIComponent(identity.name));
+      if (identity.email) h.set("x-user-email", encodeURIComponent(identity.email));
+      if (identity.userType) h.set("x-user-type", encodeURIComponent(identity.userType));
+      if (identity.role) h.set("x-user-role", encodeURIComponent(identity.role));
     };
 
     if (input instanceof Request) {

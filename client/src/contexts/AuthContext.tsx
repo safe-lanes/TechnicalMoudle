@@ -21,8 +21,7 @@ import {
 import { isReplit } from "@/lib/env";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 import {
-  setActiveRank,
-  setActiveIdentity,
+  setActiveSession,
   type ActiveIdentity,
 } from "@/lib/activeRank";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -175,6 +174,9 @@ interface AuthContextType {
   userType: UIRole | null;
   /** Full fail-closed resolution state (Task #324) — loading/error/blocked drives the app gate. */
   uiRoleResolution: ViewModeResolution;
+  isTestIdentityActive: boolean;
+  impersonateTestUser: (user: PublicUser) => void;
+  resetTestUser: () => void;
   login: (user: PublicUser) => void;
   logout: () => void;
 }
@@ -195,6 +197,13 @@ function invalidateRankScopedQueries() {
       );
     },
   });
+}
+
+function refreshQueriesForIdentityChange() {
+  // Abort any response that belongs to the previous identity before refetching
+  // active queries with the new atomic rank + forwarded-user context.
+  void queryClient.cancelQueries();
+  void queryClient.invalidateQueries();
 }
 
 /**
@@ -282,15 +291,19 @@ function captureVesselAssignments(assignments: MyVesselAssignment[], userUuid: s
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
+  // Replit-only, memory-only override. The authenticated account above is
+  // intentionally retained so reset can restore its exact rank and identity.
+  const [testUser, setTestUser] = useState<PublicUser | null>(null);
   const [myVessels, setMyVessels] = useState<MyVesselAssignment[]>([]);
   const [domain, setDomain] = useState<string | null>(null);
+  const activeUser = testUser ?? currentUser;
 
   // Task #324 — view mode is resolved SERVER-SIDE (DB mapping, fail-closed with
   // the Office/'Sail Admin' bypass), replacing the old synchronous
   // mapLoggedRoleToUIRole call. Shared TanStack key with UIRoleContext.
   const uiRoleResolution = useViewModeResolution(
-    currentUser?.userType ?? null,
-    currentUser?.role ?? null,
+    activeUser?.userType ?? null,
+    activeUser?.role ?? null,
   );
   const userType = uiRoleResolution.uiRole;
 
@@ -368,9 +381,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setCurrentUser(resolvedUser);
     setMyVessels(resolvedMyVessels);
     setDomain(resolveDomain());
-    const hydratedRankChanged = setActiveRank(resolvedUser?.rank_name ?? null);
-    // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
-    setActiveIdentity(toActiveIdentity(resolvedUser));
+    const hydratedRankChanged = setActiveSession(
+      resolvedUser?.rank_name ?? null,
+      toActiveIdentity(resolvedUser),
+    );
     // Capture-at-login (hydration path: an already-logged-in session reloading the app).
     // AFTER setActiveIdentity so the x-user-id header is on the request.
     captureVesselAssignments(resolvedMyVessels, resolvedUser?.userUuid);
@@ -386,17 +400,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const hasRole = (role: UserRole | UserRole[]): boolean => {
-    if (!currentUser) return false;
+    if (!activeUser) return false;
     if (Array.isArray(role)) {
-      return role.includes(currentUser.role);
+      return role.includes(activeUser.role);
     }
-    return currentUser.role === role;
+    return activeUser.role === role;
   };
 
-  const isShipUser = currentUser?.userType === "Ship";
-  const isOfficeUser = currentUser?.userType === "Office";
+  const isShipUser = activeUser?.userType === "Ship";
+  const isOfficeUser = activeUser?.userType === "Office";
   const isPMSAdmin =
-    currentUser?.role === "PMS Admin" || currentUser?.role === "Sail Admin";
+    activeUser?.role === "PMS Admin" || activeUser?.role === "Sail Admin";
 
   const canViewDocument = (shipViewable: boolean): boolean => {
     if (isPMSAdmin || isOfficeUser) return true;
@@ -416,6 +430,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const canApproveChanges = (): boolean => {
     return isPMSAdmin || isOfficeUser;
+  };
+
+  const impersonateTestUser = (user: PublicUser) => {
+    if (!isReplit() || !user.userUuid) return;
+    setTestUser(user);
+    setActiveSession(user.rank_name ?? null, toActiveIdentity(user));
+    refreshQueriesForIdentityChange();
+  };
+
+  const resetTestUser = () => {
+    if (!isReplit()) return;
+    setTestUser(null);
+    setActiveSession(currentUser?.rank_name ?? null, toActiveIdentity(currentUser));
+    refreshQueriesForIdentityChange();
   };
 
   const login = (user: PublicUser) => {
@@ -442,6 +470,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // View mode resolves reactively from the server via useViewModeResolution
     // once currentUser updates (Task #324) — no synchronous mapping here.
+    setTestUser(null);
     setCurrentUser(sanitizedUser);
 
     // Keep assigned-fleet ("My Vessel") scope in sync with the freshly
@@ -456,9 +485,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setMyVessels(loginMyVessels);
     setDomain(resolveDomain());
 
-    const rankChanged = setActiveRank(sanitizedUser.rank_name ?? null);
+    const rankChanged = setActiveSession(
+      sanitizedUser.rank_name ?? null,
+      toActiveIdentity(sanitizedUser),
+    );
     // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
-    setActiveIdentity(toActiveIdentity(sanitizedUser));
     // Capture-at-login (fresh login path). AFTER setActiveIdentity so x-user-id is sent.
     captureVesselAssignments(loginMyVessels, sanitizedUser.userUuid);
     if (rankChanged) {
@@ -467,6 +498,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = () => {
+    // A logout request must not combine the retained account role with an
+    // impersonated forwarded identity/rank. Restore one coherent account first.
+    if (testUser) {
+      setTestUser(null);
+      setActiveSession(currentUser?.rank_name ?? null, toActiveIdentity(currentUser));
+    }
     // Capture the role before we clear local state below, so Shipskart evicts
     // the session for the SAME account Purchasing opened (backend maps role→account).
     const roleForLogout = currentUser?.role ?? "";
@@ -502,11 +539,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoggedOutMarker();
 
     setCurrentUser(null);
+    setTestUser(null);
     setMyVessels([]);
     setDomain(null);
-    const rankChanged = setActiveRank(null);
+    const rankChanged = setActiveSession(null, null);
     // Audit Phase 0 — clear the forwarded identity on logout.
-    setActiveIdentity(null);
     if (rankChanged) {
       invalidateRankScopedQueries();
     }
@@ -526,10 +563,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const value: AuthContextType = {
-    currentUser,
+    currentUser: activeUser,
     myVessels,
     domain,
-    isAuthenticated: !!currentUser,
+    isAuthenticated: !!activeUser,
     hasRole,
     isShipUser,
     isOfficeUser,
@@ -540,6 +577,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     canApproveChanges,
     userType,
     uiRoleResolution,
+    isTestIdentityActive: !!testUser,
+    impersonateTestUser,
+    resetTestUser,
     login,
     logout,
   };

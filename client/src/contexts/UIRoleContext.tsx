@@ -28,7 +28,7 @@ interface ResolutionInputs {
 }
 
 export function UIRoleProvider({ children }: UIRoleProviderProps) {
-  const { currentUser } = useAuth();
+  const { currentUser, isTestIdentityActive } = useAuth();
   const [inputs, setInputs] = useState<ResolutionInputs>({ userType: null, role: null });
   // DEV-only role switcher override — wins over server resolution so switching
   // to synthetic storage roles (e.g. "Client Admin") never hits ROLE_NOT_FOUND.
@@ -37,6 +37,17 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
   useEffect(() => {
     if (!currentUser) {
       setInputs({ userType: null, role: null });
+      setDevOverride(null);
+      return;
+    }
+
+    // A Replit test identity is an explicit in-memory override and must drive
+    // resolution directly; it must not be shadowed by the signed-in profile.
+    if (isTestIdentityActive) {
+      setInputs({
+        userType: currentUser.userType ?? null,
+        role: currentUser.role ?? null,
+      });
       setDevOverride(null);
       return;
     }
@@ -62,7 +73,7 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
       userType: currentUser.userType ?? null,
       role: currentUser.role ?? null,
     });
-  }, [currentUser]);
+  }, [currentUser, isTestIdentityActive]);
 
   const resolution = useViewModeResolution(inputs.userType, inputs.role);
   const uiRole = devOverride ?? resolution.uiRole;

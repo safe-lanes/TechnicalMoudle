@@ -24,6 +24,7 @@ import BulkUpdateStores from "./pages/stores/BulkUpdateStores";
 
 import NotFound from "./pages/not-found";
 import { ChatButton } from "./components/chat/ChatButton";
+import { TestIdentityBanner } from "./components/RoleSwitcher";
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <UIRoleProvider>
+            <TestIdentityBanner />
             <ViewModeGate>
             <PermissionsProvider>
             <VesselProvider>
