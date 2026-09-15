@@ -35,8 +35,17 @@ from acceptance_answers import ask, judge  # noqa: E402
 #     checked ONLY if the answer describes Generate Now; (c) wo-phr-02 ("raise a work order for a pump") expects the
 #     unplanned procedure plus a one-line note of the other ways. JUDGE_VERSION selects 3 or 4 so old and new scores
 #     can be shown on the same stored answers (rejudge_wo.py).
-WO_SUITE_VERSION = "2026-09-14.4"
-JUDGE_VERSION = 4
+# .5 (owner GO, 15-Sep, after external review): per-action ATTRIBUTION rebuilt. .3/.4 split the answer into blocks only at
+#     bold/markdown headings or blank lines, so an answer written as "1. … 2. … 3. …" (inline, or one item per line) was ONE
+#     block and a condition stated for 'Generate Now' satisfied the 'Generate WO' check (D2 wo-phr-03 run 3: per-job switch
+#     missing, judge said "pairing ✓"). .5 segments the body into units (line breaks, "N." enumerators at line start or
+#     inline — section numbers such as 1.1.5.2 excluded —, "- " bullets, sentence ends) and builds ACTION SCOPES: a unit
+#     naming an action opens that action's scope; following units that name no action belong to the open scope (sub-bullet
+#     conditions stay with their action); a unit naming another action closes it. Conditions are then checked inside the
+#     scope of the action they belong to — never across the whole answer. Limitation (reported, not hidden): a condition
+#     stated in a unit BEFORE the first action unit belongs to no scope and does not count.
+WO_SUITE_VERSION = "2026-09-14.5"
+JUDGE_VERSION = 5
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -81,12 +90,48 @@ def block_for(body: str, keyword_re: str) -> str:
     return "\n".join(b for b in blocks_of(body) if re.search(keyword_re, b))
 
 
-def check_pairing(body: str) -> tuple[bool, str]:
-    """Per-action permission pairing (suite .3):
-       Generate Now  → must state Sail Admin AND the vessel switch in ITS block
-       Generate WO   → must state the vessel switch in ITS block and must NOT attach Sail Admin there"""
-    gn = block_for(body, r"generate now")
-    gw = block_for(body, r"generate wo\b|generate wo'|'generate wo|generate work order for|specific job")
+GN_RE = r"generate now"
+GW_RE = r"generate wo\b|generate wo'|'generate wo|generate work order for|specific job"
+UN_RE = r"unplanned"
+PL_RE = r"planned \(scheduled\)|scheduled work order|generated automatically|created automatically|automatically generat|automatically creat|daily scan"
+ACTIONS = [("GN", GN_RE), ("GW", GW_RE), ("UN", UN_RE), ("PL", PL_RE)]
+_UNIT_SPLIT = re.compile(
+    r"\n+"                                              # line breaks
+    r"|(?<![\d.])(?<=\s)(?=\d{1,2}\.\s\S)"              # inline "N. " enumerator (not 1.1.5.2, not after a digit/dot)
+    r"|(?<=\s)(?=- )"                                   # "- " bullet
+    r"|(?<=[.!?])\s+(?=\S)"                             # sentence end
+)
+
+
+def units_of(body: str) -> list[str]:
+    """Judge .5 segmentation: units = enumerated items (line-start or inline), bullets, lines, sentences."""
+    return [u.strip() for u in _UNIT_SPLIT.split(body) if u and u.strip()]
+
+
+def scopes_of(body: str) -> dict[str, str]:
+    """Judge .5: action scopes. Each unit naming an action opens that action's scope (units naming several actions are
+    added to every one of them); units naming no action are appended to the currently open scope. Returns action → text."""
+    scopes: dict[str, list[str]] = {a: [] for a, _ in ACTIONS}
+    current: list[str] = []
+    for u in units_of(body):
+        named = [a for a, pat in ACTIONS if re.search(pat, u)]
+        if named:
+            current = named
+        for a in current:
+            scopes[a].append(u)
+    return {a: " ".join(v) for a, v in scopes.items()}
+
+
+def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
+    """Per-action permission pairing (suite .3; attribution rebuilt in .5):
+       Generate Now  → must state Sail Admin AND the vessel switch in ITS scope
+       Generate WO   → must state the vessel switch in ITS scope and must NOT attach Sail Admin there"""
+    if version >= 5:
+        sc = scopes_of(body)
+        gn, gw = sc["GN"], sc["GW"]
+    else:
+        gn = block_for(body, GN_RE)
+        gw = block_for(body, GW_RE)
     notes: list[str] = []
     if not gn:
         notes.append("Generate Now not described")
@@ -111,7 +156,7 @@ def extra_rule(rule: str, text: str, version: int = JUDGE_VERSION) -> tuple[bool
     auto_re = AUTO_V4 if version >= 4 else AUTO_V3
     if rule == "three-paths":
         auto = bool(re.search(auto_re, t))
-        pair_ok, pair_why = check_pairing(t)
+        pair_ok, pair_why = check_pairing(t, version)
         return auto and pair_ok, ("automatic generation " + ("✓" if auto else "MISSING") + "; " + pair_why)
     if rule == "planned-auto":
         auto = bool(re.search(r"(automatic|daily scan|generated (by|from)|from the job)", t))
@@ -121,7 +166,7 @@ def extra_rule(rule: str, text: str, version: int = JUDGE_VERSION) -> tuple[bool
             return auto and office, "automatic generation " + ("✓" if auto else "MISSING") + "; Generate Now conditions (Sail Admin + switch) " + ("✓" if office else "MISSING")
         # v4: scope = the question asked (how planned WOs are created; must I create them?)
         no_user = bool(re.search(r"(do not have to|don't have to|no user action|not required|no action|does not require|nobody|by the system|by the ship system|automatically)", t))
-        gn = block_for(t, r"generate now")
+        gn = scopes_of(t)["GN"] if version >= 5 else block_for(t, r"generate now")
         pairing_ok = True
         note = ""
         if gn:  # only judged when the answer chose to describe Generate Now

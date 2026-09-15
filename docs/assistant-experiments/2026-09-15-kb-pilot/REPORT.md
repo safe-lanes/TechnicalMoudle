@@ -188,6 +188,65 @@ One run each on A and B (`kb3-general5.txt`, ranks in `kb3-rank.txt`). No pilot 
 
 Reviewer's proposed diagnostic (give the failing generic question ONLY the overview, unchanged prompt): feasible inside the prompt-v2 container by calling `retrieval.docs_prompt` with a one-hit `Routed` — must run in that container, because `app/retrieval.py` on the branch carries the v3 conditions rule text (lines 131-133), not v2. Not run; awaiting the owner.
 
+## 9. Judge .5 + captured model inputs + overview-only diagnostic (owner GO, 15-Sep; `judge5-validation.txt`, `diag-*`)
+
+Live unchanged. No content, retrieval or prompt change. Nothing deployed.
+
+### 9.1 Judge .5 — attribution rebuilt, validated on the 96 stored answers first
+
+`acceptance_wo.py` WO_SUITE_VERSION `2026-09-14.5`, `JUDGE_VERSION` 3|4|5 selectable; frozen suites and the shared base judge untouched. .5 segments the answer body into units (line breaks; "N." enumerators at line start or inline, section numbers like 1.1.5.2 excluded; "- " bullets; sentence ends) and builds action scopes: a unit naming an action opens that action's scope, units naming no action stay with the open scope (sub-bullet conditions stay with their action), a unit naming another action closes it. Conditions are checked inside the scope of their own action. Segmentation is the mechanism, not the proof: every scope the judge attributed was printed and read (`judge5-validation.txt`, `--scopes`).
+
+Format survey of the 96 answers (D2 + D3): 87 numbered items on separate lines, 9 plain paragraphs, 0 with headings only — under .3/.4, 78 of the 96 were ONE block, so any condition anywhere in the answer satisfied any action.
+
+Validation on the same stored answers (`rejudge_wo.py`, versions 3/4/5 side by side):
+
+| what changed .4 → .5 | count | detail |
+|---|---|---|
+| rule-level outcome | 1 | D2 wo-phr-03 B run 3: .4 "pairing ✓" → .5 "pairing ✗: Generate WO block lacks the vessel switch" — the known false positive; the per-job sentence reads "any user can generate a work order on demand, provided the job does not already have an active work order" (no switch) |
+| overall PASS/fail per run | 0 | that run already failed the literal must-phrase, so no case score moves; all 16 case rows keep their .4 score |
+| known false negatives re-checked | 0 changed | D3 wo-phr-01/05 B (6 runs) still fail — by reading, their per-job scope has no switch; D2 wo-phr-01 runs 1–2 and wo-phr-05 run 2 still pass — their per-job scope states the switch |
+
+Manual scope check: all 18 B answers that name Generate Now or Generate WO were read against their .5 scopes; every condition is attributed to the action it was written for. Artefact (harmless, reported): the next item's heading ("2. **one job on demand**:") trails into the previous scope because a heading names no action. Limitation: a condition written BEFORE the first action unit belongs to no scope; none of the 96 answers does this.
+
+### 9.2 Environment record (PROVEN from the container and the captured wire bodies)
+
+| item | value |
+|---|---|
+| container / image | `sail-assistant-py-exp2` (port 8018), image `sha256:8db669090d36…` = `sail-assistant-py:prompt-v2`, started 2026-09-15T04:45:57Z |
+| prompt | `v2-xref-hardrule-2026-09-14` · docsPromptSha `b37172f6122a0257` · toolLoopPromptSha `f8e5a8f86bede638` · combined `ebfd83a623e41173` (from `/health`); **every one of the 12 captured chat bodies carries a system message whose sha256[:16] = `b37172f6122a0257`** — the served v2 text, not the branch's v3 text |
+| model settings | `gpt-4o-mini`, temperature 0.2, timeout 30 s (in every captured body) |
+| retrieval settings | answer_chunks 5 · route_top_k 10 · sim floor 1.15 · margin 0.07 · masking on |
+| index | `kb-pilot`, 916 chunks (911 without `source` + 5 `kb-pilot`); overview chunk 2,044 chars, metadata carries `kb_sha256`, `chunker_version`, `embed_model`, `embed_sha` (no build table exists in this schema — `assistant_index_builds` absent) |
+| identity / masking | acceptance test identity (`diag-N`, "Acceptance", Sail Admin, `smoke-suite-tenant`), masking path on; capture scanned: 0 keys, 0 bearer tokens, 0 identity names |
+| capture | `ASSISTANT_CAPTURE_OUTBOUND` set on the diagnostic **process only** (docker exec env), never on the running service; 18 wire bodies (6 embeddings + 12 chat); file copied out, deleted from the container and from the server's /tmp; nothing to disable afterwards |
+
+Arm NORMAL = `app.chat.handle_chat(...)` in-process — the served path (rate limit, pair, redirect, embed → retrieve → route → `docs_prompt` → `agent.answer_docs`) minus the HTTP layer; decision surfaced here, taken so the running service needed no restart to capture. Arm OVERVIEW = the same docs path with `routed` replaced by one hit, the complete overview chunk, fetched from the same index set. Everything else identical. Captured user messages: NORMAL 6,417 / 5,095 chars with 5 `[i] (manual — section)` excerpts; OVERVIEW 2,272 / 2,301 chars with 1.
+
+### 9.3 Results — 2 questions × 2 arms × 3 runs (`diag-analysis.txt` has every full input and answer; `diag-capture.jsonl` the wire bodies)
+
+| question | arm | excerpts in the captured message | alternatives covered | Generate Now with Sail Admin + switch | per-job Generate WO with the office switch | judge .5 |
+|---|---|---|---|---|---|---|
+| How do I create a work order? | NORMAL | manual unplanned ×2 (ranks 1–2), **overview (rank 3)**, manual completion ×2 | 0/3 — unplanned only | not described 3/3 | not described 3/3 | 0/3 |
+| How do I create a work order? | OVERVIEW only | overview | **3/3** | 3/3 | 2/3 (run 2 drops it) | 1/3 (runs 2–3 also fail a judge synonym, see 9.4) |
+| What are the different ways…? | NORMAL | **overview (rank 1)**, manual intro ×2, manual unplanned ×2 | 3/3 | 3/3 | **0/3** — "No role check applies; the job must be active and must not already have an active work order" (the middle clause "in the office only if the vessel switch is on" dropped every time) | 0/3 |
+| What are the different ways…? | OVERVIEW only | overview | 3/3 | 3/3 | **3/3** | **3/3** |
+
+### 9.4 Split by kind (owner rule: missing prerequisites are substantive answer defects)
+
+| kind | NORMAL (6 runs) | OVERVIEW only (6 runs) |
+|---|---|---|
+| unsupported or incorrect instruction | 0 | 0 (every step matches the overview text) |
+| **missing prerequisite for an action described** | 3 (phr-01: per-job switch, 3/3) | 1 (generic-01 run 2: per-job switch) |
+| missing alternative the question asks for | 3 (generic-01: planned + per-job absent, 3/3) | 0 |
+| environment qualifier weakened (condition kept, "office only" dropped or everything framed office-side) — not counted by the judge | 0 | 4 (generic-01 runs 1, 3: "The vessel's switch must be ON for this option" without "office only"; phr-01 run 1 same; phr-01 run 3 frames per-job and unplanned as "In the office, …") — reported as a substantive precision defect, distinct from a missing prerequisite |
+| judge-only | 0 | 2 (generic-01 runs 2–3: "The system generates them/these automatically" is not in the automatic-generation phrase list of .4/.5 — a synonym gap found after validation; not edited) |
+
+### 9.5 What the diagnostic decides
+
+With the overview ALONE and the unchanged v2 prompt, the model covers all three ways 6/6 and keeps the per-job office switch 5/6. With the normal five excerpts — where the overview IS in the captured message (rank 3 and rank 1) — it drops the alternatives 3/3 for the generic question and the per-job switch 3/3 for the "different ways" question. Per the reviewer's decision tree: the conditions largely survive when the overview is alone, so the dominant cause is the **competing manual excerpts**, not the prompt or the content. Two observations narrow it further (INFERRED, one diagnostic): for the generic question the manual's unplanned sections sit at ranks 1–2 above the overview and the answer copies them; for "different ways" the overview is rank 1 and the alternatives survive but the one clause that the manual never states (the office switch) is the one dropped. A residual answer-construction effect remains (1/6 switch drop and 4/6 weakened environment qualifiers with the overview alone).
+
+**Smallest next fix to test (not implemented):** on the candidate only, collapse the duplicated Office/Vessel manual sections in the five excerpts — the same section from the two manuals occupies two of the five slots for both questions (ranks 1–2 for the generic question, 3–4 for "different ways") — so the overview and its conditions compete with less near-duplicate text. It changes which of the already-retrieved chunks are shown, nothing else; measured with the frozen suites (must stay 18/18 · 11/12 · 13/14) and the work-order suite under judge .5, three runs, with wire capture. Second candidate, only if that fails: a conditions rule in the prompt, re-tested against frozen case 09 (the v3 attempt regressed it). Judge follow-up for the owner: add "system generates … automatically" to the phrase list as .6, re-validated on the 108 stored answers before use.
+
 ### 8.6 Not changed / open
 
 Not changed: live, prompt (v2 on both instances), retrieval logic, thresholds, excerpt count, the frozen suites, the base judge's literal must-phrase check. Open for the owner: (1) the answer-generation drops now dominate — the conditions rule (prompt v3) targeted this and regressed frozen case 09 (§S.7.1); a reworded rule or a content-ordering change are the untested candidates; (2) two retrieval residues (wo-generic-03; wo-phr-02's "other ways" note, which could also be one sentence in unplanned-wo.md); (3) the literal must-phrase check in the shared base judge fails wo-phr-03 answers that are right by meaning.
