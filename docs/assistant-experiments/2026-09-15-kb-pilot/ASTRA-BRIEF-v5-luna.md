@@ -68,6 +68,16 @@ Work-order phrasings, candidate, every failing run read against the overview and
 
 Actual usage of the candidate over the suites (conversation log; usage recording fixed on the branch — see §7): 99 answers, 153,300 prompt / 38,939 completion tokens, ≈ $0.077 at the list price; latency mean 5.3 s, max 10.5 s (gpt-4o-mini: 2.5 s / 7.0 s).
 
+## 5a. Corrections after the reviewer's check (15-Sep) — REPORT §13.4a
+
+1. "No unsupported claims" withdrawn: replay generic run 3 contradicts itself on whether the June manuals describe the per-job path (they do, p.18; the excerpt-level statement should have said "not in these excerpts"); replay generic run 2 has a garbled source-comparison sentence. Corrected count: conditions and coverage 6/6, unsupported or inconsistent statements 2/6 (both in the source-comparison sentence).
+2. Retrieval distances: 17/18 identical; "raise a lesson learnt" 1.0129 vs 1.0145 (question-embedding variation, ranking unchanged). Corrected-suite equal totals hide a loss on gen-01 (B 0/3, word-match on "generated" vs "generates"; full answers quoted in §13.4a and in `luna-generated-dump.jsonl`) and a gain on gen-13.
+3. Pump phrasing: the candidate assumes unplanned work ("To raise a work order for the pump, create an unplanned work order") — now classified as a real answer defect (unsupported assumption) in addition to the retrieval miss.
+4. The tested package includes the five KB files; switching only model + prompt on the live index is untested, and the provenance line has not reached the model yet.
+5. "$0.00000" relabelled "usage UNAVAILABLE — the call was not free" in `luna-analysis.txt`.
+
+Judge .9 (parsing only): requirements block after a held heading travels with it; quoted manual file names ignored by the Sail-Admin check. Validated on 192 stored answers — exactly the two intended verdicts change. Candidate work-order score under .9: 6/8.
+
 ## 6. Open judge items (reported, not changed)
 
 1. Requirements bullets separated from their heading by a blank line are attributed to the previous action (.8 block parser).
@@ -79,6 +89,12 @@ Actual usage of the candidate over the suites (conversation log; usage recording
 
 - `CHAT_TEMPERATURE` setting: "0.2" (served default) or "default" = no temperature sent; `/health` reports `chatModel` and `temperature`.
 - Usage bug: pydantic-ai 2.42 exposes `AgentRunResult.usage` as a property; the service called it as a method, swallowed the error and logged `tokens_in/out = None` for every conversation since the port. Fixed; telemetry only.
+
+## 7a. Reviewer's next direction — plan, not started (REPORT §13.6)
+
+- Retrieval misses (wo-generic-03 overview outside the top 8; wo-phr-02 overview at rank 8): options are a hybrid lexical boost using the existing unused `tsvector` column (recommended, smallest change able to reach both), one-excerpt-per-section with refill (reaches only the pump phrasing), or the reranker step. Owner decision.
+- Provenance notice: build `kb-pilot-prov` (five KB chunks re-embedded with the "draft code-derived guidance … revision cf5241ad6; running deployment unverified" line), confirm by capture that it reaches the model, run the suites (~$0.08).
+- Deployment package: run the full suites on exactly the package the owner chooses — model + prompt + key on `repaired` 911, or the same plus the KB files with the notice — before any promotion. Neither has been tested yet.
 
 ## 8. Decision points for the owner (not taken)
 

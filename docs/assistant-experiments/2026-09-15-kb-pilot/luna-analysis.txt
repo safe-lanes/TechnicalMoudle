@@ -4,7 +4,7 @@ contexts: {"wo-generic-01": {"question": "How do I create a work order?", "chars
 
 --- wo-generic-01 · v5 · run 1 · 10992 ms · 2302 chars
     wire: model=gpt-5.6-luna temperature=(not sent) other params=[] system_sha=ff9ee87141ac1362 == v5 ✓ user_sha=ef40f46331cd52c8 == captured ✓
-    usage: {} · cost @ $0.2/$1.2 per 1M = $0.00000
+    usage: UNAVAILABLE for this call (the service returned no usage — pydantic-ai usage-property bug, fixed afterwards, REPORT §13.3); the call was NOT free — estimate ≈2,300 prompt + ≈600 completion tokens ≈ $0.0012 at $0.20/$1.20 per 1M
     judge .8: rule ✓ (automatic generation ✓; pairing ✓) · must-phrases missing: [] · invented xref: False
     GN scope: the excerpts support three ways to create a work order: - in the office, a **sail admin** can select one vessel on the work orders screen and click **generate now**, but only when the vessel’s **office work-order generation** switch is on. the switch is set in **lead time & grace period settings** a
     GW scope: 2. **create one work order for a specific job** - go to **components**. - in the office, select the vessel. - open the component, go to **part c**, and click **generate wo**. - select the reason: **planning**, **breakdown**, or **other**. - normal sign-in and vessel access are required. there is no role check, but in the office the vessel’s office work-order generation switch must be on. the job must be active and mu
@@ -40,7 +40,7 @@ contexts: {"wo-generic-01": {"question": "How do I create a work order?", "chars
 
 --- wo-generic-01 · v5 · run 2 · 8979 ms · 2387 chars
     wire: model=gpt-5.6-luna temperature=(not sent) other params=[] system_sha=ff9ee87141ac1362 == v5 ✓ user_sha=ef40f46331cd52c8 == captured ✓
-    usage: {} · cost @ $0.2/$1.2 per 1M = $0.00000
+    usage: UNAVAILABLE for this call (the service returned no usage — pydantic-ai usage-property bug, fixed afterwards, REPORT §13.3); the call was NOT free — estimate ≈2,300 prompt + ≈600 completion tokens ≈ $0.0012 at $0.20/$1.20 per 1M
     judge .8: rule ✓ (automatic generation ✓; pairing ✓) · must-phrases missing: [] · invented xref: False
     GN scope: the technical kb guidance supports three ways to create a work order: a **sail admin** can select one vessel on the work orders screen and click **generate now**, but only when that vessel’s **office work-order generation** switch is on. the switch is set by a sail admin under **lead time & grace pe
     GW scope: 2. **one job on demand** - open **components**. - in the **office**, select the vessel. - open the component, go to **part c**, and click **generate wo**. - select the reason: **planning**, **breakdown**, or **other**. - this has **no role check** beyond normal sign-in and vessel access. in the office, the vessel’s **office work-order generation** switch must be on. the job must be active and must not already have an
@@ -77,7 +77,7 @@ contexts: {"wo-generic-01": {"question": "How do I create a work order?", "chars
 
 --- wo-generic-01 · v5 · run 3 · 8123 ms · 2314 chars
     wire: model=gpt-5.6-luna temperature=(not sent) other params=[] system_sha=ff9ee87141ac1362 == v5 ✓ user_sha=ef40f46331cd52c8 == captured ✓
-    usage: {} · cost @ $0.2/$1.2 per 1M = $0.00000
+    usage: UNAVAILABLE for this call (the service returned no usage — pydantic-ai usage-property bug, fixed afterwards, REPORT §13.3); the call was NOT free — estimate ≈2,300 prompt + ≈600 completion tokens ≈ $0.0012 at $0.20/$1.20 per 1M
     judge .8: rule ✓ (automatic generation ✓; pairing ✓) · must-phrases missing: [] · invented xref: False
     GN scope: the excerpts support three ways to create a work order: a **sail admin** can click **generate now** on the work orders screen for one vessel, but only when that vessel’s **office work-order generation** switch is on. - normal sign-in and vessel access apply. a job with an active work order cannot re
     GW scope: 2. **create a work order for one job on demand** 4. click **generate wo**. 5. select the reason: **planning**, **breakdown**, or **other**. no specific role check is required, but normal sign-in and vessel access apply. the job must be active and must not already have an active work order. in the office, the vessel’s **office work-order generation** switch must be on. this path is not described in the june manuals.
@@ -117,7 +117,7 @@ contexts: {"wo-generic-01": {"question": "How do I create a work order?", "chars
 
 --- wo-phr-01 · v5 · run 1 · 8060 ms · 2002 chars
     wire: model=gpt-5.6-luna temperature=(not sent) other params=[] system_sha=ff9ee87141ac1362 == v5 ✓ user_sha=57816b0740f3a644 == captured ✓
-    usage: {} · cost @ $0.2/$1.2 per 1M = $0.00000
+    usage: UNAVAILABLE for this call (the service returned no usage — pydantic-ai usage-property bug, fixed afterwards, REPORT §13.3); the call was NOT free — estimate ≈2,300 prompt + ≈600 completion tokens ≈ $0.0012 at $0.20/$1.20 per 1M
     judge .8: rule ✓ (automatic generation ✓; pairing ✓) · must-phrases missing: [] · invented xref: False
     GN scope: - **in the office:** a **sail admin** can click **generate now** for one vessel on the work orders screen, but the vessel’s **office work-order generation** switch must be on. it is off by default and is set in **lead time & grace period settings**. the kb pilot guidance additionally documents autom
     GW scope: 2. **on-demand work order for one job** - go to **components**. in the office, select the vessel. - open the component, go to **part c**, click **generate wo**, and choose **planning**, **breakdown**, or **other**. - no special role check applies, but normal sign-in and vessel access are required. in the office, the vessel’s **office work-order generation** switch must be on. - the job must be active and must not alr
@@ -151,7 +151,7 @@ contexts: {"wo-generic-01": {"question": "How do I create a work order?", "chars
 
 --- wo-phr-01 · v5 · run 2 · 6612 ms · 2168 chars
     wire: model=gpt-5.6-luna temperature=(not sent) other params=[] system_sha=ff9ee87141ac1362 == v5 ✓ user_sha=57816b0740f3a644 == captured ✓
-    usage: {} · cost @ $0.2/$1.2 per 1M = $0.00000
+    usage: UNAVAILABLE for this call (the service returned no usage — pydantic-ai usage-property bug, fixed afterwards, REPORT §13.3); the call was NOT free — estimate ≈2,300 prompt + ≈600 completion tokens ≈ $0.0012 at $0.20/$1.20 per 1M
     judge .8: rule ✓ (automatic generation ✓; pairing ✓) · must-phrases missing: [] · invented xref: False
     GN scope: pms supports three ways to create a work order: - in the office, a **sail admin** can click **generate now** on the work orders screen for one vessel, but the vessel’s **office work-order generation** switch must be on. this switch is set in **lead time & grace period settings** and is off by defaul
     GW scope: 2. **generate a work order for one job on demand** - go to **components**. in the office, select the vessel first. - open the component, go to **part c**, click **generate wo**, and choose **planning**, **breakdown**, or **other**. - no special role check applies, but normal sign-in and vessel access are required. - the job must be active and must not already have an active work order. - in the office, the vessel’s *
@@ -187,7 +187,7 @@ contexts: {"wo-generic-01": {"question": "How do I create a work order?", "chars
 
 --- wo-phr-01 · v5 · run 3 · 6545 ms · 2111 chars
     wire: model=gpt-5.6-luna temperature=(not sent) other params=[] system_sha=ff9ee87141ac1362 == v5 ✓ user_sha=57816b0740f3a644 == captured ✓
-    usage: {} · cost @ $0.2/$1.2 per 1M = $0.00000
+    usage: UNAVAILABLE for this call (the service returned no usage — pydantic-ai usage-property bug, fixed afterwards, REPORT §13.3); the call was NOT free — estimate ≈2,300 prompt + ≈600 completion tokens ≈ $0.0012 at $0.20/$1.20 per 1M
     judge .8: rule ✓ (automatic generation ✓; pairing ✓) · must-phrases missing: [] · invented xref: False
     GN scope: - **in the office:** a sail admin can select one vessel on the work orders screen and click **generate now**, but only when that vessel’s **office work-order generation** switch is on. the switch is set by a sail admin in **lead time & grace period settings**. office generation does not run automati
     GW scope: 2. **one job on demand** - go to **components** and, in the office, select the vessel. - open the component, go to **part c**, and click **generate wo**. - select the reason: **planning**, **breakdown**, or **other**. - this path has no role check, although normal sign-in and vessel access are required. in the office, the vessel’s **office work-order generation** switch must be on. the job must be active and must not
@@ -216,4 +216,4 @@ contexts: {"wo-generic-01": {"question": "How do I create a work order?", "chars
       
       **Source:** Planned work orders — *Technical - KB pilot: How work orders are created — the three ways to create a work order*, “How work orders are created — the three ways to create a work order.” One job on demand — same KB guidance, method 2. Unplanned work — same KB guidance, method 3; *PMS User Manual For Office_Sail Admin_R2_08.06.2026*, §1.1.5.2, p.29; *PMS User Manual_Vessel Specific_R3_08.07.2026*, §1.1.5.2, p.24.
 
-== totals: prompt tokens 0 · completion tokens 0 · cost $0.0000 · latency ms min/mean/max 6545/8218/10992
+== totals: token usage UNAVAILABLE for these 6 calls (see above; suite-level actual usage is in REPORT §13.4) · estimated cost ≈ $0.007 · latency ms min/mean/max 6545/8218/10992

@@ -61,8 +61,13 @@ from acceptance_answers import ask, judge  # noqa: E402
 #     ('- Office: Select the vessel → … click Generate WO → … the switch must be ON') qualifies that procedure's conditions;
 #     an Office label attached only to vessel selection ('- Office: Select the vessel.' as its own step) cannot. Factual
 #     requirements unchanged. Validated on the stored answers before use.
-WO_SUITE_VERSION = "2026-09-14.8"
-JUDGE_VERSION = 8
+# .9 (reviewer + owner, 15-Sep, after the luna suites): PARSING ONLY — (a) a requirements/bullet block that names no action
+#     and follows a HELD heading (the heading was separated from it by a blank line) is attached to the heading's action,
+#     not to the previous one; (b) the "Sail Admin wrongly attached to Generate WO" check reads the scope with manual file
+#     names removed ('…For Office_Sail Admin…' quoted in a per-method source bullet is not a role). Validated on all stored
+#     answers before use; factual requirements unchanged.
+WO_SUITE_VERSION = "2026-09-14.9"
+JUDGE_VERSION = 9
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -184,18 +189,20 @@ _BLOCK_SPLIT = re.compile(r"\n(?=\s*(?:\d+\.\s|\*\*|#{1,4}\s|- \*\*|method \d))|
 _HEADING_RE = re.compile(r"^\s*(?:\*\*|\d+\.\s*\*\*|method \d|\d+\.\s+[a-z][^.]{0,80}(?:—|:)\s*$)")
 
 
-def scopes_v7(body: str) -> dict[str, str]:
+def scopes_v7(body: str, version: int = 7) -> dict[str, str]:
     """Judge .7: method-block scopes. Blocks = numbered/bold/heading lines and blank-line paragraphs. A block naming exactly one
     action goes whole to that action (its requirements line included, wherever it sits); a block naming several actions is
     scoped by units inside the block (.5); a block naming none goes to the open action(s) — unless it looks like a heading,
-    in which case it is held and attached to the next action(s) it introduces."""
+    in which case it is held and attached to the next action(s) it introduces.
+    .9: while a heading is held, a following block that names no action (its requirements bullets, separated from the heading
+    by a blank line) travels WITH the held heading to the next action instead of falling back to the previous one."""
     scopes: dict[str, list[str]] = {a: [] for a, _ in ACTIONS}
     current: list[str] = []
     pending: list[str] = []
     for blk in (b.strip() for b in _BLOCK_SPLIT.split(body) if b and b.strip()):
         named = [a for a, pat in ACTIONS if re.search(pat, blk)]
         if not named:
-            if _HEADING_RE.match(blk) or not current:
+            if _HEADING_RE.match(blk) or not current or (version >= 9 and pending):
                 pending.append(blk)
             else:
                 for a in current:
@@ -220,7 +227,7 @@ def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
        Generate WO   → must state the vessel switch in ITS scope and must NOT attach Sail Admin there"""
     un = ""
     if version >= 7:
-        sc = scopes_v7(body)
+        sc = scopes_v7(body, version)
         gn, gw, un = sc["GN"], sc["GW"], sc["UN"]
     elif version >= 5:
         sc = scopes_of(body)
@@ -245,7 +252,8 @@ def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
             notes.append("Generate WO block lacks the vessel switch [missing prerequisite]")
         elif version >= 6 and not unit_has_office_qualifier(gw, "switch", GW_RE, version):
             notes.append("Generate WO switch stated without the office qualifier [incorrect applicability]")
-        if "sail admin" in gw and "generate now" not in gw:
+        gw_role = re.sub(r"for office_sail admin[^\s,;.)]*", "", gw) if version >= 9 else gw  # .9: a quoted manual file name is not a role
+        if "sail admin" in gw_role and "generate now" not in gw_role:
             notes.append("Sail Admin wrongly attached to Generate WO [incorrect applicability]")
     if version >= 6 and un:
         if wrongly_conditioned(un, "switch"):
@@ -271,7 +279,7 @@ def extra_rule(rule: str, text: str, version: int = JUDGE_VERSION) -> tuple[bool
             return auto and office, "automatic generation " + ("✓" if auto else "MISSING") + "; Generate Now conditions (Sail Admin + switch) " + ("✓" if office else "MISSING")
         # v4: scope = the question asked (how planned WOs are created; must I create them?)
         no_user = bool(re.search(r"(do not have to|don't have to|no user action|not required|no action|does not require|nobody|by the system|by the ship system|automatically)", t))
-        gn = scopes_v7(t)["GN"] if version >= 7 else (scopes_of(t)["GN"] if version >= 5 else block_for(t, r"generate now"))
+        gn = scopes_v7(t, version)["GN"] if version >= 7 else (scopes_of(t)["GN"] if version >= 5 else block_for(t, r"generate now"))
         pairing_ok = True
         note = ""
         if gn:  # only judged when the answer chose to describe Generate Now
