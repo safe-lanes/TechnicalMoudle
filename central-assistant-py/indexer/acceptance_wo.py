@@ -46,6 +46,17 @@ CASES = [
 ]
 
 
+# Five fresh phrasings of the generic question (owner, 15-Sep-2026, KB-pilot step 6). Run with --phrasings. They use
+# the SAME three-paths judge as wo-generic-01 (no judge change) and the same all-runs rule.
+PHRASINGS = [
+    ("wo-phr-01", "What are the different ways to create a work order in PMS?"),
+    ("wo-phr-02", "I need to raise a work order for a pump — how do I do that?"),
+    ("wo-phr-03", "Do I create work orders myself or does the system create them?"),
+    ("wo-phr-04", "Steps to create a new work order"),
+    ("wo-phr-05", "How do work orders get created in the Technical module?"),
+]
+
+
 def body_of(text: str) -> str:
     """The answer without its trailing Source line(s) — file names such as '…For Office_Sail Admin…' must not satisfy content checks."""
     return re.split(r"\n\s*\*{0,2}source\*{0,2}\s*:", text, flags=re.I)[0].lower()
@@ -106,14 +117,19 @@ async def main() -> int:
     ap.add_argument("--set", action="append", required=True)
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--dump", default=None)
+    ap.add_argument("--phrasings", action="store_true", help="also run the five fresh phrasings of the generic question (same judge as wo-generic-01)")
     args = ap.parse_args()
     key = os.environ["IDENTITY_SIGNING_KEY"]
     sets = [(s.partition("=")[0], s.partition("=")[2]) for s in args.set]
     dump = open(args.dump, "w", encoding="utf-8") if args.dump else None  # noqa: SIM115
+    cases = list(CASES)
+    if args.phrasings:
+        base = CASES[0]
+        cases += [(cid, q, base[2], base[3], base[4], base[5], base[6], base[7], "fresh phrasing of wo-generic-01") for cid, q in PHRASINGS]
     score = dict.fromkeys([n for n, _ in sets], 0)
-    print(f"work-order suite {WO_SUITE_VERSION} · {len(CASES)} cases · repeat={args.repeat}")
+    print(f"work-order suite {WO_SUITE_VERSION} · {len(cases)} cases · repeat={args.repeat}")
     async with httpx.AsyncClient(timeout=150.0) as c:
-        for cid, q, module, manual, page, must, must_not, rule, _src in CASES:
+        for cid, q, module, manual, page, must, must_not, rule, _src in cases:
             print(f"\n[{cid}] {q}")
             runs = [await asyncio.gather(*(ask(c, u, key, q, module) for _, u in sets)) for _ in range(args.repeat)]
             for si, (n, _) in enumerate(sets):
@@ -131,7 +147,7 @@ async def main() -> int:
                 print(f"   {n:<14} PASS {'✓' if ok else '✗'} [{sum(votes)}/{len(votes)} — all runs required]")
     print("\n== totals ==")
     for n, _ in sets:
-        print(f"   {n:<14} {score[n]}/{len(CASES)}")
+        print(f"   {n:<14} {score[n]}/{len(cases)}")
     if dump:
         dump.close()
     return 0

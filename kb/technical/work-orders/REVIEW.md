@@ -8,6 +8,7 @@ All rows start as "Converted" (written by the assistant build from the June manu
 | office-generate-now.md | | | | | | Converted |
 | office-generate-wo-per-job.md | | | | | | Converted |
 | unplanned-wo.md | | | | | | Converted |
+| how-work-orders-are-created.md (overview, added 15-Sep) | | | | | | Converted |
 
 Notes for the reviewer:
 - Statements tagged `[code: …]` describe behaviour read from the repository, not from the running system; the running Technical revision has not been verified as identical.

@@ -1,0 +1,86 @@
+> Technical - KB pilot: 'Generate WO' for one job — from the Components page.md [kb-pilot from office-generate-wo-per-job.md]
+   5 chunks stored (kb-pilot, source=kb-pilot)
+> Technical - KB pilot: Planned work orders — generated automatically by the ship's daily job-due scan.md [kb-pilot from planned-wo-ship-daily-scan.md]
+   4 chunks stored (kb-pilot, source=kb-pilot)
+> Technical - KB pilot: Create an unplanned work order ('+ Unplanned W.O').md [kb-pilot from unplanned-wo.md]
+   4 chunks stored (kb-pilot, source=kb-pilot)
+index set 'kb-pilot' now holds 931 chunks across 30 documents
+DONE
+== overview chunks as indexed ==
+0 ‖ 1200 ‖ t ‖ f ‖ Applies to: Both ⏎ Who can do it (role): Depends on the way — (1) planned: nobody, the shi
+1 ‖ 1200 ‖ f ‖ t ‖ by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a 
+2 ‖ 1170 ‖ f ‖ f ‖ ceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does 
+== 'How do I create a work order?' · kb-pilot — OVERVIEW ranks [8] (excerpts = top 5)
+   1 0.7926          Technical - PMS User Manual For Office_S ci=0
+   2 0.8019 PILOT    Technical - KB pilot: Create an unplanne ci=0
+   3 0.8107          Technical - PMS User Manual_Vessel Speci ci=0
+   4 0.8125 PILOT    Technical - KB pilot: Create an unplanne ci=1
+   5 0.8373          Technical - PMS User Manual For Office_S ci=0
+   6 0.8382          Technical - PMS User Manual_Vessel Speci ci=0
+   7 0.8502          Technical - PMS User Manual For Office_S ci=0
+   8 0.8646 OVERVIEW Technical - KB pilot: How work orders ar ci=0
+== 'How are planned work orders created in PMS — do I have to create them myself?' · kb-pilot — OVERVIEW ranks [6] (excerpts = top 5)
+   1 0.8314          Technical - PMS User Manual For Office_S ci=0
+   2 0.8349          Technical - PMS User Manual_Vessel Speci ci=0
+   3 0.8367          Technical - PMS User Manual_Vessel Speci ci=0
+   4 0.8409 PILOT    Technical - KB pilot: Planned work order ci=0
+   5 0.8428          Technical - PMS User Manual For Office_S ci=0
+   6 0.8573 OVERVIEW Technical - KB pilot: How work orders ar ci=0
+   7 0.8715 PILOT    Technical - KB pilot: Planned work order ci=2
+   8 0.8775          Technical - PMS User Manual For Office_S ci=0
+== 'How to create work order in PMS?' · kb-pilot — OVERVIEW ranks NOT in top 8 (excerpts = top 5)
+   1 0.7328          Technical - PMS User Manual For Office_S ci=0
+   2 0.7514          Technical - PMS User Manual For Office_S ci=0
+   3 0.7731          Technical - PMS User Manual For Office_S ci=0
+   4 0.7877          Technical - PMS User Manual_Vessel Speci ci=0
+   5 0.7931          Technical - PMS User Manual_Vessel Speci ci=0
+   6 0.8163          Technical - PMS User Manual For Office_S ci=0
+   7 0.8184          Technical - PMS User Manual_Vessel Speci ci=2
+   8 0.8197          Technical - PMS User Manual_Vessel Speci ci=0
+== 'What are the different ways to create a work order in PMS?' · kb-pilot — OVERVIEW ranks [1, 2, 3] (excerpts = top 5)
+   1 0.7358 OVERVIEW Technical - KB pilot: How work orders ar ci=2
+   2 0.7454 OVERVIEW Technical - KB pilot: How work orders ar ci=1
+   3 0.7891 OVERVIEW Technical - KB pilot: How work orders ar ci=0
+   4 0.8108          Technical - PMS User Manual For Office_S ci=0
+   5 0.8423          Technical - PMS User Manual For Office_S ci=0
+   6 0.8654          Technical - PMS User Manual_Vessel Speci ci=0
+   7 0.8664          Technical - PMS User Manual_Vessel Speci ci=0
+   8 0.8681          Technical - PMS User Manual For Office_S ci=0
+== 'I need to raise a work order for a pump — how do I do that?' · kb-pilot — OVERVIEW ranks NOT in top 8 (excerpts = top 5)
+   1 0.9810 PILOT    Technical - KB pilot: Create an unplanne ci=0
+   2 0.9893 PILOT    Technical - KB pilot: Create an unplanne ci=1
+   3 1.0135          Technical - PMS User Manual For Office_S ci=0
+   4 1.0188          Technical - PMS User Manual_Vessel Speci ci=0
+   5 1.0503          Technical - PMS User Manual_Vessel Speci ci=0
+   6 1.0521 PILOT    Technical - KB pilot: Create an unplanne ci=2
+   7 1.0545          Technical - PMS User Manual For Office_S ci=0
+   8 1.0579          Technical - PMS User Manual_Vessel Speci ci=0
+== 'Do I create work orders myself or does the system create them?' · kb-pilot — OVERVIEW ranks [1, 2, 3] (excerpts = top 5)
+   1 0.8462 OVERVIEW Technical - KB pilot: How work orders ar ci=0
+   2 0.8744 OVERVIEW Technical - KB pilot: How work orders ar ci=1
+   3 0.9417 OVERVIEW Technical - KB pilot: How work orders ar ci=2
+   4 0.9420 PILOT    Technical - KB pilot: Planned work order ci=0
+   5 0.9497          Technical - PMS User Manual For Office_S ci=0
+   6 0.9668          Technical - PMS User Manual_Vessel Speci ci=0
+   7 0.9838          Technical - PMS User Manual For Office_S ci=0
+   8 0.9841          Technical - PMS User Manual_Vessel Speci ci=0
+== 'Steps to create a new work order' · kb-pilot — OVERVIEW ranks [8] (excerpts = top 5)
+   1 0.7729 PILOT    Technical - KB pilot: Create an unplanne ci=1
+   2 0.8270          Technical - PMS User Manual For Office_S ci=0
+   3 0.8355 PILOT    Technical - KB pilot: Create an unplanne ci=0
+   4 0.8394          Technical - PMS User Manual_Vessel Speci ci=0
+   5 0.8486          Technical - PMS User Manual_Vessel Speci ci=0
+   6 0.8648 PILOT    Technical - KB pilot: Create an unplanne ci=2
+   7 0.8689          Technical - PMS User Manual For Office_S ci=0
+   8 0.8924 OVERVIEW Technical - KB pilot: How work orders ar ci=1
+== 'How do work orders get created in the Technical module?' · kb-pilot — OVERVIEW ranks [1, 2, 3] (excerpts = top 5)
+   1 0.8004 OVERVIEW Technical - KB pilot: How work orders ar ci=1
+   2 0.8164 OVERVIEW Technical - KB pilot: How work orders ar ci=0
+   3 0.8544 OVERVIEW Technical - KB pilot: How work orders ar ci=2
+   4 0.8688 PILOT    Technical - KB pilot: Create an unplanne ci=3
+   5 0.8870          Technical - PMS User Manual For Office_S ci=0
+   6 0.8977          Technical - PMS User Manual For Office_S ci=0
+   7 0.9005          Technical - PMS User Manual For Office_S ci=0
+   8 0.9022 PILOT    Technical - KB pilot: Create an unplanne ci=0
+8016 ":"kb-base","chunks":911,"db":"connected","llmCalls":191,"pro
+8018 ":"kb-pilot","chunks":931,"db":"connected","llmCalls":191,"pr

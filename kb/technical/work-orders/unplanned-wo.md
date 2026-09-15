@@ -1,6 +1,6 @@
 # Create an unplanned work order ('+ Unplanned W.O')
 Applies to: Both
-Who can do it (role): Any user who can open the Work Orders page. No role or switch check was found on this path. [code: server/modules/work-orders/routes.ts:103, replit_dev cf5241ad6] [code: client/src/pages/pms/WorkOrders.tsx:373,1533, replit_dev cf5241ad6]
+Who can do it (role): No role or switch check was found on this path; normal authentication and vessel access still apply (the user must be signed in and able to open the Work Orders page for that vessel). [code: server/modules/work-orders/routes.ts:103, replit_dev cf5241ad6] [code: client/src/pages/pms/WorkOrders.tsx:373,1533, replit_dev cf5241ad6]
 Prerequisites (switches, settings, job/component state):
 - None — no vessel switch is involved. [code: server/modules/work-orders/routes.ts:103, replit_dev cf5241ad6]
 - On the office instance a vessel must be selected from the 'Vessel' dropdown first. [manual: Office PMS Technical manual, June rev, p.29]
