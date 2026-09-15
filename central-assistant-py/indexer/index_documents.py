@@ -24,6 +24,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -419,9 +420,17 @@ async def main() -> int:
                 display = f"{a.kb_module.title()} - KB pilot: {title}.md"  # keeps the module prefix convention (citation 'manual' = this name)
                 sha = hashlib.sha256(md.encode("utf-8")).hexdigest()
                 log(f"> {display} [kb-pilot from {f.name}]")
-                extra = {"source": "kb-pilot", "kb_path": f"kb/{a.kb_module}/work-orders/{f.name}", "kb_sha256": sha, "chunker_version": CHUNKER_VERSION}
-                chunks = chunks_from_markdown(md=md, source_file=display, source_type="md", max_chunk_size=a.max_chunk, chunk_overlap=a.overlap,
+                # Owner rule (15-Sep-2026): ONE chunk per kb file; the Sources block and the inline provenance tags go to
+                # chunk METADATA (kept for citations), not into the embedded/answer text.
+                body, _, sources = md.partition("\nSources:")
+                tags = re.findall(r"\[(?:manual|screenshot|code|unverified)[^\]]*\]", body)
+                clean = re.sub(r"\s*\[(?:manual|screenshot|code|unverified)[^\]]*\]", "", body)
+                clean = re.sub(r"[ \t]+\n", "\n", clean).strip() + "\n"
+                extra = {"source": "kb-pilot", "kb_path": f"kb/{a.kb_module}/work-orders/{f.name}", "kb_sha256": sha, "chunker_version": CHUNKER_VERSION,
+                         "kb_sources": sources.strip()[:4000], "kb_provenance": tags[:120], "kb_one_chunk": True}
+                chunks = chunks_from_markdown(md=clean, source_file=display, source_type="md", max_chunk_size=100_000, chunk_overlap=0,
                                               page_map=None, extra_metadata=extra)
+                log(f"   one-chunk mode: {len(chunks)} chunk(s), {len(chunks[0].text) if chunks else 0} chars embedded text; {len(tags)} provenance tags + Sources block ({len(sources.strip())} chars) moved to metadata")
                 inputs = [embed_input(c, a.embed_input) for c in chunks]
                 vecs, reused = await embed_or_reuse(conn, oai, embed_model, inputs, a.embed_batch, not a.no_reuse_vectors, log)
                 await store_document(conn, index_set=a.index_set, file=display, module=a.kb_module, sha=sha, source_type="md",

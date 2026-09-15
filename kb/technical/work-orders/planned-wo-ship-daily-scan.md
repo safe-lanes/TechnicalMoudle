@@ -12,7 +12,7 @@ Steps:
 Exceptions / edge cases:
 - If a job already has an active work order, the scan does not create another one for it. [code: server/services/jobDueScanner.ts:334-335, replit_dev cf5241ad6]
 - A work order can be generated ahead of the scan for one job with 'Generate WO' on the Components page — see office-generate-wo-per-job.md.
-- On the office instance no scan runs; see office-generate-now.md for the only office-side generation.
+- On the office instance no scan runs. Office-side generation is done by a user in one of two ways: 'Generate Now' for a whole vessel (Sail Admin AND the vessel switch) — see office-generate-now.md — or per-job 'Generate WO' from Components (the vessel switch) — see office-generate-wo-per-job.md.
 Where the manual differs:
 - The June manuals do not describe automatic generation at all. They describe the Scheduled / Due / Overdue tabs [manual: Office PMS Technical manual, June rev, p.28] and the job frequency / next due date [manual: Office PMS Technical manual, June rev, p.18] but never say that the system creates the work orders. Recorded in CONFLICTS.md.
 Related procedures: office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md

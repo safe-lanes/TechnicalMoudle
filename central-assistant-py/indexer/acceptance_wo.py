@@ -30,7 +30,13 @@ from acceptance_answers import ask, judge  # noqa: E402
 #     role and the vessel switch; the block that describes the per-job 'Generate WO' must carry the vessel switch and must
 #     NOT attach the Sail Admin role (the code has no role check on that path); a role attached to the wrong action fails.
 #     Added wo-generic-03 = the phrasing that ranked the new section 6th ("How to create work order in PMS?").
-WO_SUITE_VERSION = "2026-09-14.3"
+# .4 (owner, 15-Sep, KB-pilot step 3): (a) "created automatically" accepted as automatic generation; (b) wo-generic-02
+#     re-scoped to the question asked — automatic generation + "you do not create them"; the Generate Now pairing is
+#     checked ONLY if the answer describes Generate Now; (c) wo-phr-02 ("raise a work order for a pump") expects the
+#     unplanned procedure plus a one-line note of the other ways. JUDGE_VERSION selects 3 or 4 so old and new scores
+#     can be shown on the same stored answers (rejudge_wo.py).
+WO_SUITE_VERSION = "2026-09-14.4"
+JUDGE_VERSION = 4
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -49,12 +55,14 @@ CASES = [
 # Five fresh phrasings of the generic question (owner, 15-Sep-2026, KB-pilot step 6). Run with --phrasings. They use
 # the SAME three-paths judge as wo-generic-01 (no judge change) and the same all-runs rule.
 PHRASINGS = [
-    ("wo-phr-01", "What are the different ways to create a work order in PMS?"),
-    ("wo-phr-02", "I need to raise a work order for a pump — how do I do that?"),
-    ("wo-phr-03", "Do I create work orders myself or does the system create them?"),
-    ("wo-phr-04", "Steps to create a new work order"),
-    ("wo-phr-05", "How do work orders get created in the Technical module?"),
+    ("wo-phr-01", "What are the different ways to create a work order in PMS?", "three-paths"),
+    ("wo-phr-02", "I need to raise a work order for a pump — how do I do that?", "unplanned-plus-note"),  # .4: expected = unplanned procedure + one-line note of the other ways
+    ("wo-phr-03", "Do I create work orders myself or does the system create them?", "three-paths"),
+    ("wo-phr-04", "Steps to create a new work order", "three-paths"),
+    ("wo-phr-05", "How do work orders get created in the Technical module?", "three-paths"),
 ]
+AUTO_V3 = r"(generated automatically|automatically generat|daily scan|from the job schedule|job schedule|from the job'?s schedule|scheduled work orders? (are|is) (generated|created))"
+AUTO_V4 = AUTO_V3[:-1] + r"|created automatically|automatically creat)"
 
 
 def body_of(text: str) -> str:
@@ -98,17 +106,32 @@ def check_pairing(body: str) -> tuple[bool, str]:
     return ok, ("pairing ✓" if ok else "pairing ✗: " + "; ".join(notes))
 
 
-def extra_rule(rule: str, text: str) -> tuple[bool, str]:
+def extra_rule(rule: str, text: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
     t = body_of(text)
+    auto_re = AUTO_V4 if version >= 4 else AUTO_V3
     if rule == "three-paths":
-        auto = bool(re.search(r"(generated automatically|automatically generat|daily scan|from the job schedule|job schedule|from the job'?s schedule|scheduled work orders? (are|is) (generated|created))", t))
+        auto = bool(re.search(auto_re, t))
         pair_ok, pair_why = check_pairing(t)
         return auto and pair_ok, ("automatic generation " + ("✓" if auto else "MISSING") + "; " + pair_why)
     if rule == "planned-auto":
         auto = bool(re.search(r"(automatic|daily scan|generated (by|from)|from the job)", t))
-        gn = block_for(t, r"generate now") or t
-        office = ("sail admin" in gn) and ("switch" in gn)
-        return auto and office, "automatic generation " + ("✓" if auto else "MISSING") + "; Generate Now conditions (Sail Admin + switch) " + ("✓" if office else "MISSING")
+        if version <= 3:
+            gn = block_for(t, r"generate now") or t
+            office = ("sail admin" in gn) and ("switch" in gn)
+            return auto and office, "automatic generation " + ("✓" if auto else "MISSING") + "; Generate Now conditions (Sail Admin + switch) " + ("✓" if office else "MISSING")
+        # v4: scope = the question asked (how planned WOs are created; must I create them?)
+        no_user = bool(re.search(r"(do not have to|don't have to|no user action|not required|no action|does not require|nobody|by the system|by the ship system|automatically)", t))
+        gn = block_for(t, r"generate now")
+        pairing_ok = True
+        note = ""
+        if gn:  # only judged when the answer chose to describe Generate Now
+            pairing_ok = ("sail admin" in gn) and ("switch" in gn)
+            note = "; Generate Now described with its conditions " + ("✓" if pairing_ok else "✗ (Sail Admin + switch missing)")
+        return auto and no_user and pairing_ok, "automatic generation " + ("✓" if auto else "MISSING") + "; user need not create " + ("✓" if no_user else "MISSING") + note
+    if rule == "unplanned-plus-note":
+        unplanned = "unplanned w.o" in t and ("submit work order" in t or "part b" in t)
+        note = bool(re.search(r"(generate wo|generated automatically|automatically|(?<!un)planned work order|scheduled work order|other ways|generate now)", t))
+        return unplanned and note, "unplanned procedure " + ("✓" if unplanned else "MISSING") + "; note of the other ways " + ("✓" if note else "MISSING")
     return True, ""
 
 
@@ -125,7 +148,7 @@ async def main() -> int:
     cases = list(CASES)
     if args.phrasings:
         base = CASES[0]
-        cases += [(cid, q, base[2], base[3], base[4], base[5], base[6], base[7], "fresh phrasing of wo-generic-01") for cid, q in PHRASINGS]
+        cases += [(cid, q, base[2], base[3], base[4], (["unplanned w.o"] if rule == "unplanned-plus-note" else base[5]), base[6], rule, "fresh phrasing (rule " + rule + ")") for cid, q, rule in PHRASINGS]
     score = dict.fromkeys([n for n, _ in sets], 0)
     print(f"work-order suite {WO_SUITE_VERSION} · {len(cases)} cases · repeat={args.repeat}")
     async with httpx.AsyncClient(timeout=150.0) as c:

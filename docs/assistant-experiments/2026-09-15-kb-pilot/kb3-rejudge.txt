@@ -1,0 +1,17 @@
+case           set          judge .3 (stored verdict → rule v3)    judge .4 (rule v4)   note
+wo-generic-01  A-kb-base    0/3 fail                           0/3 fail         automatic generation MISSING; pairing ✗: Generate Now not described; p
+wo-generic-01  B-kb-pilot   0/3 fail                           0/3 fail         automatic generation MISSING; pairing ✗: Generate Now not described; p
+wo-generic-02  A-kb-base    0/3 fail                           0/3 fail         automatic generation MISSING; user need not create MISSING
+wo-generic-02  B-kb-pilot   0/3 fail                           3/3 PASS         automatic generation ✓; user need not create ✓
+wo-generic-03  A-kb-base    0/3 fail                           0/3 fail         automatic generation MISSING; pairing ✗: Generate Now not described; p
+wo-generic-03  B-kb-pilot   0/3 fail                           0/3 fail         automatic generation MISSING; pairing ✗: Generate Now not described; p
+wo-phr-01      A-kb-base    0/3 fail                           0/3 fail         automatic generation MISSING; pairing ✗: Generate Now not described; p
+wo-phr-01      B-kb-pilot   2/3 fail                           2/3 fail         automatic generation ✓; pairing ✗: Generate Now not described
+wo-phr-02      A-kb-base    0/3 fail                           0/3 fail         unplanned procedure ✓; note of the other ways MISSING
+wo-phr-02      B-kb-pilot   0/3 fail                           0/3 fail         unplanned procedure ✓; note of the other ways MISSING
+wo-phr-03      A-kb-base    0/3 fail                           0/3 fail         automatic generation MISSING; pairing ✗: Generate Now not described; p
+wo-phr-03      B-kb-pilot   0/3 fail                           0/3 fail         automatic generation ✓; pairing ✓
+wo-phr-04      A-kb-base    0/3 fail                           0/3 fail         automatic generation MISSING; pairing ✗: Generate Now not described; p
+wo-phr-04      B-kb-pilot   0/3 fail                           0/3 fail         automatic generation MISSING; pairing ✗: Generate Now not described; p
+wo-phr-05      A-kb-base    0/3 fail                           0/3 fail         automatic generation MISSING; pairing ✗: Generate Now not described; p
+wo-phr-05      B-kb-pilot   1/3 fail                           1/3 fail         automatic generation ✓; pairing ✗: Generate Now not described

@@ -1,0 +1,103 @@
+
+== How do I record a stock transaction for spares? · A-kb-base · gate=answer · top cites=[('Technical - PMS User Manual_Vess', ' INVENTORY TRANSACTIONS (p.38)'), ('Technical - PMS User Manual_Vess', 'CTION OF SPARES IN BULK (p.40)')]
+To record a stock transaction for spares, follow these steps:
+
+1. Click the 'Spares' sub-submodule to access the inventory.
+2. Click the 'Location' icon in the table column to view and update stock availability based on the storage location.
+3. Choose the required location (Location A or Location B), then click + Create New Location to create a new inventory location if needed.
+4. Click the ‘Save’ button to save and update the field.
+
+Source: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)
+
+== How do I record a stock transaction for spares? · B-kb-pilot · gate=answer · top cites=[('Technical - PMS User Manual_Vess', ' INVENTORY TRANSACTIONS (p.38)'), ('Technical - PMS User Manual_Vess', 'CTION OF SPARES IN BULK (p.40)')]
+To record a stock transaction for spares, follow these steps:
+
+1. Click on the 'Spares' sub-submodule to access the inventory.
+2. Click the 'Location' icon in the table column to view and update stock availability based on the storage location.
+3. Choose the required location (Location A or Location B), then click + Create New Location to create a new inventory location if needed.
+4. Click the ‘Save’ button to save and update the field.
+
+Source: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)
+
+== How do I add a new store item? · A-kb-base · gate=answer · top cites=[('Technical - PMS User Manual_Vess', '1.1.8.4 HOW TO ADD ITEM (p.43)'), ('Technical - PMS User Manual For ', '1.1.8.4 HOW TO ADD ITEM (p.50)')]
+1. Click the ‘Store’ sub-sub-module.
+2. Click on the ‘+ Add Store’ button.
+3. Provide the necessary details.
+4. Click Save Store Item to create a new store item.
+
+Use the same steps to add new items for the selected category (Stores, Lubes, Chemicals, or Others) and tab (Inventory, Location, or History).
+
+Source: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.4 HOW TO ADD ITEM (p.43)
+
+== How do I add a new store item? · B-kb-pilot · gate=answer · top cites=[('Technical - PMS User Manual_Vess', '1.1.8.4 HOW TO ADD ITEM (p.43)'), ('Technical - PMS User Manual For ', '1.1.8.4 HOW TO ADD ITEM (p.50)')]
+1. Click the ‘Store’ sub-sub-module.
+2. Click on the ‘+ Add Store’ button.
+3. Provide the necessary details.
+4. Click Save Store Item to create a new store item.
+
+Use the same steps to add new items for the selected category (Stores, Lubes, Chemicals, or Others) and tab (Inventory, Location, or History).
+
+Source: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.4 HOW TO ADD ITEM (p.43)
+
+== How do I raise a defect on equipment? · A-kb-base · gate=answer · top cites=[('Technical - Defects User Manual ', ' TO CREATE A NEW DEFECT (p.15)'), ('Technical - Defects User Manual ', 'A NEW COC DEFECT RECORD (p.19)')]
+1. Click the '+ New Defect' button to create a new defect record. (Refer to Figure 22)
+2. Fill all the required information in Part A, Part B, and Part C. (Refer to Figure 23)
+3. Click the 'Submit' button to save the updated reporting details. (Refer to Figure 23)
+
+These steps are the same as section 1.1.4.3 (page 15). 
+
+Source: Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026, sections 1.1.4.3.
+
+== How do I raise a defect on equipment? · B-kb-pilot · gate=answer · top cites=[('Technical - Defects User Manual ', ' TO CREATE A NEW DEFECT (p.15)'), ('Technical - Defects User Manual ', 'A NEW COC DEFECT RECORD (p.19)')]
+1. Click the '+ New Defect' button to create a new defect record. (Refer to Figure 22)
+2. Fill all the required information in Part A, Part B, and Part C. (Refer to Figure 23)
+3. Click the 'Submit' button to save the updated reporting details. (Refer to Figure 23)
+
+Clicking 'Submit' will forward the updated defect report to the next stage of the configured defect management workflow.
+
+Source: Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15)
+
+== How do I update running hours for a component? · A-kb-base · gate=answer · top cites=[('Technical - PMS User Manual_Vess', 'TECHNICAL USER MANUAL (p.34)'), ('Technical - PMS User Manual_Vess', 'O UPDATE RUNNING HOURS. (p.33)')]
+To update running hours for a component, follow these steps:
+
+1. Click the ‘Gear’ icon to update the running hours for a single component. 
+2. The screen for updating will appear.
+3. Enter the details accordingly.
+4. Click the ‘Save’ button to update the running hours.
+
+Source: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.33) and TECHNICAL USER MANUAL (p.34).
+
+== How do I update running hours for a component? · B-kb-pilot · gate=answer · top cites=[('Technical - PMS User Manual_Vess', 'TECHNICAL USER MANUAL (p.34)'), ('Technical - PMS User Manual_Vess', 'O UPDATE RUNNING HOURS. (p.33)')]
+To update running hours for a component, follow these steps:
+
+1. Click the ‘Gear’ icon to update the running hours for the single component.
+2. The update screen will appear. Enter the details accordingly.
+3. Click the ‘Save’ button to update the running hours.
+
+Source: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — TECHNICAL USER MANUAL (p.34)
+
+== How do I add a component to a vessel? · A-kb-base · gate=answer · top cites=[('Technical - PMS User Manual For ', '3 HOW TO ADD COMPONENTS (p.24)'), ('Technical - PMS User Manual For ', ' HOW TO EDIT COMPONENTS (p.25)')]
+To add a component to a vessel, follow these steps:
+
+1. Select the required vessel from the 'Vessel' dropdown.
+2. Click on the 'Add Component' button.
+3. Enter the required details for the component.
+4. Click the 'Save' button to save the component information.
+5. Click the 'Submit' button to add the component to the components panel.
+
+Note: All mandatory fields must be completed before the record can be saved or submitted.
+
+Source: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.3 HOW TO ADD COMPONENTS (p.24)
+
+== How do I add a component to a vessel? · B-kb-pilot · gate=answer · top cites=[('Technical - PMS User Manual For ', '3 HOW TO ADD COMPONENTS (p.24)'), ('Technical - PMS User Manual For ', ' HOW TO EDIT COMPONENTS (p.25)')]
+To add a component to a vessel, follow these steps:
+
+1. Select the required vessel from the 'Vessel' dropdown.
+2. Click on the 'Add Component' button.
+3. Enter the required details for the component.
+4. Click the 'Save' button to save the component information.
+5. Click the 'Submit' button to add the component to the components panel.
+
+Note: All mandatory fields must be completed before the record can be saved or submitted.
+
+Source: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.3 HOW TO ADD COMPONENTS (p.24)

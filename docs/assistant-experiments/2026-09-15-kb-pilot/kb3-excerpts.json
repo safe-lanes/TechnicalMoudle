@@ -1,0 +1,964 @@
+{
+ "How do I create a work order? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.7926,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.8107,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 0.8373,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+   "distance": 0.8382,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 39)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 39)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 39)\n\nscreenshot: Work Orders (W\\.O) dashboard showing status tabs and work order list with instructional callouts\n\nFigure 39\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 40)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 40)\n\nscreenshot: Part B - Work Completion Record form showing risk assessment and work duration fields with instructional callouts\n\nFigure 40\n\n☞ To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.8502,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  }
+ ],
+ "How do I create a work order? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.7926,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.8107,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+   "section": "How work orders are created — the three ways to create a work order",
+   "distance": 0.825,
+   "text": "Applies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 0.8373,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+   "distance": 0.8382,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 39)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 39)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 39)\n\nscreenshot: Work Orders (W\\.O) dashboard showing status tabs and work order list with instructional callouts\n\nFigure 39\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 40)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 40)\n\nscreenshot: Part B - Work Completion Record form showing risk assessment and work duration fields with instructional callouts\n\nFigure 40\n\n☞ To upload RA documents, ensure the radio button is not set to NA or No."
+  }
+ ],
+ "How are planned work orders created in PMS — do I have to create them myself? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.8314,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.8349,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.25)",
+   "distance": 0.8367,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 35)\n\n* Click the 'Planner' button to re-plan the Work Order. (Ref Figure 35)\n\nscreenshot: Work Orders (W\\.O) interface showing the Work orders module selected and the Planner button highlighted with instructional callouts.\n\n<a id=\"figure-35\"></a>Figure 35\n\n* The 'Work Order Planner' page below appears after clicking the 'Planner' button. (Ref Figure 36)\n\n* The user can select multiple records as per the required work order using the checkbox. (Ref Figure 36)\n\n* Click the 'Planned Date' field and select the required date to update the planned date for the selected work order. (Ref Figure 36)\n\nscreenshot: Work Order Planner interface showing multiple work orders selected and the Planned Date field with instructional callouts.\n\n<a id=\"figure-36\"></a>Figure 36"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.30)",
+   "distance": 0.8428,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 45)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 45)\n\n* Click the 'Planner' button to re-plan the Work Order. (Ref Figure 45)\n\nScreenshot of Work Orders (W\\.O) interface showing how to access work orders, select a vessel, and open the Work Order Planner.\n\n<a id=\"figure-45\"></a>Figure 45\n\n* The 'Work Order Planner' page below appears after clicking the 'Planner' button. (Ref Figure 46)\n\n* The user can select multiple records as per the required work order using the checkbox. (Ref Figure 46)\n\n* Click the 'Planned Date' field and select the required date to update the planned date for the selected work order. (Ref Figure 46)\n\nScreenshot of Work Order Planner interface showing how to select work orders and assign a planned date.\n\n<a id=\"figure-46\"></a>Figure 46"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.8775,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  }
+ ],
+ "How are planned work orders created in PMS — do I have to create them myself? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.8314,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.8349,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.25)",
+   "distance": 0.8367,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 35)\n\n* Click the 'Planner' button to re-plan the Work Order. (Ref Figure 35)\n\nscreenshot: Work Orders (W\\.O) interface showing the Work orders module selected and the Planner button highlighted with instructional callouts.\n\n<a id=\"figure-35\"></a>Figure 35\n\n* The 'Work Order Planner' page below appears after clicking the 'Planner' button. (Ref Figure 36)\n\n* The user can select multiple records as per the required work order using the checkbox. (Ref Figure 36)\n\n* Click the 'Planned Date' field and select the required date to update the planned date for the selected work order. (Ref Figure 36)\n\nscreenshot: Work Order Planner interface showing multiple work orders selected and the Planned Date field with instructional callouts.\n\n<a id=\"figure-36\"></a>Figure 36"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.30)",
+   "distance": 0.8428,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 45)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 45)\n\n* Click the 'Planner' button to re-plan the Work Order. (Ref Figure 45)\n\nScreenshot of Work Orders (W\\.O) interface showing how to access work orders, select a vessel, and open the Work Order Planner.\n\n<a id=\"figure-45\"></a>Figure 45\n\n* The 'Work Order Planner' page below appears after clicking the 'Planner' button. (Ref Figure 46)\n\n* The user can select multiple records as per the required work order using the checkbox. (Ref Figure 46)\n\n* Click the 'Planned Date' field and select the required date to update the planned date for the selected work order. (Ref Figure 46)\n\nScreenshot of Work Order Planner interface showing how to select work orders and assign a planned date.\n\n<a id=\"figure-46\"></a>Figure 46"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+   "section": "How work orders are created — the three ways to create a work order",
+   "distance": 0.8691,
+   "text": "Applies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md"
+  }
+ ],
+ "How to create work order in PMS? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.7328,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.7514,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 0.7731,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.7877,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "Introduction (p.23)",
+   "distance": 0.7931,
+   "text": "* Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  }
+ ],
+ "How to create work order in PMS? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.7328,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.7514,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 0.7731,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.7877,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "Introduction (p.23)",
+   "distance": 0.7931,
+   "text": "* Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  }
+ ],
+ "What are the different ways to create a work order in PMS? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.8108,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.8423,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.8654,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "Introduction (p.23)",
+   "distance": 0.8664,
+   "text": "* Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 0.8681,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  }
+ ],
+ "What are the different ways to create a work order in PMS? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+   "section": "How work orders are created — the three ways to create a work order",
+   "distance": 0.7935,
+   "text": "Applies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.8108,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.8423,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.8654,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "Introduction (p.23)",
+   "distance": 0.8664,
+   "text": "* Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  }
+ ],
+ "I need to raise a work order for a pump — how do I do that? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 1.0135,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 1.0188,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+   "distance": 1.0503,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 39)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 39)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 39)\n\nscreenshot: Work Orders (W\\.O) dashboard showing status tabs and work order list with instructional callouts\n\nFigure 39\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 40)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 40)\n\nscreenshot: Part B - Work Completion Record form showing risk assessment and work duration fields with instructional callouts\n\nFigure 40\n\n☞ To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 1.0545,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "Introduction (p.23)",
+   "distance": 1.0579,
+   "text": "* Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  }
+ ],
+ "I need to raise a work order for a pump — how do I do that? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 1.0135,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 1.0188,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+   "distance": 1.0503,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 39)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 39)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 39)\n\nscreenshot: Work Orders (W\\.O) dashboard showing status tabs and work order list with instructional callouts\n\nFigure 39\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 40)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 40)\n\nscreenshot: Part B - Work Completion Record form showing risk assessment and work duration fields with instructional callouts\n\nFigure 40\n\n☞ To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - KB pilot: Create an unplanned work order ('+ Unplanned W.O').md",
+   "section": "Create an unplanned work order ('+ Unplanned W.O')",
+   "distance": 1.053,
+   "text": "Applies to: Both\nWho can do it (role): No role or switch check was found on this path; normal authentication and vessel access still apply (the user must be signed in and able to open the Work Orders page for that vessel).\nPrerequisites (switches, settings, job/component state):\n- None — no vessel switch is involved.\n- On the office instance a vessel must be selected from the 'Vessel' dropdown first.\nSteps:\n1. Go to the 'Work Orders' sub-sub-module.\n2. Office: select the vessel from the 'Vessel' dropdown. (The Vessel manual omits this step: on the ship the vessel is fixed.)\n3. Click the '+ Unplanned W.O' button (top right of the Work Orders screen, next to 'Planner' and 'Export').\n4. The 'Work Order Form – Unplanned Maintenance' opens. Enter the required job details in Part A and click 'Save' (top right) to store it as a draft.\n5. Complete Part B (Work Completion Record: work carried out, running hours, spare parts consumed) and click 'Submit Work Order' at the bottom of the form to create the unplanned work order.\n6. The work order appears under the 'Unplanned' tab; its number is <VESSELCODE>-UWO-<COMPONENTCODE>-<YEAR>-<NNN>.\nExceptions / edge cases:\n- None recorded in this pilot. (An open question about running-hours readings on the unplanned form's Part B is logged in REVIEW.md, not stated here.)\nWhere the manual differs:\n- None found for the steps themselves. The Vessel manual has no 'select vessel' step (ship instance is single-vessel).\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 1.0545,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  }
+ ],
+ "Do I create work orders myself or does the system create them? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.9497,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "Introduction (p.23)",
+   "distance": 0.9668,
+   "text": "* Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.9838,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.9841,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.18)",
+   "distance": 1.0151,
+   "text": "* In the Part C section, users can view all associated jobs for the component, including Task type, frequency, and last/next due dates. (Ref Figure 22)\n* The user can click the 'Generate WO' button to create a WO manually for the selected component. (Ref Figure 22)\n\nScreenshot of the Components interface showing component details and a list of jobs. A callout box labeled \"1\" points to the jobs section, and a callout box labeled \"2\" points to the 'Generate WO' button.\n\n<u>Figure 22</u>\n\n* The screen below appears after clicking the 'Generate WO' button. (Ref Figure 23)\n* Choose the appropriate reason for generating the work order from the listed options (Ref Figure 23), and the Work Order will be generated.\n\nScreenshot of the 'Generate Work Order' pop-up window over the Components interface. A callout box points to the pop-up, indicating where to choose a reason for the Work Order.\n\n<u>Figure 23</u>\n\n[!NOTE]\nEnsure that there is no active WO for the same selected job, as the system does not allow the generation of duplicate work orders."
+  }
+ ],
+ "Do I create work orders myself or does the system create them? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+   "section": "How work orders are created — the three ways to create a work order",
+   "distance": 0.8425,
+   "text": "Applies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.9497,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 3,
+   "file": "Technical - KB pilot: Planned work orders — generated automatically by the ship's daily job-due scan.md",
+   "section": "Planned work orders — generated automatically by the ship's daily job-due scan",
+   "distance": 0.9586,
+   "text": "Applies to: Vessel\nWho can do it (role): None — no user action. Planned (scheduled) work orders are created by the ship system itself.\nPrerequisites (switches, settings, job/component state):\n- The instance must be a ship instance; the scan does not run on the office (shore) instance.\n- The job must be active and attached to a component, with a frequency and a next due date (the job schedule shown in Components → Part C).\n- The job must not already have an active work order — one active work order per job at a time.\nSteps:\n1. Nothing to do. The ship system runs the job-due scan once every 24 hours by default (interval configurable through JOB_DUE_SCAN_INTERVAL_MS) and creates a work order for every job that is due.\n2. To see the result, open the 'Work Orders' sub-sub-module and use the status tabs: Scheduled (jobs planned with a future due date), Due (due within the current period), Overdue (past due date, not completed).\n3. The work-order number is prefixed with the vessel code: <VESSELCODE>-<JOBCODE>-<COMPONENTCODE>-<YEAR>-<NNN>.\nExceptions / edge cases:\n- If a job already has an active work order, the scan does not create another one for it.\n- A work order can be generated ahead of the scan for one job with 'Generate WO' on the Components page — see office-generate-wo-per-job.md.\n- On the office instance no scan runs. Office-side generation is done by a user in one of two ways: 'Generate Now' for a whole vessel (Sail Admin AND the vessel switch) — see office-generate-now.md — or per-job 'Generate WO' from Components (the vessel switch) — see office-generate-wo-per-job.md.\nWhere the manual differs:\n- The June manuals do not describe automatic generation at all. They describe the Scheduled / Due / Overdue tabs and the job frequency / next due date but never say that the system creates the work orders. Recorded in CONFLICTS.md.\nRelated procedures: office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "Introduction (p.23)",
+   "distance": 0.9668,
+   "text": "* Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.9838,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  }
+ ],
+ "Steps to create a new work order || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.827,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.8394,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+   "distance": 0.8486,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 39)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 39)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 39)\n\nscreenshot: Work Orders (W\\.O) dashboard showing status tabs and work order list with instructional callouts\n\nFigure 39\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 40)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 40)\n\nscreenshot: Part B - Work Completion Record form showing risk assessment and work duration fields with instructional callouts\n\nFigure 40\n\n☞ To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 0.8689,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O) (p.28)",
+   "distance": 0.9569,
+   "text": "* Click the ‘Work Orders’ sub-sub-module to view all the work orders. (Ref Figure 42)\n\n* Select the vessel from the ‘Vessel’ dropdown. (Ref Figure 42)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, Unplanned, Pending Approval, and Completed) to view the corresponding work orders' status. (Ref Figure 42)\n\nScreenshot of the Work Orders (W\\.O) interface showing navigation steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, 3. Select a status tab to display the corresponding 'Work Orders'. A red note points to a postponement icon.\n\nFigure 42\n\n* Hand icon **Scheduled**: Jobs that have been planned and have a future due date.\n* **Due**: Jobs that are due within the current period.\n* **Overdue**: Jobs past their due date that have not been completed.\n* **Postponed**: Jobs that have been deferred with an approved justification.\n* **Unplanned**: Details of unplanned work orders will be displayed in this section.\n* **Pending Approval**: All submitted work order details will be displayed here for HOD approval.\n* **Completed**: Fully executed and approved ‘Work Order’ details will be displayed in this tab."
+  }
+ ],
+ "Steps to create a new work order || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.827,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.8394,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+   "distance": 0.8486,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 39)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 39)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 39)\n\nscreenshot: Work Orders (W\\.O) dashboard showing status tabs and work order list with instructional callouts\n\nFigure 39\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 40)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 40)\n\nscreenshot: Part B - Work Completion Record form showing risk assessment and work duration fields with instructional callouts\n\nFigure 40\n\n☞ To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+   "section": "How work orders are created — the three ways to create a work order",
+   "distance": 0.853,
+   "text": "Applies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 0.8689,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  }
+ ],
+ "How do work orders get created in the Technical module? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.887,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.8977,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.18)",
+   "distance": 0.9005,
+   "text": "* In the Part C section, users can view all associated jobs for the component, including Task type, frequency, and last/next due dates. (Ref Figure 22)\n* The user can click the 'Generate WO' button to create a WO manually for the selected component. (Ref Figure 22)\n\nScreenshot of the Components interface showing component details and a list of jobs. A callout box labeled \"1\" points to the jobs section, and a callout box labeled \"2\" points to the 'Generate WO' button.\n\n<u>Figure 22</u>\n\n* The screen below appears after clicking the 'Generate WO' button. (Ref Figure 23)\n* Choose the appropriate reason for generating the work order from the listed options (Ref Figure 23), and the Work Order will be generated.\n\nScreenshot of the 'Generate Work Order' pop-up window over the Components interface. A callout box points to the pop-up, indicating where to choose a reason for the Work Order.\n\n<u>Figure 23</u>\n\n[!NOTE]\nEnsure that there is no active WO for the same selected job, as the system does not allow the generation of duplicate work orders."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.9042,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "distance": 0.9153,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  }
+ ],
+ "How do work orders get created in the Technical module? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+   "section": "How work orders are created — the three ways to create a work order",
+   "distance": 0.8429,
+   "text": "Applies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "distance": 0.887,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "Introduction (p.28)",
+   "distance": 0.8977,
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.18)",
+   "distance": 0.9005,
+   "text": "* In the Part C section, users can view all associated jobs for the component, including Task type, frequency, and last/next due dates. (Ref Figure 22)\n* The user can click the 'Generate WO' button to create a WO manually for the selected component. (Ref Figure 22)\n\nScreenshot of the Components interface showing component details and a list of jobs. A callout box labeled \"1\" points to the jobs section, and a callout box labeled \"2\" points to the 'Generate WO' button.\n\n<u>Figure 22</u>\n\n* The screen below appears after clicking the 'Generate WO' button. (Ref Figure 23)\n* Choose the appropriate reason for generating the work order from the listed options (Ref Figure 23), and the Work Order will be generated.\n\nScreenshot of the 'Generate Work Order' pop-up window over the Components interface. A callout box points to the pop-up, indicating where to choose a reason for the Work Order.\n\n<u>Figure 23</u>\n\n[!NOTE]\nEnsure that there is no active WO for the same selected job, as the system does not allow the generation of duplicate work orders."
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "distance": 0.9042,
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  }
+ ],
+ "How do I record a stock transaction for spares? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)",
+   "distance": 0.9779,
+   "text": "* Click the ‘Spares’ sub-submodule, and the system will open the ‘Inventory’ tab by default. (Ref. Figure 62)\n\n* Click the ‘Location’ icon in the table column to view and update stock availability based on the storage location. (Ref. Figure 62)\n\nscreenshot_from_computer: Spares Inventory screen showing the Inventory tab with a list of spare parts. A callout '1. Click here to enter the Spares sub-sub module.' points to the Spares icon in the sidebar. Another callout '2. Click here to view spare part details.' points to the Location icon in the table.\n\nFigure 62\n\n* The screen below appears after clicking the ‘Location’ icon. (Ref Figure 63)\n\n* User can choose the required location (Location A or Location B), then click + Create New Location to create a new inventory location. (Ref Figure 63)\n\n* Click the ‘Save’ button to save and update the field. (Ref Figure 63)\n\nscreenshot_from_computer: Inventory Transaction pop-up window over the Spares Inventory screen. Callout '1. Choose a location and click + Create New Location to create a new entry.' points to the location selection fields. Callout '2. From here, the user can create a new location.' points to the + Create New Location button"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)",
+   "distance": 1.0194,
+   "text": "* Click on the 'Spares' sub – sub module. (Ref Figure 67)\n\n* Click on the 'Bulk Update Spares' button to update multiple spares at once. (Ref Figure 67)\n\nscreenshot_from_computer: Spares Inventory screen highlighting the Bulk Update Spares button with callouts: 1. Click here to enter the Spares sub-sub module. 2. Click here to update multiple spares at once.\n\n<a id=\"figure-67\"></a>\n\nFigure 67"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)",
+   "distance": 1.0285,
+   "text": "* Click on the 'Spares' sub – sub module. (Ref Figure 81)\n\n* Click on the 'Bulk Update Spares' button to update multiple spares at once. (Ref Figure 81)\n\nScreenshot of Spares Inventory interface showing the bulk update feature. Annotation 1 points to the Spares sub-sub module in the sidebar. Annotation 2 points to the 'Bulk Update Spares' button at the top right of the inventory list.\n\nFigure 81"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.7.3 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.44)",
+   "distance": 1.0387,
+   "text": "* Click the 'Spares' sub-submodule, and the system will open the 'Inventory' tab by default. (Ref Figure 75)\n\n* Click the 'Location' icon in the table column to view and update stock availability based on the storage location. (Ref Figure 75)\n\nScreenshot of the Spares Inventory dashboard. A yellow callout box points to the 'Spares' icon in the sidebar with the text '1. Click here to enter the Spares sub-sub module.' Another yellow callout box points to the 'Location' tab with the text '2. Click here to view stock by locations.'\n\nFigure 75"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.7.4 HOW TO VIEW RECORDS IN SPARES (p.39)",
+   "distance": 1.0552,
+   "text": "* Click the 'Spares' sub-sub-module to access spare parts inventory. (<u>Ref. Figure 65</u>)\n\n* Click on the 'History' tab to open the spare transaction history, which displays a comprehensive record of all inventory movements and updates for the selected item. (<u>Ref. Figure 65</u>)\n\nscreenshot_from_computer: Spares - History of Transactions interface showing navigation to history tab\n\nFigure 65"
+  }
+ ],
+ "How do I record a stock transaction for spares? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)",
+   "distance": 0.9779,
+   "text": "* Click the ‘Spares’ sub-submodule, and the system will open the ‘Inventory’ tab by default. (Ref. Figure 62)\n\n* Click the ‘Location’ icon in the table column to view and update stock availability based on the storage location. (Ref. Figure 62)\n\nscreenshot_from_computer: Spares Inventory screen showing the Inventory tab with a list of spare parts. A callout '1. Click here to enter the Spares sub-sub module.' points to the Spares icon in the sidebar. Another callout '2. Click here to view spare part details.' points to the Location icon in the table.\n\nFigure 62\n\n* The screen below appears after clicking the ‘Location’ icon. (Ref Figure 63)\n\n* User can choose the required location (Location A or Location B), then click + Create New Location to create a new inventory location. (Ref Figure 63)\n\n* Click the ‘Save’ button to save and update the field. (Ref Figure 63)\n\nscreenshot_from_computer: Inventory Transaction pop-up window over the Spares Inventory screen. Callout '1. Choose a location and click + Create New Location to create a new entry.' points to the location selection fields. Callout '2. From here, the user can create a new location.' points to the + Create New Location button"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)",
+   "distance": 1.0194,
+   "text": "* Click on the 'Spares' sub – sub module. (Ref Figure 67)\n\n* Click on the 'Bulk Update Spares' button to update multiple spares at once. (Ref Figure 67)\n\nscreenshot_from_computer: Spares Inventory screen highlighting the Bulk Update Spares button with callouts: 1. Click here to enter the Spares sub-sub module. 2. Click here to update multiple spares at once.\n\n<a id=\"figure-67\"></a>\n\nFigure 67"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)",
+   "distance": 1.0285,
+   "text": "* Click on the 'Spares' sub – sub module. (Ref Figure 81)\n\n* Click on the 'Bulk Update Spares' button to update multiple spares at once. (Ref Figure 81)\n\nScreenshot of Spares Inventory interface showing the bulk update feature. Annotation 1 points to the Spares sub-sub module in the sidebar. Annotation 2 points to the 'Bulk Update Spares' button at the top right of the inventory list.\n\nFigure 81"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.7.3 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.44)",
+   "distance": 1.0387,
+   "text": "* Click the 'Spares' sub-submodule, and the system will open the 'Inventory' tab by default. (Ref Figure 75)\n\n* Click the 'Location' icon in the table column to view and update stock availability based on the storage location. (Ref Figure 75)\n\nScreenshot of the Spares Inventory dashboard. A yellow callout box points to the 'Spares' icon in the sidebar with the text '1. Click here to enter the Spares sub-sub module.' Another yellow callout box points to the 'Location' tab with the text '2. Click here to view stock by locations.'\n\nFigure 75"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.7.4 HOW TO VIEW RECORDS IN SPARES (p.39)",
+   "distance": 1.0552,
+   "text": "* Click the 'Spares' sub-sub-module to access spare parts inventory. (<u>Ref. Figure 65</u>)\n\n* Click on the 'History' tab to open the spare transaction history, which displays a comprehensive record of all inventory movements and updates for the selected item. (<u>Ref. Figure 65</u>)\n\nscreenshot_from_computer: Spares - History of Transactions interface showing navigation to history tab\n\nFigure 65"
+  }
+ ],
+ "How do I add a new store item? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.8.4 HOW TO ADD ITEM (p.43)",
+   "distance": 0.758,
+   "text": "* Click the ‘Store’ sub-sub-module. <u>(Ref Figure 73)</u>\n\n* Click on the ‘+ Add Store’ button, provide the necessary details, and click Save Store Item to create a new store item. <u>(Ref Figure 73)</u>\n\nscreenshot: Stores Inventory dashboard showing add item process\n\n<u>Figure 73</u>\n\n☞ Use the same steps as described above to add new items for the selected category (Stores, Lubes, Chemicals, or Others) and tab (Inventory, Location, or History)"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.8.4 HOW TO ADD ITEM (p.50)",
+   "distance": 0.7646,
+   "text": "* Click the 'Store' sub-sub-module. (Ref Figure 86)\n\n* Click on the '+ Add Store' button, provide the necessary details, and click Save Store Item to create a new store item. (Ref Figure 86)\n\nScreenshot of Stores Inventory interface showing how to add a new item. A callout \"1. Click here to enter the Store sub-sub module.\" points to the Store icon in the sidebar. Another callout \"2. Click here to add a new item.\" points to the \"+ Add Store\" button.\n\nFigure 86\n\nUse the same steps as described above to add new items for the selected category (Stores, Lubes, Chemicals, or Others) and tab (Inventory, Location, or History)"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.8.1 HOW TO ACCESS THE STORE (p.49)",
+   "distance": 1.0447,
+   "text": "* Click the ‘Store’ sub-sub-module to manage consumable items; the default landing page is ‘Stores Inventory’. (Ref Figure 84)\n\n* Choose the required category (Stores, Lubes, Chemicals, or Others), then select ‘Inventory, Location, or History’ to view the information. (Ref Figure 84)\n\n* In the Actions column of the table, click the ‘i’ icon to view the item details, the ‘Edit’ icon to modify the record details, and the ‘Bin’ icon to delete the record. (Ref Figure 84)\n\nScreenshot of the Stores Inventory interface showing the navigation to the Store sub-module, category selection, and action icons for viewing, editing, and deleting records.\n\n<a id=\"figure-84\"></a>\nFigure 84\n\n☞ Items are **categorized** as Stores, Lubes, Chemicals, and Others.\n\n* **Lubes:** Displays lubricants and oils only.\n\n* **Chemicals:** Displays onboard chemicals with fields such as Hazard Classification, UN Number, and Flash Point.\n\n* **Others:** Displays miscellaneous items outside the defined categories.\n\n☞ **View Modes** – Inventory, Location, History."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.8.1 HOW TO ACCESS THE STORE (p.42)",
+   "distance": 1.0734,
+   "text": "* Click the 'Store' sub-sub-module to manage consumable items; the default landing page is 'Stores Inventory'. <u>(Ref Figure 70)</u>\n\n* Choose the required category (Stores, Lubes, Chemicals, or Others), then select Inventory, Location, or History to view the information. <u>(Ref Figure 70)</u>\n\n* In the Actions column of the table, click the 'i' icon to view the item details and the 'Bin' icon to delete the record. <u>(Ref Figure 70)</u>\n\n* The following screen is displayed only to **HOD User**. <u>(Ref Figure 70)</u>\n\nscreenshot: Stores Inventory interface for HOD User with callouts for Store sub-sub-module, category subtabs, and action icons.\n\nFigure 70\n\n* The following screen is displayed only to **Vessel User**. <u>(Ref Figure 71)</u>\n\nscreenshot: Stores Inventory interface for Vessel User with callouts for Store sub-sub-module, category subtabs, and a note about viewing item details.\n\nFigure 71\n\n☞ Items are **categorized** as Stores, Lubes, Chemicals, and Others.\n\n* **Lubes:** Displays lubricants and oils only.\n\n* **Chemicals:** Displays onboard chemicals with fields such as Hazard Classification, UN Number, and Flash Point.\n\n* **Others:** Displays miscellaneous items outsid"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.10.5 HOW TO CREATE A NEW CHANGE REQUEST FOR STORES (p.53)",
+   "distance": 1.089,
+   "text": "* Refer to the 'How to create a new change request for Components' and follow the same steps. (Ref Figure 88)\n\n* Select the 'Stores' card to change or modify. (Ref Figure 88)\n\nscreenshot_from_computer: A software interface showing a \"New Change Request\" modal with options for Components, Jobs, Spares, and Stores. A yellow callout box points to the \"Stores\" card with the text \"Select the 'Stores' card to make changes.\"\n\nFigure 88\n\n* The screen below appears after clicking the 'Stores' card. (Ref Figure 89)\n\n* Click the 'Edit' icon to access the selected Store record. (Ref Figure 89)\n\nscreenshot_from_computer: A software interface showing a \"Stores Inventory\" table with columns for Item Code, Item Name, Stores Category, UOM, ROB, Min, Stock, Location, IHM, and Actions. A yellow callout box points to an edit icon in the Actions column with the text \"Click here to edit store inventory details.\"\n\nFigure 89"
+  }
+ ],
+ "How do I add a new store item? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.8.4 HOW TO ADD ITEM (p.43)",
+   "distance": 0.758,
+   "text": "* Click the ‘Store’ sub-sub-module. <u>(Ref Figure 73)</u>\n\n* Click on the ‘+ Add Store’ button, provide the necessary details, and click Save Store Item to create a new store item. <u>(Ref Figure 73)</u>\n\nscreenshot: Stores Inventory dashboard showing add item process\n\n<u>Figure 73</u>\n\n☞ Use the same steps as described above to add new items for the selected category (Stores, Lubes, Chemicals, or Others) and tab (Inventory, Location, or History)"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.8.4 HOW TO ADD ITEM (p.50)",
+   "distance": 0.7646,
+   "text": "* Click the 'Store' sub-sub-module. (Ref Figure 86)\n\n* Click on the '+ Add Store' button, provide the necessary details, and click Save Store Item to create a new store item. (Ref Figure 86)\n\nScreenshot of Stores Inventory interface showing how to add a new item. A callout \"1. Click here to enter the Store sub-sub module.\" points to the Store icon in the sidebar. Another callout \"2. Click here to add a new item.\" points to the \"+ Add Store\" button.\n\nFigure 86\n\nUse the same steps as described above to add new items for the selected category (Stores, Lubes, Chemicals, or Others) and tab (Inventory, Location, or History)"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.8.1 HOW TO ACCESS THE STORE (p.49)",
+   "distance": 1.0447,
+   "text": "* Click the ‘Store’ sub-sub-module to manage consumable items; the default landing page is ‘Stores Inventory’. (Ref Figure 84)\n\n* Choose the required category (Stores, Lubes, Chemicals, or Others), then select ‘Inventory, Location, or History’ to view the information. (Ref Figure 84)\n\n* In the Actions column of the table, click the ‘i’ icon to view the item details, the ‘Edit’ icon to modify the record details, and the ‘Bin’ icon to delete the record. (Ref Figure 84)\n\nScreenshot of the Stores Inventory interface showing the navigation to the Store sub-module, category selection, and action icons for viewing, editing, and deleting records.\n\n<a id=\"figure-84\"></a>\nFigure 84\n\n☞ Items are **categorized** as Stores, Lubes, Chemicals, and Others.\n\n* **Lubes:** Displays lubricants and oils only.\n\n* **Chemicals:** Displays onboard chemicals with fields such as Hazard Classification, UN Number, and Flash Point.\n\n* **Others:** Displays miscellaneous items outside the defined categories.\n\n☞ **View Modes** – Inventory, Location, History."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.8.1 HOW TO ACCESS THE STORE (p.42)",
+   "distance": 1.0734,
+   "text": "* Click the 'Store' sub-sub-module to manage consumable items; the default landing page is 'Stores Inventory'. <u>(Ref Figure 70)</u>\n\n* Choose the required category (Stores, Lubes, Chemicals, or Others), then select Inventory, Location, or History to view the information. <u>(Ref Figure 70)</u>\n\n* In the Actions column of the table, click the 'i' icon to view the item details and the 'Bin' icon to delete the record. <u>(Ref Figure 70)</u>\n\n* The following screen is displayed only to **HOD User**. <u>(Ref Figure 70)</u>\n\nscreenshot: Stores Inventory interface for HOD User with callouts for Store sub-sub-module, category subtabs, and action icons.\n\nFigure 70\n\n* The following screen is displayed only to **Vessel User**. <u>(Ref Figure 71)</u>\n\nscreenshot: Stores Inventory interface for Vessel User with callouts for Store sub-sub-module, category subtabs, and a note about viewing item details.\n\nFigure 71\n\n☞ Items are **categorized** as Stores, Lubes, Chemicals, and Others.\n\n* **Lubes:** Displays lubricants and oils only.\n\n* **Chemicals:** Displays onboard chemicals with fields such as Hazard Classification, UN Number, and Flash Point.\n\n* **Others:** Displays miscellaneous items outsid"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.10.5 HOW TO CREATE A NEW CHANGE REQUEST FOR STORES (p.53)",
+   "distance": 1.089,
+   "text": "* Refer to the 'How to create a new change request for Components' and follow the same steps. (Ref Figure 88)\n\n* Select the 'Stores' card to change or modify. (Ref Figure 88)\n\nscreenshot_from_computer: A software interface showing a \"New Change Request\" modal with options for Components, Jobs, Spares, and Stores. A yellow callout box points to the \"Stores\" card with the text \"Select the 'Stores' card to make changes.\"\n\nFigure 88\n\n* The screen below appears after clicking the 'Stores' card. (Ref Figure 89)\n\n* Click the 'Edit' icon to access the selected Store record. (Ref Figure 89)\n\nscreenshot_from_computer: A software interface showing a \"Stores Inventory\" table with columns for Item Code, Item Name, Stores Category, UOM, ROB, Min, Stock, Location, IHM, and Actions. A yellow callout box points to an edit icon in the Actions column with the text \"Click here to edit store inventory details.\"\n\nFigure 89"
+  }
+ ],
+ "How do I raise a defect on equipment? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15)",
+   "distance": 0.9107,
+   "text": "* Click the '+ New Defect' button to create a new defect record. (Ref Figure 22)\n\nScreenshot of Defects Log showing the '+ New Defect' button highlighted with an arrow and a callout box saying \"1. Click here to create the report.\"\n\n<a id=\"figure-22\"></a>\nFigure 22\n\n* The screen below appears after clicking the '+ New Defect' button. (Ref Figure 23)\n\n* Fill all the required information in Part A, Part B and Part C. (Ref Figure 23)\n\n* Click 'Submit' button to save the updated reporting details. (Ref Figure 23)\n\nScreenshot of New Defect Report form with callout boxes: \"1. Modify the report accordingly.\", \"2. Click here to submit Part A.\", \"Click here to add attachments.\", and \"Click here to save the report.\"\n\n<a id=\"figure-23\"></a>\nFigure 23\n\n☞ Clicking 'Submit' button, the updated defect report is forwarded to the next stage of the configured defect management workflow.\n\nPage 15 of 20"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD (p.19)",
+   "distance": 1.0021,
+   "text": "* Refer to the 'Defect Log' sub-submodule and follow the same procedure to create a new record.\n\n(Cross-reference resolved: the steps for Condition Of Class Coc › How To Create A New Coc Defect Record are the same as section 1.1.4.3 'How To Create A New Defect' under Defects Logs, page 15. They are:)\n* Click the '+ New Defect' button to create a new defect record. (Ref Figure 22)\n\nScreenshot of Defects Log showing the '+ New Defect' button highlighted with an arrow and a callout box saying \"1. Click here to create the report.\"\n\n<a id=\"figure-22\"></a>\nFigure 22\n\n* The screen below appears after clicking the '+ New Defect' button. (Ref Figure 23)\n\n* Fill all the required information in Part A, Part B and Part C. (Ref Figure 23)\n\n* Click 'Submit' button to save the updated reporting details. (Ref Figure 23)\n\nScreenshot of New Defect Report form with callout boxes: \"1. Modify the report accordingly.\", \"2. Click here to submit Part A.\", \"Click here to add attachments.\", and \"Click here to save the report.\"\n\n<a id=\"figure-23\"></a>\nFigure 23\n\n☞ Clicking 'Submit' button, the updated defect report is forwarded to the next stage of the configured defect management workflow.\n\nPage 15 of 20"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "Introduction (p.14)",
+   "distance": 1.0055,
+   "text": "* The Defects Log screen provides a centralized register of defect reports, allowing users to search, filter, review, export, and manage defects while viewing key information such as vessel, component, status, priority, target date, and completion details."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.12)",
+   "distance": 1.0362,
+   "text": "* The screen below appears after clicking the report row. (Ref Figure 16)\n\n* Click on the 'Edit' button. (Ref Figure 16)\n\nScreenshot of View Defect Report interface showing an 'Edit' button highlighted with an arrow and a callout box saying \"1. Click here to modify the report.\"\n\n<u>Figure 16</u>\n\n* The screen below appears after clicking the 'Edit' button. (Ref Figure 17)\n\n* Update the required information in Part A, Part B and Part C. (Ref Figure 17)\n\n* Click 'Submit' button to save the updated reporting details. (Ref Figure 17)\n\nScreenshot of Edit Defect Report interface with multiple callouts: \"1. Modify the report accordingly.\" pointing to the form, \"Click here to add attachments.\" pointing to an Attachment(s) button, \"2. Click here to submit Part A.\" pointing to a Submit button, and \"Click here to save the report.\" pointing to a SAVE button at the top.\n\n<u>Figure 17</u>\n\n<mark>Clicking 'Submit' button, the updated defect report is forwarded to the next stage of the configured defect management workflow.</mark>"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "1.1.4.1 HOW TO ACCESS DEFECTS LOGS (p.14)",
+   "distance": 1.0394,
+   "text": "* Click on the 'Defect Log' sub-submodule to view all available defect reports in the Defects Log table. (Ref Figure 20)\n\nScreenshot of the Defects Log interface showing the navigation menu with 'Defect Log' highlighted.\n\nFigure 20"
+  }
+ ],
+ "How do I raise a defect on equipment? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15)",
+   "distance": 0.9107,
+   "text": "* Click the '+ New Defect' button to create a new defect record. (Ref Figure 22)\n\nScreenshot of Defects Log showing the '+ New Defect' button highlighted with an arrow and a callout box saying \"1. Click here to create the report.\"\n\n<a id=\"figure-22\"></a>\nFigure 22\n\n* The screen below appears after clicking the '+ New Defect' button. (Ref Figure 23)\n\n* Fill all the required information in Part A, Part B and Part C. (Ref Figure 23)\n\n* Click 'Submit' button to save the updated reporting details. (Ref Figure 23)\n\nScreenshot of New Defect Report form with callout boxes: \"1. Modify the report accordingly.\", \"2. Click here to submit Part A.\", \"Click here to add attachments.\", and \"Click here to save the report.\"\n\n<a id=\"figure-23\"></a>\nFigure 23\n\n☞ Clicking 'Submit' button, the updated defect report is forwarded to the next stage of the configured defect management workflow.\n\nPage 15 of 20"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD (p.19)",
+   "distance": 1.0021,
+   "text": "* Refer to the 'Defect Log' sub-submodule and follow the same procedure to create a new record.\n\n(Cross-reference resolved: the steps for Condition Of Class Coc › How To Create A New Coc Defect Record are the same as section 1.1.4.3 'How To Create A New Defect' under Defects Logs, page 15. They are:)\n* Click the '+ New Defect' button to create a new defect record. (Ref Figure 22)\n\nScreenshot of Defects Log showing the '+ New Defect' button highlighted with an arrow and a callout box saying \"1. Click here to create the report.\"\n\n<a id=\"figure-22\"></a>\nFigure 22\n\n* The screen below appears after clicking the '+ New Defect' button. (Ref Figure 23)\n\n* Fill all the required information in Part A, Part B and Part C. (Ref Figure 23)\n\n* Click 'Submit' button to save the updated reporting details. (Ref Figure 23)\n\nScreenshot of New Defect Report form with callout boxes: \"1. Modify the report accordingly.\", \"2. Click here to submit Part A.\", \"Click here to add attachments.\", and \"Click here to save the report.\"\n\n<a id=\"figure-23\"></a>\nFigure 23\n\n☞ Clicking 'Submit' button, the updated defect report is forwarded to the next stage of the configured defect management workflow.\n\nPage 15 of 20"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "Introduction (p.14)",
+   "distance": 1.0055,
+   "text": "* The Defects Log screen provides a centralized register of defect reports, allowing users to search, filter, review, export, and manage defects while viewing key information such as vessel, component, status, priority, target date, and completion details."
+  },
+  {
+   "rank": 4,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.12)",
+   "distance": 1.0362,
+   "text": "* The screen below appears after clicking the report row. (Ref Figure 16)\n\n* Click on the 'Edit' button. (Ref Figure 16)\n\nScreenshot of View Defect Report interface showing an 'Edit' button highlighted with an arrow and a callout box saying \"1. Click here to modify the report.\"\n\n<u>Figure 16</u>\n\n* The screen below appears after clicking the 'Edit' button. (Ref Figure 17)\n\n* Update the required information in Part A, Part B and Part C. (Ref Figure 17)\n\n* Click 'Submit' button to save the updated reporting details. (Ref Figure 17)\n\nScreenshot of Edit Defect Report interface with multiple callouts: \"1. Modify the report accordingly.\" pointing to the form, \"Click here to add attachments.\" pointing to an Attachment(s) button, \"2. Click here to submit Part A.\" pointing to a Submit button, and \"Click here to save the report.\" pointing to a SAVE button at the top.\n\n<u>Figure 17</u>\n\n<mark>Clicking 'Submit' button, the updated defect report is forwarded to the next stage of the configured defect management workflow.</mark>"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+   "section": "1.1.4.1 HOW TO ACCESS DEFECTS LOGS (p.14)",
+   "distance": 1.0394,
+   "text": "* Click on the 'Defect Log' sub-submodule to view all available defect reports in the Defects Log table. (Ref Figure 20)\n\nScreenshot of the Defects Log interface showing the navigation menu with 'Defect Log' highlighted.\n\nFigure 20"
+  }
+ ],
+ "How do I update running hours for a component? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.34)",
+   "distance": 0.6822,
+   "text": "* Click the ‘Gear’ icon to update the running hours for single component. <u>(Ref Figure 54)</u>\n\nscreenshot: Running Hours Overview screen with a yellow callout pointing to a gear icon labeled 'Click here to update the running hours.'\n\nFigure 54\n\n* The screen below appears after clicking the ‘Gear’ icon. <u>(Ref Figure 55)</u>\n\n* Enter the details accordingly. <u>(Ref Figure 55)</u>\n\n* Click the ‘Save’ button to update the Running hours. <u>(Ref Figure 55)</u>\n\nscreenshot: Update Running Hours modal window with a yellow callout pointing to the Save button labeled 'After entering all the information, click ‘Save’ to save all the changes.'\n\nFigure 55\n\n<mark>icon: hand pointing right For components with an Inherited RH type, updates are cascaded to all child components.</mark>"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.6.3 HOW TO UPDATE RUNNING HOURS. (p.33)",
+   "distance": 0.7144,
+   "text": "* Click on the 'Running Hrs' sub – sub module. (Ref Figure 52)\n\n* Click on the '+ Bulk Update RH' button to update multiple components at once. (Ref Figure 52)\n\nscreenshot_from_computer: Software interface showing the Running Hours module with annotations: 1. Click here to access the 'Running Hrs'. 2. Click here to update multiple components at once.\n\nFigure 52\n\n* The screen below appears after clicking the '+ Bulk Update RH' button. (Ref Figure 53)\n\n* Enter the 'Date', 'Comments', and corresponding 'Values' for each component in the form. (Ref Figure 53)\n\n* Click the 'Save' button to save all. (Ref Figure 53)\n\nscreenshot_from_computer: Bulk Update Running Hours form showing fields for Date Updated, Comments, and a table for component values with an annotation: After entering all the information, click 'Save' to save all the changes.\n\nFigure 53"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.39)",
+   "distance": 0.7258,
+   "text": "* Click on the ‘Running Hrs’ sub – sub module. (Ref Figure 63)\n\n* Click on the ‘+ Bulk Update RH’ button to update multiple components at once. (Ref Figure 63)\n\nScreenshot of the Running Hours dashboard showing the navigation menu and the Bulk Update RH button. A callout points to the 'Running Hrs' icon in the sidebar with the text '1. Click here to access the \"Running Hrs\".' Another callout points to the '+ Bulk Update RH' button with the text '2. Click here to update multiple components at once.'\n\nFigure 63\n\n* The screen below appears after clicking the ‘+ Bulk Update RH’ button. (Ref Figure 64)\n\n* Enter the ‘Date’, ‘Comments’, and corresponding ‘Values’ for each component in the form. (Ref Figure 64)\n\n* Click the ‘Save’ button to save all. (Ref Figure 64)\n\nScreenshot of the Bulk Update Running Hours form. The form includes fields for Date Updated and Comments, and a table with columns for Component Name, Component Code, Previous Running Hours, Present Running Hours, Meter Replaced?, and Status. A callout points to the 'Save' button with the text 'After entering all the information, click \"Save\" to save all the changes.'\n\nFigure 64"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.40)",
+   "distance": 0.7789,
+   "text": "* Click the ‘Gear’ icon to update the running hours for a single component. (<u>Ref Figure 65</u>)\n\nScreenshot of Running Hours dashboard showing a list of components with a 'Gear' icon highlighted by a yellow callout box that says \"Click here to update the running hours.\"\n\n<u>Figure 65</u>\n\n* The screen below appears after clicking the ‘Gear’ icon. (<u>Ref Figure 66</u>)\n\n* Enter the details accordingly. (<u>Ref Figure 66</u>)\n\n* Click the ‘Save’ button to update the Running hours. (<u>Ref Figure 66</u>)\n\nScreenshot of a pop-up window titled \"Update Running Hours - Provision Cooling Compressor Aggregates\" with fields for Mode, Old Value, New Value, Date Updated, and Comments. A yellow callout box points to the 'Save' button and says \"After entering all the information, click 'Save' to save all the changes.\"\n\n<u>Figure 66</u>\n\n<mark>Note icon For components with an Inherited RH type, updates are cascaded to all child components.</mark>"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx",
+   "section": "1.1.14.3 Running Hours Never Move Backwards",
+   "distance": 0.8992,
+   "text": "* A component's running-hours counter is never reduced by a late, low or out-of-order reading from any source (ship entry, office entry, work-order completion or sync). A lower reading entered directly is refused; a lower reading that is back-dated is kept in the audit history and on the work order without changing the counter.\n\n* The only legitimate decreases are a meter replacement or a renewal reset, recorded as such when entered.\n\n* Across sync, readings are reconciled by reading date — the latest date wins; a same-date tie goes to the ship. See the Sync (Operational) manual, section on running hours."
+  }
+ ],
+ "How do I update running hours for a component? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.34)",
+   "distance": 0.6822,
+   "text": "* Click the ‘Gear’ icon to update the running hours for single component. <u>(Ref Figure 54)</u>\n\nscreenshot: Running Hours Overview screen with a yellow callout pointing to a gear icon labeled 'Click here to update the running hours.'\n\nFigure 54\n\n* The screen below appears after clicking the ‘Gear’ icon. <u>(Ref Figure 55)</u>\n\n* Enter the details accordingly. <u>(Ref Figure 55)</u>\n\n* Click the ‘Save’ button to update the Running hours. <u>(Ref Figure 55)</u>\n\nscreenshot: Update Running Hours modal window with a yellow callout pointing to the Save button labeled 'After entering all the information, click ‘Save’ to save all the changes.'\n\nFigure 55\n\n<mark>icon: hand pointing right For components with an Inherited RH type, updates are cascaded to all child components.</mark>"
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.6.3 HOW TO UPDATE RUNNING HOURS. (p.33)",
+   "distance": 0.7144,
+   "text": "* Click on the 'Running Hrs' sub – sub module. (Ref Figure 52)\n\n* Click on the '+ Bulk Update RH' button to update multiple components at once. (Ref Figure 52)\n\nscreenshot_from_computer: Software interface showing the Running Hours module with annotations: 1. Click here to access the 'Running Hrs'. 2. Click here to update multiple components at once.\n\nFigure 52\n\n* The screen below appears after clicking the '+ Bulk Update RH' button. (Ref Figure 53)\n\n* Enter the 'Date', 'Comments', and corresponding 'Values' for each component in the form. (Ref Figure 53)\n\n* Click the 'Save' button to save all. (Ref Figure 53)\n\nscreenshot_from_computer: Bulk Update Running Hours form showing fields for Date Updated, Comments, and a table for component values with an annotation: After entering all the information, click 'Save' to save all the changes.\n\nFigure 53"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.39)",
+   "distance": 0.7258,
+   "text": "* Click on the ‘Running Hrs’ sub – sub module. (Ref Figure 63)\n\n* Click on the ‘+ Bulk Update RH’ button to update multiple components at once. (Ref Figure 63)\n\nScreenshot of the Running Hours dashboard showing the navigation menu and the Bulk Update RH button. A callout points to the 'Running Hrs' icon in the sidebar with the text '1. Click here to access the \"Running Hrs\".' Another callout points to the '+ Bulk Update RH' button with the text '2. Click here to update multiple components at once.'\n\nFigure 63\n\n* The screen below appears after clicking the ‘+ Bulk Update RH’ button. (Ref Figure 64)\n\n* Enter the ‘Date’, ‘Comments’, and corresponding ‘Values’ for each component in the form. (Ref Figure 64)\n\n* Click the ‘Save’ button to save all. (Ref Figure 64)\n\nScreenshot of the Bulk Update Running Hours form. The form includes fields for Date Updated and Comments, and a table with columns for Component Name, Component Code, Previous Running Hours, Present Running Hours, Meter Replaced?, and Status. A callout points to the 'Save' button with the text 'After entering all the information, click \"Save\" to save all the changes.'\n\nFigure 64"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.40)",
+   "distance": 0.7789,
+   "text": "* Click the ‘Gear’ icon to update the running hours for a single component. (<u>Ref Figure 65</u>)\n\nScreenshot of Running Hours dashboard showing a list of components with a 'Gear' icon highlighted by a yellow callout box that says \"Click here to update the running hours.\"\n\n<u>Figure 65</u>\n\n* The screen below appears after clicking the ‘Gear’ icon. (<u>Ref Figure 66</u>)\n\n* Enter the details accordingly. (<u>Ref Figure 66</u>)\n\n* Click the ‘Save’ button to update the Running hours. (<u>Ref Figure 66</u>)\n\nScreenshot of a pop-up window titled \"Update Running Hours - Provision Cooling Compressor Aggregates\" with fields for Mode, Old Value, New Value, Date Updated, and Comments. A yellow callout box points to the 'Save' button and says \"After entering all the information, click 'Save' to save all the changes.\"\n\n<u>Figure 66</u>\n\n<mark>Note icon For components with an Inherited RH type, updates are cascaded to all child components.</mark>"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx",
+   "section": "1.1.14.3 Running Hours Never Move Backwards",
+   "distance": 0.8992,
+   "text": "* A component's running-hours counter is never reduced by a late, low or out-of-order reading from any source (ship entry, office entry, work-order completion or sync). A lower reading entered directly is refused; a lower reading that is back-dated is kept in the audit history and on the work order without changing the counter.\n\n* The only legitimate decreases are a meter replacement or a renewal reset, recorded as such when entered.\n\n* Across sync, readings are reconciled by reading date — the latest date wins; a same-date tie goes to the ship. See the Sync (Operational) manual, section on running hours."
+  }
+ ],
+ "How do I add a component to a vessel? || kb-base": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.4.3 HOW TO ADD COMPONENTS (p.24)",
+   "distance": 0.797,
+   "text": "* Select the required vessel from the 'Vessel' dropdown. (Ref Figure 34)\n\n* Click on the 'Add Component' button. (Ref Figure 34)\n\nScreenshot of the Components screen showing the vessel selection dropdown and the Add Component button. Annotated with: 1. Click here to select the vessel. 2. Click here to add a new component.\n\n<a id=\"figure-34\"></a>\nFigure 34\n\n* The screen below appears after clicking the 'Add Component' button. (Ref Figure 35)\n\n* After entering the required details, click the 'Save' button to save the component information. (Ref Figure 35)\n\n* Click on the 'Submit' button to add a component to the components panel. (Ref Figure 35)\n\nScreenshot of the Component Register - Add Component screen showing the Save and Submit buttons. Annotated with: 1. Click here to save the component information. 2. Click here to submit the record. A red note box states: Note: A new component can also be added by clicking the '+ Add Component' button.\n\n<a id=\"figure-35\"></a>\nFigure 35\n\n☞ All mandatory fields must be completed before the record can be saved or submitted."
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.4.4 HOW TO EDIT COMPONENTS (p.25)",
+   "distance": 0.9899,
+   "text": "* Select the required vessel from the 'Vessel' dropdown. (Ref Figure 36)\n\n* Choose the desired component that needs to be edited. (Ref Figure 36)\n\n* Click on the 'Edit Component' button to modify the component details. (Ref Figure 36)\n\nScreenshot of the Components interface showing how to select a vessel, choose a component, and click the Edit Component button.\n\nFigure 36\n\n* The screen below appears after clicking the 'Edit Component' button. (Ref Figure 37)\n\n* After entering the required details, click the 'Save' button to save the component information. (Ref Figure 37)\n\n* Click on the 'Submit' button to update the component information. (Ref Figure 37)\n\nScreenshot of the Component Register - Edit Component interface showing the Save and Submit buttons.\n\nFigure 37"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.49)",
+   "distance": 1.0305,
+   "text": "* The screen below appears after clicking the ‘Components’ card. <u>(Ref Figure 81)</u>\n\n* Choose the ‘Components’ from the component tree as required. <u>(Ref Figure 81)</u>\n\n* Edit or modify the component details as per the requirements. <u>(Ref Figure 81)</u>\n\n* Click on the ‘Submit Change Request’ button to save the changes and submit for approval. <u>(Ref Figure 81)</u>\n\nscreenshot: software interface showing component modification with callouts for choosing component, editing details, and submitting change request\n\nFigure 81"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.10.2 HOW TO CREATE A CHANGE REQUEST FOR COMPONENTS (p.48)",
+   "distance": 1.1017,
+   "text": "* Click the '+ New Change Request' button. (Ref Figure 79)\n\nscreenshot_from_computer: Modify PMS - Change Requests screen showing the '+ New Change Request' button with a callout 'Click here to make new change request.'\n\nFigure 79\n\n* The screen below appears after clicking the '+ New Change Requset'. (Ref Figure 80)\n\n* Select the 'Components' card to change or modify. (Ref Figure 80)\n\nscreenshot_from_computer: New Change Request pop-up window with the 'Components' card highlighted and a callout 'Select the Components card to make changes.'\n\nFigure 80"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.4.1 HOW TO ACCESS COMPONENTS (p.14)",
+   "distance": 1.1145,
+   "text": "* Click the ‘Components’ sub-sub-module to view lists of all Components. (Ref Figure 15)\n\n* The ‘Components’ sub-sub module screen is divided into the following two parts:\n\n  * <u>Component Tree – Hierarchical navigation of equipment categories (1-8). Click to expand; click a</u> component to view details. (Ref Figure 15)\n\n  * <u>Component Details – Full information for the selected component, including Component</u> <u>Information, Running Hours & Condition Monitoring, Jobs, Spares, Maintenance History,</u> Drawings & Manuals, Classification & Regulatory Data, and Requisitions. (Ref Figure 15)\n\nscreenshot_from_computer: Software interface showing the Components module with callouts for '1. Click here to view all Components.', 'Component Tree.', and 'Component Details.'\n\n<a id=\"figure-15\"></a>Figure 15"
+  }
+ ],
+ "How do I add a component to a vessel? || kb-pilot": [
+  {
+   "rank": 1,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.4.3 HOW TO ADD COMPONENTS (p.24)",
+   "distance": 0.797,
+   "text": "* Select the required vessel from the 'Vessel' dropdown. (Ref Figure 34)\n\n* Click on the 'Add Component' button. (Ref Figure 34)\n\nScreenshot of the Components screen showing the vessel selection dropdown and the Add Component button. Annotated with: 1. Click here to select the vessel. 2. Click here to add a new component.\n\n<a id=\"figure-34\"></a>\nFigure 34\n\n* The screen below appears after clicking the 'Add Component' button. (Ref Figure 35)\n\n* After entering the required details, click the 'Save' button to save the component information. (Ref Figure 35)\n\n* Click on the 'Submit' button to add a component to the components panel. (Ref Figure 35)\n\nScreenshot of the Component Register - Add Component screen showing the Save and Submit buttons. Annotated with: 1. Click here to save the component information. 2. Click here to submit the record. A red note box states: Note: A new component can also be added by clicking the '+ Add Component' button.\n\n<a id=\"figure-35\"></a>\nFigure 35\n\n☞ All mandatory fields must be completed before the record can be saved or submitted."
+  },
+  {
+   "rank": 2,
+   "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+   "section": "1.1.4.4 HOW TO EDIT COMPONENTS (p.25)",
+   "distance": 0.9899,
+   "text": "* Select the required vessel from the 'Vessel' dropdown. (Ref Figure 36)\n\n* Choose the desired component that needs to be edited. (Ref Figure 36)\n\n* Click on the 'Edit Component' button to modify the component details. (Ref Figure 36)\n\nScreenshot of the Components interface showing how to select a vessel, choose a component, and click the Edit Component button.\n\nFigure 36\n\n* The screen below appears after clicking the 'Edit Component' button. (Ref Figure 37)\n\n* After entering the required details, click the 'Save' button to save the component information. (Ref Figure 37)\n\n* Click on the 'Submit' button to update the component information. (Ref Figure 37)\n\nScreenshot of the Component Register - Edit Component interface showing the Save and Submit buttons.\n\nFigure 37"
+  },
+  {
+   "rank": 3,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "TECHNICAL USER MANUAL (p.49)",
+   "distance": 1.0305,
+   "text": "* The screen below appears after clicking the ‘Components’ card. <u>(Ref Figure 81)</u>\n\n* Choose the ‘Components’ from the component tree as required. <u>(Ref Figure 81)</u>\n\n* Edit or modify the component details as per the requirements. <u>(Ref Figure 81)</u>\n\n* Click on the ‘Submit Change Request’ button to save the changes and submit for approval. <u>(Ref Figure 81)</u>\n\nscreenshot: software interface showing component modification with callouts for choosing component, editing details, and submitting change request\n\nFigure 81"
+  },
+  {
+   "rank": 4,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.10.2 HOW TO CREATE A CHANGE REQUEST FOR COMPONENTS (p.48)",
+   "distance": 1.1017,
+   "text": "* Click the '+ New Change Request' button. (Ref Figure 79)\n\nscreenshot_from_computer: Modify PMS - Change Requests screen showing the '+ New Change Request' button with a callout 'Click here to make new change request.'\n\nFigure 79\n\n* The screen below appears after clicking the '+ New Change Requset'. (Ref Figure 80)\n\n* Select the 'Components' card to change or modify. (Ref Figure 80)\n\nscreenshot_from_computer: New Change Request pop-up window with the 'Components' card highlighted and a callout 'Select the Components card to make changes.'\n\nFigure 80"
+  },
+  {
+   "rank": 5,
+   "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+   "section": "1.1.4.1 HOW TO ACCESS COMPONENTS (p.14)",
+   "distance": 1.1145,
+   "text": "* Click the ‘Components’ sub-sub-module to view lists of all Components. (Ref Figure 15)\n\n* The ‘Components’ sub-sub module screen is divided into the following two parts:\n\n  * <u>Component Tree – Hierarchical navigation of equipment categories (1-8). Click to expand; click a</u> component to view details. (Ref Figure 15)\n\n  * <u>Component Details – Full information for the selected component, including Component</u> <u>Information, Running Hours & Condition Monitoring, Jobs, Spares, Maintenance History,</u> Drawings & Manuals, Classification & Regulatory Data, and Requisitions. (Ref Figure 15)\n\nscreenshot_from_computer: Software interface showing the Components module with callouts for '1. Click here to view all Components.', 'Component Tree.', and 'Component Details.'\n\n<a id=\"figure-15\"></a>Figure 15"
+  }
+ ]
+}

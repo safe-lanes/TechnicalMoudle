@@ -1,0 +1,256 @@
+index set 'kb-pilot': 25 files in /app/documents; tier=agentic version=latest fresh=False dry_run=False
+> Technical - KB pilot: How work orders are created — the three ways to create a work order.md [kb-pilot from how-work-orders-are-created.md]
+   one-chunk mode: 1 chunk(s), 2044 chars embedded text; 10 provenance tags + Sources block (596 chars) moved to metadata
+> Technical - KB pilot: Office 'Generate Now' — generate a vessel's due work orders from the office.md [kb-pilot from office-generate-now.md]
+   one-chunk mode: 1 chunk(s), 1899 chars embedded text; 13 provenance tags + Sources block (925 chars) moved to metadata
+> Technical - KB pilot: 'Generate WO' for one job — from the Components page.md [kb-pilot from office-generate-wo-per-job.md]
+   one-chunk mode: 1 chunk(s), 2105 chars embedded text; 21 provenance tags + Sources block (1305 chars) moved to metadata
+> Technical - KB pilot: Planned work orders — generated automatically by the ship's daily job-due scan.md [kb-pilot from planned-wo-ship-daily-scan.md]
+   one-chunk mode: 1 chunk(s), 1952 chars embedded text; 13 provenance tags + Sources block (780 chars) moved to metadata
+> Technical - KB pilot: Create an unplanned work order ('+ Unplanned W.O').md [kb-pilot from unplanned-wo.md]
+   one-chunk mode: 1 chunk(s), 1572 chars embedded text; 18 provenance tags + Sources block (970 chars) moved to metadata
+index set 'kb-pilot' now holds 916 chunks across 30 documents
+DONE
+== kb chunks as indexed (one per file) ==
+Create an unplanned work order ('+ Unplanned W.O').md ‖ 1572 ‖ t ‖ 970 ‖ 18 ‖ f
+'Generate WO' for one job — from the Components page.md ‖ 2105 ‖ t ‖ 1305 ‖ 21 ‖ f
+How work orders are created — the three ways to create a work order.md ‖ 2044 ‖ t ‖ 596 ‖ 10 ‖ f
+Office 'Generate Now' — generate a vessel's due work orders from the office.md ‖ 1899 ‖ t ‖ 925 ‖ 13 ‖ f
+Planned work orders — generated automatically by the ship's daily job-due scan.md ‖ 1952 ‖ t ‖ 780 ‖ 13 ‖ f
+kb-pilot total chunks: 916
+== 'How do I create a work order?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.7926          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   2 0.8107          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.8373          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   4 0.8382          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   5 0.8502          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   6 0.8680          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   7 0.9038          Technical - PMS User Manual For Office_Sail  1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O)
+   8 0.9239          Technical - PMS User Manual_Vessel Specific_ Table of Contents (p.2)
+== 'How do I create a work order?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.7926          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   2 0.8107          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.8250 OVERVIEW Technical - KB pilot: How work orders are cr How work orders are created — the three 
+   4 0.8373          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   5 0.8382          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   6 0.8502          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   7 0.8680          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   8 0.8876 PILOT    Technical - KB pilot: Create an unplanned wo Create an unplanned work order ('+ Unpla
+== 'How are planned work orders created in PMS — do I have to create them myself?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.8314          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   2 0.8349          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.8367          Technical - PMS User Manual_Vessel Specific_ 1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (
+   4 0.8428          Technical - PMS User Manual For Office_Sail  1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (
+   5 0.8775          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   6 0.9248          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   7 0.9637          Technical - PMS User Manual_Vessel Specific_ Table of Contents (p.2)
+   8 0.9807          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+== 'How are planned work orders created in PMS — do I have to create them myself?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.8314          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   2 0.8349          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.8367          Technical - PMS User Manual_Vessel Specific_ 1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (
+   4 0.8428          Technical - PMS User Manual For Office_Sail  1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (
+   5 0.8691 OVERVIEW Technical - KB pilot: How work orders are cr How work orders are created — the three 
+   6 0.8775          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   7 0.8891 PILOT    Technical - KB pilot: Planned work orders —  Planned work orders — generated automati
+   8 0.9248          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+== 'How to create work order in PMS?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.7328          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   2 0.7514          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.7731          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   4 0.7877          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   5 0.7931          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   6 0.8163          Technical - PMS User Manual For Office_Sail  1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (
+   7 0.8184          Technical - PMS User Manual_Vessel Specific_ Table of Contents (p.2)
+   8 0.8197          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+== 'How to create work order in PMS?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.7328          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   2 0.7514          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.7731          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   4 0.7877          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   5 0.7931          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   6 0.8163          Technical - PMS User Manual For Office_Sail  1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (
+   7 0.8184          Technical - PMS User Manual_Vessel Specific_ Table of Contents (p.2)
+   8 0.8197          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+== 'What are the different ways to create a work order in PMS?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.8108          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   2 0.8423          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.8654          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   4 0.8664          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   5 0.8681          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   6 0.8986          Technical - PMS User Manual_Vessel Specific_ Table of Contents (p.2)
+   7 0.9113          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   8 0.9134          Technical - PMS User Manual For Office_Sail  1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O)
+== 'What are the different ways to create a work order in PMS?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.7935 OVERVIEW Technical - KB pilot: How work orders are cr How work orders are created — the three 
+   2 0.8108          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   3 0.8423          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   4 0.8654          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   5 0.8664          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   6 0.8681          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   7 0.8986          Technical - PMS User Manual_Vessel Specific_ Table of Contents (p.2)
+   8 0.9113          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+== 'I need to raise a work order for a pump — how do I do that?' · kb-base · gate=answer module=technical margin=1.000
+   1 1.0135          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   2 1.0188          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 1.0503          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   4 1.0545          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   5 1.0579          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   6 1.0628          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   7 1.0911          Technical - PMS User Manual_Vessel Specific_ Table of Contents (p.2)
+   8 1.1187          Technical - PMS User Manual For Office_Sail  1.1.5.7 HOW TO APPROVE / REJECT A WORK O
+== 'I need to raise a work order for a pump — how do I do that?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 1.0135          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   2 1.0188          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 1.0503          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   4 1.0530 PILOT    Technical - KB pilot: Create an unplanned wo Create an unplanned work order ('+ Unpla
+   5 1.0545          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   6 1.0579          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   7 1.0628          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   8 1.0831 OVERVIEW Technical - KB pilot: How work orders are cr How work orders are created — the three 
+== 'Do I create work orders myself or does the system create them?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.9497          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   2 0.9668          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   3 0.9838          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   4 0.9841          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   5 1.0151          Technical - PMS User Manual For Office_Sail  TECHNICAL USER MANUAL (p.18)
+   6 1.0406          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   7 1.0433          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   8 1.0596          Technical - PMS User Manual_Vessel Specific_ TECHNICAL USER MANUAL (p.16)
+== 'Do I create work orders myself or does the system create them?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.8425 OVERVIEW Technical - KB pilot: How work orders are cr How work orders are created — the three 
+   2 0.9497          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   3 0.9586 PILOT    Technical - KB pilot: Planned work orders —  Planned work orders — generated automati
+   4 0.9668          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   5 0.9838          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   6 0.9841          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   7 1.0151          Technical - PMS User Manual For Office_Sail  TECHNICAL USER MANUAL (p.18)
+   8 1.0406          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+== 'Steps to create a new work order' · kb-base · gate=answer module=technical margin=1.000
+   1 0.8270          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   2 0.8394          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.8486          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   4 0.8689          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   5 0.9569          Technical - PMS User Manual For Office_Sail  1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O)
+   6 0.9576          Technical - PMS User Manual For Office_Sail  TECHNICAL USER MANUAL (p.18)
+   7 0.9635          Technical - PMS User Manual_Vessel Specific_ 1.1.5.7 HOW TO APPROVE / REJECT A WORK O
+   8 0.9643          Technical - PMS User Manual_Vessel Specific_ 1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O)
+== 'Steps to create a new work order' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.8270          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   2 0.8394          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.8486          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   4 0.8530 OVERVIEW Technical - KB pilot: How work orders are cr How work orders are created — the three 
+   5 0.8689          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   6 0.8789 PILOT    Technical - KB pilot: Create an unplanned wo Create an unplanned work order ('+ Unpla
+   7 0.9569          Technical - PMS User Manual For Office_Sail  1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O)
+   8 0.9576          Technical - PMS User Manual For Office_Sail  TECHNICAL USER MANUAL (p.18)
+== 'How do work orders get created in the Technical module?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.8870          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   2 0.8977          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   3 0.9005          Technical - PMS User Manual For Office_Sail  TECHNICAL USER MANUAL (p.18)
+   4 0.9042          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   5 0.9153          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   6 0.9196          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   7 0.9268          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+   8 0.9369          Technical - PMS User Manual For Office_Sail  1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O)
+== 'How do work orders get created in the Technical module?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.8429 OVERVIEW Technical - KB pilot: How work orders are cr How work orders are created — the three 
+   2 0.8870          Technical - PMS User Manual For Office_Sail  1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   3 0.8977          Technical - PMS User Manual For Office_Sail  Introduction (p.28)
+   4 0.9005          Technical - PMS User Manual For Office_Sail  TECHNICAL USER MANUAL (p.18)
+   5 0.9042          Technical - PMS User Manual_Vessel Specific_ 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK 
+   6 0.9153          Technical - PMS User Manual For Office_Sail  1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   7 0.9196          Technical - PMS User Manual_Vessel Specific_ 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (
+   8 0.9268          Technical - PMS User Manual_Vessel Specific_ Introduction (p.23)
+== 'How do I record a stock transaction for spares?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.9779          Technical - PMS User Manual_Vessel Specific_ 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVE
+   2 1.0194          Technical - PMS User Manual_Vessel Specific_ 1.1.7.6 HOW TO DO STOCK TRANSACTION OF S
+   3 1.0285          Technical - PMS User Manual For Office_Sail  1.1.7.8 HOW TO DO STOCK TRANSACTION OF S
+   4 1.0387          Technical - PMS User Manual For Office_Sail  1.1.7.3 HOW TO UPDATE & TRACK SPARE INVE
+   5 1.0552          Technical - PMS User Manual_Vessel Specific_ 1.1.7.4 HOW TO VIEW RECORDS IN SPARES (p
+   6 1.0831          Technical - PMS User Manual_Vessel Specific_ 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS
+   7 1.0870          Technical - PMS User Manual_Vessel Specific_ TECHNICAL USER MANUAL (p.41)
+   8 1.0887          Technical - PMS User Manual For Office_Sail  1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS
+== 'How do I record a stock transaction for spares?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.9779          Technical - PMS User Manual_Vessel Specific_ 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVE
+   2 1.0194          Technical - PMS User Manual_Vessel Specific_ 1.1.7.6 HOW TO DO STOCK TRANSACTION OF S
+   3 1.0285          Technical - PMS User Manual For Office_Sail  1.1.7.8 HOW TO DO STOCK TRANSACTION OF S
+   4 1.0387          Technical - PMS User Manual For Office_Sail  1.1.7.3 HOW TO UPDATE & TRACK SPARE INVE
+   5 1.0552          Technical - PMS User Manual_Vessel Specific_ 1.1.7.4 HOW TO VIEW RECORDS IN SPARES (p
+   6 1.0831          Technical - PMS User Manual_Vessel Specific_ 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS
+   7 1.0870          Technical - PMS User Manual_Vessel Specific_ TECHNICAL USER MANUAL (p.41)
+   8 1.0887          Technical - PMS User Manual For Office_Sail  1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS
+== 'How do I add a new store item?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.7580          Technical - PMS User Manual_Vessel Specific_ 1.1.8.4 HOW TO ADD ITEM (p.43)
+   2 0.7646          Technical - PMS User Manual For Office_Sail  1.1.8.4 HOW TO ADD ITEM (p.50)
+   3 1.0447          Technical - PMS User Manual For Office_Sail  1.1.8.1 HOW TO ACCESS THE STORE (p.49)
+   4 1.0734          Technical - PMS User Manual_Vessel Specific_ 1.1.8.1 HOW TO ACCESS THE STORE (p.42)
+   5 1.0890          Technical - PMS User Manual_Vessel Specific_ 1.1.10.5 HOW TO CREATE A NEW CHANGE REQU
+   6 1.1115          Technical - PMS User Manual For Office_Sail  1.1.10.5 HOW TO CREATE A NEW CHANGE REQU
+   7 1.1225          Technical - PMS User Manual_Vessel Specific_ 1.1.8.5 HOW TO UPDATE & TRACK STORE INVE
+   8 1.1451          Technical - PMS User Manual_Vessel Specific_ 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS
+== 'How do I add a new store item?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.7580          Technical - PMS User Manual_Vessel Specific_ 1.1.8.4 HOW TO ADD ITEM (p.43)
+   2 0.7646          Technical - PMS User Manual For Office_Sail  1.1.8.4 HOW TO ADD ITEM (p.50)
+   3 1.0447          Technical - PMS User Manual For Office_Sail  1.1.8.1 HOW TO ACCESS THE STORE (p.49)
+   4 1.0734          Technical - PMS User Manual_Vessel Specific_ 1.1.8.1 HOW TO ACCESS THE STORE (p.42)
+   5 1.0890          Technical - PMS User Manual_Vessel Specific_ 1.1.10.5 HOW TO CREATE A NEW CHANGE REQU
+   6 1.1115          Technical - PMS User Manual For Office_Sail  1.1.10.5 HOW TO CREATE A NEW CHANGE REQU
+   7 1.1225          Technical - PMS User Manual_Vessel Specific_ 1.1.8.5 HOW TO UPDATE & TRACK STORE INVE
+   8 1.1451          Technical - PMS User Manual_Vessel Specific_ 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS
+== 'How do I raise a defect on equipment?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.9107          Technical - Defects User Manual For Office_S 1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15
+   2 1.0021          Technical - Defects User Manual For Office_S 1.1.5.2 HOW TO CREATE A NEW COC DEFECT R
+   3 1.0055          Technical - Defects User Manual For Office_S Introduction (p.14)
+   4 1.0362          Technical - Defects User Manual For Office_S TECHNICAL USER MANUAL (p.12)
+   5 1.0394          Technical - Defects User Manual For Office_S 1.1.4.1 HOW TO ACCESS DEFECTS LOGS (p.14
+   6 1.0453          Technical - Defects User Manual For Office_S 1.1.3.7 HOW TO VIEW A DEFECT REPORT (p.1
+   7 1.0567          Technical - Defects User Manual For Office_S 1.1.3.8 HOW TO EDIT A DEFECT REPORT (p.1
+   8 1.0629          Technical - Defects User Manual For Office_S Table of Contents (p.2)
+== 'How do I raise a defect on equipment?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.9107          Technical - Defects User Manual For Office_S 1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15
+   2 1.0021          Technical - Defects User Manual For Office_S 1.1.5.2 HOW TO CREATE A NEW COC DEFECT R
+   3 1.0055          Technical - Defects User Manual For Office_S Introduction (p.14)
+   4 1.0362          Technical - Defects User Manual For Office_S TECHNICAL USER MANUAL (p.12)
+   5 1.0394          Technical - Defects User Manual For Office_S 1.1.4.1 HOW TO ACCESS DEFECTS LOGS (p.14
+   6 1.0453          Technical - Defects User Manual For Office_S 1.1.3.7 HOW TO VIEW A DEFECT REPORT (p.1
+   7 1.0567          Technical - Defects User Manual For Office_S 1.1.3.8 HOW TO EDIT A DEFECT REPORT (p.1
+   8 1.0629          Technical - Defects User Manual For Office_S Table of Contents (p.2)
+== 'How do I update running hours for a component?' · kb-base · gate=answer module=technical margin=1.000
+   1 0.6822          Technical - PMS User Manual_Vessel Specific_ TECHNICAL USER MANUAL (p.34)
+   2 0.7144          Technical - PMS User Manual_Vessel Specific_ 1.1.6.3 HOW TO UPDATE RUNNING HOURS. (p.
+   3 0.7258          Technical - PMS User Manual For Office_Sail  1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.3
+   4 0.7789          Technical - PMS User Manual For Office_Sail  TECHNICAL USER MANUAL (p.40)
+   5 0.8992          Technical - Recent Updates & Changed Behavio 1.1.14.3 Running Hours Never Move Backwa
+   6 0.8997          Technical - Recent Updates & Changed Behavio 1.1.14.2 Completing a Running-Hours Work
+   7 0.9352          Technical - PMS User Manual_Vessel Specific_ 1.1.6.1 HOW TO ACCESS RUNNING HOURS (p.3
+   8 0.9481          Technical - PMS User Manual_Vessel Specific_ Introduction (p.32)
+== 'How do I update running hours for a component?' · kb-pilot · gate=answer module=technical margin=1.000
+   1 0.6822          Technical - PMS User Manual_Vessel Specific_ TECHNICAL USER MANUAL (p.34)
+   2 0.7144          Technical - PMS User Manual_Vessel Specific_ 1.1.6.3 HOW TO UPDATE RUNNING HOURS. (p.
+   3 0.7258          Technical - PMS User Manual For Office_Sail  1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.3
+   4 0.7789          Technical - PMS User Manual For Office_Sail  TECHNICAL USER MANUAL (p.40)
+   5 0.8992          Technical - Recent Updates & Changed Behavio 1.1.14.3 Running Hours Never Move Backwa
+   6 0.8997          Technical - Recent Updates & Changed Behavio 1.1.14.2 Completing a Running-Hours Work
+   7 0.9352          Technical - PMS User Manual_Vessel Specific_ 1.1.6.1 HOW TO ACCESS RUNNING HOURS (p.3
+   8 0.9481          Technical - PMS User Manual_Vessel Specific_ Introduction (p.32)
+== 'How do I add a component to a vessel?' · kb-base · gate=answer module=technical margin=0.342
+   1 0.7970          Technical - PMS User Manual For Office_Sail  1.1.4.3 HOW TO ADD COMPONENTS (p.24)
+   2 0.9899          Technical - PMS User Manual For Office_Sail  1.1.4.4 HOW TO EDIT COMPONENTS (p.25)
+   3 1.0305          Technical - PMS User Manual_Vessel Specific_ TECHNICAL USER MANUAL (p.49)
+   4 1.1017          Technical - PMS User Manual_Vessel Specific_ 1.1.10.2 HOW TO CREATE A CHANGE REQUEST 
+   5 1.1145          Technical - PMS User Manual_Vessel Specific_ 1.1.4.1 HOW TO ACCESS COMPONENTS (p.14)
+   6 1.1168          Technical - PMS User Manual_Vessel Specific_ Introduction (p.14)
+   7 1.1364          Technical - PMS User Manual For Office_Sail  1.1.4.7 HOW TO EXPORT COMPONENTS RECORDS
+   8 1.1383          Technical - PMS User Manual For Office_Sail  1.1.4.2 HOW TO VIEW COMPONENT DETAILS (p
+== 'How do I add a component to a vessel?' · kb-pilot · gate=answer module=technical margin=0.342
+   1 0.7970          Technical - PMS User Manual For Office_Sail  1.1.4.3 HOW TO ADD COMPONENTS (p.24)
+   2 0.9899          Technical - PMS User Manual For Office_Sail  1.1.4.4 HOW TO EDIT COMPONENTS (p.25)
+   3 1.0305          Technical - PMS User Manual_Vessel Specific_ TECHNICAL USER MANUAL (p.49)
+   4 1.1017          Technical - PMS User Manual_Vessel Specific_ 1.1.10.2 HOW TO CREATE A CHANGE REQUEST 
+   5 1.1145          Technical - PMS User Manual_Vessel Specific_ 1.1.4.1 HOW TO ACCESS COMPONENTS (p.14)
+   6 1.1168          Technical - PMS User Manual_Vessel Specific_ Introduction (p.14)
+   7 1.1364          Technical - PMS User Manual For Office_Sail  1.1.4.7 HOW TO EXPORT COMPONENTS RECORDS
+   8 1.1383          Technical - PMS User Manual For Office_Sail  1.1.4.2 HOW TO VIEW COMPONENT DETAILS (p
+8016 ":"kb-base","chunks":911,"db":"connected","llmCalls":412
+8018 ":"kb-pilot","chunks":916,"db":"connected","llmCalls":41

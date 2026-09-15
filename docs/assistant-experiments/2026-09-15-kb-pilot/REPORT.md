@@ -83,5 +83,95 @@ Not changed: prompt, thresholds, excerpt count, judges, the four procedure files
 
 ## 6. Guesses (not findings)
 
-- None of the results above are inferred; all come from the runs. One `[unverified]` remains in unplanned-wo.md (whether the running-hours completion check applies to the unplanned form's Part B submission) — not traced.
+- None of the results above are inferred; all come from the runs. One `[unverified]` remained in unplanned-wo.md at the time of §7 (whether the running-hours completion check applies to the unplanned form's Part B submission) — not traced; moved out of the indexed text into REVIEW.md in the third step (§8.1).
 - Interpretation, not measured: an overview/index procedure ("ways to create a work order") or a retrieval change (duplicate Office/Vessel collapse, or grouping chunks by procedure) would be the next candidates for the generic phrasing. Not tested, not proposed as fact.
+
+## 8. Third bounded step — content fixes, one chunk per file, judge .4, run D3 (15-Sep; `kb3-*`)
+
+Live unchanged. Prompt v2, retrieval logic, thresholds and excerpt count (5, text[:3000]) exactly as live. Instances: A = 8016 `kb-base` (911 chunks = live ids), B = 8018 `kb-pilot` (916 = 911 + 5). Artefacts in this folder: `kb3-runs.txt` (all suites), `kb3-rank.txt` (top-8 probe + chunk listing), `kb3-rejudge.txt` (judge .3 vs .4 on the stored D2 answers), `kb3-excerpts.json` (exact excerpt text per question × set), `kb3-failures.md` (every failing run with the excerpt text attached), `kb3-general5.txt/json`, the three `kb3-*-dump.jsonl`, and the two capture scripts `probe_kb3.py` / `failures_kb3.py` (evidence capture, kept for reproducibility; not suites).
+
+### 8.1 Content fixes (step 1) — `kb/technical/work-orders/`
+
+| file | change |
+|---|---|
+| how-work-orders-are-created.md | steps 2 and 3: "Any role" → "No role check on this path (sign-in and vessel access still apply)"; "select the vessel" marked "(Office: select the vessel)" in both steps; step 2 now states the two job conditions (job active; no active work order already) |
+| office-generate-wo-per-job.md | ship path: "no switch and no role check; the two job conditions below still apply"; "On both instances the job must be active / must not already have an active work order"; step 1 "(Office: select the vessel first)" |
+| planned-wo-ship-daily-scan.md | exception rewritten: office-side generation is done in one of two ways — 'Generate Now' (Sail Admin AND switch) or per-job 'Generate WO' (switch) — Generate Now is not the only office-side way |
+| CONFLICTS.md row 3 | same correction (two office ways), code refs extended with `jobService.ts:576-583` |
+| unplanned-wo.md | the `[unverified]` running-hours sentence removed from the indexed text; Exceptions now "None recorded in this pilot" |
+| REVIEW.md | the running-hours question logged as an open item for the reviewer; overview row present; note that no `[unverified]` tag remains in any indexed file |
+
+Contradiction re-read of all five files: none left. A grep for the retired wordings ("any role", "same gate", "the only", Sail Admin attached to Generate WO) returns only correct statements (Sail Admin belongs to 'Generate Now' only; the per-job path has no role check).
+
+### 8.2 One chunk per kb file (step 2)
+
+Indexer one-chunk mode for `--kb-dir`: the `Sources:` block and every inline `[manual:|screenshot:|code:|unverified]` tag are removed from the embedded text and stored in chunk metadata (`kb_sources`, `kb_provenance`, `kb_one_chunk`); the body is embedded as ONE chunk. `kb-pilot` re-indexed: 916 chunks (911 live + 5). Embedded sizes vs the excerpt budget (3,000 characters per excerpt):
+
+| kb file (display name) | embedded chars | tags → metadata | Sources block chars → metadata | fits one excerpt whole? |
+|---|---|---|---|---|
+| How work orders are created — the three ways to create a work order | 2,044 | 10 | 596 | yes |
+| Office 'Generate Now' — generate a vessel's due work orders from the office | 1,899 | 13 | 925 | yes |
+| 'Generate WO' for one job — from the Components page | 2,105 | 21 | 1,305 | yes |
+| Planned work orders — generated automatically by the ship's daily job-due scan | 1,952 | 13 | 780 | yes |
+| Create an unplanned work order ('+ Unplanned W.O') | 1,572 | 18 | 970 | yes |
+
+The exact chunk texts as supplied to the model are in `kb3-failures.md` (overview, planned, unplanned) and `kb3-excerpts.json` (all). Conditions and steps of one procedure are now always in the same excerpt.
+
+### 8.3 Judge .4, versioned (step 3) — old vs new on the SAME stored answers
+
+`acceptance_wo.py` WO_SUITE_VERSION `2026-09-14.4`, `JUDGE_VERSION` 3|4 selectable; `rejudge_wo.py` re-scores a stored dump with both. Changes: (a) "created automatically" / "automatically creat…" accepted as automatic generation; (b) wo-generic-02 re-scoped to the question asked — automatic generation + "you do not create them"; the Generate Now pairing is checked only if the answer describes Generate Now; (c) wo-phr-02 expects the unplanned procedure (`unplanned w.o` + Part B / Submit) plus a one-line note of the other ways. Re-scoring the D2 answers (`kb3-rejudge.txt`): **only wo-generic-02 B changes, 0/3 → 3/3**; all other 15 rows keep their score. wo-phr-03 B stays 0/3 under .4 — its content rule now passes on every run ("automatic generation ✓; pairing ✓"), but the case's literal must-phrases (`unplanned w.o`, `generate wo`) are absent from those answers ("unplanned work orders", "per-job"). That literal check is part of the base judge shared with the frozen suite; not changed.
+
+### 8.4 Run D3 — A vs B, 3 runs, all suites + 8 work-order phrasings (step 4)
+
+| suite | A kb-base | B kb-pilot |
+|---|---|---|
+| retrieval 18 (expectations v1 / v2) | 18/18 · 18/18 | 18/18 · 18/18 |
+| frozen 12 (.3), joint of 3 runs | 11/12 | 11/12 |
+| corrected 14 (.2) | 13/14 | 13/14 |
+| work-order 8 (.4), all runs required | 0/8 | **1/8** (wo-generic-02 3/3) |
+
+Existing suites: identical A vs B, no regression. Overview rank in the top-8 probe after one-chunk indexing (D2 multi-chunk rank in brackets):
+
+| question | overview rank | other pilot chunk in top 8 | in the 5 excerpts? |
+|---|---|---|---|
+| wo-generic-01 How do I create a work order? | 3 (was 8) | unplanned kb 8 | **yes** |
+| wo-generic-02 How are planned work orders created… myself? | 5 (was 6) | planned kb 7 | yes |
+| wo-generic-03 How to create work order in PMS? | not in top 8 (same) | none | no |
+| wo-phr-01 different ways | 1 (was 1) | — | yes |
+| wo-phr-02 raise a work order for a pump | 8 (was out) | unplanned kb 4 | no (unplanned kb yes) |
+| wo-phr-03 myself or the system | 1 (was 1) | planned kb 3 | yes |
+| wo-phr-04 Steps to create a new work order | 4 (was 8) | unplanned kb 6 | **yes** |
+| wo-phr-05 how do work orders get created | 1 (was 1) | — | yes |
+
+**Every failing run, classified against the exact excerpt text it was given** (`kb3-failures.md`; owner rule: answer generation only if the condition was in that text and the answer dropped it). Cross-check: the citations returned by all 45 failing runs lie within the probe's hit list for that question — 0 mismatches — so the attached excerpt text is what the model saw (PROVEN).
+
+| case | B runs | what the 5 excerpts contained | what the answer did | classification |
+|---|---|---|---|---|
+| wo-generic-01 | 0/3 | overview at rank 3 (all three ways, every condition) behind the two manual unplanned sections | unplanned procedure only, 3/3 | **answer generation** (D2: retrieval — the overview was not in the excerpts then) |
+| wo-phr-04 | 0/3 | overview at rank 4 | unplanned procedure only, 3/3 | **answer generation** (D2: retrieval) |
+| wo-phr-01 | 0/3 | overview at rank 1 | all three ways; Generate Now with Sail Admin + switch; the per-job 'Generate WO' block carries "no role check" and the two job conditions but drops "in the office only if the vessel switch is on" in 3/3 (run 3 drops all per-job conditions). The overview states the switch twice (Prerequisites line and step 2) | **answer generation** (D2: 2/3 passed) |
+| wo-phr-05 | 0/3 | overview at rank 1, manual p.18 'Generate WO' at rank 4 | same drop of the per-job switch, 3/3 | **answer generation** (D2: 1/3 passed) |
+| wo-phr-03 | 0/3 | overview rank 1 + planned kb chunk rank 3 (both state Generate Now = Sail Admin + switch) | planned "created automatically by the ship system" ✓; per-job described by meaning ("in the office if the vessel's switch is on") without the button name; office 'Generate Now' / Sail Admin absent in 3/3 | **answer generation** (Generate Now dropped) + literal must-phrase (§8.3) |
+| wo-generic-03 | 0/3 | no pilot chunk (overview outside top 8) | unplanned only | **retrieval** |
+| wo-phr-02 | 0/3 | manual unplanned ×2, unplanned kb chunk (rank 4), completion ×2 — none states the other ways (the kb chunk's "Related procedures" line lists file names only) | unplanned procedure ✓ 3/3; no note of the other ways | **retrieval** for the note (the content the judge wants is not in any excerpt) |
+| A (all 7 failing cases) | 0/3 each | manual sections only — no automatic generation, no Generate Now anywhere in the live corpus; p.18 'Generate WO' present for phr-03/05 | unplanned only, or "not covered" | retrieval / corpus (content absent) |
+
+Totals for B: 21 failing runs = 15 answer generation (5 questions × 3) + 6 retrieval (2 questions × 3). Totals for A: 24 failing runs, all content-absent.
+
+**What changed between D2 and D3, honestly:** one-chunk indexing moved the overview into the excerpts for two more phrasings (wo-generic-01, wo-phr-04) — and the model still answered "unplanned only" there. The balance therefore moved from retrieval to answer generation: 5 of the 7 failing B questions now fail with the needed text in front of the model. Two remain retrieval (wo-generic-03, wo-phr-02). wo-phr-01 and wo-phr-05 got **worse** on the measured metric (2/3 → 0/3, 1/3 → 0/3): the per-job vessel switch is now dropped in 6/6 runs where it survived 8/9 in D2. Two things changed for those runs at once — the step-2 wording (D2: "Any role; in the office only if the vessel switch is on; refused if…" → D3: "No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and…") and the excerpt composition (D2: three overview chunks at ranks 1–3; D3: one overview chunk plus manual sections). Which of the two causes the drop is NOT separated by this run (INFERRED either way); a content-ordering change (switch clause first) would test the first cause. Not done — reporting first.
+
+### 8.5 Five general Technical questions (step 5) — pilot chunks do not interfere
+
+One run each on A and B (`kb3-general5.txt`, ranks in `kb3-rank.txt`). No pilot chunk appears in the top 8 for any of the five on B. Top-2 citations identical A vs B for all five; answers give the same steps and source. Wording differs slightly in 2 of 5 (defect: closing sentence; running hours: steps 2–3 merged) — single runs, ordinary run-to-run variation, not attributable to the set.
+
+| question | rank-1 hit (both sets) | answer (both sets) |
+|---|---|---|
+| How do I record a stock transaction for spares? | Vessel manual 1.1.7.2 Spare inventory transactions (p.38) | Spares → Location icon → choose location / + Create New Location → Save |
+| How do I add a new store item? | Vessel manual 1.1.8.4 How to add item (p.43) | Store → + Add Store → details → Save Store Item |
+| How do I raise a defect on equipment? | Defects Office manual 1.1.4.3 Create a new defect (p.15) | + New Defect → Parts A/B/C → Submit |
+| How do I update running hours for a component? | Vessel manual p.34 / 1.1.6.3 (p.33) | Gear icon → enter details → Save |
+| How do I add a component to a vessel? | Office manual 1.1.4.3 How to add components (p.24) | select vessel → Add Component → details → Save → Submit |
+
+### 8.6 Not changed / open
+
+Not changed: live, prompt (v2 on both instances), retrieval logic, thresholds, excerpt count, the frozen suites, the base judge's literal must-phrase check. Open for the owner: (1) the answer-generation drops now dominate — the conditions rule (prompt v3) targeted this and regressed frozen case 09 (§S.7.1); a reworded rule or a content-ordering change are the untested candidates; (2) two retrieval residues (wo-generic-03; wo-phr-02's "other ways" note, which could also be one sentence in unplanned-wo.md); (3) the literal must-phrase check in the shared base judge fails wo-phr-03 answers that are right by meaning.
