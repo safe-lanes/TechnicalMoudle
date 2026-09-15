@@ -50,8 +50,15 @@ from acceptance_answers import ask, judge  # noqa: E402
 #     as an OFFICE condition ("switch required" alone = incorrect applicability, because the ship path has no switch);
 #     'Generate Now' must be placed in the office; the unplanned scope must not carry a switch or Sail Admin requirement.
 #     Reported as substantive defects ("missing prerequisite" / "incorrect applicability"), never as wording.
-WO_SUITE_VERSION = "2026-09-14.6"
-JUDGE_VERSION = 6
+# .7 (reviewer + owner, 15-Sep, before the v5 replay): FORMAT-AWARE PARSING ONLY — the acceptance requirements of .6 are
+#     unchanged. (a) `body_of` no longer cuts the answer at the first "Source:" line: every source line / "(Source: …)"
+#     parenthetical is removed wherever it sits (per-method source lines of the v4/v5 format kept truncating the body);
+#     (b) scopes are built from METHOD BLOCKS: a block (heading + its lines) that names one action is attributed whole to that
+#     action, so a requirements line written before the step that names the action is no longer lost; a heading block that
+#     names no action is held and attached to the NEXT action it introduces (not the previous one); a block naming several
+#     actions falls back to the .5 unit scoping inside the block. Validated on 132 stored answers before use.
+WO_SUITE_VERSION = "2026-09-14.7"
+JUDGE_VERSION = 7
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -91,7 +98,9 @@ def unit_has_office_qualifier(scope: str, word: str = "switch") -> bool:
     units = units_of(clean)
     if not units:
         return False
-    framed = "in the office" in units[0]
+    # the action's framing sentence = the first unit that is not a bare heading (.7 scopes start with the method heading)
+    first = next((u for u in units if not re.match(r"^\s*(?:\d+\.|(?:\d+\.\s*)?\*\*[^*]{0,80}\*\*\s*:?)\s*$", u)), units[0])
+    framed = "in the office" in first
     hits = [u for u in units if word in u]
     return bool(hits) and all(("office" in u) or framed for u in hits)
 
@@ -107,8 +116,14 @@ def wrongly_conditioned(scope: str, word: str) -> bool:
     return False
 
 
-def body_of(text: str) -> str:
-    """The answer without its trailing Source line(s) — file names such as '…For Office_Sail Admin…' must not satisfy content checks."""
+def body_of(text: str, version: int = 6) -> str:
+    """The answer without its Source line(s) — file names such as '…For Office_Sail Admin…' must not satisfy content checks.
+    ≤ .6: cut at the FIRST line starting with 'Source:' (truncates formats with one source line per method).
+    .7: remove every source line ('Source:', '— Source:', '**Source:**') and every '(Source: …)' parenthetical wherever it sits."""
+    if version >= 7:
+        t = re.sub(r"\(\s*source\s*:[^)]*\)", "", text, flags=re.I)
+        t = re.sub(r"^[ \t]*(?:[—–-]\s*)?\**\s*source\s*\**\s*:.*$", "", t, flags=re.I | re.M)
+        return t.lower()
     return re.split(r"\n\s*\*{0,2}source\*{0,2}\s*:", text, flags=re.I)[0].lower()
 
 
@@ -155,12 +170,49 @@ def scopes_of(body: str) -> dict[str, str]:
     return {a: " ".join(v) for a, v in scopes.items()}
 
 
+_BLOCK_SPLIT = re.compile(r"\n(?=\s*(?:\d+\.\s|\*\*|#{1,4}\s|- \*\*|method \d))|\n\s*\n")
+_HEADING_RE = re.compile(r"^\s*(?:\*\*|\d+\.\s*\*\*|method \d|\d+\.\s+[a-z][^.]{0,80}(?:—|:)\s*$)")
+
+
+def scopes_v7(body: str) -> dict[str, str]:
+    """Judge .7: method-block scopes. Blocks = numbered/bold/heading lines and blank-line paragraphs. A block naming exactly one
+    action goes whole to that action (its requirements line included, wherever it sits); a block naming several actions is
+    scoped by units inside the block (.5); a block naming none goes to the open action(s) — unless it looks like a heading,
+    in which case it is held and attached to the next action(s) it introduces."""
+    scopes: dict[str, list[str]] = {a: [] for a, _ in ACTIONS}
+    current: list[str] = []
+    pending: list[str] = []
+    for blk in (b.strip() for b in _BLOCK_SPLIT.split(body) if b and b.strip()):
+        named = [a for a, pat in ACTIONS if re.search(pat, blk)]
+        if not named:
+            if _HEADING_RE.match(blk) or not current:
+                pending.append(blk)
+            else:
+                for a in current:
+                    scopes[a].append(blk)
+            continue
+        if len(named) == 1:
+            current = named
+            for a in current:
+                scopes[a].extend(pending + [blk])
+        else:  # several actions in one block: unit-level attribution inside it, heading text goes to all of them
+            inner = scopes_of(blk)
+            for a in named:
+                scopes[a].extend(pending + [inner[a]])
+            current = named
+        pending = []
+    return {a: " ".join(v) for a, v in scopes.items()}
+
+
 def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
-    """Per-action permission pairing (suite .3; attribution rebuilt in .5):
+    """Per-action permission pairing (suite .3; attribution rebuilt in .5; method-block scopes in .7):
        Generate Now  → must state Sail Admin AND the vessel switch in ITS scope
        Generate WO   → must state the vessel switch in ITS scope and must NOT attach Sail Admin there"""
     un = ""
-    if version >= 5:
+    if version >= 7:
+        sc = scopes_v7(body)
+        gn, gw, un = sc["GN"], sc["GW"], sc["UN"]
+    elif version >= 5:
         sc = scopes_of(body)
         gn, gw, un = sc["GN"], sc["GW"], sc["UN"]
     else:
@@ -195,7 +247,7 @@ def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
 
 
 def extra_rule(rule: str, text: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
-    t = body_of(text)
+    t = body_of(text, version)
     auto_re = AUTO_V6 if version >= 6 else (AUTO_V4 if version >= 4 else AUTO_V3)
     if rule == "three-paths":
         auto = bool(re.search(auto_re, t))
@@ -209,7 +261,7 @@ def extra_rule(rule: str, text: str, version: int = JUDGE_VERSION) -> tuple[bool
             return auto and office, "automatic generation " + ("✓" if auto else "MISSING") + "; Generate Now conditions (Sail Admin + switch) " + ("✓" if office else "MISSING")
         # v4: scope = the question asked (how planned WOs are created; must I create them?)
         no_user = bool(re.search(r"(do not have to|don't have to|no user action|not required|no action|does not require|nobody|by the system|by the ship system|automatically)", t))
-        gn = scopes_of(t)["GN"] if version >= 5 else block_for(t, r"generate now")
+        gn = scopes_v7(t)["GN"] if version >= 7 else (scopes_of(t)["GN"] if version >= 5 else block_for(t, r"generate now"))
         pairing_ok = True
         note = ""
         if gn:  # only judged when the answer chose to describe Generate Now

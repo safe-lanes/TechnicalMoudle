@@ -1,0 +1,678 @@
+
+===== kb2-wo-dump.jsonl
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   last-run .7 reason
+wo-generic-01  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-02  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; user need not create MISSING
+wo-generic-02  B-kb-pilot   0/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; user need not create ✓
+wo-generic-03  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-03  B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      B-kb-pilot   2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail   automatic generation ✓; pairing ✗: Generate Now not described
+   -- run 1
+      .4 GN block: 1. **planned work orders**:
+   - generated automatically by the system based on each job's frequency and next due date.
+   - on the ship: automatic, once a day, no user action required.
+   - in the office: a sail admin can click 'generate now' on the work orde
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **per-job work orders**:
+      .4 GW block: 2. **per-job work orders**:
+   - navigate to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - this can be done by any role in the office, only if the vessel's switch is on. it will be refus
+      .5 GW scope: - navigate to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - this can be done by any role in the office, only if the vessel's switch is on. it will be refused if the job already has an activ
+      .5 UN scope: **unplanned work orders**: - go to the 'work orders' sub-sub module. - select the vessel from the 'vessel' dropdown. - click on the '+ unplanned w.o' button. - enter all required job details in part a and click save to store it as a draft. then complete part b
+      .7 GN scope: there are three ways to create a work order in pms: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **per-job work orders**:
+   - navigate to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - this can be done by any role in the office, only if the vessel's switch is on. it will be refused if the job already has an active work order.
+      .7 UN scope: 3. **unplanned work orders**:
+   - go to the 'work orders' sub-sub module.
+   - select the vessel from the 'vessel' dropdown.
+   - click on the '+ unplanned w.o' button.
+   - enter all required job details in part a and click save to store it as a draft. then complete part b and click submit work order to generate the 
+   -- run 2
+      .4 GN block: 1. **planned work orders**:
+   - generated automatically by the system based on each job's frequency and next due date.
+   - on the ship: automatic, once a day, no user action required.
+   - in the office: a sail admin can click 'generate now' on the work orde
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **per-job work orders**:
+      .4 GW block: 2. **per-job work orders**:
+   - navigate to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - this can be done by any role in the office, only if the vessel switch is on, and it will be ref
+      .5 GW scope: - navigate to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - this can be done by any role in the office, only if the vessel switch is on, and it will be refused if the job already has an act
+      .5 UN scope: **unplanned work orders**: - go to the 'work orders' sub-sub module. - select the vessel from the 'vessel' dropdown. - click on the '+ unplanned w.o' button. - enter all required job details in part a and click save to store it as a draft. then complete part b
+      .7 GN scope: there are three ways to create a work order in pms: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **per-job work orders**:
+   - navigate to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - this can be done by any role in the office, only if the vessel switch is on, and it will be refused if the job already has an active work order.
+      .7 UN scope: 3. **unplanned work orders**:
+   - go to the 'work orders' sub-sub module.
+   - select the vessel from the 'vessel' dropdown.
+   - click on the '+ unplanned w.o' button.
+   - enter all required job details in part a and click save to store it as a draft. then complete part b and click submit work order to generate the 
+   -- run 3
+      .4 GN block: 
+      .5 GN scope: 
+      .4 GW block: 2. **per-job work orders**:
+   - in the office, a user can create a work order for a specific job by navigating to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - this can be done by any r
+      .5 GW scope: - in the office, a user can create a work order for a specific job by navigating to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - this can be done by any role, but only if the vessel's swit
+      .5 UN scope: **unplanned work orders**: - go to the 'work orders' sub-sub module, select the vessel from the dropdown, and click on the '+ unplanned w.o' button. - enter all required job details in part a and click save to store it as a draft. then complete part b and clic
+      .7 GN scope: 
+      .7 GW scope: 2. **per-job work orders**:
+   - in the office, a user can create a work order for a specific job by navigating to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - this can be done by any role, but only if the vessel's switch is on. it will be refus
+      .7 UN scope: 3. **unplanned work orders**:
+   - go to the 'work orders' sub-sub module, select the vessel from the dropdown, and click on the '+ unplanned w.o' button.
+   - enter all required job details in part a and click save to store it as a draft. then complete part b and click submit work order to generate the unplanned work 
+wo-phr-02      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   unplanned procedure ✓; note of the other ways MISSING
+wo-phr-02      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   unplanned procedure ✓; note of the other ways MISSING
+wo-phr-03      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-03      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+   -- run 1
+      .4 GN block: 1. planned (scheduled) work orders are created automatically by the ship system once a day, with no user action required.
+2. in the office, a sail admin can click 'generate now' to create work orders for a vessel, but this requires the vessel's switch to be on
+      .5 GN scope: in the office, a sail admin can click 'generate now' to create work orders for a vessel, but this requires the vessel's switch to be on. 3.
+      .4 GW block: 1. planned (scheduled) work orders are created automatically by the ship system once a day, with no user action required.
+2. in the office, a sail admin can click 'generate now' to create work orders for a vessel, but this requires the vessel's switch to be on
+      .5 GW scope: for individual jobs, any role can generate a work order by selecting the job and choosing 'generate wo', provided the vessel's switch is on and there is no active work order for that job. 4.
+      .5 UN scope: unplanned work orders can be created by any role without any switch requirement.
+      .7 GN scope: 2. in the office, a sail admin can click 'generate now' to create work orders for a vessel, but this requires the vessel's switch to be on.
+      .7 GW scope: 3. for individual jobs, any role can generate a work order by selecting the job and choosing 'generate wo', provided the vessel's switch is on and there is no active work order for that job.
+      .7 UN scope: 4. unplanned work orders can be created by any role without any switch requirement.
+   -- run 2
+      .4 GN block: 1. planned (scheduled) work orders are created automatically by the ship system once a day, with no user action required.
+2. in the office, a sail admin can click 'generate now' to create work orders for one vessel, but only if that vessel's switch is on.
+3. f
+      .5 GN scope: in the office, a sail admin can click 'generate now' to create work orders for one vessel, but only if that vessel's switch is on. 3.
+      .4 GW block: 1. planned (scheduled) work orders are created automatically by the ship system once a day, with no user action required.
+2. in the office, a sail admin can click 'generate now' to create work orders for one vessel, but only if that vessel's switch is on.
+3. f
+      .5 GW scope: for a specific job, any user can generate a work order on demand if the vessel's switch is on and the job does not already have an active work order. 4.
+      .5 UN scope: unplanned work orders can be created by any user without any switch requirements.
+      .7 GN scope: 2. in the office, a sail admin can click 'generate now' to create work orders for one vessel, but only if that vessel's switch is on.
+      .7 GW scope: 3. for a specific job, any user can generate a work order on demand if the vessel's switch is on and the job does not already have an active work order.
+      .7 UN scope: 4. unplanned work orders can be created by any user without any switch requirements.
+   -- run 3
+      .4 GN block: 1. planned (scheduled) work orders are created automatically by the ship system once a day, with no user action required.
+2. in the office, a sail admin can click 'generate now' to create work orders for a vessel, but only if the vessel's switch is on.
+3. for 
+      .5 GN scope: in the office, a sail admin can click 'generate now' to create work orders for a vessel, but only if the vessel's switch is on. 3.
+      .4 GW block: 1. planned (scheduled) work orders are created automatically by the ship system once a day, with no user action required.
+2. in the office, a sail admin can click 'generate now' to create work orders for a vessel, but only if the vessel's switch is on.
+3. for 
+      .5 GW scope: for a specific job, any user can generate a work order on demand, provided the job does not already have an active work order. 4.
+      .5 UN scope: unplanned work orders can be created by any user without any switch requirements.
+      .7 GN scope: 2. in the office, a sail admin can click 'generate now' to create work orders for a vessel, but only if the vessel's switch is on.
+      .7 GW scope: 3. for a specific job, any user can generate a work order on demand, provided the job does not already have an active work order.
+      .7 UN scope: 4. unplanned work orders can be created by any user without any switch requirements.
+wo-phr-04      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-04      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-05      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-05      B-kb-pilot   1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail   automatic generation ✓; pairing ✗: Generate Now not described
+   -- run 1
+      .4 GN block: 
+      .5 GN scope: 
+      .4 GW block: 2. **per-job work orders**:
+   - navigate to **components** → open the component → select **part c** → click **'generate wo'** → choose the reason (planning / breakdown / other).
+   - this can be done by any role in the office, but only if the vessel's switch 
+      .5 GW scope: - navigate to **components** → open the component → select **part c** → click **'generate wo'** → choose the reason (planning / breakdown / other). - this can be done by any role in the office, but only if the vessel's switch is on. 3.
+      .5 UN scope: **unplanned work orders**: - go to **work orders** → select the vessel → click **'+ unplanned w.o'** → fill in **part a** and click **save** → complete **part b** and click **submit work order**. - this can be done by any role, and no switch is required.
+      .7 GN scope: 
+      .7 GW scope: 2. **per-job work orders**:
+   - navigate to **components** → open the component → select **part c** → click **'generate wo'** → choose the reason (planning / breakdown / other).
+   - this can be done by any role in the office, but only if the vessel's switch is on.
+      .7 UN scope: 3. **unplanned work orders**:
+   - go to **work orders** → select the vessel → click **'+ unplanned w.o'** → fill in **part a** and click **save** → complete **part b** and click **submit work order**.
+   - this can be done by any role, and no switch is required.
+   -- run 2
+      .4 GN block: 1. **planned work orders** (automatically generated by the system):
+   - on the ship: automatically created once a day based on job frequency and next due date, with no user action required.
+   - in the office: a sail admin can click 'generate now' on the work
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **per-job work orders** (on demand):
+      .4 GW block: 2. **per-job work orders** (on demand):
+   - navigate to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this can be done by any role in the office, only if the vessel's switch is on. it will b
+      .5 GW scope: - navigate to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this can be done by any role in the office, only if the vessel's switch is on. it will be refused if the job already has an active 
+      .5 UN scope: **unplanned work orders**: - go to work orders → select the vessel → click '+ unplanned w.o' → fill in part a and click save → complete part b and click submit work order. this can be done by any role, with no switch required.
+      .7 GN scope: work orders can be created in the technical module in three ways: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **per-job work orders** (on demand):
+   - navigate to components → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this can be done by any role in the office, only if the vessel's switch is on. it will be refused if the job already has an active work order.
+      .7 UN scope: 3. **unplanned work orders**:
+   - go to work orders → select the vessel → click '+ unplanned w.o' → fill in part a and click save → complete part b and click submit work order. this can be done by any role, with no switch required.
+   -- run 3
+      .4 GN block: 
+      .5 GN scope: 
+      .4 GW block: 2. **per-job work orders**:
+   - navigate to **components** → open the component → select **part c** → click **'generate wo'** → choose the reason (planning / breakdown / other).
+   - this can be done by any role, but only in the office if the vessel's switch 
+      .5 GW scope: - navigate to **components** → open the component → select **part c** → click **'generate wo'** → choose the reason (planning / breakdown / other). - this can be done by any role, but only in the office if the vessel's switch is on. 3.
+      .5 UN scope: **unplanned work orders**: - go to **work orders** → select the vessel → click **'+ unplanned w.o'** → fill in **part a** and click **save** → complete **part b** and click **submit work order**. - this can be done by any role and does not require the vessel's
+      .7 GN scope: 
+      .7 GW scope: 2. **per-job work orders**:
+   - navigate to **components** → open the component → select **part c** → click **'generate wo'** → choose the reason (planning / breakdown / other).
+   - this can be done by any role, but only in the office if the vessel's switch is on.
+      .7 UN scope: 3. **unplanned work orders**:
+   - go to **work orders** → select the vessel → click **'+ unplanned w.o'** → fill in **part a** and click **save** → complete **part b** and click **submit work order**.
+   - this can be done by any role and does not require the vessel's switch to be on.
+
+===== kb3-wo-dump.jsonl
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   last-run .7 reason
+wo-generic-01  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-02  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; user need not create MISSING
+wo-generic-02  B-kb-pilot   3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; user need not create ✓; Generate Now described with its conditions
+   -- run 1
+      .4 GN block: the creation of planned work orders is automated and does not require user action. here are the details:
+
+1. planned work orders are generated by the system based on each job's frequency and next due date.
+2. on the ship, they are generated automatically once 
+      .5 GN scope: in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, but this is only if the vessel's switch is on.
+      .4 GW block: 
+      .5 GW scope: 
+      .5 UN scope: 
+      .7 GN scope: 3. in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, but this is only if the vessel's switch is on.
+      .7 GW scope: 
+      .7 UN scope: 
+   -- run 2
+      .4 GN block: the creation of planned work orders is automated and does not require user action. here are the details:
+
+1. planned work orders are generated by the system based on each job's frequency and next due date.
+2. on the ship, this process occurs automatically once
+      .5 GN scope: in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, but only if that vessel's switch is on.
+      .4 GW block: 
+      .5 GW scope: 
+      .5 UN scope: 
+      .7 GN scope: the creation of planned work orders is automated and does not require user action. here are the details: 1. planned work orders are generated by the system based on each job's frequency and next due date. 2. on the ship, this process occurs automatically once a day. 3. in the office, a sail admin can click 'generate no
+      .7 GW scope: 
+      .7 UN scope: 
+   -- run 3
+      .4 GN block: the creation of planned work orders is handled automatically by the system based on each job's frequency and next due date. here are the steps for creating planned work orders:
+
+1. planned work orders are generated automatically on the ship once a day without 
+      .5 GN scope: in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, but only if that vessel's switch is on. you do not have to create planned work orders yourself; they are generated by the system.
+      .4 GW block: 
+      .5 GW scope: 
+      .5 UN scope: 
+      .7 GN scope: 2. in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, but only if that vessel's switch is on. you do not have to create planned work orders yourself; they are generated by the system.
+      .7 GW scope: 
+      .7 UN scope: 
+wo-generic-03  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-03  B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+   -- run 1
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - automatically generated by the system based on each job's frequency and next due date. 
+   - on the ship, this occurs once a day without user action. 
+   - in the office, a sail admin can click 'generate now' on th
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen if the vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**: 
+   - navigate to components → select the vessel → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and not already have an a
+      .5 GW scope: - navigate to components → select the vessel → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check applies, but the job must be active and not already have an active work order. 3.
+      .5 UN scope: **unplanned work**: - go to work orders → select the vessel → click '+ unplanned w.o' → enter details in part a and click save → complete part b and click submit work order. - no role check applies, and no switch is needed.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen if the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**: 
+   - navigate to components → select the vessel → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and not already have an active work order.
+      .7 UN scope: 3. **unplanned work**: 
+   - go to work orders → select the vessel → click '+ unplanned w.o' → enter details in part a and click save → complete part b and click submit work order. 
+   - no role check applies, and no switch is needed.
+   -- run 2
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date on the ship once a day, with no user action required.
+   - in the office, a sail admin can click 'generate now' on the work orders s
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and must not alr
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check applies, but the job must be active and must not already have an active work order. 3
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a and click save → complete part b and click submit work order. - no role check applies, and no switch is needed.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a and click save → complete part b and click submit work order. 
+   - no role check applies, and no switch is needed.
+   -- run 3
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system once a day on the ship.
+   - in the office, a sail admin can click 'generate now' on the work orders screen if the vessel's switch is on.
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen if the vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 3.
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a, save → complete part b, submit work order.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen if the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a, save → complete part b, submit work order.
+wo-phr-02      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   unplanned procedure ✓; note of the other ways MISSING
+wo-phr-02      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   unplanned procedure ✓; note of the other ways MISSING
+wo-phr-03      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-03      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate Now not described; per-job Generate WO not des
+wo-phr-04      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-04      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-05      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-05      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+   -- run 1
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date on the ship, once a day, with no user action required.
+   - in the office, a sail admin can click 'generate now' on the work orders 
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and must not alr
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check applies, but the job must be active and must not already have an active work order. 3
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter job details in part a and click save → complete part b and click submit work order.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter job details in part a and click save → complete part b and click submit work order.
+   -- run 2
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date. 
+   - on the ship: automatic, once a day, no user action required. 
+   - in the office: a sail admin can click 'generate now' on th
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies; the job must be active and must not already
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check applies; the job must be active and must not already have an active work order. 3.
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a and click save → complete part b and click submit work order.
+      .7 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies; the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a and click save → complete part b and click submit work order.
+   -- run 3
+      .4 GN block: 1. **planned (scheduled) work orders**:
+   - generated automatically by the system from each job's frequency and next due date on the ship once a day, with no user action required.
+   - in the office, a sail admin can click 'generate now' on the work orders sc
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and must not alr
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check applies, but the job must be active and must not already have an active work order. 3
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a and click save → complete part b and click submit work order.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a and click save → complete part b and click submit work order.
+
+===== diag-results.json
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   last-run .7 reason
+wo-generic-01  normal       0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  overview     1/3 fail  1/3 fail  1/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO switch stated without the office qualifier 
+   -- run 1
+      .4 GN block: 1. **planned (scheduled) work orders**:
+   - these are generated automatically by the system on the ship once a day. no user action is required.
+   - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, provided the ve
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, provided the vessel's 'office work-order generation' switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - ensure the job is active and does not already have an active work order. 
+      .5 GW scope: - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - ensure the job is active and does not already have an active work order. the vessel's switch must be on f
+      .5 UN scope: **unplanned work**: - navigate to work orders → (office: select the vessel) → click '+ unplanned w.o' → complete part a and save → complete part b and submit work order. - no switch is needed for this option.
+      .7 GN scope: to create a work order, follow these steps based on the type of work order you need: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, provided the vessel's 'office work-order generation' switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - ensure the job is active and does not already have an active work order. the vessel's switch must be on for this option.
+      .7 UN scope: 3. **unplanned work**:
+   - navigate to work orders → (office: select the vessel) → click '+ unplanned w.o' → complete part a and save → complete part b and submit work order.
+   - no switch is needed for this option.
+   -- run 2
+      .4 GN block: 1. **planned (scheduled) work orders**:
+   - on the ship: the system generates them automatically once a day, no user action required.
+   - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, provided the vessel's 'of
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, provided the vessel's 'office work-order generation' switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). ensure the job is active and does not already have an active work order.
+      .5 GW scope: - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). ensure the job is active and does not already have an active work order. 3.
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a and save → complete part b and submit work order.
+      .7 GN scope: to create a work order, follow these steps based on the type of work order you want to generate: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, provided the vessel's 'office work-order generation' switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). ensure the job is active and does not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a and save → complete part b and submit work order.
+   -- run 3
+      .4 GN block: 1. **planned (scheduled) work orders**:
+   - the system generates these automatically on the ship once a day based on job frequency and next due date. no user action is required.
+   - in the office, a sail admin can click 'generate now' on the work orders scre
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, but the vessel's 'office work-order generation' switch must be on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - ensure the job is active and does not already have an active work order. 
+      .5 GW scope: - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - ensure the job is active and does not already have an active work order. the vessel's switch must be on f
+      .5 UN scope: **unplanned work**: - navigate to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a and save → complete part b and submit the work order. - there are no role checks or switch requirements for this option.
+      .7 GN scope: to create a work order, follow these steps based on the type of work order you need: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, but the vessel's 'office work-order generation' switch must be on.
+      .7 GW scope: 2. **one job on demand**:
+   - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - ensure the job is active and does not already have an active work order. the vessel's switch must be on for this option.
+      .7 UN scope: 3. **unplanned work**:
+   - navigate to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a and save → complete part b and submit the work order.
+   - there are no role checks or switch requirements for this option.
+wo-phr-01      normal       0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+   -- run 1
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date. 
+   - on the ship: automatic generation occurs once a day, no user action required.
+   - in the office: a sail admin can click 'gen
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, if the vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies; the job must be active and must not alread
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check applies; the job must be active and must not already have an active work order. 3.
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a, click save → complete part b, click submit work order. - no role check applies, and no switch is needed.
+      .7 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, if the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies; the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**: 
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a, click save → complete part b, click submit work order. 
+   - no role check applies, and no switch is needed.
+   -- run 2
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date. 
+   - on the ship: automatic generation once a day, no user action required. 
+   - in the office: a sail admin can click 'generate 
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen if the vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check; the job must be active and must not already have an
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check; the job must be active and must not already have an active work order. 3.
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a, click save → complete part b, click submit work order. - no role check required, and no switch needed.
+      .7 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen if the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check; the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a, click save → complete part b, click submit work order. 
+   - no role check required, and no switch needed.
+   -- run 3
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date. 
+   - on the ship: automatic generation occurs once a day, no user action required.
+   - in the office: a sail admin can click 'gen
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, if the vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - no role check applies, but the job must be active and must not alre
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check applies, but the job must be active and must not already have an active work order. 3
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a, click save → complete part b, click submit work order. - no role check or switch is required.
+      .7 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, if the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - no role check applies, but the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a, click save → complete part b, click submit work order.
+   - no role check or switch is required.
+wo-phr-01      overview     3/3 PASS  3/3 PASS  3/3 PASS  2/3 fail  2/3 fail   automatic generation ✓; pairing ✓
+   -- run 1
+      .4 GN block: 1. **planned (scheduled) work orders**: automatically generated by the system based on each job's frequency and next due date. this occurs once a day on the ship without user action. in the office, a sail admin can click 'generate now' for one vessel if the ve
+      .5 GN scope: in the office, a sail admin can click 'generate now' for one vessel if the vessel's switch is on. 2.
+      .4 GW block: 2. **one job on demand**: navigate to components → select the vessel → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this can be done without a role check, but the vessel's switch must be on and the job m
+      .5 GW scope: **one job on demand**: navigate to components → select the vessel → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this can be done without a role check, but the vessel's switch must be on and the job must
+      .5 UN scope: **unplanned work**: go to work orders → select the vessel → click '+ unplanned w.o' → complete part a and save → complete part b and submit the work order. this can be done without a role check or switch requirement.
+      .7 GN scope: in the office, a sail admin can click 'generate now' for one vessel if the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**: navigate to components → select the vessel → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this can be done without a role check, but the vessel's switch must be on and the job must be active without an existing work order.
+      .7 UN scope: 3. **unplanned work**: go to work orders → select the vessel → click '+ unplanned w.o' → complete part a and save → complete part b and submit the work order. this can be done without a role check or switch requirement.
+   -- run 2
+      .4 GN block: 1. **planned (scheduled) work orders**: automatically generated by the system based on each job's frequency and next due date. this occurs once a day on the ship without user action. in the office, a sail admin can click 'generate now' if the vessel's switch i
+      .5 GN scope: in the office, a sail admin can click 'generate now' if the vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and must not already 
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → 'generate wo' → choose the reason (planning / breakdown / other). - no role check applies, but the job must be active and must not already have an active work order. this is
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → '+ unplanned w.o' → part a, save → part b, submit work order. - no role check or switch is required.
+      .7 GN scope: in the office, a sail admin can click 'generate now' if the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check applies, but the job must be active and must not already have an active work order. this is only available in the off
+      .7 UN scope: 3. **unplanned work**: 
+   - go to work orders → (office: select the vessel) → '+ unplanned w.o' → part a, save → part b, submit work order. 
+   - no role check or switch is required.
+   -- run 3
+      .4 GN block: 1. **planned (scheduled) work orders**: automatically generated by the system from each job's frequency and next due date. this occurs once a day on the ship without user action. in the office, a sail admin can click 'generate now' if the vessel's switch is on
+      .5 GN scope: in the office, a sail admin can click 'generate now' if the vessel's switch is on. 2.
+      .4 GW block: 2. **one job on demand**: in the office, select the vessel, open the component, go to part c, click 'generate wo', and choose the reason (planning / breakdown / other). this does not require a role check, but the vessel's switch must be on, and the job must be
+      .5 GW scope: **one job on demand**: in the office, select the vessel, open the component, go to part c, click 'generate wo', and choose the reason (planning / breakdown / other). this does not require a role check, but the vessel's switch must be on, and the job must be ac
+      .5 UN scope: **unplanned work**: in the office, select the vessel, go to work orders, click '+ unplanned w.o', fill out part a, and then submit in part b. this does not require a role check or a switch.
+      .7 GN scope: in the office, a sail admin can click 'generate now' if the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**: in the office, select the vessel, open the component, go to part c, click 'generate wo', and choose the reason (planning / breakdown / other). this does not require a role check, but the vessel's switch must be on, and the job must be active without an existing work order.
+      .7 UN scope: 3. **unplanned work**: in the office, select the vessel, go to work orders, click '+ unplanned w.o', fill out part a, and then submit in part b. this does not require a role check or a switch.
+
+===== dedup-results.json
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   last-run .7 reason
+wo-generic-01  dedup        0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  normal       0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      dedup        0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+   -- run 1
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date. 
+   - on the ship: automatic, once a day, no user action required. 
+   - in the office: a sail admin can click 'generate now' on th
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check; the job must be active and must not already have an acti
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → 'generate wo' → choose the reason (planning / breakdown / other). - no role check; the job must be active and must not already have an active work order. 3.
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → '+ unplanned w.o' → part a, save → part b, submit work order. - no role check required.
+      .7 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → 'generate wo' → choose the reason (planning / breakdown / other). 
+   - no role check; the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**: 
+   - go to work orders → (office: select the vessel) → '+ unplanned w.o' → part a, save → part b, submit work order. 
+   - no role check required.
+   -- run 2
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date on the ship once a day, with no user action required.
+   - in the office, a sail admin can click 'generate now' on the work orders s
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, provided the vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). no role check applies, but the job must be active and not already have a
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). no role check applies, but the job must be active and not already have an active work order. 3.
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → complete part a and save → complete part b and submit the work order. no role check or switch is needed.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, provided the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). no role check applies, but the job must be active and not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → complete part a and save → complete part b and submit the work order. no role check or switch is needed.
+   -- run 3
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date on the ship, once a day, with no user action required.
+   - in the office, a sail admin can click 'generate now' on the work orders 
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → 'generate wo' → choose the reason (planning / breakdown / other). this can be done without a role check, but the job must be active and must no
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → 'generate wo' → choose the reason (planning / breakdown / other). this can be done without a role check, but the job must be active and must not already have an active work 
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → '+ unplanned w.o' → part a, save → part b, submit work order. this can be done without a role check and does not require any switch.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → 'generate wo' → choose the reason (planning / breakdown / other). this can be done without a role check, but the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**: 
+   - go to work orders → (office: select the vessel) → '+ unplanned w.o' → part a, save → part b, submit work order. this can be done without a role check and does not require any switch.
+wo-phr-01      normal       0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+   -- run 1
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date. 
+   - on the ship: automatic, once a day, no user action required.
+   - in the office: a sail admin can click 'generate now' on the
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - no role check; the job must be active and must not already have an 
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check; the job must be active and must not already have an active work order. 3.
+      .5 UN scope: **unplanned work**: - navigate to work orders → (office: select the vessel) → click '+ unplanned w.o' → part a, save → part b, submit work order. - no role check required, and no switch needed.
+      .7 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - no role check; the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - navigate to work orders → (office: select the vessel) → click '+ unplanned w.o' → part a, save → part b, submit work order.
+   - no role check required, and no switch needed.
+   -- run 2
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date on the ship, once a day, with no user action required.
+   - in the office, a sail admin can click 'generate now' on the work orders 
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). no role check applies; the job must be active and must not already have 
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). no role check applies; the job must be active and must not already have an active work order. 3.
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a, click save → complete part b, and click submit work order.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). no role check applies; the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a, click save → complete part b, and click submit work order.
+   -- run 3
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system based on each job's frequency and next due date. 
+   - on the ship, this occurs once a day without user action. 
+   - in the office, a sail admin can click 'generate now' on th
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen if the vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - this does not require a role check, but the job must be active an
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - this does not require a role check, but the job must be active and must not already have an active 
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a, save → complete part b, submit work order. - no role check is required for this process.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen if the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**: 
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). 
+   - this does not require a role check, but the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**: 
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → enter details in part a, save → complete part b, submit work order. 
+   - no role check is required for this process.
+
+===== prompt-results.json
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   last-run .7 reason
+wo-generic-01  v2           0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  v4           0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+   -- run 1
+      .4 GN block: 
+      .5 GN scope: 
+      .4 GW block: **method 2: create a work order per job** — applies to: office — requirements: vessel's 'office work-order generation' switch on, job must be active and must not already have an active work order — steps:  
+1. go to components.  
+2. select the vessel.  
+3. ope
+      .5 GW scope: click 'generate wo' and choose the reason (planning / breakdown / other). **method 3: create a planned work order** — applies to: ship — requirements: none stated in the excerpts — steps: 1. the system generates planned work orders automatically based on each 
+      .5 UN scope: **method 1: create an unplanned work order** — applies to: both — requirements: none stated in the excerpts — steps: 1. go to the 'work orders' sub-sub module. 2. select the vessel from the 'vessel' dropdown. 3. click on the '+ unplanned w.o' button to create 
+      .7 GN scope: 
+      .7 GW scope: **method 2: create a work order per job** — applies to: office — requirements: vessel's 'office work-order generation' switch on, job must be active and must not already have an active work order — steps: 5. click 'generate wo' and choose the reason (planning / breakdown / other). 1. the system generates planned work o
+      .7 UN scope: **method 1: create an unplanned work order** — applies to: both — requirements: none stated in the excerpts — steps: 1. go to the 'work orders' sub-sub module. 2. select the vessel from the 'vessel' dropdown. 3. click on the '+ unplanned w.o' button to create an unplanned work order. 4. the 'work order form – unplanned
+   -- run 2
+      .4 GN block: 
+      .5 GN scope: 
+      .4 GW block: **method 2: create a work order per job** — applies to: office — requirements: vessel's 'office work-order generation' switch on, job must be active and not have an active work order — steps:  
+1. go to components.  
+2. select the vessel.  
+3. open the compone
+      .5 GW scope: click 'generate wo' and choose the reason (planning / breakdown / other). **method 3: planned work orders** — applies to: ship — requirements: none stated in the excerpts — steps: 1.
+      .5 UN scope: **method 1: create an unplanned work order** — applies to: both — requirements: none stated in the excerpts — steps: 1. go to the 'work orders' sub-sub module. 2. select the vessel from the 'vessel' dropdown. 3. click on the '+ unplanned w.o' button to create 
+      .7 GN scope: 
+      .7 GW scope: **method 2: create a work order per job** — applies to: office — requirements: vessel's 'office work-order generation' switch on, job must be active and not have an active work order — steps: 5. click 'generate wo' and choose the reason (planning / breakdown / other).
+      .7 UN scope: **method 1: create an unplanned work order** — applies to: both — requirements: none stated in the excerpts — steps: 1. go to the 'work orders' sub-sub module. 2. select the vessel from the 'vessel' dropdown. 3. click on the '+ unplanned w.o' button to create an unplanned work order. 4. the 'work order form – unplanned
+wo-phr-01      v2           0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+   -- run 1
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date.
+   - on the ship: automatic generation once a day, no user action required.
+   - in the office: a sail admin can click 'generate no
+      .5 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - no role check; must be an active job without an existing active work orde
+      .5 GW scope: - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). - no role check; must be an active job without an existing active work order. 3.
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a, save → complete part b, submit work order. - no role check, no switch required.
+      .7 GN scope: - in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - go to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other).
+   - no role check; must be an active job without an existing active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill out part a, save → complete part b, submit work order.
+   - no role check, no switch required.
+   -- run 2
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date on the ship once a day, with no user action required.
+   - in the office, a sail admin can click 'generate now' on the work orders s
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this can be done without role checks, but the job must be active and mus
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this can be done without role checks, but the job must be active and must not already have an active 
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill in part a and click save → complete part b and click submit work order. this can be done without role checks and does not require any switch.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this can be done without role checks, but the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → fill in part a and click save → complete part b and click submit work order. this can be done without role checks and does not require any switch.
+   -- run 3
+      .4 GN block: 1. **planned (scheduled) work orders**: 
+   - generated automatically by the system from each job's frequency and next due date on the ship once a day, with no user action required.
+   - in the office, a sail admin can click 'generate now' on the work orders s
+      .5 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, provided the vessel's switch is on. 2. **one job on demand**:
+      .4 GW block: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this does not require a role check, but the job must be active and must 
+      .5 GW scope: - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this does not require a role check, but the job must be active and must not already have an active wo
+      .5 UN scope: **unplanned work**: - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → complete part a and click save → then complete part b and click submit work order. no role check is required for this method.
+      .7 GN scope: - in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, provided the vessel's switch is on.
+      .7 GW scope: 2. **one job on demand**:
+   - navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo' → choose the reason (planning / breakdown / other). this does not require a role check, but the job must be active and must not already have an active work order.
+      .7 UN scope: 3. **unplanned work**:
+   - go to work orders → (office: select the vessel) → click '+ unplanned w.o' → complete part a and click save → then complete part b and click submit work order. no role check is required for this method.
+wo-phr-01      v4           0/3 fail  0/3 fail  0/3 fail  0/3 fail  2/3 fail   automatic generation ✓; pairing ✓
+   -- run 1
+      .4 GN block: 1. **planned (scheduled) work orders** — applies to: ship — requirements: automatic generation by the ship system; in the office, the vessel's 'office work-order generation' switch must be on (set by a sail admin). — steps: 
+   1. the system generates work ord
+      .5 GN scope: in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. (cross-reference resolved: details in planned-wo-ship-daily-scan.md and office-generate-now.md). 2. **per-job work orders** — app
+      .4 GW block: 2. **per-job work orders** — applies to: office — requirements: the vessel's 'office work-order generation' switch must be on; the job must be active and must not already have an active work order. — steps: 
+   1. navigate to components. 
+   2. select the vess
+      .5 GW scope: click 'generate wo'. 5. choose the reason (planning / breakdown / other). 3.
+      .5 UN scope: **unplanned work orders** — applies to: office — requirements: none stated in the excerpts. — steps: 1. go to the 'work orders' sub-sub module. 2. select the vessel from the 'vessel' dropdown. 3. click on the '+ unplanned w.o' button. 4. enter all required job
+      .7 GN scope: 3. in the office: a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's switch is on. 
+   (cross-reference resolved: details in planned-wo-ship-daily-scan.md and office-generate-now.md). 1. navigate to components. 2. select the vessel. 3. open the component.
+      .7 GW scope: 2. **per-job work orders** — applies to: office — requirements: the vessel's 'office work-order generation' switch must be on; the job must be active and must not already have an active work order. — steps: 4. click 'generate wo'. 5. choose the reason (planning / breakdown / other).
+      .7 UN scope: 3. **unplanned work orders** — applies to: office — requirements: none stated in the excerpts. — steps: 1. go to the 'work orders' sub-sub module. 2. select the vessel from the 'vessel' dropdown. 3. click on the '+ unplanned w.o' button. 4. enter all required job details in part a and click save to store it as a draft.
+   -- run 2
+      .4 GN block: 
+      .5 GN scope: 
+      .4 GW block: 2. **per-job work orders** — applies to: office — requirements: role: none; vessel's 'office work-order generation' switch on; job must be active and not have an active work order. — steps:
+   1. navigate to components.
+   2. select the vessel.
+   3. open the 
+      .5 GW scope: click 'generate wo'. 5. choose the reason (planning / breakdown / other). 3.
+      .5 UN scope: **unplanned work orders** — applies to: office — requirements: role: none; no switch required. — steps: 1. go to the 'work orders' sub-sub module. 2. select the vessel from the 'vessel' dropdown. 3. click on the '+ unplanned w.o' button. 4. enter all required 
+      .7 GN scope: 
+      .7 GW scope: 2. **per-job work orders** — applies to: office — requirements: role: none; vessel's 'office work-order generation' switch on; job must be active and not have an active work order. — steps: 4. click 'generate wo'. 5. choose the reason (planning / breakdown / other).
+      .7 UN scope: 3. **unplanned work orders** — applies to: office — requirements: role: none; no switch required. — steps: 1. go to the 'work orders' sub-sub module. 2. select the vessel from the 'vessel' dropdown. 3. click on the '+ unplanned w.o' button. 4. enter all required job details in part a and click save to store it as a dra
+   -- run 3
+      .4 GN block: **method 1: planned work orders** — applies to: ship — requirements: automatic generation by the system based on job frequency and next due date; no user action required. — steps:  
+1. on the ship, planned work orders are generated automatically once a day.  
+
+      .5 GN scope: in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's 'office work-order generation' switch is on. (cross-reference resolved: the steps for planned work orders are the same as section planned-wo-sh
+      .4 GW block: **method 2: per-job work orders** — applies to: office — requirements: the vessel's 'office work-order generation' switch must be on; the job must be active and must not already have an active work order. — steps:  
+1. navigate to components → (office: select 
+      .5 GW scope: navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo'. 2. choose the reason (planning / breakdown / other).
+      .5 UN scope: **method 3: unplanned work orders** — applies to: office / ship — requirements: none stated in the excerpts. — steps: 1. go to the 'work orders' sub-sub module. 2. (office: select the vessel) → click on the '+ unplanned w.o' button. 3. enter all required job d
+      .7 GN scope: 2. in the office, a sail admin can click 'generate now' on the work orders screen for one vessel, only if that vessel's 'office work-order generation' switch is on.  
+(cross-reference resolved: the steps for planned work orders are the same as section planned-wo-ship-daily-scan.md.)
+      .7 GW scope: **method 2: per-job work orders** — applies to: office — requirements: the vessel's 'office work-order generation' switch must be on; the job must be active and must not already have an active work order. — steps: 1. navigate to components → (office: select the vessel) → open the component → part c → click 'generate wo
+      .7 UN scope: **method 3: unplanned work orders** — applies to: office / ship — requirements: none stated in the excerpts. — steps: 1. go to the 'work orders' sub-sub module. 2. (office: select the vessel) → click on the '+ unplanned w.o' button. 3. enter all required job details in part a and click save to store it as a draft. 4. c
+
+== RULE-level outcome changes .6 → .7 (5) ==
+prompt wo-generic-01 v4 run 1: rule .6=False (automatic generation ✓; pairing ✗: Generate Now not described; Generate WO block lacks the vessel switch [missing prerequisite]; unplanned wrongly requires the switch [incorrect applicability]) → .7=False (automatic generation ✓; pairing ✗: Generate Now not described)
+prompt wo-generic-01 v4 run 2: rule .6=False (automatic generation ✓; pairing ✗: Generate Now not described; Generate WO block lacks the vessel switch [missing prerequisite]; unplanned wrongly requires the switch [incorrect applicability]) → .7=False (automatic generation ✓; pairing ✗: Generate Now not described)
+prompt wo-phr-01 v4 run 1: rule .6=False (automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prerequisite]) → .7=True (automatic generation ✓; pairing ✓)
+prompt wo-phr-01 v4 run 2: rule .6=False (automatic generation ✓; pairing ✗: Generate Now not described; Generate WO block lacks the vessel switch [missing prerequisite]) → .7=False (automatic generation ✓; pairing ✗: Generate Now not described)
+prompt wo-phr-01 v4 run 3: rule .6=False (automatic generation ✓; pairing ✗: per-job Generate WO not described) → .7=True (automatic generation ✓; pairing ✓)
+
+== overall PASS/fail changes per run .6 → .7 (2) ==
+prompt wo-phr-01 v4 run 1: .6 fail → .7 PASS
+prompt wo-phr-01 v4 run 3: .6 fail → .7 PASS

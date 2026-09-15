@@ -128,22 +128,24 @@ def docs_prompt(message: str, routed: Routed) -> tuple[str, str]:
               "contains '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' followed by steps, then "
               "the question about A IS covered: answer with those steps, and state that they are the same as section X (page N). "
               "Never answer 'not covered' when such a resolved cross-reference is present. "
-              # v4 (candidate, owner GO 15-Sep-2026) — coverage, conditions, sources, compact per-method format. The cross-reference
-              # hard rule above is verbatim v2 (attribution behaviour must be preserved — frozen case 09).
-              "RULE — coverage: if a how-to question is broad (it names no single method, form or button), describe EVERY method the "
-              "excerpts support for it, each as its own item — never answer with one method as if it were the only one; if the question "
-              "names a method, answer that method and note the other supported methods in one line. "
-              "RULE — conditions: keep each action's environment (Office / Ship), role requirement, configuration conditions (switches, "
-              "settings, record state) and steps TOGETHER in that action's item, exactly as the excerpt describing that action states them: "
-              "never present a conditional action as unconditional, never attach a condition to a different action, and never drop a "
-              "condition because another excerpt about the same action does not mention it — an omission in one source is not a contradiction. "
+              # v5 (candidate, reviewer + owner 15-Sep-2026; v4 superseded — it fabricated cross-reference statements and narrowed
+              # applicability with an 'Applies to' label). The cross-reference hard rule above is verbatim v2; the next sentence only
+              # restricts WHEN that statement may be made (frozen case 09 keeps its attribution).
+              "That 'same as section X' statement is made ONLY when an excerpt itself contains that resolved cross-reference text; a "
+              "plain pointer such as 'Details: <file>' or 'see section X' is a link, not evidence that two procedures share the same "
+              "steps — never write '(Cross-reference resolved: …)' or 'the steps are the same as …' on your own. "
+              "RULE — coverage: if the question is broad (it names no single method, form or button), first list briefly every method "
+              "the excerpts support for it — including methods described separately inside an overview excerpt — then explain each one; "
+              "never answer with one method as if it were the only one. If the question names a method, answer that method and note the "
+              "other supported methods in one line. "
+              "RULE — conditions: explain each method as plain numbered steps with its requirements written directly next to that method "
+              "— role, Office or Ship applicability, switches or settings, record state — exactly as the excerpt describing that method "
+              "states them; state Office/Ship differences wherever the source makes them; never present a conditional action as "
+              "unconditional, never attach a condition to a different action, and never drop a condition because another excerpt about "
+              "the same action does not mention it — an omission in one source is not a contradiction. "
               "RULE — sources: excerpts may be published manuals or draft code-derived guidance (marked as such, or citing application code "
-              "or a repository revision); neither automatically overrides the other. Where two excerpts actually conflict, state both and "
-              "name each source; where an excerpt is marked draft, unverified or revision-specific, say so in one clause; never present "
-              "code-derived guidance as a statement of the manual. "
-              "FORMAT for how-to answers, per method: 'Method' — 'Applies to' (Office / Ship / both — only when an excerpt states it, "
-              "otherwise omit) — 'Requirements' (role, switch or setting, record state; write 'none stated in the excerpts' only when none "
-              "is stated) — 'Steps' (numbered; keep any required cross-reference statement inside the steps of the method it belongs to) "
-              "— 'Source' (manual or guidance name and section). Keep it short and plain. "
-              'End with a "Source:" line naming the manual and section(s) you used.')
+              "or a repository revision); neither automatically overrides the other; where two excerpts actually conflict, state both and "
+              "name each source; where an excerpt is marked draft, unverified or revision-specific, say so in one clause. "
+              "Keep it short and plain; do not use 'Method' / 'Applies to' / 'Requirements' labels. "
+              'End with ONE "Source:" list naming, for each method, the manual or guidance and section that supports it.')
     return system, f"Manual excerpts:\n\n{context}\n\nQuestion: {message}"

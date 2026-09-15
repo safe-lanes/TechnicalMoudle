@@ -336,6 +336,45 @@ The diagnostic improves the two targeted defects on these contexts — broad-que
 
 The evidence points at two specific v4 wording faults, not at the approach: (a) the "Applies to" field forces a choice the excerpt does not always make — drop it, or allow it only as a quotation of the excerpt's own "Applies to"/"ON THE SHIP / IN THE OFFICE" wording; (b) the format sentence "keep any required cross-reference statement inside the steps" plus the hard rule's fixed phrase invites the model to manufacture "(Cross-reference resolved: …)" from plain "Details: <file>" pointers — the hard rule must say the statement is made only when the excerpt itself contains the resolved-cross-reference text, never otherwise. A v5 with those two changes, replayed on the same two captured contexts with a format-aware judge .7, is the smallest next test; only if it introduces no defect should the suites (case 09 first) and the eight phrasings run.
 
+## 12. Judge .7 + prompt v5 replay (reviewer plan, owner forward, 15-Sep; `judge7-validation.txt`, `prompt5-*`)
+
+Live unchanged. Same container/image, model settings and masking path as §11; capture on the diagnostic process only, scanned clean, removed from the server.
+
+### 12.1 Judge .7 — format-aware parsing, acceptance requirements unchanged
+
+Fixed before any new model call, on the 132 stored answers (96 suite + 12 overview diagnostic + 12 consolidation + 12 v4 replay): (a) source lines and "(Source: …)" parentheticals are removed wherever they sit instead of cutting the answer at the first one; (b) scopes are built from method blocks — a block naming one action is attributed whole (its requirements line included, wherever it sits), a heading block naming no action is held for the NEXT action, a block naming several actions falls back to the .5 unit scoping; (c) the "framed in the office" test skips bare headings and enumerators. Two intermediate defects were caught by the validation and fixed before acceptance (the first cut of (b) moved two v2-format verdicts because the heading became the "first unit").
+
+| .6 → .7 | count | detail |
+|---|---|---|
+| rule-level outcome changed | 5 | all five are v4-format answers: the false "Generate WO block lacks the vessel switch" (requirements line before the step) and the false "unplanned wrongly requires the switch" (method heading appended to the previous scope) are gone; what remains is real (Generate Now absent in generic-01 runs 1–2 and phr-01 run 2) |
+| overall verdict changed | 2 | phr-01 v4 runs 1 and 3: fail → PASS on the .6 acceptance set (verified by reading: per-job switch office-qualified, Generate Now with Sail Admin + switch in the office). Their fabricated cross-reference statements and "Applies to: Office" narrowing are outside the judge's acceptance set and stay manual criteria — not added to the judge |
+| the 120 earlier answers | 0 changes | every .6 verdict kept |
+
+### 12.2 Prompt v5 (`v5-plain-coverage-2026-09-15`, docs sha `ff9ee87141ac1362`, tool-loop `7a028346c1c2fdf0`, combined `aea94e2f5edb6948`)
+
+v2's rules and the cross-reference hard rule verbatim, plus: the "same as section X" statement is made ONLY when an excerpt itself contains the resolved text — a "Details: <file>" or "see section X" pointer is a link, not evidence of identical steps, never write "(Cross-reference resolved: …)" on your own; broad question → first a brief list of every supported method including those nested inside an overview excerpt, then each explained; plain numbered explanations with requirements next to the method (role, Office/Ship applicability, switches, record state), Office/Ship differences stated wherever the source makes them; the sources rule; no Method / Applies to / Requirements labels; ONE final source list attributing each method. Replayed on the same two captured contexts (user sha `ef40f46331cd52c8`, `57816b0740f3a644`; every wire body checked against its prompt sha and context sha), 3 runs each, v2 alongside.
+
+### 12.3 Results (`prompt5-analysis.txt` has every full answer)
+
+| criterion (reviewer's pass bar) | v2 (6 runs) | v5 (6 runs) |
+|---|---|---|
+| complete method coverage — planned-automatic, office Generate Now, per-job Generate WO, unplanned | generic-01 0/3 (unplanned only); phr-01 3/3 | **6/6** — the generic question now lists all three methods with Generate Now inside the planned item in every run (v4 had 0/3 for Generate Now) |
+| no invented references | 0 fabricated (the v2 generic answers' "same as section 1.1.5.2 (page 29)" refers to the section they quote — self-reference, not a manufactured cross-reference) | **0 fabricated**, no "(Cross-reference resolved: …)" text, no labels; one final source list in 4/6 runs (phr-01 runs 2–3 also add per-method source lines and a summary line) |
+| Generate Now with Sail Admin + switch, in the office | 3/6 (phr-01 only) | **6/6** |
+| per-job Generate WO switch present | phr-01 0/3, generic-01 n/a | 4/6 — **missing in generic-01 runs 1–2** ("Note: the job must be active and must not already have an active work order" / "does not require a specific role but does require the job to be active…", no switch) |
+| per-job switch stated as an OFFICE condition | — | **0/6 under judge .7** — in the 4 runs that state it the wording is "- Office: Select the vessel → … click 'Generate WO' … There is no role check, but the vessel's switch must be ON" — the "Office:" marker prefixes the step chain (as the overview's "(Office: select the vessel)" does) and the switch sentence itself is unqualified; by a lenient reading the whole bullet is office-framed, by the owner's rule ("switch required" ≠ "switch required on the office instance") it is not explicit |
+| Office/Ship applicability elsewhere | — | unplanned "both Office and Ship" stated in generic-01 runs 1–2; per-job described only for the office path in all runs (ship path, which needs no switch, unstated — omission, not a false statement); no "Applies to: Office" labels |
+| incorrect instructions or statements | 0 | 0 (minor: phr-01 run 2 "unplanned … can be created without any prerequisites" over-generalises "no role check, no switch") |
+| judge .7 rule | 0/6 | 0/6 (2 missing prerequisite, 4 incorrect applicability) |
+
+### 12.4 Decision
+
+v5 removes every defect v4 introduced (no fabricated references, no labels, no false "not covered", Generate Now present 6/6) and fixes coverage 6/6 — but it does **not** meet the bar "correct conditions and applicability": the per-job switch is dropped in 2 of 6 runs and, where present, is never stated explicitly as an office condition. Under the strict reading the replay fails; under the lenient reading it fails 2/6. Either way the pass condition for running case 09 and the broader suites is not met, so they were **not** run, nothing was built, nothing deployed. v5 stays on the branch as the candidate label; the served prompt is v2.
+
+### 12.5 What this settles and what comes next (per the reviewer's stop rule)
+
+Two prompt versions on identical captured inputs show the same residual: gpt-4o-mini at T=0.2 keeps the Generate Now conditions reliably but treats the per-job switch clause ("in the office only if the vessel switch is on", sitting mid-sentence between "No role check on this path (…)" and "the job must be active…") as droppable or re-orders it away from its qualifier, in 2–6 of 6 runs depending on the reading, whatever the prompt says about conditions. The reviewer's rule applies: stop cycling prompt wording. The next decision is a comparison of a different answer-generation approach or model on these SAME captured inputs — the replay harness (`diag_prompt.py` + the captured contexts) can run any prompt text; a model change (`CHAT_MODEL`) or a two-step generation (extract per-method conditions first, then write) would each need the owner's authorisation and a cost/latency note before running. Not started.
+
 ### 8.6 Not changed / open
 
 Not changed: live, prompt (v2 on both instances), retrieval logic, thresholds, excerpt count, the frozen suites, the base judge's literal must-phrase check. Open for the owner: (1) the answer-generation drops now dominate — the conditions rule (prompt v3) targeted this and regressed frozen case 09 (§S.7.1); a reworded rule or a content-ordering change are the untested candidates; (2) two retrieval residues (wo-generic-03; wo-phr-02's "other ways" note, which could also be one sentence in unplanned-wo.md); (3) the literal must-phrase check in the shared base judge fails wo-phr-03 answers that are right by meaning.

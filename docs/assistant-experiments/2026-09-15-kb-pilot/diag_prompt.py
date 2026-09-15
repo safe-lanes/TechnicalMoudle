@@ -2,7 +2,8 @@
 container (sail-assistant-py-exp2) so the model client, model settings (gpt-4o-mini, T=0.2) and masking path are the served
 ones. Nothing is retrieved: the user message of each question is replayed VERBATIM from diag-capture.jsonl (arm NORMAL,
 5 excerpts, no consolidation). Two system prompts: v2 (verbatim from the wire, sha b37172f6122a0257) and the v4 candidate
-(from the branch's retrieval.docs_prompt, sha recorded). 2 questions x 2 prompts x 3 runs. ASSISTANT_CAPTURE_OUTBOUND (this
+(from the branch's retrieval.docs_prompt, sha recorded) — or any prompt set in the input file. 2 questions x N prompts x 3 runs.
+Usage: python diag_prompt.py [input.json] [output.json] ASSISTANT_CAPTURE_OUTBOUND (this
 process only) records the actual wire bodies; capture line ranges are stored per run. Writes /app/out/prompt-results.json.
 """
 import asyncio
@@ -18,10 +19,11 @@ from app import agent  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.masking import Masker  # noqa: E402
 
-IN = json.load(open("/app/out/prompt-compare-input.json", encoding="utf-8"))
+IN_PATH = sys.argv[1] if len(sys.argv) > 1 else "/app/out/prompt-compare-input.json"
+IN = json.load(open(IN_PATH, encoding="utf-8"))
 RUNS = 3
 CAP = os.environ.get("ASSISTANT_CAPTURE_OUTBOUND", "")
-OUT = "/app/out/prompt-results.json"
+OUT = sys.argv[2] if len(sys.argv) > 2 else "/app/out/prompt-results.json"
 
 
 def cap_lines() -> int:
@@ -46,7 +48,7 @@ async def main() -> None:
     if masker:
         masker.register("Acceptance", "PERSON")
     for cid, c in IN["contexts"].items():
-        for pk in ("v2", "v4"):
+        for pk in IN["prompts"]:
             p = IN["prompts"][pk]
             for r in range(1, RUNS + 1):
                 start = cap_lines()
