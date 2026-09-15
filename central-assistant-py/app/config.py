@@ -46,11 +46,12 @@ class Settings(BaseSettings):
     # step 4 (owner brief 15-Sep-2026) — both OFF = the served behaviour; each is measured on its own candidate:
     #   route_intent: an explicit module or manual/sub-module name in the question decides the module; the originating
     #                 module (context.module) only breaks a clarify tie when it is one of the candidates.
-    #   hybrid:       excerpt selection fuses the vector ranking with a lexical (tsvector) ranking inside the routed module
-    #                 (reciprocal-rank fusion); thresholds and excerpt count unchanged.
+    #   hybrid:       excerpt selection consults a lexical (tsvector) ranking inside the routed module — "rescue" (r6): the
+    #                 served vector selection kept, the lexical leader takes the last slot when absent; "on" (r5): convex score
+    #                 fusion of both rankings (measured, superseded by r6). Thresholds and excerpt count unchanged in both.
     assistant_route_intent: str = "off"
-    assistant_hybrid: str = "off"
-    assistant_hybrid_alpha: float = 0.5   # weight of the vector side in the convex score fusion (r5); 1.0 = vector only
+    assistant_hybrid: str = "off"          # off | rescue | on
+    assistant_hybrid_alpha: float = 0.5   # weight of the vector side in the convex score fusion (r5 only); 1.0 = vector only
 
     # budgets (§5.7)
     llm_timeout_ms: int = 30000

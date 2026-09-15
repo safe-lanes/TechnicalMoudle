@@ -1,0 +1,8 @@
+{"set": "C-kbpilot", "reviewed_failing_cases": 33, "labels": {"CORRECT_PARAPHRASE": 30, "CORRECT_ADJACENT_PAGE": 1, "HONEST_LIMIT": 1, "WRONG_SOURCE": 1, "PARTIAL": 0, "WRONG": 0},
+ "real_defects": [
+  {"case": "hist-1", "label": "WRONG_SOURCE", "detail": "question about the Audit History manual's Review section (p.16) answered with the PMS Office manual's work-order review text (p.13, 'Reviewer Comments… Reviewed or Reopen'); citations named Sync/Ship-Side notes; routed to the wrong module"},
+  {"case": "pmsoffice-1", "label": "HONEST_LIMIT", "detail": "Due vs Overdue (PMS Office p.28) — the request hit the clarify gate ('Technical or Crewing?'), empty citations; a routing miss, not a model miss"}
+ ],
+ "adjacent": [{"case": "prep-3", "detail": "facts correct; cited p.19/p.21 (attachment view/delete) instead of the screenshot page p.20; cited pages verified to contain the facts"}],
+ "source_distinction": "pmsvessel-4: KB pilot file cited and explicitly labelled 'draft code-derived guidance', separate from the two manuals — accurate",
+ "judge_notes": "literal must-phrase matching undercounts correct paraphrases (30 of 33); citation check accepts the parallel Office/Vessel variant (pmsoffice-2 cites Vessel pages while the Office page holds the same text) — reported, not changed"}

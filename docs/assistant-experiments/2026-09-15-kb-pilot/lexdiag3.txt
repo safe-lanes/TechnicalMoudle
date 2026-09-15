@@ -1,0 +1,294 @@
+meta keys sample: ['breadcrumb', 'chunk_index', 'chunker_version', 'cleaned', 'cleanup_version', 'embed_model', 'embed_sha', 'embed_sha_source', 'file', 'llamaparse_job_id', 'llamaparse_tier', 'llamaparse_version', 'module', 'page_number', 'repair_version', 'section_title', 'slug_url', 'source_type', 'xrefs_resolved']
+
+== F01 [audit] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+  C0 five (vector order):
+     d=0.7929  Audit - Preparation Manual_Office_R1_30.06 p15 · ce_R1_30.06.2026 > Document (p.15)
+     d=0.8650  Audit - History Manual_R1_30.06.2026.pdf p9 ·  COMMENTS AND CAUSE ANALYSIS (p.9)
+     d=0.8953  Audit - History Manual_R1_30.06.2026.pdf p3 · .06.2026 > Table of Contents (p.3)
+     d=0.8979  Audit - Preparation Manual_Office_R1_30.06 p12 · ce_R1_30.06.2026 > Preamble (p.12)
+     d=0.9088  Audit - Preparation Manual_Office_R1_30.06 p14 · G THE PREPARATION CHECKLIST (p.14)
+  lexical list (score, distance):
+     lex=2.400 d=0.9510  Audit - Preparation Manual_Office_R1_30.06 p24 ·  View Repeated Observations (p.24)
+     lex=2.100 d=0.9088  Audit - Preparation Manual_Office_R1_30.06 p14 · G THE PREPARATION CHECKLIST (p.14)
+     lex=1.900 d=0.7929  Audit - Preparation Manual_Office_R1_30.06 p15 · ce_R1_30.06.2026 > Document (p.15)
+     lex=1.700 d=1.0601  Audit - Preparation Manual_Office_R1_30.06 p5 · ARATION SUB- MODULE OVERVIEW (p.5)
+     lex=1.400 d=1.0006  Audit - Preparation Manual_Office_R1_30.06 p13 · W TO CREATE NEW PREPARATION (p.13)
+     lex=1.200 d=1.0242  Audit - Preparation Manual_Office_R1_30.06 p12 · 6 > 2.8 ARCHIVE PREPARATION (p.12)
+     lex=1.200 d=0.9837  Audit - Preparation Manual_Office_R1_30.06 p15 · ce_R1_30.06.2026 > Document (p.15)
+     lex=1.200 d=1.0071  Audit - Preparation Manual_Office_R1_30.06 p3 · ice_R1_30.06.2026 > Contents (p.3)
+     lex=1.200 d=1.0818  Audit - Preparation Manual_Office_R1_30.06 p11 · DITING EXISTING PREPARATION (p.11)
+     lex=1.200 d=0.8650  Audit - History Manual_R1_30.06.2026.pdf p9 ·  COMMENTS AND CAUSE ANALYSIS (p.9)
+  fused alpha=0.5:
+     s=0.587 d=0.9510 lex=2.400  Audit - Preparation Manual_Office_R1_30.06 p24 ·  View Repeated Observations (p.24)  <-- not in C0 five
+     s=0.155 d=0.7929 lex=0.000  Audit - Preparation Manual_Office_R1_30.06 p15 · ce_R1_30.06.2026 > Document (p.15)
+     s=0.105 d=0.9088 lex=0.000  Audit - Preparation Manual_Office_R1_30.06 p14 · G THE PREPARATION CHECKLIST (p.14)
+     s=0.393 d=1.0601 lex=1.700  Audit - Preparation Manual_Office_R1_30.06 p5 · ARATION SUB- MODULE OVERVIEW (p.5)  <-- not in C0 five
+     s=0.124 d=0.8650 lex=0.000  Audit - History Manual_R1_30.06.2026.pdf p9 ·  COMMENTS AND CAUSE ANALYSIS (p.9)
+  fused alpha=0.7:
+     s=0.217 d=0.7929 lex=0.000  Audit - Preparation Manual_Office_R1_30.06 p15 · ce_R1_30.06.2026 > Document (p.15)
+     s=0.421 d=0.9510 lex=2.400  Audit - Preparation Manual_Office_R1_30.06 p24 ·  View Repeated Observations (p.24)  <-- not in C0 five
+     s=0.147 d=0.9088 lex=0.000  Audit - Preparation Manual_Office_R1_30.06 p14 · G THE PREPARATION CHECKLIST (p.14)
+     s=0.173 d=0.8650 lex=0.000  Audit - History Manual_R1_30.06.2026.pdf p9 ·  COMMENTS AND CAUSE ANALYSIS (p.9)
+     s=0.267 d=1.0601 lex=1.700  Audit - Preparation Manual_Office_R1_30.06 p5 · ARATION SUB- MODULE OVERVIEW (p.5)  <-- not in C0 five
+  LOST at 0.5: Audit - History Manual_R1_30.06.2026.pdf p3 · .06.2026 > Table of Contents (p.3) (d=0.8953, in lexical list: False)
+  LOST at 0.5: Audit - Preparation Manual_Office_R1_30.06 p12 · ce_R1_30.06.2026 > Preamble (p.12) (d=0.8979, in lexical list: False)
+
+== F03 [safety] How do I upload a document for the first time in the SMS module?
+  C0 five (vector order):
+     d=0.7034  Safety - SMS User Manual_Office_R0_31.01.2 p14 ·  FOR THE FIRST TIME IN SAIL (p.14)
+     d=0.8005  Safety - SMS User Manual_Office_R0_31.01.2 p16 · ce_R0_31.01.2026 > Document (p.16)
+     d=0.8291  Safety - SMS User Manual_Office_R0_31.01.2 p18 · 31.01.2026 > 4.2.1 Proposal (p.18)
+     d=0.8497  Safety - SMS User Manual_Office_R0_31.01.2 p15 · ce_R0_31.01.2026 > Document (p.15)
+     d=0.8602  Safety - SMS User Manual_Office_R0_31.01.2 p2 · .01.2026 > TABLE OF CONTENTS (p.2)
+  lexical list (score, distance):
+     lex=2.100 d=0.8005  Safety - SMS User Manual_Office_R0_31.01.2 p16 · ce_R0_31.01.2026 > Document (p.16)
+     lex=1.500 d=0.8497  Safety - SMS User Manual_Office_R0_31.01.2 p15 · ce_R0_31.01.2026 > Document (p.15)
+     lex=1.400 d=1.1429  Safety - SMS User Manual_Office_R0_31.01.2 p10 · perlinking in SMS documents (p.10)
+     lex=1.400 d=0.7034  Safety - SMS User Manual_Office_R0_31.01.2 p14 ·  FOR THE FIRST TIME IN SAIL (p.14)
+     lex=1.200 d=1.0156  Safety - SMS User Manual_Office_R0_31.01.2 p20 · ce_R0_31.01.2026 > Document (p.20)
+     lex=1.100 d=1.0420  Safety - SMS User Manual_Office_R0_31.01.2 p7 · 1.3 Details of SMS documents (p.7)
+     lex=1.100 d=1.1456  Safety - SMS User Manual_Office_R0_31.01.2 p9 · ice_R0_31.01.2026 > Document (p.9)
+     lex=1.100 d=0.9878  Safety - SMS User Manual_Office_R0_31.01.2 p11 ·  How to Print SMS Documents (p.11)
+     lex=1.000 d=0.9940  Safety - SMS User Manual_Office_R0_31.01.2 p5 · 31.01.2026 > 3. SMS Overview (p.5)
+  fused alpha=0.5:
+     s=0.152 d=0.8005 lex=0.000  Safety - SMS User Manual_Office_R0_31.01.2 p16 · ce_R0_31.01.2026 > Document (p.16)
+     s=0.194 d=0.7034 lex=0.000  Safety - SMS User Manual_Office_R0_31.01.2 p14 ·  FOR THE FIRST TIME IN SAIL (p.14)
+     s=0.131 d=0.8497 lex=0.000  Safety - SMS User Manual_Office_R0_31.01.2 p15 · ce_R0_31.01.2026 > Document (p.15)
+     s=0.344 d=1.0156 lex=1.200  Safety - SMS User Manual_Office_R0_31.01.2 p20 · ce_R0_31.01.2026 > Document (p.20)  <-- not in C0 five
+     s=0.336 d=1.1429 lex=1.400  Safety - SMS User Manual_Office_R0_31.01.2 p10 · perlinking in SMS documents (p.10)  <-- not in C0 five
+  fused alpha=0.7:
+     s=0.213 d=0.8005 lex=0.000  Safety - SMS User Manual_Office_R0_31.01.2 p16 · ce_R0_31.01.2026 > Document (p.16)
+     s=0.272 d=0.7034 lex=0.000  Safety - SMS User Manual_Office_R0_31.01.2 p14 ·  FOR THE FIRST TIME IN SAIL (p.14)
+     s=0.183 d=0.8497 lex=0.000  Safety - SMS User Manual_Office_R0_31.01.2 p15 · ce_R0_31.01.2026 > Document (p.15)
+     s=0.099 d=0.9878 lex=0.000  Safety - SMS User Manual_Office_R0_31.01.2 p11 ·  How to Print SMS Documents (p.11)  <-- not in C0 five
+     s=0.253 d=1.0156 lex=1.200  Safety - SMS User Manual_Office_R0_31.01.2 p20 · ce_R0_31.01.2026 > Document (p.20)  <-- not in C0 five
+  LOST at 0.5: Safety - SMS User Manual_Office_R0_31.01.2 p18 · 31.01.2026 > 4.2.1 Proposal (p.18) (d=0.8291, in lexical list: False)
+  LOST at 0.5: Safety - SMS User Manual_Office_R0_31.01.2 p2 · .01.2026 > TABLE OF CONTENTS (p.2) (d=0.8602, in lexical list: False)
+
+== F06 [incident] What actions can I take on a near miss record from the list — what do the icons do?
+  C0 five (vector order):
+     d=0.7264  Incident - Near Miss User Manual R1_30.05. p5 · 26 > 2. NEAR MISS - OVERVIEW (p.5)
+     d=0.7508  Incident - Near Miss User Manual R1_30.05. p5 · 26 > 2. NEAR MISS - OVERVIEW (p.5)
+     d=0.8288  Incident - Near Miss User Manual R1_30.05. p11 · 2026 > 7. STATUS INDICATORS (p.11)
+     d=0.8651  Incident - Near Miss User Manual R1_30.05. p10 · se analysis & Action Status (p.10)
+     d=0.8675  Incident - Near Miss User Manual R1_30.05. p4 · ARTED – NEAR MISS SUB-MODULE (p.4)
+  lexical list (score, distance):
+     lex=3.900 d=0.7264  Incident - Near Miss User Manual R1_30.05. p5 · 26 > 2. NEAR MISS - OVERVIEW (p.5)
+     lex=2.600 d=0.9813  Incident - Fleet Notification User Manual_ p8 · _ R0_20.03.2026 > 3. Actions (p.8)
+     lex=2.300 d=0.8288  Incident - Near Miss User Manual R1_30.05. p11 · 2026 > 7. STATUS INDICATORS (p.11)
+     lex=1.900 d=0.9049  Incident - Near Miss User Manual R1_30.05. p4 · ARTED – NEAR MISS SUB-MODULE (p.4)
+     lex=1.900 d=0.9606  Incident - Incident User Manual R0_20.05.2 p5 · .2026 > 2. INCIDENT OVERVIEW (p.5)
+     lex=1.700 d=0.8675  Incident - Near Miss User Manual R1_30.05. p4 · ARTED – NEAR MISS SUB-MODULE (p.4)
+     lex=1.700 d=1.1199  Incident - Incident User Manual R0_20.05.2 p19 · 026 > 14. STATUS INDICATORS (p.19)
+     lex=1.600 d=1.1349  Incident - Incident User Manual R0_20.05.2 p19 · 026 > 14. STATUS INDICATORS (p.19)
+     lex=1.600 d=0.8755  Incident - Near Miss User Manual R1_30.05. p11 · 2026 > 7. STATUS INDICATORS (p.11)
+     lex=1.500 d=0.8932  Incident - Near Miss User Manual R1_30.05. p8 · ual R1_30.05.2026 > Document (p.8)
+  fused alpha=0.5:
+     s=0.184 d=0.7264 lex=0.000  Incident - Near Miss User Manual R1_30.05. p5 · 26 > 2. NEAR MISS - OVERVIEW (p.5)
+     s=0.140 d=0.8288 lex=0.000  Incident - Near Miss User Manual R1_30.05. p11 · 2026 > 7. STATUS INDICATORS (p.11)
+     s=0.407 d=0.9813 lex=2.600  Incident - Fleet Notification User Manual_ p8 · _ R0_20.03.2026 > 3. Actions (p.8)  <-- not in C0 five
+     s=0.107 d=0.9049 lex=0.000  Incident - Near Miss User Manual R1_30.05. p4 · ARTED – NEAR MISS SUB-MODULE (p.4)  <-- not in C0 five
+     s=0.123 d=0.8675 lex=0.000  Incident - Near Miss User Manual R1_30.05. p4 · ARTED – NEAR MISS SUB-MODULE (p.4)
+  fused alpha=0.7:
+     s=0.258 d=0.7264 lex=0.000  Incident - Near Miss User Manual R1_30.05. p5 · 26 > 2. NEAR MISS - OVERVIEW (p.5)
+     s=0.196 d=0.8288 lex=0.000  Incident - Near Miss User Manual R1_30.05. p11 · 2026 > 7. STATUS INDICATORS (p.11)
+     s=0.172 d=0.8675 lex=0.000  Incident - Near Miss User Manual R1_30.05. p4 · ARTED – NEAR MISS SUB-MODULE (p.4)
+     s=0.303 d=0.9813 lex=2.600  Incident - Fleet Notification User Manual_ p8 · _ R0_20.03.2026 > 3. Actions (p.8)  <-- not in C0 five
+     s=0.149 d=0.9049 lex=0.000  Incident - Near Miss User Manual R1_30.05. p4 · ARTED – NEAR MISS SUB-MODULE (p.4)  <-- not in C0 five
+  LOST at 0.5: Incident - Near Miss User Manual R1_30.05. p5 · 26 > 2. NEAR MISS - OVERVIEW (p.5) (d=0.7508, in lexical list: False)
+  LOST at 0.5: Incident - Near Miss User Manual R1_30.05. p10 · se analysis & Action Status (p.10) (d=0.8651, in lexical list: False)
+
+== F10 [safety] When filling MoC Part B, what happens if I select No for further assessment?
+  C0 five (vector order):
+     d=0.7804  Safety - MOC User Manual_Office_R0_31.03.2 p11 · W TO FILL MOC FORM – PART B (p.11)
+     d=0.8001  Safety - MOC User Manual_Vessel_R0_31.03.2 p7 · OW TO FILL MOC FORM – PART B (p.7)
+     d=0.9954  Safety - MOC User Manual_Office_R0_31.03.2 p15 · ce_R0_31.03.2026 > Approval (p.15)
+     d=1.0201  Safety - MOC User Manual_Office_R0_31.03.2 p17 · 2026 > Proceed to Part F: - (p.17)
+     d=1.0274  Safety - MOC User Manual_Office_R0_31.03.2 p15 · W TO FILL MOC FORM – PART D (p.15)
+  lexical list (score, distance):
+     lex=2.000 d=0.8001  Safety - MOC User Manual_Vessel_R0_31.03.2 p7 · OW TO FILL MOC FORM – PART B (p.7)
+     lex=1.800 d=0.7804  Safety - MOC User Manual_Office_R0_31.03.2 p11 · W TO FILL MOC FORM – PART B (p.11)
+     lex=1.700 d=1.0507  Safety - MOC User Manual_Office_R0_31.03.2 p12 · W TO FILL MOC FORM – PART C (p.12)
+     lex=1.700 d=1.1381  Safety - MOC User Manual_Vessel_R0_31.03.2 p11 · W TO FILL MOC FORM – PART D (p.11)
+  fused alpha=0.5:
+     s=0.152 d=0.8001 lex=0.000  Safety - MOC User Manual_Vessel_R0_31.03.2 p7 · OW TO FILL MOC FORM – PART B (p.7)
+     s=0.161 d=0.7804 lex=0.000  Safety - MOC User Manual_Office_R0_31.03.2 p11 · W TO FILL MOC FORM – PART B (p.11)
+     s=0.043 d=1.0507 lex=0.000  Safety - MOC User Manual_Office_R0_31.03.2 p12 · W TO FILL MOC FORM – PART C (p.12)  <-- not in C0 five
+     s=0.430 d=1.1381 lex=1.700  Safety - MOC User Manual_Vessel_R0_31.03.2 p11 · W TO FILL MOC FORM – PART D (p.11)  <-- not in C0 five
+     s=0.067 d=0.9954 lex=0.000  Safety - MOC User Manual_Office_R0_31.03.2 p15 · ce_R0_31.03.2026 > Approval (p.15)
+  fused alpha=0.7:
+     s=0.213 d=0.8001 lex=0.000  Safety - MOC User Manual_Vessel_R0_31.03.2 p7 · OW TO FILL MOC FORM – PART B (p.7)
+     s=0.225 d=0.7804 lex=0.000  Safety - MOC User Manual_Office_R0_31.03.2 p11 · W TO FILL MOC FORM – PART B (p.11)
+     s=0.060 d=1.0507 lex=0.000  Safety - MOC User Manual_Office_R0_31.03.2 p12 · W TO FILL MOC FORM – PART C (p.12)  <-- not in C0 five
+     s=0.262 d=1.1381 lex=1.700  Safety - MOC User Manual_Vessel_R0_31.03.2 p11 · W TO FILL MOC FORM – PART D (p.11)  <-- not in C0 five
+     s=0.094 d=0.9954 lex=0.000  Safety - MOC User Manual_Office_R0_31.03.2 p15 · ce_R0_31.03.2026 > Approval (p.15)
+  LOST at 0.5: Safety - MOC User Manual_Office_R0_31.03.2 p17 · 2026 > Proceed to Part F: - (p.17) (d=1.0201, in lexical list: False)
+  LOST at 0.5: Safety - MOC User Manual_Office_R0_31.03.2 p15 · W TO FILL MOC FORM – PART D (p.15) (d=1.0274, in lexical list: False)
+
+== G01 [technical] In Bulk Data Import for jobs, do I have to fill in the Job Code column?
+  C0 five (vector order):
+     d=1.0265  Technical - Bulk Data Import (Operational) p1 · ow To Download the Import Template
+     d=1.0813  Technical - Bulk Data Import (Operational) p1 · L — BULK DATA IMPORT (OPERATIONAL)
+  lexical list (score, distance):
+     lex=2.700 d=1.0265  Technical - Bulk Data Import (Operational) p1 · ow To Download the Import Template
+     lex=1.700 d=1.0813  Technical - Bulk Data Import (Operational) p1 · L — BULK DATA IMPORT (OPERATIONAL)
+  fused alpha=0.5:
+     s=0.054 d=1.0265 lex=0.000  Technical - Bulk Data Import (Operational) p1 · ow To Download the Import Template
+     s=0.030 d=1.0813 lex=0.000  Technical - Bulk Data Import (Operational) p1 · L — BULK DATA IMPORT (OPERATIONAL)
+  fused alpha=0.7:
+     s=0.075 d=1.0265 lex=0.000  Technical - Bulk Data Import (Operational) p1 · ow To Download the Import Template
+     s=0.042 d=1.0813 lex=0.000  Technical - Bulk Data Import (Operational) p1 · L — BULK DATA IMPORT (OPERATIONAL)
+
+== G04 [technical] In work-order numbers, what do the vessel code and the segment after it mean, and what does an unplanned work order number look like?
+  C0 five (vector order):
+     d=0.6844  Technical - Ship-Side (Vessel Crew) Operat p2 · Crew) Operational Notes > Preamble
+     d=0.6901  Technical - Recent Updates & Changed Behav p1 · umbers Now Include the Vessel Code
+     d=0.7694  Technical - PMS User Manual_Vessel Specifi p23 · 3_08.07.2026 > Introduction (p.23)
+     d=0.8297  Technical - PMS User Manual For Office_Sai p28 · 2_08.06.2026 > Introduction (p.28)
+     d=0.8422  Technical - PMS User Manual For Office_Sai p29 · ATE AN UNPLANNED WORK ORDER (p.29)
+  lexical list (score, distance):
+     lex=4.900 d=0.8469  Technical - KB pilot: Create an unplanned  p- · ned work order ('+ Unplanned W.O')
+     lex=4.500 d=0.9674  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+     lex=3.900 d=0.8422  Technical - PMS User Manual For Office_Sai p29 · ATE AN UNPLANNED WORK ORDER (p.29)
+     lex=3.400 d=0.9823  Technical - KB pilot: Planned work orders  p- · y by the ship's daily job-due scan
+     lex=3.400 d=0.6901  Technical - Recent Updates & Changed Behav p1 · umbers Now Include the Vessel Code
+     lex=3.200 d=0.8495  Technical - PMS User Manual_Vessel Specifi p24 · ATE AN UNPLANNED WORK ORDER (p.24)
+     lex=2.800 d=0.9089  Technical - PMS User Manual For Office_Sai p28 · O ACCESS WORK ORDERS (W. O) (p.28)
+     lex=2.700 d=1.1462  Technical - KB pilot: 'Generate WO' for on p- · one job — from the Components page
+     lex=2.700 d=0.9325  Technical - PMS User Manual For Office_Sai p30 ·  TO PRE-PLAN THE WORK ORDER (p.30)
+  fused alpha=0.5:
+     s=0.132 d=0.8469 lex=0.000  Technical - KB pilot: Create an unplanned  p- · ned work order ('+ Unplanned W.O')  <-- not in C0 five
+     s=0.200 d=0.6901 lex=0.000  Technical - Recent Updates & Changed Behav p1 · umbers Now Include the Vessel Code
+     s=0.539 d=0.9674 lex=4.500  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order  <-- not in C0 five
+     s=0.134 d=0.8422 lex=0.000  Technical - PMS User Manual For Office_Sai p29 · ATE AN UNPLANNED WORK ORDER (p.29)
+     s=0.131 d=0.8495 lex=0.000  Technical - PMS User Manual_Vessel Specifi p24 · ATE AN UNPLANNED WORK ORDER (p.24)  <-- not in C0 five
+  fused alpha=0.7:
+     s=0.280 d=0.6901 lex=0.000  Technical - Recent Updates & Changed Behav p1 · umbers Now Include the Vessel Code
+     s=0.184 d=0.8469 lex=0.000  Technical - KB pilot: Create an unplanned  p- · ned work order ('+ Unplanned W.O')  <-- not in C0 five
+     s=0.187 d=0.8422 lex=0.000  Technical - PMS User Manual For Office_Sai p29 · ATE AN UNPLANNED WORK ORDER (p.29)
+     s=0.387 d=0.9674 lex=4.500  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order  <-- not in C0 five
+     s=0.183 d=0.8495 lex=0.000  Technical - PMS User Manual_Vessel Specifi p24 · ATE AN UNPLANNED WORK ORDER (p.24)  <-- not in C0 five
+  LOST at 0.5: Technical - Ship-Side (Vessel Crew) Operat p2 · Crew) Operational Notes > Preamble (d=0.6844, in lexical list: False)
+  LOST at 0.5: Technical - PMS User Manual_Vessel Specifi p23 · 3_08.07.2026 > Introduction (p.23) (d=0.7694, in lexical list: False)
+  LOST at 0.5: Technical - PMS User Manual For Office_Sai p28 · 2_08.06.2026 > Introduction (p.28) (d=0.8297, in lexical list: False)
+
+== G06 [technical] Who can generate work orders from the office, and what happens if the vessel's switch is off?
+  C0 five (vector order):
+     d=0.6406  Technical - Recent Updates & Changed Behav p2 · Work Orders Is a Per-Vessel Switch
+     d=0.6553  Technical - KB pilot: Office 'Generate Now p- · 's due work orders from the office
+     d=0.7372  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+     d=0.8306  Technical - KB pilot: Planned work orders  p- · y by the ship's daily job-due scan
+     d=0.8571  Technical - PMS User Manual For Office_Sai p28 · 2_08.06.2026 > Introduction (p.28)
+  lexical list (score, distance):
+     lex=6.900 d=0.6553  Technical - KB pilot: Office 'Generate Now p- · 's due work orders from the office
+     lex=6.600 d=0.7372  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+     lex=5.100 d=0.8592  Technical - KB pilot: 'Generate WO' for on p- · one job — from the Components page
+     lex=4.600 d=0.8306  Technical - KB pilot: Planned work orders  p- · y by the ship's daily job-due scan
+     lex=4.200 d=0.6406  Technical - Recent Updates & Changed Behav p2 · Work Orders Is a Per-Vessel Switch
+     lex=4.100 d=0.8897  Technical - KB pilot: Create an unplanned  p- · ned work order ('+ Unplanned W.O')
+     lex=3.100 d=0.9111  Technical - PMS User Manual For Office_Sai p29 · ATE AN UNPLANNED WORK ORDER (p.29)
+     lex=2.800 d=0.9340  Technical - PMS User Manual For Office_Sai p30 ·  TO PRE-PLAN THE WORK ORDER (p.30)
+     lex=2.600 d=0.9009  Technical - PMS User Manual For Office_Sai p28 · O ACCESS WORK ORDERS (W. O) (p.28)
+     lex=2.500 d=0.9176  Technical - Roles & Permissions (Operation p3 · ministrative Switches (Sail Admin)
+  fused alpha=0.5:
+     s=0.215 d=0.6553 lex=0.000  Technical - KB pilot: Office 'Generate Now p- · 's due work orders from the office
+     s=0.179 d=0.7372 lex=0.000  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+     s=0.221 d=0.6406 lex=0.000  Technical - Recent Updates & Changed Behav p2 · Work Orders Is a Per-Vessel Switch
+     s=0.126 d=0.8592 lex=0.000  Technical - KB pilot: 'Generate WO' for on p- · one job — from the Components page  <-- not in C0 five
+     s=0.139 d=0.8306 lex=0.000  Technical - KB pilot: Planned work orders  p- · y by the ship's daily job-due scan
+  fused alpha=0.7:
+     s=0.301 d=0.6553 lex=0.000  Technical - KB pilot: Office 'Generate Now p- · 's due work orders from the office
+     s=0.251 d=0.7372 lex=0.000  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+     s=0.310 d=0.6406 lex=0.000  Technical - Recent Updates & Changed Behav p2 · Work Orders Is a Per-Vessel Switch
+     s=0.177 d=0.8592 lex=0.000  Technical - KB pilot: 'Generate WO' for on p- · one job — from the Components page  <-- not in C0 five
+     s=0.194 d=0.8306 lex=0.000  Technical - KB pilot: Planned work orders  p- · y by the ship's daily job-due scan
+  LOST at 0.5: Technical - PMS User Manual For Office_Sai p28 · 2_08.06.2026 > Introduction (p.28) (d=0.8571, in lexical list: False)
+
+== G14 [technical] Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+  C0 five (vector order):
+     d=0.8330  Technical - Recent Updates & Changed Behav p2 · Work Orders Is a Per-Vessel Switch
+     d=0.8818  Technical - Recent Updates & Changed Behav p2 · nning Hours Is a Per-Vessel Switch
+     d=0.8926  Technical - KB pilot: Office 'Generate Now p- · 's due work orders from the office
+     d=0.8985  Technical - Roles & Permissions (Operation p3 · ministrative Switches (Sail Admin)
+     d=0.9779  Technical - PMS User Manual For Office_Sai p38 · HOW TO ACCESS RUNNING HOURS (p.38)
+  lexical list (score, distance):
+     lex=4.000 d=0.8926  Technical - KB pilot: Office 'Generate Now p- · 's due work orders from the office
+     lex=3.100 d=1.0672  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+     lex=3.100 d=1.0657  Technical - KB pilot: 'Generate WO' for on p- · one job — from the Components page
+     lex=2.800 d=0.8330  Technical - Recent Updates & Changed Behav p2 · Work Orders Is a Per-Vessel Switch
+     lex=1.900 d=0.8985  Technical - Roles & Permissions (Operation p3 · ministrative Switches (Sail Admin)
+     lex=1.800 d=1.1018  Technical - KB pilot: Planned work orders  p- · y by the ship's daily job-due scan
+     lex=1.600 d=0.8818  Technical - Recent Updates & Changed Behav p2 · nning Hours Is a Per-Vessel Switch
+     lex=0.900 d=1.0798  Technical - KB pilot: Create an unplanned  p- · ned work order ('+ Unplanned W.O')
+     lex=0.900 d=1.0256  Technical - PMS User Manual For Office_Sai p18 · 026 > TECHNICAL USER MANUAL (p.18)
+  fused alpha=0.5:
+     s=0.112 d=0.8926 lex=0.000  Technical - KB pilot: Office 'Generate Now p- · 's due work orders from the office
+     s=0.138 d=0.8330 lex=0.000  Technical - Recent Updates & Changed Behav p2 · Work Orders Is a Per-Vessel Switch
+     s=0.424 d=1.0657 lex=3.100  Technical - KB pilot: 'Generate WO' for on p- · one job — from the Components page  <-- not in C0 five
+     s=0.423 d=1.0672 lex=3.100  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order  <-- not in C0 five
+     s=0.109 d=0.8985 lex=0.000  Technical - Roles & Permissions (Operation p3 · ministrative Switches (Sail Admin)
+  fused alpha=0.7:
+     s=0.157 d=0.8926 lex=0.000  Technical - KB pilot: Office 'Generate Now p- · 's due work orders from the office
+     s=0.193 d=0.8330 lex=0.000  Technical - Recent Updates & Changed Behav p2 · Work Orders Is a Per-Vessel Switch
+     s=0.153 d=0.8985 lex=0.000  Technical - Roles & Permissions (Operation p3 · ministrative Switches (Sail Admin)
+     s=0.284 d=1.0657 lex=3.100  Technical - KB pilot: 'Generate WO' for on p- · one job — from the Components page  <-- not in C0 five
+     s=0.163 d=0.8818 lex=0.000  Technical - Recent Updates & Changed Behav p2 · nning Hours Is a Per-Vessel Switch
+  LOST at 0.5: Technical - Recent Updates & Changed Behav p2 · nning Hours Is a Per-Vessel Switch (d=0.8818, in lexical list: True)
+  LOST at 0.5: Technical - PMS User Manual For Office_Sai p38 · HOW TO ACCESS RUNNING HOURS (p.38) (d=0.9779, in lexical list: False)
+
+== R01 [technical] how do I create a work order
+  C0 five (vector order):
+     d=0.8084  Technical - PMS User Manual For Office_Sai p29 · ATE AN UNPLANNED WORK ORDER (p.29)
+     d=0.8262  Technical - PMS User Manual_Vessel Specifi p24 · ATE AN UNPLANNED WORK ORDER (p.24)
+     d=0.8358  Technical - PMS User Manual For Office_Sai p32 ·  TO COMPLETE THE WORK ORDER (p.32)
+     d=0.8428  Technical - PMS User Manual_Vessel Specifi p27 ·  TO COMPLETE THE WORK ORDER (p.27)
+     d=0.8464  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+  lexical list (score, distance):
+     lex=3.600 d=0.8464  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+     lex=3.000 d=0.8084  Technical - PMS User Manual For Office_Sai p29 · ATE AN UNPLANNED WORK ORDER (p.29)
+     lex=2.800 d=1.0290  Technical - KB pilot: Planned work orders  p- · y by the ship's daily job-due scan
+     lex=2.600 d=0.8732  Technical - KB pilot: Create an unplanned  p- · ned work order ('+ Unplanned W.O')
+     lex=2.500 d=0.8262  Technical - PMS User Manual_Vessel Specifi p24 · ATE AN UNPLANNED WORK ORDER (p.24)
+     lex=2.400 d=0.9283  Technical - PMS User Manual For Office_Sai p30 ·  TO PRE-PLAN THE WORK ORDER (p.30)
+     lex=2.200 d=1.0379  Technical - KB pilot: Office 'Generate Now p- · 's due work orders from the office
+     lex=2.200 d=0.9449  Technical - PMS User Manual_Vessel Specifi p25 ·  TO PRE-PLAN THE WORK ORDER (p.25)
+     lex=2.200 d=0.9233  Technical - PMS User Manual For Office_Sai p28 · O ACCESS WORK ORDERS (W. O) (p.28)
+     lex=1.900 d=0.9653  Technical - PMS User Manual_Vessel Specifi p30 · PROVE / REJECT A WORK ORDER (p.30)
+  fused alpha=0.5:
+     s=0.132 d=0.8464 lex=0.000  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+     s=0.149 d=0.8084 lex=0.000  Technical - PMS User Manual For Office_Sai p29 · ATE AN UNPLANNED WORK ORDER (p.29)
+     s=0.141 d=0.8262 lex=0.000  Technical - PMS User Manual_Vessel Specifi p24 · ATE AN UNPLANNED WORK ORDER (p.24)
+     s=0.120 d=0.8732 lex=0.000  Technical - KB pilot: Create an unplanned  p- · ned work order ('+ Unplanned W.O')  <-- not in C0 five
+     s=0.441 d=1.0290 lex=2.800  Technical - KB pilot: Planned work orders  p- · y by the ship's daily job-due scan  <-- not in C0 five
+  fused alpha=0.7:
+     s=0.185 d=0.8464 lex=0.000  Technical - KB pilot: How work orders are  p- ·  three ways to create a work order
+     s=0.208 d=0.8084 lex=0.000  Technical - PMS User Manual For Office_Sai p29 · ATE AN UNPLANNED WORK ORDER (p.29)
+     s=0.197 d=0.8262 lex=0.000  Technical - PMS User Manual_Vessel Specifi p24 · ATE AN UNPLANNED WORK ORDER (p.24)
+     s=0.169 d=0.8732 lex=0.000  Technical - KB pilot: Create an unplanned  p- · ned work order ('+ Unplanned W.O')  <-- not in C0 five
+     s=0.135 d=0.9283 lex=0.000  Technical - PMS User Manual For Office_Sai p30 ·  TO PRE-PLAN THE WORK ORDER (p.30)  <-- not in C0 five
+  LOST at 0.5: Technical - PMS User Manual For Office_Sai p32 ·  TO COMPLETE THE WORK ORDER (p.32) (d=0.8358, in lexical list: False)
+  LOST at 0.5: Technical - PMS User Manual_Vessel Specifi p27 ·  TO COMPLETE THE WORK ORDER (p.27) (d=0.8428, in lexical list: False)
+
+== R03 [technical] why did the running hours not go down after I completed the work order
+  C0 five (vector order):
+     d=0.8705  Technical - Recent Updates & Changed Behav p1 · ours Work Order Requires a Reading
+     d=0.9653  Technical - Ship-Side (Vessel Crew) Operat p1 · Orders on the Ship — Current Rules
+     d=0.9884  Technical - Recent Updates & Changed Behav p1 · Running Hours Never Move Backwards
+     d=1.0664  Technical - PMS User Manual For Office_Sai p39 · HOW TO UPDATE RUNNING HOURS (p.39)
+     d=1.0824  Technical - PMS User Manual_Vessel Specifi p2 · .07.2026 > Table of Contents (p.2)
+  lexical list (score, distance):
+     lex=3.600 d=0.9653  Technical - Ship-Side (Vessel Crew) Operat p1 · Orders on the Ship — Current Rules
+     lex=2.400 d=1.1137  Technical - PMS User Manual For Office_Sai p32 ·  TO COMPLETE THE WORK ORDER (p.32)
+  fused alpha=0.5:
+     s=0.080 d=0.9653 lex=0.000  Technical - Ship-Side (Vessel Crew) Operat p1 · Orders on the Ship — Current Rules
+     s=0.016 d=1.1137 lex=0.000  Technical - PMS User Manual For Office_Sai p32 ·  TO COMPLETE THE WORK ORDER (p.32)  <-- not in C0 five
+     s=0.122 d=0.8705 lex=0.000  Technical - Recent Updates & Changed Behav p1 · ours Work Order Requires a Reading
+     s=0.070 d=0.9884 lex=0.000  Technical - Recent Updates & Changed Behav p1 · Running Hours Never Move Backwards
+     s=0.036 d=1.0664 lex=0.000  Technical - PMS User Manual For Office_Sai p39 · HOW TO UPDATE RUNNING HOURS (p.39)
+  fused alpha=0.7:
+     s=0.112 d=0.9653 lex=0.000  Technical - Ship-Side (Vessel Crew) Operat p1 · Orders on the Ship — Current Rules
+     s=0.022 d=1.1137 lex=0.000  Technical - PMS User Manual For Office_Sai p32 ·  TO COMPLETE THE WORK ORDER (p.32)  <-- not in C0 five
+     s=0.170 d=0.8705 lex=0.000  Technical - Recent Updates & Changed Behav p1 · ours Work Order Requires a Reading
+     s=0.098 d=0.9884 lex=0.000  Technical - Recent Updates & Changed Behav p1 · Running Hours Never Move Backwards
+     s=0.051 d=1.0664 lex=0.000  Technical - PMS User Manual For Office_Sai p39 · HOW TO UPDATE RUNNING HOURS (p.39)
+  LOST at 0.5: Technical - PMS User Manual_Vessel Specifi p2 · .07.2026 > Table of Contents (p.2) (d=1.0824, in lexical list: False)

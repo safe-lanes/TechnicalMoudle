@@ -170,6 +170,21 @@ def score_fuse(vector_hits: list[Hit], lexical_hits: list[Hit], k: int, alpha: f
     return [keep[kk] for kk in order[:k]]
 
 
+def lexical_rescue(vector_hits: list[Hit], lexical_hits: list[Hit], k: int) -> list[Hit]:
+    """Step 4 r6 (ASSISTANT_HYBRID=rescue): the served vector selection is kept as it is, except that the chunk leading the
+    lexical ranking inside the routed module, when it is not already among the k excerpts, takes the LAST slot. Measured
+    (selectdiag.py, 104 suite questions, embeddings only) against the convex fusion r5: r5 replaced 37 % of the served
+    excerpts and lost the expected page on 3 manual-coverage cases plus a frozen case; the rescue keeps 95 % of the served
+    excerpts and supplies the section titled for the asked action (the work-order overview) where r5 did. Both inputs already
+    respect the distance floor; excerpt count, thresholds and the vector order unchanged."""
+    def key(h: Hit) -> tuple:
+        return (str(h.meta.get("file")), str(h.meta.get("breadcrumb")), str(h.meta.get("chunk_index")))
+    five = list(vector_hits[:k])
+    if lexical_hits and all(key(lexical_hits[0]) != key(h) for h in five):
+        five = (five[:k - 1] if len(five) >= k else five) + [lexical_hits[0]]
+    return five
+
+
 def rrf_fuse(vector_hits: list[Hit], lexical_hits: list[Hit], k: int, c: int = 60) -> list[Hit]:
     """Step 4 (hybrid excerpt selection, ASSISTANT_HYBRID=on): reciprocal-rank fusion of the two rankings within the routed
     module; identity = (file, breadcrumb, chunk_index). Thresholds unchanged (both inputs already respect the floor)."""

@@ -1,0 +1,23 @@
+
+== D2-hybrid: 16/57 cases pass all runs (answer ∧ citation ∧ support); runs: {'supported': 153, 'not in excerpts': 18, 'not captured': 0, 'answer ok but not in excerpts': 0}
+   passing: fs-off-1, prep-1, inc-3, fn-2, ll-2, crewing-5, crewing-6, moc-office-2, moc-vessel-2, master-review-1, sms-office-2, sms-office-3, safety-meeting-2, defects-1, pmsoffice-3, pmsvessel-1
+   failing: fs-off-2[0/3], fs-ves-1[0/3], fs-ves-2[0/3], hist-1[0/3], hist-2[0/3], hist-3[0/3], prep-2[2/3], prep-3[0/3], inc-1[0/3], inc-2[0/3], fn-1[0/3], ll-1[0/3], nm-1[0/3], nm-2[0/3], nm-3[0/3], crewing-1[0/3], crewing-2[0/3], crewing-3[2/3], crewing-4[0/3], moc-office-1[2/3], moc-vessel-1[1/3], master-review-2[0/3], ra-office-1[2/3], ra-office-2[0/3], ra-office-3[1/3], ra-vessel-1[0/3], ra-vessel-2[0/3], sms-office-1[0/3], safety-meeting-1[2/3], certsurveys-1[0/3], certsurveys-2[0/3], certsurveys-3[0/3], defects-2[0/3], defects-3[0/3], pmsoffice-1[1/3], pmsoffice-2[0/3], pmsoffice-4[0/3], pmsoffice-5[1/3], pmsvessel-2[0/3], pmsvessel-3[0/3], pmsvessel-4[0/3]
+   runs whose must phrases were NOT in the supplied excerpts (retrieval-level):
+      fs-ves-1 r1: NOT in supplied excerpts: read-only, cannot modify
+      fs-ves-1 r2: NOT in supplied excerpts: read-only, cannot modify
+      fs-ves-1 r3: NOT in supplied excerpts: read-only, cannot modify
+      hist-1 r1: NOT in supplied excerpts: office users only
+      hist-1 r2: NOT in supplied excerpts: office users only
+      hist-1 r3: NOT in supplied excerpts: office users only
+      prep-3 r1: NOT in supplied excerpts: click to add attachment, delete and download
+      prep-3 r2: NOT in supplied excerpts: click to add attachment, delete and download
+      prep-3 r3: NOT in supplied excerpts: click to add attachment, delete and download
+      inc-2 r1: NOT in supplied excerpts: overdue, necessary measures
+      inc-2 r2: NOT in supplied excerpts: overdue, necessary measures
+      inc-2 r3: NOT in supplied excerpts: overdue, necessary measures
+      master-review-2 r1: NOT in supplied excerpts: office users, close the master review
+      master-review-2 r2: NOT in supplied excerpts: office users, close the master review
+      master-review-2 r3: NOT in supplied excerpts: office users, close the master review
+      sms-office-1 r1: NOT in supplied excerpts: 4.1.2
+      sms-office-1 r2: NOT in supplied excerpts: 4.1.2
+      sms-office-1 r3: NOT in supplied excerpts: 4.1.2

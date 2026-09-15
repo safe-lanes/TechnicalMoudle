@@ -101,10 +101,14 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         hits = await retrieval.retrieve(emb)
         terms = await retrieval.title_terms() if s.assistant_route_intent.lower() == "on" else None
         routed = retrieval.route(hits, message, ui_module, terms)
-        if routed.gate == "answer" and s.assistant_hybrid.lower() == "on" and routed.module:
+        hybrid = s.assistant_hybrid.lower()
+        if routed.gate == "answer" and hybrid in ("on", "rescue") and routed.module:
             vec = [h for h in hits if h.module == routed.module and h.distance <= s.route_sim_floor]
             lex = [h for h in await db.search_lexical(emb, masker.mask_text(message) if masker else message, routed.module, s.route_top_k) if h.distance <= s.route_sim_floor]
-            routed.hits = retrieval.score_fuse(vec, lex, s.answer_chunks, s.assistant_hybrid_alpha, s.route_sim_floor)
+            if hybrid == "rescue":   # r6: served selection kept, the lexical leader takes the last slot when absent
+                routed.hits = retrieval.lexical_rescue(vec, lex, s.answer_chunks)
+            else:                    # r5: convex score fusion (measured, superseded by r6 — kept for reproducibility)
+                routed.hits = retrieval.score_fuse(vec, lex, s.answer_chunks, s.assistant_hybrid_alpha, s.route_sim_floor)
         if routed.gate == "not_documented":
             log("not_documented", NOT_DOC_MSG, confidence=routed.confidence)
             return 200, {"response": NOT_DOC_MSG, "gate": "not_documented", "module": None, "citations": [], "confidence": routed.confidence}

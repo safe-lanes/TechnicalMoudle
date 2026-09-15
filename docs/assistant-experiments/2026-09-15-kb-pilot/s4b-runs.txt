@@ -1,0 +1,220 @@
+===== STEP 4b 2026-09-15T15:14:49Z: D1 frozen; D3 (alpha 0.7) probes + frozen + WO =====
+{"ok":true,"store":"pgvector","indexSet":"kb-pilot-c","chunks":916,"db":"connected","llmCalls":0,"prompt":{"version":"v5-plain-coverage-2026-09-15","docsPromptSha":"ff9ee87141ac1362","toolLoopPromptSha":"7a028346c1c2fdf0","combined":"aea94e2f5edb6948"},"chatModel":"gpt-5.6-luna","temperature":"default"}
+
+--- ROUTING probes C0/D2/D3 ---
+routing suite 2026-09-15.2 · 13 cases · routeOnly (no answer model)
+
+[rt-general-01] How do I create a work order?  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   D2-a05     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: How work ord | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - KB pilot: Planned work
+   D3-a07     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: How work ord | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of
+
+[rt-general-02] How to create work order in PMS?  (context=technical)
+   C0-off     ✗ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual_Vessel  MISSING ['How work orders are created']
+   D2-a05     ✓ gate=answer module=Technical conf=1.0 routing=explicit: module name in question | Technical - KB pilot: How work ord | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un
+   D3-a07     ✓ gate=answer module=Technical conf=1.0 routing=explicit: module name in question | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of
+
+[rt-general-03] Steps to create a new work order  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   D2-a05     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: How work ord | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - KB pilot: Planned work
+   D3-a07     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: How work ord | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of
+
+[rt-named-01] How do I create an unplanned work order?  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel
+   D2-a05     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord | Technical - KB pilot: Planned work
+   D3-a07     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord | Technical - KB pilot: Planned work
+
+[rt-named-02] How does Generate Now work in the office?  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: Office 'Gene | Technical - Recent Updates & Chang | Technical - KB pilot: 'Generate WO | Technical - KB pilot: How work ord
+   D2-a05     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: Office 'Gene | Technical - KB pilot: How work ord | Technical - KB pilot: 'Generate WO | Technical - Recent Updates & Chang
+   D3-a07     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: Office 'Gene | Technical - KB pilot: How work ord | Technical - KB pilot: 'Generate WO | Technical - Recent Updates & Chang
+
+[rt-named-03] How do I generate a work order for one job from Components?  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: 'Generate WO | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel | Technical - KB pilot: Office 'Gene
+   D2-a05     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: 'Generate WO | Technical - KB pilot: How work ord | Technical - KB pilot: Planned work | Technical - KB pilot: Office 'Gene | Technical - PMS User Manual For Of
+   D3-a07     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: 'Generate WO | Technical - KB pilot: How work ord | Technical - KB pilot: Planned work | Technical - PMS User Manual For Of | Technical - KB pilot: Office 'Gene
+
+[rt-pump-01] I need to raise a work order for a pump — how do I do that?  (context=technical)
+   C0-off     ✗ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of  MISSING ['How work orders are created']
+   D2-a05     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: How work ord | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of
+   D3-a07     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of
+
+[rt-05-ctx-technical] What are the hazard categories in a risk assessment?  (context=technical)
+   C0-off     ✗ gate=clarify module=None conf=0.010442376136779785 routing=- |   MISSING ['Risk Assessment']
+   D2-a05     ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+   D3-a07     ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+
+[rt-05-no-ctx] What are the hazard categories in a risk assessment?  (context=None)
+   C0-off     ✗ gate=clarify module=None conf=0.010442376136779785 routing=- |   MISSING ['Risk Assessment']
+   D2-a05     ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+   D3-a07     ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+
+[rt-05-ctx-safety] What are the hazard categories in a risk assessment?  (context=safety)
+   C0-off     ✗ gate=clarify module=None conf=0.010442376136779785 routing=- |   MISSING ['Risk Assessment']
+   D2-a05     ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+   D3-a07     ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+
+[rt-05-explicit-conflict] In the Incident module, what are the hazard categories in a risk assessment?  (context=technical)
+   C0-off     ✓ gate=clarify module=None conf=0.05282473564147949 routing=- | 
+   D2-a05     ✓ gate=answer module=Incident conf=1.0 routing=explicit: module name in question | Incident - Incident User Manual R0 | Incident - Incident User Manual R0 | Incident - Incident User Manual R0 | Incident - Near Miss User Manual R | Incident - Incident User Manual R0
+   D3-a07     ✓ gate=answer module=Incident conf=1.0 routing=explicit: module name in question | Incident - Incident User Manual R0 | Incident - Incident User Manual R0 | Incident - Incident User Manual R0 | Incident - Near Miss User Manual R | Incident - Incident User Manual R0
+
+[rt-ctx-no-override] How do I report a near miss?  (context=technical)
+   C0-off     ✓ gate=answer module=Incident conf=1.0 routing=vector routing | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R
+   D2-a05     ✓ gate=answer module=Incident conf=1.0 routing=explicit: manual/sub-module name in question | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R
+   D3-a07     ✓ gate=answer module=Incident conf=1.0 routing=explicit: manual/sub-module name in question | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R
+
+[rt-explicit-module] In the Safety module, how do I record a safety meeting?  (context=technical)
+   C0-off     ✓ gate=answer module=Safety conf=1.0 routing=vector routing | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua
+   D2-a05     ✓ gate=answer module=Safety conf=1.0 routing=explicit: module name in question | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua
+   D3-a07     ✓ gate=answer module=Safety conf=1.0 routing=explicit: module name in question | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua
+
+== totals ==
+   C0-off     8/13
+   D2-a05     13/13
+   D3-a07     13/13
+
+--- RETRIEVAL 18 D3 ---
+
+== Part 1: documents — per set: chunks / <100-char / avg len / html-tagged chunks
+  manual                                       D3-a07          
+  TOTAL                                   0 /  0 /      /   0  
+
+== Part 2: retrieval — D3-a07 (http://sail-assistant-py-s4-d3:8000)   [module ✓/✗, manual ✓/✗, margin, top-distance]  expectations v1
+  how do I create a work order                 ✓✗ m=1.000 d=0.8464           
+  how to upload data in bulk data import       ✓✓ m=1.000 d=0.915            
+  why did the running hours not go down after  ✓✗ m=1.000 d=1.1468           
+  how do I raise a defect on equipment         ✓✓ m=1.000 d=1.0048           
+  how do vessels sync their data with the offi ✓✓ m=1.000 d=0.7655           
+  how do I share an audit with the fleet from  ✓✓ m=1.000 d=0.8028           
+  how do I prepare for an upcoming audit       ✓✓ m=1.000 d=1.1043           
+  where can I see the history of past audits   ✓✓ m=1.000 d=0.8883           
+  how do I create an MOC                       ✓✓ m=1.000 d=0.8442           
+  how do I carry out a risk assessment on the  ✓✓ m=1.000 d=0.8074           
+  how do I record a safety meeting             ✓✓ m=1.000 d=0.8545           
+  how does the master review the safety manage ✓✓ m=1.000 d=0.7666           
+  how do I report a near miss                  ✓✓ m=1.000 d=0.9138           
+  how do I report an incident on board         ✓✓ m=1.000 d=1.1118           
+  how do I raise a lesson learnt               ✓✓ m=1.000 d=1.0145           
+  how do fleet notifications reach the vessel  ✓✓ m=1.000 d=0.7759           
+  how do I plan a crew change                  ✓✓ m=1.000 d=0.8827           
+  how do I add a new crew member to a vessel   ✓✓ m=1.000 d=0.8405           
+  what is the weather in Singapore today       gate=not_documented           
+  how do I change my payroll bank account      gate=not_documented           
+
+  routing+manual correct (expectations v1): D3-a07 16/18
+  routing+manual correct (expectations v2, same responses): D3-a07 16/18
+
+--- FROZEN 12 x3 (D1, D3) ---
+acceptance suite 2026-09-14.4 · 12 cases · repeat=3
+
+[01 callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p15 | 'In the Inspector Observation Data view:\n\n1. Click the **Excel ic'
+   D3-a07         answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p15 | 'In the audit preparation observations view, the supported option'
+
+[02 callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. Click the **Email Notification** icon to notify the Office th'
+   D3-a07         answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. Click the **Email Notification** icon to notify the **Office '
+
+[03 callout] How do I upload a document for the first time in the SMS module?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | 'To upload a document for the first time in the SMS module:\n\n1. C'
+   D3-a07         answer ✓  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Safety - SMS User Manual_O p16 | 'The first-time upload workflow is:\n\n1. In the Office SMS module,'
+
+[04 table] In the Master Review module, what do the grey and red icons mean?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '- **Grey icon:** Response Due.\n- **Red icon:** Response Overdue.'
+   D3-a07         answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '- **Grey icon:** Response Due.\n- **Red icon:** Response Overdue.'
+
+[05 table] What are the hazard categories in a risk assessment?
+   D1-intent      answer ✓  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Safety - Risk Assessment U p19 | 'The hazard categories are:\n\n1. **Work Environment**\n2. **Equipme'
+   D3-a07         answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Risk Assessment U p12 | 'The hazard categories are:\n\n1. Work Environment  \n2. Equipment  '
+
+[06 table] What actions can I take on a near miss record from the list — what do the icons do?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | 'From the Near Miss list, you can:\n\n1. Click **Filters**, select '
+   D3-a07         answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Incident - Near Miss User  p5 | 'From the Near Miss records list:\n\n1. Click the **eye icon** to *'
+
+[07 xref] How do I apply a filter in the Stores sub-module of PMS?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The Stores filter procedure is supported for both **Office** and'
+   D3-a07         answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The Stores filter procedure is supported in two versions:\n\n**Off'
+
+[08 xref] How do I export crew details from the Waitlist in Crewing?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [2/3]  gate=answer cite=Crewing - Crewing User Man p22 | 'The Waitlist export steps are the same as **In Progress, section'
+   D3-a07         answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Crewing - Crewing User Man p22 | 'To export crew details from the **Waitlist**:\n\n1. Click the **In'
+
+[09 xref] How do I create a COC defect record?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record:\n\n1. Click **“+ New Defect.”**\n2. '
+   D3-a07         answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record, follow the same steps as **“How T'
+
+[10 note] When filling MoC Part B, what happens if I select No for further assessment?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | 'If you select **“No”** for further assessment in MoC **Part B**,'
+   D3-a07         answer ✓  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Safety - MOC User Manual_V p7 | 'If you select **“No”** for further assessment in MoC Part B, the'
+
+[11 note] In PMS, is there another way to add a component besides the components panel?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'Yes. A new component can also be added by clicking the **“+ Add '
+   D3-a07         answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'The Office PMS manual supports two entry points:\n\n1. **“Add Comp'
+
+[12 note] What should I review after deleting an implication in a vessel MoC?
+   D1-intent      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication, review the **Part E – Action tabl'
+   D3-a07         answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication, review the **Part E – Action tabl'
+
+== run-to-run disagreement (cases where runs split, 3 runs) ==
+   08 xref · D1-intent (2/3)
+
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case             D1-intent       D3-a07
+   01 callout               ✓            ✓
+   02 callout               ✓            ✓
+   03 callout               ✓            ✗
+   04 table                 ✓            ✓
+   05 table                 ✗            ✓
+   06 table                 ✓            ✗
+   07 xref                  ✓            ✓
+   08 xref                  ✓            ✓
+   09 xref                  ✓            ✓
+   10 note                  ✓            ✗
+   11 note                  ✓            ✓
+   12 note                  ✓            ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   D1-intent      12/12  11/12  12/12  JOINT 11/12
+   D3-a07         11/12  10/12  12/12  JOINT 9/12
+   D3-a07         vs D1-intent: regressions ['03 callout', '06 table', '10 note'] | gains ['05 table']
+
+--- WORK-ORDER 8 x3 (D3) ---
+work-order suite 2026-09-14.11 · 8 cases · repeat=3
+
+[wo-generic-01] How do I create a work order?
+   D3-a07         answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'The excerpts support three ways to create a work order:\n\n### 1. '
+   D3-a07         PASS ✗ [2/3 — all runs required]
+
+[wo-generic-02] How are planned work orders created in PMS — do I have to create them myself?
+   D3-a07         answer ✓  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'You do not always have to create planned work orders yourself. P'
+   D3-a07         PASS ✓ [3/3 — all runs required]
+
+[wo-generic-03] How to create work order in PMS?
+   D3-a07         answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support three ways to create a work order:\n\n1. **Pl'
+   D3-a07         PASS ✓ [3/3 — all runs required]
+
+[wo-phr-01] What are the different ways to create a work order in PMS?
+   D3-a07         answer ✗  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'The excerpts support three ways to create a work order:\n\n1. **Pl'
+   D3-a07         PASS ✗ [2/3 — all runs required]
+
+[wo-phr-02] I need to raise a work order for a pump — how do I do that?
+   D3-a07         answer ✓  cite ✓  rule ✓ (unplanned procedure ✓; note of the other ways ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'For a pump, the supported ways to raise a work order are:\n\n1. **'
+   D3-a07         PASS ✓ [3/3 — all runs required]
+
+[wo-phr-03] Do I create work orders myself or does the system create them?
+   D3-a07         answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'Both: some work orders are created automatically, while others a'
+   D3-a07         PASS ✓ [3/3 — all runs required]
+
+[wo-phr-04] Steps to create a new work order
+   D3-a07         answer ✓  cite ✓  rule ✗ (automatic generation ✓; pairing ✗: Generate WO switch stated without the office qualifier [incorrect applicability])  gate=answer cite=Technical - KB pilot: How  pNone | 'The excerpts support three ways to create a new work order:\n\n1. '
+   D3-a07         PASS ✗ [1/3 — all runs required]
+
+[wo-phr-05] How do work orders get created in the Technical module?
+   D3-a07         answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'The excerpts support three ways:\n\n1. **Planned work orders gener'
+   D3-a07         PASS ✓ [3/3 — all runs required]
+
+== totals ==
+   D3-a07         5/8
+
+===== DONE 2026-09-15T15:23:26Z =====

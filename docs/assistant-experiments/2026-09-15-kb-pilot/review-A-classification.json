@@ -1,0 +1,11 @@
+{"set": "A-manuals", "reviewed_failing_cases": 35, "labels": {"CORRECT_PARAPHRASE": 28, "CORRECT_ADJACENT_PAGE": 1, "PARTIAL": 2, "HONEST_LIMIT": 4, "WRONG": 0, "WRONG_SOURCE": 0},
+ "real_defects": [
+  {"case": "hist-1", "label": "HONEST_LIMIT", "cause": "routing — clarify gate ('Technical or Safety or Audit?'), no citations; the Audit History manual p.16 holds the answer"},
+  {"case": "pmsoffice-1", "label": "HONEST_LIMIT", "cause": "routing — clarify gate ('Technical or Crewing?'), no citations; PMS Office p.28 holds Due/Overdue"},
+  {"case": "pmsvessel-1", "label": "HONEST_LIMIT", "cause": "retrieval — right page (p.42) but the chunk defining 'Stores' was not among the excerpts; the answer says the excerpts do not describe it"},
+  {"case": "certsurveys-3", "label": "HONEST_LIMIT", "cause": "model — both sections (p.9, p.11) were in the excerpts and the pointer text 'Refer to the Certificates sub-sub-module … follow the same steps' was present, yet the answer says the manual gives no resolved cross-reference"},
+  {"case": "certsurveys-1", "label": "PARTIAL", "missing": "the auto-generated Master ID on the new editable row"},
+  {"case": "pmsoffice-5", "label": "PARTIAL", "missing": "the vessel-side Dashboard filter (§1.1.3.2 p.9, Criticality only) — the answer compared against the Reports filter section instead"}
+ ],
+ "adjacent": [{"case": "ra-office-2", "detail": "six hazard tabs correct (Figure 15 p.13) but the Source line cites p.12 and the Vessel RA p.19"}],
+ "judge_notes": "literal substring matching fails correct paraphrases (28 of 35: tense, word order, 'WO' vs 'work order'); must_not 'create a new approver' fires inside a negation ('Do not create a new approver record') — ra-office-1; citation check reads the structured citations, not the answer's own Source line (fs-off-2, prep-1, moc-office-2 cite the expected page in prose); said_not_covered flags hedges like 'does not describe' on full answers (pmsoffice-5, pmsvessel-1)"}

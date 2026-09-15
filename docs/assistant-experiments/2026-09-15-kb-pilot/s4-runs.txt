@@ -1,0 +1,466 @@
+===== STEP 4/6 SUITES 2026-09-15T15:03:15Z: image prompt-v5-r5, index kb-pilot-c 916, luna + v5 =====
+{"ok":true,"store":"pgvector","indexSet":"kb-pilot-c","chunks":916,"db":"connected","llmCalls":13,"prompt":{"version":"v5-plain-coverage-2026-09-15","docsPromptSha":"ff9ee87141ac1362","toolLoopPromptSha":"7a028346c1c2fdf0","combined":"aea94e2f5edb6948"},"chatModel":"gpt-5.6-luna","temperature":"default"}
+{"ok":true,"store":"pgvector","indexSet":"kb-pilot-c","chunks":916,"db":"connected","llmCalls":13,"prompt":{"version":"v5-plain-coverage-2026-09-15","docsPromptSha":"ff9ee87141ac1362","toolLoopPromptSha":"7a028346c1c2fdf0","combined":"aea94e2f5edb6948"},"chatModel":"gpt-5.6-luna","temperature":"default"}
+{"ok":true,"store":"pgvector","indexSet":"kb-pilot-c","chunks":916,"db":"connected","llmCalls":13,"prompt":{"version":"v5-plain-coverage-2026-09-15","docsPromptSha":"ff9ee87141ac1362","toolLoopPromptSha":"7a028346c1c2fdf0","combined":"aea94e2f5edb6948"},"chatModel":"gpt-5.6-luna","temperature":"default"}
+
+--- RETRIEVAL 18 (C0/D1/D2) ---
+
+== Part 1: documents — per set: chunks / <100-char / avg len / html-tagged chunks
+  manual                                       C0-off           |         D1-intent          |         D2-hybrid         
+  TOTAL                                   0 /  0 /      /   0   |      0 /  0 /      /   0   |      0 /  0 /      /   0  
+
+== Part 2: retrieval — C0-off (http://sail-assistant-py-s4-c0:8000) | D1-intent (http://sail-assistant-py-s4-d1:8000) | D2-hybrid (http://sail-assistant-py-s4-d2:8000)   [module ✓/✗, manual ✓/✗, margin, top-distance]  expectations v1
+  how do I create a work order                 ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8084            | ✓✗ m=1.000 d=0.8464           
+  how to upload data in bulk data import       ✓✓ m=1.000 d=0.8444            | ✓✓ m=1.000 d=0.8444            | ✓✓ m=1.000 d=0.915            
+  why did the running hours not go down after  ✓✓ m=1.000 d=1.0183            | ✓✓ m=1.000 d=1.0183            | ✓✗ m=1.000 d=1.1468           
+  how do I raise a defect on equipment         ✓✓ m=1.000 d=0.9062            | ✓✓ m=1.000 d=0.9062            | ✓✓ m=1.000 d=1.0048           
+  how do vessels sync their data with the offi ✓✓ m=1.000 d=0.7655            | ✓✓ m=1.000 d=0.7655            | ✓✓ m=1.000 d=0.7655           
+  how do I share an audit with the fleet from  ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.8028           
+  how do I prepare for an upcoming audit       ✓✓ m=1.000 d=0.9559            | ✓✓ m=1.000 d=0.9559            | ✓✓ m=1.000 d=1.1043           
+  where can I see the history of past audits   ✓✓ m=1.000 d=0.8883            | ✓✓ m=1.000 d=0.8883            | ✓✓ m=1.000 d=0.8883           
+  how do I create an MOC                       ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441           
+  how do I carry out a risk assessment on the  ✓✓ m=1.000 d=0.7231            | ✓✓ m=1.000 d=0.7231            | ✓✓ m=1.000 d=0.8074           
+  how do I record a safety meeting             ✓✓ m=1.000 d=0.8214            | ✓✓ m=1.000 d=0.8214            | ✓✓ m=1.000 d=0.8545           
+  how does the master review the safety manage ✓✓ m=1.000 d=0.7666            | ✓✓ m=1.000 d=0.7666            | ✓✓ m=1.000 d=0.7666           
+  how do I report a near miss                  ✓✓ m=1.000 d=0.8268            | ✓✓ m=1.000 d=0.8268            | ✓✓ m=1.000 d=0.9138           
+  how do I report an incident on board         ✓✓ m=1.000 d=0.9683            | ✓✓ m=1.000 d=0.9683            | ✓✓ m=1.000 d=1.1118           
+  how do I raise a lesson learnt               ✓✓ m=1.000 d=1.0145            | ✓✓ m=1.000 d=1.0145            | ✓✓ m=1.000 d=1.0145           
+  how do fleet notifications reach the vessel  ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7759           
+  how do I plan a crew change                  ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.8827           
+  how do I add a new crew member to a vessel   ✓✓ m=1.000 d=0.7846            | ✓✓ m=1.000 d=0.7846            | ✓✓ m=1.000 d=0.8405           
+  what is the weather in Singapore today       gate=not_documented            | gate=not_documented            | gate=not_documented           
+  how do I change my payroll bank account      gate=not_documented            | gate=not_documented            | gate=not_documented           
+
+  routing+manual correct (expectations v1): C0-off 18/18   D1-intent 18/18   D2-hybrid 16/18
+  routing+manual correct (expectations v2, same responses): C0-off 18/18   D1-intent 18/18   D2-hybrid 16/18
+
+--- WORK-ORDER 8 phrasings x3 (C0/D1/D2, judge .11) ---
+work-order suite 2026-09-14.11 · 8 cases · repeat=3
+
+[wo-generic-01] How do I create a work order?
+   C0-off         answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support three ways to create a work order:\n\n1. **Pl'
+   C0-off         PASS ✓ [3/3 — all runs required]
+   D1-intent      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support three ways to create a work order:\n\n1. **Pl'
+   D1-intent      PASS ✓ [3/3 — all runs required]
+   D2-hybrid      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'The excerpts support four ways:\n\n1. **Planned work order on the '
+   D2-hybrid      PASS ✓ [3/3 — all runs required]
+
+[wo-generic-02] How are planned work orders created in PMS — do I have to create them myself?
+   C0-off         answer ✓  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'No—you do not normally create planned work orders yourself.\n\n1. '
+   C0-off         PASS ✓ [3/3 — all runs required]
+   D1-intent      answer ✓  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'No—**not for planned work orders on the ship**.\n\n1. **On Ship:**'
+   D1-intent      PASS ✓ [3/3 — all runs required]
+   D2-hybrid      answer ✓  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'Planned work orders can be created in these ways:\n\n1. **Automati'
+   D2-hybrid      PASS ✓ [3/3 — all runs required]
+
+[wo-generic-03] How to create work order in PMS?
+   C0-off         answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p28 | 'The excerpts cover creating an **unplanned work order** in two c'
+   C0-off         PASS ✗ [0/3 — all runs required]
+   D1-intent      answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p28 | 'The excerpts support creating an **unplanned work order** in two'
+   D1-intent      PASS ✗ [0/3 — all runs required]
+   D2-hybrid      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'The excerpts support four ways to create a work order:\n\n1. **Pla'
+   D2-hybrid      PASS ✓ [3/3 — all runs required]
+
+[wo-phr-01] What are the different ways to create a work order in PMS?
+   C0-off         answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'PMS supports three ways to create a work order:\n\n1. **Planned, s'
+   C0-off         PASS ✓ [3/3 — all runs required]
+   D1-intent      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'PMS supports three ways to create a work order:\n\n1. **Planned, s'
+   D1-intent      PASS ✓ [3/3 — all runs required]
+   D2-hybrid      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'PMS supports these ways to create a work order:\n\n1. **Planned wo'
+   D2-hybrid      PASS ✓ [3/3 — all runs required]
+
+[wo-phr-02] I need to raise a work order for a pump — how do I do that?
+   C0-off         answer ✓  cite ✓  rule ✗ (unplanned procedure ✓; note of the other ways MISSING)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support **creating an unplanned work order** for th'
+   C0-off         PASS ✗ [0/3 — all runs required]
+   D1-intent      answer ✓  cite ✓  rule ✗ (unplanned procedure ✓; note of the other ways MISSING)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support creating an **unplanned work order** for th'
+   D1-intent      PASS ✗ [1/3 — all runs required]
+   D2-hybrid      answer ✓  cite ✓  rule ✓ (unplanned procedure ✓; note of the other ways ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'The Technical documentation supports three ways to raise a work '
+   D2-hybrid      PASS ✓ [3/3 — all runs required]
+
+[wo-phr-03] Do I create work orders myself or does the system create them?
+   C0-off         answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'You can do either, depending on the situation:\n\n1. **Planned wor'
+   C0-off         PASS ✓ [3/3 — all runs required]
+   D1-intent      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'Both are supported, depending on how the work order is created:\n'
+   D1-intent      PASS ✓ [3/3 — all runs required]
+   D2-hybrid      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'There are four supported ways:\n\n1. **Planned work orders — the s'
+   D2-hybrid      PASS ✓ [3/3 — all runs required]
+
+[wo-phr-04] Steps to create a new work order
+   C0-off         answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support four ways to create a work order:\n\n1. **Pla'
+   C0-off         PASS ✓ [3/3 — all runs required]
+   D1-intent      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support three ways to create a work order:\n\n1. **Pl'
+   D1-intent      PASS ✗ [2/3 — all runs required]
+   D2-hybrid      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'The excerpts support four ways to create a new work order:\n\n1. *'
+   D2-hybrid      PASS ✓ [3/3 — all runs required]
+
+[wo-phr-05] How do work orders get created in the Technical module?
+   C0-off         answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'Work orders are created in three supported ways:\n\n1. **Planned o'
+   C0-off         PASS ✓ [3/3 — all runs required]
+   D1-intent      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'Work orders are created in three ways:\n\n1. **Planned, scheduled '
+   D1-intent      PASS ✓ [3/3 — all runs required]
+   D2-hybrid      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'Work orders are created in four supported ways:\n\n1. **Automatic '
+   D2-hybrid      PASS ✓ [3/3 — all runs required]
+
+== totals ==
+   C0-off         6/8
+   D1-intent      5/8
+   D2-hybrid      8/8
+
+--- FROZEN 12 x3 (D2) ---
+acceptance suite 2026-09-14.4 · 12 cases · repeat=3
+
+[01 callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   D2-hybrid      answer ✓  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Audit - Preparation Manual p24 | 'In the **Inspector Observation Data** view:\n\n1. Enter the vessel'
+
+[02 callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   D2-hybrid      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. Click the **Email Notification** icon to notify the **Office*'
+
+[03 callout] How do I upload a document for the first time in the SMS module?
+   D2-hybrid      answer ✓  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Safety - SMS User Manual_O p16 | '1. Click **+New Document** to start an SMS change request. The r'
+
+[04 table] In the Master Review module, what do the grey and red icons mean?
+   D2-hybrid      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '- **Grey icon:** Response Due.\n- **Red icon:** Response Overdue.'
+
+[05 table] What are the hazard categories in a risk assessment?
+   D2-hybrid      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Risk Assessment U p12 | 'The risk-assessment hazard categories shown when selecting hazar'
+
+[06 table] What actions can I take on a near miss record from the list — what do the icons do?
+   D2-hybrid      answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Incident - Near Miss User  p5 | 'From the Near Miss list, you can:\n\n1. Click the **View Record** '
+
+[07 xref] How do I apply a filter in the Stores sub-module of PMS?
+   D2-hybrid      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The Stores filter process differs between Office and Ship:\n\n**Of'
+
+[08 xref] How do I export crew details from the Waitlist in Crewing?
+   D2-hybrid      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Crewing - Crewing User Man p22 | 'The Waitlist export steps are the same as **In Progress, section'
+
+[09 xref] How do I create a COC defect record?
+   D2-hybrid      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 | 'To create a Condition of Class (COC) defect record:\n\n1. Click **'
+
+[10 note] When filling MoC Part B, what happens if I select No for further assessment?
+   D2-hybrid      answer ✓  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Safety - MOC User Manual_V p7 | 'If you select **“No”** for further assessment in MoC Part B, the'
+
+[11 note] In PMS, is there another way to add a component besides the components panel?
+   D2-hybrid      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'Yes. In the Office PMS, a new component can also be added by cli'
+
+[12 note] What should I review after deleting an implication in a vessel MoC?
+   D2-hybrid      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication, review the **Part E – Action tabl'
+
+== run-to-run disagreement (cases where runs split, 3 runs) ==
+   none
+
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case             D2-hybrid
+   01 callout               ✗
+   02 callout               ✓
+   03 callout               ✗
+   04 table                 ✓
+   05 table                 ✓
+   06 table                 ✗
+   07 xref                  ✓
+   08 xref                  ✓
+   09 xref                  ✓
+   10 note                  ✗
+   11 note                  ✓
+   12 note                  ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   D2-hybrid      11/12  9/12  12/12  JOINT 8/12
+
+--- CORRECTED 14 x3 (D2) ---
+generated-docs suite 2026-09-14.2 · 14 cases · repeat=3
+
+[01 gen] In Bulk Data Import for jobs, do I have to fill in the Job Code column?
+   D2-hybrid      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone | 'No. In Bulk Data Import for Jobs, the **Job Code** column is opt'
+
+[02 gen] Where do I find Bulk Data Import in the application?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. Open the **PMS** module.\n2. Open **Admin**.\n3. Select the **B'
+
+[03 gen] What does the dry-run show for each row in a bulk import, and when do I see the created and updated counts?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '- The dry-run marks each row as **OK, warning, or error** and sh'
+
+[04 gen] In work-order numbers, what do the vessel code and the segment after it mean, and what does an unplanned work order number look like?
+   D2-hybrid      answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - KB pilot: Crea pNone | 'In an unplanned work-order number:\n\n`<VESSELCODE>-UWO-<COMPONENT'
+
+[05 gen] A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'The vessel code reaches the ship **only through provisioning**. '
+
+[06 gen] Who can generate work orders from the office, and what happens if the vessel's switch is off?
+   D2-hybrid      answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - KB pilot: Offi pNone | 'From the office, work orders can be generated in three ways:\n\n1.'
+
+[07 gen] Can a Head of Department do everything an office user can do for their department?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No. The excerpts do not establish that a Head of Department can '
+
+[08 gen] Is Level 2 Reviewer a user role I can assign?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No. **Level 2 Reviewer is not a user role that a Sail Admin assi'
+
+[09 gen] Where is the Me / My Team toggle and who can use it?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p11 | 'The **“Me / My Team”** toggle is located in the **PMS Dashboard '
+
+[10 gen] On the Fleet Sync Overview, what does an amber status mean?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'Amber means the vessel is **stale**: it has not synced for more '
+
+[11 gen] Does one press of Sync Now clear a long backlog on the ship?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'No. One press **may** clear the backlog, but it is not guarantee'
+
+[12 gen] If a ship's vessel master data changes, how is the ship refreshed?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'If a ship’s vessel master data changes:\n\n1. A Sail Admin re-prov'
+
+[13 gen] On the ship, what happens if I enter a running-hours reading lower than the component's current hours when completing a work order?
+   D2-hybrid      answer ✓  cite ✓  PASS ✓ [2/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | 'On the ship:\n\n1. If the entered reading is lower than the compon'
+
+[14 gen] Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+   D2-hybrid      answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - KB pilot: Offi pNone | 'The per-vessel switches are held on the **Lead Time & Grace Peri'
+
+== per-case (answer ∧ citation), out of 14 ==
+   case     D2-hybrid
+   01               ✗
+   02               ✓
+   03               ✓
+   04               ✗
+   05               ✓
+   06               ✗
+   07               ✓
+   08               ✓
+   09               ✓
+   10               ✓
+   11               ✓
+   12               ✓
+   13               ✓
+   14               ✗
+   D2-hybrid      10/14
+
+--- MANUAL-COVERAGE 57 x3 (D2) ---
+manual-coverage suite 2026-09-15.1 · 57 cases · repeat=3
+
+[fs-off-1 condition] Can an office user delete a fleet sharing record after it's already been submitted, or only while it's still a draft?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p5 | 'An office user can delete a Fleet Sharing record **only while it'
+   D2-hybrid    PASS ✓ [3/3]
+
+[fs-off-2 procedure] What are the steps to add an action item that vessels need to complete on a fleet sharing record?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p6 | 'On the **Office** Fleet Sharing record:\n\n1. Click **+ Add Action'
+   D2-hybrid    PASS ✗ [0/3]
+
+[fs-ves-1 condition] As a ship user, am I able to edit the information the office entered under Step 1 of a fleet sharing record?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p5 | 'The Audit documentation does not state whether a ship user can e'
+   D2-hybrid    PASS ✗ [0/3]
+
+[fs-ves-2 procedure] After closing out all the actions the office assigned in a fleet sharing record, what do I need to do to finish it off?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p5 | 'After all assigned actions are closed:\n\n1. Enter the **Date Comp'
+   D2-hybrid    PASS ✗ [0/3]
+
+[hist-1 condition] Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=code-derived+manual    gate=answer cite=Technical - PMS User Manua p13 | 'The **office** is allowed to add comments in the Review section.'
+   D2-hybrid    PASS ✗ [0/3]
+
+[hist-2 table] What does the pencil icon do on the inspection records list?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p6 | 'The pencil icon opens and allows you to edit the selected inspec'
+   D2-hybrid    PASS ✗ [0/3]
+
+[hist-3 xref] The manual explains how to record a negative observation with attachments — does that same process apply when I want to add a Positive Observation or LAE finding instead?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p13 | 'Yes. The manual supports these processes:\n\n1. **Manual entry**\n '
+   D2-hybrid    PASS ✗ [0/3]
+
+[prep-1 procedure] What are the steps to start a brand new SIRE preparation record for a vessel?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Preparation Manual p13 | 'In the **Office Preparation** sub-module:\n\n1. Click **+ New Prep'
+   D2-hybrid    PASS ✓ [3/3]
+
+[prep-2 condition] If I change the assigned inspector on an existing preparation record, which fields can't be changed, and what happens to the vessel's answers that were already entered?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Preparation Manual p11 | '1. Click **Edit** on the existing preparation record. All fields'
+   D2-hybrid    PASS ✗ [2/3]
+
+[prep-3 screenshot] On the preparation checklist, how do I add a new attachment to a question, and what can I do with it afterward?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Preparation Manual p19 | '1. For the selected checklist question, click the **Attachments*'
+   D2-hybrid    PASS ✗ [0/3]
+
+[inc-1 condition] Can a vessel user fill in the closeout comments and close an incident report themselves?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p11 | 'No. A vessel user must not fill in or modify the closeout sectio'
+   D2-hybrid    PASS ✗ [0/3]
+
+[inc-2 table] What does it mean if an incident report shows the overdue-action status icon?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p19 | 'The provided Incident documentation does not define the meaning '
+   D2-hybrid    PASS ✗ [0/3]
+
+[inc-3 procedure] What's the second way to record the sequence of events for an incident, using separate date/time fields instead of typing it into one box?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p9 | 'Use the **Date / Time / Description** section:\n\n1. Enter the eve'
+   D2-hybrid    PASS ✓ [3/3]
+
+[fn-1 condition] When I'm updating the actions on a fleet notification, when exactly should I click Submit?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Fleet Notificat p8 | 'Click **Submit only after updating the “Date Closed” for all act'
+   D2-hybrid    PASS ✗ [0/3]
+
+[fn-2 procedure] How do I record that a fleet notification was discussed onboard with the crew?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Fleet Notificat p6 | 'For a **Fleet Notification**:\n\n1. Log in, click **Audit**, selec'
+   D2-hybrid    PASS ✓ [3/3]
+
+[ll-1 condition] Can I, as a ship user, edit the description details the office shared in a lesson learnt record?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Lesson Learnt U p6 | 'No. As a ship user, you cannot edit the description details shar'
+   D2-hybrid    PASS ✗ [0/3]
+
+[ll-2 procedure] What steps confirm that a lesson learnt record has been discussed with the crew onboard?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Lesson Learnt U p7 | 'To confirm that a Lesson Learnt record was discussed onboard:\n\n1'
+   D2-hybrid    PASS ✓ [3/3]
+
+[nm-1 xref] I need to report a Significant Near Miss — do I fill it in on this same reporting form?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p5 | 'No. For a **Significant Near Miss**, use the form available unde'
+   D2-hybrid    PASS ✗ [0/3]
+
+[nm-2 condition] Is a vessel user permitted to fill in the Office Closeout part of a near miss report?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p8 | 'No. Vessel users should not enter or modify any information in t'
+   D2-hybrid    PASS ✗ [0/3]
+
+[nm-3 table] What does the grey circle-with-slash icon mean next to a near miss report?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p5 | 'The grey circle-with-slash icon means **Action(s) Due**: actions'
+   D2-hybrid    PASS ✗ [0/3]
+
+[crewing-1 procedure] In the In-Progress screen, what do I click to start a new crew record, and can I save my work before I finish filling in the form?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p14 | '1. In the **In-Progress** sub-submodule, click **“+ New Crew”** '
+   D2-hybrid    PASS ✗ [0/3]
+
+[crewing-2 condition] Does a crew promotion review form show up directly in the Promotion sub-module, or does something else have to happen first?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p46 | 'Something must happen first. The promotion review form must be c'
+   D2-hybrid    PASS ✗ [0/3]
+
+[crewing-3 table] On the Crew Due/Overdue timeline, what does it mean when a crew member's bar shows as green versus yellow versus red?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p39 | '- **Green:** Active or ongoing onboard service period.\n- **Yello'
+   D2-hybrid    PASS ✗ [2/3]
+
+[crewing-4 screenshot] On the New Rotation Plan screen, besides picking the vessel, rank, and date range and then saving, is there anything else the annotated screenshot says I can do from that screen?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p41 | 'Yes. From the New Rotation Plan screen, you can also:\n\n1. Check '
+   D2-hybrid    PASS ✗ [0/3]
+
+[crewing-5 xref] After clicking '+ New Crew' in the Crew Database to add someone straight to the Crew Pool, which other section's steps am I supposed to follow to fill out the form?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p29 | 'Follow the steps in the **In-Progress** sub-sub-module. The Crew'
+   D2-hybrid    PASS ✓ [3/3]
+
+[crewing-6 procedure] What button do I press to add a brand-new record to the Training Matrix, and what do I click afterward to save it once the details are entered?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p110 | '1. In the **Training Matrix**, click **“+ New.”**\n2. Enter the r'
+   D2-hybrid    PASS ✓ [3/3]
+
+[moc-office-1 table] In the MoC Log, what does clicking the eye icon actually do, and does that differ between the Office and Vessel versions of the manual?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_O p7 | '- **Office version:** Clicking the eye icon lets you **view, edi'
+   D2-hybrid    PASS ✗ [2/3]
+
+[moc-office-2 xref] When I click the Link icon in Part C's Risk Assessment section of an Office MoC, where does the saved RA actually end up?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_O p13 | 'In an Office MoC, after clicking **Link**, select **Office RA** '
+   D2-hybrid    PASS ✓ [3/3]
+
+[moc-vessel-1 condition] In a Vessel MoC, what happens automatically if the MoC Approver selects 'No' in Part D?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_V p11 | 'The Safety documentation does not state what happens automatical'
+   D2-hybrid    PASS ✗ [1/3]
+
+[moc-vessel-2 procedure] What are the steps to fill out and submit Part A of a Vessel MoC form?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_V p6 | '1. Complete all required fields under **Part A**.\n2. Add attachm'
+   D2-hybrid    PASS ✓ [3/3]
+
+[master-review-1 table] What can I do with the action icons in the Master Review report table besides deleting a record?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Master Review Man p6 | 'In the Master Review report table, besides deleting a record, yo'
+   D2-hybrid    PASS ✓ [3/3]
+
+[master-review-2 condition] Who is meant to use Part E of a Master Review record, and what can they do there?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=manual  NOT-COVERED-said  gate=answer cite=Safety - Master Review Man p6 | 'Part E of a Master Review record is not covered in the provided '
+   D2-hybrid    PASS ✗ [0/3]
+
+[ra-office-1 condition] Can the same Position/Rank hold two different Approval Levels for Risk Assessments, and what should I do if one needs to change?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p25 | 'No. A Position/Rank can be assigned only one Approval Level for '
+   D2-hybrid    PASS ✗ [2/3]
+
+[ra-office-2 screenshot] When adding hazards from the database in Part B of an Office RA, what are the tab categories in the hazard-selection pop-up window?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p12 | 'The hazard-selection pop-up has these tab categories:\n\n1. Work E'
+   D2-hybrid    PASS ✗ [0/3]
+
+[ra-office-3 xref] Do the filters work the same way in the Generic RA Library, Office RA, and Vessels RA sections, or is each explained separately?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p7 | 'The filtering process works the same way; it is not a different '
+   D2-hybrid    PASS ✗ [1/3]
+
+[ra-vessel-1 condition] As a vessel user, can I edit Generic Risk Assessments in the Generic RA Library, or only look at them?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p7 | 'As a vessel user, you can only view Generic Risk Assessments in '
+   D2-hybrid    PASS ✗ [0/3]
+
+[ra-vessel-2 procedure] What are the three ways offered for starting a brand-new Vessel Risk Assessment?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p18 | 'To start a new Vessel Risk Assessment:\n\n1. Go to the **Vessel RA'
+   D2-hybrid    PASS ✗ [0/3]
+
+[sms-office-1 xref] For approving a revision of an already-uploaded SMS document (Section 4.2.2), what does the manual tell the Approver to do?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p12 | 'The provided excerpts do not explain what the Approver must do t'
+   D2-hybrid    PASS ✗ [0/3]
+
+[sms-office-2 condition] If I create a folder in SMS with the 'Is Form' checkbox selected, will the documents I upload there show up when users browse SMS?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p15 | 'No. Documents uploaded to a folder created with **“Is Form”** se'
+   D2-hybrid    PASS ✓ [3/3]
+
+[sms-office-3 screenshot] In the SMS hyperlinking example figure, what specific document reference is shown as something a link inside a document can jump straight to?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p10 | 'The document reference shown is **“Doc 4.2.03.”**'
+   D2-hybrid    PASS ✓ [3/3]
+
+[safety-meeting-1 xref] For an Additional Safety Meeting (Add SM) form, do Parts B, C and D have their own instructions, or should I look elsewhere in the manual?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Safety Meeting Us p18 | 'For an **Additional Safety Meeting (Add SM)** form, look elsewhe'
+   D2-hybrid    PASS ✗ [2/3]
+
+[safety-meeting-2 condition] What happens to a circular in the Advisories & Circulars section if nobody marks it as discussed during the meeting?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Safety Meeting Us p13 | 'It will be automatically carried forward to the next meeting.'
+   D2-hybrid    PASS ✓ [3/3]
+
+[certsurveys-1 procedure] What are the steps to add a brand-new certificate type to the Master list under Ship's Certificates?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p13 | '1. In the Office Sail Admin module, click **Admin**.\n2. Click **'
+   D2-hybrid    PASS ✗ [0/3]
+
+[certsurveys-2 condition] Is there anything that stops me from saving a new certificate master record if I leave some fields blank?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p18 | 'Yes. Fields marked with an asterisk (*) are mandatory and must b'
+   D2-hybrid    PASS ✗ [0/3]
+
+[certsurveys-3 xref] How do I add or view attachments for a survey record — is the process different from certificates?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual  NOT-COVERED-said  gate=answer cite=Technical - Cert. & Survey p9 | 'For survey attachments, the manual does not provide a separate c'
+   D2-hybrid    PASS ✗ [0/3]
+
+[defects-1 screenshot] In the Defects Log list, is there a way to edit a report directly from its row without opening it via the Eye icon first?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p16 | 'Yes. In the Defects Log list, click the **Edit** icon shown in t'
+   D2-hybrid    PASS ✓ [3/3]
+
+[defects-2 condition] What happens after I click Submit on a new defect report?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p19 | 'After you fill in the required information in Parts A, B, and C '
+   D2-hybrid    PASS ✗ [0/3]
+
+[defects-3 xref] How do I export all the Condition of Class records at once, or do I need to export them one at a time?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p20 | 'You can export all Condition of Class records at once; the docum'
+   D2-hybrid    PASS ✗ [0/3]
+
+[pmsoffice-1 table] In the Work Orders section, what's the difference between a job showing 'Due' status versus 'Overdue' status?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p28 | '- **Due:** The job is due within the current period.\n- **Overdue'
+   D2-hybrid    PASS ✗ [1/3]
+
+[pmsoffice-2 condition] Can I update a spare part's ROB directly without selecting a storage location first?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p38 | 'No. A spare part’s ROB cannot be modified unless a storage locat'
+   D2-hybrid    PASS ✗ [0/3]
+
+[pmsoffice-3 procedure] How can I reorder components within the Component Tree?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p26 | '1. Select a component in the Component Tree.\n2. Click **Edit**.\n'
+   D2-hybrid    PASS ✓ [3/3]
+
+[pmsoffice-4 screenshot] Is there a special restriction on approving a locked work order?
+   D2-hybrid    answer ✓  cite ✗  support not captured  sources=kb-pilot+manual    gate=answer cite=Technical - PMS User Manua p30 | 'Yes. For a locked work order:\n\n1. The Tech Superintendent must a'
+   D2-hybrid    PASS ✗ [0/3]
+
+[pmsoffice-5 condition] On the PMS Dashboard, what fields can I filter by — and is that the same set of filters available on the vessel side?
+   D2-hybrid    answer ✗  cite ✓  support not captured  sources=manual  NOT-COVERED-said  gate=answer cite=Technical - PMS User Manua p9 | 'On the PMS Dashboard, you can filter by:\n\n1. Click **Filter**.\n2'
+   D2-hybrid    PASS ✗ [1/3]
+
+[pmsvessel-1 table] What are the different item categories under Stores, and what does each one show?
+   D2-hybrid    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p42 | 'The item categories under Stores are:\n\n1. **Stores** — The excer'
+   D2-hybrid    PASS ✓ [3/3]
+
+[pmsvessel-2 screenshot] As a Vessel User, can I create a new Modify PMS change request myself?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p48 | 'No. As a **Vessel User**, you cannot create a new Modify PMS cha'
+   D2-hybrid    PASS ✗ [0/3]
+
+[pmsvessel-3 xref] How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p50 | 'The excerpts support two bulk-update procedures:\n\n1. **Stores**\n'
+   D2-hybrid    PASS ✗ [0/3]
+
+[pmsvessel-4 condition] If I try to generate a work order for a component job that already has an active one, what happens?
+   D2-hybrid    answer ✗  cite ✗  support not captured  sources=kb-pilot+manual    gate=answer cite=Technical - KB pilot: 'Gen pNone | 'The system refuses to generate another work order for that job. '
+   D2-hybrid    PASS ✗ [0/3]
+
+== totals (answer ∧ citation ∧ support, all runs) ==
+   D2-hybrid    16/57
+
+===== DONE 2026-09-15T15:28:17Z =====

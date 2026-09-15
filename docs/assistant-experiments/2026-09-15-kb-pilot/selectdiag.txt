@@ -1,0 +1,62 @@
+== expected source among the five excerpts (routing on; selection variant) ==
+suite          n      V0      r5      VA      VB      VC
+routing       13       7       9       9       9       9
+work-order     8       5       8       8       7       8
+frozen        12      11      11      11      11      11
+corrected     14      14      14      14      14      14
+manual        57      53      50      49      52      52
+
+== cases where a variant differs from V0 (value = rank of the expected chunk, or 1/0 for routing probes) ==
+  routing    rt-general-02          gate=answer module=technical  V0=0  r5=1  VA=1  VB=1  VC=1   [How to create work order in PMS?]
+      V0: Technical - PMS User Manual Fo p28 | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual Fo p32 | Technical - PMS User Manual_Ve p24 | Technical - PMS User Manual_Ve p23
+      r5: Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - PMS User Manual Fo p30 | Technical - KB pilot: Create a pNone
+      VA: Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - PMS User Manual Fo p30 | Technical - KB pilot: Create a pNone
+      VB: Technical - PMS User Manual Fo p28 | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual Fo p32 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: How work pNone
+      VC: Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p30 | Technical - PMS User Manual Fo p32
+  routing    rt-pump-01             gate=answer module=technical  V0=0  r5=1  VA=1  VB=1  VC=1   [I need to raise a work order for a pump — how do I do that?]
+      V0: Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - PMS User Manual_Ve p27 | Technical - PMS User Manual Fo p32
+      r5: Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - PMS User Manual Fo p30
+      VA: Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - PMS User Manual Fo p30
+      VB: Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - PMS User Manual_Ve p27 | Technical - KB pilot: How work pNone
+      VC: Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p32
+  work-order wo-generic-02          gate=answer module=technical  V0=0  r5=2  VA=2  VB=0  VC=4   [planned-auto: needs 'Planned work orders']
+      V0: Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - PMS User Manual_Ve p25 | Technical - PMS User Manual Fo p30 | Technical - KB pilot: How work pNone
+      r5: Technical - KB pilot: How work pNone | Technical - KB pilot: Planned  pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual Fo p30 | Technical - PMS User Manual_Ve p25
+      VA: Technical - KB pilot: How work pNone | Technical - KB pilot: Planned  pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual Fo p30 | Technical - PMS User Manual_Ve p25
+      VC: Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual Fo p30 | Technical - KB pilot: Planned  pNone | Technical - PMS User Manual_Ve p25
+  work-order wo-generic-03          gate=answer module=technical  V0=0  r5=1  VA=1  VB=5  VC=3   [three-paths: needs 'How work orders are created']
+      V0: Technical - PMS User Manual Fo p28 | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual Fo p32 | Technical - PMS User Manual_Ve p24 | Technical - PMS User Manual_Ve p23
+      r5: Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - PMS User Manual Fo p30 | Technical - KB pilot: Create a pNone
+      VA: Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - PMS User Manual Fo p30 | Technical - KB pilot: Create a pNone
+      VB: Technical - PMS User Manual Fo p28 | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual Fo p32 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: How work pNone
+      VC: Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p30 | Technical - PMS User Manual Fo p32
+  work-order wo-phr-02              gate=answer module=technical  V0=0  r5=1  VA=1  VB=5  VC=4   [unplanned-plus-note: needs 'How work orders are created']
+      V0: Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - PMS User Manual_Ve p27 | Technical - PMS User Manual Fo p32
+      r5: Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - PMS User Manual Fo p30
+      VA: Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - PMS User Manual Fo p30
+      VB: Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - PMS User Manual_Ve p27 | Technical - KB pilot: How work pNone
+      VC: Technical - PMS User Manual Fo p29 | Technical - PMS User Manual_Ve p24 | Technical - KB pilot: Create a pNone | Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p32
+  manual     inc-1                  gate=answer module=incident  V0=5  r5=5  VA=0  VB=5  VC=0   [Incident - Incident User Manua p[18]]
+      V0: Incident - Incident User Manua p19 | Incident - Near Miss User Manu p11 | Incident - Incident User Manua p19 | Incident - Incident User Manua p6 | Incident - Incident User Manua p18
+      VA: Incident - Near Miss User Manu p11 | Incident - Incident User Manua p17 | Incident - Incident User Manua p19 | Incident - Near Miss User Manu p8 | Incident - Incident User Manua p6
+      VC: Incident - Near Miss User Manu p11 | Incident - Incident User Manua p19 | Incident - Incident User Manua p17 | Incident - Incident User Manua p6 | Incident - Near Miss User Manu p8
+  manual     master-review-2        gate=answer module=safety  V0=5  r5=0  VA=0  VB=0  VC=4   [Safety - Master Review Manual  p[11]]
+      V0: Safety - Master Review Manual  p7 | Safety - MOC User Manual_Offic p16 | Safety - MOC User Manual_Vesse p12 | Safety - Master Review Manual  p2 | Safety - Master Review Manual  p11
+      r5: Safety - Master Review Manual  p6 | Safety - Master Review Manual  p5 | Safety - MOC User Manual_Vesse p15 | Safety - MOC User Manual_Offic p19 | Safety - Master Review Manual  p7
+      VA: Safety - Master Review Manual  p6 | Safety - Master Review Manual  p5 | Safety - MOC User Manual_Vesse p15 | Safety - MOC User Manual_Offic p19 | Safety - Master Review Manual  p7
+      VB: Safety - Master Review Manual  p7 | Safety - MOC User Manual_Offic p16 | Safety - MOC User Manual_Vesse p12 | Safety - Master Review Manual  p2 | Safety - Master Review Manual  p6
+  manual     pmsoffice-4            gate=answer module=technical  V0=2  r5=0  VA=0  VB=2  VC=2   [Technical - PMS User Manual Fo p[34]]
+      V0: Technical - PMS User Manual_Ve p30 | Technical - PMS User Manual Fo p34 | Technical - PMS User Manual_Ve p30 | Technical - PMS User Manual Fo p12 | Technical - PMS User Manual Fo p35
+      r5: Technical - PMS User Manual_Ve p30 | Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p28 | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual Fo p30
+      VA: Technical - PMS User Manual_Ve p30 | Technical - KB pilot: How work pNone | Technical - PMS User Manual Fo p28 | Technical - PMS User Manual Fo p29 | Technical - PMS User Manual Fo p30
+  manual     pmsvessel-4            gate=answer module=technical  V0=3  r5=0  VA=0  VB=3  VC=5   [Technical - PMS User Manual_Ve p[16]]
+      V0: Technical - KB pilot: 'Generat pNone | Technical - PMS User Manual Fo p18 | Technical - PMS User Manual_Ve p16 | Technical - KB pilot: Planned  pNone | Technical - KB pilot: How work pNone
+      r5: Technical - KB pilot: 'Generat pNone | Technical - KB pilot: Planned  pNone | Technical - KB pilot: How work pNone | Technical - KB pilot: Office ' pNone | Technical - PMS User Manual Fo p18
+      VA: Technical - KB pilot: 'Generat pNone | Technical - KB pilot: Planned  pNone | Technical - KB pilot: How work pNone | Technical - KB pilot: Office ' pNone | Technical - PMS User Manual Fo p18
+
+== vector-five chunks kept per variant (sum over answerable cases) ==
+  routing     V0=44/44  r5=31/44  VA=31/44  VB=41/44  VC=35/44
+  work-order  V0=40/40  r5=25/40  VA=25/40  VB=38/40  VC=29/40
+  frozen      V0=54/54  r5=39/54  VA=39/54  VB=52/54  VC=45/54
+  corrected   V0=58/58  r5=37/58  VA=37/58  VB=57/58  VC=42/58
+  manual      V0=258/258  r5=161/258  VA=167/258  VB=244/258  VC=194/258
