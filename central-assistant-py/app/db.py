@@ -10,6 +10,7 @@ Queries are explicit SQL via SQLAlchemy Core `text()` on an async engine
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -18,6 +19,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from .config import settings
+
+# words carrying no retrieval signal in a how-to question (the lexical OR query drops them; the vector side still sees them)
+_STOPWORDS = {"how", "do", "does", "i", "we", "you", "to", "a", "an", "the", "in", "on", "of", "for", "is", "are", "it", "that", "this",
+              "what", "which", "where", "when", "can", "could", "should", "would", "need", "my", "me", "and", "or", "with", "from", "into",
+              "there", "any", "be", "by", "at", "as", "if", "so", "not", "get", "got"}
 
 
 @lru_cache(maxsize=1)
@@ -168,13 +174,23 @@ async def search_lexical(embedding: list[float], question: str, module: str, top
     generated `tsv` column (english, over the chunk content) against the question, returned WITH each chunk's vector distance
     so fused hits keep the same distance semantics for citations. Thresholds are not applied here — the caller fuses."""
     q = "[" + ",".join(f"{x:.8f}" for x in embedding) + "]"
+    # OR-of-terms query (r2): plainto_tsquery ANDs every word, so one word absent from a chunk ("PMS" in "How to create work
+    # order in PMS?") excluded the right chunk entirely; ts_rank_cd over an OR query still rewards chunks matching more terms.
+    words = [w for w in re.findall(r"[a-z0-9][a-z0-9'&-]{1,}", question.lower()) if w not in _STOPWORDS]
+    if not words:
+        return []
+    orq = " | ".join(dict.fromkeys(words))
     async with engine().connect() as c:
         rows = await c.execute(text(
             "SELECT module, file, section_title, breadcrumb, metadata, content, "
-            "power(embedding <-> CAST(:q AS vector), 2) AS distance, ts_rank_cd(tsv, plainto_tsquery('english', :question)) AS lex "
-            "FROM assistant_chunks WHERE index_set=:s AND lower(module)=:m AND tsv @@ plainto_tsquery('english', :question) "
+            "power(embedding <-> CAST(:q AS vector), 2) AS distance, "
+            # r4: the chunk's own heading counts as well as its body — a section titled for the asked action ("…ways to create a
+            # work order", "How to add components") should outrank a body that merely mentions the words many times
+            "ts_rank_cd(tsv, to_tsquery('english', :orq)) + ts_rank_cd(to_tsvector('english', coalesce(section_title, '') || ' ' || coalesce(breadcrumb, '')), to_tsquery('english', :orq)) AS lex "
+            "FROM assistant_chunks WHERE index_set=:s AND lower(module)=:m AND tsv @@ to_tsquery('english', :orq) "
+            "AND lower(coalesce(breadcrumb, '')) NOT LIKE '%table of contents%' AND lower(coalesce(section_title, '')) NOT LIKE '%table of contents%' "  # r3: a contents page names every section and carries no procedure
             "ORDER BY lex DESC LIMIT :k"),
-            {"q": q, "question": question, "s": settings().assistant_index_set, "m": module.lower(), "k": top_k})
+            {"q": q, "orq": orq, "s": settings().assistant_index_set, "m": module.lower(), "k": top_k})
         out: list[Hit] = []
         for r in rows:
             m = dict(r._mapping)

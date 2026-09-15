@@ -104,7 +104,7 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         if routed.gate == "answer" and s.assistant_hybrid.lower() == "on" and routed.module:
             vec = [h for h in hits if h.module == routed.module and h.distance <= s.route_sim_floor]
             lex = [h for h in await db.search_lexical(emb, masker.mask_text(message) if masker else message, routed.module, s.route_top_k) if h.distance <= s.route_sim_floor]
-            routed.hits = retrieval.rrf_fuse(vec, lex, s.answer_chunks)
+            routed.hits = retrieval.score_fuse(vec, lex, s.answer_chunks, s.assistant_hybrid_alpha, s.route_sim_floor)
         if routed.gate == "not_documented":
             log("not_documented", NOT_DOC_MSG, confidence=routed.confidence)
             return 200, {"response": NOT_DOC_MSG, "gate": "not_documented", "module": None, "citations": [], "confidence": routed.confidence}

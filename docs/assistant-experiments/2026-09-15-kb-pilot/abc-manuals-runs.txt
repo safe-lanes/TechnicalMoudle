@@ -1,0 +1,464 @@
+===== MANUAL-COVERAGE SUITE 2026-09-15T14:41:00Z: luna + v5 on A/B/C, 57 cases x 3 runs =====
+manual-coverage suite 2026-09-15.1 · 57 cases · repeat=3
+
+[fs-off-1 condition] Can an office user delete a fleet sharing record after it's already been submitted, or only while it's still a draft?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p5 | 'An office user can delete a Fleet Sharing record **only while it'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p5 | 'An office user can delete a Fleet Sharing record **only while it'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p5 | 'An office user can delete a Fleet Sharing record **only while it'
+   C-kbpilot    PASS ✓ [3/3]
+
+[fs-off-2 procedure] What are the steps to add an action item that vessels need to complete on a fleet sharing record?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p6 | 'For an **Office user**:\n\n1. Open the Fleet Sharing record and cl'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p6 | 'Office users add an action as follows:\n\n1. Open the Fleet Sharin'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p6 | 'For an **Office user**:\n\n1. In the Fleet Sharing record, click *'
+   C-kbpilot    PASS ✗ [0/3]
+
+[fs-ves-1 condition] As a ship user, am I able to edit the information the office entered under Step 1 of a fleet sharing record?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p5 | 'No. Under Step 1, the information entered by the Office is share'
+   A-manuals    PASS ✗ [1/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p5 | 'No. Under **Step 1 – Description**, the information shared by th'
+   B-corrected  PASS ✗ [2/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p5 | 'No. As a ship user, you cannot edit the information entered by t'
+   C-kbpilot    PASS ✗ [2/3]
+
+[fs-ves-2 procedure] After closing out all the actions the office assigned in a fleet sharing record, what do I need to do to finish it off?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p6 | 'After all assigned actions are closed:\n\n1. Enter the **Date Comp'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p6 | '1. In the **Update Action** window, enter the **Date Completed**'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Fleet Sharing Manu p6 | 'For the vessel completing actions:\n\n1. In the **Update Action** '
+   C-kbpilot    PASS ✓ [3/3]
+
+[hist-1 condition] Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?
+   A-manuals    answer ✗  cite ✗  support not captured  sources=none  NOT-COVERED-said  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✗  support not captured  sources=code-derived+manual    gate=answer cite=Technical - Ship-Side (Ves pNone | 'The **office** is allowed to add comments in the Review section.'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✗  support not captured  sources=code-derived+manual    gate=answer cite=Technical - Ship-Side (Ves pNone | 'The **Office / Sail Admin** adds comments in the Review section.'
+   C-kbpilot    PASS ✗ [0/3]
+
+[hist-2 table] What does the pencil icon do on the inspection records list?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p6 | 'The pencil icon **Edit Record** opens and lets you edit the sele'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p6 | 'The pencil icon opens the selected inspection record for editing'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p6 | 'The pencil icon **opens the selected inspection record for editi'
+   C-kbpilot    PASS ✗ [0/3]
+
+[hist-3 xref] The manual explains how to record a negative observation with attachments — does that same process apply when I want to add a Positive Observation or LAE finding instead?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p10 | 'Yes. The manual explicitly says to follow the same procedure for'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p10 | 'Yes. The manual states that the procedure for adding attachments'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p10 | 'Yes. The manual states that the procedure for adding attachments'
+   C-kbpilot    PASS ✗ [0/3]
+
+[prep-1 procedure] What are the steps to start a brand new SIRE preparation record for a vessel?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p7 | 'To start a brand-new SIRE preparation record:\n\n1. In the **Offic'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p7 | 'In the **Office** application:\n\n1. Click **+ New Preparation**.\n'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - History Manual_R1_ p7 | 'To create a brand-new preparation record in the **Office** modul'
+   C-kbpilot    PASS ✗ [0/3]
+
+[prep-2 condition] If I change the assigned inspector on an existing preparation record, which fields can't be changed, and what happens to the vessel's answers that were already entered?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Preparation Manual p11 | '1. Open the existing preparation with the **Edit** icon.\n2. You '
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Preparation Manual p11 | '1. Open the existing preparation and click **Edit**.\n2. You can '
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Audit - Preparation Manual p11 | 'When editing an existing preparation in the Office:\n\n1. Click **'
+   C-kbpilot    PASS ✗ [0/3]
+
+[prep-3 screenshot] On the preparation checklist, how do I add a new attachment to a question, and what can I do with it afterward?
+   A-manuals    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Preparation Manual p19 | 'On the preparation checklist:\n\n1. Select the checklist question '
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Preparation Manual p19 | '1. Select the checklist question and click its **Attachments** i'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Audit - Preparation Manual p19 | '1. Select the checklist question and click the **Attachments** i'
+   C-kbpilot    PASS ✗ [0/3]
+
+[inc-1 condition] Can a vessel user fill in the closeout comments and close an incident report themselves?
+   A-manuals    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p19 | 'No. A vessel user must not enter or modify the Office Closeout s'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p19 | 'No. A vessel user cannot fill in the closeout comments or close '
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p19 | 'No. A vessel user must not fill in or modify the Office Closeout'
+   C-kbpilot    PASS ✗ [0/3]
+
+[inc-2 table] What does it mean if an incident report shows the overdue-action status icon?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p19 | 'It means the required actions are overdue. The vessel should tak'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p19 | 'The overdue-action status icon means that required actions are o'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p19 | 'If an incident report shows the **overdue-action status icon**, '
+   C-kbpilot    PASS ✓ [3/3]
+
+[inc-3 procedure] What's the second way to record the sequence of events for an incident, using separate date/time fields instead of typing it into one box?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p9 | 'The second way is to use the separate **Date / Time / Descriptio'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p9 | 'The second way is to use the **Date / Time / Description** field'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Incident User M p9 | 'Use the **Date / Time / Description** fields:\n\n1. Enter the even'
+   C-kbpilot    PASS ✓ [3/3]
+
+[fn-1 condition] When I'm updating the actions on a fleet notification, when exactly should I click Submit?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Fleet Notificat p7 | 'Click **Submit only after all actions are completed and the Date'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Fleet Notificat p7 | 'Click **Submit only after you have updated the Date Closed (comp'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Fleet Notificat p7 | 'Click **Submit only after all actions are completed and the Date'
+   C-kbpilot    PASS ✓ [3/3]
+
+[fn-2 procedure] How do I record that a fleet notification was discussed onboard with the crew?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Fleet Notificat p6 | 'In **Section 2 – Discussion Record** of the Fleet Notification:\n'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Fleet Notificat p6 | 'In the **Vessel Fleet Notification** form, after the onboard dis'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Fleet Notificat p6 | 'For a **Fleet Notification**, in **Section 2 – Discussion Record'
+   C-kbpilot    PASS ✓ [3/3]
+
+[ll-1 condition] Can I, as a ship user, edit the description details the office shared in a lesson learnt record?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Lesson Learnt U p6 | 'No. As a ship user, you cannot edit the description details shar'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Lesson Learnt U p6 | 'No. In **Section 1 – Description**, the information shared by th'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Lesson Learnt U p6 | 'No. As a ship user, you can only view the description details sh'
+   C-kbpilot    PASS ✗ [0/3]
+
+[ll-2 procedure] What steps confirm that a lesson learnt record has been discussed with the crew onboard?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Lesson Learnt U p7 | 'To confirm that a **Lesson Learnt** record was discussed with th'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Lesson Learnt U p7 | '1. In **Section 2 – Discussion Record**, select **“Notification '
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Lesson Learnt U p7 | 'To confirm that a **Lesson Learnt** record was discussed with th'
+   C-kbpilot    PASS ✓ [3/3]
+
+[nm-1 xref] I need to report a Significant Near Miss — do I fill it in on this same reporting form?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p6 | 'No. For a **Significant Near Miss**, use the form available unde'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p6 | 'No. For a **Significant Near Miss**, use the form available unde'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p6 | 'No. For a **Significant Near Miss**, use the form available unde'
+   C-kbpilot    PASS ✗ [0/3]
+
+[nm-2 condition] Is a vessel user permitted to fill in the Office Closeout part of a near miss report?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p11 | 'No. The Office Closeout section is for office users only. Vessel'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p11 | 'No. The Office Closeout section is for office users only. Vessel'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p11 | 'No. Vessel users are not permitted to fill in or modify the **Of'
+   C-kbpilot    PASS ✗ [0/3]
+
+[nm-3 table] What does the grey circle-with-slash icon mean next to a near miss report?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p11 | 'The grey circle-with-slash icon means **Action(s) Due**: actions'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p11 | 'The grey circle-with-slash icon means **Action(s) Due**: actions'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Incident - Near Miss User  p11 | 'The **grey circle-with-slash icon** means **Action(s) Due**: act'
+   C-kbpilot    PASS ✓ [3/3]
+
+[crewing-1 procedure] In the In-Progress screen, what do I click to start a new crew record, and can I save my work before I finish filling in the form?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p14 | '1. Go to the **In-Progress** sub-sub module.\n2. Click **“+ New C'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p14 | '1. Go to the **In-Progress** sub-sub module.\n2. Click **“+ New C'
+   B-corrected  PASS ✗ [2/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p14 | '1. Go to the **In-Progress** sub-sub module.\n2. Click **“+ New C'
+   C-kbpilot    PASS ✓ [3/3]
+
+[crewing-2 condition] Does a crew promotion review form show up directly in the Promotion sub-module, or does something else have to happen first?
+   A-manuals    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p46 | 'The form does **not** appear directly in the Promotion sub-modul'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p46 | 'It does **not** appear directly by default in the Promotion sub-'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p46 | 'No. The promotion review form does not appear directly in the Pr'
+   C-kbpilot    PASS ✗ [0/3]
+
+[crewing-3 table] On the Crew Due/Overdue timeline, what does it mean when a crew member's bar shows as green versus yellow versus red?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p39 | '- **Green bar:** The crew member is actively or currently servin'
+   A-manuals    PASS ✗ [1/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p39 | '- **Green bar:** The crew member’s onboard service period is act'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p39 | '- **Green:** Active or ongoing onboard service period.\n- **Yello'
+   C-kbpilot    PASS ✓ [3/3]
+
+[crewing-4 screenshot] On the New Rotation Plan screen, besides picking the vessel, rank, and date range and then saving, is there anything else the annotated screenshot says I can do from that screen?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p41 | 'Yes. The annotated screenshot says you can **check compliance** '
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p41 | 'Yes. From the New Rotation Plan screen, you can:\n\n1. Check compl'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p41 | 'Yes. The annotation says you can **check compliance** from the N'
+   C-kbpilot    PASS ✗ [0/3]
+
+[crewing-5 xref] After clicking '+ New Crew' in the Crew Database to add someone straight to the Crew Pool, which other section's steps am I supposed to follow to fill out the form?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p29 | 'Follow the steps in the **In-Progress** sub-sub-module. The Crew'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p29 | 'Follow the steps in the **In-Progress** sub-sub-module. The Crew'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p29 | 'Follow the steps in the **In-Progress** sub-sub-module. The Crew'
+   C-kbpilot    PASS ✓ [3/3]
+
+[crewing-6 procedure] What button do I press to add a brand-new record to the Training Matrix, and what do I click afterward to save it once the details are entered?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p110 | '1. In the **Training Matrix**, click **“+ New.”**\n2. Enter the r'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p110 | '1. Click **“+ New”** in the Training Matrix.\n2. Enter the requir'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Crewing - Crewing User Man p110 | '1. In the **Training Matrix**, click **“+ New.”**\n2. Enter the r'
+   C-kbpilot    PASS ✓ [3/3]
+
+[moc-office-1 table] In the MoC Log, what does clicking the eye icon actually do, and does that differ between the Office and Vessel versions of the manual?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_O p7 | 'Clicking the **eye icon** differs between the manuals:\n\n1. **Off'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_O p7 | '- **Office:** Click the eye icon to **view, edit, or export** th'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_O p7 | 'Yes, it differs:\n\n- **Office version:** Clicking the eye icon op'
+   C-kbpilot    PASS ✗ [2/3]
+
+[moc-office-2 xref] When I click the Link icon in Part C's Risk Assessment section of an Office MoC, where does the saved RA actually end up?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p12 | 'After clicking **Link** in Part C, select the applicable option:'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p12 | 'After clicking **Link** in Part C:\n\n1. Select **Office RA** or *'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p12 | 'After clicking **Link** in Section C3:\n\n1. Select **Office RA** '
+   C-kbpilot    PASS ✗ [0/3]
+
+[moc-vessel-1 condition] In a Vessel MoC, what happens automatically if the MoC Approver selects 'No' in Part D?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_V p11 | 'The Vessel MoC is automatically marked as **“Not Approved.”**\n\nS'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_V p11 | 'In a Vessel MoC, if the MoC Approver selects **“No”** in Part D,'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_V p11 | 'The MoC is automatically marked as **“Not Approved.”**\n\n**Source'
+   C-kbpilot    PASS ✓ [3/3]
+
+[moc-vessel-2 procedure] What are the steps to fill out and submit Part A of a Vessel MoC form?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_V p6 | '1. Complete all required fields under **Part A**.\n2. Add attachm'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_V p6 | '1. Complete all required fields under **Part A** of the Vessel M'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - MOC User Manual_V p6 | '1. Complete all required fields under **Part A**.\n2. Add any att'
+   C-kbpilot    PASS ✓ [3/3]
+
+[master-review-1 table] What can I do with the action icons in the Master Review report table besides deleting a record?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Master Review Man p6 | 'Besides deleting a record, the action icons let you:\n\n1. **Add a'
+   A-manuals    PASS ✗ [2/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Master Review Man p6 | 'Besides deleting a record, the action icons let you:\n\n1. **Add A'
+   B-corrected  PASS ✗ [2/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Master Review Man p6 | 'Besides deleting a record, the action icons let you:\n\n1. **Add a'
+   C-kbpilot    PASS ✓ [3/3]
+
+[master-review-2 condition] Who is meant to use Part E of a Master Review record, and what can they do there?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Master Review Man p7 | '**Part E is for Office users.** They can:\n\n1. Add comments to th'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Master Review Man p7 | 'Part E is for **Office users**. They can:\n\n1. Add comments to th'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Master Review Man p7 | 'Part E is for **Office users**. They can:\n\n1. Add comments to th'
+   C-kbpilot    PASS ✗ [0/3]
+
+[ra-office-1 condition] Can the same Position/Rank hold two different Approval Levels for Risk Assessments, and what should I do if one needs to change?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p25 | 'No. A Position/Rank can be assigned only **one Approval Level** '
+   A-manuals    PASS ✗ [2/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p25 | 'No. A Position/Rank can be assigned only one Approval Level for '
+   B-corrected  PASS ✗ [2/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p25 | 'No. A Position/Rank can be assigned only one Approval Level for '
+   C-kbpilot    PASS ✓ [3/3]
+
+[ra-office-2 screenshot] When adding hazards from the database in Part B of an Office RA, what are the tab categories in the hazard-selection pop-up window?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p12 | 'The hazard-selection pop-up has these tab categories:\n\n- Work En'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p12 | 'The hazard-selection pop-up has these tab categories:\n\n1. Work E'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p12 | 'The hazard-selection pop-up has these tab categories:\n\n1. Work E'
+   C-kbpilot    PASS ✗ [0/3]
+
+[ra-office-3 xref] Do the filters work the same way in the Generic RA Library, Office RA, and Vessels RA sections, or is each explained separately?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p7 | 'The filtering process works the same way across the **Generic RA'
+   A-manuals    PASS ✗ [2/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p7 | 'The filtering process is the same across the **Generic RA Librar'
+   B-corrected  PASS ✗ [2/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p7 | 'The filtering process is the same across the **Generic RA Librar'
+   C-kbpilot    PASS ✗ [2/3]
+
+[ra-vessel-1 condition] As a vessel user, can I edit Generic Risk Assessments in the Generic RA Library, or only look at them?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p7 | 'As a vessel user, you can **only view** Generic Risk Assessments'
+   A-manuals    PASS ✗ [1/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p7 | 'As a vessel user, you can only view Generic Risk Assessments in '
+   B-corrected  PASS ✗ [1/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p7 | 'As a vessel user, you can **only view** Generic Risk Assessments'
+   C-kbpilot    PASS ✗ [1/3]
+
+[ra-vessel-2 procedure] What are the three ways offered for starting a brand-new Vessel Risk Assessment?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p18 | 'The three ways to start a new Vessel Risk Assessment are:\n\n1. Im'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p18 | 'The three ways are:\n\n1. Import from the **Generic Library**.\n2. '
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - Risk Assessment U p18 | 'After opening **Vessel RA** and clicking **+ New RA**, you can s'
+   C-kbpilot    PASS ✗ [0/3]
+
+[sms-office-1 xref] For approving a revision of an already-uploaded SMS document (Section 4.2.2), what does the manual tell the Approver to do?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p16 | 'The Approver must:\n\n1. Select **Need Improvement**, **Approved**'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p16 | 'The Approver must:\n\n1. Select the appropriate checkbox: **Need I'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p16 | 'The Approver must:\n\n1. Select one checkbox: **Need Improvement**'
+   C-kbpilot    PASS ✗ [0/3]
+
+[sms-office-2 condition] If I create a folder in SMS with the 'Is Form' checkbox selected, will the documents I upload there show up when users browse SMS?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p15 | 'No. Documents uploaded to a folder created with **“Is Form”** se'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p15 | 'No. Documents uploaded to folders created with **“Is Form”** sel'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p15 | 'No. Documents uploaded to folders created with **“Is Form”** sel'
+   C-kbpilot    PASS ✓ [3/3]
+
+[sms-office-3 screenshot] In the SMS hyperlinking example figure, what specific document reference is shown as something a link inside a document can jump straight to?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p10 | 'The hyperlinking example shows a link to document **“Doc 4.2.03.'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p10 | 'The hyperlinking example shows **“Doc 4.2.03”** as the document '
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - SMS User Manual_O p10 | 'The specific document reference shown is **“Doc 4.2.03.”**'
+   C-kbpilot    PASS ✓ [3/3]
+
+[safety-meeting-1 xref] For an Additional Safety Meeting (Add SM) form, do Parts B, C and D have their own instructions, or should I look elsewhere in the manual?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Safety Meeting Us p18 | 'The Add SM form does not provide separate instructions for all t'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Safety Meeting Us p18 | 'For an **Additional Safety Meeting (Add SM)** form, Parts B, C, '
+   B-corrected  PASS ✗ [2/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Safety Meeting Us p18 | 'For an **Additional Safety Meeting (Add SM)** form:\n\n1. **Part B'
+   C-kbpilot    PASS ✓ [3/3]
+
+[safety-meeting-2 condition] What happens to a circular in the Advisories & Circulars section if nobody marks it as discussed during the meeting?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Safety Meeting Us p13 | 'It is automatically carried forward to the next meeting.'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Safety Meeting Us p13 | 'It will be automatically carried forward to the next meeting.'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Safety - Safety Meeting Us p13 | 'It will be automatically carried forward to the next meeting.'
+   C-kbpilot    PASS ✓ [3/3]
+
+[certsurveys-1 procedure] What are the steps to add a brand-new certificate type to the Master list under Ship's Certificates?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p17 | '1. In the **Admin** sub-module, click **Ship’s Certificates**. T'
+   A-manuals    PASS ✗ [1/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p17 | 'To add a brand-new certificate type to the **Master** list:\n\n1. '
+   B-corrected  PASS ✗ [1/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p17 | '1. In the **Admin** sub-module, click **Ship’s Certificates**. T'
+   C-kbpilot    PASS ✗ [1/3]
+
+[certsurveys-2 condition] Is there anything that stops me from saving a new certificate master record if I leave some fields blank?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p18 | 'Yes. Fields marked as mandatory (*) must be completed before a n'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p18 | 'Yes. Fields marked as mandatory (*) must be completed before the'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p18 | 'Yes. Mandatory fields marked with an asterisk (*) must be comple'
+   C-kbpilot    PASS ✗ [0/3]
+
+[certsurveys-3 xref] How do I add or view attachments for a survey record — is the process different from certificates?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual  NOT-COVERED-said  gate=answer cite=Technical - Cert. & Survey p9 | 'The survey attachment procedure is **not covered in enough detai'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p9 | 'The survey section only directs users to the **Certificates** su'
+   B-corrected  PASS ✗ [2/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Cert. & Survey p9 | 'The manual states that survey attachments use the same process a'
+   C-kbpilot    PASS ✗ [0/3]
+
+[defects-1 screenshot] In the Defects Log list, is there a way to edit a report directly from its row without opening it via the Eye icon first?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p16 | 'Yes. In the Defects Log list, click the report’s **Edit icon** d'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p16 | 'Yes. In the Defects Log list:\n\n1. Locate the report.\n2. Click th'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p16 | 'Yes. In the Defects Log row, click the **Edit** icon directly; t'
+   C-kbpilot    PASS ✓ [3/3]
+
+[defects-2 condition] What happens after I click Submit on a new defect report?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p15 | 'After you click **Submit** on a new defect report:\n\n1. The repor'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p15 | 'After you click **Submit** on a new defect report:\n\n1. The repor'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p15 | 'After you click **Submit** on a new defect report:\n\n1. The updat'
+   C-kbpilot    PASS ✓ [3/3]
+
+[defects-3 xref] How do I export all the Condition of Class records at once, or do I need to export them one at a time?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p20 | 'You can export all Condition of Class (CoC) records at once; exp'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p20 | 'You can export all displayed Condition of Class records at once;'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - Defects User M p20 | 'You can export all Condition of Class records at once; you do no'
+   C-kbpilot    PASS ✗ [0/3]
+
+[pmsoffice-1 table] In the Work Orders section, what's the difference between a job showing 'Due' status versus 'Overdue' status?
+   A-manuals    answer ✗  cite ✗  support not captured  sources=none  NOT-COVERED-said  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✗  support not captured  sources=none  NOT-COVERED-said  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✗  support not captured  sources=none  NOT-COVERED-said  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   C-kbpilot    PASS ✗ [0/3]
+
+[pmsoffice-2 condition] Can I update a spare part's ROB directly without selecting a storage location first?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p38 | 'No. A storage location must be selected first.\n\n1. **Inventory t'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p38 | 'No. A storage location must be selected before updating a spare '
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p38 | 'No. The ROB cannot be modified until a storage location is selec'
+   C-kbpilot    PASS ✗ [0/3]
+
+[pmsoffice-3 procedure] How can I reorder components within the Component Tree?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p26 | 'In the Office PMS:\n\n1. Select a component in the Component Tree.'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p26 | '1. Select any component in the Component Tree.\n2. Click **Edit**'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p26 | 'In the Office PMS:\n\n1. Select a component in the Component Tree.'
+   C-kbpilot    PASS ✓ [3/3]
+
+[pmsoffice-4 screenshot] Is there a special restriction on approving a locked work order?
+   A-manuals    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p30 | 'Yes. For a **locked work order**, approval is permitted only aft'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p30 | 'Yes. For a locked work order, approval is permitted only after:\n'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p30 | 'Yes. For a **locked Work Order**, approval is permitted only aft'
+   C-kbpilot    PASS ✗ [0/3]
+
+[pmsoffice-5 condition] On the PMS Dashboard, what fields can I filter by — and is that the same set of filters available on the vessel side?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual  NOT-COVERED-said  gate=answer cite=Technical - PMS User Manua p9 | 'The PMS Dashboard supports these filters:\n\n1. Click **Filter**.\n'
+   A-manuals    PASS ✗ [2/3]
+   B-corrected  answer ✗  cite ✓  support not captured  sources=manual  NOT-COVERED-said  gate=answer cite=Technical - PMS User Manua p9 | 'The PMS Dashboard lets you filter by:\n\n1. Click **Filter**.\n2. S'
+   B-corrected  PASS ✗ [2/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p9 | 'On the **PMS Dashboard (Office)**, you can filter by:\n\n1. Click '
+   C-kbpilot    PASS ✓ [3/3]
+
+[pmsvessel-1 table] What are the different item categories under Stores, and what does each one show?
+   A-manuals    answer ✗  cite ✗  support not captured  sources=manual  NOT-COVERED-said  gate=answer cite=Technical - PMS User Manua p49 | 'Under **Store**, items are categorized as:\n\n- **Stores:** Listed'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p49 | 'The item categories under **Store** are:\n\n1. **Stores** — Genera'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✓  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p49 | 'The item categories under **Store** are:\n\n1. **Stores** — The ex'
+   C-kbpilot    PASS ✗ [0/3]
+
+[pmsvessel-2 screenshot] As a Vessel User, can I create a new Modify PMS change request myself?
+   A-manuals    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p47 | 'No. As a **Vessel User**, the Change Request option is not avail'
+   A-manuals    PASS ✓ [3/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p47 | 'No. As a **Vessel User**, the Change Request option is not avail'
+   B-corrected  PASS ✓ [3/3]
+   C-kbpilot    answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p47 | 'No. As a **Vessel User**, the Modify PMS change-request option i'
+   C-kbpilot    PASS ✗ [1/3]
+
+[pmsvessel-3 xref] How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?
+   A-manuals    answer ✗  cite ✓  support not captured  sources=manual  NOT-COVERED-said  gate=answer cite=Technical - PMS User Manua p43 | 'For **Stores**, the manual does not describe a separate workflow'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✓  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p43 | 'For **Stores**, the documented process is:\n\n1. Open the **Store*'
+   B-corrected  PASS ✗ [2/3]
+   C-kbpilot    answer ✗  cite ✓  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p43 | 'For bulk stock updates, the manuals support these two related pr'
+   C-kbpilot    PASS ✗ [1/3]
+
+[pmsvessel-4 condition] If I try to generate a work order for a component job that already has an active one, what happens?
+   A-manuals    answer ✗  cite ✗  support not captured  sources=manual    gate=answer cite=Technical - PMS User Manua p18 | 'The system does not generate a duplicate work order. If an activ'
+   A-manuals    PASS ✗ [0/3]
+   B-corrected  answer ✗  cite ✗  support not captured  sources=code-derived+manual    gate=answer cite=Technical - PMS User Manua p18 | 'The system does not allow you to generate a duplicate work order'
+   B-corrected  PASS ✗ [0/3]
+   C-kbpilot    answer ✗  cite ✗  support not captured  sources=kb-pilot+manual    gate=answer cite=Technical - KB pilot: 'Gen pNone | 'For the Components → **Generate WO** action, the system refuses '
+   C-kbpilot    PASS ✗ [0/3]
+
+== totals (answer ∧ citation ∧ support, all runs) ==
+   A-manuals    22/57
+   B-corrected  20/57
+   C-kbpilot    24/57
+===== DONE 2026-09-15T14:55:19Z =====

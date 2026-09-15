@@ -24,7 +24,7 @@ import httpx2 as httpx  # noqa: E402
 
 from app.identity import sign_identity  # noqa: E402
 
-ROUTING_SUITE_VERSION = "2026-09-15.1"
+ROUTING_SUITE_VERSION = "2026-09-15.2"  # .2: must/must_not substrings match "manual — section", not the file name alone
 # (id, question, context module or None, expected gate, expected module label or None, must-include excerpt substrings, must-exclude substrings)
 CASES = [
     ("rt-general-01", "How do I create a work order?", "technical", "answer", "Technical", ["How work orders are created", "HOW TO CREATE AN UNPLANNED WORK ORDER"], []),
@@ -71,7 +71,7 @@ async def main() -> int:
             for n, u in sets:
                 r = await probe(c, u, key, q, ctx)
                 gate, mod = r.get("gate"), r.get("module")
-                files = [ci.get("manual", "") for ci in r.get("citations", [])]
+                files = [f"{ci.get('manual', '')} — {ci.get('section', '')}" for ci in r.get("citations", [])]  # manual AND section (a section name is not in the file name)
                 ok_gate = exp_gate is None or gate == exp_gate
                 ok_mod = exp_mod is None or mod == exp_mod or (gate == "clarify" and exp_mod in (r.get("candidates") or []))
                 ok_inc = all(any(m in f for f in files) for m in must)

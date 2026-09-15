@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     #                 (reciprocal-rank fusion); thresholds and excerpt count unchanged.
     assistant_route_intent: str = "off"
     assistant_hybrid: str = "off"
+    assistant_hybrid_alpha: float = 0.5   # weight of the vector side in the convex score fusion (r5); 1.0 = vector only
 
     # budgets (§5.7)
     llm_timeout_ms: int = 30000

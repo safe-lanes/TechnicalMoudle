@@ -146,6 +146,30 @@ def route(hits: list[Hit], message: str | None = None, ui_module: str | None = N
     return r
 
 
+def score_fuse(vector_hits: list[Hit], lexical_hits: list[Hit], k: int, alpha: float, floor: float) -> list[Hit]:
+    """Step 4 r5 (ASSISTANT_HYBRID=on): convex score fusion inside the routed module —
+         score = alpha * (1 - distance / floor)  +  (1 - alpha) * (lexical / max lexical)
+    Reciprocal-rank fusion (r2–r4) could never surface a chunk that leads ONE ranking but is absent from the other (a section
+    titled for the asked action, outside the vector top-10, lexical rank 1) — any chunk present in both lists outranked it.
+    Both inputs already respect the distance floor; excerpt count unchanged."""
+    def key(h: Hit) -> tuple:
+        return (str(h.meta.get("file")), str(h.meta.get("breadcrumb")), str(h.meta.get("chunk_index")))
+    lex_max = max((float(h.meta.get("lexical_rank_score", 0.0)) for h in lexical_hits), default=0.0) or 1.0
+    keep: dict[tuple, Hit] = {}
+    vec_part: dict[tuple, float] = {}
+    lex_part: dict[tuple, float] = {}
+    for h in vector_hits:
+        keep.setdefault(key(h), h)
+        vec_part[key(h)] = max(0.0, 1.0 - h.distance / floor)
+    for h in lexical_hits:
+        keep.setdefault(key(h), h)
+        vec_part.setdefault(key(h), max(0.0, 1.0 - h.distance / floor))  # its true vector distance is known too
+        lex_part[key(h)] = float(h.meta.get("lexical_rank_score", 0.0)) / lex_max
+    score = {kk: alpha * vec_part.get(kk, 0.0) + (1 - alpha) * lex_part.get(kk, 0.0) for kk in keep}
+    order = sorted(score, key=lambda kk: (-score[kk], keep[kk].distance))
+    return [keep[kk] for kk in order[:k]]
+
+
 def rrf_fuse(vector_hits: list[Hit], lexical_hits: list[Hit], k: int, c: int = 60) -> list[Hit]:
     """Step 4 (hybrid excerpt selection, ASSISTANT_HYBRID=on): reciprocal-rank fusion of the two rankings within the routed
     module; identity = (file, breadcrumb, chunk_index). Thresholds unchanged (both inputs already respect the floor)."""

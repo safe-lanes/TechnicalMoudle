@@ -1,0 +1,71 @@
+routing suite 2026-09-15.2 · 13 cases · routeOnly (no answer model)
+
+[rt-general-01] How do I create a work order?  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   D1-intent  ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   D2-intent+hybrid ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of
+
+[rt-general-02] How to create work order in PMS?  (context=technical)
+   C0-off     ✗ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual_Vessel  MISSING ['How work orders are created']
+   D1-intent  ✗ gate=answer module=Technical conf=1.0 routing=explicit: module name in question | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual_Vessel  MISSING ['How work orders are created']
+   D2-intent+hybrid ✗ gate=answer module=Technical conf=1.0 routing=explicit: module name in question | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of  MISSING ['How work orders are created']
+
+[rt-general-03] Steps to create a new work order  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   D1-intent  ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   D2-intent+hybrid ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of
+
+[rt-named-01] How do I create an unplanned work order?  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel
+   D1-intent  ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel
+   D2-intent+hybrid ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of | Technical - KB pilot: Planned work
+
+[rt-named-02] How does Generate Now work in the office?  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: Office 'Gene | Technical - Recent Updates & Chang | Technical - KB pilot: 'Generate WO | Technical - KB pilot: How work ord
+   D1-intent  ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: Office 'Gene | Technical - Recent Updates & Chang | Technical - KB pilot: 'Generate WO | Technical - KB pilot: How work ord
+   D2-intent+hybrid ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: Office 'Gene | Technical - Recent Updates & Chang | Technical - KB pilot: How work ord | Technical - KB pilot: 'Generate WO
+
+[rt-named-03] How do I generate a work order for one job from Components?  (context=technical)
+   C0-off     ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: 'Generate WO | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel | Technical - KB pilot: Office 'Gene
+   D1-intent  ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: 'Generate WO | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel | Technical - KB pilot: Office 'Gene
+   D2-intent+hybrid ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: 'Generate WO | Technical - KB pilot: How work ord | Technical - KB pilot: Planned work | Technical - PMS User Manual For Of | Technical - KB pilot: Office 'Gene
+
+[rt-pump-01] I need to raise a work order for a pump — how do I do that?  (context=technical)
+   C0-off     ✗ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of  MISSING ['How work orders are created']
+   D1-intent  ✗ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of  MISSING ['How work orders are created']
+   D2-intent+hybrid ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - KB pilot: How work ord | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of
+
+[rt-05-ctx-technical] What are the hazard categories in a risk assessment?  (context=technical)
+   C0-off     ✗ gate=clarify module=None conf=0.010442376136779785 routing=- |   MISSING ['Risk Assessment']
+   D1-intent  ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+   D2-intent+hybrid ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+
+[rt-05-no-ctx] What are the hazard categories in a risk assessment?  (context=None)
+   C0-off     ✗ gate=clarify module=None conf=0.010442376136779785 routing=- |   MISSING ['Risk Assessment']
+   D1-intent  ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+   D2-intent+hybrid ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+
+[rt-05-ctx-safety] What are the hazard categories in a risk assessment?  (context=safety)
+   C0-off     ✗ gate=clarify module=None conf=0.010442376136779785 routing=- |   MISSING ['Risk Assessment']
+   D1-intent  ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+   D2-intent+hybrid ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+
+[rt-05-explicit-conflict] In the Incident module, what are the hazard categories in a risk assessment?  (context=technical)
+   C0-off     ✓ gate=clarify module=None conf=0.05282473564147949 routing=- | 
+   D1-intent  ✓ gate=answer module=Incident conf=1.0 routing=explicit: module name in question | Incident - Incident User Manual R0 | Incident - Near Miss User Manual R | Incident - Incident User Manual R0
+   D2-intent+hybrid ✓ gate=answer module=Incident conf=1.0 routing=explicit: module name in question | Incident - Incident User Manual R0 | Incident - Near Miss User Manual R | Incident - Incident User Manual R0 | Incident - Incident User Manual R0 | Incident - Incident User Manual R0
+
+[rt-ctx-no-override] How do I report a near miss?  (context=technical)
+   C0-off     ✓ gate=answer module=Incident conf=1.0 routing=vector routing | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R
+   D1-intent  ✓ gate=answer module=Incident conf=1.0 routing=explicit: manual/sub-module name in question | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R
+   D2-intent+hybrid ✓ gate=answer module=Incident conf=1.0 routing=explicit: manual/sub-module name in question | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R
+
+[rt-explicit-module] In the Safety module, how do I record a safety meeting?  (context=technical)
+   C0-off     ✓ gate=answer module=Safety conf=1.0 routing=vector routing | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua
+   D1-intent  ✓ gate=answer module=Safety conf=1.0 routing=explicit: module name in question | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua
+   D2-intent+hybrid ✓ gate=answer module=Safety conf=1.0 routing=explicit: module name in question | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua
+
+== totals ==
+   C0-off     8/13
+   D1-intent  11/13
+   D2-intent+hybrid 12/13

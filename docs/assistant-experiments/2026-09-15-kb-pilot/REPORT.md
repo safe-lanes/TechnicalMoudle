@@ -548,6 +548,41 @@ What this establishes:
 | work-order judge `.10` | negation window 90 chars and trailing negation | all stored WO answers | 1 (C wo-phr-04 run 2, false "unplanned requires the switch") |
 | work-order judge `.11` | a switch/role mention inside the unplanned scope counts as a requirement only when its sentence carries requirement wording and no negation — the v5 source-comparison sentence ("the office-switch details come from draft code-derived guidance") was read as a condition | all stored WO answers, 243 runs (`judge11-validation.txt`) | 3 verdicts (C wo-phr-03 r2, wo-phr-04 r2, wo-phr-05 r3 → PASS); 8 more rule notes dropped on already-failing unplanned-only answers ("Office / Sail Admin" heading labels are no longer read as a role requirement) |
 
+### 14.5 Step 3 (part 2) — manual-coverage suite on the three sets (`abc-manuals-runs.txt`, `abc-manuals-dump.jsonl`, captures `abcm-{a,b,c}-capture.jsonl`)
+
+Suite `acceptance_manuals.py` 2026-09-15.1, 57 source-backed cases over all 20 official manuals (procedure 12 · condition 20 · table 8 · screenshot 7 · cross-reference 10), authored from the manuals-only chunk text with every must phrase and page verified against that text before use (`manual_cases.json`); 3 runs per set; the request bodies of every run captured per container. Automatic score = base judge (manual + accepted pages + must/must_not, markdown-normalised) ∧ support (the must phrases present in the cited/supplied excerpt text of that very run).
+
+| set | cases passing all 3 runs | runs pass | runs: answer-phrase fail, citation ok | runs: answer ok, cited page/manual ≠ expected | runs: both | runs: said "not covered" although the manual holds it |
+|---|---|---|---|---|---|---|
+| A manuals only | 22/57 | 78/171 | 37 | 32 | 11 | 13 |
+| B + corrected docs | 20/57 | 80/171 | 36 | 36 | 12 | 7 |
+| C + KB files | 24/57 | 82/171 | 36 | 35 | 13 | 5 |
+
+Sources used (from citations and captured excerpts): A 165/171 runs manual-only (6 no citation); B 162 manual, 6 code-derived + manual, 3 none; C 162 manual, 3 code-derived + manual, 3 KB + manual, 3 none — the additional sources are used in ≤ 6 of 171 runs and only alongside a manual. Per kind (runs passing, A): procedure 25/36 · table 12/24 · condition 24/60 · screenshot 9/21 · cross-reference 8/30.
+
+The automatic score is a floor, not a verdict: 32–36 runs per set have a correct-looking answer whose top citation is a neighbouring page or the other Office/Vessel variant, and 36–37 fail a literal must phrase. Every failing case (35 on A, 33 on C) is being read against the manual text with a six-way classification (correct paraphrase · correct but adjacent page · partial · wrong · honest limit · wrong source); the classification and the resulting true-defect list are in §14.5a when complete.
+
+### 14.6 Step 4 — intent and routing (`s4-routing*.txt`, `s4-routing-r*-dump.jsonl`, `probe2.py`)
+
+How the assistant identified the module before this step (READ, `app/chat.py`, `app/retrieval.py`): one embedding of the question; the ten nearest chunks; per-module best distance; if the best two modules are within 0.07 → `clarify`; otherwise the top module's chunks (≤ 5) are the excerpts. `context.module` was not used on the docs path at all. Nothing recognised a named method or an action; "create a work order" simply landed on the nearest chunk, the manual's unplanned section.
+
+Bounded approach implemented behind two flags (both default off = served behaviour; image `sail-assistant-py:prompt-v5-r5`; thresholds, excerpt count, prompt unchanged):
+- `ASSISTANT_ROUTE_INTENT=on` — the question's own words decide the module when they name it: an explicit module name/alias ("Safety module", "PMS") or a manual/sub-module name derived from the served corpus's document titles ("risk assessment", "near miss", "master review", "bulk data import", …; single generic words such as "history" or "sync" are excluded; a term that maps to two modules is dropped). An explicit module name beats a manual name; a named module overrides vector routing and cancels `clarify`. The originating module (`context.module`) only breaks a clarify tie when it is one of the near candidates. Identity, tenant and vessel checks are untouched (routing only). The response now carries `routing` = the reason.
+- `ASSISTANT_HYBRID=on` — excerpt selection inside the routed module fuses the vector ranking with a lexical ranking over the existing `tsv` column (OR of the question's content words; contents pages excluded; a chunk's own heading weighted as well as its body), score = 0.5·(1 − distance/floor) + 0.5·(lexical/max). Four revisions were measured on the routing probes before this one (below).
+
+Routing probes (`acceptance_routing.py` 2026-09-15.2, `routeOnly` — embeddings only, no answer model; 13 cases incl. frozen case 05 with technical / no / safety context and with a conflicting explicit "Incident module", the three work-order intents, and the guard that context never overrides an explicit name). Measured separately: C0 = flags off, D1 = routing only, D2 = routing + excerpt selection, same image, same index `kb-pilot-c`, same query embeddings per probe:
+
+| image revision | change | C0 | D1 | D2 |
+|---|---|---|---|---|
+| r1/r2 | RRF fusion of vector and lexical ranks; lexical = AND of all words (r1) → OR of content words (r2) | 8/13 | 11/13 | 12/13 |
+| r3 | contents pages excluded from the lexical side | 8 | 11 | 12 |
+| r4 | chunk heading weighted in the lexical score | 8 | 11 | 12 — the overview now leads the LEXICAL ranking for "How to create work order in PMS?" (score 3.7) but RRF cannot surface a chunk that leads one ranking and is absent from the other |
+| **r5** | convex score fusion instead of RRF | 8 | 11 | **13/13** |
+
+What each part does (D1 vs C0 = routing; D2 vs D1 = excerpt selection): case 05 "What are the hazard categories in a risk assessment?" — `clarify` (margin 0.010) with technical context, without context and with safety context on C0; on D1/D2 it routes to Safety by the manual name and the five excerpts are the Risk Assessment manuals in all three context variants; "In the Incident module, what are the hazard categories in a risk assessment?" → Incident on D1/D2 (explicit module wins, honest "not in Incident documentation" expected at answer level); "How do I report a near miss?" with technical context → Incident on all (context does not override). Excerpt selection: "How to create work order in PMS?" gets the overview only on D2-r5 (first excerpt), the pump phrasing gets it on D2 from r2 on (third excerpt at r5); a named method keeps its own procedure (unplanned, Generate Now, Generate WO cases pass on all three).
+
+Retrieval-18 on the three (top-1 source check, expectations v1/v2): C0 18/18 · D1 18/18 · **D2 16/18** — two top-1 changes, both reorderings within the five excerpts, not losses: "how do I create a work order" now leads with the KB overview (then the two manual unplanned sections, the KB unplanned and planned files — the two "complete the work order" sections dropped out); "why did the running hours not go down…" now leads with the Ship-Side notes §1.1.13.2 (the Recent Updates §1.1.14.2/§1.1.14.3 chunks stay at positions 3–4). The suite's expectations predate the KB files; a v3 expectation for the first query would name the overview — reported, not changed. Answer-level effect measured in §14.7.
+
 ### 8.6 Not changed / open
 
 Not changed: live, prompt (v2 on both instances), retrieval logic, thresholds, excerpt count, the frozen suites, the base judge's literal must-phrase check. Open for the owner: (1) the answer-generation drops now dominate — the conditions rule (prompt v3) targeted this and regressed frozen case 09 (§S.7.1); a reworded rule or a content-ordering change are the untested candidates; (2) two retrieval residues (wo-generic-03; wo-phr-02's "other ways" note, which could also be one sentence in unplanned-wo.md); (3) the literal must-phrase check in the shared base judge fails wo-phr-03 answers that are right by meaning.
