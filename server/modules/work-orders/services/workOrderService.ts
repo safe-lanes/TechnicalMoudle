@@ -998,6 +998,18 @@ export async function updateWorkOrder(id: string, body: any) {
     throw new NotFoundError('Work order not found');
   }
 
+  const { findAttemptedWorkOrderSnapshotFields } = await import('../utils/workOrderPartADates');
+  const attemptedSnapshotFields = findAttemptedWorkOrderSnapshotFields(body);
+  if (attemptedSnapshotFields.length > 0) {
+    throw new ValidationError(
+      `Cannot modify immutable Work Order snapshot fields: ${attemptedSnapshotFields.join(', ')}`,
+      {
+        code: 'WORK_ORDER_SNAPSHOT_FIELDS_READ_ONLY',
+        disallowedFields: attemptedSnapshotFields,
+      },
+    );
+  }
+
   // RH synchronization stamps and approval outcomes are server-owned. No
   // client PATCH path may forge an applied/skipped state.
   const SERVER_OWNED_RH_FIELDS = [

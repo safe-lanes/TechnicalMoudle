@@ -1,6 +1,7 @@
 import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError } from '../../shared/errors';
 import { ensureArray, ensureJsonObject } from '../../shared/jsonHelpers';
+import { resolveWorkOrderPartADates } from '../utils/workOrderPartADates';
 
 // Helper: Convert DD-MMM-YYYY to ISO YYYY-MM-DD for HTML date inputs
 function convertToIsoDate(dateStr: string | null | undefined): string {
@@ -280,8 +281,16 @@ export async function getWorkOrderContext(workOrderId: string) {
     lastCompletedCurrentReading = lastCompletedRH;
   }
 
-  // Build templateData from job data (Part A - immutable from job definition)
-  // This ensures Section A is populated from the job template
+  const resolvedPartADates = resolveWorkOrderPartADates({
+    ...workOrder,
+    maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis,
+  });
+  const partALastCompletedOn = resolvedPartADates.lastCompletedOn;
+  const partANextDueDate = resolvedPartADates.nextDueDate;
+
+  // Job fields still hydrate the operational/template state used by existing
+  // completion logic. Dedicated Part A dates below come from the Work Order
+  // snapshots so later Job edits cannot change an existing Work Order form.
   const rawSpareParts = ensureArray(job?.requiredSpareParts);
   const enrichedSpareParts = await enrichSparePartsWithROB(rawSpareParts, workOrder.vesselId as string);
 
@@ -293,7 +302,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     componentCode: workOrder.componentCode || component.componentCode,
     componentName: component.name,
     sfiCode: job.sfiCode || job.componentCode || component.componentCode,
-    maintenanceBasis: job.maintenanceBasis,
+    maintenanceBasis: workOrder.maintenanceBasis || job.maintenanceBasis,
     maintenanceType: job.maintenanceType,
     frequencyValue: job.frequencyValue?.toString() || '',
     frequencyUnit: job.frequencyUnit || 'Months',
@@ -313,6 +322,8 @@ export async function getWorkOrderContext(workOrderId: string) {
     lastCompletedRH,
     lastCompletedDateForRH,
     lastCompletedCurrentReading,
+    partALastCompletedOn,
+    partANextDueDate,
     briefWorkDescription: job.briefWorkDescription || job.jobDescription,
     jobDescription: job.jobDescription,
     requiredSpareParts: enrichedSpareParts,
@@ -348,6 +359,8 @@ export async function getWorkOrderContext(workOrderId: string) {
     lastCompletedRH,
     lastCompletedDateForRH,
     lastCompletedCurrentReading,
+    partALastCompletedOn,
+    partANextDueDate,
     briefWorkDescription: workOrder.briefWorkDescription,
     jobDescription: workOrder.briefWorkDescription,
     requiredSpareParts: [],

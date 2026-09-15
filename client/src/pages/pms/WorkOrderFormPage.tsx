@@ -307,6 +307,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     },
     workHistory: [] as Array<{woNo: string, assignedTo: string, performedBy: string, workDate: string, runDate: string, completionDate: string, status: string, description: string, remarks: string}>
   });
+  const displayedPartANextDueDate =
+    resolvedMode !== 'template' && !isNewJobCreation
+      ? ((workOrderContext as any)?.templateData?.partANextDueDate || '')
+      : templateData.nextDueDate;
 
   const woDepartment = templateData?.department ||
     (workOrderContext as any)?.templateData?.department ||
@@ -1144,9 +1148,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           setLastCalendarUnit(normalizedFrequencyUnit);
         }
 
-        setLastDoneDate(context.templateData.lastCompletedDate || context.templateData.lastDoneDate || '');
+        const partALastCompletedOn = context.templateData.partALastCompletedOn || '';
+        const useWorkOrderSnapshot = resolvedMode !== 'template';
+        setLastDoneDate(
+          useWorkOrderSnapshot
+            ? partALastCompletedOn
+            : (context.templateData.lastCompletedDate || context.templateData.lastDoneDate || ''),
+        );
         setLastDoneRH(context.templateData.lastCompletedRH || context.templateData.lastDoneRH || '');
-        setLastDoneDateForRH(context.templateData.lastCompletedDateForRH || context.templateData.lastCompletedDate || context.templateData.lastDoneDate || '');
+        setLastDoneDateForRH(
+          useWorkOrderSnapshot
+            ? partALastCompletedOn
+            : (context.templateData.lastCompletedDateForRH || context.templateData.lastCompletedDate || context.templateData.lastDoneDate || ''),
+        );
 
         // Set Modify Mode snapshot if enabled
         if (isModifyMode && setOriginalSnapshot) {
@@ -4830,7 +4844,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due Date</Label>
                       <Input
                         type="date"
-                        value={templateData.nextDueDate}
+                        value={displayedPartANextDueDate}
                         onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
                         className={`text-sm ${isNewJobCreation && templateData.maintenanceBasis === 'Calendar' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
                         disabled={isPartAReadOnly || (isNewJobCreation && templateData.maintenanceBasis === 'Calendar')}
