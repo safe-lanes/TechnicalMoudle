@@ -97,7 +97,21 @@ export async function createJob(body: any) {
   const { z } = await import('zod');
 
   const jobCreateSchema = insertJobSchema.extend({ juuid: z.string().optional() });
-  let jobData = jobCreateSchema.parse(body);
+  const createInput = { ...body };
+  if (!Object.prototype.hasOwnProperty.call(createInput, 'lastDoneDate') &&
+      Object.prototype.hasOwnProperty.call(createInput, 'lastCompletedDate')) {
+    createInput.lastDoneDate = createInput.lastCompletedDate;
+  }
+  delete createInput.lastCompletedDate;
+  let jobData = jobCreateSchema.parse(createInput);
+
+  if (jobData.lastDoneDate) {
+    const normalizedLastDoneDate = normalizeDateToDDMMMYYYY(jobData.lastDoneDate);
+    if (!normalizedLastDoneDate) {
+      throw new ValidationError('Last Completed Date is invalid');
+    }
+    jobData = { ...jobData, lastDoneDate: normalizedLastDoneDate };
+  }
 
   // Component validation
   let component: any = null;
@@ -269,6 +283,19 @@ export async function updateJob(id: string, body: any) {
   const { calculateNextDueDate, normalizeDateToDDMMMYYYY } = await import('@shared/dateUtils');
 
   let updateData = { ...body };
+  if (!Object.prototype.hasOwnProperty.call(updateData, 'lastDoneDate') &&
+      Object.prototype.hasOwnProperty.call(updateData, 'lastCompletedDate')) {
+    updateData.lastDoneDate = updateData.lastCompletedDate;
+  }
+  delete updateData.lastCompletedDate;
+
+  if (updateData.lastDoneDate) {
+    const normalizedLastDoneDate = normalizeDateToDDMMMYYYY(updateData.lastDoneDate);
+    if (!normalizedLastDoneDate) {
+      throw new ValidationError('Last Completed Date is invalid');
+    }
+    updateData.lastDoneDate = normalizedLastDoneDate;
+  }
 
   if (Object.prototype.hasOwnProperty.call(updateData, 'isDeleted') ||
       Object.prototype.hasOwnProperty.call(updateData, 'is_deleted')) {

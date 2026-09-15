@@ -36,6 +36,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AdminOnly } from "@/components/RoleGuard";
 import { FEATURES } from '@/config/features';
 import { formatProfessionalDate } from "@/lib/dateUtils";
+import { buildDraftJobPayload } from "@/lib/jobFormPayload";
 import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
 
 const SFI_FORMAT_HINT = "Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.";
@@ -849,27 +850,11 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
           const jobErrors: string[] = [];
           for (const draft of draftJobs) {
             try {
-              const jobPayload: Record<string, any> = {
-                jobTitle: draft.jobTitle,
-                maintenanceType: draft.maintenanceType || null,
-                maintenanceBasis: draft.maintenanceBasis,
-                jobPriority: draft.jobPriority || null,
-                assignedTo: draft.assignedTo || null,
-                briefWorkDescription: draft.briefWorkDescription || null,
-                componentId: newComponent.cuuid,
-                componentCode: newComponent.componentCode,
-                componentName: newComponent.name,
-                vesselId: vesselId || 'V001',
-              };
-              if (draft.maintenanceBasis === 'Running Hours') {
-                jobPayload.intervalRunningHour = parseInt(draft.frequencyValue) || 0;
-                jobPayload.frequencyUnit = 'Hours';
-                if (draft.lastDoneRH) jobPayload.lastDoneRH = draft.lastDoneRH;
-              } else {
-                jobPayload.frequencyValue = draft.frequencyValue || null;
-                jobPayload.frequencyUnit = draft.frequencyUnit || null;
-                if (draft.lastDoneDate) jobPayload.lastDoneDate = draft.lastDoneDate;
-              }
+              const jobPayload = buildDraftJobPayload(
+                draft,
+                newComponent,
+                vesselId || 'V001',
+              );
               await apiRequest('POST', '/technical/api/jobs', jobPayload);
               successCount++;
             } catch (jobErr: any) {
