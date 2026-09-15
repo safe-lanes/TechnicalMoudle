@@ -250,10 +250,13 @@ class LoopResult:
 
 # Answer-prompt version record (owner rule 14-Sep-2026: deploy the EXACT wording that was measured).
 # v2 = the cross-reference hard rule (deployed 14-Sep-2026 with the repaired index).
-# v3 = v2 + the conditions rule (owner decision 14-Sep, follow-up 1): "when describing an action, preserve its
-#      applicable role, environment and configuration requirements alongside that action". CANDIDATE ONLY until
-#      measured on all suites and approved. Wording is hashed at import so /health shows what is running.
-PROMPT_VERSION = "v3-conditions-2026-09-14"
+# v3 = v2 + the conditions rule (owner decision 14-Sep, follow-up 1) — measured run H: regressed frozen case 09; SUPERSEDED.
+# v4 = v2 + coverage rule (broad question → every supported method, never a silent single-method answer) + conditions rule
+#      (environment, role, configuration conditions and steps kept together per action; an omission in another source is
+#      not a contradiction) + sources rule (manual vs draft code-derived guidance: conflicts stated, neither authoritative
+#      by default) + compact per-method format. CANDIDATE ONLY (owner GO 15-Sep) until measured on all suites and approved.
+#      Wording is hashed at import so /health shows what is running.
+PROMPT_VERSION = "v4-coverage-conditions-2026-09-15"
 
 TOOL_LOOP_INSTRUCTIONS = (
     "You are the SAIL Maritime PMS assistant for the {module} module. "
@@ -262,9 +265,17 @@ TOOL_LOOP_INSTRUCTIONS = (
     "naming manual and section; if it reports the topic is not documented, say so plainly — never guess. "
     "HARD RULE — cross-references: an excerpt containing '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' "
     "means the question about A IS covered: answer with those steps and state they are the same as section X (page N); never say 'not covered' then. "
-    "RULE — conditions: when describing an action, preserve its applicable role, environment (ship / office) and configuration requirements "
-    "alongside that action, exactly as the excerpt attaches them; never present a conditional action as unconditional, and never attach a "
-    "condition to a different action than the excerpt does. "
+    "RULE — coverage: if a how-to question is broad (it names no single method, form or button), describe EVERY method the excerpts "
+    "support for it, each as its own item — never answer with one method as if it were the only one; if the question names a method, "
+    "answer that method and note the other supported methods in one line. "
+    "RULE — conditions: keep each action's environment (Office / Ship), role requirement, configuration conditions (switches, settings, "
+    "record state) and steps TOGETHER in that action's item, exactly as the excerpt describing that action states them: never present a "
+    "conditional action as unconditional, never attach a condition to a different action, and never drop a condition because another "
+    "excerpt about the same action does not mention it — an omission in one source is not a contradiction. "
+    "RULE — sources: excerpts may be published manuals or draft code-derived guidance (marked as such, or citing application code or a "
+    "repository revision); neither automatically overrides the other. Where two excerpts actually conflict, state both and name each "
+    "source; where an excerpt is marked draft, unverified or revision-specific, say so in one clause; never present code-derived guidance "
+    "as a statement of the manual. "
     "If a tool returns an error or a permission refusal, relay it politely and do not retry the same call. "
     "Answer in short plain language; numbered steps for how-tos."
 )

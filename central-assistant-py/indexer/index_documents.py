@@ -438,10 +438,11 @@ async def main() -> int:
                     n_code = sum(1 for t in tags if t.startswith("[code"))
                     n_man = sum(1 for t in tags if t.startswith("[manual") or t.startswith("[screenshot"))
                     rev = re.search(r"origin/replit_dev\s+([0-9a-f]{7,})", sources) or re.search(r"\b([0-9a-f]{9})\b", sources)
-                    prov_line = (f"Provenance note: this is a reviewed knowledge-base procedure, not a published manual. {n_man} statement(s) come from the "
-                                 f"June PMS manuals; {n_code} statement(s) about roles, switches and automatic generation were read from the Technical "
-                                 f"application code at repository revision {rev.group(1) if rev else 'recorded in the Sources block'} and apply to that "
-                                 f"revision — the running deployment has not been verified as identical.")
+                    # Owner wording (15-Sep): no "reviewed" unless a review is recorded in REVIEW.md.
+                    prov_line = (f"Provenance note: draft code-derived guidance, not a published manual. {n_man} statement(s) come from the June PMS "
+                                 f"manuals; {n_code} statement(s) about roles, switches and automatic generation were inspected in the Technical "
+                                 f"application code at repository revision {rev.group(1) if rev else 'recorded in the Sources block'}; "
+                                 f"running deployment unverified.")
                     clean = prov_line + "\n\n" + clean
                 extra = {"source": "kb-pilot", "kb_path": f"kb/{a.kb_module}/work-orders/{f.name}", "kb_sha256": sha, "chunker_version": CHUNKER_VERSION,
                          "kb_sources": sources.strip()[:4000], "kb_provenance": tags[:120], "kb_one_chunk": True, "kb_provenance_line": bool(prov_line)}
