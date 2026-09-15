@@ -63,6 +63,27 @@ describe("Job form Last Completed Date persistence", () => {
     expect(repo.create.mock.calls[0][0]).not.toHaveProperty("lastCompletedDate");
   });
 
+  it("accepts the live form lastCompletedOn field as an API alias", async () => {
+    const { createJob } = await import("../services/jobService");
+
+    const job = await createJob({
+      jobNo: "TEST-003",
+      jobTitle: "Live form inspection",
+      vesselId: "vessel-1",
+      componentId: "component-1",
+      maintenanceBasis: "Calendar",
+      frequencyValue: "1",
+      frequencyUnit: "Months",
+      lastCompletedOn: "2026-09-01",
+    });
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ lastDoneDate: "01-Sep-2026" }),
+    );
+    expect(repo.create.mock.calls[0][0]).not.toHaveProperty("lastCompletedOn");
+    expect(job.lastDoneDate).toBe("01-Sep-2026");
+  });
+
   it("maps Last Completed Date on update to the persisted lastDoneDate field", async () => {
     repo.findById.mockResolvedValue({
       id: "job-1",
@@ -80,6 +101,26 @@ describe("Job form Last Completed Date persistence", () => {
 
     expect(repo.update).toHaveBeenCalledWith("job-1", {
       lastDoneDate: "10-Jul-2026",
+    });
+  });
+
+  it("maps the legacy live form field on update without persisting the alias", async () => {
+    repo.findById.mockResolvedValue({
+      id: "job-1",
+      juuid: "job-1",
+      vesselId: "vessel-1",
+      componentId: null,
+      maintenanceBasis: "Calendar",
+      frequencyValue: null,
+      frequencyUnit: null,
+      lastDoneDate: null,
+    });
+    const { updateJob } = await import("../services/jobService");
+
+    await updateJob("job-1", { lastCompletedOn: "2026-08-10" });
+
+    expect(repo.update).toHaveBeenCalledWith("job-1", {
+      lastDoneDate: "10-Aug-2026",
     });
   });
 });

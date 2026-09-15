@@ -52,6 +52,7 @@ import { useRanks, ensureRankInOptions } from "@/hooks/useRanks";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { mapLastCompletedOnToLastDoneDate } from "@/lib/jobFormPayload";
 import { viewAuthedDocument } from "@/lib/authedDownload";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useApprovalPolicy, effectiveApprovalTier } from "@/hooks/useApprovalPolicy";
@@ -3228,7 +3229,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             : undefined,
         level2ReviewerRankId: (templateData as any).level2ReviewerRankId || null,
         lastDoneRH: (templateData as any).lastDoneRH ? String((templateData as any).lastDoneRH).trim() : null,
-        lastCompletedOn: (templateData as any).lastCompletedOn || null,
+        lastDoneDate: mapLastCompletedOnToLastDoneDate((templateData as any).lastCompletedOn),
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
       };
 

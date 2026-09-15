@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { buildDraftJobPayload } from "../../../../client/src/lib/jobFormPayload";
+import {
+  buildDraftJobPayload,
+  mapLastCompletedOnToLastDoneDate,
+} from "../../../../client/src/lib/jobFormPayload";
 
 describe("buildDraftJobPayload", () => {
+  it("maps the live vessel Job form value to the canonical lastDoneDate field", () => {
+    expect(mapLastCompletedOnToLastDoneDate("2026-09-15")).toBe("2026-09-15");
+    expect(mapLastCompletedOnToLastDoneDate(" 2026-09-15 ")).toBe("2026-09-15");
+    expect(mapLastCompletedOnToLastDoneDate("")).toBeNull();
+  });
+
   it("maps the form Last Done Date to the Job lastDoneDate API field", () => {
     const payload = buildDraftJobPayload(
       {

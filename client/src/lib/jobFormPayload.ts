@@ -6,6 +6,13 @@ interface ComponentIdentity {
   name?: string | null;
 }
 
+export function mapLastCompletedOnToLastDoneDate(
+  lastCompletedOn: string | null | undefined,
+): string | null {
+  const value = lastCompletedOn?.trim();
+  return value || null;
+}
+
 export function buildDraftJobPayload(
   draft: DraftJob,
   component: ComponentIdentity,

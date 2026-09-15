@@ -98,11 +98,15 @@ export async function createJob(body: any) {
 
   const jobCreateSchema = insertJobSchema.extend({ juuid: z.string().optional() });
   const createInput = { ...body };
-  if (!Object.prototype.hasOwnProperty.call(createInput, 'lastDoneDate') &&
-      Object.prototype.hasOwnProperty.call(createInput, 'lastCompletedDate')) {
-    createInput.lastDoneDate = createInput.lastCompletedDate;
+  if (!Object.prototype.hasOwnProperty.call(createInput, 'lastDoneDate')) {
+    if (Object.prototype.hasOwnProperty.call(createInput, 'lastCompletedDate')) {
+      createInput.lastDoneDate = createInput.lastCompletedDate;
+    } else if (Object.prototype.hasOwnProperty.call(createInput, 'lastCompletedOn')) {
+      createInput.lastDoneDate = createInput.lastCompletedOn;
+    }
   }
   delete createInput.lastCompletedDate;
+  delete createInput.lastCompletedOn;
   let jobData = jobCreateSchema.parse(createInput);
 
   if (jobData.lastDoneDate) {
@@ -283,11 +287,15 @@ export async function updateJob(id: string, body: any) {
   const { calculateNextDueDate, normalizeDateToDDMMMYYYY } = await import('@shared/dateUtils');
 
   let updateData = { ...body };
-  if (!Object.prototype.hasOwnProperty.call(updateData, 'lastDoneDate') &&
-      Object.prototype.hasOwnProperty.call(updateData, 'lastCompletedDate')) {
-    updateData.lastDoneDate = updateData.lastCompletedDate;
+  if (!Object.prototype.hasOwnProperty.call(updateData, 'lastDoneDate')) {
+    if (Object.prototype.hasOwnProperty.call(updateData, 'lastCompletedDate')) {
+      updateData.lastDoneDate = updateData.lastCompletedDate;
+    } else if (Object.prototype.hasOwnProperty.call(updateData, 'lastCompletedOn')) {
+      updateData.lastDoneDate = updateData.lastCompletedOn;
+    }
   }
   delete updateData.lastCompletedDate;
+  delete updateData.lastCompletedOn;
 
   if (updateData.lastDoneDate) {
     const normalizedLastDoneDate = normalizeDateToDDMMMYYYY(updateData.lastDoneDate);
