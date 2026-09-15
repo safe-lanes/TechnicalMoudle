@@ -1,0 +1,90 @@
+== 'How do I create a work order?' · kb-base (A/B top-5 = excerpts; C = top-6) ==
+   1 0.7926       Technical - PMS User Manual For Of 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) ci=0
+   2 0.8107       Technical - PMS User Manual_Vessel 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24) ci=0
+   3 0.8373       Technical - PMS User Manual For Of 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) ci=0
+   4 0.8382       Technical - PMS User Manual_Vessel 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27) ci=0
+   5 0.8502       Technical - PMS User Manual For Of Introduction (p.28) ci=0
+   6 0.8680       Technical - PMS User Manual_Vessel Introduction (p.23) ci=0
+   7 0.9038       Technical - PMS User Manual For Of 1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O) (p.28) ci=1
+   8 0.9239       Technical - PMS User Manual_Vessel Table of Contents (p.2) ci=2
+== 'How do I create a work order?' · kb-pilot (A/B top-5 = excerpts; C = top-6) ==
+   1 0.7891 PILOT Technical - KB pilot: Create an un Create an unplanned work order ('+ Unplanned W.O') ci=0
+   2 0.7926       Technical - PMS User Manual For Of 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) ci=0
+   3 0.8107       Technical - PMS User Manual_Vessel 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24) ci=0
+   4 0.8346 PILOT Technical - KB pilot: Create an un Create an unplanned work order ('+ Unplanned W.O') ci=1
+   5 0.8373       Technical - PMS User Manual For Of 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) ci=0
+   6 0.8382       Technical - PMS User Manual_Vessel 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27) ci=0
+   7 0.8502       Technical - PMS User Manual For Of Introduction (p.28) ci=0
+   8 0.8680       Technical - PMS User Manual_Vessel Introduction (p.23) ci=0
+== 'How to create work order in PMS?' · kb-base (A/B top-5 = excerpts; C = top-6) ==
+   1 0.7328       Technical - PMS User Manual For Of Introduction (p.28) ci=0
+   2 0.7514       Technical - PMS User Manual For Of 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) ci=0
+   3 0.7731       Technical - PMS User Manual For Of 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) ci=0
+   4 0.7877       Technical - PMS User Manual_Vessel 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24) ci=0
+   5 0.7931       Technical - PMS User Manual_Vessel Introduction (p.23) ci=0
+   6 0.8163       Technical - PMS User Manual For Of 1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.30) ci=0
+   7 0.8184       Technical - PMS User Manual_Vessel Table of Contents (p.2) ci=2
+   8 0.8197       Technical - PMS User Manual_Vessel 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27) ci=0
+== 'How to create work order in PMS?' · kb-pilot (A/B top-5 = excerpts; C = top-6) ==
+   1 0.7328       Technical - PMS User Manual For Of Introduction (p.28) ci=0
+   2 0.7514       Technical - PMS User Manual For Of 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) ci=0
+   3 0.7731       Technical - PMS User Manual For Of 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) ci=0
+   4 0.7877       Technical - PMS User Manual_Vessel 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24) ci=0
+   5 0.7931       Technical - PMS User Manual_Vessel Introduction (p.23) ci=0
+   6 0.8163       Technical - PMS User Manual For Of 1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.30) ci=0
+   7 0.8184       Technical - PMS User Manual_Vessel Table of Contents (p.2) ci=2
+   8 0.8197       Technical - PMS User Manual_Vessel 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27) ci=0
+== 'How are planned work orders created in PMS — do I have to create them myself?' · kb-base (A/B top-5 = excerpts; C = top-6) ==
+   1 0.8314       Technical - PMS User Manual For Of 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) ci=0
+   2 0.8349       Technical - PMS User Manual_Vessel 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24) ci=0
+   3 0.8367       Technical - PMS User Manual_Vessel 1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.25) ci=0
+   4 0.8428       Technical - PMS User Manual For Of 1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.30) ci=0
+   5 0.8775       Technical - PMS User Manual For Of Introduction (p.28) ci=0
+   6 0.9248       Technical - PMS User Manual_Vessel Introduction (p.23) ci=0
+   7 0.9637       Technical - PMS User Manual_Vessel Table of Contents (p.2) ci=2
+   8 0.9807       Technical - PMS User Manual For Of 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) ci=0
+== 'How are planned work orders created in PMS — do I have to create them myself?' · kb-pilot (A/B top-5 = excerpts; C = top-6) ==
+   1 0.8314       Technical - PMS User Manual For Of 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) ci=0
+   2 0.8349       Technical - PMS User Manual_Vessel 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24) ci=0
+   3 0.8367       Technical - PMS User Manual_Vessel 1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.25) ci=0
+   4 0.8409 PILOT Technical - KB pilot: Planned work Planned work orders — generated automatically by the ci=0
+   5 0.8428       Technical - PMS User Manual For Of 1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.30) ci=0
+   6 0.8715 PILOT Technical - KB pilot: Planned work Planned work orders — generated automatically by the ci=2
+   7 0.8728 PILOT Technical - KB pilot: Create an un Create an unplanned work order ('+ Unplanned W.O') ci=1
+   8 0.8775       Technical - PMS User Manual For Of Introduction (p.28) ci=0
+== 'how do I create a work order' · kb-base (A/B top-5 = excerpts; C = top-6) ==
+   1 0.8084       Technical - PMS User Manual For Of 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) ci=0
+   2 0.8262       Technical - PMS User Manual_Vessel 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24) ci=0
+   3 0.8358       Technical - PMS User Manual For Of 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) ci=0
+   4 0.8428       Technical - PMS User Manual_Vessel 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27) ci=0
+   5 0.8601       Technical - PMS User Manual For Of Introduction (p.28) ci=0
+   6 0.8806       Technical - PMS User Manual_Vessel Introduction (p.23) ci=0
+   7 0.9233       Technical - PMS User Manual For Of 1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O) (p.28) ci=1
+   8 0.9283       Technical - PMS User Manual For Of 1.1.5.3 HOW TO PRE-PLAN THE WORK ORDER (p.30) ci=0
+== 'how do I create a work order' · kb-pilot (A/B top-5 = excerpts; C = top-6) ==
+   1 0.8084       Technical - PMS User Manual For Of 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) ci=0
+   2 0.8262       Technical - PMS User Manual_Vessel 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24) ci=0
+   3 0.8358       Technical - PMS User Manual For Of 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) ci=0
+   4 0.8428       Technical - PMS User Manual_Vessel 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27) ci=0
+   5 0.8500 PILOT Technical - KB pilot: Create an un Create an unplanned work order ('+ Unplanned W.O') ci=0
+   6 0.8601       Technical - PMS User Manual For Of Introduction (p.28) ci=0
+   7 0.8634 PILOT Technical - KB pilot: Create an un Create an unplanned work order ('+ Unplanned W.O') ci=1
+   8 0.8806       Technical - PMS User Manual_Vessel Introduction (p.23) ci=0
+== 'How do I create a COC defect record?' · kb-base (A/B top-5 = excerpts; C = top-6) ==
+   1 0.5793       Technical - Defects User Manual Fo 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD (p.19) ci=2
+   2 0.6956       Technical - Defects User Manual Fo 1.1.5.1 HOW TO ACCESS CONDITION OF CLASS (COC) (p.19 ci=1
+   3 0.7313       Technical - Defects User Manual Fo 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.1 ci=4
+   4 0.7567       Technical - Defects User Manual Fo 1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15) ci=0
+   5 0.7684       Technical - Defects User Manual Fo 1.1.5 CONDITION OF CLASS (COC) (p.19) ci=0
+   6 0.8135       Technical - Defects User Manual Fo 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.1 ci=5
+   7 0.8241       Technical - Defects User Manual Fo 1.1.5.6 HOW TO EXPORT AN INDIVIDUAL COC RECORD (p.20 ci=1
+   8 0.8718       Technical - Defects User Manual Fo 1.1.5.5 HOW TO EXPORT ALL COC RECORDS (p.20) ci=0
+== 'How do I create a COC defect record?' · kb-pilot (A/B top-5 = excerpts; C = top-6) ==
+   1 0.5793       Technical - Defects User Manual Fo 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD (p.19) ci=2
+   2 0.6956       Technical - Defects User Manual Fo 1.1.5.1 HOW TO ACCESS CONDITION OF CLASS (COC) (p.19 ci=1
+   3 0.7313       Technical - Defects User Manual Fo 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.1 ci=4
+   4 0.7567       Technical - Defects User Manual Fo 1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15) ci=0
+   5 0.7684       Technical - Defects User Manual Fo 1.1.5 CONDITION OF CLASS (COC) (p.19) ci=0
+   6 0.8135       Technical - Defects User Manual Fo 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.1 ci=5
+   7 0.8241       Technical - Defects User Manual Fo 1.1.5.6 HOW TO EXPORT AN INDIVIDUAL COC RECORD (p.20 ci=1
+   8 0.8718       Technical - Defects User Manual Fo 1.1.5.5 HOW TO EXPORT ALL COC RECORDS (p.20) ci=0

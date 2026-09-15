@@ -300,6 +300,8 @@ async def main() -> int:
     ap.add_argument("--embed-input", choices=["meta", "text"], default="meta", help="what is embedded: metadata+text (LlamaIndex-compatible, the live set) or text only")
     ap.add_argument("--no-reuse-vectors", action="store_true", help="always call the embedding API, even when a stored vector exists for the identical input")
     ap.add_argument("--apply-repairs", action="store_true", help="insert the verified extraction repairs (indexer/repairs/*.json, matched by source sha256) on their pages")
+    ap.add_argument("--kb-dir", default=None, help="KB pilot: directory of reviewed procedure markdown files, indexed as-is (no parser) with metadata source=kb-pilot")
+    ap.add_argument("--kb-module", default="technical", help="module tag for --kb-dir files")
     a = ap.parse_args()
     repairs = load_repairs() if a.apply_repairs else {}
 
@@ -406,6 +408,27 @@ async def main() -> int:
                 failures += 1
                 log(f"   FAILED: {e}")
                 summary.append({"file": f.name, "error": str(e)})
+        # ── KB pilot: reviewed procedure markdown, indexed as-is (owner brief 14/15-Sep-2026) ──
+        if a.kb_dir and conn is not None and oai is not None:
+            kb = Path(a.kb_dir)
+            for f in sorted(kb.glob("*.md")):
+                if f.name.upper() in ("README.MD", "CONFLICTS.MD", "REVIEW.MD"):
+                    continue
+                md = f.read_text(encoding="utf-8")
+                title = next((ln.lstrip("# ").strip() for ln in md.splitlines() if ln.startswith("# ")), f.stem)
+                display = f"{a.kb_module.title()} - KB pilot: {title}.md"  # keeps the module prefix convention (citation 'manual' = this name)
+                sha = hashlib.sha256(md.encode("utf-8")).hexdigest()
+                log(f"> {display} [kb-pilot from {f.name}]")
+                extra = {"source": "kb-pilot", "kb_path": f"kb/{a.kb_module}/work-orders/{f.name}", "kb_sha256": sha, "chunker_version": CHUNKER_VERSION}
+                chunks = chunks_from_markdown(md=md, source_file=display, source_type="md", max_chunk_size=a.max_chunk, chunk_overlap=a.overlap,
+                                              page_map=None, extra_metadata=extra)
+                inputs = [embed_input(c, a.embed_input) for c in chunks]
+                vecs, reused = await embed_or_reuse(conn, oai, embed_model, inputs, a.embed_batch, not a.no_reuse_vectors, log)
+                await store_document(conn, index_set=a.index_set, file=display, module=a.kb_module, sha=sha, source_type="md",
+                                     chunks=chunks, vectors=vecs, embed_inputs=inputs, pages=None, stub=False, tier="none", version="kb-pilot",
+                                     embed_model=embed_model, clean_report={"source": "kb-pilot", "kb_path": extra["kb_path"], "vectors_reused": reused})
+                log(f"   {len(chunks)} chunks stored ({a.index_set}, source=kb-pilot)")
+                summary.append({"file": display, "chunks": len(chunks), "source": "kb-pilot"})
         if conn is not None:
             total = await conn.fetchval("SELECT count(*) FROM assistant_chunks WHERE index_set=$1", a.index_set)
             log(f"\nindex set '{a.index_set}' now holds {total} chunks across "
