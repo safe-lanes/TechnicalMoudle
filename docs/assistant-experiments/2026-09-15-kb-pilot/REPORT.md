@@ -247,6 +247,60 @@ With the overview ALONE and the unchanged v2 prompt, the model covers all three 
 
 **Smallest next fix to test (not implemented):** on the candidate only, collapse the duplicated Office/Vessel manual sections in the five excerpts — the same section from the two manuals occupies two of the five slots for both questions (ranks 1–2 for the generic question, 3–4 for "different ways") — so the overview and its conditions compete with less near-duplicate text. It changes which of the already-retrieved chunks are shown, nothing else; measured with the frozen suites (must stay 18/18 · 11/12 · 13/14) and the work-order suite under judge .5, three runs, with wire capture. Second candidate, only if that fails: a conditions rule in the prompt, re-tested against frozen case 09 (the v3 attempt regressed it). Judge follow-up for the owner: add "system generates … automatically" to the phrase list as .6, re-validated on the 108 stored answers before use.
 
+## 10. Judge .6 + Office/Vessel pair consolidation comparison + prepared provenance line (owner GO, 15-Sep; `judge6-validation.txt`, `pair-texts.json`, `dedup-*`)
+
+Live and unrelated services unchanged. Same container `sail-assistant-py-exp2` (image `8db669090d36…` prompt-v2, started 04:45:57Z), same index `kb-pilot` 916, same settings; every captured chat body again carries system sha `b37172f6122a0257` = v2, `gpt-4o-mini`, temperature 0.2. Capture on the diagnostic process only; scanned (0 keys / 0 tokens / 0 identity names); removed from the container and server.
+
+### 10.1 Judge .6 — validated on the 108 stored answers first (96 suite + 12 diagnostic)
+
+Changes: (a) automatic-generation wording accepted whenever generate/create and automatic(ally) share a sentence; (b) environment and prerequisite checked together per action — the per-job 'Generate WO' switch must be stated as an office condition ("switch required" alone = incorrect applicability, the ship path has no switch); 'Generate Now' must be placed in the office; the unplanned scope must carry no switch or Sail Admin requirement. Notes are tagged `[missing prerequisite]` / `[incorrect applicability]`. Two defects found and fixed during validation before the version was accepted: the manual file name "For Office_Sail Admin" quoted inside an answer body tripped the unplanned check (5 false hits), and the step parenthetical "(Office: select the vessel)" satisfied the office qualifier for the switch (1 false pass) — both excluded explicitly. Frozen suites and the shared base judge untouched.
+
+| .5 → .6 | count | detail |
+|---|---|---|
+| rule-level outcome changed | 6 | D2 wo-phr-03 B runs 1–2: "provided the vessel's switch is on" with no office → **incorrect applicability** (correct: that sentence applies the office switch to both instances); diagnostic overview runs generic-01 1 and 3, phr-01 1: "The vessel's switch must be ON for this option" → incorrect applicability; generic-01 overview runs 2–3: "the system generates them/these automatically" now accepted |
+| overall PASS/fail changed | 2 | diagnostic overview runs generic-01 run 1 and phr-01 run 1: PASS → fail (switch without the office qualifier). The 96 suite answers: **0 score changes** |
+
+Reported by hand, not judged: phr-01 overview run 3 frames the per-job and unplanned actions as "In the office, …" (office-side framing with the ship path unstated) — passes .6 because the switch is correctly office-qualified there; noted as a precision observation.
+
+### 10.2 Duplicate pairs inspected from the captured texts (`pair-texts.json`)
+
+| pair (Office vs Vessel) | exact differences | decision |
+|---|---|---|
+| 1.1.5.2 How to create an unplanned work order (p.29 vs p.24) | Office has one extra step "Select the vessel from the 'Vessel' dropdown"; figure numbers 43/44 vs 33/34; Office screenshot callouts are longer (the Vessel ones are one-line summaries); Office carries a "Page 29 of 64" footer. Every Vessel step line has an identical Office line. | consolidate: Office text (superset) + explicit note "Vessel manual (… p.24): the same steps as above, with these differences: Office manual only: 'Select the vessel…'" — both references in the excerpt header and the citation |
+| 1.1.5.6 How to complete the work order (p.32 vs p.27) | same pattern: Office-only "Select the vessel" step; figures 49/50 vs 39/40; longer Office callouts; RA note identical (marker `\*` vs `☞`) | consolidate, same form |
+| Introduction (p.28 vs p.23) | one word: "Work Orders (WO) are" vs "is" | consolidate; the wording difference recorded in the note |
+
+Eligibility was decided from the texts at run time by the script (Vessel step/sentence lines ⊆ Office lines at ratio ≥ 0.97, screenshot descriptions and figure captions ignored because the Office text is kept whole), not from headings; a pair with any Vessel-only line would have been left separate — none was.
+
+### 10.3 Controlled comparison — NORMAL vs consolidated pairs (`dedup-analysis.txt`, `dedup-capture.jsonl`, `dedup-results.json`)
+
+Arm DEDUP = the served docs path, then eligible pairs consolidated at the first occurrence, freed slots NOT refilled, relative order kept: for "How do I create a work order?" the message went from 5 excerpts (Office unplanned, Vessel unplanned, overview, Office complete, Vessel complete) to 3 (merged unplanned, overview, merged complete); for "different ways" from 5 (overview, Office intro, Office unplanned, Vessel unplanned, Vessel intro) to 3 (overview, merged intro, merged unplanned). The consolidation note is present in every DEDUP wire body (checked). A first attempt consolidated nothing because of a script bug (an unordered-set comparison); its six NORMAL-arm runs are kept as extra baseline data in `dedup-*-attempt1-nodedup.*` and behave like every other NORMAL run.
+
+| question | arm | excerpts | alternatives covered | per-job switch (office-qualified) | Generate Now (Sail Admin + switch, office) | judge .6 |
+|---|---|---|---|---|---|---|
+| How do I create a work order? | NORMAL | 5 | 0/3 (unplanned only) | not described | not described | 0/3 |
+| How do I create a work order? | DEDUP | 3 (overview now at position 2) | **0/3 (unplanned only)** | not described | not described | 0/3 |
+| What are the different ways…? | NORMAL | 5 | 3/3 | **0/3** dropped | 3/3 | 0/3 |
+| What are the different ways…? | DEDUP | 3 | 3/3 | **0/3** dropped | 3/3 | 0/3 |
+
+Split by kind, DEDUP arm (6 runs): incorrect instruction 0; missing prerequisite 3 (phr-01, per-job switch); missing alternative 3 (generic-01); judge-only 0. One new observation: the DEDUP generic-01 answers state "Select the vessel from the 'Vessel' dropdown" unconditionally and add "These steps are the same as section 1.1.5.2 (page 24) of the Vessel manual" — the consolidation note said that step is Office-only, and the model did not carry the qualifier. Citations in the DEDUP arm list the merged excerpt with both references ("… (p.29) [consolidated with … (p.24)]").
+
+**Finding:** removing the duplicated Office/Vessel sections changed nothing measurable — the same two defects recur 3/3 in both arms, exactly as in the 5-excerpt arm of §9. Duplication alone is therefore NOT the cause. Combined with §9 (overview alone: alternatives 6/6, per-job switch 5/6), the remaining difference between the failing and the succeeding conditions is the presence of manual excerpts at all — in particular the manual's own "How to create an unplanned work order" section, whose shape matches the generic question directly — not their duplication, and not the overview's position (position 2 or 1 in DEDUP, still ignored or trimmed). INFERRED from two diagnostics; a third arm (overview + ONE manual excerpt) would isolate "any manual excerpt" from "the unplanned section specifically"; not run.
+
+Per the owner's rule the existing regression suites and the work-order suite were NOT run for this change (no improvement to carry forward).
+
+### 10.4 Prepared, not applied: provenance line for the kb chunks (item 4)
+
+`index_documents.py --kb-provenance-line` (default off; no index set re-built) prepends ONE line to each kb chunk's embedded/answer text; the file:line references stay in `kb_provenance` metadata. Rendered for the overview file: "Provenance note: this is a reviewed knowledge-base procedure, not a published manual. 3 statement(s) come from the June PMS manuals; 7 statement(s) about roles, switches and automatic generation were read from the Technical application code at repository revision cf5241ad6 and apply to that revision — the running deployment has not been verified as identical." Applying it re-embeds the five kb chunks (their text changes) and must be measured on its own (frozen suites + work-order suite + capture), separately from any excerpt change. Not bundled into §10.3.
+
+### 10.5 Evidence record corrected (item 5)
+
+`kb3-failures.md` and `failures_kb3.py` now carry the "earlier reconstructed-input report" label, the claim that the reconstruction proves the model input is withdrawn, and the 3,000-character statement is corrected (tool path only); the wire captures (`diag-capture.jsonl`, `dedup-capture.jsonl`) are identified as the verified evidence.
+
+### 10.6 Recommendation
+
+Do not pursue deduplication further as a fix — it is measured as no-effect here. The smallest next diagnostic (not a fix, not implemented): one more arm, overview + the single manual unplanned section, three runs each on the two questions, to settle whether any manual excerpt or that specific section triggers the drop. If the drop follows the unplanned section, the candidate fixes become either a prompt rule for conditions (re-tested against frozen case 09, which v3 regressed) or a retrieval rule that prefers a KB procedure over a manual section covering the same action — both need the owner's decision. Judge .6 should be the scoring version from here; the provenance line (§10.4) is ready to apply as its own measured step.
+
 ### 8.6 Not changed / open
 
 Not changed: live, prompt (v2 on both instances), retrieval logic, thresholds, excerpt count, the frozen suites, the base judge's literal must-phrase check. Open for the owner: (1) the answer-generation drops now dominate — the conditions rule (prompt v3) targeted this and regressed frozen case 09 (§S.7.1); a reworded rule or a content-ordering change are the untested candidates; (2) two retrieval residues (wo-generic-03; wo-phr-02's "other ways" note, which could also be one sentence in unplanned-wo.md); (3) the literal must-phrase check in the shared base judge fails wo-phr-03 answers that are right by meaning.

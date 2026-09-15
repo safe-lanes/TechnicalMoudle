@@ -1,6 +1,8 @@
-# Run D3 — every failing work-order run, with the exact excerpt text supplied to the model
+# Run D3 — every failing work-order run, with the RECONSTRUCTED excerpt text (earlier reconstructed-input report)
 
-Excerpts: top-5 hits of the winning module, text[:3000], from the same index and embedding model as the run (probe_kb3.py). One excerpt set per question × set (deterministic retrieval); each run's returned citations are cross-checked against it below.
+**Status of this file (corrected 15-Sep after external review):** this is the earlier reconstructed-input report. The excerpt texts below were reproduced by a separate probe (`probe_kb3.py`) from the same index set and embedding model — they are NOT captures of the requests sent to the model. The probe reproduced `text[:3000]` without headers; the served docs path actually sends each chunk's FULL text with a `[i] (manual — section)` header and `---` separators (the 3,000-character cut applies only to the tool path). For the chunks involved (all ≤ 2,105 characters) the text is the same, but the citation cross-check below shows only that the probe and the runs retrieved the same chunks — it does not prove the exact model input. **The verified evidence is the wire capture of the later diagnostic: `diag-capture.jsonl` (actual request bodies) with `diag-analysis.txt` and `diag-results.json` (REPORT.md §9).** The classifications below stand as reconstructed-input classifications.
+
+Excerpts: top-5 hits of the winning module, reconstructed by probe_kb3.py from the same index and embedding model as the run. One excerpt set per question × set (deterministic retrieval); each run's returned citations are compared with it below (consistency check only).
 
 ## Totals
 | classification | failing runs |

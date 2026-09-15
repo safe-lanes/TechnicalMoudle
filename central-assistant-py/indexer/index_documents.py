@@ -303,6 +303,10 @@ async def main() -> int:
     ap.add_argument("--apply-repairs", action="store_true", help="insert the verified extraction repairs (indexer/repairs/*.json, matched by source sha256) on their pages")
     ap.add_argument("--kb-dir", default=None, help="KB pilot: directory of reviewed procedure markdown files, indexed as-is (no parser) with metadata source=kb-pilot")
     ap.add_argument("--kb-module", default="technical", help="module tag for --kb-dir files")
+    ap.add_argument("--kb-provenance-line", action="store_true",
+                    help="KB pilot input-format correction (owner, 15-Sep-2026, prepared — NOT applied to any index set yet): prepend one short "
+                         "qualification line to each kb chunk's embedded/answer text so the answer model is told that code-derived statements "
+                         "are revision-specific and the running deployment is unverified; the detailed code paths stay in metadata")
     a = ap.parse_args()
     repairs = load_repairs() if a.apply_repairs else {}
 
@@ -426,8 +430,21 @@ async def main() -> int:
                 tags = re.findall(r"\[(?:manual|screenshot|code|unverified)[^\]]*\]", body)
                 clean = re.sub(r"\s*\[(?:manual|screenshot|code|unverified)[^\]]*\]", "", body)
                 clean = re.sub(r"[ \t]+\n", "\n", clean).strip() + "\n"
+                prov_line = None
+                if a.kb_provenance_line:
+                    # Prepared input-format correction (owner, 15-Sep-2026): the one-chunk mode moved every [code: …] tag to metadata,
+                    # so the answer model no longer sees that code-derived behaviour is revision-specific. This ONE line restores
+                    # that qualification in the text the model reads; the file:line references stay in kb_provenance metadata.
+                    n_code = sum(1 for t in tags if t.startswith("[code"))
+                    n_man = sum(1 for t in tags if t.startswith("[manual") or t.startswith("[screenshot"))
+                    rev = re.search(r"origin/replit_dev\s+([0-9a-f]{7,})", sources) or re.search(r"\b([0-9a-f]{9})\b", sources)
+                    prov_line = (f"Provenance note: this is a reviewed knowledge-base procedure, not a published manual. {n_man} statement(s) come from the "
+                                 f"June PMS manuals; {n_code} statement(s) about roles, switches and automatic generation were read from the Technical "
+                                 f"application code at repository revision {rev.group(1) if rev else 'recorded in the Sources block'} and apply to that "
+                                 f"revision — the running deployment has not been verified as identical.")
+                    clean = prov_line + "\n\n" + clean
                 extra = {"source": "kb-pilot", "kb_path": f"kb/{a.kb_module}/work-orders/{f.name}", "kb_sha256": sha, "chunker_version": CHUNKER_VERSION,
-                         "kb_sources": sources.strip()[:4000], "kb_provenance": tags[:120], "kb_one_chunk": True}
+                         "kb_sources": sources.strip()[:4000], "kb_provenance": tags[:120], "kb_one_chunk": True, "kb_provenance_line": bool(prov_line)}
                 chunks = chunks_from_markdown(md=clean, source_file=display, source_type="md", max_chunk_size=100_000, chunk_overlap=0,
                                               page_map=None, extra_metadata=extra)
                 log(f"   one-chunk mode: {len(chunks)} chunk(s), {len(chunks[0].text) if chunks else 0} chars embedded text; {len(tags)} provenance tags + Sources block ({len(sources.strip())} chars) moved to metadata")

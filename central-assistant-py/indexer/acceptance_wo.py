@@ -44,8 +44,14 @@ from acceptance_answers import ask, judge  # noqa: E402
 #     conditions stay with their action); a unit naming another action closes it. Conditions are then checked inside the
 #     scope of the action they belong to — never across the whole answer. Limitation (reported, not hidden): a condition
 #     stated in a unit BEFORE the first action unit belongs to no scope and does not count.
-WO_SUITE_VERSION = "2026-09-14.5"
-JUDGE_VERSION = 5
+# .6 (owner GO, 15-Sep, second review): (a) equivalent automatic-generation wording accepted — any sentence that pairs
+#     generate/create with automatic(ally) ("the system generates them automatically", "automatically created by the ship
+#     system"); (b) environment + prerequisite checked TOGETHER per action: the per-job 'Generate WO' switch must be stated
+#     as an OFFICE condition ("switch required" alone = incorrect applicability, because the ship path has no switch);
+#     'Generate Now' must be placed in the office; the unplanned scope must not carry a switch or Sail Admin requirement.
+#     Reported as substantive defects ("missing prerequisite" / "incorrect applicability"), never as wording.
+WO_SUITE_VERSION = "2026-09-14.6"
+JUDGE_VERSION = 6
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -72,6 +78,33 @@ PHRASINGS = [
 ]
 AUTO_V3 = r"(generated automatically|automatically generat|daily scan|from the job schedule|job schedule|from the job'?s schedule|scheduled work orders? (are|is) (generated|created))"
 AUTO_V4 = AUTO_V3[:-1] + r"|created automatically|automatically creat)"
+# .6: generate/create and automatic(ally) in the same sentence, either order ("the system generates them automatically")
+AUTO_V6 = AUTO_V4[:-1] + r"|(generat|creat)\w*[^.\n]{0,80}automatic|automatic\w*[^.\n]{0,80}(generat|creat))"
+NEG_RE = r"(no|not|without|does not require|doesn't require|no need for|not required|nor)\b[^.\n]{0,40}$"
+
+
+def unit_has_office_qualifier(scope: str, word: str = "switch") -> bool:
+    """.6: the switch must be stated as an OFFICE condition — 'office' in the same unit (sentence/item) as `word`, or the
+    action itself framed 'in the office' in the scope's first unit. The step parenthetical '(Office: select the vessel)' and
+    manual file names ('For Office_Sail Admin') do not count as a qualifier."""
+    clean = re.sub(r"\(office:[^)]*\)|for office_sail admin[^\s,;.)]*", "", scope)
+    units = units_of(clean)
+    if not units:
+        return False
+    framed = "in the office" in units[0]
+    hits = [u for u in units if word in u]
+    return bool(hits) and all(("office" in u) or framed for u in hits)
+
+
+def wrongly_conditioned(scope: str, word: str) -> bool:
+    """.6: `word` appears in the scope as a requirement (not negated: 'no switch', 'without a switch', 'no role check or switch');
+    the manual file name 'For Office_Sail Admin_R2…' quoted in the body is not a requirement."""
+    clean = re.sub(r"for office_sail admin[^\s,;.)]*", "", scope)
+    for m in re.finditer(word, clean):
+        before = clean[max(0, m.start() - 60): m.start()]
+        if not re.search(NEG_RE, before):
+            return True
+    return False
 
 
 def body_of(text: str) -> str:
@@ -126,9 +159,10 @@ def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
     """Per-action permission pairing (suite .3; attribution rebuilt in .5):
        Generate Now  → must state Sail Admin AND the vessel switch in ITS scope
        Generate WO   → must state the vessel switch in ITS scope and must NOT attach Sail Admin there"""
+    un = ""
     if version >= 5:
         sc = scopes_of(body)
-        gn, gw = sc["GN"], sc["GW"]
+        gn, gw, un = sc["GN"], sc["GW"], sc["UN"]
     else:
         gn = block_for(body, GN_RE)
         gw = block_for(body, GW_RE)
@@ -137,23 +171,32 @@ def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
         notes.append("Generate Now not described")
     else:
         if "sail admin" not in gn:
-            notes.append("Generate Now block lacks Sail Admin")
+            notes.append("Generate Now block lacks Sail Admin [missing prerequisite]")
         if "switch" not in gn:
-            notes.append("Generate Now block lacks the vessel switch")
+            notes.append("Generate Now block lacks the vessel switch [missing prerequisite]")
+        if version >= 6 and "office" not in gn:
+            notes.append("Generate Now not placed in the office [incorrect applicability]")
     if not gw:
         notes.append("per-job Generate WO not described")
     else:
         if "switch" not in gw:
-            notes.append("Generate WO block lacks the vessel switch")
+            notes.append("Generate WO block lacks the vessel switch [missing prerequisite]")
+        elif version >= 6 and not unit_has_office_qualifier(gw, "switch"):
+            notes.append("Generate WO switch stated without the office qualifier [incorrect applicability]")
         if "sail admin" in gw and "generate now" not in gw:
-            notes.append("Sail Admin wrongly attached to Generate WO")
+            notes.append("Sail Admin wrongly attached to Generate WO [incorrect applicability]")
+    if version >= 6 and un:
+        if wrongly_conditioned(un, "switch"):
+            notes.append("unplanned wrongly requires the switch [incorrect applicability]")
+        if wrongly_conditioned(un, "sail admin"):
+            notes.append("unplanned wrongly requires Sail Admin [incorrect applicability]")
     ok = not notes
     return ok, ("pairing ✓" if ok else "pairing ✗: " + "; ".join(notes))
 
 
 def extra_rule(rule: str, text: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
     t = body_of(text)
-    auto_re = AUTO_V4 if version >= 4 else AUTO_V3
+    auto_re = AUTO_V6 if version >= 6 else (AUTO_V4 if version >= 4 else AUTO_V3)
     if rule == "three-paths":
         auto = bool(re.search(auto_re, t))
         pair_ok, pair_why = check_pairing(t, version)

@@ -1,10 +1,9 @@
-"""Run D3 — for EVERY failing run of the work-order suite, attach the exact excerpt text supplied to the model and classify.
-
-Excerpt text = the top-5 hits of the winning module from the SAME index (kb-base = live ids / kb-pilot 916) with the same
-embedding model, captured by probe_kb3.py, text[:3000] exactly as retrieval.py builds the excerpt block. Retrieval is
-deterministic for a fixed index + embedding (provider repeatability proven 14-Sep, cosine 1.000000), so the three runs of one
-question share one excerpt set; as a cross-check the citations returned by each run are compared with the probe's hit list
-and any mismatch is printed.
+"""Run D3 — for EVERY failing run of the work-order suite, attach the RECONSTRUCTED excerpt text and classify.
+EARLIER RECONSTRUCTED-INPUT REPORT (corrected 15-Sep): the excerpt text comes from probe_kb3.py, a separate probe on the same
+index set and embedding model — not from the requests sent to the model. The probe used text[:3000] without headers; the served
+docs path sends each chunk's FULL text with '[i] (manual — section)' headers (the 3,000 cut is tool-path only). The citation
+cross-check shows the probe and the runs retrieved the same chunks; it does not prove the exact model input. Verified
+evidence = the later wire capture (diag-capture.jsonl, REPORT.md §9).
 
 Owner rule (15-Sep): classify a failing run as ANSWER GENERATION only if the condition was in the supplied excerpt text and
 the answer dropped it; otherwise RETRIEVAL (the needed content was not in the text the model saw).

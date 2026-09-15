@@ -1,0 +1,38 @@
+{
+ "unplanned": {
+  "office": {
+   "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64"
+  },
+  "vessel": {
+   "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+   "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 33)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 33)\n\nscreenshot: Work Orders dashboard showing navigation to Work Orders and the Unplanned W\\.O button\n\nFigure 33\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 34)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 34)\n\nscreenshot: Work Order Form - Unplanned showing the Save button and Submit Work Order button\n\nFigure 34"
+  }
+ },
+ "complete": {
+  "office": {
+   "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No."
+  },
+  "vessel": {
+   "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+   "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+   "text": "* Go to the 'Work Orders' sub-sub module. (Ref Figure 39)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 39)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 39)\n\nscreenshot: Work Orders (W\\.O) dashboard showing status tabs and work order list with instructional callouts\n\nFigure 39\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 40)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 40)\n\nscreenshot: Part B - Work Completion Record form showing risk assessment and work duration fields with instructional callouts\n\nFigure 40\n\n☞ To upload RA documents, ensure the radio button is not set to NA or No."
+  }
+ },
+ "intro": {
+  "office": {
+   "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+   "section": "Introduction (p.28)",
+   "text": "* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  },
+  "vessel": {
+   "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+   "section": "Introduction (p.23)",
+   "text": "* Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+  }
+ }
+}

@@ -1,0 +1,1138 @@
+{
+ "ran_at_utc": "2026-09-15T09:21:15Z",
+ "container_hostname": "57b6f3231bde",
+ "health": {
+  "ok": true,
+  "store": "pgvector",
+  "indexSet": "kb-pilot",
+  "chunks": 916,
+  "db": "connected",
+  "llmCalls": 643,
+  "prompt": {
+   "version": "v2-xref-hardrule-2026-09-14",
+   "docsPromptSha": "b37172f6122a0257",
+   "toolLoopPromptSha": "f8e5a8f86bede638",
+   "combined": "ebfd83a623e41173"
+  }
+ },
+ "settings": {
+  "chat_model": "gpt-4o-mini",
+  "answer_chunks": 5,
+  "route_top_k": 10,
+  "route_sim_floor": 1.15,
+  "route_margin": 0.07,
+  "masking_enabled": true,
+  "model_settings": {
+   "temperature": 0.2,
+   "timeout": 30.0
+  }
+ },
+ "index": {
+  "index_set": "kb-pilot",
+  "chunks": 916
+ },
+ "capture_file": "/app/out/dedup-capture.jsonl",
+ "runs": [
+  {
+   "identity": {
+    "userId": "dedup-1",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "http_status": 200,
+   "response": {
+    "response": "To create an unplanned work order, follow these steps:\n\n1. Go to the 'Work Orders' sub-sub module.\n2. Select the vessel from the 'Vessel' dropdown.\n3. Click on the '+ Unplanned W.O' button to create an unplanned work order.\n4. The 'Work Order Form – Unplanned Maintenance' form will appear.\n5. Enter all required job details in Part A and click Save to store it as a draft.\n6. Complete Part B and click Submit Work Order to generate the unplanned work order.\n\nThese steps are the same as in section 1.1.5.2 of the Technical - PMS User Manual For Office and the Technical - PMS User Manual_Vessel Specific. \n\nSource: Technical - PMS User Manual For Office, section 1.1.5.2; Technical - PMS User Manual_Vessel Specific, section 1.1.5.2.",
+    "gate": "answer",
+    "module": "Technical",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+      "distance": 0.7926
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+      "distance": 0.8107
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+      "section": "How work orders are created — the three ways to create a work order",
+      "distance": 0.825
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+      "distance": 0.8373
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+      "distance": 0.8382
+     }
+    ],
+    "confidence": 1.0,
+    "usage": null
+   },
+   "latency_ms": 3609,
+   "case": "wo-generic-01",
+   "question": "How do I create a work order?",
+   "arm": "normal",
+   "run": 1,
+   "capture_lines": [
+    0,
+    2
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-2",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "http_status": 200,
+   "response": {
+    "response": "To create an unplanned work order, follow these steps:\n\n1. Go to the 'Work Orders' sub-sub module.\n2. Select the vessel from the 'Vessel' dropdown.\n3. Click on the '+ Unplanned W.O' button to create an unplanned work order.\n4. The 'Work Order Form – Unplanned Maintenance' will appear.\n5. Enter all required job details in Part A and click Save to store it as a draft.\n6. Complete Part B and click Submit Work Order to generate the unplanned work order.\n\nThese steps are the same as those in section 1.1.5.2 of the manual (page 29). \n\nSource: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026, section 1.1.5.2.",
+    "gate": "answer",
+    "module": "Technical",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+      "distance": 0.7926
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+      "distance": 0.8107
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+      "section": "How work orders are created — the three ways to create a work order",
+      "distance": 0.825
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+      "distance": 0.8373
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+      "distance": 0.8382
+     }
+    ],
+    "confidence": 1.0,
+    "usage": null
+   },
+   "latency_ms": 2637,
+   "case": "wo-generic-01",
+   "question": "How do I create a work order?",
+   "arm": "normal",
+   "run": 2,
+   "capture_lines": [
+    2,
+    4
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-3",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "http_status": 200,
+   "response": {
+    "response": "To create an unplanned work order, follow these steps:\n\n1. Go to the 'Work Orders' sub-sub module.\n2. Select the vessel from the 'Vessel' dropdown.\n3. Click on the '+ Unplanned W.O' button to create an unplanned work order.\n4. The 'Work Order Form – Unplanned Maintenance' will appear.\n5. Enter all required job details in Part A and click Save to store it as a draft.\n6. Complete Part B and click Submit Work Order to generate the unplanned work order.\n\nThese steps are the same as in section 1.1.5.2 (page 24) of the Vessel Specific manual. \n\nSource: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2, Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2.",
+    "gate": "answer",
+    "module": "Technical",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+      "distance": 0.7926
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+      "distance": 0.8107
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+      "section": "How work orders are created — the three ways to create a work order",
+      "distance": 0.825
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+      "distance": 0.8373
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+      "distance": 0.8382
+     }
+    ],
+    "confidence": 1.0,
+    "usage": null
+   },
+   "latency_ms": 2831,
+   "case": "wo-generic-01",
+   "question": "How do I create a work order?",
+   "arm": "normal",
+   "run": 3,
+   "capture_lines": [
+    4,
+    6
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-4",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "masking_on": true,
+   "excerpts_before": [
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "chars": 1026,
+     "distance": 0.7926
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "chars": 681,
+     "distance": 0.8107
+    },
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044,
+     "distance": 0.825
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+     "chars": 1173,
+     "distance": 0.8373
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+     "chars": 763,
+     "distance": 0.8382
+    }
+   ],
+   "decisions": [
+    {
+     "position_first": 1,
+     "position_second": 2,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "office_only_lines": [
+      "Select the vessel from the 'Vessel' dropdown."
+     ],
+     "vessel_only_lines": [],
+     "non_identical_lines": [],
+     "office_chars": 1026,
+     "vessel_chars": 681,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1304,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\""
+    },
+    {
+     "position_first": 4,
+     "position_second": 5,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+     "office_only_lines": [
+      "Select the vessel from the 'Vessel' dropdown."
+     ],
+     "vessel_only_lines": [],
+     "non_identical_lines": [],
+     "office_chars": 1173,
+     "vessel_chars": 763,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1444,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\""
+    }
+   ],
+   "excerpts_after": [
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "chars": 1304
+    },
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)]",
+     "chars": 1444
+    }
+   ],
+   "system": "You are the SAIL Maritime PMS assistant. Answer the user's question using ONLY the manual excerpts provided. Rules: if the excerpts do not answer the question, say plainly that it is not covered in the Technical documentation — never guess. HARD RULE — cross-references: the manuals often say 'Refer to the <other> sub-module and apply the same steps'. When an excerpt contains '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' followed by steps, then the question about A IS covered: answer with those steps, and state that they are the same as section X (page N). Never answer 'not covered' when such a resolved cross-reference is present. Answer in short plain language, as numbered steps when the question is a how-to. End with a \"Source:\" line naming the manual and section(s) you used.",
+   "user": "Manual excerpts:\n\n[1] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)])\n* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\"\n\n\n---\n\n[2] (Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order)\nApplies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md\n\n---\n\n[3] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)])\n* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No.\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\"\n\n\nQuestion: How do I create a work order?",
+   "answer": "To create an unplanned work order, follow these steps:\n\n1. Go to the 'Work Orders' sub-sub module.\n2. Select the vessel from the 'Vessel' dropdown.\n3. Click on the '+ Unplanned W.O' button to create an unplanned work order.\n4. The 'Work Order Form – Unplanned Maintenance' will appear.\n5. Enter all required job details in Part A and click Save to store it as a draft.\n6. Complete Part B and click Submit Work Order to generate the unplanned work order.\n\nThese steps are the same as section 1.1.5.2 (page 24) of the Vessel manual. \n\nSource: Technical - PMS User Manual For Office, section 1.1.5.2; Technical - PMS User Manual_Vessel Specific, section 1.1.5.2.",
+   "usage": null,
+   "citations": [
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "distance": 0.7926
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "distance": 0.825
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)]",
+     "distance": 0.8373
+    }
+   ],
+   "latency_ms": 2451,
+   "case": "wo-generic-01",
+   "question": "How do I create a work order?",
+   "arm": "dedup",
+   "run": 1,
+   "capture_lines": [
+    6,
+    8
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-5",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "masking_on": true,
+   "excerpts_before": [
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "chars": 1026,
+     "distance": 0.7926
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "chars": 681,
+     "distance": 0.8107
+    },
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044,
+     "distance": 0.825
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+     "chars": 1173,
+     "distance": 0.8373
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+     "chars": 763,
+     "distance": 0.8382
+    }
+   ],
+   "decisions": [
+    {
+     "position_first": 1,
+     "position_second": 2,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "office_only_lines": [
+      "Select the vessel from the 'Vessel' dropdown."
+     ],
+     "vessel_only_lines": [],
+     "non_identical_lines": [],
+     "office_chars": 1026,
+     "vessel_chars": 681,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1304,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\""
+    },
+    {
+     "position_first": 4,
+     "position_second": 5,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+     "office_only_lines": [
+      "Select the vessel from the 'Vessel' dropdown."
+     ],
+     "vessel_only_lines": [],
+     "non_identical_lines": [],
+     "office_chars": 1173,
+     "vessel_chars": 763,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1444,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\""
+    }
+   ],
+   "excerpts_after": [
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "chars": 1304
+    },
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)]",
+     "chars": 1444
+    }
+   ],
+   "system": "You are the SAIL Maritime PMS assistant. Answer the user's question using ONLY the manual excerpts provided. Rules: if the excerpts do not answer the question, say plainly that it is not covered in the Technical documentation — never guess. HARD RULE — cross-references: the manuals often say 'Refer to the <other> sub-module and apply the same steps'. When an excerpt contains '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' followed by steps, then the question about A IS covered: answer with those steps, and state that they are the same as section X (page N). Never answer 'not covered' when such a resolved cross-reference is present. Answer in short plain language, as numbered steps when the question is a how-to. End with a \"Source:\" line naming the manual and section(s) you used.",
+   "user": "Manual excerpts:\n\n[1] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)])\n* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\"\n\n\n---\n\n[2] (Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order)\nApplies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md\n\n---\n\n[3] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)])\n* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No.\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\"\n\n\nQuestion: How do I create a work order?",
+   "answer": "To create an unplanned work order, follow these steps:\n\n1. Go to the 'Work Orders' sub-sub module.\n2. Select the vessel from the 'Vessel' dropdown.\n3. Click on the '+ Unplanned W.O' button to create an unplanned work order.\n4. The 'Work Order Form – Unplanned Maintenance' will appear.\n5. Enter all required job details in Part A and click Save to store it as a draft.\n6. Complete Part B and click Submit Work Order to generate the unplanned work order.\n\nThese steps are the same as section 1.1.5.2 (page 24) in the Vessel manual. \n\nSource: Technical - PMS User Manual For Office, section 1.1.5.2; Technical - PMS User Manual_Vessel Specific, section 1.1.5.2.",
+   "usage": null,
+   "citations": [
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "distance": 0.7926
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "distance": 0.825
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)]",
+     "distance": 0.8373
+    }
+   ],
+   "latency_ms": 2508,
+   "case": "wo-generic-01",
+   "question": "How do I create a work order?",
+   "arm": "dedup",
+   "run": 2,
+   "capture_lines": [
+    8,
+    10
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-6",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "masking_on": true,
+   "excerpts_before": [
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "chars": 1026,
+     "distance": 0.7926
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "chars": 681,
+     "distance": 0.8107
+    },
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044,
+     "distance": 0.825
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+     "chars": 1173,
+     "distance": 0.8373
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+     "chars": 763,
+     "distance": 0.8382
+    }
+   ],
+   "decisions": [
+    {
+     "position_first": 1,
+     "position_second": 2,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "office_only_lines": [
+      "Select the vessel from the 'Vessel' dropdown."
+     ],
+     "vessel_only_lines": [],
+     "non_identical_lines": [],
+     "office_chars": 1026,
+     "vessel_chars": 681,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1304,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\""
+    },
+    {
+     "position_first": 4,
+     "position_second": 5,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+     "office_only_lines": [
+      "Select the vessel from the 'Vessel' dropdown."
+     ],
+     "vessel_only_lines": [],
+     "non_identical_lines": [],
+     "office_chars": 1173,
+     "vessel_chars": 763,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1444,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\""
+    }
+   ],
+   "excerpts_after": [
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "chars": 1304
+    },
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)]",
+     "chars": 1444
+    }
+   ],
+   "system": "You are the SAIL Maritime PMS assistant. Answer the user's question using ONLY the manual excerpts provided. Rules: if the excerpts do not answer the question, say plainly that it is not covered in the Technical documentation — never guess. HARD RULE — cross-references: the manuals often say 'Refer to the <other> sub-module and apply the same steps'. When an excerpt contains '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' followed by steps, then the question about A IS covered: answer with those steps, and state that they are the same as section X (page N). Never answer 'not covered' when such a resolved cross-reference is present. Answer in short plain language, as numbered steps when the question is a how-to. End with a \"Source:\" line naming the manual and section(s) you used.",
+   "user": "Manual excerpts:\n\n[1] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)])\n* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\"\n\n\n---\n\n[2] (Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order)\nApplies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md\n\n---\n\n[3] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)])\n* Go to the 'Work Orders' sub-sub module. (Ref Figure 49)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 49)\n\n* Click the required status tab (Scheduled, Due, Overdue, Postponed, or Unplanned). (Ref Figure 49)\n\n* Then select the work order by clicking the 'Edit' icon or the table row. (Ref Figure 49)\n\nScreenshot of the Work Orders (W\\.O) dashboard with four callout boxes: 1. Click on the 'Work Order'. 2. Click here to select a vessel. 3. Choose the required field from the status tab that needs to be completed. 4. The work order form can be opened by clicking the 'Edit' icon or selecting the table row.\n\nFigure 49\n\n* The 'Work Order Form' appears after clicking the 'Edit' icon. (Ref Figure 50)\n\n* Navigate to 'Part B – Work Completion Record', enter the required information. (Ref Figure 50)\n\nScreenshot of the Part B - Work Completion Record form with three callout boxes: 1. Click here to open the 'Part B' section and enter the required details. 2. From here, the user can upload the docs. 3. Use this section to add or select quick inputs and smart suggestions.\n\nFigure 50\n\n\\* To upload RA documents, ensure the radio button is not set to NA or No.\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\"\n\n\nQuestion: How do I create a work order?",
+   "answer": "To create an unplanned work order, follow these steps:\n\n1. Go to the 'Work Orders' sub-sub module.\n2. Select the vessel from the 'Vessel' dropdown.\n3. Click on the '+ Unplanned W.O' button to create an unplanned work order.\n4. The 'Work Order Form – Unplanned Maintenance' form will appear.\n5. Enter all required job details in Part A and click Save to store it as a draft.\n6. Complete Part B and click Submit Work Order to generate the unplanned work order.\n\nThese steps are the same as section 1.1.5.2 (page 24) of the Vessel manual. \n\nSource: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2; Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2.",
+   "usage": null,
+   "citations": [
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "distance": 0.7926
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "distance": 0.825
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.32) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)]",
+     "distance": 0.8373
+    }
+   ],
+   "latency_ms": 2283,
+   "case": "wo-generic-01",
+   "question": "How do I create a work order?",
+   "arm": "dedup",
+   "run": 3,
+   "capture_lines": [
+    10,
+    12
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-7",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "http_status": 200,
+   "response": {
+    "response": "1. **Planned (scheduled) work orders**: \n   - Generated automatically by the system from each job's frequency and next due date. \n   - ON THE SHIP: automatic, once a day, no user action required.\n   - IN THE OFFICE: A Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is ON.\n\n2. **One job on demand**:\n   - Navigate to Components → (Office: select the vessel) → open the component → Part C → click 'Generate WO' → choose the reason (Planning / Breakdown / Other).\n   - No role check; the job must be active and must not already have an active work order.\n\n3. **Unplanned work**:\n   - Navigate to Work Orders → (Office: select the vessel) → click '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order.\n   - No role check required, and no switch needed.\n\nSource: [1] (Technical - KB pilot: How work orders are created — the three ways to create a work order.md)",
+    "gate": "answer",
+    "module": "Technical",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+      "section": "How work orders are created — the three ways to create a work order",
+      "distance": 0.7935
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "Introduction (p.28)",
+      "distance": 0.8108
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+      "distance": 0.8423
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+      "distance": 0.8654
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "Introduction (p.23)",
+      "distance": 0.8664
+     }
+    ],
+    "confidence": 1.0,
+    "usage": null
+   },
+   "latency_ms": 3156,
+   "case": "wo-phr-01",
+   "question": "What are the different ways to create a work order in PMS?",
+   "arm": "normal",
+   "run": 1,
+   "capture_lines": [
+    12,
+    14
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-8",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "http_status": 200,
+   "response": {
+    "response": "1. **Planned (scheduled) work orders**: \n   - Generated automatically by the system from each job's frequency and next due date on the ship, once a day, with no user action required.\n   - In the office, a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is ON.\n\n2. **One job on demand**:\n   - Navigate to Components → (Office: select the vessel) → open the component → Part C → click 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check applies; the job must be active and must not already have an active work order.\n\n3. **Unplanned work**:\n   - Go to Work Orders → (Office: select the vessel) → click '+ Unplanned W.O' → enter details in Part A, click Save → complete Part B, and click Submit Work Order.\n\nSource: [1] (Technical - KB pilot: How work orders are created — the three ways to create a work order.md)",
+    "gate": "answer",
+    "module": "Technical",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+      "section": "How work orders are created — the three ways to create a work order",
+      "distance": 0.7935
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "Introduction (p.28)",
+      "distance": 0.8108
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+      "distance": 0.8423
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+      "distance": 0.8654
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "Introduction (p.23)",
+      "distance": 0.8664
+     }
+    ],
+    "confidence": 1.0,
+    "usage": null
+   },
+   "latency_ms": 3330,
+   "case": "wo-phr-01",
+   "question": "What are the different ways to create a work order in PMS?",
+   "arm": "normal",
+   "run": 2,
+   "capture_lines": [
+    14,
+    16
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-9",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "http_status": 200,
+   "response": {
+    "response": "1. **Planned (scheduled) work orders**: \n   - Generated automatically by the system based on each job's frequency and next due date. \n   - On the ship, this occurs once a day without user action. \n   - In the office, a Sail Admin can click 'Generate Now' on the Work Orders screen if the vessel's switch is ON.\n\n2. **One job on demand**: \n   - Navigate to Components → (Office: select the vessel) → open the component → Part C → click 'Generate WO' → choose the reason (Planning / Breakdown / Other). \n   - This does not require a role check, but the job must be active and must not already have an active work order.\n\n3. **Unplanned work**: \n   - Go to Work Orders → (Office: select the vessel) → click '+ Unplanned W.O' → enter details in Part A, Save → complete Part B, Submit Work Order. \n   - No role check is required for this process.\n\nSource: [1] (Technical - KB pilot: How work orders are created — the three ways to create a work order)",
+    "gate": "answer",
+    "module": "Technical",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+      "section": "How work orders are created — the three ways to create a work order",
+      "distance": 0.7935
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "Introduction (p.28)",
+      "distance": 0.8108
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+      "distance": 0.8423
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+      "distance": 0.8654
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "Introduction (p.23)",
+      "distance": 0.8664
+     }
+    ],
+    "confidence": 1.0,
+    "usage": null
+   },
+   "latency_ms": 3177,
+   "case": "wo-phr-01",
+   "question": "What are the different ways to create a work order in PMS?",
+   "arm": "normal",
+   "run": 3,
+   "capture_lines": [
+    16,
+    18
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-10",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "masking_on": true,
+   "excerpts_before": [
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044,
+     "distance": 0.7935
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "Introduction (p.28)",
+     "chars": 319,
+     "distance": 0.8108
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "chars": 1026,
+     "distance": 0.8423
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "chars": 681,
+     "distance": 0.8654
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "Introduction (p.23)",
+     "chars": 318,
+     "distance": 0.8664
+    }
+   ],
+   "decisions": [
+    {
+     "position_first": 2,
+     "position_second": 5,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.28)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)",
+     "office_only_lines": [],
+     "vessel_only_lines": [],
+     "non_identical_lines": [
+      {
+       "vessel": "Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.",
+       "office": "Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+      }
+     ],
+     "office_chars": 319,
+     "vessel_chars": 318,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1141,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)): the same steps as above, with these differences:\n- Vessel manual wording: \"Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\" (Office: \"Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\")"
+    },
+    {
+     "position_first": 3,
+     "position_second": 4,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "office_only_lines": [
+      "Select the vessel from the 'Vessel' dropdown."
+     ],
+     "vessel_only_lines": [],
+     "non_identical_lines": [],
+     "office_chars": 1026,
+     "vessel_chars": 681,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1304,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\""
+    }
+   ],
+   "excerpts_after": [
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "Introduction (p.28) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)]",
+     "chars": 1141
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "chars": 1304
+    }
+   ],
+   "system": "You are the SAIL Maritime PMS assistant. Answer the user's question using ONLY the manual excerpts provided. Rules: if the excerpts do not answer the question, say plainly that it is not covered in the Technical documentation — never guess. HARD RULE — cross-references: the manuals often say 'Refer to the <other> sub-module and apply the same steps'. When an excerpt contains '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' followed by steps, then the question about A IS covered: answer with those steps, and state that they are the same as section X (page N). Never answer 'not covered' when such a resolved cross-reference is present. Answer in short plain language, as numbered steps when the question is a how-to. End with a \"Source:\" line naming the manual and section(s) you used.",
+   "user": "Manual excerpts:\n\n[1] (Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order)\nApplies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md\n\n---\n\n[2] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.28) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)])\n* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)): the same steps as above, with these differences:\n- Vessel manual wording: \"Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\" (Office: \"Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\")\n\n\n---\n\n[3] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)])\n* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\"\n\n\nQuestion: What are the different ways to create a work order in PMS?",
+   "answer": "1. **Planned (scheduled) work orders**: \n   - Generated automatically by the system from each job's frequency and next due date. \n   - ON THE SHIP: automatic, once a day, no user action required. \n   - IN THE OFFICE: A Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is ON.\n\n2. **One job on demand**: \n   - Navigate to Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). \n   - No role check; the job must be active and must not already have an active work order.\n\n3. **Unplanned work**: \n   - Go to Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. \n   - No role check required.\n\nSource: [1] How work orders are created — the three ways to create a work order.",
+   "usage": null,
+   "citations": [
+    {
+     "module": "Technical",
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "distance": 0.7935
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "Introduction (p.28) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)]",
+     "distance": 0.8108
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "distance": 0.8423
+    }
+   ],
+   "latency_ms": 2092,
+   "case": "wo-phr-01",
+   "question": "What are the different ways to create a work order in PMS?",
+   "arm": "dedup",
+   "run": 1,
+   "capture_lines": [
+    18,
+    20
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-11",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "masking_on": true,
+   "excerpts_before": [
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044,
+     "distance": 0.7935
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "Introduction (p.28)",
+     "chars": 319,
+     "distance": 0.8108
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "chars": 1026,
+     "distance": 0.8423
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "chars": 681,
+     "distance": 0.8654
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "Introduction (p.23)",
+     "chars": 318,
+     "distance": 0.8664
+    }
+   ],
+   "decisions": [
+    {
+     "position_first": 2,
+     "position_second": 5,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.28)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)",
+     "office_only_lines": [],
+     "vessel_only_lines": [],
+     "non_identical_lines": [
+      {
+       "vessel": "Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.",
+       "office": "Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+      }
+     ],
+     "office_chars": 319,
+     "vessel_chars": 318,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1141,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)): the same steps as above, with these differences:\n- Vessel manual wording: \"Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\" (Office: \"Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\")"
+    },
+    {
+     "position_first": 3,
+     "position_second": 4,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "office_only_lines": [
+      "Select the vessel from the 'Vessel' dropdown."
+     ],
+     "vessel_only_lines": [],
+     "non_identical_lines": [],
+     "office_chars": 1026,
+     "vessel_chars": 681,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1304,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\""
+    }
+   ],
+   "excerpts_after": [
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "Introduction (p.28) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)]",
+     "chars": 1141
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "chars": 1304
+    }
+   ],
+   "system": "You are the SAIL Maritime PMS assistant. Answer the user's question using ONLY the manual excerpts provided. Rules: if the excerpts do not answer the question, say plainly that it is not covered in the Technical documentation — never guess. HARD RULE — cross-references: the manuals often say 'Refer to the <other> sub-module and apply the same steps'. When an excerpt contains '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' followed by steps, then the question about A IS covered: answer with those steps, and state that they are the same as section X (page N). Never answer 'not covered' when such a resolved cross-reference is present. Answer in short plain language, as numbered steps when the question is a how-to. End with a \"Source:\" line naming the manual and section(s) you used.",
+   "user": "Manual excerpts:\n\n[1] (Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order)\nApplies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md\n\n---\n\n[2] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.28) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)])\n* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)): the same steps as above, with these differences:\n- Vessel manual wording: \"Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\" (Office: \"Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\")\n\n\n---\n\n[3] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)])\n* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\"\n\n\nQuestion: What are the different ways to create a work order in PMS?",
+   "answer": "1. **Planned (scheduled) work orders**: \n   - Generated automatically by the system from each job's frequency and next due date on the ship once a day, with no user action required.\n   - In the office, a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, provided the vessel's switch is ON.\n\n2. **One job on demand**:\n   - Navigate to Components → (Office: select the vessel) → open the component → Part C → click 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check applies, but the job must be active and not already have an active work order.\n\n3. **Unplanned work**:\n   - Go to Work Orders → (Office: select the vessel) → click '+ Unplanned W.O' → complete Part A and save → complete Part B and submit the work order. No role check or switch is needed.\n\nSource: [1] How work orders are created — the three ways to create a work order.",
+   "usage": null,
+   "citations": [
+    {
+     "module": "Technical",
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "distance": 0.7935
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "Introduction (p.28) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)]",
+     "distance": 0.8108
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "distance": 0.8423
+    }
+   ],
+   "latency_ms": 2047,
+   "case": "wo-phr-01",
+   "question": "What are the different ways to create a work order in PMS?",
+   "arm": "dedup",
+   "run": 2,
+   "capture_lines": [
+    20,
+    22
+   ]
+  },
+  {
+   "identity": {
+    "userId": "dedup-12",
+    "userName": "Acceptance",
+    "role": "Sail Admin",
+    "tenantDomain": "smoke-suite-tenant"
+   },
+   "masking_on": true,
+   "excerpts_before": [
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044,
+     "distance": 0.7935
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "Introduction (p.28)",
+     "chars": 319,
+     "distance": 0.8108
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "chars": 1026,
+     "distance": 0.8423
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "chars": 681,
+     "distance": 0.8654
+    },
+    {
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "Introduction (p.23)",
+     "chars": 318,
+     "distance": 0.8664
+    }
+   ],
+   "decisions": [
+    {
+     "position_first": 2,
+     "position_second": 5,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.28)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)",
+     "office_only_lines": [],
+     "vessel_only_lines": [],
+     "non_identical_lines": [
+      {
+       "vessel": "Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.",
+       "office": "Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements."
+      }
+     ],
+     "office_chars": 319,
+     "vessel_chars": 318,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1141,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)): the same steps as above, with these differences:\n- Vessel manual wording: \"Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\" (Office: \"Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\")"
+    },
+    {
+     "position_first": 3,
+     "position_second": 4,
+     "office": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29)",
+     "vessel": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)",
+     "office_only_lines": [
+      "Select the vessel from the 'Vessel' dropdown."
+     ],
+     "vessel_only_lines": [],
+     "non_identical_lines": [],
+     "office_chars": 1026,
+     "vessel_chars": 681,
+     "decision": "consolidated at the first occurrence",
+     "merged_chars": 1304,
+     "merged_note": "Vessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\""
+    }
+   ],
+   "excerpts_after": [
+    {
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "chars": 2044
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "Introduction (p.28) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)]",
+     "chars": 1141
+    },
+    {
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "chars": 1304
+    }
+   ],
+   "system": "You are the SAIL Maritime PMS assistant. Answer the user's question using ONLY the manual excerpts provided. Rules: if the excerpts do not answer the question, say plainly that it is not covered in the Technical documentation — never guess. HARD RULE — cross-references: the manuals often say 'Refer to the <other> sub-module and apply the same steps'. When an excerpt contains '(Cross-reference resolved: the steps for A are the same as section X …, page N. They are:)' followed by steps, then the question about A IS covered: answer with those steps, and state that they are the same as section X (page N). Never answer 'not covered' when such a resolved cross-reference is present. Answer in short plain language, as numbered steps when the question is a how-to. End with a \"Source:\" line naming the manual and section(s) you used.",
+   "user": "Manual excerpts:\n\n[1] (Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order)\nApplies to: Both\nWho can do it (role): Depends on the way — (1) planned: nobody, the ship system creates them; office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': no role check; (3) unplanned: no role check. Normal sign-in and vessel access apply to all.\nPrerequisites (switches, settings, job/component state): Office 'Generate Now' and office per-job 'Generate WO' both need the vessel's 'office work-order generation' switch ON (off by default, set by a Sail Admin on 'Lead Time & Grace Period Settings'). Unplanned needs no switch. A job with an active work order cannot get another one.\nSteps:\n1. Planned (scheduled) work orders — generated by the system from each job's frequency and next due date. ON THE SHIP: automatic, once a day, no user action. IN THE OFFICE: nothing runs automatically; a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is on. Details: planned-wo-ship-daily-scan.md and office-generate-now.md.\n2. One job on demand — Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). No role check on this path (sign-in and vessel access still apply); in the office only if the vessel switch is on; the job must be active and must not already have an active work order. Details: office-generate-wo-per-job.md.\n3. Unplanned work — Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. No role check on this path, no switch. Details: unplanned-wo.md.\nExceptions / edge cases: The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders.\nWhere the manual differs: The June manuals describe only ways 2 and 3 and state no office conditions; automatic ship generation and 'Generate Now' are absent from them. See CONFLICTS.md.\nRelated procedures: planned-wo-ship-daily-scan.md · office-generate-now.md · office-generate-wo-per-job.md · unplanned-wo.md\n\n---\n\n[2] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.28) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)])\n* Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)): the same steps as above, with these differences:\n- Vessel manual wording: \"Work Orders (WO) is a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\" (Office: \"Work Orders (WO) are a structured instruction used onboard to plan, execute, and record maintenance activities for equipment and systems. It serves as the primary control mechanism to ensure that all maintenance tasks are carried out systematically, safely, and in compliance with company and regulatory requirements.\")\n\n\n---\n\n[3] (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)])\n* Go to the 'Work Orders' sub-sub module. (Ref Figure 43)\n\n* Select the vessel from the 'Vessel' dropdown. (Ref Figure 43)\n\n* Click on the '+ Unplanned W\\.O' button to create an unplanned work order. (Ref Figure 43)\n\nScreenshot of the Work Orders (W\\.O) dashboard showing three steps: 1. Click here to access the 'Work Orders', 2. Click here to select a vessel, and 3. Click here to open an unplanned work order form.\n\nFigure 43\n\n* The 'Work Order Form – Unplanned Maintenance' form below appears after clicking the '+ Unplanned W\\.O' button. (Ref Figure 44)\n\n* Enter all required job details in Part A and click Save to store it as a draft. Then complete Part B and click Submit Work Order to generate the unplanned work order. (Ref Figure 44)\n\nScreenshot of the Work Order Form - Unplanned showing the Save button highlighted with \"Click the Save button to save it as a draft\" and the Submit Work Order button highlighted with \"After filling the form, click here to create an unplanned work order.\"\n\nFigure 44\n\nPage 29 of 64\n\nVessel manual (Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)): the same steps as above, with these differences:\n- Office manual only (not in the Vessel manual): \"Select the vessel from the 'Vessel' dropdown.\"\n\n\nQuestion: What are the different ways to create a work order in PMS?",
+   "answer": "1. **Planned (scheduled) work orders**: \n   - Generated automatically by the system from each job's frequency and next due date on the ship, once a day, with no user action required.\n   - In the office, a Sail Admin can click 'Generate Now' on the Work Orders screen for one vessel, only if that vessel's switch is ON.\n\n2. **One job on demand**: \n   - Navigate to Components → (Office: select the vessel) → open the component → Part C → 'Generate WO' → choose the reason (Planning / Breakdown / Other). This can be done without a role check, but the job must be active and must not already have an active work order.\n\n3. **Unplanned work**: \n   - Go to Work Orders → (Office: select the vessel) → '+ Unplanned W.O' → Part A, Save → Part B, Submit Work Order. This can be done without a role check and does not require any switch.\n\nSource: [1] How work orders are created — the three ways to create a work order.",
+   "usage": null,
+   "citations": [
+    {
+     "module": "Technical",
+     "manual": "Technical - KB pilot: How work orders are created — the three ways to create a work order.md",
+     "section": "How work orders are created — the three ways to create a work order",
+     "distance": 0.7935
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "Introduction (p.28) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.23)]",
+     "distance": 0.8108
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.29) [consolidated with Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER (p.24)]",
+     "distance": 0.8423
+    }
+   ],
+   "latency_ms": 2132,
+   "case": "wo-phr-01",
+   "question": "What are the different ways to create a work order in PMS?",
+   "arm": "dedup",
+   "run": 3,
+   "capture_lines": [
+    22,
+    24
+   ]
+  }
+ ]
+}
