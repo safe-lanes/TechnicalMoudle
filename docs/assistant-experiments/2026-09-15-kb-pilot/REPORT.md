@@ -88,7 +88,7 @@ Not changed: prompt, thresholds, excerpt count, judges, the four procedure files
 
 ## 8. Third bounded step — content fixes, one chunk per file, judge .4, run D3 (15-Sep; `kb3-*`)
 
-Live unchanged. Prompt v2, retrieval logic, thresholds and excerpt count (5, text[:3000]) exactly as live. Instances: A = 8016 `kb-base` (911 chunks = live ids), B = 8018 `kb-pilot` (916 = 911 + 5). Artefacts in this folder: `kb3-runs.txt` (all suites), `kb3-rank.txt` (top-8 probe + chunk listing), `kb3-rejudge.txt` (judge .3 vs .4 on the stored D2 answers), `kb3-excerpts.json` (exact excerpt text per question × set), `kb3-failures.md` (every failing run with the excerpt text attached), `kb3-general5.txt/json`, the three `kb3-*-dump.jsonl`, and the two capture scripts `probe_kb3.py` / `failures_kb3.py` (evidence capture, kept for reproducibility; not suites).
+Live unchanged. Prompt v2, retrieval logic, thresholds and excerpt count (5) exactly as live. Correction (15-Sep, after external review): the docs path (`chat.py:110` → `retrieval.docs_prompt`) sends each chunk's FULL text with a `[i] (manual — section)` header and `---` separators; the 3,000-character cut applies only to the tool path (`search_docs_tool`). The probe below reproduced `text[:3000]` without the headers — identical text for every chunk involved (all ≤ 2,105 characters), but it is a reconstruction, not a capture of the wire body. Instances: A = 8016 `kb-base` (911 chunks = live ids), B = 8018 `kb-pilot` (916 = 911 + 5). Artefacts in this folder: `kb3-runs.txt` (all suites), `kb3-rank.txt` (top-8 probe + chunk listing), `kb3-rejudge.txt` (judge .3 vs .4 on the stored D2 answers), `kb3-excerpts.json` (exact excerpt text per question × set), `kb3-failures.md` (every failing run with the excerpt text attached), `kb3-general5.txt/json`, the three `kb3-*-dump.jsonl`, and the two capture scripts `probe_kb3.py` / `failures_kb3.py` (evidence capture, kept for reproducibility; not suites).
 
 ### 8.1 Content fixes (step 1) — `kb/technical/work-orders/`
 
@@ -143,7 +143,7 @@ Existing suites: identical A vs B, no regression. Overview rank in the top-8 pro
 | wo-phr-04 Steps to create a new work order | 4 (was 8) | unplanned kb 6 | **yes** |
 | wo-phr-05 how do work orders get created | 1 (was 1) | — | yes |
 
-**Every failing run, classified against the exact excerpt text it was given** (`kb3-failures.md`; owner rule: answer generation only if the condition was in that text and the answer dropped it). Cross-check: the citations returned by all 45 failing runs lie within the probe's hit list for that question — 0 mismatches — so the attached excerpt text is what the model saw (PROVEN).
+**Every failing run, classified against the exact excerpt text it was given** (`kb3-failures.md`; owner rule: answer generation only if the condition was in that text and the answer dropped it). Cross-check: the citations returned by all 45 failing runs lie within the probe's hit list for that question — 0 mismatches. Correction (15-Sep, after external review): this shows the probe and the runs retrieved the same chunks; it does NOT capture the final messages sent to the model (headers, order, separators). The service has a wire-capture seam (`ASSISTANT_CAPTURE_OUTBOUND`, `app/llm.py:32-43`, body only, no headers or keys) that can record the actual request bodies on the candidate; not used in D3. Until that capture exists, "the text was in front of the model" is INFERRED from identical retrieval, not PROVEN.
 
 | case | B runs | what the 5 excerpts contained | what the answer did | classification |
 |---|---|---|---|---|
@@ -171,6 +171,22 @@ One run each on A and B (`kb3-general5.txt`, ranks in `kb3-rank.txt`). No pilot 
 | How do I raise a defect on equipment? | Defects Office manual 1.1.4.3 Create a new defect (p.15) | + New Defect → Parts A/B/C → Submit |
 | How do I update running hours for a component? | Vessel manual p.34 / 1.1.6.3 (p.33) | Gear icon → enter details → Save |
 | How do I add a component to a vessel? | Office manual 1.1.4.3 How to add components (p.24) | select vessel → Add Component → details → Save → Submit |
+
+### 8.7 External review of §8 (Astra, 15-Sep) — checked point by point
+
+1. *"The attachments are D2, not D3."* Handover issue: the reviewer received `kb2-*`. The D3 evidence is `kb3-runs.txt`, `kb3-rank.txt`, `kb3-rejudge.txt`, `kb3-failures.md`, `kb3-excerpts.json`, `kb3-*-dump.jsonl` (all in this folder, commit fc3c0b1cc).
+2. *"The judge rejects correct wording and accepts missing conditions."* (a) "created automatically" rejected — true under .3, fixed in .4 (§8.3). (b) **Confirmed defect in .3 AND .4:** when the model writes "1. … 2. … 3. …" inside one paragraph (no line breaks), `blocks_of` returns ONE block, so the per-action check reads the whole answer as the Generate WO block and the Generate Now sentence's "switch" satisfies it. D2 wo-phr-03 B run 3 omits the per-job switch ("any user can generate a work order on demand, provided the job does not already have an active work order") and both judge versions report "pairing ✓". The pairing therefore only works when the answer uses line-separated numbered/bold items (as the D3 wo-phr-01/05 answers do). Fix candidate: split blocks on inline "N." numbering as well; version as .5; validate on the 96 stored D2 + D3 answers before any new model call. Not done.
+3. *"Matching citations does not prove the model input."* Accepted; §8 corrected above. The capture seam exists and needs no code change (env var on the candidate container, body only).
+4. *"1/8 does not mean seven answers are factually wrong."* Accepted. The 21 failing B runs of D3, split by kind (from reading every answer against the manual p.29 text and the overview):
+
+| kind | runs | cases |
+|---|---|---|
+| unsupported or incorrect instruction | **0** | — (every step stated matches manual p.29 / p.18 or the overview) |
+| missing prerequisite for an action the answer describes | 6 | wo-phr-01 ×3, wo-phr-05 ×3 (per-job Generate WO without the office switch) |
+| missing alternative the question asks for | 12 | wo-generic-01 ×3, wo-generic-03 ×3, wo-phr-04 ×3 (generic question, unplanned only); wo-phr-03 ×3 (office Generate Now / Sail Admin absent) |
+| judge-only / owner-set expectation | 3 (+3 partial) | wo-phr-02 ×3 (the "other ways" note is the owner's .4 design choice; the unplanned procedure itself is complete and correct); wo-phr-03 additionally fails the literal must-phrase |
+
+Reviewer's proposed diagnostic (give the failing generic question ONLY the overview, unchanged prompt): feasible inside the prompt-v2 container by calling `retrieval.docs_prompt` with a one-hit `Routed` — must run in that container, because `app/retrieval.py` on the branch carries the v3 conditions rule text (lines 131-133), not v2. Not run; awaiting the owner.
 
 ### 8.6 Not changed / open
 
