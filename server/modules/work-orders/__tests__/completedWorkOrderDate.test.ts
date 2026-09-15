@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   ensureCompletedWorkOrderDate,
+  getJobCompletionDate,
   isCompletedWorkOrderStatus,
   isValidCompletedWorkOrderDate,
+  resolveFinalCompletionDate,
 } from '../utils/completedWorkOrderDate';
 
 describe('Completed Work Order date guarantee', () => {
@@ -59,6 +61,28 @@ describe('Completed Work Order date guarantee', () => {
       update,
     );
     expect(update.dateCompleted).toBe('2026-09-10T12:30:00.000Z');
+  });
+
+  it('uses only dateCompleted for Job tracking and normalizes it to a calendar date', () => {
+    expect(getJobCompletionDate({
+      dateCompleted: '2026-09-20T16:38:00.000Z',
+      completionDateTime: '2026-09-10T14:36:00.000Z',
+    } as any)).toBe('2026-09-20');
+    expect(getJobCompletionDate({
+      dateCompleted: null,
+      completionDateTime: '2026-09-10T14:36:00.000Z',
+    } as any)).toBeNull();
+  });
+
+  it('preserves dateCompleted during final approval when the execution timestamp differs', () => {
+    expect(resolveFinalCompletionDate({
+      dateCompleted: '2026-09-20T16:38:00.000Z',
+      completionDateTime: '2026-09-10T14:36:00.000Z',
+    })).toBe('2026-09-20T16:38:00.000Z');
+    expect(resolveFinalCompletionDate({
+      dateCompleted: null,
+      completionDateTime: '2026-09-10T14:36:00.000Z',
+    })).toBe('2026-09-10T14:36:00.000Z');
   });
 
   it('rejects a Completed transition with no usable completion date', () => {

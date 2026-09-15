@@ -169,12 +169,6 @@ export async function findMaintenanceHistoryByJobId(jobId: string) {
   return storage.getMaintenanceHistoryByJobId(jobId);
 }
 
-// ── Job Component Links ──
-
-export async function updateJobComponentLinkTracking(vesselId: string, jobId: string, componentId: string, data: any) {
-  return storage.updateJobComponentLinkTracking(vesselId, jobId, componentId, data);
-}
-
 export async function findAllJobComponentLinks() {
   return storage.getAllJobComponentLinks();
 }

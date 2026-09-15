@@ -99,6 +99,51 @@ export function isValidCompletedWorkOrderDate(value: unknown): value is string {
 }
 
 /**
+ * Return the persisted final Work Order date in the date-only format used by
+ * Job cycle tracking. completionDateTime is intentionally not accepted here.
+ */
+export function getJobCompletionDate(
+  workOrder: { dateCompleted?: string | null },
+): string | null {
+  const date = nonBlank(workOrder.dateCompleted);
+  if (!date || !isValidCompletedWorkOrderDate(date)) return null;
+
+  let match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+
+  match = date.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+
+  match = date.match(/^(\d{1,2})[-/\s]([A-Za-z]{3,9})[-/\s](\d{4})/);
+  if (match) {
+    const month = namedMonthNumber(match[2]);
+    return month === null
+      ? null
+      : `${match[3]}-${String(month).padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+  }
+
+  match = date.match(/^([A-Za-z]{3,9})[\s-](\d{1,2}),?[\s-](\d{4})/);
+  if (match) {
+    const month = namedMonthNumber(match[1]);
+    return month === null
+      ? null
+      : `${match[3]}-${String(month).padStart(2, '0')}-${match[2].padStart(2, '0')}`;
+  }
+
+  return null;
+}
+
+/**
+ * Preserve an already-persisted final date during approval. Legacy rows that
+ * predate dateCompleted may still initialize it from their execution timestamp.
+ */
+export function resolveFinalCompletionDate(
+  workOrder: Pick<DateFields, 'dateCompleted' | 'completionDateTime'>,
+): string | null {
+  return nonBlank(workOrder.dateCompleted) ?? nonBlank(workOrder.completionDateTime);
+}
+
+/**
  * Final-state safety net for Work Order writers.
  *
  * This deliberately does not change any caller's normal date-source

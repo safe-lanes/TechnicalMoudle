@@ -434,7 +434,7 @@ export class JobDueScannerService {
         continue;
       }
       
-      // Generate a work order for EACH linked component (with per-component RH tracking)
+      // Generate a work order for EACH linked component using the Job's RH tracking.
       for (const linkedComponent of linkedComponents) {
         const componentCode = linkedComponent.componentCode;
         const componentName = linkedComponent.componentName;
@@ -444,8 +444,7 @@ export class JobDueScannerService {
           continue;
         }
 
-        // Use component-specific lastDoneRH from link table, fall back to job-level
-        const rhLastDone = parseFloat(linkedComponent.lastDoneRH || job.lastDoneRH || '0');
+        const rhLastDone = parseFloat(job.lastDoneRH || '0');
         
         // Compute per-component current RH from the linked component's own record
         let componentCurrentRH = rhEffectiveCurrent;

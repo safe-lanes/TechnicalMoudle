@@ -9,7 +9,10 @@ import { logFieldChanges } from '../../sync';
 import { isShipInstance } from '../../sync/syncRole';
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
-import { ensureCompletedWorkOrderDate } from '../utils/completedWorkOrderDate';
+import {
+  ensureCompletedWorkOrderDate,
+  getJobCompletionDate,
+} from '../utils/completedWorkOrderDate';
 
 // ── Complete Work Order ──
 
@@ -777,15 +780,16 @@ export async function completeWorkOrder(
       // completions. Semantics unchanged: Calendar/Dual/RH legs, D2 RH
       // conditionality, R1 completion-RH source — see the helper's header.
       const { computeJobCycleUpdates } = await import('@shared/workOrders/jobCycleCalc');
+      const jobCompletionDate = getJobCompletionDate(updatedWorkOrder);
       const { jobUpdates } = computeJobCycleUpdates({
         maintenanceBasis: workOrder.maintenanceBasis,
-        dateOfCompletion,
+        dateOfCompletion: jobCompletionDate,
         completionRH: cycleRH,
         originalDueDate,
         job,
       });
 
-      if (workOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletion && !cycleRH) {
+      if (workOrder.maintenanceBasis === 'Dual Frequency' && jobCompletionDate && !cycleRH) {
         console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
       }
 
@@ -947,6 +951,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
   }
 
   const rawCompletionDate: string | null = workOrder.completionDateTime || workOrder.dateCompleted || null;
+  const jobCompletionDate = getJobCompletionDate(workOrder);
   const missedCycles: number = workOrder.missedCycles || 0;
   const originalDueDate: string | null = workOrder.originalDueDate || workOrder.nextDueDate || workOrder.dueDate || null;
 
@@ -1010,19 +1015,18 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
       }
     }
 
-    if (job && rawCompletionDate) {
-      const dateOfCompletionNorm = normalizeToISO(rawCompletionDate);
+    if (job && jobCompletionDate) {
       const basis = workOrder.maintenanceBasis;
 
-      if ((basis === 'Calendar' || basis === 'Dual Frequency') && dateOfCompletionNorm) {
+      if (basis === 'Calendar' || basis === 'Dual Frequency') {
         const { calculateNextDueDate } = await import('@shared/dateUtils');
-        const updates: any = { lastDoneDate: dateOfCompletionNorm };
+        const updates: any = { lastDoneDate: jobCompletionDate };
         if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, originalDueDate);
+          const nextDue = calculateNextDueDate(jobCompletionDate, job.frequencyValue, job.frequencyUnit, originalDueDate);
           if (nextDue) updates.nextDueDate = nextDue;
         }
         await repo.updateJob(job.juuid, updates);
-        console.log(`✅ [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
+        console.log(`✅ [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${jobCompletionDate}`);
       }
 
       // R1 (migration 139): next cycle derives from the stored WO Completion RH

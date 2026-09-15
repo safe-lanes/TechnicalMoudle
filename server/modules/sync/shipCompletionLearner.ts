@@ -30,6 +30,7 @@ import { computeJobCycleUpdates } from '@shared/workOrders/jobCycleCalc';
 import { parseWorkOrderDate } from '@shared/workOrders/dateParse';
 import { isCompletedStatus } from '../../utils/workOrderStatus';
 import { syncDiag } from './syncDiagLogger';
+import { getJobCompletionDate } from '../work-orders/utils/completedWorkOrderDate';
 
 export interface LearnResult {
   candidates: number;
@@ -199,9 +200,10 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
 
       // Completion RH source chain mirrors the completion service (R1).
       const completionRH = wo.wo_completion_rh ?? wo.completion_rh ?? wo.current_reading;
+      const jobCompletionDate = getJobCompletionDate({ dateCompleted: wo.date_completed });
       const { jobUpdates } = computeJobCycleUpdates({
         maintenanceBasis: wo.maintenance_basis,
-        dateOfCompletion: wo.date_completed,
+        dateOfCompletion: jobCompletionDate,
         completionRH: completionRH != null ? String(completionRH) : null,
         originalDueDate: wo.next_due_date || wo.due_date || null,
         job: {

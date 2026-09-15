@@ -9400,14 +9400,12 @@ export class PostgresStorage {
       ));
   }
 
-  async getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>> {
+  async getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
     const db = await getDb();
     const links = await db.select({
       componentId: jobComponentLinks.componentId,
       componentCode: components.componentCode,
       componentName: components.name,
-      lastDoneRH: jobComponentLinks.lastDoneRH,
-      nextDueRH: jobComponentLinks.nextDueRH,
     })
     .from(jobComponentLinks)
     .innerJoin(components, eq(jobComponentLinks.componentId, components.cuuid))
@@ -9417,8 +9415,6 @@ export class PostgresStorage {
       componentId: l.componentId,
       componentCode: l.componentCode || '',
       componentName: l.componentName || '',
-      lastDoneRH: l.lastDoneRH,
-      nextDueRH: l.nextDueRH,
     }));
   }
 
@@ -9428,8 +9424,8 @@ export class PostgresStorage {
    * scanner to KILL the per-job N+1 (previously one query per RH/Dual job).
    * Jobs with no links are simply absent from the returned map.
    */
-  async getLinkedComponentsForJobs(jobIds: string[]): Promise<Map<string, Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>> {
-    const result = new Map<string, Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>();
+  async getLinkedComponentsForJobs(jobIds: string[]): Promise<Map<string, Array<{ componentId: string; componentCode: string; componentName: string }>>> {
+    const result = new Map<string, Array<{ componentId: string; componentCode: string; componentName: string }>>();
     if (!jobIds || jobIds.length === 0) return result;
 
     const db = await getDb();
@@ -9438,8 +9434,6 @@ export class PostgresStorage {
       componentId: jobComponentLinks.componentId,
       componentCode: components.componentCode,
       componentName: components.name,
-      lastDoneRH: jobComponentLinks.lastDoneRH,
-      nextDueRH: jobComponentLinks.nextDueRH,
     })
     .from(jobComponentLinks)
     .innerJoin(components, eq(jobComponentLinks.componentId, components.cuuid))
@@ -9451,8 +9445,6 @@ export class PostgresStorage {
         componentId: l.componentId,
         componentCode: l.componentCode || '',
         componentName: l.componentName || '',
-        lastDoneRH: l.lastDoneRH,
-        nextDueRH: l.nextDueRH,
       });
       result.set(l.jobId, arr);
     }
@@ -9475,45 +9467,6 @@ export class PostgresStorage {
       jobNo: l.jobNo || '',
       jobTitle: l.jobTitle || '',
     }));
-  }
-
-  // Component-specific tracking updates (prevents data mixing between components sharing the same job)
-  // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
-  async updateJobComponentLinkTracking(vesselId: string, jobId: string, componentId: string, updates: {
-    lastDoneDate?: string;
-    nextDueDate?: string;
-    lastDoneRH?: string;
-    nextDueRH?: string;
-    updatedAt?: Date;
-  }): Promise<JobComponentLink | null> {
-    if (!vesselId) {
-      throw new Error('vesselId is required for updateJobComponentLinkTracking to ensure vessel isolation');
-    }
-    const db = await getDb();
-    const result = await db.update(jobComponentLinks)
-      .set(updates)
-      .where(and(
-        eq(jobComponentLinks.vesselId, vesselId),
-        eq(jobComponentLinks.jobId, jobId),
-        eq(jobComponentLinks.componentId, componentId)
-      ))
-      .returning();
-    return result[0] || null;
-  }
-
-  // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
-  async getJobComponentLinkWithTracking(vesselId: string, jobId: string, componentId: string): Promise<JobComponentLink | null> {
-    if (!vesselId) {
-      throw new Error('vesselId is required for getJobComponentLinkWithTracking to ensure vessel isolation');
-    }
-    const db = await getDb();
-    const result = await db.select().from(jobComponentLinks)
-      .where(and(
-        eq(jobComponentLinks.vesselId, vesselId),
-        eq(jobComponentLinks.jobId, jobId),
-        eq(jobComponentLinks.componentId, componentId)
-      ));
-    return result[0] || null;
   }
 
   // ============= INVENTORY MANAGEMENT: SPARE LOCATION STOCK =============

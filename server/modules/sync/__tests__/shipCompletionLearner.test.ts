@@ -40,11 +40,11 @@ describe('filterAdvanceOnly (advance-only per leg)', () => {
     expect(filterAdvanceOnly({ last_done_date: null }, { ...calUpdates })).toBeTruthy();
   });
 
-  it('re-applying the SAME completion is a no-op (idempotent)', () => {
+  it('re-applying the same completion is a no-op', () => {
     expect(filterAdvanceOnly({ last_done_date: '01-Aug-2026' }, { ...calUpdates })).toBeNull();
   });
 
-  it('out-of-order OLDER completion never regresses tracking', () => {
+  it('does not regress tracking from an out-of-order older completion', () => {
     expect(filterAdvanceOnly({ last_done_date: '15-Aug-2026' }, { ...calUpdates })).toBeNull();
   });
 
@@ -54,9 +54,9 @@ describe('filterAdvanceOnly (advance-only per leg)', () => {
     expect(filterAdvanceOnly({ last_done_rh: '13000' }, { ...rhUpdates })).toBeNull();
   });
 
-  it('legs filter independently (batched/out-of-order per leg)', () => {
+  it('filters calendar and RH legs independently', () => {
     const res = filterAdvanceOnly(
-      { last_done_date: '15-Aug-2026', last_done_rh: '11000' }, // calendar ahead, RH behind
+      { last_done_date: '15-Aug-2026', last_done_rh: '11000' },
       { ...calUpdates, ...rhUpdates },
     );
     expect(res).toBeTruthy();

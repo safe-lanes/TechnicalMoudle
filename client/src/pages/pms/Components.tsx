@@ -871,20 +871,10 @@ const JobRow: React.FC<{
 }> = ({ job, onRowClick, toast, activeComponentCode, isAdminRole }) => {
   const [showReasonDialog, setShowReasonDialog] = useState(false);
 
-  // Get component-specific tracking data for THIS component (prevents data mixing between components)
-  const componentTracking = job.componentTracking?.[activeComponentCode] || {};
-  const effectiveLastDoneDate = hasTrackingValue(componentTracking.lastDoneDate)
-    ? componentTracking.lastDoneDate
-    : job.lastDoneDate;
-  const effectiveNextDueDate = hasTrackingValue(componentTracking.nextDueDate)
-    ? componentTracking.nextDueDate
-    : job.nextDueDate;
-  const effectiveLastDoneRH = hasTrackingValue(componentTracking.lastDoneRH)
-    ? componentTracking.lastDoneRH
-    : job.lastDoneRH;
-  const effectiveNextDueRH = hasTrackingValue(componentTracking.nextDueRH)
-    ? componentTracking.nextDueRH
-    : job.nextDueRH;
+  const effectiveLastDoneDate = job.lastDoneDate;
+  const effectiveNextDueDate = job.nextDueDate;
+  const effectiveLastDoneRH = job.lastDoneRH;
+  const effectiveNextDueRH = job.nextDueRH;
   const isRunningHoursBased =
     job.maintenanceBasis === 'Running Hours' ||
     job.maintenanceBasis === 'Dual Frequency';

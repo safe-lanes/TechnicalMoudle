@@ -98,9 +98,7 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isGlobal: false,
     isConfigurable: false,
     businessRules: null,
-    notes: 'Job-component associations managed by office. Integer PK, no UUID identity. ' +
-      'PROTECTED TRACKING COLUMNS (migration 161): same guard as jobs — last_done_date/next_due_date/' +
-      'last_done_rh/next_due_rh preserved on ship unless a newer tracking_rebaselined_at authorizes the overwrite.',
+    notes: 'Job-component associations managed by office. Integer PK, no UUID identity. Job cycle tracking is read from the jobs table only.',
   },
 
   // ── Fleet Management ──

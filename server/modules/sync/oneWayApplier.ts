@@ -240,7 +240,7 @@ export async function applyRotationToComponent(conn: any, rowData: Record<string
  * @param rows - Array of row objects to upsert
  * @returns Counts of inserts, updates, soft-deletes, and any per-row errors
  */
-/** Ship-owned tracking columns on jobs / job_component_links (snake_case, DB names). */
+/** Ship-owned tracking columns on jobs (snake_case, DB names). */
 export const JOB_TRACKING_COLUMNS = ['last_done_date', 'next_due_date', 'last_done_rh', 'next_due_rh'] as const;
 
 function toTimeOrNull(v: any): number | null {
@@ -404,13 +404,13 @@ export async function applyOneWayRows(
         } else {
           let rowToApply = row;
           // ── Job tracking-column guard (migration 161) ─────────────────────
-          // jobs / job_component_links are ONE_WAY shore→ship full-row applies with no
+          // jobs are ONE_WAY shore→ship full-row applies with no
           // protected columns: any shore job edit would overwrite the SHIP's fresher
           // last-done/next-due tracking (ship completions never sync into shore jobs, so
           // shore tracking is chronically stale). Preserve local non-NULL tracking values
           // unless the incoming row carries a NEWER tracking_rebaselined_at stamp (the
           // authorized admin rebaseline escape hatch). Definition fields flow unchanged.
-          if (tableName === 'jobs' || tableName === 'job_component_links') {
+          if (tableName === 'jobs') {
             try {
               const localRes = await pool.query(
                 `SELECT last_done_date, next_due_date, last_done_rh, next_due_rh, tracking_rebaselined_at

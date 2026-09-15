@@ -21,7 +21,10 @@ import {
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { classifyApprovalTransition } from '../utils/approvalTransition';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
-import { ensureCompletedWorkOrderDate } from '../utils/completedWorkOrderDate';
+import {
+  ensureCompletedWorkOrderDate,
+  getJobCompletionDate,
+} from '../utils/completedWorkOrderDate';
 
 async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Promise<string | null> {
   if (!assignedTo) return null;
@@ -310,19 +313,6 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
     }
   }
 
-  // Load job-component links for RH tracking data
-  // Keyed by `${jobId}:${componentId}` for quick lookup
-  const allLinks = await repo.findAllJobComponentLinks();
-  const linksByJobComponent = new Map<string, { lastDoneRH: string | null; nextDueRH: string | null }>();
-  for (const link of allLinks) {
-    if (link.lastDoneRH || link.nextDueRH) {
-      linksByJobComponent.set(`${link.jobId}:${link.componentId}`, {
-        lastDoneRH: link.lastDoneRH,
-        nextDueRH: link.nextDueRH,
-      });
-    }
-  }
-
   // Build rank-name → rankId lookup once per call so we can backfill any
   // work orders whose assignedToRankId is missing or out of sync with assignedTo.
   // This is what keeps Dashboard Me/My Team scoping aligned with the
@@ -378,18 +368,16 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
     const component = wo.componentCode
       ? componentsByCodeMap.get(`${woVesselId}:${wo.componentCode}`)
       : (wo.component ? componentsMap.get(wo.component) : null);
-
-    // Resolve dueRH: link.nextDueRH → wo.nextDueReading → computed(lastDoneRH + interval)
-    // When wo.nextDueReading equals interval (likely stale from initial WO creation), prefer computed
     const componentId = component?.cuuid || component?.id;
-    const linkKey = (wo.jobId && componentId) ? `${wo.jobId}:${componentId}` : null;
-    const linkData = linkKey ? linksByJobComponent.get(linkKey) : null;
+
+    // Resolve dueRH from the Job row, then the Work Order snapshot, then Job cycle inputs.
+    // When wo.nextDueReading equals interval (likely stale from initial WO creation), prefer computed
     let dueRH: number | undefined;
     if (wo.maintenanceBasis === 'Running Hours') {
-      dueRH = parseRH(linkData?.nextDueRH);
+      dueRH = parseRH(job?.nextDueRH);
       if (dueRH == null) {
         const woNextDue = parseRH(wo.nextDueReading);
-        const lastDone = parseRH(linkData?.lastDoneRH) ?? parseRH(job?.lastDoneRH);
+        const lastDone = parseRH(job?.lastDoneRH);
         const interval = parseRH(job?.intervalRunningHour);
         const computed = (lastDone != null && interval != null && interval > 0) ? lastDone + interval : undefined;
         if (woNextDue != null && computed != null && computed > woNextDue) {
@@ -718,28 +706,14 @@ export async function getWorkOrder(id: string) {
     return isNaN(num) ? undefined : num;
   };
 
-  // Resolve dueRH: link.nextDueRH → wo.nextDueReading → computed(lastDoneRH + interval)
+  // Resolve dueRH from the Job row, then the Work Order snapshot, then Job cycle inputs.
   // When wo.nextDueReading equals interval (likely stale from initial WO creation), prefer computed
-  let linkNextDueRH: string | null = null;
-  let linkLastDoneRH: string | null = null;
-  const compId = component?.cuuid || component?.id;
-  if (workOrder.maintenanceBasis === 'Running Hours' && workOrder.jobId && compId) {
-    const links = await storage.getJobComponentLinksByJob(workOrder.jobId);
-    const link = links.find((l: any) => l.componentId === compId);
-    if (link?.nextDueRH) {
-      linkNextDueRH = link.nextDueRH;
-    }
-    if (link?.lastDoneRH) {
-      linkLastDoneRH = link.lastDoneRH;
-    }
-  }
-
   let dueRH: number | undefined;
   if (workOrder.maintenanceBasis === 'Running Hours') {
-    dueRH = parseRH(linkNextDueRH);
+    dueRH = parseRH(job?.nextDueRH);
     if (dueRH == null) {
       const woNextDue = parseRH(workOrder.nextDueReading);
-      const lastDone = parseRH(linkLastDoneRH) ?? parseRH(job?.lastDoneRH);
+      const lastDone = parseRH(job?.lastDoneRH);
       const interval = parseRH(job?.intervalRunningHour);
       const computed = (lastDone != null && interval != null && interval > 0) ? lastDone + interval : undefined;
       if (woNextDue != null && computed != null && computed > woNextDue) {
@@ -1621,6 +1595,12 @@ export async function updateWorkOrder(id: string, body: any) {
     );
   }
   const isApprovalTransition = approvalTransition.explicitApproval;
+  if (isApprovalTransition && existingWO.dateCompleted) {
+    // The persisted final Work Order date is authoritative. Approval UIs may
+    // resend completionDateTime as dateCompleted; do not let that replace the
+    // final date already selected during completion.
+    updateData.dateCompleted = existingWO.dateCompleted;
+  }
 
   // Phase 0 / P0.2 (defect D1): the Layer-5 safety gates below run for EVERY approval
   // transition — the Level 2 interception happens AFTER them (see below), so an L2 job
@@ -2337,7 +2317,7 @@ export async function updateWorkOrder(id: string, body: any) {
           }
 
           if (job) {
-            const rawJobCompletionDate = freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime;
+            const rawJobCompletionDate = getJobCompletionDate(freshWorkOrder);
             // R1 (migration 139): next-cycle math derives from the stored WO
             // Completion RH; fallback to the stored reading = pre-feature
             // behaviour for historical/in-flight WOs. The raw reading is still

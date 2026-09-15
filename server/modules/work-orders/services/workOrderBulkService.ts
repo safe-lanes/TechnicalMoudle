@@ -6,7 +6,10 @@ import { invalidateComplianceCache } from './complianceAnomalyService';
 import { logFieldChanges } from '../../sync';
 import { finalizeWorkOrderCompletion } from './workOrderCompletionService';
 import { isSuperintendentLockEnabled } from './workOrderService';
-import { ensureCompletedWorkOrderDate } from '../utils/completedWorkOrderDate';
+import {
+  ensureCompletedWorkOrderDate,
+  resolveFinalCompletionDate,
+} from '../utils/completedWorkOrderDate';
 
 // ── Bulk Approve Work Orders ──
 
@@ -52,7 +55,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       }
 
       // Calculate next due date/reading based on actual completion date
-      const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
+      const actualCompletionDate = resolveFinalCompletionDate(existingWO);
       let nextDueDate = undefined;
       let nextDueReading = undefined;
 
@@ -208,6 +211,14 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         }
       }
 
+      if (!requiresLevel2Review) {
+        try {
+          await finalizeWorkOrderCompletion(workOrderId);
+        } catch (finalizeErr) {
+          console.error('[Bulk Approve] finalizeWorkOrderCompletion failed (non-blocking):', finalizeErr);
+        }
+      }
+
       results.success.push(workOrderId);
       console.log(`✅ Approved work order: ${workOrderId}`);
     } catch (err: any) {
@@ -254,7 +265,7 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     }
   }
 
-  const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
+  const actualCompletionDate = resolveFinalCompletionDate(existingWO);
   const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
 
   let nextDueDate: string | undefined;

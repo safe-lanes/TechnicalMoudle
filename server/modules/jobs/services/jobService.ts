@@ -14,7 +14,6 @@ export async function listJobs(vesselId?: string, componentId?: string, vesselId
 
   // PERFORMANCE OPTIMIZATION: Batch fetch all job-component links
   let jobLinksMap = new Map<string, string[]>();
-  let jobLinkTrackingMap = new Map<string, any>();
 
   if (vesselId && vesselId !== 'all') {
     const allLinks = await repo.findJobComponentLinks(vesselId);
@@ -22,7 +21,6 @@ export async function listJobs(vesselId?: string, componentId?: string, vesselId
       const existing = jobLinksMap.get(link.jobId) || [];
       existing.push((link as any).componentCode);
       jobLinksMap.set(link.jobId, existing);
-      jobLinkTrackingMap.set(`${link.jobId}:${link.componentId}`, link);
     }
   } else if (jobs.length > 0) {
     const vesselIds = Array.from(new Set(jobs.map(j => j.vesselId).filter((v): v is string => v != null)));
@@ -32,7 +30,6 @@ export async function listJobs(vesselId?: string, componentId?: string, vesselId
         const existing = jobLinksMap.get(link.jobId) || [];
         existing.push((link as any).componentCode);
         jobLinksMap.set(link.jobId, existing);
-        jobLinkTrackingMap.set(`${link.jobId}:${link.componentId}`, link);
       }
     }
   }
@@ -64,43 +61,10 @@ export async function listJobs(vesselId?: string, componentId?: string, vesselId
       linkedComponentCodes.push(job.componentCode);
     }
 
-    const componentTracking: Record<string, any> = {};
-    for (const [linkKey, link] of Array.from(jobLinkTrackingMap.entries())) {
-      if (linkKey.startsWith(`${job.juuid}:`)) {
-        const compCode = (link as any).componentCode;
-        if (compCode) {
-          componentTracking[compCode] = {
-            lastDoneDate: (link as any).lastDoneDate || null,
-            nextDueDate: (link as any).nextDueDate || null,
-            lastDoneRH: (link as any).lastDoneRH || null,
-            nextDueRH: (link as any).nextDueRH || null,
-          };
-        }
-      }
-    }
-
     let hydratedJob: any = {
       ...job,
       linkedComponentCodes,
-      componentTracking,
     };
-
-    const hasMultipleComponents = Object.keys(componentTracking).length > 1;
-    if (hasMultipleComponents) {
-      hydratedJob.lastDoneDate = null;
-      hydratedJob.nextDueDate = null;
-      hydratedJob.lastDoneRH = null;
-      hydratedJob.nextDueRH = null;
-    } else if (componentId) {
-      const linkKey = `${job.juuid}:${componentId}`;
-      const componentLink = jobLinkTrackingMap.get(linkKey);
-      if (componentLink) {
-        if (componentLink.lastDoneDate) hydratedJob.lastDoneDate = componentLink.lastDoneDate;
-        if (componentLink.nextDueDate) hydratedJob.nextDueDate = componentLink.nextDueDate;
-        if (componentLink.lastDoneRH) hydratedJob.lastDoneRH = componentLink.lastDoneRH;
-        if (componentLink.nextDueRH) hydratedJob.nextDueRH = componentLink.nextDueRH;
-      }
-    }
 
     if (job.maintenanceBasis === 'Running Hours' && job.componentId) {
       const component = await getComponentCached(job.componentId);
@@ -536,8 +500,8 @@ export async function getJobMaintenanceHistory(jobId: string, user: UserInfo) {
 
 /**
  * Rebaseline job tracking (migration 161 escape hatch): stamps tracking_rebaselined_at
- * NOW() on the job and its component links so the next shore→ship sync is AUTHORIZED to
- * overwrite the ship's tracking columns. Instance/role enforcement is in the controller.
+ * on the Job so the next shore→ship sync is authorized to overwrite its tracking columns.
+ * Instance/role enforcement is in the controller.
  */
 export async function rebaselineJobTracking(jobId: string, username: string) {
   const job = await repo.findById(jobId);
@@ -549,12 +513,8 @@ export async function rebaselineJobTracking(jobId: string, username: string) {
     `UPDATE jobs SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE juuid = $1`,
     [jobId],
   );
-  const linkRes = await pool.query(
-    `UPDATE job_component_links SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE job_id = $1`,
-    [jobId],
-  );
-  console.log(`[Rebaseline] job ${job.jobNo || jobId} tracking rebaselined by ${username} (links: ${linkRes.rowCount ?? 0})`);
-  return { success: true, jobId, jobStamped: (jobRes.rowCount ?? 0) > 0, linksStamped: linkRes.rowCount ?? 0 };
+  console.log(`[Rebaseline] job ${job.jobNo || jobId} tracking rebaselined by ${username}`);
+  return { success: true, jobId, jobStamped: (jobRes.rowCount ?? 0) > 0 };
 }
 
 export async function generateWorkOrder(jobId: string, reason: string, activeComponentCode?: string) {
