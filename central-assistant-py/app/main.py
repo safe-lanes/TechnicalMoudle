@@ -79,8 +79,10 @@ async def health() -> dict[str, Any]:
         chunks = await db.chunk_count()
     except Exception:
         chunks = None
+    ms = agent._model_settings()
     return {"ok": True, "store": "pgvector", "indexSet": settings().assistant_index_set, "chunks": chunks,
-            "db": "connected" if db_ok else "unreachable", "llmCalls": llm.llm_calls, "prompt": prompt_record()}
+            "db": "connected" if db_ok else "unreachable", "llmCalls": llm.llm_calls, "prompt": prompt_record(),
+            "chatModel": settings().chat_model, "temperature": ms.get("temperature", "default")}
 
 
 # ── admin (nginx denies publicly; tunnel-only) ─────────────────────────────────────

@@ -19,6 +19,12 @@ from app import agent  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.masking import Masker  # noqa: E402
 
+if os.environ.get("DIAG_NO_TEMPERATURE") == "1":
+    # Owner decision 1 (15-Sep): the alternative model rejects temperature 0.2 ("only the default (1) value is supported"),
+    # so this process sends NO temperature; everything else in the served call path is unchanged. Recorded in the results.
+    from pydantic_ai.settings import ModelSettings as _MS
+    agent._model_settings = lambda: _MS(timeout=settings().llm_timeout_ms / 1000.0)  # type: ignore[assignment]
+
 IN_PATH = sys.argv[1] if len(sys.argv) > 1 else "/app/out/prompt-compare-input.json"
 IN = json.load(open(IN_PATH, encoding="utf-8"))
 RUNS = 3

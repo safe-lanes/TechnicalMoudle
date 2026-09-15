@@ -229,12 +229,22 @@ def _model() -> MaskingModel:
 
 
 def _model_settings() -> ModelSettings:
-    return ModelSettings(temperature=0.2, timeout=settings().llm_timeout_ms / 1000.0)
+    """Served sampling settings. CHAT_TEMPERATURE (default "0.2") — set to "default" to send NO temperature: gpt-5.6-luna
+    rejects any non-default value (owner decision 1, 15-Sep-2026); the value in force is shown in /health."""
+    s = settings()
+    t = s.chat_temperature.strip().lower()
+    if t in ("", "default", "none"):
+        return ModelSettings(timeout=s.llm_timeout_ms / 1000.0)
+    return ModelSettings(temperature=float(t), timeout=s.llm_timeout_ms / 1000.0)
 
 
 def _usage(result: Any) -> dict[str, int] | None:
+    """Token usage of the run. FIX 15-Sep-2026: in pydantic-ai 2.42 `AgentRunResult.usage` is a PROPERTY, so the former
+    `result.usage()` raised TypeError and every conversation row logged tokens as None (found while recording the
+    gpt-5.6-luna replay). Handles both shapes."""
     try:
-        u = result.usage()
+        u = result.usage
+        u = u() if callable(u) else u
         return {"prompt_tokens": int(u.input_tokens or 0), "completion_tokens": int(u.output_tokens or 0)}
     except Exception:
         return None

@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     route_top_k: int = 10
     answer_chunks: int = 5
 
+    # sampling: "0.2" (served default) or "default" = send no temperature (models such as gpt-5.6-luna accept only their default)
+    chat_temperature: str = "0.2"
+
     # budgets (§5.7)
     llm_timeout_ms: int = 30000
     tool_timeout_ms: int = 10000
