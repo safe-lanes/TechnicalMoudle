@@ -1,0 +1,76 @@
+
+===== kb2-wo-dump.jsonl
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   judge .8   last-run .8 reason
+wo-generic-01  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-02  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; user need not create MISSING
+wo-generic-02  B-kb-pilot   0/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; user need not create ✓
+wo-generic-03  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-03  B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      B-kb-pilot   2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail   automatic generation ✓; pairing ✗: Generate Now not described
+wo-phr-02      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   unplanned procedure ✓; note of the other ways MISSING
+wo-phr-02      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   unplanned procedure ✓; note of the other ways MISSING
+wo-phr-03      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-03      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+wo-phr-04      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-04      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-05      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-05      B-kb-pilot   1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail   automatic generation ✓; pairing ✗: Generate Now not described
+
+===== kb3-wo-dump.jsonl
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   judge .8   last-run .8 reason
+wo-generic-01  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-02  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; user need not create MISSING
+wo-generic-02  B-kb-pilot   3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; user need not create ✓; Generate Now described with its conditions
+wo-generic-03  A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-03  B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+wo-phr-02      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   unplanned procedure ✓; note of the other ways MISSING
+wo-phr-02      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   unplanned procedure ✓; note of the other ways MISSING
+wo-phr-03      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-03      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate Now not described; per-job Generate WO not des
+wo-phr-04      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-04      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-05      A-kb-base    0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-05      B-kb-pilot   0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+
+===== diag-results.json
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   judge .8   last-run .8 reason
+wo-generic-01  normal       0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  overview     1/3 fail  1/3 fail  1/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO switch stated without the office qualifier 
+wo-phr-01      normal       0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+wo-phr-01      overview     3/3 PASS  3/3 PASS  3/3 PASS  2/3 fail  2/3 fail  2/3 fail   automatic generation ✓; pairing ✓
+
+===== dedup-results.json
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   judge .8   last-run .8 reason
+wo-generic-01  dedup        0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  normal       0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      dedup        0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+wo-phr-01      normal       0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+
+===== prompt-results.json
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   judge .8   last-run .8 reason
+wo-generic-01  v2           0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  v4           0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-phr-01      v2           0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+wo-phr-01      v4           0/3 fail  0/3 fail  0/3 fail  0/3 fail  2/3 fail  2/3 fail   automatic generation ✓; pairing ✓
+
+===== prompt5-results.json
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   judge .8   last-run .8 reason
+wo-generic-01  v2           0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-01  v5           1/3 fail  1/3 fail  1/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO switch stated without the office qualifier 
+wo-phr-01      v2           0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prer
+wo-phr-01      v5           2/3 fail  2/3 fail  2/3 fail  0/3 fail  0/3 fail  3/3 PASS   automatic generation ✓; pairing ✓
+
+== RULE-level outcome changes .7 → .8 (3) ==
+prompt wo-phr-01 v5 run 1: rule .7=False (automatic generation ✓; pairing ✗: Generate WO switch stated without the office qualifier [incorrect applicability]) → .8=True (automatic generation ✓; pairing ✓)
+prompt wo-phr-01 v5 run 2: rule .7=False (automatic generation ✓; pairing ✗: Generate WO switch stated without the office qualifier [incorrect applicability]) → .8=True (automatic generation ✓; pairing ✓)
+prompt wo-phr-01 v5 run 3: rule .7=False (automatic generation ✓; pairing ✗: Generate WO switch stated without the office qualifier [incorrect applicability]) → .8=True (automatic generation ✓; pairing ✓)
+
+== overall PASS/fail changes per run .7 → .8 (3) ==
+prompt wo-phr-01 v5 run 1: .7 fail → .8 PASS
+prompt wo-phr-01 v5 run 2: .7 fail → .8 PASS
+prompt wo-phr-01 v5 run 3: .7 fail → .8 PASS

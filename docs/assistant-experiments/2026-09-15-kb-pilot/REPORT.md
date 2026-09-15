@@ -367,6 +367,21 @@ v2's rules and the cross-reference hard rule verbatim, plus: the "same as sectio
 | incorrect instructions or statements | 0 | 0 (minor: phr-01 run 2 "unplanned … can be created without any prerequisites" over-generalises "no role check, no switch") |
 | judge .7 rule | 0/6 | 0/6 (2 missing prerequisite, 4 incorrect applicability) |
 
+### 12.3a Corrected reading of the v5 answers (owner rule 15-Sep: an Office label governing an entire procedure qualifies its conditions; one attached only to vessel selection cannot) — `prompt5-analysis.txt`
+
+| run | methods | per-job prerequisites | Office/Ship applicability | unsupported claims | citations | judge .7 | judge .8 |
+|---|---|---|---|---|---|---|---|
+| generic-01 v5 r1 | 4/4 ✓ | **missing condition** — per-job states only "the job must be active and must not already have an active work order"; the switch is absent | per-job "(available in Office)" governs the whole procedure but the ship path (no switch) is unstated → ambiguous; unplanned "(both Office and Ship)" ✓; planned "Ship automatic / Office Generate Now" ✓ | none | per-method, supported ✓ | ✗ real | ✗ real |
+| generic-01 v5 r2 | 4/4 ✓ | **missing condition** — "does not require a specific role but does require the job to be active…", no switch | per-job "In the office, the steps are:" governs the procedure, ship path unstated → ambiguous; unplanned "both Office and Ship" ✓ | none | supported ✓ | ✗ real | ✗ real |
+| generic-01 v5 r3 | 4/4 ✓ | switch present ("the vessel switch must be ON") | **ambiguous applicability** — the only Office label is "- Office: Select the vessel." as its own step, so it cannot qualify the switch sentence | none | supported ✓ | ✗ real | ✗ real |
+| phr-01 v5 r1 | 4/4 ✓ | ✓ "- Office: Select the vessel → … click 'Generate WO' → … There is no role check on this path, but the vessel's switch must be ON, and the job must be active…" — the label opens the whole procedure line → qualified | unplanned "- Office: Select the vessel → Click '+ Unplanned W.O' …" frames unplanned as an office procedure; the Vessel manual excerpt in the context has no such step → **ambiguous** (ship path unstated) | none | supported ✓ ([1] overview, [2]/[3] manuals) | ✗ **judge-only** (framing test needed "in the office") | ✓ |
+| phr-01 v5 r2 | 4/4 ✓ | ✓ same construction | unplanned office-only framing → ambiguous | **"Unplanned work orders — These can be created without any prerequisites."** — the source says no role check and no switch; "no prerequisites" is broader (owner rule: "no role check on this route" must not become "no prerequisites") | supported ✓ ([1], [3], [4] match the context indices) | ✗ judge-only | ✓ |
+| phr-01 v5 r3 | 4/4 ✓ | ✓ same construction | unplanned office-only framing → ambiguous | "can be created at any time" — minor, unsupported wording | supported ✓ | ✗ judge-only | ✓ |
+
+Totals, v5 (6 runs): missing condition 2 · ambiguous applicability 6 (per-job in generic-01 r1–r3; unplanned in phr-01 r1–r3) · unsupported claim 1 (+1 minor) · judge-only 3 under .7, 0 under .8 · runs meeting all four requirements: **0/6**. v2 on the same contexts: generic-01 r1–r3 missing methods (unplanned only; its "same as section 1.1.5.2 (page 29)" is a self-reference to the quoted section, not an invented cross-reference — the analysis flag over-counted it); phr-01 r1–r3 missing condition (per-job switch absent), "(Office: select the vessel)" attached to vessel selection only.
+
+Judge .8 (`judge8-validation.txt`): parsing only — a unit that opens with "Office:" / "in the office" AND carries the action qualifies; a bare "Office: select the vessel." step does not. Validated on all 144 stored answers: exactly three changes, phr-01 v5 r1–r3 fail → PASS; generic-01 v5 r3 stays a fail; the other 138 verdicts unchanged. The judge still does not detect the unplanned office-only framing or the "no prerequisites" claim — those stay manual criteria (not added, so the factual bar is not relaxed by the judge either way).
+
 ### 12.4 Decision
 
 v5 removes every defect v4 introduced (no fabricated references, no labels, no false "not covered", Generate Now present 6/6) and fixes coverage 6/6 — but it does **not** meet the bar "correct conditions and applicability": the per-job switch is dropped in 2 of 6 runs and, where present, is never stated explicitly as an office condition. Under the strict reading the replay fails; under the lenient reading it fails 2/6. Either way the pass condition for running case 09 and the broader suites is not met, so they were **not** run, nothing was built, nothing deployed. v5 stays on the branch as the candidate label; the served prompt is v2.
@@ -374,6 +389,21 @@ v5 removes every defect v4 introduced (no fabricated references, no labels, no f
 ### 12.5 What this settles and what comes next (per the reviewer's stop rule)
 
 Two prompt versions on identical captured inputs show the same residual: gpt-4o-mini at T=0.2 keeps the Generate Now conditions reliably but treats the per-job switch clause ("in the office only if the vessel switch is on", sitting mid-sentence between "No role check on this path (…)" and "the job must be active…") as droppable or re-orders it away from its qualifier, in 2–6 of 6 runs depending on the reading, whatever the prompt says about conditions. The reviewer's rule applies: stop cycling prompt wording. The next decision is a comparison of a different answer-generation approach or model on these SAME captured inputs — the replay harness (`diag_prompt.py` + the captured contexts) can run any prompt text; a model change (`CHAT_MODEL`) or a two-step generation (extract per-method conditions first, then write) would each need the owner's authorisation and a cost/latency note before running. Not started.
+
+## 13. Planned: alternative answer model on the same captured inputs (owner GO 15-Sep; NOT started — awaiting model access)
+
+Scope: candidate only; prompt v5 and the two captured contexts unchanged; `diag_prompt.py` replayed inside the same container with `CHAT_MODEL` overridden for that process only (the running service keeps `gpt-4o-mini`); wire capture on; judge .8 plus a full reading against the evidence (methods, action-specific prerequisites, Office/Ship applicability, supported citations; "no role check" ≠ "no prerequisites"). Recorded per run: model identifier from the wire body, temperature and timeout as sent, prompt/completion tokens from the response usage, latency, and cost computed from tokens at the published list price (the price used is quoted in the record so it can be verified against the account's actual billing — the API key cannot read billing).
+
+Model requested: **`gpt-4.1`** (same API family, supports temperature 0.2 so the settings stay like-for-like; stronger instruction following than gpt-4o-mini). Second choice if 4.1 cannot be enabled: `gpt-4o`. Reasoning models (o-series / gpt-5) would not be like-for-like — they do not accept the temperature setting. The key is a restricted project key: `models.list` returns 403 (missing `api.model.read`), so availability was not probed with test calls.
+
+Estimated cost, list prices as known 15-Sep (gpt-4.1: $2.00 per 1M input tokens, $8.00 per 1M output; gpt-4o: $2.50 / $10.00):
+
+| step | calls | tokens per call (approx.) | gpt-4.1 | gpt-4o |
+|---|---|---|---|---|
+| replay, 2 questions × 3 runs | 6 | ~2,200 in / ~500 out | ~$0.05 | ~$0.06 |
+| only if the replay passes: frozen 12 ×3 + corrected 14 ×3 + WO 8 phrasings ×3 + retrieval 18 (+ embeddings) | ~120 | ~2,500 in / ~400 out | ~$1.0 | ~$1.3 |
+
+Pass condition for the replay: every run — correct methods, action-specific prerequisites incl. the per-job office switch, Office/Ship applicability where the source makes it, supported citations, no invented references, no "no prerequisites"-type claims. The replay does not test the phrasings where retrieval misses the overview (wo-generic-03, wo-phr-02); those stay retrieval failures whatever the model does.
 
 ### 8.6 Not changed / open
 

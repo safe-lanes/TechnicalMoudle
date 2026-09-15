@@ -57,8 +57,12 @@ from acceptance_answers import ask, judge  # noqa: E402
 #     action, so a requirements line written before the step that names the action is no longer lost; a heading block that
 #     names no action is held and attached to the NEXT action it introduces (not the previous one); a block naming several
 #     actions falls back to the .5 unit scoping inside the block. Validated on 132 stored answers before use.
-WO_SUITE_VERSION = "2026-09-14.7"
-JUDGE_VERSION = 7
+# .8 (owner rule, 15-Sep, after reading the v5 answers): PARSING ONLY — an Office label that governs an entire procedure
+#     ('- Office: Select the vessel → … click Generate WO → … the switch must be ON') qualifies that procedure's conditions;
+#     an Office label attached only to vessel selection ('- Office: Select the vessel.' as its own step) cannot. Factual
+#     requirements unchanged. Validated on the stored answers before use.
+WO_SUITE_VERSION = "2026-09-14.8"
+JUDGE_VERSION = 8
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -90,10 +94,13 @@ AUTO_V6 = AUTO_V4[:-1] + r"|(generat|creat)\w*[^.\n]{0,80}automatic|automatic\w*
 NEG_RE = r"(no|not|without|does not require|doesn't require|no need for|not required|nor)\b[^.\n]{0,40}$"
 
 
-def unit_has_office_qualifier(scope: str, word: str = "switch") -> bool:
+def unit_has_office_qualifier(scope: str, word: str = "switch", action_re: str = r"generate wo", version: int = JUDGE_VERSION) -> bool:
     """.6: the switch must be stated as an OFFICE condition — 'office' in the same unit (sentence/item) as `word`, or the
     action itself framed 'in the office' in the scope's first unit. The step parenthetical '(Office: select the vessel)' and
-    manual file names ('For Office_Sail Admin') do not count as a qualifier."""
+    manual file names ('For Office_Sail Admin') do not count as a qualifier.
+    .8 (owner rule 15-Sep): an Office label that governs the ENTIRE procedure qualifies its conditions — a unit that opens with
+    'office:' / 'in the office' AND contains the action itself ('Office: select the vessel → … click Generate WO …') — while an
+    Office label attached only to vessel selection ('- Office: Select the vessel.' as its own step) cannot."""
     clean = re.sub(r"\(office:[^)]*\)|for office_sail admin[^\s,;.)]*", "", scope)
     units = units_of(clean)
     if not units:
@@ -101,6 +108,9 @@ def unit_has_office_qualifier(scope: str, word: str = "switch") -> bool:
     # the action's framing sentence = the first unit that is not a bare heading (.7 scopes start with the method heading)
     first = next((u for u in units if not re.match(r"^\s*(?:\d+\.|(?:\d+\.\s*)?\*\*[^*]{0,80}\*\*\s*:?)\s*$", u)), units[0])
     framed = "in the office" in first
+    if version >= 8 and not framed:
+        # a whole-procedure Office label: the unit that carries the action starts with the label
+        framed = any(re.match(r"^\s*(?:-\s*)?(?:in the office|office)\s*[:—–-]", u) and re.search(action_re, u) for u in units)
     hits = [u for u in units if word in u]
     return bool(hits) and all(("office" in u) or framed for u in hits)
 
@@ -233,7 +243,7 @@ def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
     else:
         if "switch" not in gw:
             notes.append("Generate WO block lacks the vessel switch [missing prerequisite]")
-        elif version >= 6 and not unit_has_office_qualifier(gw, "switch"):
+        elif version >= 6 and not unit_has_office_qualifier(gw, "switch", GW_RE, version):
             notes.append("Generate WO switch stated without the office qualifier [incorrect applicability]")
         if "sail admin" in gw and "generate now" not in gw:
             notes.append("Sail Admin wrongly attached to Generate WO [incorrect applicability]")

@@ -21,7 +21,7 @@ argv = sys.argv[1:]
 show_scopes = "--scopes" in argv
 OLD = int(argv[argv.index("--from") + 1]) if "--from" in argv else 4
 files = [a for i, a in enumerate(argv) if not a.startswith("--") and (i == 0 or argv[i - 1] != "--from")]
-VERSIONS = (3, 4, 5, 6, 7)
+VERSIONS = (3, 4, 5, 6, 7, 8)
 NEW = VERSIONS[-1]
 
 
