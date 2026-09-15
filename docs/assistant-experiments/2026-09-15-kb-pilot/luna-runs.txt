@@ -1,0 +1,243 @@
+===== LUNA SUITES 2026-09-15T12:01:12Z: A = 8018 prompt-v2 gpt-4o-mini T=0.2 · B = 8020 prompt-v5 gpt-5.6-luna T=default · index kb-pilot 916 both =====
+{"ok":true,"store":"pgvector","indexSet":"kb-pilot","chunks":916,"db":"connected","llmCalls":0,"prompt":{"version":"v5-plain-coverage-2026-09-15","docsPromptSha":"ff9ee87141ac1362","toolLoopPromptSha":"7a028346c1c2fdf0","combined":"aea94e2f5edb6948"},"chatModel":"gpt-5.6-luna","temperature":"default"}
+{"ok":true,"store":"pgvector","indexSet":"kb-pilot","chunks":916,"db":"connected","llmCalls":643,"prompt":{"version":"v2-xref-hardrule-2026-09-14","docsPromptSha":"b37172f6122a0257","toolLoopPromptSha":"f8e5a8f86bede638","combined":"ebfd83a623e41173"}}
+
+--- FROZEN 12 (case 09 first), 3 runs ---
+acceptance suite 2026-09-14.3 · 12 cases · repeat=3
+
+[01 callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p15 | 'To export the data in the audit preparation checklist observatio'
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p15 | 'In the **Inspector Observation Data** view:\n\n1. Click the **Exce'
+
+[02 callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon notifies the Office that the '
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. Click the **Email Notification** icon to notify the **Office '
+
+[03 callout] How do I upload a document for the first time in the SMS module?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | 'To upload a document for the first time in the SMS module, follo'
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | '1. Click **+New Document** to start an SMS change request. The f'
+
+[04 table] In the Master Review module, what do the grey and red icons mean?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '1. The **Grey Icon** indicates that a response is due.\n2. The **'
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '- **Grey icon:** Response Due.\n- **Red icon:** Response Overdue.'
+
+[05 table] What are the hazard categories in a risk assessment?
+   A-v2-4omini    answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   B-v5-luna      answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+
+[06 table] What actions can I take on a near miss record from the list — what do the icons do?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | '1. **View Record**: Click the eye icon to view, edit, or export '
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | 'From the Near Miss records list:\n\n1. **Eye icon — View Record:**'
+
+[07 xref] How do I apply a filter in the Stores sub-module of PMS?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 | 'To apply a filter in the Stores sub-module of PMS, follow these '
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 | 'In the **Stores** sub-module:\n\n1. **Office PMS**\n   1. Open **St'
+
+[08 xref] How do I export crew details from the Waitlist in Crewing?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Crewing - Crewing User Man p22 | 'To export crew details from the Waitlist in Crewing, follow thes'
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Crewing - Crewing User Man p22 | 'To export crew details from the **Waitlist**:\n\nThese steps are t'
+
+[09 xref] How do I create a COC defect record?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record, follow these steps:\n\n1. Click on '
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record, follow the same steps as **“How t'
+
+[10 note] When filling MoC Part B, what happens if I select No for further assessment?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | '1. If you select **“No”** for further assessment, the MoC will b'
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | 'If you select **“No”** for further assessment in MoC **Part B**,'
+
+[11 note] In PMS, is there another way to add a component besides the components panel?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | "Yes, a new component can also be added by clicking the '+ Add Co"
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'Yes. In the Office PMS, a new component can also be added by cli'
+
+[12 note] What should I review after deleting an implication in a vessel MoC?
+   A-v2-4omini    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | '1. Review the **Part E – Action table** to ensure data consisten'
+   B-v5-luna      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication, review the **Part E – Action tabl'
+
+== run-to-run disagreement (cases where runs split, 3 runs) ==
+   none
+
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case           A-v2-4omini    B-v5-luna
+   01 callout               ✓            ✓
+   02 callout               ✓            ✓
+   03 callout               ✓            ✓
+   04 table                 ✓            ✓
+   05 table                 ✗            ✗
+   06 table                 ✓            ✓
+   07 xref                  ✓            ✓
+   08 xref                  ✓            ✓
+   09 xref                  ✓            ✓
+   10 note                  ✓            ✓
+   11 note                  ✓            ✓
+   12 note                  ✓            ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   A-v2-4omini    11/12  11/12  12/12  JOINT 11/12
+   B-v5-luna      11/12  11/12  12/12  JOINT 11/12
+   B-v5-luna      vs A-v2-4omini: regressions none | gains none
+
+--- WORK-ORDER 8 phrasings (judge .8), 3 runs ---
+work-order suite 2026-09-14.8 · 8 cases · repeat=3
+
+[wo-generic-01] How do I create a work order?
+   A-v2-4omini    answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p29 | 'To create an unplanned work order, follow these steps:\n\n1. Go to'
+   A-v2-4omini    PASS ✗ [0/3 — all runs required]
+   B-v5-luna      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The Technical KB guidance describes three ways to create a work '
+   B-v5-luna      PASS ✗ [2/3 — all runs required]
+
+[wo-generic-02] How are planned work orders created in PMS — do I have to create them myself?
+   A-v2-4omini    answer ✓  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The creation of planned work orders is automated and does not re'
+   A-v2-4omini    PASS ✓ [3/3 — all runs required]
+   B-v5-luna      answer ✓  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'Planned work orders are created in two ways:\n\n1. **On the ship:*'
+   B-v5-luna      PASS ✓ [3/3 — all runs required]
+
+[wo-generic-03] How to create work order in PMS?
+   A-v2-4omini    answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p28 | 'To create an unplanned work order in PMS, follow these steps:\n\n1'
+   A-v2-4omini    PASS ✗ [0/3 — all runs required]
+   B-v5-luna      answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p28 | 'The excerpts support creating an **unplanned work order** in two'
+   B-v5-luna      PASS ✗ [0/3 — all runs required]
+
+[wo-phr-01] What are the different ways to create a work order in PMS?
+   A-v2-4omini    answer ✓  cite ✓  rule ✗ (automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prerequisite])  gate=answer cite=Technical - KB pilot: How  pNone | '1. **Planned (scheduled) work orders**: \n   - Generated automati'
+   A-v2-4omini    PASS ✗ [0/3 — all runs required]
+   B-v5-luna      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'PMS supports three ways to create a work order:\n\n1. **Planned/sc'
+   B-v5-luna      PASS ✓ [3/3 — all runs required]
+
+[wo-phr-02] I need to raise a work order for a pump — how do I do that?
+   A-v2-4omini    answer ✓  cite ✓  rule ✗ (unplanned procedure ✓; note of the other ways MISSING)  gate=answer cite=Technical - PMS User Manua p29 | "1. Go to the 'Work Orders' sub-sub module.\n2. Select the vessel "
+   A-v2-4omini    PASS ✗ [0/3 — all runs required]
+   B-v5-luna      answer ✓  cite ✓  rule ✗ (unplanned procedure ✓; note of the other ways MISSING)  gate=answer cite=Technical - PMS User Manua p29 | 'To raise a work order for the pump, create an **unplanned work o'
+   B-v5-luna      PASS ✗ [0/3 — all runs required]
+
+[wo-phr-03] Do I create work orders myself or does the system create them?
+   A-v2-4omini    answer ✗  cite ✓  rule ✗ (automatic generation ✓; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - KB pilot: How  pNone | '1. Planned (scheduled) work orders are created automatically by '
+   A-v2-4omini    PASS ✗ [0/3 — all runs required]
+   B-v5-luna      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'There are four supported ways:\n\n1. **Planned work orders — creat'
+   B-v5-luna      PASS ✓ [3/3 — all runs required]
+
+[wo-phr-04] Steps to create a new work order
+   A-v2-4omini    answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p29 | "1. Go to the 'Work Orders' sub-sub module.\n2. Select the vessel "
+   A-v2-4omini    PASS ✗ [0/3 — all runs required]
+   B-v5-luna      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support three ways to create a new work order:\n\n1. '
+   B-v5-luna      PASS ✓ [3/3 — all runs required]
+
+[wo-phr-05] How do work orders get created in the Technical module?
+   A-v2-4omini    answer ✓  cite ✓  rule ✗ (automatic generation ✓; pairing ✗: Generate WO block lacks the vessel switch [missing prerequisite])  gate=answer cite=Technical - KB pilot: How  pNone | '1. **Planned (scheduled) work orders**:\n   - Generated automatic'
+   A-v2-4omini    PASS ✗ [0/3 — all runs required]
+   B-v5-luna      answer ✓  cite ✓  rule ✗ (automatic generation ✓; pairing ✗: Sail Admin wrongly attached to Generate WO [incorrect applicability])  gate=answer cite=Technical - KB pilot: How  pNone | 'The Technical module supports four ways to create work orders:\n\n'
+   B-v5-luna      PASS ✗ [2/3 — all runs required]
+
+== totals ==
+   A-v2-4omini    1/8
+   B-v5-luna      4/8
+
+--- CORRECTED 14, 3 runs ---
+generated-docs suite 2026-09-14.2 · 14 cases · repeat=3
+
+[01 gen] In Bulk Data Import for jobs, do I have to fill in the Job Code column?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. The Job Code column is optional.\n2. A blank Job Code is accep'
+   B-v5-luna      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone | 'No. For Jobs, the **Job Code** column is optional:\n\n1. Leave it '
+
+[02 gen] Where do I find Bulk Data Import in the application?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p63 | "1. In the PMS module, open Admin.\n2. Select the 'Bulk Data Imp' "
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p63 | 'In the PMS module:\n\n1. Open **Admin**.\n2. Select the **Bulk Data'
+
+[03 gen] What does the dry-run show for each row in a bulk import, and when do I see the created and updated counts?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. The dry-run shows each row marked as ok, warning, or error. T'
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | 'The dry-run shows each row as:\n\n- **OK** — the row is valid.\n- *'
+
+[04 gen] In work-order numbers, what do the vessel code and the segment after it mean, and what does an unplanned work order number look like?
+   A-v2-4omini    answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | '1. The vessel code is a prefix in work-order numbers that identi'
+   B-v5-luna      answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | '- The **vessel code** is the vessel’s code used as the number pr'
+
+[05 gen] A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'To get the vessel code onto the ship, follow these steps:\n\n1. Th'
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'The vessel code reaches the ship **through provisioning**. If it'
+
+[06 gen] Who can generate work orders from the office, and what happens if the vessel's switch is off?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | '1. Only a Sail Admin can generate work orders directly from the '
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'From the office, work orders can be generated in three ways:\n\n1.'
+
+[07 gen] Can a Head of Department do everything an office user can do for their department?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No, a Head of Department cannot do everything an office user can'
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No. A Head of Department cannot be said to do everything an offi'
+
+[08 gen] Is Level 2 Reviewer a user role I can assign?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No, the Level 2 Reviewer is not a role that a Sail Admin can ass'
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No. **Level 2 Reviewer is not a user role that a Sail Admin assi'
+
+[09 gen] Where is the Me / My Team toggle and who can use it?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p11 | "1. The 'Me / My Team' toggle is located on the PMS Dashboard und"
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [2/3]  gate=answer cite=Technical - PMS User Manua p11 | 'The **Me / My Team** toggle is located in the **PMS Dashboard’s '
+
+[10 gen] On the Fleet Sync Overview, what does an amber status mean?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'An amber status on the Fleet Sync Overview means that there has '
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'Amber (Stale) means the vessel has not synced for more than 24 h'
+
+[11 gen] Does one press of Sync Now clear a long backlog on the ship?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | "No, one press of 'Sync Now' does not clear a long backlog on the"
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'No. One press of **Sync Now** may not clear a long backlog. On t'
+
+[12 gen] If a ship's vessel master data changes, how is the ship refreshed?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | '1. A Sail Admin re-provisions the ship from Admin → Ship Provisi'
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | '1. On the **Office** side, a Sail Admin can click **Sync All** a'
+
+[13 gen] On the ship, what happens if I enter a running-hours reading lower than the component's current hours when completing a work order?
+   A-v2-4omini    answer ✗  cite ✓  PASS ✗ [1/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | "1. The lower reading is refused ('Running hours cannot go backwa"
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | '1. **If the lower reading is not back-dated:** the work-order co'
+
+[14 gen] Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+   A-v2-4omini    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | "1. Open the 'Lead Time & Grace Period Settings' screen.\n2. Locat"
+   B-v5-luna      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'The per-vessel switches are on the **Lead Time & Grace Period Se'
+
+== per-case (answer ∧ citation), out of 14 ==
+   case   A-v2-4omini    B-v5-luna
+   01               ✓            ✗
+   02               ✓            ✓
+   03               ✓            ✓
+   04               ✗            ✗
+   05               ✓            ✓
+   06               ✓            ✓
+   07               ✓            ✓
+   08               ✓            ✓
+   09               ✓            ✓
+   10               ✓            ✓
+   11               ✓            ✓
+   12               ✓            ✓
+   13               ✗            ✓
+   14               ✓            ✓
+   A-v2-4omini    12/14
+   B-v5-luna      12/14
+
+--- RETRIEVAL 18 ---
+
+== Part 1: documents — per set: chunks / <100-char / avg len / html-tagged chunks
+  manual                                    A-v2-4omini         |         B-v5-luna         
+  TOTAL                                   0 /  0 /      /   0   |      0 /  0 /      /   0  
+
+== Part 2: retrieval — A-v2-4omini (http://sail-assistant-py-exp2:8000) | B-v5-luna (http://sail-assistant-py-luna:8000)   [module ✓/✗, manual ✓/✗, margin, top-distance]  expectations v1
+  how do I create a work order                 ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8084           
+  how to upload data in bulk data import       ✓✓ m=1.000 d=0.8444            | ✓✓ m=1.000 d=0.8444           
+  why did the running hours not go down after  ✓✓ m=1.000 d=1.0183            | ✓✓ m=1.000 d=1.0183           
+  how do I raise a defect on equipment         ✓✓ m=1.000 d=0.9062            | ✓✓ m=1.000 d=0.9062           
+  how do vessels sync their data with the offi ✓✓ m=1.000 d=0.7655            | ✓✓ m=1.000 d=0.7655           
+  how do I share an audit with the fleet from  ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.7533           
+  how do I prepare for an upcoming audit       ✓✓ m=1.000 d=0.9559            | ✓✓ m=1.000 d=0.9559           
+  where can I see the history of past audits   ✓✓ m=1.000 d=0.8883            | ✓✓ m=1.000 d=0.8883           
+  how do I create an MOC                       ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441           
+  how do I carry out a risk assessment on the  ✓✓ m=1.000 d=0.7231            | ✓✓ m=1.000 d=0.7231           
+  how do I record a safety meeting             ✓✓ m=1.000 d=0.8214            | ✓✓ m=1.000 d=0.8214           
+  how does the master review the safety manage ✓✓ m=1.000 d=0.7666            | ✓✓ m=1.000 d=0.7666           
+  how do I report a near miss                  ✓✓ m=1.000 d=0.8268            | ✓✓ m=1.000 d=0.8268           
+  how do I report an incident on board         ✓✓ m=1.000 d=0.9683            | ✓✓ m=1.000 d=0.9683           
+  how do I raise a lesson learnt               ✓✓ m=1.000 d=1.0129            | ✓✓ m=1.000 d=1.0145           
+  how do fleet notifications reach the vessel  ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7342           
+  how do I plan a crew change                  ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7967           
+  how do I add a new crew member to a vessel   ✓✓ m=1.000 d=0.7846            | ✓✓ m=1.000 d=0.7846           
+  what is the weather in Singapore today       gate=not_documented            | gate=not_documented           
+  how do I change my payroll bank account      gate=not_documented            | gate=not_documented           
+
+  routing+manual correct (expectations v1): A-v2-4omini 18/18   B-v5-luna 18/18
+  routing+manual correct (expectations v2, same responses): A-v2-4omini 18/18   B-v5-luna 18/18
+
+===== DONE 2026-09-15T12:10:22Z =====

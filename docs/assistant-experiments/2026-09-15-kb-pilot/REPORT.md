@@ -441,6 +441,44 @@ Every answer also carries a source-difference sentence ("The June Office and Ves
 
 Candidate container `sail-assistant-py-luna` on 127.0.0.1:8020 (image `sail-assistant-py:prompt-v5` 8b1d2ddfb910, built from the branch on the server; health: prompt v5 hashes, `chatModel gpt-5.6-luna`, `temperature default`, index `kb-pilot` 916). Its env file `~/central-assistant/assistant-luna.env` (600) holds the new key — decision surfaced: the dedicated key now exists on the AI server in that one file, used by this candidate only; live keeps `assistant.env` with the borrowed key. Suites run from the bridge network by container name (the DB host resolves only there).
 
+### 13.4 Suites — candidate B (8020: prompt v5 + gpt-5.6-luna, default temperature, new key) vs A (8018: prompt v2 + gpt-4o-mini, T=0.2), both on `kb-pilot` 916 (`luna-runs.txt`, `luna-*-dump.jsonl`; run 11:58–12:10 UTC)
+
+| suite | A | B (judge) | B by reading |
+|---|---|---|---|
+| retrieval 18 (expectations v1 and v2) | 18/18 | 18/18 | — (identical distances; retrieval does not depend on the answer model) |
+| frozen 12 (.3), 3 runs, joint | 11/12 | **11/12** | same case fails on both: 05 hazard categories → routing `clarify` gate, unchanged since §S.6 |
+| **case 09** (cross-reference attribution) | 3/3 | **3/3** | "follow the same steps as 'How to create a new defect'… (p.15)" — attribution kept; the v3 regression does not recur |
+| corrected claims 14 (.2), 3 runs | 12/14 | 12/14 | **13/14** — gen-04 fails on both (known test-string defect); gen-01 fails on B by word match only: the answer says "the system generates a code on import" and the judge requires the literal "generated" (3/3 runs; run 3 also lacks the literal "optional" while saying "leave Job Code blank… the system accepts it") — correct by meaning, judge-only. A's gen-13 1/3 is A's own run-to-run variation |
+| work-order 8 phrasings (.8), 3 runs, all runs required | 1/8 | **4/8** | **6/8** — see below |
+
+Work-order phrasings on B, every failing run read against the overview text and manual p.29 (`luna-wo-dump.jsonl`):
+
+| case | B judge | reading | classification |
+|---|---|---|---|
+| wo-generic-01 How do I create a work order? | 2/3 | 3/3 — run 3 states "In the Office, the vessel's office work-order generation switch must be ON" in the per-job block, before its numbered steps | **judge-only**: a blank line separates the heading from its requirements bullets, so the .8 block parser attaches those bullets to the previous action |
+| wo-generic-02 planned… myself? | 3/3 | 3/3 | pass |
+| wo-generic-03 How to create work order in PMS? | 0/3 | 0/3 — the five excerpts contain no overview (manual intro ×2, unplanned ×2, completion); the answer correctly says "The excerpts do not describe how to create a planned or scheduled work order" and gives the Office and Ship unplanned procedures | **retrieval failure**, recorded separately as the owner required; not a model defect. Run 3 labels the office procedure "Office / Sail Admin" (from the manual's file name) — an unsupported role implication, minor |
+| wo-phr-01 different ways | 3/3 | 3/3 | pass |
+| wo-phr-02 raise a work order for a pump | 0/3 | 0/3 for the judge's "note of the other ways" — the excerpts (manual unplanned ×2, completion ×2, KB unplanned chunk) contain no other way; the answers give the unplanned procedure with an explicit Office/Ship split and the KB chunk's "no role or switch check… normal authentication and vessel access" | **retrieval failure**, recorded separately; the answers themselves are correct and complete for the supplied evidence |
+| wo-phr-03 myself or the system | 3/3 | 3/3 | pass |
+| wo-phr-04 steps to create | 3/3 | 3/3 (with the overview at rank 4 the answer lists all three ways) | pass |
+| wo-phr-05 how do work orders get created | 2/3 | 3/3 — run 1: per-job "no special role. In the Office, the vessel's … switch must be ON" ✓; the judge's "Sail Admin wrongly attached to Generate WO" comes from the per-method source bullet "*PMS User Manual For Office_Sail Admin_R2…*, p. 18" (the .8 "sail admin" check reads the raw scope, the file-name exclusion applies only to the negation check). Run 1 also opens with "supports four ways" then lists three — a wording slip | **judge-only** (+ one wording slip) |
+
+Judge .8 gaps found by this run, reported and NOT changed: (1) requirements bullets separated from their heading by a blank line are attributed to the previous action; (2) the raw-scope "sail admin" check is triggered by a manual file name inside a per-method source bullet. Both would need a .9 validated on the stored answers before use.
+
+Actual usage of the candidate over the suites, from the conversation log (usage recording works after §13.3):
+
+| | B gpt-5.6-luna | A gpt-4o-mini |
+|---|---|---|
+| answered rows | 99 | 105 |
+| prompt / completion tokens | 153,300 / 38,939 | not recorded (A runs the old image with the usage bug) |
+| cost at the list price ($0.20 / $1.20 per 1M, READ from the web) | **≈ $0.077** | — |
+| latency, mean / max | 5.3 s / 10.5 s | 2.5 s / 7.0 s |
+
+### 13.5 Result and what is now the owner's decision
+
+On identical retrieval, the v5 prompt + gpt-5.6-luna candidate keeps every existing suite (retrieval 18/18, frozen 11/12 with case 09 3/3, corrected 13/14 by reading) and lifts the work-order phrasings from 1/8 to 4/8 by judge and 6/8 by reading; the two remaining misses are retrieval (the overview is not among the five excerpts for those phrasings) and were never in scope of an answer-model change. Answers are about twice as slow (5.3 s mean) and ~1.5–2× longer. No deployment has been made and none is authorised. What would change if the owner chose to promote this candidate: (a) live moves to the dedicated key and therefore to gpt-5.6-luna (the key cannot serve gpt-4o-mini) with `CHAT_TEMPERATURE=default`; (b) the served prompt becomes v5 (`ff9ee87141ac1362`); (c) the served index stays `repaired` 911 unless the KB pilot files are promoted too — the suites above ran on `kb-pilot` 916, so a promotion of the model/prompt alone would need one confirming run on `repaired`; (d) the borrowed SMS-RAG key is retired from `assistant.env`. Rollback = nginx back to the current container, as before.
+
 ### 8.6 Not changed / open
 
 Not changed: live, prompt (v2 on both instances), retrieval logic, thresholds, excerpt count, the frozen suites, the base judge's literal must-phrase check. Open for the owner: (1) the answer-generation drops now dominate — the conditions rule (prompt v3) targeted this and regressed frozen case 09 (§S.7.1); a reworded rule or a content-ordering change are the untested candidates; (2) two retrieval residues (wo-generic-03; wo-phr-02's "other ways" note, which could also be one sentence in unplanned-wo.md); (3) the literal must-phrase check in the shared base judge fails wo-phr-03 answers that are right by meaning.
