@@ -405,6 +405,20 @@ Estimated cost, list prices as known 15-Sep (gpt-4.1: $2.00 per 1M input tokens,
 
 Pass condition for the replay: every run — correct methods, action-specific prerequisites incl. the per-job office switch, Office/Ship applicability where the source makes it, supported citations, no invented references, no "no prerequisites"-type claims. The replay does not test the phrasings where retrieval misses the overview (wo-generic-03, wo-phr-02); those stay retrieval failures whatever the model does.
 
+### 13.1 New dedicated assistant key checked (15-Sep, evening) — PROVEN by minimal probes, key never printed
+
+The owner created a dedicated key for the assistant (file `central-assistant/newchatbotkey.txt`, untracked; a `.gitignore` rule was added so it can never be committed), scoped to `gpt-5.6-luna` and `text-embedding-3-large`. Probes from the build machine (5 calls, ~30 tokens total):
+
+| probe | result |
+|---|---|
+| `models.list` | 403 — restricted key, no `api.model.read` (as with the borrowed key) |
+| chat `gpt-5.6-luna`, no temperature | OK — "OK", 13 prompt / 4 completion tokens, 2.5 s |
+| chat `gpt-5.6-luna`, temperature 0.2 | **400 — "'temperature' does not support 0.2 with this model. Only the default (1) value is supported."** |
+| chat `gpt-4o-mini` | **403 — the new project has no access to `gpt-4o-mini`** |
+| embeddings `text-embedding-3-large` | OK — 3072 dimensions (same as the index), 1 token |
+
+Consequences: (1) the comparison cannot keep the served model settings — the service sends temperature 0.2 (`agent._model_settings`) and this model rejects it, so a replay on gpt-5.6-luna must omit temperature (default 1) and is therefore not like-for-like on that setting; the served code would need a model-dependent settings change before this model could serve; (2) the new key cannot run the current live model at all — moving live to the dedicated key means moving live to gpt-5.6-luna, which is unmeasured; live stays on the borrowed key and gpt-4o-mini until that is measured and approved; (3) SMS RAG (prod 13.250.9.130 and dev) runs gpt-4o-mini for chat/rerank/rewrite and text-embedding-3-large for embeddings — the same as the assistant today. Price (READ from OpenAI's model page and OpenRouter via web search, not verified against billing): gpt-5.6-luna is the smallest of the GPT-5.6 family (Luna / Terra / Sol) at about $0.20 per 1M input and $1.20 per 1M output tokens — a gpt-4o-mini-class model, not a larger one. Estimated cost of the replay: about $0.01 for 6 calls; the suites, if reached, about $0.15. Not started — awaiting the owner's decision on the temperature difference.
+
 ### 8.6 Not changed / open
 
 Not changed: live, prompt (v2 on both instances), retrieval logic, thresholds, excerpt count, the frozen suites, the base judge's literal must-phrase check. Open for the owner: (1) the answer-generation drops now dominate — the conditions rule (prompt v3) targeted this and regressed frozen case 09 (§S.7.1); a reworded rule or a content-ordering change are the untested candidates; (2) two retrieval residues (wo-generic-03; wo-phr-02's "other ways" note, which could also be one sentence in unplanned-wo.md); (3) the literal must-phrase check in the shared base judge fails wo-phr-03 answers that are right by meaning.

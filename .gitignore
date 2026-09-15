@@ -51,3 +51,7 @@ attached_assets/*
 # client/src/assets/ so this list stops growing.
 !attached_assets/SAIL logo Transparent_1753957135582.png
 !attached_assets/component tree_1761646533252.csv
+
+# assistant API key files — never commit (owner rule: keys in files, never in chat or git)
+central-assistant/newchatbotkey.txt
+central-assistant/*key*.txt
