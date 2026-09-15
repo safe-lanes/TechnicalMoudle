@@ -304,9 +304,10 @@ async def main() -> int:
     ap.add_argument("--kb-dir", default=None, help="KB pilot: directory of reviewed procedure markdown files, indexed as-is (no parser) with metadata source=kb-pilot")
     ap.add_argument("--kb-module", default="technical", help="module tag for --kb-dir files")
     ap.add_argument("--kb-provenance-line", action="store_true",
-                    help="KB pilot input-format correction (owner, 15-Sep-2026, prepared — NOT applied to any index set yet): prepend one short "
-                         "qualification line to each kb chunk's embedded/answer text so the answer model is told that code-derived statements "
-                         "are revision-specific and the running deployment is unverified; the detailed code paths stay in metadata")
+                    help="KB pilot input-format correction (owner, 15-Sep-2026): prepend one short qualification line to each kb chunk's "
+                         "embedded/answer text so the answer model is told which statements are code-derived (draft guidance, inspected "
+                         "repository revision, owner-confirmed as the running application) and which come from the manuals; the detailed "
+                         "code paths stay in metadata")
     a = ap.parse_args()
     repairs = load_repairs() if a.apply_repairs else {}
 
@@ -438,12 +439,20 @@ async def main() -> int:
                     n_code = sum(1 for t in tags if t.startswith("[code"))
                     n_man = sum(1 for t in tags if t.startswith("[manual") or t.startswith("[screenshot"))
                     rev = re.search(r"origin/replit_dev\s+([0-9a-f]{7,})", sources) or re.search(r"\b([0-9a-f]{9})\b", sources)
-                    # Owner wording (15-Sep): no "reviewed" unless a review is recorded in REVIEW.md.
+                    # Owner wording (15-Sep): no "reviewed" unless a review is recorded in REVIEW.md. Owner confirmation (15-Sep): the
+                    # running Technical application is the inspected revision — stated as the owner's confirmation, not as a measured check.
                     prov_line = (f"Provenance note: draft code-derived guidance, not a published manual. {n_man} statement(s) come from the June PMS "
                                  f"manuals; {n_code} statement(s) about roles, switches and automatic generation were inspected in the Technical "
-                                 f"application code at repository revision {rev.group(1) if rev else 'recorded in the Sources block'}; "
-                                 f"running deployment unverified.")
-                    clean = prov_line + "\n\n" + clean
+                                 f"application code at repository revision {rev.group(1) if rev else 'recorded in the Sources block'}, which the "
+                                 f"application owner has confirmed is the code running in the Technical application. Where this guidance and a "
+                                 f"manual differ, say which source says what.")
+                    # Insert AFTER the title line so the markdown chunker keeps ONE chunk (a paragraph before the first heading
+                    # would become its own chunk and the note would never travel with the procedure).
+                    first_nl = clean.find("\n")
+                    if clean.startswith("#") and first_nl > 0:
+                        clean = clean[:first_nl + 1] + "\n" + prov_line + "\n" + clean[first_nl + 1:]
+                    else:
+                        clean = prov_line + "\n\n" + clean
                 extra = {"source": "kb-pilot", "kb_path": f"kb/{a.kb_module}/work-orders/{f.name}", "kb_sha256": sha, "chunker_version": CHUNKER_VERSION,
                          "kb_sources": sources.strip()[:4000], "kb_provenance": tags[:120], "kb_one_chunk": True, "kb_provenance_line": bool(prov_line)}
                 chunks = chunks_from_markdown(md=clean, source_file=display, source_type="md", max_chunk_size=100_000, chunk_overlap=0,

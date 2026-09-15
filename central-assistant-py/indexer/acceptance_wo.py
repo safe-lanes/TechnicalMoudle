@@ -66,8 +66,16 @@ from acceptance_answers import ask, judge  # noqa: E402
 #     not to the previous one; (b) the "Sail Admin wrongly attached to Generate WO" check reads the scope with manual file
 #     names removed ('…For Office_Sail Admin…' quoted in a per-method source bullet is not a role). Validated on all stored
 #     answers before use; factual requirements unchanged.
-WO_SUITE_VERSION = "2026-09-14.9"
-JUDGE_VERSION = 9
+# .10 (15-Sep, after the three-set run): PARSING ONLY — the unplanned "wrongly requires the switch" check missed negations
+#      that sit more than 40 characters before the word ("no special role check or vessel-generation switch is required") and
+#      negations AFTER it ("switch is not required", "no … switch requirement"); the window is now 90 characters before and
+#      a trailing "not required / no … requirement" also negates. Validated on all stored answers before use.
+# .11 (15-Sep): PARSING ONLY — a bare mention of the switch inside the unplanned scope is only a "requirement" when the same
+#      sentence carries requirement wording (must / require / need / only if / only when / has to) and no negation; the v5
+#      source-comparison sentences ("the office-switch details come from draft code-derived guidance", "the manuals do not state
+#      the role or switch conditions") were being read as conditions attached to the unplanned procedure.
+WO_SUITE_VERSION = "2026-09-14.11"
+JUDGE_VERSION = 11
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -120,14 +128,33 @@ def unit_has_office_qualifier(scope: str, word: str = "switch", action_re: str =
     return bool(hits) and all(("office" in u) or framed for u in hits)
 
 
-def wrongly_conditioned(scope: str, word: str) -> bool:
+def wrongly_conditioned(scope: str, word: str, version: int = JUDGE_VERSION) -> bool:
     """.6: `word` appears in the scope as a requirement (not negated: 'no switch', 'without a switch', 'no role check or switch');
-    the manual file name 'For Office_Sail Admin_R2…' quoted in the body is not a requirement."""
+    the manual file name 'For Office_Sail Admin_R2…' quoted in the body is not a requirement.
+    .10: negation window 90 chars before the word (was 60/40) and a trailing negation counts ('switch is not required',
+    'no … switch requirement', 'switch requirement', 'switch is needed' preceded by 'no')."""
     clean = re.sub(r"for office_sail admin[^\s,;.)]*", "", scope)
-    for m in re.finditer(word, clean):
-        before = clean[max(0, m.start() - 60): m.start()]
-        if not re.search(NEG_RE, before):
+    win = 90 if version >= 10 else 60
+    neg = r"(no|not|without|does not require|doesn't require|no need for|not required|nor|neither)\b[^.\n]{0,80}$" if version >= 10 else NEG_RE
+    if version >= 11:
+        # .11: judge sentence by sentence — a mention counts as a requirement only when the sentence carries requirement wording
+        for sent in re.split(r"(?<=[.!?])\s+|\n+", clean):
+            if word not in sent:
+                continue
+            if not re.search(r"\b(must|require[sd]?|requirement|needs?|needed|only if|only when|has to|have to|mandatory)\b", sent):
+                continue
+            if re.search(r"\b(no|not|without|nor|neither|n't)\b", sent):
+                continue
             return True
+        return False
+    for m in re.finditer(word, clean):
+        before = clean[max(0, m.start() - win): m.start()]
+        after = clean[m.end(): m.end() + 40]
+        if re.search(neg, before):
+            continue
+        if version >= 10 and re.match(r"\s*(requirement|is|are|was)?\s*(is |are )?(not|no)\b", after):
+            continue
+        return True
     return False
 
 
@@ -256,9 +283,9 @@ def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
         if "sail admin" in gw_role and "generate now" not in gw_role:
             notes.append("Sail Admin wrongly attached to Generate WO [incorrect applicability]")
     if version >= 6 and un:
-        if wrongly_conditioned(un, "switch"):
+        if wrongly_conditioned(un, "switch", version):
             notes.append("unplanned wrongly requires the switch [incorrect applicability]")
-        if wrongly_conditioned(un, "sail admin"):
+        if wrongly_conditioned(un, "sail admin", version):
             notes.append("unplanned wrongly requires Sail Admin [incorrect applicability]")
     ok = not notes
     return ok, ("pairing ✓" if ok else "pairing ✗: " + "; ".join(notes))

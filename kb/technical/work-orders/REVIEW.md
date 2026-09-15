@@ -11,7 +11,7 @@ All rows start as "Converted" (written by the assistant build from the June manu
 | how-work-orders-are-created.md (overview, added 15-Sep) | | | | | | Converted |
 
 Notes for the reviewer:
-- Statements tagged `[code: …]` describe behaviour read from the repository, not from the running system; the running Technical revision has not been verified as identical.
+- Statements tagged `[code: …]` describe behaviour read from the Technical repository at `origin/replit_dev` cf5241ad6. Owner confirmation (Ghazi Anwer, 15-Sep-2026): the running Technical application is this same code at this revision. This is the owner's confirmation, not an independently measured deployment check. Code-derived statements remain distinguished from the official manuals; where code and manual disagree, the specific difference is recorded in CONFLICTS.md.
 - Statements tagged `[screenshot: …]` were taken from the callout text embedded in the PDF text layer, plus the rendered page image for the 'Generate Work Order' pop-up options and the unplanned form layout. No OCR engine was available on the build machine; nothing was transcribed from an unreadable image.
 - No `[unverified]` tag remains in any indexed file (owner rule 15-Sep: indexed text carries no unverified claims).
 

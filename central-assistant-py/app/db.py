@@ -163,6 +163,39 @@ async def search_chunks(embedding: list[float], top_k: int) -> list[Hit]:
         return out
 
 
+async def search_lexical(embedding: list[float], question: str, module: str, top_k: int) -> list[Hit]:
+    """Step 4 (hybrid excerpt selection, ASSISTANT_HYBRID=on): lexical ranking of the ROUTED module's chunks by the existing
+    generated `tsv` column (english, over the chunk content) against the question, returned WITH each chunk's vector distance
+    so fused hits keep the same distance semantics for citations. Thresholds are not applied here — the caller fuses."""
+    q = "[" + ",".join(f"{x:.8f}" for x in embedding) + "]"
+    async with engine().connect() as c:
+        rows = await c.execute(text(
+            "SELECT module, file, section_title, breadcrumb, metadata, content, "
+            "power(embedding <-> CAST(:q AS vector), 2) AS distance, ts_rank_cd(tsv, plainto_tsquery('english', :question)) AS lex "
+            "FROM assistant_chunks WHERE index_set=:s AND lower(module)=:m AND tsv @@ plainto_tsquery('english', :question) "
+            "ORDER BY lex DESC LIMIT :k"),
+            {"q": q, "question": question, "s": settings().assistant_index_set, "m": module.lower(), "k": top_k})
+        out: list[Hit] = []
+        for r in rows:
+            m = dict(r._mapping)
+            meta = dict(m.get("metadata") or {})
+            meta.setdefault("file", m.get("file"))
+            meta.setdefault("breadcrumb", m.get("breadcrumb"))
+            meta.setdefault("section_title", m.get("section_title"))
+            meta.setdefault("module", m.get("module"))
+            meta["lexical_rank_score"] = float(m["lex"] or 0.0)
+            out.append(Hit(meta=meta, text=m.get("content") or "", distance=float(m["distance"]), module=str(m.get("module") or "unknown").lower()))
+        return out
+
+
+async def document_titles() -> list[tuple[str, str]]:
+    """(module, file) for every document in the served index set — the source of the manual/sub-module name terms that the
+    intent router recognises (derived from the corpus, not from any test question)."""
+    async with engine().connect() as c:
+        rows = await c.execute(text("SELECT DISTINCT lower(module), file FROM assistant_chunks WHERE index_set=:s"), {"s": settings().assistant_index_set})
+        return [(str(r[0]), str(r[1])) for r in rows]
+
+
 # ── rate limit (Postgres sliding window, multi-instance safe) ────────────────────
 async def rate_check(user_id: str, window_ms: int, max_hits: int) -> bool:
     """Exactly MAX allowed per sliding window per user, even under a concurrent burst:

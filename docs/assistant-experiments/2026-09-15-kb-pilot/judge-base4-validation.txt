@@ -1,0 +1,20 @@
+abc-generated-dump.jsonl         A-manuals      runs  42  pass .3-matching   3 → .4-matching   6
+abc-generated-dump.jsonl         B-corrected    runs  42  pass .3-matching  31 → .4-matching  34
+abc-generated-dump.jsonl         C-kbpilot      runs  42  pass .3-matching  33 → .4-matching  35
+kb2-generated-dump.jsonl         A-kb-base      runs  42  pass .3-matching  39 → .4-matching  39
+kb2-generated-dump.jsonl         B-kb-pilot     runs  42  pass .3-matching  38 → .4-matching  38
+kb3-generated-dump.jsonl         A-kb-base      runs  42  pass .3-matching  38 → .4-matching  38
+kb3-generated-dump.jsonl         B-kb-pilot     runs  42  pass .3-matching  38 → .4-matching  38
+luna-generated-dump.jsonl        A-v2-4omini    runs  42  pass .3-matching  37 → .4-matching  37
+luna-generated-dump.jsonl        B-v5-luna      runs  42  pass .3-matching  35 → .4-matching  36
+
+== run verdicts changed by markdown normalisation (9) ==
+luna-generated-dump.jsonl generated case 9 B-v5-luna run 3: answer False→True cite True→True | 'The **Me / My Team** toggle is located in the **PMS Dashboard**, in the header of the **Op'
+abc-generated-dump.jsonl generated case 9 A-manuals run 1: answer False→True cite True→True | 'The **Me / My Team** toggle is in the **Operation** tab of the header, on the PMS Operatio'
+abc-generated-dump.jsonl generated case 9 A-manuals run 2: answer False→True cite True→True | 'The **Me / My Team** toggle is on the **Operation** tab in the header. Click **Operation**'
+abc-generated-dump.jsonl generated case 9 A-manuals run 3: answer False→True cite True→True | 'The **Me / My Team** toggle is in the **Operation** tab header on the PMS Operation Dashbo'
+abc-generated-dump.jsonl generated case 9 B-corrected run 1: answer False→True cite True→True | '1. Open the PMS **Dashboard** and select the **Operation** tab.  \n2. The **“Me / My Team”*'
+abc-generated-dump.jsonl generated case 9 B-corrected run 2: answer False→True cite True→True | '1. Open the **PMS Dashboard** and click the **Operation** tab. The **Me / My Team** toggle'
+abc-generated-dump.jsonl generated case 9 B-corrected run 3: answer False→True cite True→True | '1. On the **PMS Dashboard**, open the **Operation** tab. The **Me / My Team** toggle is in'
+abc-generated-dump.jsonl generated case 9 C-kbpilot run 2: answer False→True cite True→True | '1. Open the **PMS Dashboard** and click the **Operation** tab in the header.\n2. The **Me /'
+abc-generated-dump.jsonl generated case 9 C-kbpilot run 3: answer False→True cite True→True | '1. Click the **Operation** tab in the PMS Dashboard header.\n2. Use the **Me / My Team** to'

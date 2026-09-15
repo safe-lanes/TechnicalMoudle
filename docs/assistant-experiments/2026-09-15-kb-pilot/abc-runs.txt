@@ -1,0 +1,292 @@
+===== ABC SUITES 2026-09-15T14:19:56Z: luna + v5 on A manuals-only 855 / B kb-base 911 / C kb-pilot-c 916 =====
+{"ok":true,"store":"pgvector","indexSet":"manuals-only","chunks":855,"db":"connected","llmCalls":0,"prompt":{"version":"v5-plain-coverage-2026-09-15","docsPromptSha":"ff9ee87141ac1362","toolLoopPromptSha":"7a028346c1c2fdf0","combined":"aea94e2f5edb6948"},"chatModel":"gpt-5.6-luna","temperature":"default"}
+{"ok":true,"store":"pgvector","indexSet":"kb-base","chunks":911,"db":"connected","llmCalls":0,"prompt":{"version":"v5-plain-coverage-2026-09-15","docsPromptSha":"ff9ee87141ac1362","toolLoopPromptSha":"7a028346c1c2fdf0","combined":"aea94e2f5edb6948"},"chatModel":"gpt-5.6-luna","temperature":"default"}
+{"ok":true,"store":"pgvector","indexSet":"kb-pilot-c","chunks":916,"db":"connected","llmCalls":0,"prompt":{"version":"v5-plain-coverage-2026-09-15","docsPromptSha":"ff9ee87141ac1362","toolLoopPromptSha":"7a028346c1c2fdf0","combined":"aea94e2f5edb6948"},"chatModel":"gpt-5.6-luna","temperature":"default"}
+
+--- FROZEN 12, 3 runs ---
+acceptance suite 2026-09-14.3 · 12 cases · repeat=3
+
+[01 callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p15 | 'In the **Inspector Observation Data** view for **SIRE inspection'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p15 | 'In the **Inspector Observation Data** view:\n\n1. To export the di'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p15 | 'In the **Inspector Observation Data** view:\n\n1. Click the **Exce'
+
+[02 callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | 'The **Email Notification** icon sends the Office an email statin'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | '1. The **Email Notification** icon sends the Office a notificati'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 | 'The **Email Notification** icon sends the Office an email notify'
+
+[03 callout] How do I upload a document for the first time in the SMS module?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | 'The SMS Office module supports uploading:\n\n- A viewable document'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | 'To upload a document for the first time in the SMS module:\n\n1. I'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 | 'To upload a document for the first time:\n\n1. Click **+New Docume'
+
+[04 table] In the Master Review module, what do the grey and red icons mean?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '- **Grey icon:** Response Due.\n- **Red icon:** Response Overdue.'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '- **Grey icon:** Response Due.\n- **Red icon:** Response Overdue.'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 | '- **Grey icon:** Response due.\n- **Red icon:** Response overdue.'
+
+[05 table] What are the hazard categories in a risk assessment?
+   A-manuals      answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   B-corrected    answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   C-kbpilot      answer ✗  cite ✗  attrib ✓  JOINT ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+
+[06 table] What actions can I take on a near miss record from the list — what do the icons do?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | 'From the Near Miss records list, you can:\n\n1. Click the **eye ic'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | 'From the Near Miss records list, the available icons let you:\n\n1'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 | 'From the Near Miss list, you can:\n\n1. Click the **eye icon** to '
+
+[07 xref] How do I apply a filter in the Stores sub-module of PMS?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 | 'In the **Office PMS**—the Stores filter procedure is the same as'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 | 'The Stores filter process is the same as the Spares filter proce'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 | 'For **Office**:\n\n1. Open **Stores**, then select the **Spares** '
+
+[08 xref] How do I export crew details from the Waitlist in Crewing?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Crewing - Crewing User Man p22 | 'The Waitlist export steps are the same as **“How To Export Crew '
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [2/3]  gate=answer cite=Crewing - Crewing User Man p22 | 'For **Waitlist**, the export steps are the same as **In-Progress'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [2/3]  gate=answer cite=Crewing - Crewing User Man p22 | 'The Waitlist export steps are the same as **section 1.2.1.5, “Ho'
+
+[09 xref] How do I create a COC defect record?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record, follow the same steps as **“How T'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record, follow the same steps as **“How T'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 | 'To create a COC defect record, follow the same steps as **“How T'
+
+[10 note] When filling MoC Part B, what happens if I select No for further assessment?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | 'When filling MoC Part B, select **“No”** if no further assessmen'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | 'When filling MoC Part B, select **“No”** if no further assessmen'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 | 'If you select **“No”** for further assessment in **MoC Part B**,'
+
+[11 note] In PMS, is there another way to add a component besides the components panel?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'The manual documents two entry points:\n\n1. Select the vessel fro'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 | 'The manual does not document a way to add a component outside th'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [2/3]  gate=answer cite=Technical - PMS User Manua p24 | 'Yes. The manual states that a new component can also be added by'
+
+[12 note] What should I review after deleting an implication in a vessel MoC?
+   A-manuals      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication, review the **Part E – Action tabl'
+   B-corrected    answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication, review the **Part E – Action tabl'
+   C-kbpilot      answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 | 'After deleting an implication, review the **Part E – Action tabl'
+
+== run-to-run disagreement (cases where runs split, 3 runs) ==
+   08 xref · B-corrected (2/3)
+   08 xref · C-kbpilot (2/3)
+   11 note · C-kbpilot (2/3)
+
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case             A-manuals  B-corrected    C-kbpilot
+   01 callout               ✓            ✓            ✓
+   02 callout               ✓            ✓            ✓
+   03 callout               ✓            ✓            ✓
+   04 table                 ✓            ✓            ✓
+   05 table                 ✗            ✗            ✗
+   06 table                 ✓            ✓            ✓
+   07 xref                  ✓            ✓            ✓
+   08 xref                  ✓            ✓            ✓
+   09 xref                  ✓            ✓            ✓
+   10 note                  ✓            ✓            ✓
+   11 note                  ✓            ✓            ✓
+   12 note                  ✓            ✓            ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   A-manuals      11/12  11/12  12/12  JOINT 11/12
+   B-corrected    11/12  11/12  12/12  JOINT 11/12
+   C-kbpilot      11/12  11/12  12/12  JOINT 11/12
+   B-corrected    vs A-manuals: regressions none | gains none
+   C-kbpilot      vs A-manuals: regressions none | gains none
+
+--- WORK-ORDER 8 phrasings (judge .9), 3 runs ---
+work-order suite 2026-09-14.8 · 8 cases · repeat=3
+
+[wo-generic-01] How do I create a work order?
+   A-manuals      answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support creating an **unplanned work order** in two'
+   A-manuals      PASS ✗ [0/3 — all runs required]
+   B-corrected    answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described; unplanned wrongly requires Sail Admin [incorrect applicability])  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support creating an **unplanned work order** in two'
+   B-corrected    PASS ✗ [0/3 — all runs required]
+   C-kbpilot      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The draft guidance supports these ways to create a work order. I'
+   C-kbpilot      PASS ✓ [3/3 — all runs required]
+
+[wo-generic-02] How are planned work orders created in PMS — do I have to create them myself?
+   A-manuals      answer ✗  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support two related operations:\n\n1. **Create a work'
+   A-manuals      PASS ✗ [0/3 — all runs required]
+   B-corrected    answer ✗  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The documentation supports two related actions, but it does **no'
+   B-corrected    PASS ✗ [0/3 — all runs required]
+   C-kbpilot      answer ✓  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'Planned work orders are created in two ways:\n\n1. **Automatically'
+   C-kbpilot      PASS ✓ [3/3 — all runs required]
+
+[wo-generic-03] How to create work order in PMS?
+   A-manuals      answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p28 | 'The excerpts cover creating an **unplanned work order**:\n\n**In t'
+   A-manuals      PASS ✗ [0/3 — all runs required]
+   B-corrected    answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p28 | 'The excerpts support creating an **unplanned work order** in two'
+   B-corrected    PASS ✗ [0/3 — all runs required]
+   C-kbpilot      answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p28 | 'The excerpts support two ways to create an **unplanned work orde'
+   C-kbpilot      PASS ✗ [0/3 — all runs required]
+
+[wo-phr-01] What are the different ways to create a work order in PMS?
+   A-manuals      answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p28 | 'The excerpts support one creation process, with different steps '
+   A-manuals      PASS ✗ [0/3 — all runs required]
+   B-corrected    answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p28 | 'The excerpts support two documented paths for creating an **unpl'
+   B-corrected    PASS ✗ [0/3 — all runs required]
+   C-kbpilot      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'PMS supports three ways to create a work order:\n\n1. **Planned, s'
+   C-kbpilot      PASS ✓ [3/3 — all runs required]
+
+[wo-phr-02] I need to raise a work order for a pump — how do I do that?
+   A-manuals      answer ✓  cite ✓  rule ✗ (unplanned procedure ✓; note of the other ways MISSING)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support creating an **unplanned work order** in eit'
+   A-manuals      PASS ✗ [1/3 — all runs required]
+   B-corrected    answer ✓  cite ✓  rule ✗ (unplanned procedure ✓; note of the other ways MISSING)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support raising an **unplanned work order** in eith'
+   B-corrected    PASS ✗ [0/3 — all runs required]
+   C-kbpilot      answer ✓  cite ✓  rule ✓ (unplanned procedure ✓; note of the other ways ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support raising a **new unplanned work order** for '
+   C-kbpilot      PASS ✗ [1/3 — all runs required]
+
+[wo-phr-03] Do I create work orders myself or does the system create them?
+   A-manuals      answer ✓  cite ✓  rule ✗ (automatic generation ✓; pairing ✗: Generate Now not described; Generate WO block lacks the vessel switch [missing prerequisite])  gate=answer cite=Technical - PMS User Manua p28 | 'Both are supported:\n\n1. **Create an unplanned work order yoursel'
+   A-manuals      PASS ✗ [0/3 — all runs required]
+   B-corrected    answer ✓  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; Generate WO block lacks the vessel switch [missing prerequisite])  gate=answer cite=Technical - PMS User Manua p28 | 'Both are involved: **you initiate the action, and the system gen'
+   B-corrected    PASS ✗ [0/3 — all runs required]
+   C-kbpilot      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'Both: some work orders are created automatically, while others a'
+   C-kbpilot      PASS ✗ [2/3 — all runs required]
+
+[wo-phr-04] Steps to create a new work order
+   A-manuals      answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support creating a new **unplanned work order** in '
+   A-manuals      PASS ✗ [0/3 — all runs required]
+   B-corrected    answer ✗  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO not described)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts cover creating a new **unplanned work order**:\n\n**O'
+   B-corrected    PASS ✗ [0/3 — all runs required]
+   C-kbpilot      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support three ways to create a work order:\n\n1. **Pl'
+   C-kbpilot      PASS ✗ [2/3 — all runs required]
+
+[wo-phr-05] How do work orders get created in the Technical module?
+   A-manuals      answer ✓  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; Generate WO block lacks the vessel switch [missing prerequisite])  gate=answer cite=Technical - PMS User Manua p29 | 'The excerpts support two ways to create work orders:\n\n1. Create '
+   A-manuals      PASS ✗ [0/3 — all runs required]
+   B-corrected    answer ✓  cite ✓  rule ✗ (automatic generation MISSING; pairing ✗: Generate Now not described; Generate WO block lacks the vessel switch [missing prerequisite])  gate=answer cite=Technical - PMS User Manua p29 | 'Work orders can be created in two supported ways:\n\n1. **Create a'
+   B-corrected    PASS ✗ [0/3 — all runs required]
+   C-kbpilot      answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone | 'Work orders are created in three ways:\n\n**1. Planned, scheduled '
+   C-kbpilot      PASS ✗ [2/3 — all runs required]
+
+== totals ==
+   A-manuals      0/8
+   B-corrected    0/8
+   C-kbpilot      3/8
+
+--- CORRECTED 14, 3 runs ---
+generated-docs suite 2026-09-14.2 · 14 cases · repeat=3
+
+[01 gen] In Bulk Data Import for jobs, do I have to fill in the Job Code column?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=not_documented cite=- pNone | "That isn't covered in the module documentation I have. Please re"
+   B-corrected    answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone | 'No. The **Job Code** column is optional for Jobs:\n\n1. Leave it b'
+   C-kbpilot      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone | 'No. For Jobs, the **Job Code** column is optional:\n\n1. You may l'
+
+[02 gen] Where do I find Bulk Data Import in the application?
+   A-manuals      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p63 | 'The manual identifies **Bulk Data Import** as a module, but it d'
+   B-corrected    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p63 | '1. Open the **PMS** module.\n2. Open **Admin**.\n3. Select the **B'
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p63 | 'In the PMS module, open **Admin** and select the **“Bulk Data Im'
+
+[03 gen] What does the dry-run show for each row in a bulk import, and when do I see the created and updated counts?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=not_documented cite=- pNone | "That isn't covered in the module documentation I have. Please re"
+   B-corrected    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. **Dry-run results:** Each row is marked **OK, Warning, or Err'
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone | '1. The dry-run checks the file without saving anything. Each row'
+
+[04 gen] In work-order numbers, what do the vessel code and the segment after it mean, and what does an unplanned work order number look like?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p23 | 'The technical documentation excerpts provided do not explain wha'
+   B-corrected    answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | '- The **vessel code** is the vessel’s identifying prefix.\n- The '
+   C-kbpilot      answer ✓  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | '- The **vessel code** is the vessel’s code, placed at the beginn'
+
+[05 gen] A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p23 | 'The Technical documentation does not cover how the vessel code i'
+   B-corrected    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'The vessel code reaches the ship through **provisioning**. The v'
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'The vessel code reaches the ship **through provisioning**. If it'
+
+[06 gen] Who can generate work orders from the office, and what happens if the vessel's switch is off?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p28 | 'This is not covered in the Technical documentation excerpts prov'
+   B-corrected    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'Only a **Sail Admin** can generate work orders directly from the'
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'For office generation using **“Generate Now”**:\n\n1. **Only a Sai'
+
+[07 gen] Can a Head of Department do everything an office user can do for their department?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=not_documented cite=- pNone | "That isn't covered in the module documentation I have. Please re"
+   B-corrected    answer ✓  cite ✓  PASS ✓ [2/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No. The excerpts do not establish that a Head of Department can '
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No. The excerpts do not support that a Head of Department can do'
+
+[08 gen] Is Level 2 Reviewer a user role I can assign?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p12 | 'The excerpt identifies “Level 2 Reviewer” as a user role, but do'
+   B-corrected    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No. **Level 2 Reviewer is not a user role that a Sail Admin assi'
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone | 'No. **Level 2 Reviewer is not a user role that a Sail Admin assi'
+
+[09 gen] Where is the Me / My Team toggle and who can use it?
+   A-manuals      answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p11 | 'The **Me / My Team** toggle is in the **Operation** tab of the h'
+   B-corrected    answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p11 | '1. Open the PMS **Dashboard** and select the **Operation** tab. '
+   C-kbpilot      answer ✗  cite ✓  PASS ✗ [1/3]  gate=answer cite=Technical - PMS User Manua p11 | '1. The **“Me / My Team”** toggle is in the **PMS Dashboard**, on'
+
+[10 gen] On the Fleet Sync Overview, what does an amber status mean?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=clarify cite=- pNone | 'Your question could relate to more than one module — is this abo'
+   B-corrected    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'Amber means the vessel has not synced for more than 24 hours. Th'
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'Amber means the vessel is **stale**: it has not synced for more '
+
+[11 gen] Does one press of Sync Now clear a long backlog on the ship?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - Cert. & Survey p21 | 'The Technical documentation does not state that one press of **S'
+   B-corrected    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'No. One press may not clear a long backlog. On the ship, **Sync '
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'Not necessarily. On the ship, one **Sync Now** press repeats pus'
+
+[12 gen] If a ship's vessel master data changes, how is the ship refreshed?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - Cert. & Survey p21 | 'A ship can be refreshed in two ways:\n\n1. **Manual synchronizatio'
+   B-corrected    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'For vessel master data changes:\n\n1. A Sail Admin must re-provisi'
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone | 'For a ship’s vessel master data changes:\n\n1. On the shore/Office'
+
+[13 gen] On the ship, what happens if I enter a running-hours reading lower than the component's current hours when completing a work order?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p33 | 'This is not covered in the Technical documentation provided. The'
+   B-corrected    answer ✓  cite ✓  PASS ✓ [2/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | 'When completing a running-hours work order:\n\n1. The completion r'
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [2/3]  gate=answer cite=Technical - Ship-Side (Ves pNone | 'On the ship:\n\n1. A lower reading is normally refused with **“Run'
+
+[14 gen] Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+   A-manuals      answer ✗  cite ✗  PASS ✗ [0/3]  gate=answer cite=Technical - PMS User Manua p38 | 'This is not covered in the Technical documentation excerpts prov'
+   B-corrected    answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'The per-vessel switches are held on the **Lead Time & Grace Peri'
+   C-kbpilot      answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone | 'The per-vessel switches are held on the **Lead Time & Grace Peri'
+
+== per-case (answer ∧ citation), out of 14 ==
+   case     A-manuals  B-corrected    C-kbpilot
+   01               ✗            ✗            ✗
+   02               ✓            ✓            ✓
+   03               ✗            ✓            ✓
+   04               ✗            ✗            ✗
+   05               ✗            ✓            ✓
+   06               ✗            ✓            ✓
+   07               ✗            ✓            ✓
+   08               ✗            ✓            ✓
+   09               ✗            ✗            ✗
+   10               ✗            ✓            ✓
+   11               ✗            ✓            ✓
+   12               ✗            ✓            ✓
+   13               ✗            ✓            ✓
+   14               ✗            ✓            ✓
+   A-manuals      1/14
+   B-corrected    11/14
+   C-kbpilot      11/14
+
+--- RETRIEVAL 18 ---
+
+== Part 1: documents — per set: chunks / <100-char / avg len / html-tagged chunks
+  manual                                     A-manuals          |        B-corrected         |         C-kbpilot         
+  TOTAL                                   0 /  0 /      /   0   |      0 /  0 /      /   0   |      0 /  0 /      /   0  
+
+== Part 2: retrieval — A-manuals (http://sail-assistant-py-abc-a:8000) | B-corrected (http://sail-assistant-py-abc-b:8000) | C-kbpilot (http://sail-assistant-py-abc-c:8000)   [module ✓/✗, manual ✓/✗, margin, top-distance]  expectations v1
+  how do I create a work order                 ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8084           
+  how to upload data in bulk data import       ✓✓ m=1.000 d=0.8444            | ✓✓ m=1.000 d=0.8444            | ✓✓ m=1.000 d=0.8444           
+  why did the running hours not go down after  ✓✗ m=1.000 d=1.1468            | ✓✓ m=1.000 d=1.0183            | ✓✓ m=1.000 d=1.0183           
+  how do I raise a defect on equipment         ✓✓ m=1.000 d=0.9062            | ✓✓ m=1.000 d=0.9062            | ✓✓ m=1.000 d=0.9062           
+  how do vessels sync their data with the offi ✓✗ m=0.278 d=0.8376            | ✓✓ m=1.000 d=0.7655            | ✓✓ m=1.000 d=0.7655           
+  how do I share an audit with the fleet from  ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.7533           
+  how do I prepare for an upcoming audit       ✓✓ m=1.000 d=0.9559            | ✓✓ m=1.000 d=0.9559            | ✓✓ m=1.000 d=0.9559           
+  where can I see the history of past audits   ✓✓ m=1.000 d=0.8883            | ✓✓ m=1.000 d=0.8883            | ✓✓ m=1.000 d=0.8883           
+  how do I create an MOC                       ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441           
+  how do I carry out a risk assessment on the  ✓✓ m=1.000 d=0.7231            | ✓✓ m=1.000 d=0.7231            | ✓✓ m=1.000 d=0.7231           
+  how do I record a safety meeting             ✓✓ m=1.000 d=0.8214            | ✓✓ m=1.000 d=0.8214            | ✓✓ m=1.000 d=0.8214           
+  how does the master review the safety manage ✓✓ m=1.000 d=0.7666            | ✓✓ m=1.000 d=0.7666            | ✓✓ m=1.000 d=0.7666           
+  how do I report a near miss                  ✓✓ m=1.000 d=0.8268            | ✓✓ m=1.000 d=0.8268            | ✓✓ m=1.000 d=0.8268           
+  how do I report an incident on board         ✓✓ m=1.000 d=0.9683            | ✓✓ m=1.000 d=0.9683            | ✓✓ m=1.000 d=0.9683           
+  how do I raise a lesson learnt               ✓✓ m=1.000 d=1.0145            | ✓✓ m=1.000 d=1.0145            | ✓✓ m=1.000 d=1.0145           
+  how do fleet notifications reach the vessel  ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7342           
+  how do I plan a crew change                  ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7967           
+  how do I add a new crew member to a vessel   ✓✓ m=1.000 d=0.7846            | ✓✓ m=1.000 d=0.7846            | ✓✓ m=1.000 d=0.7846           
+  what is the weather in Singapore today       gate=not_documented            | gate=not_documented            | gate=not_documented           
+  how do I change my payroll bank account      gate=not_documented            | gate=not_documented            | gate=not_documented           
+
+  routing+manual correct (expectations v1): A-manuals 16/18   B-corrected 18/18   C-kbpilot 18/18
+  routing+manual correct (expectations v2, same responses): A-manuals 16/18   B-corrected 18/18   C-kbpilot 18/18
+
+===== DONE 2026-09-15T14:31:40Z =====

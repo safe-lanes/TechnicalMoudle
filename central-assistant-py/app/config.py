@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     # sampling: "0.2" (served default) or "default" = send no temperature (models such as gpt-5.6-luna accept only their default)
     chat_temperature: str = "0.2"
 
+    # step 4 (owner brief 15-Sep-2026) — both OFF = the served behaviour; each is measured on its own candidate:
+    #   route_intent: an explicit module or manual/sub-module name in the question decides the module; the originating
+    #                 module (context.module) only breaks a clarify tie when it is one of the candidates.
+    #   hybrid:       excerpt selection fuses the vector ranking with a lexical (tsvector) ranking inside the routed module
+    #                 (reciprocal-rank fusion); thresholds and excerpt count unchanged.
+    assistant_route_intent: str = "off"
+    assistant_hybrid: str = "off"
+
     # budgets (§5.7)
     llm_timeout_ms: int = 30000
     tool_timeout_ms: int = 10000

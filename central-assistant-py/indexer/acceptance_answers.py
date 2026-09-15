@@ -33,7 +33,17 @@ from app.identity import sign_identity  # noqa: E402
 # SUITE FROZEN 14-Sep-2026 (SUITE_VERSION below) after every expected answer was checked against the
 # source manuals (page renders + the saved parses; see docs/assistant-experiments/2026-09-14-repairs/).
 # Any later change to a case must be reported explicitly and bumps SUITE_VERSION.
-SUITE_VERSION = "2026-09-14.3"  # .3 (post-freeze, reported): case 08 also requires the final step "download" (Export button, p20)
+SUITE_VERSION = "2026-09-14.4"  # .3 (post-freeze, reported): case 08 also requires the final step "download" (Export button, p20)
+# .4 (15-Sep-2026, reported, cases UNCHANGED): the judge strips markdown emphasis (**bold**, `code`) before phrase matching —
+#     gpt-5.6-luna writes "the **Operation** tab", which the literal check read as "operation** tab" and failed. Re-scored on
+#     every stored dump (rejudge_base.py); JUDGE_MD_NORMALISE=False reproduces the .3 matching.
+JUDGE_MD_NORMALISE = True
+
+
+def md_plain(text: str) -> str:
+    """Remove markdown emphasis markers without touching the words: **x** → x, *x* → x, `x` → x."""
+    t = re.sub(r"\*\*|`", "", text)
+    return re.sub(r"(?<!\w)\*(?=\S)|(?<=\S)\*(?!\w)", "", t)
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (class, question, module, expected manual substring, accepted pages (None = any), must phrases, must_not phrases, source note)
 CASES: list[tuple[str, str, str, str, tuple[int, ...] | None, list[str], list[str], str]] = [
@@ -96,7 +106,7 @@ def judge(j: dict, manual: str, page: tuple[int, ...] | int | None, must: list[s
     an answer built from another section's text must name where it came from (the resolver
     labels pulled-in text with its source section and page)."""
     raw = j.get("response") or ""
-    ans = raw.lower()
+    ans = md_plain(raw).lower() if JUDGE_MD_NORMALISE else raw.lower()
     ok_answer = all(p.lower() in ans for p in must) and not any(p.lower() in ans for p in must_not) and j.get("gate") == "answer"
     if cls == "xref" and re.search(r"refer to the ['‘\"]?[\w &-]+['’\"]? (sub-)?(sub-)?module", ans) and not re.search(r"^\s*\d+\.\s+(click|go to|select|open|use|enter)", ans, re.M):
         ok_answer = False  # judge tightened 14-Sep-2026: parroting the manual's pointer ("Refer to the X sub-module, follow the same procedure") is NOT an answer

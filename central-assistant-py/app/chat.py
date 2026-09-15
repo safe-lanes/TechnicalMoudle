@@ -94,7 +94,17 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
                          "toolsUsed": r.tools_used, "partial": r.partial, "usage": r.usage}
 
         # ── Stage 1 docs path ──
-        routed = retrieval.route(await retrieval.retrieve(await llm.embed(message, masker)))
+        # Step 4 (owner brief 15-Sep-2026): the same one embedding call; routing may consult the question's own words and
+        # the originating module (ASSISTANT_ROUTE_INTENT), excerpt selection may fuse a lexical ranking inside the routed
+        # module (ASSISTANT_HYBRID). Both default off = served behaviour. Neither touches identity, tenant or vessel checks.
+        emb = await llm.embed(message, masker)
+        hits = await retrieval.retrieve(emb)
+        terms = await retrieval.title_terms() if s.assistant_route_intent.lower() == "on" else None
+        routed = retrieval.route(hits, message, ui_module, terms)
+        if routed.gate == "answer" and s.assistant_hybrid.lower() == "on" and routed.module:
+            vec = [h for h in hits if h.module == routed.module and h.distance <= s.route_sim_floor]
+            lex = [h for h in await db.search_lexical(emb, masker.mask_text(message) if masker else message, routed.module, s.route_top_k) if h.distance <= s.route_sim_floor]
+            routed.hits = retrieval.rrf_fuse(vec, lex, s.answer_chunks)
         if routed.gate == "not_documented":
             log("not_documented", NOT_DOC_MSG, confidence=routed.confidence)
             return 200, {"response": NOT_DOC_MSG, "gate": "not_documented", "module": None, "citations": [], "confidence": routed.confidence}
@@ -106,13 +116,15 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         label = MODULE_LABELS.get(routed.module or "", routed.module)
         if body.get("routeOnly") is True:
             log("route_only", None, module=routed.module, citations=citations, confidence=routed.confidence)
-            return 200, {"gate": "answer", "module": label, "confidence": round(routed.confidence, 4), "citations": citations, "routeOnly": True}
+            return 200, {"gate": "answer", "module": label, "confidence": round(routed.confidence, 4), "citations": citations, "routeOnly": True,
+                         "routing": getattr(routed, "reason", "vector routing")}
         system, user = retrieval.docs_prompt(message, routed)
         text, usage = await agent.answer_docs(system, user, masker)
         if masker and masker.warnings:
             print("[assistant] unmask warnings:", masker.warnings)
         log("answer", text, module=routed.module, citations=citations, confidence=routed.confidence, usage=usage, model=s.chat_model)
-        return 200, {"response": text, "gate": "answer", "module": label, "citations": citations, "confidence": round(routed.confidence, 4), "usage": usage}
+        return 200, {"response": text, "gate": "answer", "module": label, "citations": citations, "confidence": round(routed.confidence, 4), "usage": usage,
+                     "routing": getattr(routed, "reason", "vector routing")}
     except Exception as e:
         if "mask" in str(e).lower():
             log("masking_error", MASK_ERR_MSG)

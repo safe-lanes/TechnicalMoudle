@@ -1,6 +1,6 @@
 # Conflict log — work orders (manual vs code), KB pilot, 15-Sep-2026
 
-Manuals: `Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf` (Office, June rev) and `PMS User Manual_Vessel Specific_R3_08.07.2026.pdf` (Vessel). Code: Technical repository `origin/replit_dev` cf5241ad6 (seven work-order files verified byte-identical to the working branch; the running deployment and the Replit phase2 fork NOT verified). Conflicts are recorded for the domain owner; the procedure files state the code behaviour marked `[code: …]` and do not assume the code is right.
+Manuals: `Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf` (Office, June rev) and `PMS User Manual_Vessel Specific_R3_08.07.2026.pdf` (Vessel). Code: Technical repository `origin/replit_dev` cf5241ad6 (seven work-order files verified byte-identical to the working branch). Owner confirmation (Ghazi Anwer, 15-Sep-2026): the running Technical application is this same code at this revision — recorded as the owner's confirmation, not as an independently measured deployment check. Conflicts are recorded for the domain owner; the procedure files state the code behaviour marked `[code: …]` and do not assume the code is right — where code and manual disagree, the specific difference is documented below rather than one side chosen.
 
 | # | procedure | manual says | code says | file:line |
 |---|---|---|---|---|
