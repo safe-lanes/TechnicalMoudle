@@ -33,4 +33,20 @@ describe('Defects approval card terminal decisions', () => {
       );
     },
   );
+
+  it('passes the committed request UUID to verification return handling', async () => {
+    await defectsApprovalCard.onDecision({ tenantId: 'tenant' }, {
+      requuid: 'request-returned-1',
+      scope: { moduleId: 'defects', screenId: 'defects-verification', actionId: '' },
+      classification: 'Normal',
+      subjectRef: 'defect-1',
+      outcome: 'returned',
+      decidedBy: 'user-1',
+      remarks: 'Closeout evidence is incomplete',
+    });
+
+    expect(mocks.applyVerificationDecision).toHaveBeenCalledWith(
+      'defect-1', false, 'Closeout evidence is incomplete', 'user-1', 'request-returned-1',
+    );
+  });
 });

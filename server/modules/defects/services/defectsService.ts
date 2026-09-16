@@ -46,6 +46,14 @@ export async function getDefect(id: string) {
   return defectsRepo.getDefect(id);
 }
 
+export async function getDefectClosureHistory(id: string) {
+  const defect = await defectsRepo.getDefect(id);
+  if (!defect) {
+    throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
+  }
+  return defectsRepo.getDefectClosureHistory(defect.duuid);
+}
+
 export async function getDefectApprovalSettings() {
   const settings = await defectsRepo.getDefectApprovalSettings();
   if (!settings) {
@@ -110,11 +118,11 @@ const missingWorkflowConsequence = (scope: string) =>
  */
 export async function getDefectApprovalDiagnostics() {
   const queryPlan = {
-    fixedReads: 5,
+    fixedReads: 6,
     resolverQueriesPerPair: 3,
-    description: 'Five bounded set-based reads plus strict role resolution for each distinct active-workflow role and vessel with a nondeleted defect.',
+    description: 'Six bounded set-based reads plus strict role resolution for each distinct active-workflow role and vessel with a nondeleted defect.',
     formula: 'fixedReads + (distinctRoles × vesselsWithDefects × resolverQueriesPerPair)',
-    conditionalReads: 'workflow nodes/slots reads are skipped when there are no active Defects workflows; pending requests and active slots always use one left-join read',
+    conditionalReads: 'workflow nodes/slots reads are skipped when there are no active Defects workflows; pending requests/active slots and returned-verification consistency each use one bounded read',
   };
   if (!isApprovalEngineAvailable()) {
     const workflowMatrix = DIAGNOSTIC_SCOPES.flatMap((scope) =>
@@ -133,7 +141,8 @@ export async function getDefectApprovalDiagnostics() {
       unresolvedApprovers: [],
       stalledRequests: [],
       orphanRequestedExtensions: [],
-      summary: { workflowGaps: 0, unresolvedApprovers: 0, stalledRequests: 0, orphanRequestedExtensions: 0 },
+      returnedVerificationStillVerified: [],
+      summary: { workflowGaps: 0, unresolvedApprovers: 0, stalledRequests: 0, orphanRequestedExtensions: 0, returnedVerificationStillVerified: 0 },
       queryPlan: { ...queryPlan, resolverPairs: 0, expectedQueries: 0, currentExpectedQueries: 0 },
     };
   }
@@ -165,6 +174,7 @@ export async function getDefectApprovalDiagnostics() {
   const defectRows: any[] = await db.select({
     duuid: defects.duuid, vesselId: defects.vesselId,
     status: defects.status, isDeleted: defects.isDeleted,
+    verified: defects.verified,
     targetDateExtensions: defects.targetDateExtensions,
   }).from(defects).where(or(eq(defects.isDeleted, false), isNull(defects.isDeleted)));
   const pendingWithSlots = await db.select({
@@ -181,6 +191,16 @@ export async function getDefectApprovalDiagnostics() {
     eq(apprvRequests.moduleId, 'defects'),
     inArray(apprvRequests.screenId, [...DIAGNOSTIC_SCOPES]),
     eq(apprvRequests.status, 'pending'),
+  ));
+  const returnedVerificationRows = await db.select({
+    requuid: apprvRequests.requuid,
+    subjectRef: apprvRequests.subjectRef,
+    vesselId: apprvRequests.vesselId,
+    finalizedAt: apprvRequests.finalizedAt,
+  }).from(apprvRequests).where(and(
+    eq(apprvRequests.moduleId, 'defects'),
+    eq(apprvRequests.screenId, DEFECTS_VERIFICATION_SCREEN),
+    eq(apprvRequests.status, 'returned'),
   ));
   const pendingRequests = Array.from(new Map(pendingWithSlots.map((r) => [r.requuid, {
     requuid: r.requuid, subjectRef: r.subjectRef, vesselId: r.vesselId,
@@ -264,6 +284,15 @@ export async function getDefectApprovalDiagnostics() {
         consequence: 'Requested extension has no pending engine request; it does not block closeout and needs review.',
       }));
     });
+  const returnedVerificationStillVerified = returnedVerificationRows
+    .filter((request) => defectById.get(request.subjectRef)?.verified === true)
+    .map((request) => ({
+      requestUuid: request.requuid,
+      defectId: request.subjectRef,
+      vesselId: request.vesselId ?? defectById.get(request.subjectRef)?.vesselId ?? null,
+      finalizedAt: request.finalizedAt,
+      consequence: 'Verification was returned by the Approval Engine, but the defect still carries verified closure state. The Defects reopen callback failed or was not applied and requires reconciliation.',
+    }));
   const unresolvedApprovers = roleCoverage.flatMap((role) =>
     role.zeroApproverVessels.map((vesselId) => ({
       roleId: role.roleId, roleLabel: role.roleLabel, vesselId,
@@ -275,17 +304,20 @@ export async function getDefectApprovalDiagnostics() {
   return {
     generatedAt: new Date().toISOString(),
     available: true, healthy: missingActiveWorkflows.length === 0 && roleCoverage.every((r) => r.healthy) &&
-      stalledRequests.length === 0 && orphanRequestedExtensions.length === 0,
-    consequence: missingActiveWorkflows.length || roleCoverage.some((r) => !r.healthy) || stalledRequests.length || orphanRequestedExtensions.length
+      stalledRequests.length === 0 && orphanRequestedExtensions.length === 0 &&
+      returnedVerificationStillVerified.length === 0,
+    consequence: missingActiveWorkflows.length || roleCoverage.some((r) => !r.healthy) || stalledRequests.length ||
+      orphanRequestedExtensions.length || returnedVerificationStillVerified.length
       ? 'One or more approval configuration or data integrity issues require administrator review.'
       : null,
     workflowMatrix, missingActiveWorkflows, roleCoverage, unresolvedApprovers,
-    stalledRequests, orphanRequestedExtensions,
+    stalledRequests, orphanRequestedExtensions, returnedVerificationStillVerified,
     summary: {
       workflowGaps: missingActiveWorkflows.length,
       unresolvedApprovers: unresolvedApprovers.length,
       stalledRequests: stalledRequests.length,
       orphanRequestedExtensions: orphanRequestedExtensions.length,
+      returnedVerificationStillVerified: returnedVerificationStillVerified.length,
     },
     queryPlan: { ...queryPlan, resolverPairs, expectedQueries, currentExpectedQueries: expectedQueries },
   };

@@ -610,13 +610,63 @@ export async function applyExtensionDecision(duuid: string, approve: boolean, re
   console.log(`[approvals] defect ${defect.id} extension ${entry.id} ${entry.status} by ${who.name}`);
 }
 
-export async function applyVerificationDecision(duuid: string, approve: boolean, remarks: string, decidedBy: string): Promise<void> {
+export async function applyVerificationDecision(
+  duuid: string,
+  approve: boolean,
+  remarks: string,
+  decidedBy: string,
+  approvalRequestUuid: string,
+): Promise<void> {
   const defect: any = await defectsRepo.getDefect(duuid);
   if (!defect) throw new AppError(404, `[approvals] defect ${duuid} not found for verification decision`);
   if (!approve) {
-    // Returned: verified stays false; the remarks reach the submitter via the engine's
-    // notification. No defect field records verification rejection (none exists today).
-    console.log(`[approvals] defect ${defect.id} verification RETURNED (${remarks})`);
+    const who = await deciderIdentity(decidedBy);
+    try {
+      const result = await defectsRepo.reopenDefectAfterVerificationReturn({
+        defectDuuid: defect.duuid,
+        approvalRequestUuid,
+        rejectedByUserUuid: decidedBy,
+        rejectedByName: who.name,
+        rejectedByPosition: who.roleLabel,
+        rejectionReason: remarks,
+      });
+      console.log(
+        `[approvals] defect ${defect.id} verification RETURNED; closure attempt ${result.history.attemptNumber} preserved`
+        + (result.alreadyApplied ? ' (idempotent replay)' : ''),
+      );
+    } catch (error: any) {
+      // The engine request is already terminal. Record the split state outside
+      // the failed Defects transaction, then rethrow so the existing
+      // committed-decision callbackError warning reaches the user.
+      try {
+        await defectsRepo.createAuditLog({
+          userId: decidedBy,
+          vesselCode: defect.vesselId ?? null,
+          entityType: 'defect_verification_reopen',
+          entityId: defect.duuid,
+          actionType: 'error',
+          fieldName: 'verification',
+          oldValue: 'returned',
+          newValue: defect.status,
+          source: 'system',
+          payload: {
+            approvalRequestUuid,
+            defectId: defect.id,
+            defectDuuid: defect.duuid,
+            reason: remarks,
+            reopenError: error?.message || String(error),
+            actorLabel: who.name,
+            actorRole: who.roleLabel,
+          },
+        });
+      } catch (auditError) {
+        console.error(
+          `[approvals] CRITICAL: failed to audit verification split state for defect ${defect.id}, request ${approvalRequestUuid}`,
+          auditError,
+        );
+      }
+      throw error;
+    }
     return;
   }
   if (defect.verified === true) {

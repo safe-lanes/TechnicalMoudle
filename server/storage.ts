@@ -70,6 +70,7 @@ import {
   defects,
   type Defect,
   type InsertDefect,
+  type DefectClosureHistory,
   defectActions,
   type DefectAction,
   type InsertDefectAction,
@@ -656,6 +657,15 @@ export interface IStorage {
   createDefect(defect: InsertDefect): Promise<Defect>;
   updateDefect(id: string, updates: Partial<InsertDefect>): Promise<Defect>;
   deleteDefect(id: string): Promise<void>;
+  getDefectClosureHistory(defectDuuid: string): Promise<DefectClosureHistory[]>;
+  reopenDefectAfterVerificationReturn(input: {
+    defectDuuid: string;
+    approvalRequestUuid: string;
+    rejectedByUserUuid: string;
+    rejectedByName: string;
+    rejectedByPosition: string;
+    rejectionReason: string;
+  }): Promise<{ history: DefectClosureHistory; defect: Defect; alreadyApplied: boolean }>;
   
   // Defect Actions methods
   getDefectActions(defectId: string): Promise<DefectAction[]>;

@@ -37,6 +37,7 @@ import {
   storesItems,
   storesLedger,
   defects,
+  defectClosureHistory,
   defectActions,
   defectAttachments,
   defectSequences,
@@ -177,6 +178,7 @@ import {
   type InsertImportChangeLog,
   type AuditLog,
   type InsertAuditLog,
+  type DefectClosureHistory,
   type BulkImportHistory,
   type InsertBulkImportHistory,
   type BulkImportError,
@@ -299,6 +301,129 @@ export function getWorkOrderNumericFields(): string[] {
     _woNumericFields = ['maintenanceIntervalValue', 'intervalRunningHour', 'woCompletionRh', 'missedCycles', 'daysLate'];
   }
   return _woNumericFields;
+}
+
+export type VerificationReturnReopenInput = {
+  defectDuuid: string;
+  approvalRequestUuid: string;
+  rejectedByUserUuid: string;
+  rejectedByName: string;
+  rejectedByPosition: string;
+  rejectionReason: string;
+};
+
+export async function reopenDefectAfterVerificationReturnTx(
+  tx: any,
+  input: VerificationReturnReopenInput,
+): Promise<{ history: DefectClosureHistory; defect: Defect; alreadyApplied: boolean }> {
+  const existingHistory = (await tx.select().from(defectClosureHistory)
+    .where(eq(defectClosureHistory.approvalRequestUuid, input.approvalRequestUuid))
+    .limit(1))[0];
+  if (existingHistory) {
+    const current = (await tx.select().from(defects)
+      .where(eq(defects.duuid, input.defectDuuid)).limit(1))[0];
+    if (!current) throw new Error(`Defect ${input.defectDuuid} not found`);
+    return { history: existingHistory, defect: current, alreadyApplied: true };
+  }
+
+  // The defect row serializes attempt numbering and prevents a replay from
+  // clearing a later closeout cycle.
+  const current = (await tx.select().from(defects)
+    .where(eq(defects.duuid, input.defectDuuid)).limit(1).for('update'))[0];
+  if (!current) throw new Error(`Defect ${input.defectDuuid} not found`);
+
+  const afterLockHistory = (await tx.select().from(defectClosureHistory)
+    .where(eq(defectClosureHistory.approvalRequestUuid, input.approvalRequestUuid))
+    .limit(1))[0];
+  if (afterLockHistory) {
+    return { history: afterLockHistory, defect: current, alreadyApplied: true };
+  }
+
+  const [{ nextAttempt }] = await tx.select({
+    nextAttempt: sql<number>`coalesce(max(${defectClosureHistory.attemptNumber}), 0) + 1`,
+  }).from(defectClosureHistory)
+    .where(eq(defectClosureHistory.defectDuuid, input.defectDuuid));
+
+  const history = (await tx.insert(defectClosureHistory).values({
+    defectDuuid: current.duuid,
+    vesselId: current.vesselId,
+    attemptNumber: Number(nextAttempt),
+    priorStatus: current.status,
+    closedOutByName: current.closedOutByName,
+    closedOutByRank: current.closedOutByRank,
+    confirmCompleted: current.confirmCompleted === true,
+    dateCompleted: current.dateCompleted,
+    closedByName: current.closedByName,
+    closedByRank: current.closedByRank,
+    closureComment: current.closureComment,
+    closedBy: current.closedBy,
+    closedOn: current.closedOn,
+    closureFiles: current.closureFiles,
+    rejectedByUserUuid: input.rejectedByUserUuid,
+    rejectedByName: input.rejectedByName,
+    rejectedByPosition: input.rejectedByPosition,
+    rejectionReason: input.rejectionReason,
+    approvalRequestUuid: input.approvalRequestUuid,
+    createdByUuid: input.rejectedByUserUuid,
+    updatedByUuid: input.rejectedByUserUuid,
+  }).returning())[0];
+
+  const reopened = (await tx.update(defects).set({
+    status: 'Open',
+    confirmCompleted: false,
+    dateCompleted: null,
+    closedOutByName: null,
+    closedOutByRank: null,
+    closedByName: null,
+    closedByRank: null,
+    closureComment: null,
+    closedBy: null,
+    closedOn: null,
+    closureFiles: null,
+    verified: false,
+    dateVerified: null,
+    verifiedDate: null,
+    verifiedByName: null,
+    verifiedByOfficePosition: null,
+    updatedByUuid: input.rejectedByUserUuid,
+    updatedAt: new Date(),
+    // isDeferred and targetCloseDate intentionally remain unchanged.
+  }).where(eq(defects.duuid, current.duuid)).returning())[0];
+  if (!reopened) throw new Error(`Defect ${input.defectDuuid} could not be reopened`);
+
+  const actor = getAuditActor();
+  await tx.insert(auditLog).values({
+    userId: input.rejectedByUserUuid,
+    vesselCode: current.vesselId,
+    entityType: 'defect_closure_history',
+    entityId: current.duuid,
+    actionType: 'reject',
+    fieldName: 'verification',
+    oldValue: current.status,
+    newValue: 'Open',
+    source: 'system',
+    payload: {
+      actorLabel: input.rejectedByName || actor.actorLabel,
+      actorType: actor.actorType,
+      actorEmail: actor.actorEmail,
+      actorRole: input.rejectedByPosition || actor.actorRole,
+      approvalRequestUuid: input.approvalRequestUuid,
+      closureHistoryUuid: history.dchuuid,
+      attemptNumber: history.attemptNumber,
+      reason: input.rejectionReason,
+    },
+  });
+
+  try {
+    await logFieldChanges(
+      'defects', current.duuid, current.vesselId || null,
+      current, reopened, input.rejectedByUserUuid, tx,
+    );
+  } catch (e) {
+    console.error('[FieldLogger] defect verification return reopen:', e);
+  }
+
+  return { history, defect: reopened, alreadyApplied: false };
 }
 
 export class PostgresStorage {
@@ -4980,6 +5105,21 @@ export class PostgresStorage {
     try { await logFieldChanges('defects', existingDefect.duuid, existingDefect.vesselId || null, existingDefect, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect update:', e); }
 
     return result[0];
+  }
+
+  async getDefectClosureHistory(defectDuuid: string): Promise<DefectClosureHistory[]> {
+    const db = await getDb();
+    return db.select().from(defectClosureHistory).where(and(
+      eq(defectClosureHistory.defectDuuid, defectDuuid),
+      eq(defectClosureHistory.isDeleted, false),
+    )).orderBy(asc(defectClosureHistory.attemptNumber));
+  }
+
+  async reopenDefectAfterVerificationReturn(
+    input: VerificationReturnReopenInput,
+  ): Promise<{ history: DefectClosureHistory; defect: Defect; alreadyApplied: boolean }> {
+    const db = await getDb();
+    return db.transaction((tx) => reopenDefectAfterVerificationReturnTx(tx, input));
   }
 
   async deleteDefect(id: string): Promise<void> {

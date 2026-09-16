@@ -14,6 +14,7 @@ import {
   formatDiagnosticsOrphan,
   formatDiagnosticsStalled,
   formatDiagnosticsUnresolved,
+  formatDiagnosticsReturnedVerificationStillVerified,
   projectDiagnosticsSummary,
 } from "../defects/defectApprovalPresentation";
 
@@ -39,10 +40,12 @@ type DefectApprovalDiagnostics = {
     stalledRequests?: number;
     workflowGaps?: number;
     missingWorkflows?: number;
+    returnedVerificationStillVerified?: number;
   };
   unresolvedApprovers: Array<{ vesselId: string; roleId: string; roleLabel: string; workflowScopes?: string[]; consequence: string }>;
   orphanRequestedExtensions: Array<{ defectId: string; vesselId: string; entryId: string; requestedAt: string; newTargetDate: string; consequence: string }>;
   stalledRequests: Array<{ requestUuid: string; defectId: string; vesselId: string; screenId: string; submittedAt: string; daysPending: number; consequence: string }>;
+  returnedVerificationStillVerified: Array<{ requestUuid: string; defectId: string; vesselId: string; finalizedAt: string; consequence: string }>;
 };
 
 function DefectApprovalDiagnosticsPanel() {
@@ -103,6 +106,12 @@ function DefectApprovalDiagnosticsPanel() {
                 <DiagnosticsGroup title="Unresolved approvers" rows={data.unresolvedApprovers} format={formatDiagnosticsUnresolved} />
                 <DiagnosticsGroup title="Stalled requests" rows={data.stalledRequests} format={formatDiagnosticsStalled} />
                 <DiagnosticsGroup title="Orphan requested extensions" rows={data.orphanRequestedExtensions} format={formatDiagnosticsOrphan} />
+                <DiagnosticsGroup
+                  title="Returned verifications still verified"
+                  rows={data.returnedVerificationStillVerified ?? []}
+                  format={formatDiagnosticsReturnedVerificationStillVerified}
+                  warning
+                />
               </div>
             </DialogContent>
           </Dialog>
@@ -112,12 +121,12 @@ function DefectApprovalDiagnosticsPanel() {
   );
 }
 
-function DiagnosticsGroup<T>({ title, rows, format }: {
-  title: string; rows: T[]; format: (row: T) => string;
+function DiagnosticsGroup<T>({ title, rows, format, warning = false }: {
+  title: string; rows: T[]; format: (row: T) => string; warning?: boolean;
 }) {
   return (
-    <div style={{ marginTop: 10 }}>
-      <h3 style={{ margin: "0 0 4px", fontSize: 13 }}>{title} ({rows.length})</h3>
+    <div style={{ marginTop: 10, ...(warning ? { borderLeft: "3px solid #d97706", background: "#fffbeb", padding: "8px 10px" } : {}) }}>
+      <h3 style={{ margin: "0 0 4px", fontSize: 13, color: warning ? "#92400e" : undefined }}>{title} ({rows.length})</h3>
       {rows.length ? (
         <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: "#344054" }}>
           {rows.slice(0, 25).map((row, index) => <li key={`${title}-${index}`}>{format(row)}</li>)}
@@ -169,10 +178,10 @@ function EmailStatusBanner() {
     >
       <span>
         {!ok
-          ? "⚠ Approval emails are not configured — approvers receive in-app notifications only. To enable email, set AWS_SES_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and APPROVAL_EMAIL_FROM on the server."
+          ? "Warning: approval emails are not configured — approvers receive in-app notifications only. To enable email, set AWS_SES_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and APPROVAL_EMAIL_FROM on the server."
           : !on
-            ? "⚠ Approval emails are switched OFF by an admin — approvers receive in-app notifications only. Turn the toggle on to resume email."
-            : `✓ Approval emails are on${data.mode === "json-test" ? " (test mode — no real send)" : data.from ? ` (from ${data.from})` : ""}. Approvers receive in-app + email notifications.`}
+            ? "Warning: approval emails are switched OFF by an admin — approvers receive in-app notifications only. Turn the toggle on to resume email."
+            : `Approval emails are on${data.mode === "json-test" ? " (test mode — no real send)" : data.from ? ` (from ${data.from})` : ""}. Approvers receive in-app + email notifications.`}
       </span>
       <label
         title={!ok ? "Email is not configured on this server — the toggle has no effect until SES is set up." : on ? "Switch approval emails off (in-app notifications continue)" : "Switch approval emails on"}

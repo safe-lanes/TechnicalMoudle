@@ -57,6 +57,7 @@ import {
   isOrphanedRequestedExtensionAt,
   extensionEntryPermissions,
   projectExtensionHistory,
+  projectRejectedClosureHistory,
   type ApprovalPreviewStep,
   type DefectApprovalRoutingPreview,
 } from "./defectApprovalPresentation";
@@ -74,6 +75,119 @@ type ExtensionHistoryRecord = {
   approved?: boolean;
   approvalDate?: string;
 };
+
+type RejectedClosureAttempt = {
+  id: string | number;
+  dchuuid?: string | null;
+  defectDuuid?: string | null;
+  attemptNumber?: number | null;
+  priorStatus?: string | null;
+  closedOutByName?: string | null;
+  closedOutByRank?: string | null;
+  confirmCompleted?: boolean | null;
+  dateCompleted?: string | null;
+  closedByName?: string | null;
+  closedByRank?: string | null;
+  closureComment?: string | null;
+  closedBy?: string | null;
+  closedOn?: string | null;
+  closureFiles?: string[] | null;
+  rejectedByUserUuid?: string | null;
+  rejectedByName?: string | null;
+  rejectedByPosition?: string | null;
+  rejectedAt?: string | null;
+  rejectionReason?: string | null;
+  approvalRequestUuid?: string | null;
+};
+
+function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt[] }) {
+  const historyProjection = projectRejectedClosureHistory(attempts);
+  const orderedAttempts = historyProjection.attempts;
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(historyProjection.defaultExpandedIds),
+  );
+  useEffect(() => {
+    setExpanded(new Set(
+      orderedAttempts.length === 1 ? [String(orderedAttempts[0].id)] : [],
+    ));
+  }, [orderedAttempts.length]);
+  if (!orderedAttempts.length) return null;
+  const display = (value?: string | number | boolean | null) =>
+    value === null || value === undefined || value === "" ? "Not recorded" : String(value);
+  const date = (value?: string | null) => {
+    if (!value) return "Not recorded";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  };
+  const toggle = (id: string) => setExpanded((current) => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50/60 p-4" data-testid="rejected-closure-history">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h4 className="font-semibold text-amber-950">Previous rejected closure attempts</h4>
+          <p className="mt-1 text-xs text-amber-900/75">
+            Read-only audit history. {orderedAttempts.length} {orderedAttempts.length === 1 ? "attempt" : "attempts"} recorded.
+          </p>
+        </div>
+        {orderedAttempts.length > 1 && (
+          <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
+            {orderedAttempts.length} rejected attempts
+          </span>
+        )}
+      </div>
+      <div className="mt-3 space-y-2">
+        {orderedAttempts.map((attempt, index) => {
+          const id = String(attempt.id);
+          const isOpen = expanded.has(id);
+          return (
+            <div key={id} className="overflow-hidden rounded border border-amber-200 bg-white">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm hover:bg-amber-50"
+                aria-expanded={isOpen}
+                onClick={() => toggle(id)}
+                data-testid={`rejected-closure-toggle-${id}`}
+              >
+                <span className="font-medium text-slate-800">
+                  Attempt {attempt.attemptNumber ?? index + 1} · rejected {date(attempt.rejectedAt)}
+                </span>
+                <span className="text-xs font-medium text-amber-800">{isOpen ? "Collapse" : "Expand"}</span>
+              </button>
+              {isOpen && (
+                <div className="grid gap-3 border-t border-amber-100 p-3 text-sm md:grid-cols-2">
+                  <div><span className="text-xs text-slate-500">Prior status</span><div>{display(attempt.priorStatus)}</div></div>
+                  <div><span className="text-xs text-slate-500">Approval request</span><div className="break-all">{display(attempt.approvalRequestUuid)}</div></div>
+                  <div><span className="text-xs text-slate-500">Closeout submitted by</span><div>{display(attempt.closedOutByName)}{attempt.closedOutByRank ? ` · ${attempt.closedOutByRank}` : ""}</div></div>
+                  <div><span className="text-xs text-slate-500">Closeout completed</span><div>{date(attempt.dateCompleted)} · {attempt.confirmCompleted ? "Confirmed" : "Not confirmed"}</div></div>
+                  <div><span className="text-xs text-slate-500">Closed by</span><div>{display(attempt.closedByName)}{attempt.closedByRank ? ` · ${attempt.closedByRank}` : ""}</div></div>
+                  <div><span className="text-xs text-slate-500">Closed on</span><div>{date(attempt.closedOn)}</div></div>
+                  <div><span className="text-xs text-slate-500">Rejected by</span><div>{display(attempt.rejectedByName)}{attempt.rejectedByPosition ? ` · ${attempt.rejectedByPosition}` : ""}</div></div>
+                  <div><span className="text-xs text-slate-500">Rejected at</span><div>{date(attempt.rejectedAt)}</div></div>
+                  <div className="md:col-span-2"><span className="text-xs text-slate-500">Closure comment</span><div className="whitespace-pre-wrap">{display(attempt.closureComment)}</div></div>
+                  <div className="md:col-span-2"><span className="text-xs text-slate-500">Rejection reason</span><div className="whitespace-pre-wrap font-medium text-amber-950">{display(attempt.rejectionReason)}</div></div>
+                  {!!attempt.closureFiles?.length && (
+                    <div className="md:col-span-2">
+                      <span className="text-xs text-slate-500">Closure files</span>
+                      <ul className="mt-1 list-inside list-disc">
+                        {attempt.closureFiles.map((file, fileIndex) => (
+                          <li key={`${file}-${fileIndex}`}><a className="break-all text-blue-700 underline" href={file} target="_blank" rel="noreferrer">{file}</a></li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 function ExtensionHistoryCard({
   entry,
@@ -455,6 +569,17 @@ export default function DefectFormWizard({
   
   const currentDefect = defect || fetchedDefect;
   const approvalDefectId = currentDefect?.id ?? params.id ?? createdDefectId ?? null;
+  const closureHistory = useQuery<RejectedClosureAttempt[]>({
+    queryKey: ["/technical/api/defects", approvalDefectId, "closure-history"],
+    enabled: Boolean(approvalDefectId) && Boolean(currentDefect || params.id),
+    queryFn: async () => {
+      const response = await fetch(`/technical/api/defects/${encodeURIComponent(String(approvalDefectId))}/closure-history`);
+      if (!response.ok) throw new Error("Failed to fetch closure history");
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : [];
+    },
+    staleTime: 60_000,
+  });
   const extensionApproval = useDefectApprovalChain(approvalDefectId, "extension");
   const verificationApproval = useDefectApprovalChain(approvalDefectId, "verification");
   const canEditDefect = canEdit("defects-active");
@@ -2399,6 +2524,9 @@ export default function DefectFormWizard({
                   {/* C1. Closeout Section */}
                   <div className="space-y-6">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C1. Closeout</h3>
+                    {closureHistory.data && closureHistory.data.length > 0 && (
+                      <RejectedClosureHistory attempts={closureHistory.data} />
+                    )}
                     {hasPendingExtensionRequest && isMasterRank && (
                       <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="c1-extension-pending-warning">
                         Closeout is blocked while the extension approval is pending.

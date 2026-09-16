@@ -11,6 +11,8 @@ import {
   formatDiagnosticsOrphan,
   formatDiagnosticsStalled,
   formatDiagnosticsUnresolved,
+  formatDiagnosticsReturnedVerificationStillVerified,
+  projectRejectedClosureHistory,
   resolveVerificationDisplay,
 } from "./defectApprovalPresentation";
 
@@ -58,6 +60,24 @@ describe("Defect approval client presentation states", () => {
     expect(formatDiagnosticsOrphan({ defectId: "D1", vesselId: "V1", entryId: "E1", requestedAt: "2026-01-01", newTargetDate: "2026-02-01", consequence: "does not block" })).toContain("E1");
     expect(formatDiagnosticsOrphan({ defectId: "D1", vesselId: "V1", entryId: "E1", requestedAt: "2026-01-01", newTargetDate: "2026-02-01", consequence: "does not block" })).toContain("does not block");
     expect(formatDiagnosticsStalled({ requestUuid: "Q1", defectId: "D1", vesselId: "V1", screenId: "verify", submittedAt: "2026-01-01", daysPending: 4, consequence: "blocked" })).toContain("4 days pending");
+    expect(formatDiagnosticsReturnedVerificationStillVerified({ requestUuid: "Q1", defectId: "D1", vesselId: "V1", finalizedAt: "2026-01-02", consequence: "verification must be cleared" })).toContain("verification must be cleared");
+  });
+  it("orders rejected closure attempts oldest first and expands only a single entry", () => {
+    expect(projectRejectedClosureHistory([
+      { id: "third", attemptNumber: 3 },
+      { id: "first", attemptNumber: 1 },
+      { id: "second", attemptNumber: 2 },
+    ])).toEqual({
+      attempts: [
+        { id: "first", attemptNumber: 1 },
+        { id: "second", attemptNumber: 2 },
+        { id: "third", attemptNumber: 3 },
+      ],
+      defaultExpandedIds: [],
+    });
+    expect(projectRejectedClosureHistory([
+      { id: "only", attemptNumber: 1 },
+    ]).defaultExpandedIds).toEqual(["only"]);
   });
   it("formats unresolved approvers safely with or without workflow scopes", () => {
     const base = { vesselId: "V1", roleId: "R1", roleLabel: "Master", consequence: "cannot approve" };

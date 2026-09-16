@@ -83,6 +83,13 @@ router.get('/defects/:id/approval-chain',
   requireVesselAccess,
   asyncHandler(defectsCtrl.getDefectApprovalChain));
 
+// GET /defects/:id/closure-history — immutable rejected C1 attempts, read-only
+router.get('/defects/:id/closure-history',
+  asyncHandler(defectsCtrl.loadDefectVesselAccess),
+  asyncHandler(defectsCtrl.enforceDefectVesselIdentity),
+  requireVesselAccess,
+  asyncHandler(defectsCtrl.getDefectClosureHistory));
+
 // GET    /defects/:id — get single defect
 router.get('/defects/:id', asyncHandler(defectsCtrl.getDefect));
 

@@ -27,17 +27,19 @@ import { getDefectApprovalDiagnostics } from '../services/defectsService';
 
 function mockDb(data: {
   workflows?: any[]; nodes?: any[]; slots?: any[]; defects?: any[];
-  requests?: any[]; requestSlots?: any[];
+  requests?: any[]; returnedRequests?: any[]; requestSlots?: any[];
 }) {
   const rows = {
     workflows: data.workflows ?? [], nodes: data.nodes ?? [], slots: data.slots ?? [],
-    defects: data.defects ?? [], requests: data.requests ?? [], requestSlots: data.requestSlots ?? [],
+    defects: data.defects ?? [], requests: data.requests ?? [],
+    returnedRequests: data.returnedRequests ?? [], requestSlots: data.requestSlots ?? [],
   };
   mocks.select.mockImplementation((fields: any) => ({
     from: () => {
       const keys = Object.keys(fields);
-      const group = keys.includes('classification') ? 'workflows'
-        : keys.includes('subjectRef') ? 'requests'
+       const group = keys.includes('classification') ? 'workflows'
+         : keys.includes('finalizedAt') ? 'returnedRequests'
+         : keys.includes('subjectRef') ? 'requests'
             : keys.includes('duuid') ? 'defects'
               : keys.includes('roleId') ? 'slots' : 'nodes';
       const query = { where: async () => {
@@ -95,8 +97,8 @@ describe('Defects approval diagnostics aggregation', () => {
       expect.objectContaining({ defectId: 'D-open', requestedAt: '2026-01-02' }),
       expect.objectContaining({ defectId: 'D-pending', entryId: 'extra', requestedAt: '2026-01-04' }),
     ]));
-    expect(result.queryPlan.expectedQueries).toBe(5 + 3 * 2);
-    expect(mocks.select).toHaveBeenCalledTimes(5);
+     expect(result.queryPlan.expectedQueries).toBe(6 + 3 * 2);
+     expect(mocks.select).toHaveBeenCalledTimes(6);
     expect(result.missingActiveWorkflows.find((gap) =>
       gap.screenId === 'defects-repeat-extension' && gap.classification === 'Normal')?.consequence)
       .toBe('Repeat extensions in this classification will fall back to the initial extension workflow until this is configured.');
@@ -123,6 +125,30 @@ describe('Defects approval diagnostics aggregation', () => {
     expect(result.stalledRequests).toEqual([]);
     expect(result.orphanRequestedExtensions).toEqual([]);
     expect(mocks.resolveRoleApproverUserIds).not.toHaveBeenCalled();
-    expect(result.queryPlan.expectedQueries).toBe(5);
+     expect(result.queryPlan.expectedQueries).toBe(6);
+  });
+
+  it('flags returned verification requests whose defect remains verified', async () => {
+    mockDb({
+      defects: [{
+        duuid: 'D-split', vesselId: 'V1', status: 'Closed', verified: true,
+        isDeleted: false, targetDateExtensions: [],
+      }],
+      returnedRequests: [{
+        requuid: 'R-returned', subjectRef: 'D-split', vesselId: 'V1',
+        finalizedAt: '2026-09-16T08:00:00.000Z',
+      }],
+    });
+
+    const result = await getDefectApprovalDiagnostics();
+    expect(result.returnedVerificationStillVerified).toEqual([
+      expect.objectContaining({
+        requestUuid: 'R-returned',
+        defectId: 'D-split',
+        vesselId: 'V1',
+      }),
+    ]);
+    expect(result.summary.returnedVerificationStillVerified).toBe(1);
+    expect(result.healthy).toBe(false);
   });
 });

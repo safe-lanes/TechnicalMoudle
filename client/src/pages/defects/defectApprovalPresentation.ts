@@ -341,17 +341,19 @@ export function resolveDiagnosticsHealth(input: {
   orphanRequestedExtensions?: number;
   stalledRequests?: number;
   missingWorkflows?: number;
+  returnedVerificationStillVerified?: number;
 } | null | undefined): DiagnosticsHealth {
   if (!input || input.unavailable) return "unavailable";
   return (input.unresolvedApprovers ?? 0) +
     (input.orphanRequestedExtensions ?? 0) +
     (input.stalledRequests ?? 0) +
-    (input.missingWorkflows ?? 0) > 0 ? "warnings" : "healthy";
+    (input.missingWorkflows ?? 0) +
+    (input.returnedVerificationStillVerified ?? 0) > 0 ? "warnings" : "healthy";
 }
 
 export type DiagnosticsSummaryProjection = {
   healthy: boolean;
-  chips: Array<{ key: "workflowGaps" | "unresolvedApprovers" | "stalledRequests" | "orphanRequestedExtensions"; label: string; count: number }>;
+  chips: Array<{ key: "workflowGaps" | "unresolvedApprovers" | "stalledRequests" | "orphanRequestedExtensions" | "returnedVerificationStillVerified"; label: string; count: number }>;
 };
 
 export function projectDiagnosticsSummary(summary: {
@@ -361,12 +363,14 @@ export function projectDiagnosticsSummary(summary: {
   unresolvedApprovers?: number;
   stalledRequests?: number;
   orphanRequestedExtensions?: number;
+  returnedVerificationStillVerified?: number;
 } | null | undefined): DiagnosticsSummaryProjection {
   const chips = [
     { key: "workflowGaps" as const, label: "Workflow gaps", count: summary?.workflowGaps ?? summary?.missingWorkflows ?? 0 },
     { key: "unresolvedApprovers" as const, label: "Unresolved approvers", count: summary?.unresolvedApprovers ?? 0 },
     { key: "stalledRequests" as const, label: "Stalled requests", count: summary?.stalledRequests ?? 0 },
     { key: "orphanRequestedExtensions" as const, label: "Orphan requested extensions", count: summary?.orphanRequestedExtensions ?? 0 },
+    { key: "returnedVerificationStillVerified" as const, label: "Returned verifications still verified", count: summary?.returnedVerificationStillVerified ?? 0 },
   ];
   return { healthy: chips.every((chip) => chip.count === 0), chips };
 }
@@ -395,4 +399,26 @@ export function formatDiagnosticsStalled(row: {
   requestUuid: string; defectId: string; vesselId: string; screenId: string; submittedAt: string; daysPending: number; consequence: string;
 }): string {
   return `Request ${row.requestUuid} for defect ${row.defectId} on vessel ${row.vesselId}; scope ${row.screenId}, submitted ${row.submittedAt}, ${row.daysPending} days pending — ${row.consequence}`;
+}
+
+export function formatDiagnosticsReturnedVerificationStillVerified(row: {
+  requestUuid: string;
+  defectId: string;
+  vesselId: string;
+  finalizedAt: string;
+  consequence: string;
+}): string {
+  return `Request ${row.requestUuid} for defect ${row.defectId} on vessel ${row.vesselId}; finalized ${row.finalizedAt} while verification remained recorded — ${row.consequence}`;
+}
+
+export function projectRejectedClosureHistory<T extends { id: string | number; attemptNumber?: number | null }>(
+  attempts: T[] | null | undefined,
+): { attempts: T[]; defaultExpandedIds: string[] } {
+  const ordered = [...(attempts ?? [])].sort((left, right) =>
+    (left.attemptNumber ?? Number.MAX_SAFE_INTEGER) -
+    (right.attemptNumber ?? Number.MAX_SAFE_INTEGER));
+  return {
+    attempts: ordered,
+    defaultExpandedIds: ordered.length === 1 ? [String(ordered[0].id)] : [],
+  };
 }

@@ -112,7 +112,7 @@ export const defectsApprovalCard: ApprovalCard = {
     if (notice.scope.screenId === DEFECTS_EXTENSION_SCREEN || notice.scope.screenId === DEFECTS_REPEAT_EXTENSION_SCREEN) {
       await applyExtensionDecision(notice.subjectRef, approve, remarks, notice.decidedBy);
     } else if (notice.scope.screenId === DEFECTS_VERIFICATION_SCREEN) {
-      await applyVerificationDecision(notice.subjectRef, approve, remarks, notice.decidedBy);
+      await applyVerificationDecision(notice.subjectRef, approve, remarks, notice.decidedBy, notice.requuid);
     } else {
       throw new AppError(400, `[approvals] unknown defects scope ${notice.scope.screenId}`);
     }

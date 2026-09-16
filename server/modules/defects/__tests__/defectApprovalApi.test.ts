@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   getDefectApprovalRouting: vi.fn(),
   getDefectApprovalChain: vi.fn(),
+  getDefectClosureHistory: vi.fn(),
   updateDefectApprovalSettings: vi.fn(),
   getDefectApprovalSettings: vi.fn(),
   updateDefect: vi.fn(),
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../services/defectsService', () => ({
   getDefectApprovalRouting: mocks.getDefectApprovalRouting,
   getDefectApprovalChain: mocks.getDefectApprovalChain,
+  getDefectClosureHistory: mocks.getDefectClosureHistory,
   updateDefectApprovalSettings: mocks.updateDefectApprovalSettings,
   getDefectApprovalSettings: mocks.getDefectApprovalSettings,
   getDefect: vi.fn(),
@@ -24,6 +26,7 @@ vi.mock('../services/defectsService', () => ({
 import {
   enforceDefectVesselIdentity,
   getDefectApprovalChain,
+  getDefectClosureHistory,
   getDefectApprovalRouting,
   updateDefectApprovalSettings,
   updateDefect as updateDefectController,
@@ -148,6 +151,21 @@ describe('Defects approval API controllers', () => {
     }));
   });
 
+  it('returns immutable closure history without invoking a mutation', async () => {
+    mocks.getDefectClosureHistory.mockResolvedValue([
+      { dchuuid: 'history-1', defectDuuid: 'D-1', attemptNumber: 1 },
+    ]);
+    const res = response();
+
+    await getDefectClosureHistory({ params: { id: 'DEF-1' } } as any, res);
+
+    expect(mocks.getDefectClosureHistory).toHaveBeenCalledWith('DEF-1');
+    expect(mocks.updateDefect).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith([
+      expect.objectContaining({ dchuuid: 'history-1', attemptNumber: 1 }),
+    ]);
+  });
+
   it('preserves approval-engine unavailability as HTTP 503', async () => {
     mocks.getDefectApprovalChain.mockRejectedValue(
       Object.assign(new Error('Approval status is unavailable on this instance'), {
@@ -217,15 +235,19 @@ describe('Defects approval API route guards', () => {
       layer.route?.path === '/defects/:id/approval-chain' && layer.route.methods.get);
     const diagnostics = stack.find((layer: any) =>
       layer.route?.path === '/defects/approval-diagnostics' && layer.route.methods.get);
+    const closureHistory = stack.find((layer: any) =>
+      layer.route?.path === '/defects/:id/closure-history' && layer.route.methods.get);
 
     expect(getSettings).toBeDefined();
     expect(putSettings).toBeDefined();
     expect(diagnostic).toBeDefined();
     expect(chain).toBeDefined();
     expect(diagnostics).toBeDefined();
+    expect(closureHistory).toBeDefined();
     expect(mocks.requireRole).toHaveBeenCalledTimes(3);
     expect(mocks.requireRole).toHaveBeenCalledWith(['PMS Admin', 'Sail Admin', 'Super Admin']);
     expect(diagnostic.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);
     expect(chain.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);
+    expect(closureHistory.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);
   });
 });

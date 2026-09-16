@@ -42,13 +42,14 @@ describe("approval history and diagnostics projections", () => {
   });
 
   it("projects exactly four warning chips and a quiet healthy state", () => {
-    expect(projectDiagnosticsSummary({ workflowGaps: 1, unresolvedApprovers: 0, stalledRequests: 2, orphanRequestedExtensions: 0 })).toEqual({
+     expect(projectDiagnosticsSummary({ workflowGaps: 1, unresolvedApprovers: 0, stalledRequests: 2, orphanRequestedExtensions: 0 })).toEqual({
       healthy: false,
       chips: [
         { key: "workflowGaps", label: "Workflow gaps", count: 1 },
         { key: "unresolvedApprovers", label: "Unresolved approvers", count: 0 },
         { key: "stalledRequests", label: "Stalled requests", count: 2 },
         { key: "orphanRequestedExtensions", label: "Orphan requested extensions", count: 0 },
+         { key: "returnedVerificationStillVerified", label: "Returned verifications still verified", count: 0 },
       ],
     });
     expect(projectDiagnosticsSummary({}).healthy).toBe(true);

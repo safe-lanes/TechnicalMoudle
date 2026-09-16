@@ -261,6 +261,14 @@ export async function getDefectApprovalChain(req: Request, res: Response) {
   }
 }
 
+export async function getDefectClosureHistory(req: Request, res: Response) {
+  try {
+    res.json(await defectsService.getDefectClosureHistory(req.params.id));
+  } catch (error: any) {
+    return sendDefectError(res, error, 'Failed to fetch defect closure history');
+  }
+}
+
 export async function getDefectApprovalDiagnostics(_req: Request, res: Response) {
   try {
     res.json(await defectsService.getDefectApprovalDiagnostics());
