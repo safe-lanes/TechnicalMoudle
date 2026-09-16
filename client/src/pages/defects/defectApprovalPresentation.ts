@@ -369,6 +369,74 @@ export function resolveVerificationDisplay(
   };
 }
 
+export function shouldRenderVerificationApproval(input: {
+  c1CloseoutComplete: boolean;
+  chain?: {
+    requestUuid?: string | null;
+    requestStatus?: string | null;
+  } | null;
+}): boolean {
+  const hasRequest = Boolean(input.chain?.requestUuid);
+  const requestStatus = String(input.chain?.requestStatus ?? "").toLowerCase();
+  const reopenedAfterRejection = hasRequest
+    && ["rejected", "returned"].includes(requestStatus);
+  return !reopenedAfterRejection && (input.c1CloseoutComplete || hasRequest);
+}
+
+export function hasAuditDisplayValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.some(hasAuditDisplayValue);
+  return true;
+}
+
+export function formatAuditIdentity(name?: string | null, rank?: string | null): string {
+  return [name, rank]
+    .filter((value): value is string => hasAuditDisplayValue(value))
+    .map((value) => value.trim())
+    .join(" · ");
+}
+
+export function projectRejectedClosureAuditFields(attempt: {
+  priorStatus?: string | null;
+  approvalRequestUuid?: string | null;
+  closedOutByName?: string | null;
+  closedOutByRank?: string | null;
+  dateCompleted?: string | null;
+  confirmCompleted?: boolean | null;
+  closedByName?: string | null;
+  closedByRank?: string | null;
+  closedBy?: string | null;
+  closedOn?: string | null;
+  rejectedByName?: string | null;
+  rejectedByPosition?: string | null;
+  rejectedAt?: string | null;
+  closureComment?: string | null;
+  rejectionReason?: string | null;
+  closureFiles?: string[] | null;
+}) {
+  const text = (value?: string | null) => hasAuditDisplayValue(value) ? value!.trim() : "";
+  return {
+    priorStatus: text(attempt.priorStatus),
+    approvalRequestUuid: text(attempt.approvalRequestUuid),
+    closeoutSubmittedBy: formatAuditIdentity(attempt.closedOutByName, attempt.closedOutByRank),
+    showCloseoutCompleted: hasAuditDisplayValue(attempt.dateCompleted)
+      || attempt.confirmCompleted !== null && attempt.confirmCompleted !== undefined,
+    dateCompleted: text(attempt.dateCompleted),
+    confirmCompleted: attempt.confirmCompleted,
+    closedBy: formatAuditIdentity(attempt.closedByName, attempt.closedByRank),
+    legacyClosedBy: text(attempt.closedBy),
+    closedOn: text(attempt.closedOn),
+    rejectedBy: formatAuditIdentity(attempt.rejectedByName, attempt.rejectedByPosition),
+    rejectedAt: text(attempt.rejectedAt),
+    closureComment: text(attempt.closureComment),
+    rejectionReason: text(attempt.rejectionReason),
+    closureFiles: (attempt.closureFiles ?? [])
+      .filter((file) => hasAuditDisplayValue(file))
+      .map((file) => file.trim()),
+  };
+}
+
 export function approvalDecisionApplyError(payload: unknown): string | null {
   if (!payload || typeof payload !== "object" || !("callbackError" in payload)) return null;
   const callbackError = (payload as { callbackError?: unknown }).callbackError;

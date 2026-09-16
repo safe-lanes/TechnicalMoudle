@@ -53,11 +53,14 @@ import {
   resolveEffectiveExtensionRequestStatus,
   resolveDefectApprovalPresentation,
   resolveVerificationDisplay,
+  shouldRenderVerificationApproval,
   hasPendingExtensionForEntries,
   isOrphanedRequestedExtensionAt,
   formatDefectAuditTimestamp,
+  hasAuditDisplayValue,
   projectExtensionCardPresentation,
   projectExtensionHistory,
+  projectRejectedClosureAuditFields,
   projectRejectedClosureHistory,
   type ApprovalPreviewStep,
   type DefectApprovalRoutingPreview,
@@ -113,10 +116,8 @@ function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt
     ));
   }, [orderedAttempts.length]);
   if (!orderedAttempts.length) return null;
-  const display = (value?: string | number | boolean | null) =>
-    value === null || value === undefined || value === "" ? "Not recorded" : String(value);
-  const date = (value?: string | null) => value ? formatDefectAuditTimestamp(value, "record") : "Not recorded";
-  const decisionDate = (value?: string | null) => value ? formatDefectAuditTimestamp(value, "decision") : "Not recorded";
+  const date = (value: string) => formatDefectAuditTimestamp(value, "record");
+  const decisionDate = (value: string) => formatDefectAuditTimestamp(value, "decision");
   const toggle = (id: string) => setExpanded((current) => {
     const next = new Set(current);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -141,6 +142,7 @@ function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt
         {orderedAttempts.map((attempt, index) => {
           const id = String(attempt.id);
           const isOpen = expanded.has(id);
+          const fields = projectRejectedClosureAuditFields(attempt);
           return (
             <div key={id} className="overflow-hidden rounded border border-amber-200 bg-white">
               <button
@@ -151,27 +153,38 @@ function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt
                 data-testid={`rejected-closure-toggle-${id}`}
               >
                 <span className="font-medium text-slate-800">
-                  Attempt {attempt.attemptNumber ?? index + 1} · rejected {decisionDate(attempt.rejectedAt)}
+                  Attempt {attempt.attemptNumber ?? index + 1} · rejected
+                  {hasAuditDisplayValue(attempt.rejectedAt) ? ` ${decisionDate(attempt.rejectedAt!)}` : ""}
                 </span>
                 <span className="text-xs font-medium text-amber-800">{isOpen ? "Collapse" : "Expand"}</span>
               </button>
               {isOpen && (
                 <div className="grid gap-3 border-t border-amber-100 p-3 text-sm md:grid-cols-2">
-                  <div><span className="text-xs text-slate-500">Prior status</span><div>{display(attempt.priorStatus)}</div></div>
-                  <div><span className="text-xs text-slate-500">Approval request</span><div className="break-all">{display(attempt.approvalRequestUuid)}</div></div>
-                  <div><span className="text-xs text-slate-500">Closeout submitted by</span><div>{display(attempt.closedOutByName)}{attempt.closedOutByRank ? ` · ${attempt.closedOutByRank}` : ""}</div></div>
-                  <div><span className="text-xs text-slate-500">Closeout completed</span><div>{date(attempt.dateCompleted)} · {attempt.confirmCompleted ? "Confirmed" : "Not confirmed"}</div></div>
-                  <div><span className="text-xs text-slate-500">Closed by</span><div>{display(attempt.closedByName)}{attempt.closedByRank ? ` · ${attempt.closedByRank}` : ""}</div></div>
-                  <div><span className="text-xs text-slate-500">Closed on</span><div>{date(attempt.closedOn)}</div></div>
-                  <div><span className="text-xs text-slate-500">Rejected by</span><div>{display(attempt.rejectedByName)}{attempt.rejectedByPosition ? ` · ${attempt.rejectedByPosition}` : ""}</div></div>
-                  <div><span className="text-xs text-slate-500">Rejected at</span><div>{decisionDate(attempt.rejectedAt)}</div></div>
-                  <div className="md:col-span-2"><span className="text-xs text-slate-500">Closure comment</span><div className="whitespace-pre-wrap">{display(attempt.closureComment)}</div></div>
-                  <div className="md:col-span-2"><span className="text-xs text-slate-500">Rejection reason</span><div className="whitespace-pre-wrap font-medium text-amber-950">{display(attempt.rejectionReason)}</div></div>
-                  {!!attempt.closureFiles?.length && (
+                  {fields.priorStatus && <div><span className="text-xs text-slate-500">Prior status</span><div>{fields.priorStatus}</div></div>}
+                  {fields.approvalRequestUuid && <div><span className="text-xs text-slate-500">Approval request</span><div className="break-all">{fields.approvalRequestUuid}</div></div>}
+                  {fields.closeoutSubmittedBy && <div><span className="text-xs text-slate-500">Closeout submitted by</span><div>{fields.closeoutSubmittedBy}</div></div>}
+                  {fields.showCloseoutCompleted && (
+                    <div>
+                      <span className="text-xs text-slate-500">Closeout completed</span>
+                      <div>
+                        {fields.dateCompleted ? date(fields.dateCompleted) : ""}
+                        {fields.dateCompleted && fields.confirmCompleted !== null && fields.confirmCompleted !== undefined ? " · " : ""}
+                        {fields.confirmCompleted !== null && fields.confirmCompleted !== undefined ? (fields.confirmCompleted ? "Confirmed" : "Not confirmed") : ""}
+                      </div>
+                    </div>
+                  )}
+                  {fields.closedBy && <div><span className="text-xs text-slate-500">Closed by</span><div>{fields.closedBy}</div></div>}
+                  {fields.legacyClosedBy && <div><span className="text-xs text-slate-500">Closed by (legacy)</span><div>{fields.legacyClosedBy}</div></div>}
+                  {fields.closedOn && <div><span className="text-xs text-slate-500">Closed on</span><div>{date(fields.closedOn)}</div></div>}
+                  {fields.rejectedBy && <div><span className="text-xs text-slate-500">Rejected by</span><div>{fields.rejectedBy}</div></div>}
+                  {fields.rejectedAt && <div><span className="text-xs text-slate-500">Rejected at</span><div>{decisionDate(fields.rejectedAt)}</div></div>}
+                  {fields.closureComment && <div className="md:col-span-2"><span className="text-xs text-slate-500">Closure comment</span><div className="whitespace-pre-wrap">{fields.closureComment}</div></div>}
+                  {fields.rejectionReason && <div className="md:col-span-2"><span className="text-xs text-slate-500">Rejection reason</span><div className="whitespace-pre-wrap font-medium text-amber-950">{fields.rejectionReason}</div></div>}
+                  {fields.closureFiles.length > 0 && (
                     <div className="md:col-span-2">
                       <span className="text-xs text-slate-500">Closure files</span>
                       <ul className="mt-1 list-inside list-disc">
-                        {attempt.closureFiles.map((file, fileIndex) => (
+                        {fields.closureFiles.map((file, fileIndex) => (
                           <li key={`${file}-${fileIndex}`}><a className="break-all text-blue-700 underline" href={file} target="_blank" rel="noreferrer">{file}</a></li>
                         ))}
                       </ul>
@@ -705,6 +718,10 @@ export default function DefectFormWizard({
     dateCompleted: dateCompletedValue,
     closedByName: closedByNameValue,
     closedByRank: closedByRankValue,
+  });
+  const renderVerificationApproval = shouldRenderVerificationApproval({
+    c1CloseoutComplete,
+    chain: verificationApproval.data,
   });
   const isExtensionDateSettled = debouncedExtensionDate === currentExtension.newTargetDate;
 
@@ -2657,7 +2674,7 @@ export default function DefectFormWizard({
                       <label className="text-sm text-gray-600 mb-1.5">Verified By (Office Position)</label>
                       <Input value={verificationDisplay.position} readOnly data-testid="input-verified-by-office-position" className="h-10 text-sm border-gray-300 bg-gray-100" />
                     </div>
-                    {!hasPendingExtensionRequest && (c1CloseoutComplete || hasPersistedApprovalRequest(verificationApproval.data)) && (
+                    {!hasPendingExtensionRequest && renderVerificationApproval && (
                       verificationApproval.data &&
                       !verificationApproval.data.hasActiveWorkflow &&
                       !hasPersistedApprovalRequest(verificationApproval.data) ? (

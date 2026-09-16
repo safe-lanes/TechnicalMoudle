@@ -13,7 +13,11 @@ import {
   formatDiagnosticsUnresolved,
   formatDiagnosticsReturnedVerificationStillVerified,
   projectRejectedClosureHistory,
+  projectRejectedClosureAuditFields,
   resolveVerificationDisplay,
+  formatAuditIdentity,
+  hasAuditDisplayValue,
+  shouldRenderVerificationApproval,
 } from "./defectApprovalPresentation";
 
 describe("Defect approval client presentation states", () => {
@@ -44,6 +48,50 @@ describe("Defect approval client presentation states", () => {
   });
   it("preserves legacy verification display", () => {
     expect(resolveVerificationDisplay({ requestUuid: null, requestStatus: "none" }, { verified: true, verifiedDate: "2026-01-02", verifiedByName: "Master", verifiedByOfficePosition: "Master" })).toMatchObject({ date: "2026-01-02", isLegacyVerification: true });
+  });
+  it("suppresses only stale rejected or returned verification after reopen", () => {
+    expect(shouldRenderVerificationApproval({ c1CloseoutComplete: false, chain: { requestUuid: "r1", requestStatus: "rejected" } })).toBe(false);
+    expect(shouldRenderVerificationApproval({ c1CloseoutComplete: false, chain: { requestUuid: "r1", requestStatus: "returned" } })).toBe(false);
+    expect(shouldRenderVerificationApproval({ c1CloseoutComplete: false, chain: { requestUuid: "r1", requestStatus: "pending" } })).toBe(true);
+    expect(shouldRenderVerificationApproval({ c1CloseoutComplete: false, chain: { requestUuid: "r1", requestStatus: "approved" } })).toBe(true);
+    expect(shouldRenderVerificationApproval({ c1CloseoutComplete: false, chain: { requestUuid: null, requestStatus: "none" } })).toBe(false);
+    expect(shouldRenderVerificationApproval({ c1CloseoutComplete: true, chain: { requestUuid: null, requestStatus: "none" } })).toBe(true);
+    expect(shouldRenderVerificationApproval({ c1CloseoutComplete: true, chain: { requestUuid: "old", requestStatus: "rejected" } })).toBe(false);
+    expect(shouldRenderVerificationApproval({ c1CloseoutComplete: true, chain: { requestUuid: "old", requestStatus: "returned" } })).toBe(false);
+    expect(shouldRenderVerificationApproval({ c1CloseoutComplete: true, chain: { requestUuid: "r2", requestStatus: "pending" } })).toBe(true);
+  });
+  it("keeps closure-history identities separate and omits empty values", () => {
+    expect(formatAuditIdentity("Master One", "Master")).toBe("Master One · Master");
+    expect(formatAuditIdentity(null, "Chief Officer")).toBe("Chief Officer");
+    expect(formatAuditIdentity("  ", null)).toBe("");
+    expect(hasAuditDisplayValue(null)).toBe(false);
+    expect(hasAuditDisplayValue("  ")).toBe(false);
+    expect(hasAuditDisplayValue([])).toBe(false);
+    expect(hasAuditDisplayValue(["", "legacy.pdf"])).toBe(true);
+    expect(hasAuditDisplayValue(false)).toBe(true);
+    const authoritative = formatAuditIdentity("Authoritative Name", "Master");
+    const closeoutSubmitter = formatAuditIdentity("Submitter Name", "Chief Officer");
+    const legacyClosedBy = "legacy-caller-value";
+    expect(authoritative).toBe("Authoritative Name · Master");
+    expect(closeoutSubmitter).toBe("Submitter Name · Chief Officer");
+    expect(legacyClosedBy).not.toBe(authoritative);
+    expect(projectRejectedClosureAuditFields({
+      closedOutByName: "Submitter Name",
+      closedOutByRank: "Chief Officer",
+      closedByName: "Authoritative Name",
+      closedByRank: "Master",
+      closedBy: "legacy-caller-value",
+      closedOn: null,
+      closureComment: " ",
+      closureFiles: ["", " evidence.pdf "],
+    })).toMatchObject({
+      closeoutSubmittedBy: "Submitter Name · Chief Officer",
+      closedBy: "Authoritative Name · Master",
+      legacyClosedBy: "legacy-caller-value",
+      closedOn: "",
+      closureComment: "",
+      closureFiles: ["evidence.pdf"],
+    });
   });
   it("projects diagnostics healthy, warnings, and unavailable", () => {
     expect(resolveDiagnosticsHealth({})).toBe("healthy");
