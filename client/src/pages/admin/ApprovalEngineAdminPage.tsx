@@ -7,6 +7,112 @@
 import React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ApprovalEngineAdmin from "../../../../server/modules/approval-engine/client/ApprovalEngineAdmin";
+import {
+  formatDiagnosticsOrphan,
+  formatDiagnosticsStalled,
+  formatDiagnosticsUnresolved,
+} from "../defects/defectApprovalPresentation";
+
+type DefectApprovalDiagnostics = {
+  generatedAt: string;
+  available: boolean;
+  healthy: boolean;
+  consequence: string;
+  queryPlan: { expectedQueries?: number; description?: string } | string;
+  workflowMatrix?: Array<{
+    scope: string;
+    classification: string;
+    configured: boolean;
+    consequence: string;
+  }>;
+  summary: {
+    vesselsWithDefects?: number;
+    openDefectsWithRequestedExtensions?: number;
+    activeWorkflows?: number;
+    pendingRequests?: number;
+    unresolvedApprovers?: number;
+    orphanRequestedExtensions?: number;
+    stalledRequests?: number;
+    missingWorkflows?: number;
+  };
+  unresolvedApprovers: Array<{ vesselId: string; roleId: string; roleLabel: string; workflowScopes?: string[]; consequence: string }>;
+  orphanRequestedExtensions: Array<{ defectId: string; vesselId: string; entryId: string; requestedAt: string; newTargetDate: string; consequence: string }>;
+  stalledRequests: Array<{ requestUuid: string; defectId: string; vesselId: string; screenId: string; submittedAt: string; daysPending: number; consequence: string }>;
+};
+
+function DefectApprovalDiagnosticsPanel() {
+  const { data, isLoading, error } = useQuery<DefectApprovalDiagnostics>({
+    queryKey: ["/technical/api/defects/approval-diagnostics"],
+    staleTime: 60_000,
+    retry: false,
+  });
+  return (
+    <section
+      aria-label="Defects approval diagnostics"
+      data-testid="defects-approval-diagnostics"
+      style={{ margin: "12px", padding: "14px", border: "1px solid #d0d5dd", borderRadius: 8, background: "#fff" }}
+    >
+      <h2 style={{ margin: 0, fontSize: 16, color: "#1e3a5f" }}>Defects approval diagnostics</h2>
+      <p style={{ margin: "4px 0 12px", fontSize: 12, color: "#667085" }}>
+        Read-only safety checks for configured Defects approval workflows.
+      </p>
+      {isLoading && <div style={{ fontSize: 13 }}>Loading diagnostics...</div>}
+      {(error || data?.available === false) && <div style={{ color: "#b42318", fontSize: 13 }}>Diagnostics unavailable. Contact your administrator.</div>}
+      {data && (
+        <>
+          {data.available !== false && <div style={{ fontSize: 12, marginBottom: 8 }}>{data.consequence}</div>}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            {Object.entries(data.summary ?? {}).map(([label, value]) => (
+              <div key={label} style={{ padding: "7px 10px", borderRadius: 6, background: "#f2f4f7", fontSize: 12 }}>
+                <strong>{String(value ?? 0)}</strong>{" "}
+                {label.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`)}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "#667085", marginBottom: 10 }}>
+            Generated {data.generatedAt ? new Date(data.generatedAt).toLocaleString() : "unknown"}.
+            {" "}{typeof data.queryPlan === "string" ? data.queryPlan : data.queryPlan?.description ?? `Bounded diagnostic queries: ${data.queryPlan?.expectedQueries ?? "n/a"}.`}
+          </div>
+          {data.workflowMatrix && (
+            <div style={{ marginTop: 10 }}>
+              <h3 style={{ margin: "0 0 4px", fontSize: 13 }}>Defects workflow coverage (six combinations)</h3>
+              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: "#344054" }}>
+                {data.workflowMatrix.map((item) => (
+                  <li key={`${item.scope}-${item.classification}`}>
+                    <strong>{item.scope} / {item.classification}</strong>: {item.configured ? "configured" : "missing"} — {item.consequence}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <DiagnosticsGroup title="Unresolved approvers" rows={data.unresolvedApprovers} format={formatDiagnosticsUnresolved} />
+          <DiagnosticsGroup title="Orphan Requested extensions" rows={data.orphanRequestedExtensions} format={formatDiagnosticsOrphan} />
+          <DiagnosticsGroup title="Stalled requests" rows={data.stalledRequests} format={formatDiagnosticsStalled} />
+          {data.available !== false && data.healthy && (
+            <div style={{ marginTop: 12, padding: "8px 10px", borderRadius: 6, background: "#ecfdf3", color: "#067647", fontSize: 12 }} data-testid="defects-diagnostics-healthy">
+              Healthy: all configured Defects approval checks are resolved.
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function DiagnosticsGroup<T>({ title, rows, format }: {
+  title: string; rows: T[]; format: (row: T) => string;
+}) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      <h3 style={{ margin: "0 0 4px", fontSize: 13 }}>{title} ({rows.length})</h3>
+      {rows.length ? (
+        <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: "#344054" }}>
+          {rows.slice(0, 25).map((row, index) => <li key={`${title}-${index}`}>{format(row)}</li>)}
+        </ul>
+      ) : <div style={{ fontSize: 12, color: "#667085" }}>None detected.</div>}
+    </div>
+  );
+}
 
 // F4: admin-visible email delivery status + the per-tenant ON/OFF toggle (mig 172). When
 // SES is unconfigured the notifier sends in-app only; this banner is the least-intrusive
@@ -77,6 +183,7 @@ export default function ApprovalEngineAdminPage() {
   return (
     <div>
       <EmailStatusBanner />
+      <DefectApprovalDiagnosticsPanel />
       <ApprovalEngineAdmin basePath="/technical/api/approval-engine" />
     </div>
   );

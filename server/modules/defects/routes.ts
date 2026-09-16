@@ -44,6 +44,9 @@ router.get('/defects/approval-settings',
 router.put('/defects/approval-settings',
   requireRole(['PMS Admin', 'Sail Admin', 'Super Admin']),
   asyncHandler(defectsCtrl.updateDefectApprovalSettings));
+router.get('/defects/approval-diagnostics',
+  requireRole(['PMS Admin', 'Sail Admin', 'Super Admin']),
+  asyncHandler(defectsCtrl.getDefectApprovalDiagnostics));
 
 // POST /defects — create new defect
 router.post('/defects', asyncHandler(defectsCtrl.createDefect));

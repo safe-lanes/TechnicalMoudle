@@ -261,14 +261,25 @@ export async function getDefectApprovalChain(req: Request, res: Response) {
   }
 }
 
+export async function getDefectApprovalDiagnostics(_req: Request, res: Response) {
+  try {
+    res.json(await defectsService.getDefectApprovalDiagnostics());
+  } catch (error: any) {
+    return sendDefectError(res, error, 'Failed to fetch defect approval diagnostics');
+  }
+}
+
 // ── POST /defects ──
 
 export async function createDefect(req: Request, res: Response) {
   try {
-    const defect = await defectsService.createDefect(req.body);
+    const defect = await defectsService.createDefect(req.body, defectActor(req));
     res.status(201).json(defect);
   } catch (error: any) {
     console.error('[DefectRoutes] Error creating defect:', error);
+    if (error?.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     if (error.name === 'ZodError') {
       return res.status(400).json({ error: "Invalid defect data", details: error.errors });
     }
@@ -280,8 +291,18 @@ export async function createDefect(req: Request, res: Response) {
 
 export async function updateDefect(req: Request, res: Response) {
   try {
-    const defect = await defectsService.updateDefect(req.params.id, req.body, defectActor(req));
-    res.json(defect);
+    const result = await defectsService.updateDefect(req.params.id, req.body, defectActor(req));
+    // Preserve the historical PATCH response shape (the saved defect remains the
+    // top-level object) while exposing the post-save engine outcome explicitly.
+    const raw = result.approvalSubmissions[0];
+    const approvalSubmission = !raw
+      ? { status: 'not_required' as const }
+      : raw.status === 'error'
+        ? { status: 'failed' as const, message: raw.error ?? 'The approval submission failed. Contact an administrator.' }
+        : raw.status === 'started' || raw.status === 'already_pending'
+          ? { status: 'succeeded' as const }
+          : { status: 'not_required' as const };
+    res.json({ ...result.defect, approvalSubmission });
   } catch (error: any) {
     return sendDefectError(res, error, 'Failed to update defect');
   }

@@ -4,13 +4,22 @@ import { generateDefectNumber } from '../../../utils/defectNumbering';
 import { storage } from '../../../storage';
 import {
   DEFECTS_EXTENSION_SCREEN, DEFECTS_REPEAT_EXTENSION_SCREEN, DEFECTS_VERIFICATION_SCREEN,
-  classifyDefect, deciderIdentity,
+  DEFECT_CLASS_CRITICAL, DEFECT_CLASS_NORMAL, classifyDefect, deciderIdentity,
 } from '../approvalCard';
 import {
   activeWorkflowScoped, approvalActorCanDecide, approvalRequestsInScopes,
   isApprovalEngineAvailable, scopeFor,
 } from '../../approvals/engineGateway';
 import type { RequestRow, RequestSlotRow, StoredWorkflow } from '../../approval-engine';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { defects } from '@shared/schema';
+import {
+  apprvWorkflows, apprvWorkflowNodes, apprvNodeSlots,
+  apprvRequests, apprvRequestSlots,
+} from '../../approval-engine/db/schema';
+import { getPostgresClient } from '../../../postgresClient';
+import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage';
+import { resolveRoleApproverUserIds } from '../../approvals/approvalCard';
 
 // ── Core Defects ──
 
@@ -79,6 +88,201 @@ export async function getDefectApprovalRouting(
 ) {
   const { resolveDefectApprovalRouting } = await import('./defectsApprovalHooks');
   return resolveDefectApprovalRouting(id, action, newTargetDate, actorUserId, { auditFallback: false });
+}
+
+const DIAGNOSTIC_CLASSIFICATIONS = [DEFECT_CLASS_NORMAL, DEFECT_CLASS_CRITICAL] as const;
+const DIAGNOSTIC_SCOPES = [
+  DEFECTS_EXTENSION_SCREEN, DEFECTS_REPEAT_EXTENSION_SCREEN, DEFECTS_VERIFICATION_SCREEN,
+] as const;
+const diagnosticDb = () => getCurrentTenantContext()?.db ?? getPostgresClient().db;
+
+/**
+ * Bounded, read-only Defects approval health projection. The five base reads are
+ * set-based; role membership is the only bounded cartesian operation (role ×
+ * vessel), because the shared resolver is the server-authoritative membership
+ * implementation.
+ */
+export async function getDefectApprovalDiagnostics() {
+  const queryPlan = {
+    fixedReads: 5,
+    resolverQueriesPerPair: 3,
+    description: 'Five bounded set-based reads plus strict role resolution for each distinct active-workflow role and vessel with a nondeleted defect.',
+    formula: 'fixedReads + (distinctRoles × vesselsWithDefects × resolverQueriesPerPair)',
+    conditionalReads: 'workflow nodes/slots reads are skipped when there are no active Defects workflows; pending requests and active slots always use one left-join read',
+  };
+  if (!isApprovalEngineAvailable()) {
+    const workflowMatrix = DIAGNOSTIC_SCOPES.flatMap((scope) =>
+      DIAGNOSTIC_CLASSIFICATIONS.map((classification) => ({
+        scope, classification, configured: false,
+        consequence: 'Approval Engine is unavailable; configuration could not be confirmed.',
+      })));
+    return {
+      generatedAt: new Date().toISOString(),
+      available: false,
+      healthy: false,
+      consequence: 'Approval Engine is unavailable on this instance; no engine diagnostics can be confirmed.',
+      workflowMatrix,
+      missingActiveWorkflows: [],
+      roleCoverage: [],
+      unresolvedApprovers: [],
+      stalledRequests: [],
+      orphanRequestedExtensions: [],
+      summary: { workflowGaps: 0, unresolvedApprovers: 0, stalledRequests: 0, orphanRequestedExtensions: 0 },
+      queryPlan: { ...queryPlan, resolverPairs: 0, expectedQueries: 0, currentExpectedQueries: 0 },
+    };
+  }
+
+  const db = diagnosticDb();
+  const workflows = await db.select({
+    wfuuid: apprvWorkflows.wfuuid,
+    screenId: apprvWorkflows.screenId,
+    classification: apprvWorkflows.classification,
+  }).from(apprvWorkflows).where(and(
+    eq(apprvWorkflows.moduleId, 'defects'),
+    inArray(apprvWorkflows.screenId, [...DIAGNOSTIC_SCOPES]),
+    eq(apprvWorkflows.status, 'active'),
+    eq(apprvWorkflows.isDeleted, false),
+  ));
+  const workflowIds = workflows.map((w) => w.wfuuid);
+  const workflowNodes = workflowIds.length
+    ? await db.select({ workflowWfuuid: apprvWorkflowNodes.workflowWfuuid, nodeKey: apprvWorkflowNodes.nodeKey })
+      .from(apprvWorkflowNodes).where(and(inArray(apprvWorkflowNodes.workflowWfuuid, workflowIds), eq(apprvWorkflowNodes.type, 'approval-step')))
+    : [];
+  const workflowSlots = workflowIds.length
+    ? await db.select({
+      workflowWfuuid: apprvNodeSlots.workflowWfuuid,
+      nodeKey: apprvNodeSlots.nodeKey,
+      roleId: apprvNodeSlots.roleId,
+      roleLabel: apprvNodeSlots.roleLabel,
+    }).from(apprvNodeSlots).where(inArray(apprvNodeSlots.workflowWfuuid, workflowIds))
+    : [];
+  const defectRows: any[] = await db.select({
+    duuid: defects.duuid, vesselId: defects.vesselId,
+    status: defects.status, isDeleted: defects.isDeleted,
+    targetDateExtensions: defects.targetDateExtensions,
+  }).from(defects).where(or(eq(defects.isDeleted, false), isNull(defects.isDeleted)));
+  const pendingWithSlots = await db.select({
+    requuid: apprvRequests.requuid, subjectRef: apprvRequests.subjectRef,
+    vesselId: apprvRequests.vesselId, submittedAt: apprvRequests.submittedAt,
+    screenId: apprvRequests.screenId,
+    slotRequuid: apprvRequestSlots.requuid, nodeKey: apprvRequestSlots.nodeKey,
+    slotOrdinal: apprvRequestSlots.slotOrdinal, resolved: apprvRequestSlots.resolvedApproverIdsJson,
+    slotStatus: apprvRequestSlots.status,
+  }).from(apprvRequests).leftJoin(apprvRequestSlots, and(
+    eq(apprvRequestSlots.requuid, apprvRequests.requuid),
+    eq(apprvRequestSlots.status, 'active'),
+  )).where(and(
+    eq(apprvRequests.moduleId, 'defects'),
+    inArray(apprvRequests.screenId, [...DIAGNOSTIC_SCOPES]),
+    eq(apprvRequests.status, 'pending'),
+  ));
+  const pendingRequests = Array.from(new Map(pendingWithSlots.map((r) => [r.requuid, {
+    requuid: r.requuid, subjectRef: r.subjectRef, vesselId: r.vesselId,
+    submittedAt: r.submittedAt, screenId: r.screenId,
+  }])).values());
+  const activeSlots = pendingWithSlots.filter((r) => r.slotRequuid).map((r) => ({
+    requuid: r.slotRequuid!, nodeKey: r.nodeKey, slotOrdinal: r.slotOrdinal,
+    resolved: r.resolved, status: r.slotStatus,
+  }));
+
+  const vessels = Array.from(new Set(defectRows.map((d) => d.vesselId).filter(Boolean)));
+  const roleMap = new Map<string, { roleId: string; roleLabel: string; workflowScopes: string[] }>();
+  for (const slot of workflowSlots) {
+    const workflow = workflows.find((w) => w.wfuuid === slot.workflowWfuuid);
+    if (!workflow) continue;
+    const existing = roleMap.get(slot.roleId) ?? {
+      roleId: slot.roleId, roleLabel: slot.roleLabel, workflowScopes: [],
+    };
+    const scopeKey = `${workflow.screenId}:${workflow.classification}`;
+    if (!existing.workflowScopes.includes(scopeKey)) existing.workflowScopes.push(scopeKey);
+    roleMap.set(slot.roleId, existing);
+  }
+  const roleCoverage = [];
+  for (const role of Array.from(roleMap.values())) {
+    const zeroVessels: string[] = [];
+    let resolvedPairs = 0;
+    for (const vesselId of vessels) {
+      const ids = await resolveRoleApproverUserIds(role.roleId, vesselId);
+      if (ids.length === 0) zeroVessels.push(vesselId);
+      else resolvedPairs++;
+    }
+    roleCoverage.push({
+      ...role, vesselsChecked: vessels.length, resolvedVessels: resolvedPairs,
+      zeroApproverVessels: zeroVessels,
+      healthy: zeroVessels.length === 0,
+      consequence: zeroVessels.length
+        ? 'No approver resolves for one or more defect vessels; requests can stall until role assignment is fixed.'
+        : null,
+    });
+  }
+
+  const missingActiveWorkflows = DIAGNOSTIC_SCOPES.flatMap((screenId) =>
+    DIAGNOSTIC_CLASSIFICATIONS.filter((classification) =>
+      !workflows.some((w) => w.screenId === screenId && w.classification === classification))
+      .map((classification) => ({
+        screenId, classification,
+        consequence: 'New requests in this scope/classification cannot enter an active approval chain.',
+      })));
+  const workflowMatrix = DIAGNOSTIC_SCOPES.flatMap((scope) =>
+    DIAGNOSTIC_CLASSIFICATIONS.map((classification) => {
+      const configured = workflows.some((w) => w.screenId === scope && w.classification === classification);
+      return {
+        scope, classification, configured,
+        consequence: configured ? null : 'New requests in this scope/classification cannot enter an active approval chain.',
+      };
+    }));
+  const defectById = new Map(defectRows.map((d) => [d.duuid, d]));
+  const stalledRequests = pendingRequests.filter((r) =>
+    activeSlots.filter((s) => s.requuid === r.requuid)
+      .some((s) => !Array.isArray(s.resolved) || s.resolved.length === 0)
+    && defectById.has(r.subjectRef))
+    .map((r) => ({
+      requestUuid: r.requuid, defectId: r.subjectRef, vesselId: r.vesselId ?? defectById.get(r.subjectRef)?.vesselId ?? null,
+      screenId: r.screenId, submittedAt: r.submittedAt,
+      daysPending: Math.max(0, Math.floor((Date.now() - new Date(r.submittedAt).getTime()) / 86_400_000)),
+      consequence: 'The active approval step has no resolved approver; this request cannot advance until assignment is fixed.',
+    }));
+  const pendingExtensionIds = new Set(pendingRequests
+    .filter((r) => r.screenId === DEFECTS_EXTENSION_SCREEN || r.screenId === DEFECTS_REPEAT_EXTENSION_SCREEN)
+    .map((r) => r.subjectRef));
+  const orphanRequestedExtensions = defectRows
+    .filter((d) => d.status !== 'Closed' && d.status !== 'Resolved')
+    .flatMap((d) => {
+      const requested = (Array.isArray(d.targetDateExtensions) ? d.targetDateExtensions : [])
+        .filter((e: any) => e?.status === 'Requested');
+      const correspondingId = pendingExtensionIds.has(d.duuid) ? requested[0]?.id : null;
+      return requested.filter((e: any) => e?.id !== correspondingId)
+      .map((e: any) => ({
+        defectId: d.duuid, vesselId: d.vesselId, entryId: e.id ?? null,
+        requestedAt: e.requestedAt ?? null, newTargetDate: e.newTargetDate ?? null,
+        consequence: 'Requested extension has no pending engine request; it does not block closeout and needs review.',
+      }));
+    });
+  const unresolvedApprovers = roleCoverage.flatMap((role) =>
+    role.zeroApproverVessels.map((vesselId) => ({
+      roleId: role.roleId, roleLabel: role.roleLabel, vesselId,
+      workflowScopes: role.workflowScopes,
+      consequence: role.consequence,
+    })));
+  const resolverPairs = roleMap.size * vessels.length;
+  const expectedQueries = queryPlan.fixedReads + resolverPairs * queryPlan.resolverQueriesPerPair;
+  return {
+    generatedAt: new Date().toISOString(),
+    available: true, healthy: missingActiveWorkflows.length === 0 && roleCoverage.every((r) => r.healthy) &&
+      stalledRequests.length === 0 && orphanRequestedExtensions.length === 0,
+    consequence: missingActiveWorkflows.length || roleCoverage.some((r) => !r.healthy) || stalledRequests.length || orphanRequestedExtensions.length
+      ? 'One or more approval configuration or data integrity issues require administrator review.'
+      : null,
+    workflowMatrix, missingActiveWorkflows, roleCoverage, unresolvedApprovers,
+    stalledRequests, orphanRequestedExtensions,
+    summary: {
+      workflowGaps: missingActiveWorkflows.length,
+      unresolvedApprovers: unresolvedApprovers.length,
+      stalledRequests: stalledRequests.length,
+      orphanRequestedExtensions: orphanRequestedExtensions.length,
+    },
+    queryPlan: { ...queryPlan, resolverPairs, expectedQueries, currentExpectedQueries: expectedQueries },
+  };
 }
 
 export type DefectApprovalChainAction = 'extension' | 'verification';
@@ -259,8 +463,10 @@ export async function hasActiveUserVesselAssignment(userUuid: string, vesselId: 
   return defectsRepo.hasActiveUserVesselAssignment(userUuid, vesselId);
 }
 
-export async function createDefect(body: any) {
+export async function createDefect(body: any, _actor?: import('./defectsApprovalHooks').DefectActor) {
   const validatedData = insertDefectSchema.parse(body);
+  const { assertDefectCreationApprovalStateAllowed } = await import('./defectsApprovalHooks');
+  assertDefectCreationApprovalStateAllowed(validatedData);
 
   // Generate proper defect ID using naming convention
   const vesselId = validatedData.vesselId || 'UNKNOWN';
@@ -292,13 +498,51 @@ export async function updateDefect(id: string, body: any, actor?: import('./defe
   const partialDefectSchema = insertDefectSchema.partial();
   const validatedData = partialDefectSchema.parse(gated.body);
   const updated = await defectsRepo.updateDefect(id, validatedData);
+  const approvalSubmissions: Array<import('./defectsApprovalHooks').ExtensionSubmissionOutcome> = [];
+  const recordSubmissionFailure = async (payload: any) => {
+    try {
+      await defectsRepo.createAuditLog({
+        userId: actor?.userUuid || 'system',
+        entityType: 'defect_extension_approval',
+        entityId: id,
+        actionType: 'submission_failed',
+        fieldName: 'targetDateExtensions',
+        oldValue: null,
+        newValue: null,
+        source: 'approval-engine',
+        payload,
+      });
+    } catch (auditError) {
+      // Audit persistence is best effort after the defect has been saved.
+      console.error('[approvals] defects submission-failure audit write failed:', auditError);
+    }
+  };
   for (const task of gated.postSave) {
-    try { await task(); } catch (e) { console.error('[approvals] defects post-save submit failed (legacy continues):', e); }
+    try {
+      const outcome = await task();
+      approvalSubmissions.push(outcome);
+      if (outcome.status === 'error') {
+        await recordSubmissionFailure({
+          status: outcome.status,
+          error: outcome.error ?? 'Approval engine submission failed',
+        });
+      }
+    } catch (e: any) {
+      // The extension was intentionally persisted before this task. Surface a
+      // structured failure rather than converting a successful save into a 500.
+      console.error('[approvals] defects post-save submit failed (legacy continues):', e);
+      const outcome = {
+        status: 'error' as const,
+        error: 'The extension was saved, but approval submission failed. Contact an administrator.',
+      };
+      approvalSubmissions.push(outcome);
+      await recordSubmissionFailure({ ...outcome, internalError: String(e?.message ?? e) });
+    }
   }
   try { await afterDefectUpdate(current, updated, actor ?? {}); } catch (e) {
     console.error('[approvals] defects post-update hook failed (non-fatal):', e);
   }
-  return updated;
+  return { defect: updated, approvalSubmissions };
 }
 
 export async function deleteDefect(id: string) {
@@ -383,9 +627,10 @@ export async function closeDefect(defectId: string, body: any, actor?: import('.
   // Master-only closure rule (03-Sep-2026). This route has no live UI caller (Phase A:
   // DefectsActive/DefectsLog are not rendered) but stays HTTP-reachable — an ungated
   // side door around the PATCH gate is not acceptable, so the same rule applies here.
-  if ((actor?.rankName || '').trim() !== 'Master') {
-    throw Object.assign(new Error('Only the Master may perform defect closure (Part C1 Closeout).'), { statusCode: 403, code: 'CLOSURE_MASTER_ONLY' });
-  }
+  const current = await defectsRepo.getDefect(defectId);
+  if (!current) throw Object.assign(new Error(`Defect ${defectId} not found`), { statusCode: 404 });
+  const { assertDefectCloseoutAllowed } = await import('./defectsApprovalHooks');
+  await assertDefectCloseoutAllowed(current, actor ?? {});
   const { closedBy, closureComment, closureFiles, actionTakenRequested, targetCloseDate, dateCompleted } = body;
 
   // Validate all required fields

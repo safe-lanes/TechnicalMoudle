@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getDefectApprovalChain: vi.fn(),
   updateDefectApprovalSettings: vi.fn(),
   getDefectApprovalSettings: vi.fn(),
+  updateDefect: vi.fn(),
   requireRole: vi.fn(() => (_req: any, _res: any, next: () => void) => next()),
   requireVesselAccess: vi.fn((_req: any, _res: any, next: () => void) => next()),
   hasActiveUserVesselAssignment: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock('../services/defectsService', () => ({
   updateDefectApprovalSettings: mocks.updateDefectApprovalSettings,
   getDefectApprovalSettings: mocks.getDefectApprovalSettings,
   getDefect: vi.fn(),
+  updateDefect: mocks.updateDefect,
   hasActiveUserVesselAssignment: mocks.hasActiveUserVesselAssignment,
 }));
 
@@ -24,6 +26,7 @@ import {
   getDefectApprovalChain,
   getDefectApprovalRouting,
   updateDefectApprovalSettings,
+  updateDefect as updateDefectController,
 } from '../controllers/defectsController';
 
 function response() {
@@ -35,6 +38,30 @@ function response() {
 
 describe('Defects approval API controllers', () => {
   beforeEach(() => vi.resetAllMocks());
+
+  it.each([
+    [{ status: 'started' }, 'succeeded'],
+    [{ status: 'already_pending' }, 'succeeded'],
+    [{ status: 'no_workflow' }, 'not_required'],
+    [{ status: 'off' }, 'not_required'],
+    [{ status: 'error', error: 'The extension was saved, but approval submission failed. Contact an administrator.' }, 'failed'],
+  ])('normalizes post-save approval status %j to %s', async (raw, status) => {
+    mocks.updateDefect.mockResolvedValue({ defect: { id: 'DEF-1' }, approvalSubmissions: [raw] });
+    const res = response();
+    await updateDefectController({ params: { id: 'DEF-1' }, body: {} } as any, res);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      approvalSubmission: expect.objectContaining({ status }),
+    }));
+  });
+
+  it('returns not_required when no post-save approval task exists', async () => {
+    mocks.updateDefect.mockResolvedValue({ defect: { id: 'DEF-1' }, approvalSubmissions: [] });
+    const res = response();
+    await updateDefectController({ params: { id: 'DEF-1' }, body: {} } as any, res);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      approvalSubmission: { status: 'not_required' },
+    }));
+  });
 
   it('rejects invalid approval settings before the service/storage write', async () => {
     const res = response();
@@ -188,12 +215,15 @@ describe('Defects approval API route guards', () => {
       layer.route?.path === '/defects/:id/approval-routing' && layer.route.methods.get);
     const chain = stack.find((layer: any) =>
       layer.route?.path === '/defects/:id/approval-chain' && layer.route.methods.get);
+    const diagnostics = stack.find((layer: any) =>
+      layer.route?.path === '/defects/approval-diagnostics' && layer.route.methods.get);
 
     expect(getSettings).toBeDefined();
     expect(putSettings).toBeDefined();
     expect(diagnostic).toBeDefined();
     expect(chain).toBeDefined();
-    expect(mocks.requireRole).toHaveBeenCalledTimes(2);
+    expect(diagnostics).toBeDefined();
+    expect(mocks.requireRole).toHaveBeenCalledTimes(3);
     expect(mocks.requireRole).toHaveBeenCalledWith(['PMS Admin', 'Sail Admin', 'Super Admin']);
     expect(diagnostic.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);
     expect(chain.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);

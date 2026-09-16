@@ -18,6 +18,8 @@ vi.mock('../approvalCard', () => ({
   DEFECTS_EXTENSION_SCREEN: 'defects-extension',
   DEFECTS_REPEAT_EXTENSION_SCREEN: 'defects-repeat-extension',
   DEFECTS_VERIFICATION_SCREEN: 'defects-verification',
+  DEFECT_CLASS_NORMAL: 'Normal',
+  DEFECT_CLASS_CRITICAL: 'Critical Equipment / COC Related',
   classifyDefect: mocks.classifyDefect,
   deciderIdentity: mocks.deciderIdentity,
 }));

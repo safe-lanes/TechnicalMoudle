@@ -2,3 +2,4 @@
 - [Radix ScrollArea intrinsic width](radix-scrollarea-intrinsic-width.md) — long unbroken content can expand narrow modal lists despite truncation; constrain the viewport and row explicitly.
 - [Running Hours monotonicity](running-hours-monotonicity.md) — normal RH updates never decrease live counters; only explicit approved reset/replacement workflows may do so.
 - [Approval status availability](approval-status-availability.md) — loading, unavailable/error, confirmed no-workflow, and loaded approval states must remain distinct.
+- [Defect extension approval correspondence](defect-extension-approval-correspondence.md) — a pending defect-level request governs only the oldest Requested extension; later Requested entries are orphans.

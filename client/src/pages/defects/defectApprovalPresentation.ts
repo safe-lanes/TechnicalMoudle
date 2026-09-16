@@ -156,6 +156,44 @@ export function hasPersistedApprovalRequest(
   return Boolean(chain?.requestUuid);
 }
 
+/** A requested B5 entry is governed only when the engine has persisted a request. */
+export function hasPendingExtensionApproval(
+  chain: { requestUuid?: string | null; requestStatus?: string | null } | null | undefined,
+): boolean {
+  return Boolean(
+    chain?.requestUuid &&
+    String(chain.requestStatus ?? "").toLowerCase() === "pending",
+  );
+}
+
+export function hasPendingExtensionForEntries(
+  entries: Array<{ status?: string | null }> | null | undefined,
+  chain: { requestUuid?: string | null; requestStatus?: string | null } | null | undefined,
+): boolean {
+  return hasPendingExtensionApproval(chain) &&
+    (entries ?? []).some((entry) => String(entry.status ?? "").toLowerCase() === "requested");
+}
+
+/** Stored Requested entries without a persisted request are visible orphan warnings,
+ * not approval blocks. */
+export function isOrphanedRequestedExtension(
+  extension: { status?: string | null } | null | undefined,
+  chain: { requestUuid?: string | null } | null | undefined,
+): boolean {
+  return String(extension?.status ?? "").toLowerCase() === "requested" &&
+    !hasPersistedApprovalRequest(chain);
+}
+
+export function isOrphanedRequestedExtensionAt(
+  entries: Array<{ status?: string | null }> | null | undefined,
+  index: number,
+  chain: { requestUuid?: string | null; requestStatus?: string | null } | null | undefined,
+): boolean {
+  if (String(entries?.[index]?.status ?? "").toLowerCase() !== "requested") return false;
+  const firstRequested = (entries ?? []).findIndex((entry) => String(entry.status ?? "").toLowerCase() === "requested");
+  return !hasPendingExtensionApproval(chain) || index !== firstRequested;
+}
+
 export function isC1CloseoutComplete(values: {
   confirmCompleted?: boolean | null;
   dateCompleted?: string | null;
@@ -226,4 +264,56 @@ export function approvalDecisionApplyError(payload: unknown): string | null {
   if (typeof callbackError === "string") return callbackError;
   if (callbackError instanceof Error) return callbackError.message;
   return "The approval was recorded, but the defect could not be updated.";
+}
+
+export type DiagnosticsHealth = "healthy" | "warnings" | "unavailable";
+
+export function resolveDiagnosticsStatus(input: {
+  available?: boolean;
+  healthy?: boolean;
+  consequence?: string;
+} | null | undefined): DiagnosticsHealth {
+  if (!input || input.available === false) return "unavailable";
+  return input.healthy ? "healthy" : "warnings";
+}
+
+/** Pure status projection shared by the admin diagnostics presentation and tests. */
+export function resolveDiagnosticsHealth(input: {
+  unavailable?: boolean;
+  unresolvedApprovers?: number;
+  orphanRequestedExtensions?: number;
+  stalledRequests?: number;
+  missingWorkflows?: number;
+} | null | undefined): DiagnosticsHealth {
+  if (!input || input.unavailable) return "unavailable";
+  return (input.unresolvedApprovers ?? 0) +
+    (input.orphanRequestedExtensions ?? 0) +
+    (input.stalledRequests ?? 0) +
+    (input.missingWorkflows ?? 0) > 0 ? "warnings" : "healthy";
+}
+
+export function resolveDiagnosticsGroupState(
+  rows: unknown[] | null | undefined,
+  unavailable = false,
+): "healthy" | "warnings" | "unavailable" {
+  if (unavailable) return "unavailable";
+  return rows?.length ? "warnings" : "healthy";
+}
+
+export function formatDiagnosticsUnresolved(row: {
+  vesselId: string; roleId: string; roleLabel: string; workflowScopes?: string[]; consequence: string;
+}): string {
+  return `Vessel ${row.vesselId} — ${row.roleLabel} (${row.roleId}); scopes: ${(row.workflowScopes ?? []).join(", ") || "none"} — ${row.consequence}`;
+}
+
+export function formatDiagnosticsOrphan(row: {
+  defectId: string; vesselId: string; entryId: string; requestedAt: string; newTargetDate: string; consequence: string;
+}): string {
+  return `Defect ${row.defectId} on vessel ${row.vesselId}; extension ${row.entryId}, requested ${row.requestedAt}, new target ${row.newTargetDate} — ${row.consequence}`;
+}
+
+export function formatDiagnosticsStalled(row: {
+  requestUuid: string; defectId: string; vesselId: string; screenId: string; submittedAt: string; daysPending: number; consequence: string;
+}): string {
+  return `Request ${row.requestUuid} for defect ${row.defectId} on vessel ${row.vesselId}; scope ${row.screenId}, submitted ${row.submittedAt}, ${row.daysPending} days pending — ${row.consequence}`;
 }

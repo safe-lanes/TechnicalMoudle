@@ -53,6 +53,8 @@ import {
   resolveEffectiveExtensionRequestStatus,
   resolveDefectApprovalPresentation,
   resolveVerificationDisplay,
+  hasPendingExtensionForEntries,
+  isOrphanedRequestedExtensionAt,
   type ApprovalPreviewStep,
   type DefectApprovalRoutingPreview,
 } from "./defectApprovalPresentation";
@@ -67,6 +69,15 @@ const defectFormSchema = insertDefectSchema.extend({
 });
 
 type DefectFormData = z.infer<typeof defectFormSchema>;
+
+type DefectSaveResult =
+  | { kind: "save-in-progress"; saved: false; success: false }
+  | { kind: "missing-required-fields"; saved: false; success: false; fields: string[] }
+  | { kind: "validation-failure"; saved: false; success: false }
+  | { kind: "server-rejection"; saved: false; success: false; message: string }
+  | { kind: "network-failure"; saved: false; success: false; message: string }
+  | { kind: "saved-success"; saved: true; success: true; approvalSubmission: "submitted" | "not-required" }
+  | { kind: "saved-approval-failed"; saved: true; success: false; approvalSubmission: "failed"; message: string };
 
 const decisionSchema = z.object({
   decision: z.enum(["approve", "reject"], { required_error: "Choose Approve or Reject." }),
@@ -449,6 +460,11 @@ export default function DefectFormWizard({
       ? "Rejected"
       : displayedExtension?.status;
   const hasPendingExtension = extensionUi.state === "requester-pending" || extensionUi.state === "approver-pending";
+  const hasPendingExtensionRequest = hasPendingExtensionForEntries(targetDateExtensions, extensionApproval.data);
+  const latestExtensionIndex = targetDateExtensions.length - 1;
+  const orphanedRequestedExtension = isOrphanedRequestedExtensionAt(
+    targetDateExtensions, latestExtensionIndex, extensionApproval.data,
+  );
   const validDraftExtensionDate = Boolean(
     /^\d{4}-\d{2}-\d{2}$/.test(currentExtension.newTargetDate) &&
     liveTargetDate &&
@@ -621,10 +637,10 @@ export default function DefectFormWizard({
     setIsRootCauseModalOpen(false);
   };
 
-  const saveDefect = async (data: DefectFormData, showToast = true, navigate = false, extensionsOverride?: typeof targetDateExtensions): Promise<boolean> => {
+  const saveDefect = async (data: DefectFormData, showToast = true, navigate = false, extensionsOverride?: typeof targetDateExtensions): Promise<DefectSaveResult> => {
     // Prevent duplicate saves from rapid clicks
     if (isSaving) {
-      return false;
+      return { kind: "save-in-progress", saved: false, success: false };
     }
     
     // Validate mandatory fields: Vessel, Date Observed (issueDate), and Description
@@ -645,7 +661,7 @@ export default function DefectFormWizard({
         description: `Please fill in: ${missingFields.join(', ')}`,
         variant: "destructive" 
       });
-      return false;
+      return { kind: "missing-required-fields", saved: false, success: false, fields: missingFields };
     }
 
     const effectiveExtensions = extensionsOverride ?? targetDateExtensions;
@@ -671,7 +687,7 @@ export default function DefectFormWizard({
           variant: 'destructive',
         });
       }
-      return false;
+      return { kind: "validation-failure", saved: false, success: false };
     }
 
     // Part C (C1. Closeout) validation: if any field is filled, all must be filled
@@ -702,7 +718,7 @@ export default function DefectFormWizard({
         description: `Once started, all Part C fields are required: ${missingPartC.join(', ')}`,
         variant: "destructive"
       });
-      return false;
+      return { kind: "validation-failure", saved: false, success: false };
     }
     
     setIsSaving(true);
@@ -719,9 +735,30 @@ export default function DefectFormWizard({
       
       // Use createdDefectId if we already created this defect in this session
       const existingId = currentDefect?.id || createdDefectId;
+      let approvalSubmission: "submitted" | "not-required" = "not-required";
       
-      if (existingId) {
-        await apiRequest('PATCH', `/technical/api/defects/${existingId}`, submitData);
+        if (existingId) {
+          const response = await apiRequest('PATCH', `/technical/api/defects/${existingId}`, submitData);
+          // Newer servers return a structured outcome. A persisted defect must remain
+          // usable when the post-save engine submission failed.
+          let outcome: any = null;
+          try { outcome = await response.clone().json(); } catch { /* legacy empty response */ }
+          const submission = outcome?.approvalSubmission ?? outcome?.approval ?? null;
+          if (submission?.status === "succeeded" || submission?.status === "started") {
+            approvalSubmission = "submitted";
+          } else if (submission?.status === "not_required") {
+            approvalSubmission = "not-required";
+          }
+          if (submission?.status === "failed" || submission?.status === "error") {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['defects'] }),
+              queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] }),
+            ]);
+            return {
+              kind: "saved-approval-failed", saved: true, success: false, approvalSubmission: "failed",
+              message: submission.message || submission.error || "Defect saved, but approval submission failed. Please contact your administrator.",
+            };
+          }
         queryClient.invalidateQueries({ queryKey: ['defects'] });
         queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
         if (showToast) {
@@ -730,7 +767,15 @@ export default function DefectFormWizard({
       } else {
         const response = await apiRequest('POST', '/technical/api/defects', submitData);
         try {
-          const createdDefect = await response.json();
+          const createdDefect = await response.clone().json();
+          const submission = createdDefect?.approvalSubmission ?? createdDefect?.approval ?? null;
+          if (submission?.status === "succeeded" || submission?.status === "started") approvalSubmission = "submitted";
+          if (submission?.status === "failed" || submission?.status === "error") {
+            return {
+              kind: "saved-approval-failed", saved: true, success: false, approvalSubmission: "failed",
+              message: submission.message || submission.error || "Defect saved, but approval submission failed. Please contact your administrator.",
+            };
+          }
           if (createdDefect && createdDefect.id) {
             setCreatedDefectId(createdDefect.id);
           }
@@ -748,13 +793,22 @@ export default function DefectFormWizard({
       } else if (navigate) {
         setLocation("/defects/active");
       }
-      return true;
+      return { kind: "saved-success", saved: true, success: true, approvalSubmission };
     } catch (error) {
       // Approval-gate refusals (403 Master-only, 409 pending approval) carry the reason —
       // surface it instead of a blind generic message.
-      const message = error instanceof Error ? error.message : undefined;
+      const rawMessage = error instanceof Error ? error.message : "Could not save defect.";
+      let message = rawMessage;
+      const jsonStart = rawMessage.indexOf("{");
+      if (jsonStart >= 0) {
+        try {
+          const payload = JSON.parse(rawMessage.slice(jsonStart));
+          message = payload.message || payload.error || rawMessage;
+        } catch { /* retain the transport message */ }
+      }
       toast({ title: "Error saving defect", description: message, variant: "destructive" });
-      return false;
+      const kind = /^(403|409|400|422)\b/.test(rawMessage) ? "server-rejection" as const : "network-failure" as const;
+      return { kind, saved: false, success: false, message };
     } finally {
       setIsSaving(false);
     }
@@ -766,8 +820,8 @@ export default function DefectFormWizard({
 
   const handleStepSubmit = async (stepNumber: number): Promise<boolean> => {
     const data = form.getValues();
-    const success = await saveDefect(data, true, false);
-    if (success) {
+    const result = await saveDefect(data, true, false);
+    if (result.saved && result.success) {
       if (stepNumber === 3 && approvalDefectId !== null) {
         await queryClient.invalidateQueries({
           queryKey: defectApprovalChainQueryKey(approvalDefectId, "verification"),
@@ -776,7 +830,7 @@ export default function DefectFormWizard({
       const partLabel = stepNumber === 1 ? 'A' : stepNumber === 2 ? 'B' : 'C';
       toast({ title: `Part ${partLabel} submitted successfully.` });
     }
-    return success;
+    return result.saved && result.success;
   };
 
   const openAddActionModal = () => {
@@ -841,8 +895,8 @@ export default function DefectFormWizard({
     // Auto-save before closing only if form has been modified by the user
     if (form.formState.isDirty) {
       const data = form.getValues();
-      await saveDefect(data, false, false);
-      toast({ title: "Defect saved automatically" });
+      const result = await saveDefect(data, false, false);
+      if (result.saved) toast({ title: "Defect saved automatically" });
     }
     
     if (onBack) {
@@ -1997,6 +2051,14 @@ export default function DefectFormWizard({
                             </div>
                           )}
                         </div>
+                        {orphanedRequestedExtension && (
+                          <div
+                            className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+                            data-testid="extension-orphan-warning"
+                          >
+                            This extension is marked Requested, but no pending approval request was found. It does not block closeout; please contact your administrator to reconcile it.
+                          </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-6">
                           <div className="flex flex-col">
@@ -2147,15 +2209,23 @@ export default function DefectFormWizard({
                                   
                                   // Auto-save using the existing saveDefect function with the updated extensions
                                   const formData = form.getValues();
-                                  const success = await saveDefect(formData, false, false, updatedExtensions);
+                                   const result = await saveDefect(formData, false, false, updatedExtensions);
                                   
-                                  if (success) {
+                                   if (result.saved) {
                                     setTargetDateExtensions(updatedExtensions);
                                     setShowExtensionForm(false);
                                     if (approvalDefectId !== null) {
                                       await queryClient.invalidateQueries({ queryKey: defectApprovalChainQueryKey(approvalDefectId, "extension") });
                                     }
-                                    toast({ title: "Extension request submitted and saved" });
+                                     if (result.kind === "saved-approval-failed") {
+                                       toast({
+                                         title: result.message,
+                                         description: "The extension was saved.",
+                                         variant: "destructive",
+                                       });
+                                     } else {
+                                       toast({ title: "Extension request submitted and saved" });
+                                     }
                                   } else {
                                     toast({ title: "Extension added but save failed. Please click SAVE.", variant: "destructive" });
                                   }
@@ -2218,6 +2288,11 @@ export default function DefectFormWizard({
                   {/* C1. Closeout Section */}
                   <div className="space-y-6">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C1. Closeout</h3>
+                    {hasPendingExtensionRequest && isMasterRank && (
+                      <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="c1-extension-pending-warning">
+                        Closeout is blocked while the extension approval is pending.
+                      </p>
+                    )}
                     {!isMasterRank && !isViewMode && (
                       <p className="text-sm text-amber-600" data-testid="note-closeout-master-only">
                         Only the Master may complete Part C1 Closeout.
@@ -2234,7 +2309,7 @@ export default function DefectFormWizard({
                               id="confirm-completed"
                               checked={field.value || false}
                               onCheckedChange={field.onChange}
-                              disabled={isViewMode || !isMasterRank}
+                              disabled={isViewMode || !isMasterRank || hasPendingExtensionRequest}
                               data-testid="checkbox-confirm-completed"
                             />
                           )}
@@ -2283,6 +2358,7 @@ export default function DefectFormWizard({
                         <Button
                           type="button"
                           onClick={() => handleStepSubmit(3)}
+                          disabled={hasPendingExtensionRequest}
                           className="bg-blue-600 hover:bg-blue-700 text-white px-6"
                           data-testid="button-submit-c1"
                         >
@@ -2295,6 +2371,11 @@ export default function DefectFormWizard({
                   {/* C2. Verification Section */}
                   <div className="space-y-6 pt-4">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C2. Verification</h3>
+                    {hasPendingExtensionRequest && (
+                      <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="c2-extension-pending-warning">
+                        Verification is blocked while the extension approval is pending.
+                      </p>
+                    )}
                     {"isLegacyVerification" in verificationDisplay && verificationDisplay.isLegacyVerification && (
                       <p className="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700" data-testid="legacy-verification-note">
                         Verified before an approval workflow was configured.
@@ -2314,14 +2395,23 @@ export default function DefectFormWizard({
                       <label className="text-sm text-gray-600 mb-1.5">Verified By (Office Position)</label>
                       <Input value={verificationDisplay.position} readOnly data-testid="input-verified-by-office-position" className="h-10 text-sm border-gray-300 bg-gray-100" />
                     </div>
-                    {(c1CloseoutComplete || hasPersistedApprovalRequest(verificationApproval.data)) && (
-                      <DefectApprovalStatus
-                        action="verification"
-                        defectId={approvalDefectId}
-                        approval={verificationApproval}
-                        canEdit={canEditDefect && !isViewMode}
-                        previewWhenNoRequest
-                      />
+                    {!hasPendingExtensionRequest && (c1CloseoutComplete || hasPersistedApprovalRequest(verificationApproval.data)) && (
+                      verificationApproval.data &&
+                      !verificationApproval.data.hasActiveWorkflow &&
+                      !hasPersistedApprovalRequest(verificationApproval.data) ? (
+                        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="verification-workflow-missing">
+                          No verification workflow is configured for scope <strong>{verificationApproval.data.scope || "defects-verification"}</strong>
+                          {verificationApproval.data.classification ? ` and classification ${verificationApproval.data.classification}` : ""}. Contact your administrator.
+                        </div>
+                      ) : (
+                        <DefectApprovalStatus
+                          action="verification"
+                          defectId={approvalDefectId}
+                          approval={verificationApproval}
+                          canEdit={canEditDefect && !isViewMode}
+                          previewWhenNoRequest
+                        />
+                      )
                     )}
                   </div>
                 </div>
