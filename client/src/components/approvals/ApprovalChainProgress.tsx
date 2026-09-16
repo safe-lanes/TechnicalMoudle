@@ -11,7 +11,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { formatDecidedSlotRemark } from "@/pages/defects/defectApprovalPresentation";
+import { formatDecidedSlotRemark, formatMaritimeUtcDateTime } from "@/pages/defects/defectApprovalPresentation";
 
 export class DefectApprovalChainFetchError extends Error {
   constructor(message: string, public readonly code?: string, public readonly status?: number) {
@@ -252,7 +252,7 @@ export function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
                       {slot.roleLabel || "Approver"}: {String(slot.status || "pending").toLowerCase()}
                       {slot.decidedByName ? ` — ${slot.decidedByName}` : ""}
                       {slot.decidedByPosition ? ` (${slot.decidedByPosition})` : ""}
-                      {slot.decidedAt ? ` on ${slot.decidedAt}` : ""}
+                      {slot.decidedAt ? ` on ${formatMaritimeUtcDateTime(slot.decidedAt)}` : ""}
                     </span>
                     {remark ? (
                       <div className="ml-2 max-w-xl whitespace-pre-wrap text-xs text-gray-600" data-testid="approval-slot-remark">

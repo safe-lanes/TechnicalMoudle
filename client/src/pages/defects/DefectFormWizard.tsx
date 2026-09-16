@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -55,7 +55,8 @@ import {
   resolveVerificationDisplay,
   hasPendingExtensionForEntries,
   isOrphanedRequestedExtensionAt,
-  extensionEntryPermissions,
+  formatDefectAuditTimestamp,
+  projectExtensionCardPresentation,
   projectExtensionHistory,
   projectRejectedClosureHistory,
   type ApprovalPreviewStep,
@@ -114,11 +115,8 @@ function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt
   if (!orderedAttempts.length) return null;
   const display = (value?: string | number | boolean | null) =>
     value === null || value === undefined || value === "" ? "Not recorded" : String(value);
-  const date = (value?: string | null) => {
-    if (!value) return "Not recorded";
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
-  };
+  const date = (value?: string | null) => value ? formatDefectAuditTimestamp(value, "record") : "Not recorded";
+  const decisionDate = (value?: string | null) => value ? formatDefectAuditTimestamp(value, "decision") : "Not recorded";
   const toggle = (id: string) => setExpanded((current) => {
     const next = new Set(current);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -153,7 +151,7 @@ function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt
                 data-testid={`rejected-closure-toggle-${id}`}
               >
                 <span className="font-medium text-slate-800">
-                  Attempt {attempt.attemptNumber ?? index + 1} · rejected {date(attempt.rejectedAt)}
+                  Attempt {attempt.attemptNumber ?? index + 1} · rejected {decisionDate(attempt.rejectedAt)}
                 </span>
                 <span className="text-xs font-medium text-amber-800">{isOpen ? "Collapse" : "Expand"}</span>
               </button>
@@ -166,7 +164,7 @@ function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt
                   <div><span className="text-xs text-slate-500">Closed by</span><div>{display(attempt.closedByName)}{attempt.closedByRank ? ` · ${attempt.closedByRank}` : ""}</div></div>
                   <div><span className="text-xs text-slate-500">Closed on</span><div>{date(attempt.closedOn)}</div></div>
                   <div><span className="text-xs text-slate-500">Rejected by</span><div>{display(attempt.rejectedByName)}{attempt.rejectedByPosition ? ` · ${attempt.rejectedByPosition}` : ""}</div></div>
-                  <div><span className="text-xs text-slate-500">Rejected at</span><div>{date(attempt.rejectedAt)}</div></div>
+                  <div><span className="text-xs text-slate-500">Rejected at</span><div>{decisionDate(attempt.rejectedAt)}</div></div>
                   <div className="md:col-span-2"><span className="text-xs text-slate-500">Closure comment</span><div className="whitespace-pre-wrap">{display(attempt.closureComment)}</div></div>
                   <div className="md:col-span-2"><span className="text-xs text-slate-500">Rejection reason</span><div className="whitespace-pre-wrap font-medium text-amber-950">{display(attempt.rejectionReason)}</div></div>
                   {!!attempt.closureFiles?.length && (
@@ -189,50 +187,71 @@ function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt
   );
 }
 
-function ExtensionHistoryCard({
+function ExtensionCard({
   entry,
   index,
   total,
   chain,
+  current,
+  status,
+  children,
+  approval,
 }: {
   entry: ExtensionHistoryRecord;
   index: number;
   total: number;
   chain?: DefectApprovalChain | null;
+  current: boolean;
+  status?: string | null;
+  children?: ReactNode;
+  approval?: ReactNode;
 }) {
-  const permissions = extensionEntryPermissions(entry, index, total, false);
-  const status = String(entry.status || "Requested").toUpperCase();
+  const presentation = projectExtensionCardPresentation({
+    index,
+    total,
+    current,
+    status: status || entry.status,
+    reasonForExtension: entry.reasonForExtension,
+  });
+  const body = (
+    <div className="space-y-4 border-t border-slate-100 p-4 text-sm">
+      {children ?? (
+        <>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div><span className="text-slate-500">Existing target date</span><div className="font-medium">{entry.existingTargetDate || "Not recorded"}</div></div>
+            <div><span className="text-slate-500">New target date</span><div className="font-medium">{entry.newTargetDate || "Not recorded"}</div></div>
+          </div>
+          <div><span className="text-slate-500">Reason for extension</span><div className="whitespace-pre-wrap">{entry.reasonForExtension || "Not recorded"}</div></div>
+        </>
+      )}
+      <div>
+        {approval !== undefined ? approval : (chain ? <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} /> : (
+          <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${entry.id}`}>
+            No approval chain is associated with this entry. Historical approval data was not inferred.
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  if (current || total === 1) {
+    return (
+      <div className="rounded border border-slate-200 bg-white" data-testid={`extension-current-${entry.id}`}>
+        <div className="px-4 py-3">
+          <span className="font-medium text-slate-800">{presentation.title}</span>
+        </div>
+        {body}
+      </div>
+    );
+  }
   return (
-    <details open={permissions.current && !permissions.terminal} className="rounded border border-slate-200 bg-white" data-testid={`extension-history-${entry.id}`}>
+    <details className="rounded border border-slate-200 bg-white" data-testid={`extension-history-${entry.id}`}>
       <summary className="cursor-pointer list-none px-4 py-3">
         <div className="flex items-center justify-between gap-3">
-          <span className="font-medium text-slate-800">Extension {index + 1} of {total} — {status}</span>
-          <span className="text-xs text-slate-500">{permissions.current ? "Current" : "Historical"}</span>
+          <span className="font-medium text-slate-800">{presentation.title}</span>
+          <span className="text-xs text-slate-500">Expand</span>
         </div>
       </summary>
-      <div className="grid gap-3 border-t border-slate-100 p-4 text-sm md:grid-cols-2">
-        <div><span className="text-slate-500">Existing target date</span><div className="font-medium">{entry.existingTargetDate || "Not recorded"}</div></div>
-        <div><span className="text-slate-500">New target date</span><div className="font-medium">{entry.newTargetDate || "Not recorded"}</div></div>
-        <div className="md:col-span-2"><span className="text-slate-500">Reason</span><div className="whitespace-pre-wrap">{entry.reasonForExtension || "Not recorded"}</div></div>
-        <div><span className="text-slate-500">Requested</span><div>{entry.requestedAt ? new Date(entry.requestedAt).toLocaleString() : "Not recorded"}</div></div>
-        <div>
-          <span className="text-slate-500">Decision attribution / local confirmation</span>
-          <div className="space-y-0.5">
-            {entry.submitForApprovalToName && <div>Intended approver: {entry.submitForApprovalToName}</div>}
-            {entry.approvalDate && <div>Approval date: {entry.approvalDate}</div>}
-            {entry.electronicConfirmation && <div>Electronic confirmation: {entry.electronicConfirmation}</div>}
-            {entry.approverComments && <div>Approver comments: {entry.approverComments}</div>}
-            {!entry.submitForApprovalToName && !entry.approvalDate && !entry.electronicConfirmation && !entry.approverComments && <div>Not recorded</div>}
-          </div>
-        </div>
-        <div className="md:col-span-2">
-          {chain ? <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} /> : (
-            <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${entry.id}`}>
-              No approval chain is associated with this entry. Historical approval data was not inferred.
-            </div>
-          )}
-        </div>
-      </div>
+      {body}
     </details>
   );
 }
@@ -661,6 +680,7 @@ export default function DefectFormWizard({
     canEdit: canEditDefect && !isViewMode,
   });
   const isDraftingExtension = extensionUi.state === "draft-preview";
+  const visibleExtensionTotal = orderedExtensions.length + (isDraftingExtension ? 1 : 0);
   const displayedExtension = isDraftingExtension ? null : latestExtension;
   const displayedExtensionStatus = effectiveExtensionStatus === "approved"
     ? "Approved"
@@ -2222,7 +2242,7 @@ export default function DefectFormWizard({
                   </div>
 
                   {/* B5. Target Date Extension */}
-                  <div className="space-y-4 pt-6">
+                  <div id="b5-target-date-extension" className="space-y-4 pt-6">
                     <div className="flex items-center justify-center">
                       {!showExtensionForm && !hasPendingExtension && (
                         <Button
@@ -2244,35 +2264,7 @@ export default function DefectFormWizard({
                     </div>
                     {extensionUi.showContainer && (
                       <div className="border border-amber-300 rounded-lg p-6 bg-amber-50/30 space-y-6">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B5. Target Date Extension</h3>
-                          {displayedExtension && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600">Status:</span>
-                              <span className={`text-sm font-medium ${
-                                displayedExtensionStatus === 'Approved'
-                                  ? 'text-green-600' 
-                                  : displayedExtensionStatus === 'Rejected'
-                                    ? 'text-red-600'
-                                    : 'text-amber-600'
-                              }`}>
-                                {displayedExtensionStatus?.toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        {displayedExtension && (
-                          <div className="rounded border border-blue-200 bg-blue-50/50 px-4 py-3" data-testid={`extension-current-${displayedExtension.id}`}>
-                            <div className="font-medium text-slate-800">Extension {orderedExtensions.length} of {orderedExtensions.length} — {String(displayedExtensionStatus ?? displayedExtension.status).toUpperCase()}</div>
-                            <div className="mt-1 text-xs text-slate-600">Current entry · editable only while non-terminal; decisions are available only for a current Requested entry.</div>
-                            <div className="mt-2 grid gap-1 text-sm text-slate-700 md:grid-cols-2">
-                              {displayedExtension.approvalDate && <div>Approval date: {displayedExtension.approvalDate}</div>}
-                              {displayedExtension.electronicConfirmation && <div>Electronic confirmation: {displayedExtension.electronicConfirmation}</div>}
-                              {displayedExtension.submitForApprovalToName && <div>Intended approver: {displayedExtension.submitForApprovalToName}</div>}
-                              {displayedExtension.approverComments && <div>Approver comments: {displayedExtension.approverComments}</div>}
-                            </div>
-                          </div>
-                        )}
+                        <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B5. Target Date Extension</h3>
                         {orphanedRequestedExtension && (
                           <div
                             className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
@@ -2282,16 +2274,60 @@ export default function DefectFormWizard({
                           </div>
                         )}
 
-                        {extensionHistory.slice(0, -1).map((row, index) => (
-                          <ExtensionHistoryCard
+                        {extensionHistory.slice(0, isDraftingExtension ? undefined : -1).map((row, index) => (
+                          <ExtensionCard
                             key={row.entry.id}
                             entry={row.entry}
                             index={index}
-                            total={orderedExtensions.length}
+                            total={visibleExtensionTotal}
                             chain={(row.chain as DefectApprovalChain | undefined) ?? null}
+                            current={false}
                           />
                         ))}
 
+                        {displayedExtension && (
+                          <ExtensionCard
+                            entry={displayedExtension}
+                            index={orderedExtensions.length - 1}
+                            total={visibleExtensionTotal}
+                            chain={currentExtensionChain}
+                            current
+                            status={displayedExtensionStatus}
+                            approval={(
+                              <>
+                                {hasExtensionChainsProjection && !currentExtensionChain ? (
+                                  <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${displayedExtension.id}`}>
+                                    No approval chain is associated with this entry. Historical approval data was not inferred.
+                                  </div>
+                                ) : (
+                                  <DefectApprovalStatus
+                                    action="extension"
+                                    defectId={approvalDefectId}
+                                    approval={currentExtensionApproval}
+                                    canEdit={canEditDefect && !isViewMode && String(displayedExtensionStatus ?? "").toLowerCase() === "requested"}
+                                  />
+                                )}
+                              </>
+                            )}
+                          />
+                        )}
+
+                        {isDraftingExtension && (
+                          <ExtensionCard
+                            entry={{
+                              id: "draft",
+                              existingTargetDate: liveTargetDate,
+                              newTargetDate: currentExtension.newTargetDate,
+                              reasonForExtension: currentExtension.reasonForExtension,
+                              status: "Requested",
+                              requestedAt: "",
+                            }}
+                            index={visibleExtensionTotal - 1}
+                            total={visibleExtensionTotal}
+                            current
+                            status="Requested"
+                            approval={null}
+                          >
                         <div className="grid grid-cols-2 gap-6">
                           <div className="flex flex-col">
                             <label className="text-sm text-gray-600 mb-1.5">Existing Target Date (Auto filled)</label>
@@ -2345,21 +2381,6 @@ export default function DefectFormWizard({
                           </div>
                         </div>
 
-                        {displayedExtension?.submitForApprovalToName && (
-                          <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="legacy-approver-warning">
-                            This entry recorded {displayedExtension.submitForApprovalToName} as the intended approver before an approval workflow was configured. It does not determine who approves this request. The configured workflow below is authoritative.
-                          </div>
-                        )}
-
-                        {displayedExtension?.electronicConfirmation && (
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span>Electronic Confirmation (System Generated):</span>
-                            <span className="italic text-gray-800">
-                              {displayedExtension.electronicConfirmation}
-                            </span>
-                          </div>
-                        )}
-
                         {displayedExtension && hasExtensionChainsProjection && !currentExtensionChain ? (
                           <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${displayedExtension.id}`}>
                             No approval chain is associated with this entry. Historical approval data was not inferred.
@@ -2389,6 +2410,8 @@ export default function DefectFormWizard({
                               <ApprovalWorkflowPreview action="extension" {...extensionPreview.data} />
                             ) : null}
                           </div>
+                        )}
+                          </ExtensionCard>
                         )}
 
                         {extensionUi.showSubmit && (

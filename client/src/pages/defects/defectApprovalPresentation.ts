@@ -23,6 +23,28 @@ export function formatDecidedSlotRemark(status?: string | null, remarks?: string
     : "";
 }
 
+const UTC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Defects compliance timestamp display. Date-only values must remain date-only. */
+export function formatMaritimeUtcDateTime(value?: string | null): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  const month = UTC_MONTHS[parsed.getUTCMonth()];
+  const year = parsed.getUTCFullYear();
+  const hours = String(parsed.getUTCHours()).padStart(2, "0");
+  const minutes = String(parsed.getUTCMinutes()).padStart(2, "0");
+  return `${day} ${month} ${year}, ${hours}${minutes} Z`;
+}
+
+export function formatDefectAuditTimestamp(value: string, kind: "decision" | "record"): string {
+  if (kind === "decision") return formatMaritimeUtcDateTime(value);
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
 export function extensionEntryPermissions(entry: ExtensionHistoryEntry, index: number, total: number, canEdit: boolean) {
   const current = index === total - 1;
   const terminal = ["approved", "rejected", "returned"].includes(String(entry.status ?? "").toLowerCase());
@@ -31,6 +53,24 @@ export function extensionEntryPermissions(entry: ExtensionHistoryEntry, index: n
     terminal,
     canEdit: Boolean(canEdit && current && !terminal),
     canDecide: Boolean(current && !terminal && String(entry.status ?? "").toLowerCase() === "requested"),
+  };
+}
+
+export function projectExtensionCardPresentation(input: {
+  index: number;
+  total: number;
+  current: boolean;
+  status?: string | null;
+  reasonForExtension?: string | null;
+}) {
+  const normalizedStatus = String(input.status || "Requested").toUpperCase();
+  return {
+    title: input.total === 1
+      ? `Extension — ${normalizedStatus}`
+      : `Extension ${input.index + 1} of ${input.total} — ${normalizedStatus}`,
+    expanded: input.current || input.total === 1,
+    readOnly: ["APPROVED", "REJECTED", "RETURNED"].includes(normalizedStatus),
+    reasonForExtension: input.reasonForExtension || "Not recorded",
   };
 }
 
