@@ -46,8 +46,15 @@ import {
 } from "@/components/ui/form";
 import {
   approvalDecisionApplyError,
+  approvalPreviewMessage,
+  hasPersistedApprovalRequest,
+  isC1CloseoutComplete,
+  resolveDefectExtensionUi,
+  resolveEffectiveExtensionRequestStatus,
   resolveDefectApprovalPresentation,
   resolveVerificationDisplay,
+  type ApprovalPreviewStep,
+  type DefectApprovalRoutingPreview,
 } from "./defectApprovalPresentation";
 
 const defectFormSchema = insertDefectSchema.extend({
@@ -70,6 +77,24 @@ const decisionSchema = z.object({
   }
 });
 type DecisionFormData = z.infer<typeof decisionSchema>;
+
+type ApprovalWorkflowPreviewData = {
+  routing: DefectApprovalRoutingPreview;
+  steps: ApprovalPreviewStep[];
+};
+
+function ApprovalWorkflowPreview({
+  routing,
+  steps,
+  action,
+}: ApprovalWorkflowPreviewData & { action: "extension" | "verification" }) {
+  return (
+    <div className="rounded border border-blue-200 bg-blue-50/40 p-3 text-sm text-blue-900" data-testid={`approval-preview-${action}`}>
+      <div className="font-medium mb-1">Approval workflow</div>
+      <div>{approvalPreviewMessage(routing, steps)}</div>
+    </div>
+  );
+}
 
 function ApprovalDecisionPanel({
   chain,
@@ -174,11 +199,13 @@ export function DefectApprovalStatus({
   defectId,
   approval,
   canEdit,
+  previewWhenNoRequest = false,
 }: {
   action: "extension" | "verification";
   defectId: string | number | null;
   approval: ReturnType<typeof useDefectApprovalChain>;
   canEdit: boolean;
+  previewWhenNoRequest?: boolean;
 }) {
   const actionLabel = action === "extension" ? "Defect Target Date Extension" : "Defect Verification";
   const presentation = resolveDefectApprovalPresentation(approval, canEdit);
@@ -210,6 +237,23 @@ export function DefectApprovalStatus({
     );
   }
   if (!chain) return null;
+  if (previewWhenNoRequest && !hasPersistedApprovalRequest(chain)) {
+    return (
+      <ApprovalWorkflowPreview
+        action={action}
+        routing={{
+          scope: chain.scope ?? "",
+          classification: chain.classification ?? "this request",
+          activeWorkflowExists: chain.hasActiveWorkflow,
+          fellBackFromRepeatScope: false,
+        }}
+        steps={(chain.steps ?? []).map((step, index) => ({
+          label: step.label || step.name || `Step ${index + 1}`,
+          roles: (step.slots ?? []).map((slot) => slot.roleLabel || "Approver"),
+        }))}
+      />
+    );
+  }
   return (
     <>
       <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} />
@@ -306,6 +350,7 @@ export default function DefectFormWizard({
     newTargetDate: '',
     reasonForExtension: '',
   });
+  const [debouncedExtensionDate, setDebouncedExtensionDate] = useState('');
   const [isSubmittingExtension, setIsSubmittingExtension] = useState(false);
   
   // Section refs for scroll tracking
@@ -373,11 +418,111 @@ export default function DefectFormWizard({
   });
 
   const dateCompletedValue = form.watch("dateCompleted");
+  const confirmCompletedValue = form.watch("confirmCompleted");
+  const closedByNameValue = form.watch("closedByName");
+  const closedByRankValue = form.watch("closedByRank");
+  const liveTargetDate = form.watch("targetCloseDate") || "";
   const vesselLocationType = form.watch("vesselLocationType");
   const dateRegisteredInSystemValue = form.watch("dateRegisteredInSystem");
   const viqVersionValue = form.watch("viqVersion");
   
   const sireReferenceOptions = getSireReferencesByVersion(viqVersionValue || "");
+
+  const latestExtension = targetDateExtensions[targetDateExtensions.length - 1] ?? null;
+  const hasSavedExtension = latestExtension !== null;
+  const effectiveExtensionStatus = resolveEffectiveExtensionRequestStatus(
+    latestExtension?.status,
+    extensionApproval.data?.requestStatus,
+  );
+  const extensionUi = resolveDefectExtensionUi({
+    formOpen: showExtensionForm,
+    hasStoredExtension: hasSavedExtension,
+    requestStatus: effectiveExtensionStatus,
+    currentUserCanDecide: extensionApproval.data?.currentUserCanDecide,
+    canEdit: canEditDefect && !isViewMode,
+  });
+  const isDraftingExtension = extensionUi.state === "draft-preview";
+  const displayedExtension = isDraftingExtension ? null : latestExtension;
+  const displayedExtensionStatus = effectiveExtensionStatus === "approved"
+    ? "Approved"
+    : effectiveExtensionStatus === "rejected" || effectiveExtensionStatus === "returned"
+      ? "Rejected"
+      : displayedExtension?.status;
+  const hasPendingExtension = extensionUi.state === "requester-pending" || extensionUi.state === "approver-pending";
+  const validDraftExtensionDate = Boolean(
+    /^\d{4}-\d{2}-\d{2}$/.test(currentExtension.newTargetDate) &&
+    liveTargetDate &&
+    currentExtension.newTargetDate > liveTargetDate,
+  );
+  const c1CloseoutComplete = isC1CloseoutComplete({
+    confirmCompleted: confirmCompletedValue,
+    dateCompleted: dateCompletedValue,
+    closedByName: closedByNameValue,
+    closedByRank: closedByRankValue,
+  });
+  const isExtensionDateSettled = debouncedExtensionDate === currentExtension.newTargetDate;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedExtensionDate(validDraftExtensionDate ? currentExtension.newTargetDate : "");
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [currentExtension.newTargetDate, validDraftExtensionDate]);
+
+  const extensionPreview = useQuery<ApprovalWorkflowPreviewData>({
+    queryKey: ["defect-approval-preview", approvalDefectId, debouncedExtensionDate],
+    enabled: isDraftingExtension && Boolean(approvalDefectId) && Boolean(debouncedExtensionDate) && isExtensionDateSettled,
+    retry: false,
+    queryFn: async () => {
+      const defectId = encodeURIComponent(String(approvalDefectId));
+      const routingResponse = await fetch(
+        `/technical/api/defects/${defectId}/approval-routing?action=extension&newTargetDate=${encodeURIComponent(debouncedExtensionDate)}`,
+      );
+      if (!routingResponse.ok) throw new Error("Could not determine the approval chain.");
+      const routing = await routingResponse.json() as DefectApprovalRoutingPreview;
+      if (!routing.activeWorkflowExists) return { routing, steps: [] };
+
+      const scopeQuery = new URLSearchParams({
+        moduleId: "defects",
+        screenId: routing.scope,
+        actionId: "",
+      });
+      const workflowListResponse = await fetch(`/technical/api/approval-engine/workflows?${scopeQuery}`);
+      if (!workflowListResponse.ok) throw new Error("Could not determine the approval chain.");
+      const workflows = await workflowListResponse.json() as Array<{
+        wfuuid: string;
+        classification: string;
+        status: string;
+        version: number;
+      }>;
+      const workflow = workflows
+        .filter((item) => item.classification === routing.classification && item.status === "active")
+        .sort((a, b) => b.version - a.version)[0];
+      if (!workflow) throw new Error("Could not determine the approval chain.");
+
+      const workflowResponse = await fetch(
+        `/technical/api/approval-engine/workflows/${encodeURIComponent(workflow.wfuuid)}`,
+      );
+      if (!workflowResponse.ok) throw new Error("Could not determine the approval chain.");
+      const workflowDetails = await workflowResponse.json() as {
+        nodes?: Array<{
+          type?: string;
+          label?: string;
+          key?: string;
+          ordinal?: number;
+          slots?: Array<{ roleLabel?: string }>;
+        }>;
+      };
+      const steps = (workflowDetails.nodes ?? [])
+        .filter((node) => node.type === "approval-step")
+        .sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+        .map((node, index) => ({
+          label: node.label || node.key || `Step ${index + 1}`,
+          roles: (node.slots ?? []).map((slot) => slot.roleLabel || "Approver"),
+        }));
+      return { routing, steps };
+    },
+  });
   
   useEffect(() => {
     if (vesselLocationType === 'atPort') {
@@ -623,6 +768,11 @@ export default function DefectFormWizard({
     const data = form.getValues();
     const success = await saveDefect(data, true, false);
     if (success) {
+      if (stepNumber === 3 && approvalDefectId !== null) {
+        await queryClient.invalidateQueries({
+          queryKey: defectApprovalChainQueryKey(approvalDefectId, "verification"),
+        });
+      }
       const partLabel = stepNumber === 1 ? 'A' : stepNumber === 2 ? 'B' : 'C';
       toast({ title: `Part ${partLabel} submitted successfully.` });
     }
@@ -1810,12 +1960,15 @@ export default function DefectFormWizard({
                   {/* B5. Target Date Extension */}
                   <div className="space-y-4 pt-6">
                     <div className="flex items-center justify-center">
-                      {!showExtensionForm && targetDateExtensions.length === 0 && (
+                      {!showExtensionForm && !hasPendingExtension && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setShowExtensionForm(true)}
+                          onClick={() => {
+                            setCurrentExtension({ newTargetDate: "", reasonForExtension: "" });
+                            setShowExtensionForm(true);
+                          }}
                           disabled={isViewMode}
                           data-testid="button-extend-target-date"
                           className="border-gray-300"
@@ -1825,28 +1978,21 @@ export default function DefectFormWizard({
                         </Button>
                       )}
                     </div>
-                    <DefectApprovalStatus
-                      action="extension"
-                      defectId={approvalDefectId}
-                      approval={extensionApproval}
-                      canEdit={canEditDefect && !isViewMode}
-                    />
-
-                    {(showExtensionForm || targetDateExtensions.length > 0) && (
+                    {extensionUi.showContainer && (
                       <div className="border border-amber-300 rounded-lg p-6 bg-amber-50/30 space-y-6">
                         <div className="flex items-center justify-between">
                           <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B5. Target Date Extension</h3>
-                          {targetDateExtensions.length > 0 && (
+                          {displayedExtension && (
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-gray-600">Status:</span>
                               <span className={`text-sm font-medium ${
-                                targetDateExtensions[targetDateExtensions.length - 1]?.status === 'Approved' 
+                                displayedExtensionStatus === 'Approved'
                                   ? 'text-green-600' 
-                                  : targetDateExtensions[targetDateExtensions.length - 1]?.status === 'Rejected'
+                                  : displayedExtensionStatus === 'Rejected'
                                     ? 'text-red-600'
                                     : 'text-amber-600'
                               }`}>
-                                {targetDateExtensions[targetDateExtensions.length - 1]?.status?.toUpperCase()}
+                                {displayedExtensionStatus?.toUpperCase()}
                               </span>
                             </div>
                           )}
@@ -1857,7 +2003,7 @@ export default function DefectFormWizard({
                             <label className="text-sm text-gray-600 mb-1.5">Existing Target Date (Auto filled)</label>
                             <Input 
                               type="date"
-                              value={form.watch('targetCloseDate') || ''}
+                              value={displayedExtension ? displayedExtension.existingTargetDate : liveTargetDate}
                               disabled
                               data-testid="input-existing-target-date"
                               className="h-10 text-sm border-gray-300 bg-gray-100"
@@ -1867,9 +2013,9 @@ export default function DefectFormWizard({
                             <label className="text-sm text-gray-600 mb-1.5">New Target Date<span className="text-red-500">*</span></label>
                             <Input 
                               type="date"
-                              value={currentExtension.newTargetDate}
+                              value={displayedExtension ? displayedExtension.newTargetDate : currentExtension.newTargetDate}
                               min={(() => {
-                                const existingDate = form.watch('targetCloseDate');
+                                const existingDate = liveTargetDate;
                                 if (!existingDate) return undefined;
                                 const [year, month, day] = existingDate.split('-').map(Number);
                                 const nextDay = new Date(year, month - 1, day + 1);
@@ -1877,14 +2023,14 @@ export default function DefectFormWizard({
                               })()}
                               onChange={(e) => {
                                 const newDate = e.target.value;
-                                const existingDate = form.watch('targetCloseDate') || '';
+                                const existingDate = liveTargetDate;
                                 if (newDate && existingDate && newDate <= existingDate) {
                                   toast({ title: "New Target Date must be later than the existing Target Date", variant: "destructive" });
                                   return;
                                 }
                                 setCurrentExtension(prev => ({ ...prev, newTargetDate: newDate }));
                               }}
-                              disabled={isViewMode}
+                              disabled={extensionUi.fieldsReadOnly}
                               data-testid="input-new-target-date"
                               className="h-10 text-sm border-gray-300"
                             />
@@ -1895,9 +2041,9 @@ export default function DefectFormWizard({
                           <div className="flex flex-col">
                             <label className="text-sm text-gray-600 mb-1.5">Reason for Extension<span className="text-red-500">*</span></label>
                             <Textarea 
-                              value={currentExtension.reasonForExtension}
+                              value={displayedExtension ? displayedExtension.reasonForExtension : currentExtension.reasonForExtension}
                               onChange={(e) => setCurrentExtension(prev => ({ ...prev, reasonForExtension: e.target.value }))}
-                              disabled={isViewMode}
+                              disabled={extensionUi.fieldsReadOnly}
                               data-testid="input-reason-for-extension"
                               className="text-sm border-gray-300 min-h-[80px]"
                               placeholder="Enter reason for extension..."
@@ -1905,22 +2051,49 @@ export default function DefectFormWizard({
                           </div>
                         </div>
 
-                        {targetDateExtensions[targetDateExtensions.length - 1]?.submitForApprovalToName && (
+                        {displayedExtension?.submitForApprovalToName && (
                           <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="legacy-approver-warning">
-                            This entry recorded {targetDateExtensions[targetDateExtensions.length - 1].submitForApprovalToName} as the intended approver before an approval workflow was configured. It does not determine who approves this request. The configured workflow below is authoritative.
+                            This entry recorded {displayedExtension.submitForApprovalToName} as the intended approver before an approval workflow was configured. It does not determine who approves this request. The configured workflow below is authoritative.
                           </div>
                         )}
 
-                        {targetDateExtensions.length > 0 && targetDateExtensions[targetDateExtensions.length - 1]?.electronicConfirmation && (
+                        {displayedExtension?.electronicConfirmation && (
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <span>Electronic Confirmation (System Generated):</span>
                             <span className="italic text-gray-800">
-                              {targetDateExtensions[targetDateExtensions.length - 1]?.electronicConfirmation}
+                              {displayedExtension.electronicConfirmation}
                             </span>
                           </div>
                         )}
 
-                        {!isViewMode && (
+                        {displayedExtension ? (
+                          <DefectApprovalStatus
+                            action="extension"
+                            defectId={approvalDefectId}
+                            approval={extensionApproval}
+                            canEdit={canEditDefect && !isViewMode}
+                          />
+                        ) : (
+                          <div data-testid="extension-approval-preview-container">
+                            {!validDraftExtensionDate ? (
+                              <div className="rounded border border-blue-200 bg-blue-50/40 p-3 text-sm text-blue-900" data-testid="approval-preview-extension-date-required">
+                                The approval chain will depend on the requested date.
+                              </div>
+                            ) : !isExtensionDateSettled || extensionPreview.isLoading || extensionPreview.isFetching ? (
+                              <div className="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600" data-testid="approval-preview-extension-loading">
+                                Determining approval workflow...
+                              </div>
+                            ) : extensionPreview.error ? (
+                              <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700" data-testid="approval-preview-extension-error">
+                                Could not determine the approval chain.
+                              </div>
+                            ) : extensionPreview.data ? (
+                              <ApprovalWorkflowPreview action="extension" {...extensionPreview.data} />
+                            ) : null}
+                          </div>
+                        )}
+
+                        {extensionUi.showSubmit && (
                           <div className="flex justify-end pt-2">
                             <Button
                               type="button"
@@ -1970,17 +2143,15 @@ export default function DefectFormWizard({
                                     requestedAt: new Date().toISOString(),
                                   };
                                   
-                                  // Update the extensions array
                                   const updatedExtensions = [...targetDateExtensions, newExtension];
-                                  setTargetDateExtensions(updatedExtensions);
-                                  
-                                  // Don't clear currentExtension - keep the values visible in the form
                                   
                                   // Auto-save using the existing saveDefect function with the updated extensions
                                   const formData = form.getValues();
                                   const success = await saveDefect(formData, false, false, updatedExtensions);
                                   
                                   if (success) {
+                                    setTargetDateExtensions(updatedExtensions);
+                                    setShowExtensionForm(false);
                                     if (approvalDefectId !== null) {
                                       await queryClient.invalidateQueries({ queryKey: defectApprovalChainQueryKey(approvalDefectId, "extension") });
                                     }
@@ -2143,12 +2314,15 @@ export default function DefectFormWizard({
                       <label className="text-sm text-gray-600 mb-1.5">Verified By (Office Position)</label>
                       <Input value={verificationDisplay.position} readOnly data-testid="input-verified-by-office-position" className="h-10 text-sm border-gray-300 bg-gray-100" />
                     </div>
-                    <DefectApprovalStatus
-                      action="verification"
-                      defectId={approvalDefectId}
-                      approval={verificationApproval}
-                      canEdit={canEditDefect && !isViewMode}
-                    />
+                    {(c1CloseoutComplete || hasPersistedApprovalRequest(verificationApproval.data)) && (
+                      <DefectApprovalStatus
+                        action="verification"
+                        defectId={approvalDefectId}
+                        approval={verificationApproval}
+                        canEdit={canEditDefect && !isViewMode}
+                        previewWhenNoRequest
+                      />
+                    )}
                   </div>
                 </div>
               </div>

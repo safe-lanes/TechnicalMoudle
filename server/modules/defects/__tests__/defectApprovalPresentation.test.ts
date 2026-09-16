@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   approvalDecisionApplyError,
+  approvalPreviewMessage,
+  isC1CloseoutComplete,
   resolveDefectApprovalPresentation,
+  resolveDefectExtensionUi,
+  resolveEffectiveExtensionRequestStatus,
   resolveVerificationDisplay,
 } from '../../../../client/src/pages/defects/defectApprovalPresentation';
 
@@ -143,5 +147,135 @@ describe('Defect approval presentation states', () => {
     expect(approvalDecisionApplyError({ callbackError: 'Defect update failed' }))
       .toBe('Defect update failed');
     expect(approvalDecisionApplyError({ requestStatus: 'approved' })).toBeNull();
+  });
+
+  it.each([
+    {
+      name: 'no request',
+      input: { formOpen: false, hasStoredExtension: false, canEdit: true },
+      state: 'no-request',
+      showContainer: false,
+      fieldsReadOnly: true,
+      showSubmit: false,
+    },
+    {
+      name: 'unsaved preview',
+      input: { formOpen: true, hasStoredExtension: false, canEdit: true },
+      state: 'draft-preview',
+      showContainer: true,
+      fieldsReadOnly: false,
+      showSubmit: true,
+    },
+    {
+      name: 'requester pending',
+      input: { formOpen: false, hasStoredExtension: true, requestStatus: 'pending', currentUserCanDecide: false, canEdit: true },
+      state: 'requester-pending',
+      showContainer: true,
+      fieldsReadOnly: true,
+      showSubmit: false,
+    },
+    {
+      name: 'approver pending',
+      input: { formOpen: false, hasStoredExtension: true, requestStatus: 'pending', currentUserCanDecide: true, canEdit: true },
+      state: 'approver-pending',
+      showContainer: true,
+      fieldsReadOnly: true,
+      showSubmit: false,
+    },
+    {
+      name: 'approved',
+      input: { formOpen: false, hasStoredExtension: true, requestStatus: 'approved', currentUserCanDecide: false, canEdit: true },
+      state: 'approved',
+      showContainer: true,
+      fieldsReadOnly: true,
+      showSubmit: false,
+    },
+    {
+      name: 'repeat draft after approval',
+      input: { formOpen: true, hasStoredExtension: true, requestStatus: 'approved', currentUserCanDecide: false, canEdit: true },
+      state: 'draft-preview',
+      showContainer: true,
+      fieldsReadOnly: false,
+      showSubmit: true,
+    },
+    {
+      name: 'rejected',
+      input: { formOpen: false, hasStoredExtension: true, requestStatus: 'returned', currentUserCanDecide: false, canEdit: true },
+      state: 'rejected',
+      showContainer: true,
+      fieldsReadOnly: true,
+      showSubmit: false,
+    },
+  ])('resolves the B5 $name state', ({ input, name: _name, ...expected }) => {
+    expect(resolveDefectExtensionUi(input)).toEqual(expected);
+  });
+
+  it('does not call a B5 preview a progress chain and names its ordered roles', () => {
+    const message = approvalPreviewMessage({
+      scope: 'defect-extension',
+      classification: 'Normal',
+      activeWorkflowExists: true,
+      fellBackFromRepeatScope: false,
+    }, [
+      { label: 'First', roles: ['User'] },
+      { label: 'Second', roles: ['Admin'] },
+    ]);
+    expect(message).toBe('This request will require 2 approvals: Step 1 - User, Step 2 - Admin.');
+    expect(message).not.toContain('progress');
+    expect(message).not.toContain('pending');
+  });
+
+  it('explains Critical date-threshold escalation', () => {
+    expect(approvalPreviewMessage({
+      scope: 'defect-extension',
+      classification: 'Critical Equipment / COC Related',
+      activeWorkflowExists: true,
+      fellBackFromRepeatScope: false,
+      factors: { exceedsThreshold: true, longExtensionThreshold: 90, extensionDays: 91 },
+    }, [
+      { label: 'First', roles: ['User'] },
+      { label: 'Second', roles: ['Admin'] },
+    ])).toBe('This extension exceeds 90 days and will require 2 approvals: Step 1 - User, Step 2 - Admin.');
+  });
+
+  it('uses the effective repeat-fallback workflow without requester-facing fallback wording', () => {
+    const message = approvalPreviewMessage({
+      scope: 'defect-extension',
+      classification: 'Normal',
+      activeWorkflowExists: true,
+      fellBackFromRepeatScope: true,
+    }, [{ label: 'Initial extension approval', roles: ['Superintendent'] }]);
+    expect(message).toContain('Step 1 - Superintendent');
+    expect(message.toLowerCase()).not.toContain('fallback');
+    expect(message.toLowerCase()).not.toContain('repeat');
+  });
+
+  it('does not guess a preview count when no active workflow exists', () => {
+    const message = approvalPreviewMessage({
+      scope: 'defect-extension',
+      classification: 'Normal',
+      activeWorkflowExists: false,
+      fellBackFromRepeatScope: false,
+    }, []);
+    expect(message).toBe('No approval workflow is configured for Normal. Contact your administrator.');
+    expect(message).not.toMatch(/\d+ approval/);
+  });
+
+  it.each([
+    [{ confirmCompleted: false, dateCompleted: '2026-09-16', closedByName: 'Master', closedByRank: 'Master' }, false],
+    [{ confirmCompleted: true, dateCompleted: '', closedByName: 'Master', closedByRank: 'Master' }, false],
+    [{ confirmCompleted: true, dateCompleted: '2026-09-16', closedByName: 'Master', closedByRank: 'Master' }, true],
+  ] as const)('gates the C2 preview on complete C1 values', (values, expected) => {
+    expect(isC1CloseoutComplete(values)).toBe(expected);
+  });
+
+  it.each([
+    ['Requested', undefined, 'pending'],
+    ['Requested', 'pending', 'pending'],
+    ['Requested', 'approved', 'approved'],
+    ['Requested', 'returned', 'returned'],
+    ['Approved', 'approved', 'approved'],
+  ])('lets terminal chain state override stale local extension state', (local, chain, expected) => {
+    expect(resolveEffectiveExtensionRequestStatus(local, chain)).toBe(expected);
   });
 });

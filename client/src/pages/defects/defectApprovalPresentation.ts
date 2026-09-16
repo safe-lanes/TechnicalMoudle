@@ -1,5 +1,84 @@
 export type DefectApprovalAction = "extension" | "verification";
 
+export type ApprovalPreviewStep = {
+  label: string;
+  roles: string[];
+};
+
+export type DefectApprovalRoutingPreview = {
+  scope: string;
+  classification: string;
+  activeWorkflowExists: boolean;
+  fellBackFromRepeatScope: boolean;
+  factors?: {
+    extensionDays?: number | null;
+    longExtensionThreshold?: number | null;
+    exceedsThreshold?: boolean;
+  };
+};
+
+export type DefectExtensionUiState =
+  | "no-request"
+  | "draft-preview"
+  | "requester-pending"
+  | "approver-pending"
+  | "approved"
+  | "rejected";
+
+export function resolveEffectiveExtensionRequestStatus(
+  localStatus?: string | null,
+  chainStatus?: string | null,
+): string | null {
+  const normalizedChain = chainStatus ? chainStatus.toLowerCase() : null;
+  if (normalizedChain && ["approved", "rejected", "returned"].includes(normalizedChain)) {
+    return normalizedChain;
+  }
+  if (localStatus?.toLowerCase() === "requested") return "pending";
+  return normalizedChain ?? localStatus?.toLowerCase() ?? null;
+}
+
+export function resolveDefectExtensionUi(input: {
+  formOpen: boolean;
+  hasStoredExtension: boolean;
+  requestStatus?: string | null;
+  currentUserCanDecide?: boolean;
+  canEdit: boolean;
+}): {
+  state: DefectExtensionUiState;
+  showContainer: boolean;
+  fieldsReadOnly: boolean;
+  showSubmit: boolean;
+} {
+  const status = String(input.requestStatus ?? "pending").toLowerCase();
+  const isTerminal = status === "approved" || status === "rejected" || status === "returned";
+  if (input.formOpen && (!input.hasStoredExtension || isTerminal)) {
+    return {
+      state: "draft-preview",
+      showContainer: true,
+      fieldsReadOnly: !input.canEdit,
+      showSubmit: input.canEdit,
+    };
+  }
+  if (!input.hasStoredExtension) {
+    if (!input.formOpen) {
+      return { state: "no-request", showContainer: false, fieldsReadOnly: true, showSubmit: false };
+    }
+    return { state: "no-request", showContainer: false, fieldsReadOnly: true, showSubmit: false };
+  }
+  if (status === "approved") {
+    return { state: "approved", showContainer: true, fieldsReadOnly: true, showSubmit: false };
+  }
+  if (status === "rejected" || status === "returned") {
+    return { state: "rejected", showContainer: true, fieldsReadOnly: true, showSubmit: false };
+  }
+  return {
+    state: input.currentUserCanDecide ? "approver-pending" : "requester-pending",
+    showContainer: true,
+    fieldsReadOnly: true,
+    showSubmit: false,
+  };
+}
+
 export type DefectApprovalPresentation =
   | { state: "idle"; showDecisionControls: false }
   | { state: "loading"; showDecisionControls: false }
@@ -69,6 +148,45 @@ export function resolveDefectApprovalPresentation(
       String(chain.requestStatus).toLowerCase() === "pending",
     ),
   };
+}
+
+export function hasPersistedApprovalRequest(
+  chain: { requestUuid?: string | null } | null | undefined,
+): boolean {
+  return Boolean(chain?.requestUuid);
+}
+
+export function isC1CloseoutComplete(values: {
+  confirmCompleted?: boolean | null;
+  dateCompleted?: string | null;
+  closedByName?: string | null;
+  closedByRank?: string | null;
+}): boolean {
+  return Boolean(
+    values.confirmCompleted &&
+    values.dateCompleted?.trim() &&
+    values.closedByName?.trim() &&
+    values.closedByRank?.trim(),
+  );
+}
+
+export function approvalPreviewMessage(
+  routing: DefectApprovalRoutingPreview,
+  steps: ApprovalPreviewStep[],
+): string {
+  if (!routing.activeWorkflowExists || steps.length === 0) {
+    return `No approval workflow is configured for ${routing.classification}. Contact your administrator.`;
+  }
+  const stepList = steps.map((step, index) => {
+    const roles = step.roles.length > 0 ? step.roles.join(" / ") : step.label;
+    return `Step ${index + 1} - ${roles}`;
+  }).join(", ");
+  const approvalCount = `${steps.length} approval${steps.length === 1 ? "" : "s"}`;
+  if (routing.factors?.exceedsThreshold) {
+    const threshold = routing.factors.longExtensionThreshold ?? 90;
+    return `This extension exceeds ${threshold} days and will require ${approvalCount}: ${stepList}.`;
+  }
+  return `This request will require ${approvalCount}: ${stepList}.`;
 }
 
 export function resolveVerificationDisplay(
