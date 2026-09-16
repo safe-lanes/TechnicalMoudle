@@ -8,7 +8,7 @@ Factual reference for the Seafarer Technical Management System (maritime PMS) as
 
 | Layer | Technology |
 |---|---|
-| Language | TypeScript (ESM), strict mode; acknowledged tsc error baseline of 374 (`replit.md`) |
+| Language | TypeScript (ESM), strict mode; acknowledged tsc error baseline of 294 |
 | Frontend | React 18, Vite, Wouter (routing), TanStack React Query v5, React Context |
 | UI | shadcn/ui (Radix primitives), Tailwind CSS, lucide-react icons, Framer Motion |
 | Tables | AG Grid Enterprise **34.1.0 (pinned — license-capped, do not upgrade)** via shared `AgGridTable` components |
@@ -19,6 +19,8 @@ Factual reference for the Seafarer Technical Management System (maritime PMS) as
 | Files | Multer (memory) → Replit Object Storage / GCS signed URLs |
 | Exports | ExcelJS, jspdf, JSZip, xlsx (bulk import parsing) |
 | Testing | Playwright E2E (`tests/`, targets localhost:5000), Vitest unit (`server/**/__tests__`) |
+
+The 294-error figure is the measured count as at September 16, 2026; any change to it must be stated explicitly in a task report rather than absorbed silently.
 
 ### Folder structure
 ```
@@ -422,7 +424,7 @@ All module routers (including Shipskart) are mounted flat on **`/technical/api`*
 - AG Grid family pinned exactly (enterprise/community/react 34.1.0, ag-charts 12.3.0) — license-capped, no `^`/`~`.
 
 ### Pre-commit
-- `npx tsc --noEmit` must not exceed the 374-error baseline; re-run new migrations for idempotency; verify edited files are on the live code path.
+- `npx tsc --noEmit` must not exceed the 294-error baseline; re-run new migrations for idempotency; verify edited files are on the live code path.
 
 ---
 
@@ -458,6 +460,6 @@ All module routers (including Shipskart) are mounted flat on **`/technical/api`*
 - AG Grid warns about `data-replit-metadata` / `data-component-name` passed into gridOptions (dev-tooling props leaking into AG Grid config).
 
 **Technical debt**
-- Accepted tsc baseline of 374 errors (must not grow).
+- Accepted tsc baseline of 294 errors (must not grow).
 - `server/postgresStorage.ts` is a ~9.7k-line monolith implementing all of `IStorage`; module repositories wrap it rather than replacing it.
 - Legacy JS migration array (entries 001–081) in `server/migrations.ts` is frozen; two SQL naming tracks (4-digit drizzle vs 3-digit hand-written) intentionally sort auto-generated files first.
