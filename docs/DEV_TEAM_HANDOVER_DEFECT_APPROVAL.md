@@ -46,6 +46,14 @@ it. Add this paste-ready entry inside the `ONE_WAY_SHORE_TO_SHIP` section:
   },
 ```
 
+> **WARNING:** This table carries a database trigger that raises an exception on
+> any UPDATE or DELETE. Before activating shore-to-ship sync for this table,
+> verify how the sync engine writes incoming rows. If it upserts, a redelivered
+> row will trigger the exception. Confirm whether a failed row aborts only that
+> table or the whole sync batch. Do not enable this entry until that behaviour is
+> verified. Related: retention/purge policies will also fail against this table,
+> and `is_deleted` can never be set because soft delete requires an UPDATE.
+
 This task deliberately does not modify `shared/syncConfig.ts`.
 
 ## OPEN ITEMS
