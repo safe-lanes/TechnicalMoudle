@@ -1032,10 +1032,17 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
       // R1 (migration 139): next cycle derives from the stored WO Completion RH
       // (fallback: the stored reading = pre-feature behaviour for old rows).
       const finalizeCycleRH = (workOrder as any).woCompletionRh ?? workOrder.runningHours;
+      if (basis === 'Running Hours') {
+        await repo.updateJob(job.juuid, { lastDoneDate: jobCompletionDate });
+        console.log(`✅ [Finalize] Updated RH job ${job.jobNo} lastDoneDate: ${jobCompletionDate}`);
+      }
       if ((basis === 'Running Hours' || basis === 'Dual Frequency') && finalizeCycleRH) {
         const currentRH = parseInt(String(finalizeCycleRH));
         if (!isNaN(currentRH)) {
           const rhUpdates: any = { lastDoneRH: currentRH };
+          if (jobCompletionDate) {
+            rhUpdates.lastDoneDate = jobCompletionDate;
+          }
           const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
           if (rhInterval && !isNaN(rhInterval)) {
             rhUpdates.nextDueRH = currentRH + rhInterval;

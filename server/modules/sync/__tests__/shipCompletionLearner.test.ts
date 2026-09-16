@@ -98,6 +98,20 @@ describe('learnFromShipCompletions', () => {
         due_date: null,
         work_order_no: 'WO-2',
       },
+      'wo-rh': {
+        wouuid: 'wo-rh',
+        status: 'Completed',
+        job_id: 'job-rh',
+        vessel_id: 'vessel-1',
+        maintenance_basis: 'Running Hours',
+        date_completed: '04-Aug-2026',
+        wo_completion_rh: '14000',
+        completion_rh: '13000',
+        current_reading: '12000',
+        next_due_date: null,
+        due_date: null,
+        work_order_no: 'WO-RH',
+      },
       'wo-no-job': {
         wouuid: 'wo-no-job',
         status: 'Completed',
@@ -137,6 +151,16 @@ describe('learnFromShipCompletions', () => {
         interval_running_hour: null,
         last_done_date: '01-Jul-2026',
         last_done_rh: null,
+      },
+      'job-rh': {
+        juuid: 'job-rh',
+        job_no: 'JOB-RH',
+        vessel_id: 'vessel-1',
+        frequency_value: null,
+        frequency_unit: null,
+        interval_running_hour: 500,
+        last_done_date: '01-Jul-2026',
+        last_done_rh: '13500',
       },
     };
 
@@ -190,6 +214,21 @@ describe('learnFromShipCompletions', () => {
     expect(result).toEqual({ candidates: 1, jobsAdvanced: 0, skipped: 1, errors: 0 });
     expect(queries.some((q) => q.text.includes('FROM jobs'))).toBe(false);
     expect(queries.some((q) => q.text.startsWith('UPDATE jobs'))).toBe(false);
+  });
+
+  it('learns RH completion date and RH from the same persisted Work Order', async () => {
+    const { client, queries } = makeClient();
+    const result = await learnFromShipCompletions(client, ['wo-rh']);
+
+    expect(result).toEqual({ candidates: 1, jobsAdvanced: 1, skipped: 0, errors: 0 });
+    const update = queries.find((q) => q.text.startsWith('UPDATE jobs'));
+    expect(update).toBeTruthy();
+    expect(update!.text).toContain('"last_done_date"');
+    expect(update!.text).toContain('"last_done_rh"');
+    expect(update!.text).toContain('"next_due_rh"');
+    expect(update!.values).toContain('2026-08-04');
+    expect(update!.values).toContain('14000');
+    expect(update!.values).toContain('14500');
   });
 
   it('rolls back only the failed Work Order savepoint and continues the batch', async () => {

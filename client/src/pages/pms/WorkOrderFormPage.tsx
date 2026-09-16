@@ -311,6 +311,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     resolvedMode !== 'template' && !isNewJobCreation
       ? ((workOrderContext as any)?.templateData?.partANextDueDate || '')
       : templateData.nextDueDate;
+  const displayedPartANextDueRH =
+    resolvedMode !== 'template'
+      && !isNewJobCreation
+      && templateData.maintenanceBasis === 'Running Hours'
+      ? ((workOrderContext as any)?.templateData?.partANextDueRH || '')
+      : templateData.nextDueReading;
 
   const woDepartment = templateData?.department ||
     (workOrderContext as any)?.templateData?.department ||
@@ -1103,6 +1109,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
           : (context.templateData.frequencyValue || '');
 
+        const useWorkOrderSnapshot = resolvedMode !== 'template';
+        const useRhWorkOrderSnapshot =
+          useWorkOrderSnapshot
+          && context.templateData.maintenanceBasis === 'Running Hours';
         const normalizedTemplateData = {
           ...context.templateData,
           // Map backend field names to frontend field names
@@ -1115,7 +1125,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           // Ensure frequency unit matches maintenance basis
           frequencyUnit: normalizedFrequencyUnit,
           // For RH jobs, store the next due RH value
-          nextDueReading: context.templateData.nextDueRH || '',
+          nextDueReading: useRhWorkOrderSnapshot
+            ? (context.templateData.partANextDueRH || '')
+            : (context.templateData.nextDueRH || ''),
           // Map other fields
           taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
           assignedTo: context.templateData.assignedTo || '',
@@ -1149,13 +1161,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
 
         const partALastCompletedOn = context.templateData.partALastCompletedOn || '';
-        const useWorkOrderSnapshot = resolvedMode !== 'template';
         setLastDoneDate(
           useWorkOrderSnapshot
             ? partALastCompletedOn
             : (context.templateData.lastCompletedDate || context.templateData.lastDoneDate || ''),
         );
-        setLastDoneRH(context.templateData.lastCompletedRH || context.templateData.lastDoneRH || '');
+        setLastDoneRH(
+          useRhWorkOrderSnapshot
+            ? (context.templateData.partALastCompletedRH || '')
+            : (context.templateData.lastCompletedRH || context.templateData.lastDoneRH || ''),
+        );
         setLastDoneDateForRH(
           useWorkOrderSnapshot
             ? partALastCompletedOn
@@ -4833,7 +4848,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />{isNewJobCreation ? 'Next Due Hour' : 'Next Due RH'}</Label>
                       <Input
                         type="text"
-                        value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
+                        value={displayedPartANextDueRH ? `${displayedPartANextDueRH} Hours` : '-'}
                         className="text-sm bg-gray-50"
                         disabled={true}
                         data-testid="WOF.A1.27"

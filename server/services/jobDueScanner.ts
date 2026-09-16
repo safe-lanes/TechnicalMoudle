@@ -528,6 +528,7 @@ export class JobDueScannerService {
           dueRhSnapshot: String(rhDue),
           effectiveRhAtGeneration: String(rhEffectiveCurrent),
           rhLastDoneSnapshot: String(rhLastDone),
+          lastDoneDateSnapshot: job.lastDoneDate || null,
         };
         
         try {
@@ -1085,6 +1086,7 @@ export class JobDueScannerService {
         dueRhSnapshot: String(rhDueValue),
         effectiveRhAtGeneration: String(currentRH),
         rhLastDoneSnapshot: String(rhLastDone),
+        lastDoneDateSnapshot: job.lastDoneDate || null,
         nextDueReading: String(rhDueValue),
         currentReading: String(currentRH),
         intervalRunningHour: job.intervalRunningHour,

@@ -287,6 +287,8 @@ export async function getWorkOrderContext(workOrderId: string) {
   });
   const partALastCompletedOn = resolvedPartADates.lastCompletedOn;
   const partANextDueDate = resolvedPartADates.nextDueDate;
+  const partALastCompletedRH = resolvedPartADates.lastCompletedRH;
+  const partANextDueRH = resolvedPartADates.nextDueRH;
 
   // Job fields still hydrate the operational/template state used by existing
   // completion logic. Dedicated Part A dates below come from the Work Order
@@ -324,6 +326,8 @@ export async function getWorkOrderContext(workOrderId: string) {
     lastCompletedCurrentReading,
     partALastCompletedOn,
     partANextDueDate,
+    partALastCompletedRH,
+    partANextDueRH,
     briefWorkDescription: job.briefWorkDescription || job.jobDescription,
     jobDescription: job.jobDescription,
     requiredSpareParts: enrichedSpareParts,
@@ -361,6 +365,8 @@ export async function getWorkOrderContext(workOrderId: string) {
     lastCompletedCurrentReading,
     partALastCompletedOn,
     partANextDueDate,
+    partALastCompletedRH,
+    partANextDueRH,
     briefWorkDescription: workOrder.briefWorkDescription,
     jobDescription: workOrder.briefWorkDescription,
     requiredSpareParts: [],

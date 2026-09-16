@@ -23,12 +23,26 @@ describe('computeJobCycleUpdates', () => {
     expect(Object.keys(jobUpdates)).toHaveLength(0);
   });
 
-  it('Running Hours: numeric Job updates, interval from intervalRunningHour', () => {
+  it('Running Hours: saves completion date metadata and numeric RH cycle updates', () => {
     const { jobUpdates } = computeJobCycleUpdates({
-      maintenanceBasis: 'Running Hours', completionRH: '12000', job: rhJob,
+      maintenanceBasis: 'Running Hours',
+      dateOfCompletion: '01-Aug-2026',
+      completionRH: '12000',
+      job: rhJob,
     });
+    expect(jobUpdates.lastDoneDate).toBe('01-Aug-2026');
     expect(jobUpdates.lastDoneRH).toBe(12000);
     expect(jobUpdates.nextDueRH).toBe(12500);
+  });
+
+  it('Running Hours: completion date metadata does not require or calculate RH', () => {
+    const { jobUpdates } = computeJobCycleUpdates({
+      maintenanceBasis: 'Running Hours',
+      dateOfCompletion: '01-Aug-2026',
+      completionRH: null,
+      job: rhJob,
+    });
+    expect(jobUpdates).toEqual({ lastDoneDate: '01-Aug-2026' });
   });
 
   it('Running Hours: interval falls back to parseInt(frequencyValue)', () => {

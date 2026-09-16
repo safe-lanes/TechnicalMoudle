@@ -826,11 +826,37 @@ export async function createWorkOrder(body: any) {
         j.jobTitle === workOrderData.jobTitle
       );
       if (matchingJob) {
-        workOrderData = { ...workOrderData, jobId: (matchingJob as any).id };
-        console.log(`Auto-resolved jobId: ${(matchingJob as any).id} for component ${workOrderData.component} and job "${workOrderData.jobTitle}"`);
+        const resolvedJobId = (matchingJob as any).juuid || (matchingJob as any).id;
+        workOrderData = { ...workOrderData, jobId: resolvedJobId };
+        console.log(`Auto-resolved jobId: ${resolvedJobId} for component ${workOrderData.component} and job "${workOrderData.jobTitle}"`);
       }
     } catch (error) {
       console.error('Failed to auto-resolve jobId:', error);
+    }
+  }
+
+  // Planned RH Work Orders snapshot the linked Job's cycle state exactly once.
+  // Explicit generator-provided snapshots win; the Job is only a creation-time
+  // source and is never consulted later for existing Work Order Part A display.
+  if (workOrderData.maintenanceBasis === 'Running Hours' && workOrderData.jobId) {
+    const sourceJob: any = await repo.findJob(workOrderData.jobId);
+    if (sourceJob) {
+      const dueRh =
+        workOrderData.dueRhSnapshot
+        ?? workOrderData.cycleDueRhSnapshot
+        ?? workOrderData.nextDueReading
+        ?? sourceJob.nextDueRH
+        ?? null;
+      workOrderData = {
+        ...workOrderData,
+        lastDoneDateSnapshot:
+          workOrderData.lastDoneDateSnapshot ?? sourceJob.lastDoneDate ?? null,
+        rhLastDoneSnapshot:
+          workOrderData.rhLastDoneSnapshot ?? sourceJob.lastDoneRH ?? null,
+        dueRhSnapshot: workOrderData.dueRhSnapshot ?? dueRh,
+        cycleDueRhSnapshot: workOrderData.cycleDueRhSnapshot ?? dueRh,
+        nextDueReading: workOrderData.nextDueReading ?? (dueRh != null ? String(dueRh) : null),
+      };
     }
   }
 
@@ -2365,10 +2391,16 @@ export async function updateWorkOrder(id: string, body: any) {
             }
 
             // Handle Running Hours-based jobs
+            if (freshWorkOrder.maintenanceBasis === 'Running Hours' && dateOfCompletionNorm) {
+              await repo.updateJob(job.juuid, { lastDoneDate: dateOfCompletionNorm });
+            }
             if (freshWorkOrder.maintenanceBasis === 'Running Hours' && runningHours) {
               const currentRH = parseInt(runningHours);
               if (!isNaN(currentRH)) {
                 const rhUpdates: any = { lastDoneRH: currentRH };
+                if (dateOfCompletionNorm) {
+                  rhUpdates.lastDoneDate = dateOfCompletionNorm;
+                }
                 const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                 if (rhInterval && !isNaN(rhInterval)) {
                   rhUpdates.nextDueRH = currentRH + rhInterval;

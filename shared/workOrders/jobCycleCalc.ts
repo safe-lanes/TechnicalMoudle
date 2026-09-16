@@ -11,8 +11,9 @@
  *    (with originalDueDate anchoring).
  *  - Dual Frequency: Calendar leg ALWAYS (given a completion date); RH leg ONLY when a
  *    completion RH was entered (D2 rule — untouched otherwise).
- *  - Running Hours: requires completionRH; interval = intervalRunningHour, falling back
- *    to parseInt(frequencyValue).
+ *  - Running Hours: the completion date advances lastDoneDate as cycle metadata,
+ *    while completionRH advances lastDoneRH/nextDueRH. The date never participates
+ *    in RH threshold or due calculations.
  *  - jobUpdates carries lastDoneRH/nextDueRH as NUMBERS, matching the jobs table's
  *    existing write contract.
  */
@@ -81,6 +82,10 @@ export function computeJobCycleUpdates(input: JobCycleInput): JobCycleResult {
   if (maintenanceBasis === 'Dual Frequency' && dateOfCompletion) {
     applyCalendarLeg(); // Calendar leg: ALWAYS
     applyRhLeg();       // RH leg: ONLY if RH entered (D2) — applyRhLeg no-ops without RH
+  }
+
+  if (maintenanceBasis === 'Running Hours' && dateOfCompletion) {
+    jobUpdates.lastDoneDate = dateOfCompletion;
   }
 
   if (maintenanceBasis === 'Running Hours' && completionRH) {

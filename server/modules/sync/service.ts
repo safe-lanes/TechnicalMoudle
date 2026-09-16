@@ -28,6 +28,10 @@ import {
   COMPLETED_DATE_SYNC_ERROR,
   ensureDateBeforeSyncedCompletedStatus,
 } from './completedWorkOrderDateSync';
+import {
+  isImmutableWorkOrderSnapshotField,
+  shouldApplySyncedWorkOrderSnapshot,
+} from '../work-orders/utils/workOrderPartADates';
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER — Vessel UUID ↔ vessel_code lookup
@@ -510,6 +514,31 @@ export async function receivePushData(
               fieldLogsApplied++;
               continue;
             }
+
+            if (
+              log.tableName === 'work_orders'
+              && isImmutableWorkOrderSnapshotField(log.fieldName)
+            ) {
+              const currentResult = await client.query(
+                `SELECT "${fieldNameSnake}" AS value FROM "work_orders" WHERE "${identityCol}" = $1 LIMIT 1`,
+                [log.rowUuid],
+              );
+              if (
+                currentResult.rows.length > 0
+                && !shouldApplySyncedWorkOrderSnapshot(
+                  currentResult.rows[0]?.value,
+                  log.oldValue,
+                )
+              ) {
+                fieldLogsApplied++;
+                syncDiag(
+                  `RECEIVE UPDATE SNAPSHOT-ACK immutable work_orders.${fieldNameSnake} row=${log.rowUuid}`,
+                );
+                try { await client.query(`RELEASE SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
+                continue;
+              }
+            }
+
             let valueToApply: any = effectiveNewValue;
             if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
               try {
