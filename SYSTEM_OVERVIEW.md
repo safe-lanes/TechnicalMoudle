@@ -41,7 +41,7 @@ server/
   objectStorage.ts  # file storage service
   migrations.ts     # migration runner (applies, never generates)
 shared/
-  schema.ts         # Drizzle schema, ~107 tables (~4.4k lines)
+  schema.ts         # Drizzle schema, 121 pgTable declarations (~4.4k lines)
   syncConfig.ts     # ship↔shore sync table classification (DO NOT MODIFY casually)
 migrations/         # 4-digit drizzle-generated + 3-digit hand-written SQL
 ```
@@ -108,7 +108,8 @@ Top navigation (in `TopMenuBar`): **Technical · Cert. & Surveys · Defects · P
 | Conflict Review | `sync-conflicts` | `pages/admin/SyncConflictReview.tsx` | Manual sync conflict resolution | Production-ready |
 | Ship Provisioning | `sync-provisioning` | `pages/admin/SyncProvisioning.tsx` | Provision ship instances | Production-ready |
 | Fleet Overview | `sync-fleet` (Sail Admin only) | `pages/admin/SyncFleetOverview.tsx` | Fleet-wide sync overview | Production-ready |
-| Approval Workflow | `approval-workflow` | `pages/admin/ApprovalWorkflow.tsx` | Configure approval levels per module function | Production-ready |
+| Approval Workflow | `approval-workflow` | `pages/admin/ApprovalWorkflow.tsx` | Legacy level matrix still consumed by Modify PMS and WO postponement; its Defects rows are not consumed by live Defects approval code | Production-ready (legacy/dual-wired) |
+| Approval Engine | `approval-engine` | `pages/admin/ApprovalEngineAdminPage.tsx` | Configure classification-specific engine workflows and view Defects approval diagnostics; shore-only and restricted to PMS Admin, Sail Admin, and Super Admin | Production-ready |
 | Fleet Component Editor | `fleet-component-editor/:id?` | `pages/admin/AddEditFleetComponent.tsx` | Fleet-level component template editor | Production-ready |
 
 ### 2.5 Purchasing
@@ -137,7 +138,7 @@ Top navigation (in `TopMenuBar`): **Technical · Cert. & Surveys · Defects · P
 
 ## 3. DATABASE SCHEMA
 
-~107 tables in `shared/schema.ts`. Nearly every table carries the sync-readiness columns: `{prefix}uuid` (TEXT UNIQUE, `gen_random_uuid()::text` DB default), `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`, `is_deleted` (soft delete), `is_sync`. UUIDs (e.g. `vuuid`, `cuuid`, `juuid`, `wouuid`, `duuid`, `suuid`) are the canonical cross-instance identity for ship↔shore sync; integer `id` PKs are local only.
+121 tables are declared with `pgTable` in `shared/schema.ts`. Nearly every table carries the sync-readiness columns: `{prefix}uuid` (TEXT UNIQUE, `gen_random_uuid()::text` DB default), `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`, `is_deleted` (soft delete), `is_sync`. UUIDs (e.g. `vuuid`, `cuuid`, `juuid`, `wouuid`, `duuid`, `suuid`) are the canonical cross-instance identity for ship↔shore sync; integer `id` PKs are local only.
 
 **pgEnums**: `user_role` (Ship, Office, PMS Admin, Sail Admin), `inventory_event_type` (RECEIVE, CONSUME, ADJUST_OPENING_BALANCE, ADJUST_CORRECTION), `inventory_reference_type`, `ihm_presence` (YES/NO/UNKNOWN), `ihm_evidence_type`.
 
@@ -153,7 +154,7 @@ Top navigation (in `TopMenuBar`): **Technical · Cert. & Surveys · Defects · P
 | `sfi_details` | SFI classification codes |
 | `adm_available_ranks`, `adm_vessel_org_chart`, `vessel_org_chart_nodes`, `vessel_department_config` | Rank master, standard hierarchy, per-vessel org chart |
 | `admn_role_master`, `adm_menumaster_ac`, `adm_role_menu_access` | RBAC: roles, menu master, role→menu permissions |
-| `approval_workflow_config` | Approval levels per module/function (Modify PMS, WO, defects) |
+| `approval_workflow_config` | Legacy approval levels per module/function; live step creation remains in Modify PMS and WO postponement, while the displayed Defects rows are not consumed by Defects runtime approval logic |
 | `moc_approvers` | Management-of-change approver assignments |
 
 ### PMS
@@ -204,6 +205,26 @@ Top navigation (in `TopMenuBar`): **Technical · Cert. & Surveys · Defects · P
 | `recurring_defects`, `recurring_defect_links` | Recurrence detection groupings |
 | `defect_sequences` | Per-vessel annual defect number counters |
 | `defect_categories`, `defect_types` | Lookups |
+| `defect_approval_settings` | Shore-side Defects routing singleton (`long_extension_days`, report toggle); singleton key is fixed to `default` and the threshold is constrained to 1–3650 |
+| `defect_closure_history` | Immutable shore-written snapshots of C1 values returned during C2 verification; a database trigger rejects UPDATE and DELETE, so soft delete and retention/purge updates fail |
+
+### Approval Engine
+
+The seven `apprv_*` tables are intentionally declared outside `shared/schema.ts` in `server/modules/approval-engine/db/schema.ts`. They are engine-owned, tenant-local, shore-side tables intended as `NO_SYNC`; `shared/syncConfig.ts` does not currently contain registry entries for them.
+
+| Table | Purpose |
+|---|---|
+| `apprv_workflows` | Versioned workflow headers selected by module/screen/action scope and classification |
+| `apprv_workflow_nodes` | Workflow nodes, ordinals, labels, and quorum settings |
+| `apprv_node_edges` | Directed edges between workflow nodes |
+| `apprv_node_slots` | Stable role slots attached to approval-step nodes |
+| `apprv_requests` | Runtime requests with workflow snapshot, subject, vessel, current node, and terminal state |
+| `apprv_request_slots` | Runtime role-slot resolution and decision history |
+| `apprv_scope_settings` | Per-scope enable/disable switches |
+| `approval_notifications` | Shore-side per-user approval inbox and email-delivery status; intended `NO_SYNC` but absent from `shared/syncConfig.ts` |
+| `company_approval_settings` | Tenant singleton holding the active approval-email toggle; registered `ONE_WAY_SHORE_TO_SHIP` |
+
+The engine tables do not follow the shared six-column sync convention uniformly. Their lifecycle fields are specific to workflow configuration and runtime requests; module decision callbacks write approved outcomes through the owning module's normal tables instead of syncing engine rows.
 
 ### Compliance
 | Table | Purpose |
@@ -257,8 +278,9 @@ Top navigation (in `TopMenuBar`): **Technical · Cert. & Surveys · Defects · P
 - **Work Order completion → Spares consumption**: WO completion can consume linked spares via the inventory service, writing `inventory_transactions` with WO reference.
 - **Defects ↔ Components / Spares / Work Orders**: defects reference `component_id`; `LinkDefectsModal` / `LinkSparesModal` create many-to-many links between defects, WOs, spares, and components.
 - **Modify PMS (Change Requests) → Components/Jobs/Spares/Stores**: `changeRequestsService.ts` classifies targets (Critical/Normal), pulls approval levels from `approval_workflow_config`, resolves target IDs to UUIDs, and applies approved changes to the target module's tables.
+- **Defects → Approval Engine**: the generic Defects PATCH gate detects a newly requested B5 extension or a direct C2 verification attempt; a shore-side post-save hook detects newly completed C1 closeout, and the post-sync arrival sweep detects equivalent ship-originated records. Extensions use the repeat-extension scope after a prior approved extension, with fallback to the ordinary extension scope when no matching repeat workflow exists; C1 closeout and direct C2 attempts use the verification scope. Classification is Critical when the defect is CoC-related, its linked component is critical, or the requested extension exceeds `defect_approval_settings.long_extension_days`; otherwise it is Normal. The card resolves configured role slots at runtime with strict vessel scoping and applies terminal decisions through Defects repositories: extension approval/rejection updates the selected history entry (approval also advances target date and deferment), while verification approval stamps the defect and rejection preserves the returned C1 snapshot and reopens incomplete closeout.
 - **Alert engine reads everything**: `pmsAlertEngine.ts` (driven by `server/services/maintenanceOrchestrator.ts`) evaluates work orders (critical overdue, skipped cycles), spares (low critical stock), certificates/surveys (expiry — reads LIVE vessel_certificate_data/vessel_survey_data), and defects (overdue, CoC). Alerts fire once-ever into `alert_events`.
-- **Approval workflow config** (`approval_workflow_config`) is shared by Modify PMS, WO postponement, and defect flows; edited in Admin → Approval Workflow.
+- **Approval configuration split**: Modify PMS and WO postponement remain dual-wired: they create legacy steps from `approval_workflow_config` and can also submit to the Approval Engine. Defects uses the Approval Engine card/settings and does not consume its legacy Approval Workflow rows. Active engine workflows and enabled legacy levels must not govern the same Technical scope simultaneously.
 - **Fleet templates → vessel data**: fleet_components/jobs/spares are mapped to vessels via the mapping tables; bulk import and provisioning generate vessel-level rows and auto-generate WOs from job templates.
 - **Form engine → Work Orders**: WO execution forms are rendered from `form_versions.schema_json`; results are saved into `work_orders.form_data`.
 
@@ -321,6 +343,15 @@ Top navigation (in `TopMenuBar`): **Technical · Cert. & Surveys · Defects · P
 ### 5.7 Vessel context
 - `VesselContext` provides the active `vesselId` app-wide (persisted in localStorage for admins). Nearly all queries are vessel-scoped — new features should accept `?vesselId=` and respect `requireVesselAccess`.
 
+### 5.8 Approval Engine
+- Mounted at `/technical/api/approval-engine` only on shore instances. The host registers the Technical and Defects approval cards and supplies tenant, actor, admin-write guard, repository provider, and notification event handler.
+- Workflow selection key is module/screen/action scope plus card-returned classification. Workflows are versioned; each request stores a complete workflow snapshot, so later edits do not change an in-flight request.
+- Implemented execution is a linear chain of 1–6 approval steps ending at one terminal node. A step may contain multiple role slots with `all`, `any`, or `nOfM` quorum. Conditional nodes, advanced mode, and parallel fork/join branches exist in types/schema but validation rejects them.
+- Workflows store stable role IDs and display-label snapshots. User IDs are resolved when a step activates; Defects delegates to the shared role resolver with the subject vessel. The strict vessel-scope flag prevents unrelated vessel assignments from resolving.
+- Request states are `pending`, `approved`, and `returned`; slot states are `pending`, `active`, `approved`, `rejected`, and `superseded`. Rejection finalizes a request as `returned`.
+- A step whose active slots all resolve zero approvers can be decided only through the narrow host-marked admin override. The override is available to PMS Admin, Sail Admin, and Super Admin and is recorded distinctly; it does not apply when any active slot has a resolved approver.
+- **Adding approvals to a new module**: create and register an approval card declaring scopes and classifications; keep module validation and safety checks before submission; classify the opaque subject and resolve role slots in the card; implement an idempotent `onDecision` callback that writes through module-owned tables. Integrate through the approvals host gateway/card boundary; do not modify `server/modules/approval-engine/**` for module-specific work or read/write `apprv_*` directly.
+
 ---
 
 ## 6. API ENDPOINTS (by module)
@@ -360,6 +391,24 @@ All module routers (including Shipskart) are mounted flat on **`/technical/api`*
 **Defects**
 - `GET /defects` (filters), `GET /defects/coc`, `POST /defects`, `PATCH /defects/:id/close`
 - `GET /recurring-defects`, `POST /recurring-defects/recalculate`
+- `GET|PUT /defects/approval-settings` — Defects classification/report settings; `PMS Admin`, `Sail Admin`, or `Super Admin`
+- `GET /defects/:id/approval-routing` — current scope/classification/workflow preview; loaded-defect vessel identity + `requireVesselAccess`
+- `GET /defects/:id/approval-chain?action=extension|verification` — current approval history; loaded-defect vessel identity + `requireVesselAccess`
+- `GET /defects/approval-diagnostics` — bounded workflow/approver/request diagnostics; `PMS Admin`, `Sail Admin`, or `Super Admin`
+- `GET /defects/:id/closure-history` — immutable rejected C1 history; loaded-defect vessel identity + `requireVesselAccess`
+
+**Approval Engine** (shore-only; under `/approval-engine`)
+- `GET /registry`, `GET /roles`, `GET /workflows`, `GET /workflows/:wfuuid`, `GET /scopes/enabled` — configuration reads; no endpoint-specific role guard beyond the shared Technical middleware
+- `POST /workflows`, `PUT /scopes/enabled` — configuration writes; `PMS Admin`, `Sail Admin`, or `Super Admin`
+- `POST /requests` — submit; no endpoint-specific role guard (module safety gates submit through the in-process gateway)
+- `POST /requests/:requuid/decide` — approve/reject; the engine permits only a resolved current approver or the narrow all-zero admin override
+- `GET /requests/status`, `GET /pending` — subject history and current-user pending work; no endpoint-specific role guard
+
+**Approval host gateway** (under `/approvals`)
+- `GET /config`, `GET /email-config` — runtime vessel-scope/email flags; no endpoint-specific role guard
+- `GET /role-approvers` — configured role-name resolution; `PMS Admin`, `Sail Admin`, or `Super Admin`
+- `PUT /email-config` — tenant email toggle; `PMS Admin`, `Sail Admin`, or `Super Admin`
+- `GET /notifications`, `GET /notifications/count`, `PATCH /notifications/:anuuid/read`, `POST /notifications/read-all` — current-user notification reads/updates; ownership is enforced by user UUID in each query
 
 **Certificates & Surveys**
 - `GET /certificates`, `PATCH /certificates/:id`; `GET /surveys`, `POST /surveys`
@@ -402,6 +451,7 @@ All module routers (including Shipskart) are mounted flat on **`/technical/api`*
 - **Layering (mandatory)**: routes → controllers → services → repositories → storage. Routes only delegate; controllers parse/format; services own business logic; repositories own DB access. No raw `db.insert/update/delete` in services (bypasses UUID generation).
 - No cross-module imports via internal paths — go through the other module's service layer.
 - New module = folder under `server/modules/<name>/` with `routes.ts`, `controllers/`, `services/`, `repositories/`; register the router in `server/modules/index.ts`.
+- Module-specific approval work integrates through cards and the approvals host gateway. Do not modify `server/modules/approval-engine/**` for module behavior and do not access `apprv_*` tables directly.
 - Express route ordering: specific before generic; avoid colliding param shapes (`/things/:vesselId` vs `/things/:id` — use `/things/details/:id`).
 - Zod validation on request bodies before hitting storage.
 
@@ -409,6 +459,7 @@ All module routers (including Shipskart) are mounted flat on **`/technical/api`*
 - Schema change flow: edit `shared/schema.ts` → `npm run db:generate` → review SQL → server applies on startup. **Never `db:push`** on an existing DB. Never expect startup to generate migrations.
 - DB defaults: use `.default(sql\`gen_random_uuid()::text\`)`, never `.$defaultFn()` (JS-only, breaks raw SQL inserts).
 - Every new table needs: `{prefix}uuid`, `createdAt`, `updatedAt`, `createdByUuid`, `updatedByUuid`, `isDeleted`, `isSync`.
+- Every new table also requires an explicit `shared/syncConfig.ts` registry entry in the appropriate category; having the six sync-readiness columns alone does not register it. The engine-owned `apprv_*` tables currently lack these entries despite their `NO_SYNC` design intent.
 - Hand-written migrations must be idempotent (`IF NOT EXISTS`, `ON CONFLICT (name)`, `DO $$` guards); never hardcode PK ids; name-based FK lookups.
 
 ### Frontend
@@ -453,6 +504,21 @@ All module routers (including Shipskart) are mounted flat on **`/technical/api`*
 - `VITE_AG_GRID_LICENSE_KEY` unset → AG Grid runs in trial mode with console warnings/watermark.
 - `SHIPSKART_*` vars unset → Purchasing module shows error state.
 - Sync env (`SYNC_SHORE_URL`, `SYNC_API_KEY`, `SYNC_INSTANCE_ID`) not configured → Sync Dashboard shows "Never synced".
+
+**Approval Engine / Defects approval gaps**
+- **Verified:** the seven `apprv_*` tables and `approval_notifications` have no entries in `shared/syncConfig.ts`, although their schema/migration comments describe them as `NO_SYNC` (`server/modules/approval-engine/db/schema.ts`, `server/modules/approvals/notificationSchema.ts`).
+- **Verified:** `defect_approval_settings` and `defect_closure_history` have no `shared/syncConfig.ts` entries. The intended classifications are respectively `NO_SYNC` and insert-only `ONE_WAY_SHORE_TO_SHIP`; the latter must not be enabled until redelivery/upsert behavior is safe because its trigger rejects every UPDATE and DELETE (`migrations/0065_watery_micromacro.sql`, `migrations/0067_flashy_charles_xavier.sql`).
+- **Verified:** `PUT /technical/api/approvals/email-config` writes `company_approval_settings` directly and does not call `logFieldChanges`, despite that table's `ONE_WAY_SHORE_TO_SHIP` registry classification (`server/modules/approvals/routes.ts`).
+- **Unverified — historical/runtime fact, not determinable from repository code:** there is no evidence that `scripts/generate-approval-workflows-from-awc.ts` was run with `--apply` for every tenant. The script defaults to dry-run, and Modify PMS and WO postponement still create legacy levels before engine submission; enabling both mechanisms for one scope creates a dual-gating risk (`server/modules/approval-engine/INTEGRATION-GUIDE.md`).
+- **Verified:** a role slot resolving zero users remains active with no timeout, escalation, or automatic reassignment. The only recovery in engine behavior is the narrow host-marked admin override, available only when every active slot resolves zero (`server/modules/approval-engine/core/engine.ts`, `server/modules/approvals/mount.ts`).
+- **Verified:** the request model has no withdraw or cancel state or endpoint; terminal states are only `approved` and `returned` (`server/modules/approval-engine/core/types.ts`, `server/modules/approval-engine/http/router.ts`).
+- **Verified:** strict vessel approver resolution depends on login-captured `master_user_vessels` assignments. A new assignment is unavailable until capture occurs, and a transferred-off assignment can remain resolvable until it is evicted (`server/modules/approvals/approvalCard.ts`).
+- **Verified contract gap:** `engine.status()` currently receives rows ordered by descending `submitted_at` from the Drizzle repository, but neither the repository interface nor the core return contract declares that ordering guarantee. Consumers should not infer a stable public ordering contract from the current adapter implementation (`server/modules/approval-engine/core/engine.ts`, `server/modules/approval-engine/db/drizzleRepository.ts`).
+- **Verified:** the Defect PDF payload and renderer include only the latest target-date extension and current C1/C2 values; they do not include extension history or `defect_closure_history`. `show_rejected_closures_on_report` is stored but has no report/PDF consumer (`client/src/lib/pdfReportGenerator.ts`, `client/src/pages/defects/DefectFormWizard.tsx`).
+- **Verified:** `isDeferred` is interpreted inconsistently. The Defects list and shared dashboard status helper present deferred defects as Extended and suppress Overdue; server reports group raw status and can count an Open deferred defect as overdue; the alert evaluator does not receive `isDeferred` and alerts on any past-due non-Closed/non-Cancelled defect (`client/src/lib/defectStatusUtils.ts`, `server/modules/defects/services/defectsService.ts`, `server/modules/alerts/evaluators/defectEvaluators.ts`).
+- **Verified:** `closure_files` stores caller-supplied strings without URL validation and closure history renders them directly as links. No retention/reference protection prevents a referenced object from being deleted (`shared/schema.ts`, `client/src/pages/defects/DefectFormWizard.tsx`).
+- **Verified environment gap:** the approval SES variables are unset in this environment, so email delivery is unavailable while in-app notifications continue (`server/modules/approvals/sesEmailTransport.ts`).
+- **Verified deployment requirement:** a Replit-only test identity switcher exists. It is guarded by both client and server environment checks, but any non-Replit deployment must confirm `/technical/api/dev/test-users` returns 404 and that the controls/banner are inert, or remove the mechanism (`docs/DEV_TEAM_TEST_IDENTITY_SWITCHER.md`).
 
 **Data / runtime issues observed**
 - Component tree logs "Parent not found" warnings for orphan SFI codes (e.g. `554.001.x`, `652.001.12`).
