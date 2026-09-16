@@ -9,6 +9,7 @@ import { logFieldChanges } from '../../sync';
 import { isShipInstance } from '../../sync/syncRole';
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
+import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
 import {
   ensureCompletedWorkOrderDate,
   getJobCompletionDate,
@@ -77,6 +78,20 @@ export async function completeWorkOrder(
     status: 'Completed',
     dateCompleted: dateOfCompletion,
   }).dateCompleted;
+
+  const b2BaselineError = validateWorkOrderB2Baselines({
+    maintenanceBasis: workOrder.maintenanceBasis,
+    startDateTime: executionData.startDateTime ?? workOrder.startDateTime,
+    lastDoneDateSnapshot: workOrder.lastDoneDateSnapshot,
+    woCompletionRh,
+    rhLastDoneSnapshot: workOrder.rhLastDoneSnapshot,
+  })[0];
+  if (b2BaselineError) {
+    throw new ValidationError(b2BaselineError.message, {
+      code: b2BaselineError.code,
+      field: b2BaselineError.field,
+    });
+  }
 
   const vesselCode = workOrder.vesselId
     ? (await repo.getStorage().getVessel(workOrder.vesselId))?.vCode

@@ -86,4 +86,39 @@ describe('final approval date projection', () => {
     );
     expect(finalizeWorkOrderCompletion).toHaveBeenCalledWith('wo-1');
   });
+
+  it('bulk approval refuses an invalid stored B2 boundary before persistence', async () => {
+    repo.findById.mockResolvedValueOnce({
+      ...baseWorkOrder,
+      status: 'Pending Approval',
+      startDateTime: '2026-07-15T08:00',
+      lastDoneDateSnapshot: '15-Jul-2026',
+    });
+    const { bulkApprove } = await import('../services/workOrderBulkService');
+
+    const result = await bulkApprove(['wo-1'], 'Chief Engineer');
+
+    expect(result.results.success).toEqual([]);
+    expect(result.results.failed[0]?.error).toBe(
+      'Start Date must be after Last Completed On (2026-07-15).',
+    );
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  it('level-2 approval refuses an invalid stored B2 boundary before persistence', async () => {
+    repo.findById.mockResolvedValueOnce({
+      ...baseWorkOrder,
+      status: 'Pending Office Review',
+      maintenanceBasis: 'Running Hours',
+      startDateTime: '2026-07-16T08:00',
+      lastDoneDateSnapshot: '15-Jul-2026',
+      woCompletionRh: '5000',
+      rhLastDoneSnapshot: '5000',
+    });
+    const { reviewerApprove } = await import('../services/workOrderBulkService');
+
+    await expect(reviewerApprove('wo-1', 'Reviewed', 'reviewer-1'))
+      .rejects.toThrow('WO Completion RH must be greater than Last Completed At (5000 Hours).');
+    expect(repo.update).not.toHaveBeenCalled();
+  });
 });

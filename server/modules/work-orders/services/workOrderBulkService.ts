@@ -10,6 +10,7 @@ import {
   ensureCompletedWorkOrderDate,
   resolveFinalCompletionDate,
 } from '../utils/completedWorkOrderDate';
+import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
 
 // ── Bulk Approve Work Orders ──
 
@@ -40,6 +41,20 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
           (existingWO as any).computedStatus !== 'Pending Approval') {
         results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO.status})` });
         continue;
+      }
+
+      const b2BaselineError = validateWorkOrderB2Baselines({
+        maintenanceBasis: existingWO.maintenanceBasis,
+        startDateTime: existingWO.startDateTime,
+        lastDoneDateSnapshot: existingWO.lastDoneDateSnapshot,
+        woCompletionRh: existingWO.woCompletionRh,
+        rhLastDoneSnapshot: existingWO.rhLastDoneSnapshot,
+      })[0];
+      if (b2BaselineError) {
+        throw new ValidationError(b2BaselineError.message, {
+          code: b2BaselineError.code,
+          field: b2BaselineError.field,
+        });
       }
 
       const hodResolution = await resolveHodForDepartment(
@@ -246,6 +261,20 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
   }
   if (existingWO.status !== 'Pending Office Review') {
     throw new ValidationError(`Work order is not pending office review (status: ${existingWO.status})`);
+  }
+
+  const b2BaselineError = validateWorkOrderB2Baselines({
+    maintenanceBasis: existingWO.maintenanceBasis,
+    startDateTime: existingWO.startDateTime,
+    lastDoneDateSnapshot: existingWO.lastDoneDateSnapshot,
+    woCompletionRh: existingWO.woCompletionRh,
+    rhLastDoneSnapshot: existingWO.rhLastDoneSnapshot,
+  })[0];
+  if (b2BaselineError) {
+    throw new ValidationError(b2BaselineError.message, {
+      code: b2BaselineError.code,
+      field: b2BaselineError.field,
+    });
   }
 
   // Phase 0 / P0.2 (defect D1): the office step must not complete a WO that is still held by

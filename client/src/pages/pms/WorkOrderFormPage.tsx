@@ -66,6 +66,7 @@ import { FEATURES, IHM_ACTIONS } from '@/config/features';
 import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
 import { stripServerManagedWorkOrderRhFields } from '@shared/workOrderPayload';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
+import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
 import { SectionBlock } from '@/components/SectionBlock';
 import { PartHeader } from '@/components/PartHeader';
 import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
@@ -1031,6 +1032,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       remarks: ""
     }
   });
+  const b2BaselineErrors = useMemo(() => validateWorkOrderB2Baselines({
+    maintenanceBasis: templateData.maintenanceBasis,
+    startDateTime: executionData.startDateTime,
+    lastDoneDateSnapshot: lastDoneDateForRH || lastDoneDate,
+    woCompletionRh: executionData.woCompletionRh,
+    rhLastDoneSnapshot: lastDoneRH,
+  }), [
+    templateData.maintenanceBasis,
+    executionData.startDateTime,
+    executionData.woCompletionRh,
+    lastDoneDateForRH,
+    lastDoneDate,
+    lastDoneRH,
+  ]);
+  const startDateBaselineError = b2BaselineErrors.find(
+    (error) => error.field === 'startDateTime',
+  );
+  const completionRhBaselineError = b2BaselineErrors.find(
+    (error) => error.field === 'woCompletionRh',
+  );
 
   const { ranks: rankOptions } = useRanks();
   const ranksForAssignedTo = ensureRankInOptions(rankOptions, templateData.assignedTo);
@@ -2662,6 +2683,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
+      hardErrors.push(...b2BaselineErrors.map((error) => error.message));
+
       if (!draftIntent && executionData.performedBy && hodLabel && executionData.performedBy === hodLabel) {
         hardErrors.push(`The Head of Department (${hodLabel}) cannot both perform and approve the work. The server will assign ${hodLabel} as approver based on the vessel org chart.`);
       }
@@ -3301,6 +3324,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const handleSavePartBEdit = async () => {
     if (!workOrderId) return;
+    if (b2BaselineErrors.length > 0) {
+      toast({
+        title: 'Validation Error',
+        description: b2BaselineErrors[0].message,
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsSavingPartB(true);
     try {
       const payload: Record<string, unknown> = {
@@ -5941,10 +5972,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         handleExecutionChange('startDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
                       }}
                       disabled={isPartBReadOnly}
-                      className="text-sm"
+                      className={`text-sm ${startDateBaselineError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                      aria-invalid={!!startDateBaselineError}
                       placeholder="dd-mm-yyyy"
                       data-testid="WOF.B2.6"
                     />
+                    {startDateBaselineError && (
+                      <p className="text-xs text-red-600" data-testid="error-start-date-after-last-completed">
+                        {startDateBaselineError.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -6049,10 +6086,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           value={woRhValue}
                           onChange={(e) => handleExecutionChange('woCompletionRh', e.target.value)}
                           disabled={isPartBReadOnly || isB3EditLocked}
-                          className="text-sm"
+                          className={`text-sm ${completionRhBaselineError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                          aria-invalid={!!completionRhBaselineError}
                           placeholder="RH at completion (prefilled from Current Reading)"
                           data-testid="input-wo-completion-rh"
                         />
+                        {completionRhBaselineError && (
+                          <p className="text-xs text-red-600" data-testid="error-completion-rh-after-last-completed">
+                            {completionRhBaselineError.message}
+                          </p>
+                        )}
                         <p className="text-[11px] text-gray-400">Hours at the time the work was done — drives the next RH cycle.</p>
                       </div>
                     );

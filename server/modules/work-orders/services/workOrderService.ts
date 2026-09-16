@@ -21,6 +21,7 @@ import {
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { classifyApprovalTransition } from '../utils/approvalTransition';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
+import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
 import {
   ensureCompletedWorkOrderDate,
   getJobCompletionDate,
@@ -1114,6 +1115,19 @@ export async function updateWorkOrder(id: string, body: any) {
       if (key === 'partBOfficeEdit') continue; // strip the marker
       if (ALLOWED_FIELDS.has(key)) updateData[key] = value;
     }
+    const b2BaselineError = validateWorkOrderB2Baselines({
+      maintenanceBasis: existingWO.maintenanceBasis,
+      startDateTime: updateData.startDateTime ?? existingWO.startDateTime,
+      lastDoneDateSnapshot: existingWO.lastDoneDateSnapshot,
+      woCompletionRh: existingWO.woCompletionRh,
+      rhLastDoneSnapshot: existingWO.rhLastDoneSnapshot,
+    })[0];
+    if (b2BaselineError) {
+      throw new ValidationError(b2BaselineError.message, {
+        code: b2BaselineError.code,
+        field: b2BaselineError.field,
+      });
+    }
     console.log(`📝 Part B office edit — WO ${existingWO.workOrderNo}: updating [${Object.keys(updateData).filter(k => !['userId','userRole','userUuid'].includes(k)).join(', ')}]`);
     // updatedAt is set automatically by the Drizzle .$onUpdateFn on the column,
     // ensuring shore's edit wins over any in-flight ship sync for the same fields.
@@ -1449,6 +1463,11 @@ export async function updateWorkOrder(id: string, body: any) {
   const isSubmittingForApproval =
     updateData.status === 'Pending Approval' &&
     existingWO.status !== 'Pending Approval';
+  const normalizedIncomingStatus = String(updateData.status || '').trim().toLowerCase();
+  const isFinalizingApproval =
+    (normalizedIncomingStatus === 'approved' || normalizedIncomingStatus === 'completed')
+    && existingWO.status !== 'Approved'
+    && existingWO.status !== 'Completed';
   const effectiveCompletionRh = updateData.woCompletionRh ?? (existingWO as any).woCompletionRh;
   const effectiveCounterType = resolvedComponent?.rhCounterType || 'MASTER';
   if (
@@ -1460,6 +1479,26 @@ export async function updateWorkOrder(id: string, body: any) {
       'WO Completion RH is required for Running Hours-based Work Orders',
       { code: 'WO_COMPLETION_RH_REQUIRED' }
     );
+  }
+
+  const shouldValidateStartBaseline =
+    updateData.startDateTime !== undefined || isSubmittingForApproval || isFinalizingApproval;
+  const shouldValidateRhBaseline =
+    updateData.woCompletionRh !== undefined || isSubmittingForApproval || isFinalizingApproval;
+  const b2BaselineError = validateWorkOrderB2Baselines({
+    maintenanceBasis: existingWO.maintenanceBasis,
+    startDateTime: shouldValidateStartBaseline
+      ? (updateData.startDateTime ?? existingWO.startDateTime)
+      : null,
+    lastDoneDateSnapshot: existingWO.lastDoneDateSnapshot,
+    woCompletionRh: shouldValidateRhBaseline ? effectiveCompletionRh : null,
+    rhLastDoneSnapshot: existingWO.rhLastDoneSnapshot,
+  })[0];
+  if (b2BaselineError) {
+    throw new ValidationError(b2BaselineError.message, {
+      code: b2BaselineError.code,
+      field: b2BaselineError.field,
+    });
   }
 
   // ── RH accuracy validations (migration 139) — PATCH path mirror of the

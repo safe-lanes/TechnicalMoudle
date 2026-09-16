@@ -3,3 +3,4 @@
 - [Running Hours monotonicity](running-hours-monotonicity.md) — normal RH updates never decrease live counters; only explicit approved reset/replacement workflows may do so.
 - [RH Work Order snapshots](rh-work-order-snapshots.md) — Part A is immutable per-cycle history; completion dates update Job metadata but never RH math or the completed WO.
 - [Completed Work Order dates](completed-work-order-dates.md) — final Completed state requires a valid completion date without changing pre-approval date behavior.
+- [Work Order B2 baselines](work-order-b2-baselines.md) — Start Date and RH completion boundaries are strict and use immutable Part A snapshots.
