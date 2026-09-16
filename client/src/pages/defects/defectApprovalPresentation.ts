@@ -23,6 +23,21 @@ export function formatDecidedSlotRemark(status?: string | null, remarks?: string
     : "";
 }
 
+export function formatInlineApprovalSlotRemark(status?: string | null, remarks?: string | null): string {
+  return String(status ?? "").toLowerCase() === "rejected"
+    ? ""
+    : formatDecidedSlotRemark(status, remarks);
+}
+
+export function formatRejectionHeading(
+  stepIndex: number | null,
+  stepCount: number,
+  attribution?: string | null,
+): string {
+  const step = stepIndex !== null && stepCount > 1 ? ` at Step ${stepIndex + 1}` : "";
+  return `Rejected${step}${attribution ? ` by ${attribution}` : ""}`;
+}
+
 const UTC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** Defects compliance timestamp display. Date-only values must remain date-only. */

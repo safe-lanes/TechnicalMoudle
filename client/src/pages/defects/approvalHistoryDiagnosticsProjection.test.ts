@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDecidedSlotRemark, formatDefectAuditTimestamp, formatMaritimeUtcDateTime, projectDiagnosticsSummary, projectExtensionCardPresentation, projectExtensionHistory } from "./defectApprovalPresentation";
+import { formatDecidedSlotRemark, formatDefectAuditTimestamp, formatInlineApprovalSlotRemark, formatMaritimeUtcDateTime, formatRejectionHeading, projectDiagnosticsSummary, projectExtensionCardPresentation, projectExtensionHistory } from "./defectApprovalPresentation";
 
 describe("approval history and diagnostics projections", () => {
   it("keeps three mixed extension entries oldest-first with every label", () => {
@@ -65,6 +65,21 @@ describe("approval history and diagnostics projections", () => {
     });
   });
 
+  it("keeps multi-entry rejected titles numbered while suppressing only 1 of 1", () => {
+    expect(projectExtensionCardPresentation({
+      index: 1,
+      total: 2,
+      current: true,
+      status: "Rejected",
+    }).title).toBe("Extension 2 of 2 — REJECTED");
+    expect(projectExtensionCardPresentation({
+      index: 0,
+      total: 1,
+      current: true,
+      status: "Rejected",
+    }).title).toBe("Extension — REJECTED");
+  });
+
   it("formats Defects timestamps in maritime UTC without changing date-only values", () => {
     expect(formatMaritimeUtcDateTime("2026-09-16T11:50:11.473Z")).toBe("16 Sep 2026, 1150 Z");
     expect(formatMaritimeUtcDateTime("2026-09-16T23:05:00-04:00")).toBe("17 Sep 2026, 0305 Z");
@@ -84,6 +99,13 @@ describe("approval history and diagnostics projections", () => {
     expect(formatDecidedSlotRemark("rejected", "Needs a revised closeout date")).toBe("Needs a revised closeout date");
     expect(formatDecidedSlotRemark("approved", "   ")).toBe("");
     expect(formatDecidedSlotRemark("pending", "Not yet decided")).toBe("");
+  });
+
+  it("keeps rejection remarks only in the step-aware summary banner", () => {
+    expect(formatInlineApprovalSlotRemark("rejected", "Insufficient evidence")).toBe("");
+    expect(formatInlineApprovalSlotRemark("approved", "Approved with monitoring")).toBe("Approved with monitoring");
+    expect(formatRejectionHeading(1, 3, "Manager One")).toBe("Rejected at Step 2 by Manager One");
+    expect(formatRejectionHeading(0, 1, "Manager One")).toBe("Rejected by Manager One");
   });
 
   it("projects exactly four warning chips and a quiet healthy state", () => {

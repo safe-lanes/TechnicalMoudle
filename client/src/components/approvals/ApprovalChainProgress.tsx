@@ -11,7 +11,11 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { formatDecidedSlotRemark, formatMaritimeUtcDateTime } from "@/pages/defects/defectApprovalPresentation";
+import {
+  formatInlineApprovalSlotRemark,
+  formatMaritimeUtcDateTime,
+  formatRejectionHeading,
+} from "@/pages/defects/defectApprovalPresentation";
 
 export class DefectApprovalChainFetchError extends Error {
   constructor(message: string, public readonly code?: string, public readonly status?: number) {
@@ -216,8 +220,12 @@ export function ApprovalChainProgress({
 
 export function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
   const steps = Array.isArray(chain.steps) ? chain.steps : [];
-  const rejectedStep = steps.flatMap((step) => step.slots ?? []).find((slot) => String(slot.status).toLowerCase() === "rejected")
-    || steps.find((step) => String(step.status).toLowerCase() === "rejected");
+  const rejectedStepIndex = steps.findIndex((step) =>
+    String(step.status).toLowerCase() === "rejected"
+    || (step.slots ?? []).some((slot) => String(slot.status).toLowerCase() === "rejected"));
+  const rejectedWorkflowStep = rejectedStepIndex >= 0 ? steps[rejectedStepIndex] : undefined;
+  const rejectedStep = rejectedWorkflowStep?.slots?.find((slot) => String(slot.status).toLowerCase() === "rejected")
+    || (String(rejectedWorkflowStep?.status).toLowerCase() === "rejected" ? rejectedWorkflowStep : undefined);
   const requestRejected = ["rejected", "returned"].includes(String(chain.requestStatus).toLowerCase());
   const rejection = rejectedStep || (requestRejected
     ? steps.flatMap((step) => [step, ...(step.slots ?? [])]).find((item) => item.remarks || item.decidedBy || item.decidedByName)
@@ -245,7 +253,7 @@ export function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
               </span>
               {step.decidedBy && <span className="text-gray-600">by {step.decidedBy}</span>}
               {step.slots?.map((slot, slotIndex) => {
-                const remark = formatDecidedSlotRemark(slot.status, slot.remarks);
+                const remark = formatInlineApprovalSlotRemark(slot.status, slot.remarks);
                 return (
                   <div key={slot.slotId || `${key}-slot-${slotIndex}`} className="flex flex-col items-start gap-1">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${slot.status === "rejected" ? "bg-red-50 text-red-700" : "bg-gray-50 text-gray-700"}`}>
@@ -268,7 +276,11 @@ export function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
       </div>
       {(rejection || requestRejected) && (
         <div className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-red-800" data-testid="approval-rejection-attribution">
-          <div className="font-medium">Rejected{rejectionAttribution ? ` by ${rejectionAttribution}` : ""}</div>
+          <div className="font-medium">{formatRejectionHeading(
+            rejectedStepIndex >= 0 ? rejectedStepIndex : null,
+            steps.length,
+            rejectionAttribution,
+          )}</div>
           {rejectionReason && <div>{rejectionReason}</div>}
         </div>
       )}
