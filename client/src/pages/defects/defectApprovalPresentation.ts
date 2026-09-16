@@ -1,5 +1,62 @@
 export type DefectApprovalAction = "extension" | "verification";
 
+export type ExtensionHistoryEntry = {
+  id: string;
+  status?: string | null;
+  requestedAt?: string | null;
+};
+
+export function orderExtensionHistory<T extends ExtensionHistoryEntry>(entries: T[]): T[] {
+  const dated = entries.map((entry) => ({
+    entry,
+    requestedAt: Date.parse(String(entry.requestedAt ?? "")),
+  }));
+  const allDatesAreUsable = dated.every(({ requestedAt }) => Number.isFinite(requestedAt))
+    && new Set(dated.map(({ requestedAt }) => requestedAt)).size === dated.length;
+  if (!allDatesAreUsable) return [...entries];
+  return dated.sort((a, b) => a.requestedAt - b.requestedAt).map(({ entry }) => entry);
+}
+
+export function formatDecidedSlotRemark(status?: string | null, remarks?: string | null): string {
+  return ["approved", "rejected"].includes(String(status ?? "").toLowerCase()) && remarks?.trim()
+    ? remarks.trim()
+    : "";
+}
+
+export function extensionEntryPermissions(entry: ExtensionHistoryEntry, index: number, total: number, canEdit: boolean) {
+  const current = index === total - 1;
+  const terminal = ["approved", "rejected", "returned"].includes(String(entry.status ?? "").toLowerCase());
+  return {
+    current,
+    terminal,
+    canEdit: Boolean(canEdit && current && !terminal),
+    canDecide: Boolean(current && !terminal && String(entry.status ?? "").toLowerCase() === "requested"),
+  };
+}
+
+export function projectExtensionHistory<T extends ExtensionHistoryEntry>(
+  entries: T[],
+  chainMap: Record<string, unknown> | undefined,
+  canEdit: boolean,
+) {
+  const ordered = orderExtensionHistory(entries);
+  const hasChainMap = chainMap !== undefined;
+  return ordered.map((entry, index) => ({
+    entry,
+    label: `Extension ${index + 1} of ${ordered.length} — ${String(entry.status ?? "Requested").toUpperCase()}`,
+    expanded: index === ordered.length - 1,
+    chain: hasChainMap ? chainMap[entry.id] : undefined,
+    chainId: hasChainMap ? (chainMap[entry.id] as { requestUuid?: string } | undefined)?.requestUuid ?? null : null,
+    attribution: {
+      approvalDate: (entry as T & { approvalDate?: string }).approvalDate ?? "",
+      electronicConfirmation: (entry as T & { electronicConfirmation?: string }).electronicConfirmation ?? "",
+      intendedApprover: (entry as T & { submitForApprovalToName?: string }).submitForApprovalToName ?? "",
+      approverComments: (entry as T & { approverComments?: string }).approverComments ?? "",
+    },
+    permissions: extensionEntryPermissions(entry, index, ordered.length, canEdit),
+  }));
+}
+
 export type ApprovalPreviewStep = {
   label: string;
   roles: string[];
@@ -290,6 +347,28 @@ export function resolveDiagnosticsHealth(input: {
     (input.orphanRequestedExtensions ?? 0) +
     (input.stalledRequests ?? 0) +
     (input.missingWorkflows ?? 0) > 0 ? "warnings" : "healthy";
+}
+
+export type DiagnosticsSummaryProjection = {
+  healthy: boolean;
+  chips: Array<{ key: "workflowGaps" | "unresolvedApprovers" | "stalledRequests" | "orphanRequestedExtensions"; label: string; count: number }>;
+};
+
+export function projectDiagnosticsSummary(summary: {
+  workflowGaps?: number;
+  /** Legacy response alias retained for older installations. */
+  missingWorkflows?: number;
+  unresolvedApprovers?: number;
+  stalledRequests?: number;
+  orphanRequestedExtensions?: number;
+} | null | undefined): DiagnosticsSummaryProjection {
+  const chips = [
+    { key: "workflowGaps" as const, label: "Workflow gaps", count: summary?.workflowGaps ?? summary?.missingWorkflows ?? 0 },
+    { key: "unresolvedApprovers" as const, label: "Unresolved approvers", count: summary?.unresolvedApprovers ?? 0 },
+    { key: "stalledRequests" as const, label: "Stalled requests", count: summary?.stalledRequests ?? 0 },
+    { key: "orphanRequestedExtensions" as const, label: "Orphan requested extensions", count: summary?.orphanRequestedExtensions ?? 0 },
+  ];
+  return { healthy: chips.every((chip) => chip.count === 0), chips };
 }
 
 export function resolveDiagnosticsGroupState(

@@ -181,4 +181,94 @@ describe('Defects approval chain projection', () => {
       remarks: 'Looks good',
     });
   });
+
+  it('maps each persisted extension decision to its own history entry without fabricating legacy chains', async () => {
+    const snapshot = {
+      scope: { moduleId: 'defects', screenId: 'defects-extension', actionId: '' },
+      classification: 'Normal', mode: 'simple', label: 'Extension', nodes, edges: [],
+      wfuuid: 'wf-extension', version: 1,
+    };
+    const request = (requuid: string, status: 'approved' | 'returned' | 'pending', submittedAt: string, remarks: string | null) => ({
+      requuid, scope: snapshot.scope, classification: 'Normal', subjectRef: 'defect-uuid-1', vesselId: 'vessel-1',
+      snapshot, status, currentNodeKey: status === 'pending' ? 'review' : null, submittedBy: 'submitter',
+      submittedAt, finalizedAt: status === 'pending' ? null : submittedAt,
+      slots: [{ requuid, nodeKey: 'review', slotOrdinal: 0, roleId: 'role-review', roleLabel: 'Reviewer',
+        status: status === 'returned' ? 'rejected' : status, resolvedApproverIds: ['user-1'],
+        decidedBy: status === 'pending' ? null : 'user-1', decidedAt: status === 'pending' ? null : submittedAt, remarks },
+      ],
+    });
+    const requests = [
+      request('approved-request', 'approved', '2026-01-01T00:00:00.000Z', 'approved remark'),
+      request('rejected-request', 'returned', '2026-01-02T00:00:00.000Z', 'rejected remark'),
+      request('pending-request', 'pending', '2026-01-03T00:00:00.000Z', null),
+    ];
+    mocks.getDefect.mockResolvedValue({
+      ...baseDefect,
+      targetDateExtensions: [
+        { id: 'approved-entry', status: 'Approved', requestedAt: '2026-01-01T01:00:00.000Z' },
+        { id: 'rejected-entry', status: 'Rejected', requestedAt: '2026-01-02T01:00:00.000Z' },
+        { id: 'pending-entry', status: 'Requested', requestedAt: '2026-01-03T01:00:00.000Z' },
+        { id: 'legacy-entry', status: 'Legacy', requestedAt: '2025-01-01T00:00:00.000Z' },
+      ],
+    });
+    mocks.approvalRequestsInScopes.mockResolvedValue(requests);
+    mocks.approvalActorCanDecide.mockReturnValue({ canDecide: false, slotId: null });
+
+    const result = await getDefectApprovalChain('DEF-1', 'extension', 'user-1', 'Vessel User');
+
+    expect(mocks.approvalRequestsInScopes).toHaveBeenCalledTimes(1);
+    expect(Object.keys(result.extensionChains ?? {})).toEqual(expect.arrayContaining([
+      'approved-entry', 'rejected-entry', 'pending-entry',
+    ]));
+    expect(Object.keys(result.extensionChains ?? {})).toHaveLength(3);
+    expect(result.extensionChains?.['approved-entry']).toMatchObject({
+      requestUuid: 'approved-request', requestStatus: 'approved',
+    });
+    expect(result.extensionChains?.['approved-entry'].steps[0].slots[0].remarks).toBe('approved remark');
+    expect(result.extensionChains?.['rejected-entry']).toMatchObject({
+      requestUuid: 'rejected-request', requestStatus: 'returned',
+    });
+    expect(result.extensionChains?.['rejected-entry'].steps[0]).toMatchObject({
+      status: 'rejected',
+      slots: [{ remarks: 'rejected remark' }],
+    });
+    expect(result.extensionChains?.['pending-entry']).toMatchObject({
+      requestUuid: 'pending-request', requestStatus: 'pending',
+    });
+    expect(result.extensionChains?.['legacy-entry']).toBeUndefined();
+  });
+
+  it('only pairs multiple terminal history entries when chronology is unambiguous', async () => {
+    const snapshot = {
+      scope: { moduleId: 'defects', screenId: 'defects-extension', actionId: '' },
+      classification: 'Normal', mode: 'simple', label: 'Extension', nodes, edges: [],
+      wfuuid: 'wf-extension', version: 1,
+    };
+    const terminal = (requuid: string, submittedAt: string, remarks: string) => ({
+      requuid, scope: snapshot.scope, classification: 'Normal', subjectRef: 'defect-uuid-1', vesselId: 'vessel-1',
+      snapshot, status: 'approved' as const, currentNodeKey: null, submittedBy: 'submitter', submittedAt,
+      finalizedAt: submittedAt, slots: [{ requuid, nodeKey: 'review', slotOrdinal: 0, roleId: 'role-review',
+        roleLabel: 'Reviewer', status: 'approved' as const, resolvedApproverIds: ['user-1'],
+        decidedBy: 'user-1', decidedAt: submittedAt, remarks }],
+    });
+    const requests = [
+      terminal('early', '2026-01-01T00:00:00.000Z', 'early'),
+      terminal('late', '2026-01-02T00:00:00.000Z', 'late'),
+    ];
+    mocks.approvalRequestsInScopes.mockResolvedValue(requests);
+    mocks.getDefect.mockResolvedValue({ ...baseDefect, targetDateExtensions: [
+      { id: 'first', status: 'Approved', requestedAt: '2026-01-01T01:00:00.000Z' },
+      { id: 'second', status: 'Approved', requestedAt: '2026-01-02T01:00:00.000Z' },
+    ] });
+    let result = await getDefectApprovalChain('DEF-1', 'extension', 'user-1', 'Vessel User');
+    expect(result.extensionChains?.first?.requestUuid).toBe('early');
+    expect(result.extensionChains?.second?.requestUuid).toBe('late');
+
+    mocks.getDefect.mockResolvedValue({ ...baseDefect, targetDateExtensions: [
+      { id: 'duplicate-a', status: 'Approved', requestedAt: '2026-01-01T00:00:00.000Z' },
+      { id: 'duplicate-b', status: 'Approved' },
+    ] });
+    result = await getDefectApprovalChain('DEF-1', 'extension', 'user-1', 'Vessel User');
+    expect(result.extensionChains).toEqual({});
+  });
 });

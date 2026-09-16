@@ -3,3 +3,4 @@
 - [Running Hours monotonicity](running-hours-monotonicity.md) — normal RH updates never decrease live counters; only explicit approved reset/replacement workflows may do so.
 - [Approval status availability](approval-status-availability.md) — loading, unavailable/error, confirmed no-workflow, and loaded approval states must remain distinct.
 - [Defect extension approval correspondence](defect-extension-approval-correspondence.md) — a pending defect-level request governs only the oldest Requested extension; later Requested entries are orphans.
+- [Defect extension history correlation](defect-extension-history-correlation.md) — engine requests lack extension IDs; historical chains must use conservative ordering and leave ambiguous entries unmatched.

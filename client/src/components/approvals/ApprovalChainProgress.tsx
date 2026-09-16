@@ -11,6 +11,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatDecidedSlotRemark } from "@/pages/defects/defectApprovalPresentation";
 
 export class DefectApprovalChainFetchError extends Error {
   constructor(message: string, public readonly code?: string, public readonly status?: number) {
@@ -68,6 +69,7 @@ export interface DefectApprovalChain {
   steps: DefectApprovalStep[];
   currentUserCanDecide: boolean;
   currentUserSlotId?: string | null;
+  extensionChains?: Record<string, DefectApprovalChain>;
 }
 
 export function defectApprovalChainQueryKey(
@@ -199,7 +201,7 @@ export function ApprovalChainProgress({
                   data-testid={unresolved ? "approval-slot-unresolved" : undefined}
                   style={{ display: "inline-flex", alignItems: "center", gap: 4, background: unresolved ? "#fef3f2" : "#f9fafb", border: unresolved ? "1px solid #fda29b" : undefined, color: unresolved ? "#b42318" : undefined, borderRadius: 10, padding: "1px 8px" }}>
                   <span style={{ width: 8, height: 8, borderRadius: 4, background: DOT[s.status] ?? "#98a2b3", display: "inline-block" }} />
-                  {s.roleLabel}{unresolved ? " — ⚠ no approver assigned for this vessel" : ""}
+                  {s.roleLabel}{unresolved ? " — no approver assigned for this vessel" : ""}
                 </span>
               );
             })}
@@ -212,7 +214,7 @@ export function ApprovalChainProgress({
   );
 }
 
-function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
+export function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
   const steps = Array.isArray(chain.steps) ? chain.steps : [];
   const rejectedStep = steps.flatMap((step) => step.slots ?? []).find((slot) => String(slot.status).toLowerCase() === "rejected")
     || steps.find((step) => String(step.status).toLowerCase() === "rejected");
@@ -242,14 +244,24 @@ function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
                 {status}
               </span>
               {step.decidedBy && <span className="text-gray-600">by {step.decidedBy}</span>}
-              {step.slots?.map((slot, slotIndex) => (
-                <span key={slot.slotId || `${key}-slot-${slotIndex}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${slot.status === "rejected" ? "bg-red-50 text-red-700" : "bg-gray-50 text-gray-700"}`}>
-                  {slot.roleLabel || "Approver"}: {String(slot.status || "pending").toLowerCase()}
-                  {slot.decidedByName ? ` — ${slot.decidedByName}` : ""}
-                  {slot.decidedByPosition ? ` (${slot.decidedByPosition})` : ""}
-                  {slot.decidedAt ? ` on ${slot.decidedAt}` : ""}
-                </span>
-              ))}
+              {step.slots?.map((slot, slotIndex) => {
+                const remark = formatDecidedSlotRemark(slot.status, slot.remarks);
+                return (
+                  <div key={slot.slotId || `${key}-slot-${slotIndex}`} className="flex flex-col items-start gap-1">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${slot.status === "rejected" ? "bg-red-50 text-red-700" : "bg-gray-50 text-gray-700"}`}>
+                      {slot.roleLabel || "Approver"}: {String(slot.status || "pending").toLowerCase()}
+                      {slot.decidedByName ? ` — ${slot.decidedByName}` : ""}
+                      {slot.decidedByPosition ? ` (${slot.decidedByPosition})` : ""}
+                      {slot.decidedAt ? ` on ${slot.decidedAt}` : ""}
+                    </span>
+                    {remark ? (
+                      <div className="ml-2 max-w-xl whitespace-pre-wrap text-xs text-gray-600" data-testid="approval-slot-remark">
+                        {remark}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           );
         })}

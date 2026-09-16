@@ -95,6 +95,12 @@ const DIAGNOSTIC_SCOPES = [
   DEFECTS_EXTENSION_SCREEN, DEFECTS_REPEAT_EXTENSION_SCREEN, DEFECTS_VERIFICATION_SCREEN,
 ] as const;
 const diagnosticDb = () => getCurrentTenantContext()?.db ?? getPostgresClient().db;
+const missingWorkflowConsequence = (scope: string) =>
+  scope === DEFECTS_REPEAT_EXTENSION_SCREEN
+    ? 'Repeat extensions in this classification will fall back to the initial extension workflow until this is configured.'
+    : scope === DEFECTS_EXTENSION_SCREEN
+      ? 'Initial extension approval has no alternate fallback; repeat requests relying on this fallback cannot complete through approval until the initial extension workflow is configured.'
+      : 'Verification C2 cannot complete through approval until this is configured.';
 
 /**
  * Bounded, read-only Defects approval health projection. The five base reads are
@@ -221,14 +227,14 @@ export async function getDefectApprovalDiagnostics() {
       !workflows.some((w) => w.screenId === screenId && w.classification === classification))
       .map((classification) => ({
         screenId, classification,
-        consequence: 'New requests in this scope/classification cannot enter an active approval chain.',
+        consequence: missingWorkflowConsequence(screenId),
       })));
   const workflowMatrix = DIAGNOSTIC_SCOPES.flatMap((scope) =>
     DIAGNOSTIC_CLASSIFICATIONS.map((classification) => {
       const configured = workflows.some((w) => w.screenId === scope && w.classification === classification);
       return {
         scope, classification, configured,
-        consequence: configured ? null : 'New requests in this scope/classification cannot enter an active approval chain.',
+        consequence: configured ? null : missingWorkflowConsequence(scope),
       };
     }));
   const defectById = new Map(defectRows.map((d) => [d.duuid, d]));
@@ -312,7 +318,11 @@ type DefectApprovalChain = {
   }>;
   currentUserCanDecide: boolean;
   currentUserSlotId: string | null;
+  extensionChains?: ExtensionChainMap;
 };
+
+type ExtensionChainMap = Record<string, DefectApprovalChain>;
+type ChainRequest = RequestRow & { slots: RequestSlotRow[] };
 
 const requestDateForExtension = (defect: any): string | null => {
   const entries = Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : [];
@@ -330,6 +340,105 @@ const extensionScopeForDefect = (defect: any) => {
 const slotViewStatus = (status: RequestSlotRow['status'] | undefined): DefectApprovalChain['steps'][number]['slots'][number]['status'] => {
   if (status === 'superseded') return 'skipped';
   return status ?? 'pending';
+};
+
+const projectApprovalChain = async (
+  request: ChainRequest | null,
+  workflow: Pick<StoredWorkflow, 'nodes'> | null,
+  classification: string,
+  scope: any,
+  actorUserId?: string | null,
+  actorRole?: string | null,
+): Promise<DefectApprovalChain> => {
+  const activeRequest = request?.status === 'pending' ? request : null;
+  const actorDecision = activeRequest
+    ? approvalActorCanDecide(activeRequest, actorUserId, actorRole)
+    : { canDecide: false, slotId: null };
+  const requestSlots = request?.slots ?? [];
+  const nodes = (workflow?.nodes ?? [])
+    .filter((node) => node.type === 'approval-step')
+    .slice()
+    .sort((a, b) => a.ordinal - b.ordinal);
+  const currentOrdinal = request?.currentNodeKey == null
+    ? null
+    : nodes.find((node) => node.key === request.currentNodeKey)?.ordinal ?? null;
+  const decidedByIds = Array.from(new Set(requestSlots.map((slot) => slot.decidedBy).filter((id): id is string => !!id)));
+  const identities = new Map<string, { name: string; roleLabel: string }>();
+  await Promise.all(decidedByIds.map(async (userUuid) => identities.set(userUuid, await deciderIdentity(userUuid))));
+  const steps = nodes.map((node) => {
+    const nodeSlots = requestSlots.filter((slot) => slot.nodeKey === node.key);
+    let status: DefectApprovalChain['steps'][number]['status'] = 'pending';
+    if (request) {
+      if (request.status === 'pending') {
+        if (request.currentNodeKey === node.key || nodeSlots.some((slot) => slot.status === 'active')) status = 'active';
+        else if (nodeSlots.some((slot) => slot.status === 'approved') ||
+          (currentOrdinal !== null && node.ordinal < currentOrdinal)) status = 'approved';
+      } else {
+        if (nodeSlots.some((slot) => slot.status === 'rejected')) status = 'rejected';
+        else if (nodeSlots.some((slot) => slot.status === 'approved')) status = 'approved';
+        else status = 'skipped';
+      }
+    }
+    const slots = (node.slots ?? []).map((slot, slotOrdinal) => {
+      const persisted = nodeSlots.find((candidate) => candidate.slotOrdinal === slotOrdinal);
+      const identity = persisted?.decidedBy ? identities.get(persisted.decidedBy) : undefined;
+      return {
+        slotId: `${node.key}:${slotOrdinal}`, roleLabel: persisted?.roleLabel ?? slot.roleLabel,
+        status: slotViewStatus(persisted?.status), decidedByName: identity?.name ?? null,
+        decidedByPosition: identity?.roleLabel ?? null, decidedAt: persisted?.decidedAt ?? null,
+        remarks: persisted?.remarks ?? null,
+      };
+    });
+    return { nodeKey: node.key, label: node.label || node.key, ordinal: node.ordinal,
+      quorumRule: node.quorum?.rule ?? 'all', status, slots };
+  });
+  return {
+    hasActiveWorkflow: !!workflow || !!request, scope: scope.screenId, classification,
+    requestStatus: request?.status ?? 'none', requestUuid: request?.requuid ?? null,
+    currentStepKey: request?.currentNodeKey ?? null, steps,
+    currentUserCanDecide: actorDecision.canDecide, currentUserSlotId: actorDecision.slotId,
+  };
+};
+
+const extensionRequestStatusCompatible = (entry: any, request: ChainRequest) =>
+  (entry?.status ?? entry?.state) === 'Approved' ? request.status === 'approved'
+    : (entry?.status ?? entry?.state) === 'Rejected' ? request.status === 'returned'
+      : (entry?.status ?? entry?.state) === 'Requested' ? request.status === 'pending' : false;
+
+/** Pair immutable extension history with its persisted request, without fabricating legacy chains. */
+const matchExtensionRequests = (entries: any[], requests: ChainRequest[]): Map<string, ChainRequest> => {
+  const result = new Map<string, ChainRequest>();
+  const dateValue = (value: any) => value ? new Date(value).getTime() : Number.NaN;
+  const entriesByStatus = (status: string) => entries.filter((entry) => (entry?.status ?? entry?.state) === status);
+  // Stage 1's correspondence rule is intentionally conservative: the one pending
+  // request belongs to the oldest Requested entry, never to a nearest-date guess.
+  const requestedEntries = entriesByStatus('Requested')
+    .slice().sort((a, b) => {
+      const ad = dateValue(a.requestedAt ?? a.submittedAt), bd = dateValue(b.requestedAt ?? b.submittedAt);
+      return (Number.isNaN(ad) ? 9e15 : ad) - (Number.isNaN(bd) ? 9e15 : bd);
+    });
+  const pendingRequests = requests.filter((request) => request.status === 'pending')
+    .slice().sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt)));
+  if (requestedEntries[0]?.id && pendingRequests[0]) {
+    result.set(String(requestedEntries[0].id), pendingRequests[0]);
+  }
+
+  // Terminal history has no extension id. Pairing is safe only if each side has
+  // complete, unique dates; otherwise legacy entries remain visibly unmatched.
+  for (const [entryStatus, requestStatus] of [['Approved', 'approved'], ['Rejected', 'returned']] as const) {
+    const terminalEntries = entriesByStatus(entryStatus);
+    const terminalRequests = requests.filter((request) => request.status === requestStatus);
+    if (terminalEntries.length !== terminalRequests.length || terminalEntries.length === 0) continue;
+    const entryDates = terminalEntries.map((entry) => dateValue(entry.requestedAt ?? entry.submittedAt));
+    const requestDates = terminalRequests.map((request) => dateValue(request.submittedAt));
+    const unique = (dates: number[]) => dates.every((date) => !Number.isNaN(date))
+      && new Set(dates).size === dates.length;
+    if (!unique(entryDates) || !unique(requestDates)) continue;
+    terminalEntries.slice().sort((a, b) => dateValue(a.requestedAt ?? a.submittedAt) - dateValue(b.requestedAt ?? b.submittedAt))
+      .forEach((entry, index) => result.set(String(entry.id), terminalRequests
+        .slice().sort((a, b) => dateValue(a.submittedAt) - dateValue(b.submittedAt))[index]));
+  }
+  return result;
 };
 
 /**
@@ -389,74 +498,22 @@ export async function getDefectApprovalChain(
     workflow = await activeWorkflowScoped(scope, classification);
   }
 
-  const activeRequest = request?.status === 'pending' ? request : null;
-  const actorDecision = activeRequest
-    ? approvalActorCanDecide(activeRequest, actorUserId, actorRole)
-    : { canDecide: false, slotId: null };
-  const requestSlots = request?.slots ?? [];
-  const nodes = (workflow?.nodes ?? [])
-    .filter((node) => node.type === 'approval-step')
-    .slice()
-    .sort((a, b) => a.ordinal - b.ordinal);
-  const currentOrdinal = request?.currentNodeKey == null
-    ? null
-    : nodes.find((node) => node.key === request.currentNodeKey)?.ordinal ?? null;
+  const chain = await projectApprovalChain(request, workflow, classification, scope, actorUserId, actorRole);
+  if (action !== 'extension') return chain;
 
-  const decidedByIds = Array.from(new Set(requestSlots.map((slot) => slot.decidedBy).filter((id): id is string => !!id)));
-  const identities = new Map<string, { name: string; roleLabel: string }>();
-  await Promise.all(decidedByIds.map(async (userUuid) => identities.set(userUuid, await deciderIdentity(userUuid))));
-
-  const steps = nodes.map((node) => {
-    const nodeSlots = requestSlots.filter((slot) => slot.nodeKey === node.key);
-    let status: DefectApprovalChain['steps'][number]['status'] = 'pending';
-    if (request) {
-      if (request.status === 'pending') {
-        if (request.currentNodeKey === node.key || nodeSlots.some((slot) => slot.status === 'active')) {
-          status = 'active';
-        } else if (nodeSlots.some((slot) => slot.status === 'approved') ||
-                   (currentOrdinal !== null && node.ordinal < currentOrdinal)) {
-          status = 'approved';
-        }
-      } else {
-        if (nodeSlots.some((slot) => slot.status === 'rejected')) status = 'rejected';
-        else if (nodeSlots.some((slot) => slot.status === 'approved')) status = 'approved';
-        else status = 'skipped';
-      }
-    }
-    const slots = (node.slots ?? []).map((slot, slotOrdinal) => {
-      const persisted = nodeSlots.find((candidate) => candidate.slotOrdinal === slotOrdinal);
-      const identity = persisted?.decidedBy ? identities.get(persisted.decidedBy) : undefined;
-      return {
-        slotId: `${node.key}:${slotOrdinal}`,
-        roleLabel: persisted?.roleLabel ?? slot.roleLabel,
-        status: slotViewStatus(persisted?.status),
-        decidedByName: identity?.name ?? null,
-        decidedByPosition: identity?.roleLabel ?? null,
-        decidedAt: persisted?.decidedAt ?? null,
-        remarks: persisted?.remarks ?? null,
-      };
-    });
-    return {
-      nodeKey: node.key,
-      label: node.label || node.key,
-      ordinal: node.ordinal,
-      quorumRule: node.quorum?.rule ?? 'all',
-      status,
-      slots,
-    };
-  });
-
-  return {
-    hasActiveWorkflow: !!workflow || !!request,
-    scope: scope.screenId,
-    classification,
-    requestStatus: request?.status ?? 'none',
-    requestUuid: request?.requuid ?? null,
-    currentStepKey: request?.currentNodeKey ?? null,
-    steps,
-    currentUserCanDecide: actorDecision.canDecide,
-    currentUserSlotId: actorDecision.slotId,
-  };
+  // This is deliberately derived from the single requests-in-scopes read above.
+  // Legacy entries without a compatible persisted request remain absent.
+  const entries = Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : [];
+  const matches = matchExtensionRequests(entries, requests as ChainRequest[]);
+  const extensionChains: ExtensionChainMap = {};
+  await Promise.all(entries.map(async (entry: any) => {
+    const matched = entry?.id == null ? null : matches.get(String(entry.id));
+    if (!matched) return;
+    extensionChains[String(entry.id)] = await projectApprovalChain(
+      matched, matched.snapshot, matched.classification, matched.scope, actorUserId, actorRole,
+    );
+  }));
+  return entries.length ? { ...chain, extensionChains } : chain;
 }
 
 export async function hasActiveUserVesselAssignment(userUuid: string, vesselId: string) {

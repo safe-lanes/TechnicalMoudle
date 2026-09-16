@@ -5,12 +5,16 @@
  * ApprovalWorkflow screen stays untouched and reachable until cutover.
  */
 import React from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ApprovalEngineAdmin from "../../../../server/modules/approval-engine/client/ApprovalEngineAdmin";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   formatDiagnosticsOrphan,
   formatDiagnosticsStalled,
   formatDiagnosticsUnresolved,
+  projectDiagnosticsSummary,
 } from "../defects/defectApprovalPresentation";
 
 type DefectApprovalDiagnostics = {
@@ -33,6 +37,7 @@ type DefectApprovalDiagnostics = {
     unresolvedApprovers?: number;
     orphanRequestedExtensions?: number;
     stalledRequests?: number;
+    workflowGaps?: number;
     missingWorkflows?: number;
   };
   unresolvedApprovers: Array<{ vesselId: string; roleId: string; roleLabel: string; workflowScopes?: string[]; consequence: string }>;
@@ -41,6 +46,7 @@ type DefectApprovalDiagnostics = {
 };
 
 function DefectApprovalDiagnosticsPanel() {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { data, isLoading, error } = useQuery<DefectApprovalDiagnostics>({
     queryKey: ["/technical/api/defects/approval-diagnostics"],
     staleTime: 60_000,
@@ -60,39 +66,46 @@ function DefectApprovalDiagnosticsPanel() {
       {(error || data?.available === false) && <div style={{ color: "#b42318", fontSize: 13 }}>Diagnostics unavailable. Contact your administrator.</div>}
       {data && (
         <>
-          {data.available !== false && <div style={{ fontSize: 12, marginBottom: 8 }}>{data.consequence}</div>}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-            {Object.entries(data.summary ?? {}).map(([label, value]) => (
-              <div key={label} style={{ padding: "7px 10px", borderRadius: 6, background: "#f2f4f7", fontSize: 12 }}>
-                <strong>{String(value ?? 0)}</strong>{" "}
-                {label.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`)}
+          {data.available !== false && (() => {
+            const projection = projectDiagnosticsSummary(data.summary);
+            return projection.healthy ? (
+              <div style={{ fontSize: 12, color: "#067647", marginBottom: 8 }} data-testid="defects-diagnostics-healthy">
+                Healthy: all configured Defects approval checks are resolved.
+                <Button variant="link" size="sm" className="ml-2 h-auto p-0" onClick={() => setDetailsOpen(true)}>View details</Button>
               </div>
-            ))}
-          </div>
-          <div style={{ fontSize: 12, color: "#667085", marginBottom: 10 }}>
-            Generated {data.generatedAt ? new Date(data.generatedAt).toLocaleString() : "unknown"}.
-            {" "}{typeof data.queryPlan === "string" ? data.queryPlan : data.queryPlan?.description ?? `Bounded diagnostic queries: ${data.queryPlan?.expectedQueries ?? "n/a"}.`}
-          </div>
-          {data.workflowMatrix && (
-            <div style={{ marginTop: 10 }}>
-              <h3 style={{ margin: "0 0 4px", fontSize: 13 }}>Defects workflow coverage (six combinations)</h3>
-              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: "#344054" }}>
-                {data.workflowMatrix.map((item) => (
-                  <li key={`${item.scope}-${item.classification}`}>
-                    <strong>{item.scope} / {item.classification}</strong>: {item.configured ? "configured" : "missing"} — {item.consequence}
-                  </li>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                {projection.chips.map((chip) => (
+                  <span key={chip.key} data-testid={`diagnostics-chip-${chip.key}`} style={{
+                    padding: "5px 9px", borderRadius: 999, fontSize: 12,
+                    border: `1px solid ${chip.count ? "#fda29b" : "#d0d5dd"}`,
+                    background: chip.count ? "#fff1f0" : "#f8fafc",
+                    color: chip.count ? "#b42318" : "#667085",
+                  }}><strong>{chip.count}</strong> {chip.label.toLowerCase()}</span>
                 ))}
-              </ul>
-            </div>
-          )}
-          <DiagnosticsGroup title="Unresolved approvers" rows={data.unresolvedApprovers} format={formatDiagnosticsUnresolved} />
-          <DiagnosticsGroup title="Orphan Requested extensions" rows={data.orphanRequestedExtensions} format={formatDiagnosticsOrphan} />
-          <DiagnosticsGroup title="Stalled requests" rows={data.stalledRequests} format={formatDiagnosticsStalled} />
-          {data.available !== false && data.healthy && (
-            <div style={{ marginTop: 12, padding: "8px 10px", borderRadius: 6, background: "#ecfdf3", color: "#067647", fontSize: 12 }} data-testid="defects-diagnostics-healthy">
-              Healthy: all configured Defects approval checks are resolved.
-            </div>
-          )}
+                <Button variant="outline" size="sm" onClick={() => setDetailsOpen(true)}>View details</Button>
+              </div>
+            );
+          })()}
+          <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+            <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Defects approval diagnostics</DialogTitle>
+                <DialogDescription>Generated and read-only diagnostic detail.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 text-sm">
+                <div className="rounded border bg-slate-50 p-3">
+                  <div><strong>Generated:</strong> {data.generatedAt ? new Date(data.generatedAt).toLocaleString() : "unknown"}</div>
+                  <div><strong>Query plan:</strong> {typeof data.queryPlan === "string" ? data.queryPlan : data.queryPlan?.description ?? `Bounded diagnostic queries: ${data.queryPlan?.expectedQueries ?? "n/a"}.`}</div>
+                  <div className="mt-2">{data.consequence}</div>
+                </div>
+                {data.workflowMatrix && <div><h3 className="font-semibold">Workflow coverage</h3><ul className="list-disc pl-5">{data.workflowMatrix.map((item) => <li key={`${item.scope}-${item.classification}`}><strong>{item.scope} / {item.classification}</strong>: {item.configured ? "configured" : "missing"} — {item.consequence}</li>)}</ul></div>}
+                <DiagnosticsGroup title="Unresolved approvers" rows={data.unresolvedApprovers} format={formatDiagnosticsUnresolved} />
+                <DiagnosticsGroup title="Stalled requests" rows={data.stalledRequests} format={formatDiagnosticsStalled} />
+                <DiagnosticsGroup title="Orphan requested extensions" rows={data.orphanRequestedExtensions} format={formatDiagnosticsOrphan} />
+              </div>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </section>

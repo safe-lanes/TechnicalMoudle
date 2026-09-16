@@ -55,9 +55,73 @@ import {
   resolveVerificationDisplay,
   hasPendingExtensionForEntries,
   isOrphanedRequestedExtensionAt,
+  extensionEntryPermissions,
+  projectExtensionHistory,
   type ApprovalPreviewStep,
   type DefectApprovalRoutingPreview,
 } from "./defectApprovalPresentation";
+
+type ExtensionHistoryRecord = {
+  id: string;
+  existingTargetDate: string;
+  newTargetDate: string;
+  reasonForExtension: string;
+  status: "Requested" | "Approved" | "Rejected";
+  requestedAt: string;
+  submitForApprovalToName?: string;
+  electronicConfirmation?: string;
+  approverComments?: string;
+  approved?: boolean;
+  approvalDate?: string;
+};
+
+function ExtensionHistoryCard({
+  entry,
+  index,
+  total,
+  chain,
+}: {
+  entry: ExtensionHistoryRecord;
+  index: number;
+  total: number;
+  chain?: DefectApprovalChain | null;
+}) {
+  const permissions = extensionEntryPermissions(entry, index, total, false);
+  const status = String(entry.status || "Requested").toUpperCase();
+  return (
+    <details open={permissions.current && !permissions.terminal} className="rounded border border-slate-200 bg-white" data-testid={`extension-history-${entry.id}`}>
+      <summary className="cursor-pointer list-none px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-medium text-slate-800">Extension {index + 1} of {total} — {status}</span>
+          <span className="text-xs text-slate-500">{permissions.current ? "Current" : "Historical"}</span>
+        </div>
+      </summary>
+      <div className="grid gap-3 border-t border-slate-100 p-4 text-sm md:grid-cols-2">
+        <div><span className="text-slate-500">Existing target date</span><div className="font-medium">{entry.existingTargetDate || "Not recorded"}</div></div>
+        <div><span className="text-slate-500">New target date</span><div className="font-medium">{entry.newTargetDate || "Not recorded"}</div></div>
+        <div className="md:col-span-2"><span className="text-slate-500">Reason</span><div className="whitespace-pre-wrap">{entry.reasonForExtension || "Not recorded"}</div></div>
+        <div><span className="text-slate-500">Requested</span><div>{entry.requestedAt ? new Date(entry.requestedAt).toLocaleString() : "Not recorded"}</div></div>
+        <div>
+          <span className="text-slate-500">Decision attribution / local confirmation</span>
+          <div className="space-y-0.5">
+            {entry.submitForApprovalToName && <div>Intended approver: {entry.submitForApprovalToName}</div>}
+            {entry.approvalDate && <div>Approval date: {entry.approvalDate}</div>}
+            {entry.electronicConfirmation && <div>Electronic confirmation: {entry.electronicConfirmation}</div>}
+            {entry.approverComments && <div>Approver comments: {entry.approverComments}</div>}
+            {!entry.submitForApprovalToName && !entry.approvalDate && !entry.electronicConfirmation && !entry.approverComments && <div>Not recorded</div>}
+          </div>
+        </div>
+        <div className="md:col-span-2">
+          {chain ? <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} /> : (
+            <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${entry.id}`}>
+              No approval chain is associated with this entry. Historical approval data was not inferred.
+            </div>
+          )}
+        </div>
+      </div>
+    </details>
+  );
+}
 
 const defectFormSchema = insertDefectSchema.extend({
   critical: z.boolean().optional(),
@@ -439,17 +503,36 @@ export default function DefectFormWizard({
   
   const sireReferenceOptions = getSireReferencesByVersion(viqVersionValue || "");
 
-  const latestExtension = targetDateExtensions[targetDateExtensions.length - 1] ?? null;
+  const rawExtensionChains = (extensionApproval.data as (DefectApprovalChain & {
+    extensionChains?: Record<string, DefectApprovalChain>;
+  }) | undefined)?.extensionChains;
+  const hasExtensionChainsProjection = Boolean(
+    extensionApproval.data &&
+    Object.prototype.hasOwnProperty.call(extensionApproval.data, "extensionChains"),
+  );
+  const extensionHistory = projectExtensionHistory(
+    targetDateExtensions as ExtensionHistoryRecord[],
+    rawExtensionChains,
+    canEditDefect && !isViewMode,
+  );
+  const orderedExtensions = extensionHistory.map((row) => row.entry);
+  const latestExtension = orderedExtensions[orderedExtensions.length - 1] ?? null;
+  const currentExtensionChain = latestExtension
+    ? (hasExtensionChainsProjection ? rawExtensionChains?.[latestExtension.id] : extensionApproval.data)
+    : extensionApproval.data;
+  const currentExtensionApproval = currentExtensionChain && extensionApproval.data
+    ? { ...extensionApproval, data: currentExtensionChain }
+    : extensionApproval;
   const hasSavedExtension = latestExtension !== null;
   const effectiveExtensionStatus = resolveEffectiveExtensionRequestStatus(
     latestExtension?.status,
-    extensionApproval.data?.requestStatus,
+    currentExtensionChain?.requestStatus,
   );
   const extensionUi = resolveDefectExtensionUi({
     formOpen: showExtensionForm,
     hasStoredExtension: hasSavedExtension,
     requestStatus: effectiveExtensionStatus,
-    currentUserCanDecide: extensionApproval.data?.currentUserCanDecide,
+    currentUserCanDecide: currentExtensionChain?.currentUserCanDecide,
     canEdit: canEditDefect && !isViewMode,
   });
   const isDraftingExtension = extensionUi.state === "draft-preview";
@@ -460,10 +543,12 @@ export default function DefectFormWizard({
       ? "Rejected"
       : displayedExtension?.status;
   const hasPendingExtension = extensionUi.state === "requester-pending" || extensionUi.state === "approver-pending";
-  const hasPendingExtensionRequest = hasPendingExtensionForEntries(targetDateExtensions, extensionApproval.data);
-  const latestExtensionIndex = targetDateExtensions.length - 1;
+  const hasPendingExtensionRequest = hasPendingExtensionForEntries(targetDateExtensions, currentExtensionChain);
+  const latestExtensionIndex = latestExtension
+    ? targetDateExtensions.findIndex((entry) => entry.id === latestExtension.id)
+    : -1;
   const orphanedRequestedExtension = isOrphanedRequestedExtensionAt(
-    targetDateExtensions, latestExtensionIndex, extensionApproval.data,
+    targetDateExtensions, latestExtensionIndex, currentExtensionChain,
   );
   const validDraftExtensionDate = Boolean(
     /^\d{4}-\d{2}-\d{2}$/.test(currentExtension.newTargetDate) &&
@@ -2051,6 +2136,18 @@ export default function DefectFormWizard({
                             </div>
                           )}
                         </div>
+                        {displayedExtension && (
+                          <div className="rounded border border-blue-200 bg-blue-50/50 px-4 py-3" data-testid={`extension-current-${displayedExtension.id}`}>
+                            <div className="font-medium text-slate-800">Extension {orderedExtensions.length} of {orderedExtensions.length} — {String(displayedExtensionStatus ?? displayedExtension.status).toUpperCase()}</div>
+                            <div className="mt-1 text-xs text-slate-600">Current entry · editable only while non-terminal; decisions are available only for a current Requested entry.</div>
+                            <div className="mt-2 grid gap-1 text-sm text-slate-700 md:grid-cols-2">
+                              {displayedExtension.approvalDate && <div>Approval date: {displayedExtension.approvalDate}</div>}
+                              {displayedExtension.electronicConfirmation && <div>Electronic confirmation: {displayedExtension.electronicConfirmation}</div>}
+                              {displayedExtension.submitForApprovalToName && <div>Intended approver: {displayedExtension.submitForApprovalToName}</div>}
+                              {displayedExtension.approverComments && <div>Approver comments: {displayedExtension.approverComments}</div>}
+                            </div>
+                          </div>
+                        )}
                         {orphanedRequestedExtension && (
                           <div
                             className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
@@ -2059,6 +2156,16 @@ export default function DefectFormWizard({
                             This extension is marked Requested, but no pending approval request was found. It does not block closeout; please contact your administrator to reconcile it.
                           </div>
                         )}
+
+                        {extensionHistory.slice(0, -1).map((row, index) => (
+                          <ExtensionHistoryCard
+                            key={row.entry.id}
+                            entry={row.entry}
+                            index={index}
+                            total={orderedExtensions.length}
+                            chain={(row.chain as DefectApprovalChain | undefined) ?? null}
+                          />
+                        ))}
 
                         <div className="grid grid-cols-2 gap-6">
                           <div className="flex flex-col">
@@ -2128,12 +2235,16 @@ export default function DefectFormWizard({
                           </div>
                         )}
 
-                        {displayedExtension ? (
+                        {displayedExtension && hasExtensionChainsProjection && !currentExtensionChain ? (
+                          <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${displayedExtension.id}`}>
+                            No approval chain is associated with this entry. Historical approval data was not inferred.
+                          </div>
+                        ) : displayedExtension ? (
                           <DefectApprovalStatus
                             action="extension"
                             defectId={approvalDefectId}
-                            approval={extensionApproval}
-                            canEdit={canEditDefect && !isViewMode}
+                            approval={currentExtensionApproval}
+                            canEdit={canEditDefect && !isViewMode && String(displayedExtensionStatus ?? "").toLowerCase() === "requested"}
                           />
                         ) : (
                           <div data-testid="extension-approval-preview-container">

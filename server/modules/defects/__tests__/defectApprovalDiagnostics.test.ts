@@ -97,6 +97,17 @@ describe('Defects approval diagnostics aggregation', () => {
     ]));
     expect(result.queryPlan.expectedQueries).toBe(5 + 3 * 2);
     expect(mocks.select).toHaveBeenCalledTimes(5);
+    expect(result.missingActiveWorkflows.find((gap) =>
+      gap.screenId === 'defects-repeat-extension' && gap.classification === 'Normal')?.consequence)
+      .toBe('Repeat extensions in this classification will fall back to the initial extension workflow until this is configured.');
+    expect(result.missingActiveWorkflows.find((gap) =>
+      gap.screenId === 'defects-extension' && gap.classification === 'Critical Equipment / COC Related')?.consequence)
+      .toBe('Initial extension approval has no alternate fallback; repeat requests relying on this fallback cannot complete through approval until the initial extension workflow is configured.');
+    expect(result.missingActiveWorkflows.find((gap) =>
+      gap.screenId === 'defects-verification' && gap.classification === 'Normal')?.consequence)
+      .toBe('Verification C2 cannot complete through approval until this is configured.');
+    expect(result.workflowMatrix.find((gap) => gap.scope === 'defects-repeat-extension' && gap.classification === 'Normal')?.consequence)
+      .toBe('Repeat extensions in this classification will fall back to the initial extension workflow until this is configured.');
   });
 
   it('returns an explicit healthy empty state with no resolver work', async () => {
