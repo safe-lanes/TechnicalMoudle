@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDecidedSlotRemark, formatDefectAuditTimestamp, formatInlineApprovalSlotRemark, formatMaritimeUtcDateTime, formatRejectionHeading, projectDiagnosticsSummary, projectExtensionCardPresentation, projectExtensionHistory } from "./defectApprovalPresentation";
+import { formatDecidedSlotRemark, formatDefectAuditTimestamp, formatDiagnosticsMissingWorkflow, formatDiagnosticsReturnedVerificationStillVerified, formatDiagnosticsUnresolved, formatInlineApprovalSlotRemark, formatMaritimeUtcDateTime, formatRejectionHeading, projectDiagnosticsSummary, projectExtensionCardPresentation, projectExtensionHistory } from "./defectApprovalPresentation";
 
 describe("approval history and diagnostics projections", () => {
   it("keeps three mixed extension entries oldest-first with every label", () => {
@@ -108,17 +108,51 @@ describe("approval history and diagnostics projections", () => {
     expect(formatRejectionHeading(0, 1, "Manager One")).toBe("Rejected by Manager One");
   });
 
-  it("projects exactly four warning chips and a quiet healthy state", () => {
+  it("projects only non-zero warning chips in severity order and a quiet healthy state", () => {
      expect(projectDiagnosticsSummary({ workflowGaps: 1, unresolvedApprovers: 0, stalledRequests: 2, orphanRequestedExtensions: 0 })).toEqual({
       healthy: false,
       chips: [
-        { key: "workflowGaps", label: "Workflow gaps", count: 1 },
-        { key: "unresolvedApprovers", label: "Unresolved approvers", count: 0 },
-        { key: "stalledRequests", label: "Stalled requests", count: 2 },
-        { key: "orphanRequestedExtensions", label: "Orphan requested extensions", count: 0 },
-         { key: "returnedVerificationStillVerified", label: "Returned verifications still verified", count: 0 },
+        { key: "stalledRequests", label: "approvals are waiting with nobody able to approve them", count: 2 },
+        { key: "workflowGaps", label: "approval steps are not set up", count: 1 },
       ],
     });
-    expect(projectDiagnosticsSummary({}).healthy).toBe(true);
+    expect(projectDiagnosticsSummary({})).toEqual({ healthy: true, chips: [] });
+  });
+
+  it("keeps technical identifiers out of visible diagnostic wording", () => {
+    const returned = formatDiagnosticsReturnedVerificationStillVerified({
+      requestUuid: "702279c3-c796-48e9-88db-09e97105b401",
+      defectId: "735d3bf6-274d-4313-9ee7-c39478b82e7d",
+      vesselId: "35af961c-5877-4e70-bdf2-85d23162d773",
+      defectReportId: "D004-26-0005",
+      vesselName: "WATER TIGER",
+      finalizedAt: "2026-09-16T13:29:50Z",
+      consequence: "technical",
+    } as any);
+    expect(returned).toBe("D004-26-0005 on WATER TIGER is still marked verified after verification was rejected. Reconcile this defect in SAILERP under Defects before relying on its closure status.");
+    expect(returned).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
+
+    expect(formatDiagnosticsUnresolved({
+      vesselName: "Unknown vessel (no longer in the vessel list)",
+      roles: [{ roleName: "Unknown role (removed from the role list)", issue: "missing-workflow-role" }],
+      consequence: "Until these roles are assigned, approval requests for this vessel will wait with nobody able to action them.",
+    })).toBe("Unknown vessel (no longer in the vessel list) — no approver assigned. Roles needing attention for this vessel: Unknown role (removed from the role list). Until these roles are assigned, approval requests for this vessel will wait with nobody able to action them. Replace the removed roles (Unknown role (removed from the role list)) in the Approval Engine builder on this page and save a new workflow version.");
+  });
+
+  it("gives distinct recovery instructions for stalled requests and future vessel membership", () => {
+    expect(formatDiagnosticsUnresolved({
+      vesselName: "WATER LILY",
+      roles: [{ roleName: "Super Admin", issue: "missing-vessel-membership" }],
+      consequence: "Until these roles are assigned, approval requests for this vessel will wait with nobody able to action them.",
+    })).toContain("SAILERP's user identity or profile source");
+  });
+
+  it("directs repeat-extension workflow gaps to the Approval Engine builder", () => {
+    const message = formatDiagnosticsMissingWorkflow({
+      screenId: "defects-repeat-extension",
+      classification: "Normal",
+    });
+    expect(message).toBe("Repeat defect extension for Normal defects is not set up. Configure this approval step in the Approval Engine builder on this page.");
+    expect(message).not.toContain("Approval Workflow");
   });
 });

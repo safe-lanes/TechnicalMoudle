@@ -1,5 +1,5 @@
 import * as defectsRepo from '../repositories/defectsRepository';
-import { insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema } from '@shared/schema';
+import { admnRoleMaster, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema } from '@shared/schema';
 import { generateDefectNumber } from '../../../utils/defectNumbering';
 import { storage } from '../../../storage';
 import {
@@ -118,9 +118,9 @@ const missingWorkflowConsequence = (scope: string) =>
  */
 export async function getDefectApprovalDiagnostics() {
   const queryPlan = {
-    fixedReads: 6,
+    fixedReads: 7,
     resolverQueriesPerPair: 3,
-    description: 'Six bounded set-based reads plus strict role resolution for each distinct active-workflow role and vessel with a nondeleted defect.',
+    description: 'Seven bounded set-based reads plus strict role resolution for each distinct active-workflow role and vessel with a nondeleted defect.',
     formula: 'fixedReads + (distinctRoles × vesselsWithDefects × resolverQueriesPerPair)',
     conditionalReads: 'workflow nodes/slots reads are skipped when there are no active Defects workflows; pending requests/active slots and returned-verification consistency each use one bounded read',
   };
@@ -171,8 +171,16 @@ export async function getDefectApprovalDiagnostics() {
       roleLabel: apprvNodeSlots.roleLabel,
     }).from(apprvNodeSlots).where(inArray(apprvNodeSlots.workflowWfuuid, workflowIds))
     : [];
+  const activeRoleRows = await db.select({
+    roleId: admnRoleMaster.ruid,
+    roleName: admnRoleMaster.assignedRole,
+  }).from(admnRoleMaster).where(and(
+    eq(admnRoleMaster.isActive, true),
+    eq(admnRoleMaster.isDeleted, false),
+  ));
+  const activeRoleIds = new Set(activeRoleRows.map((role) => role.roleId));
   const defectRows: any[] = await db.select({
-    duuid: defects.duuid, vesselId: defects.vesselId,
+    duuid: defects.duuid, reportId: defects.id, vesselId: defects.vesselId, vesselName: defects.vesselName,
     status: defects.status, isDeleted: defects.isDeleted,
     verified: defects.verified,
     targetDateExtensions: defects.targetDateExtensions,
@@ -192,15 +200,17 @@ export async function getDefectApprovalDiagnostics() {
     inArray(apprvRequests.screenId, [...DIAGNOSTIC_SCOPES]),
     eq(apprvRequests.status, 'pending'),
   ));
-  const returnedVerificationRows = await db.select({
+  const terminalVerificationRows = await db.select({
     requuid: apprvRequests.requuid,
     subjectRef: apprvRequests.subjectRef,
     vesselId: apprvRequests.vesselId,
+    status: apprvRequests.status,
+    submittedAt: apprvRequests.submittedAt,
     finalizedAt: apprvRequests.finalizedAt,
   }).from(apprvRequests).where(and(
     eq(apprvRequests.moduleId, 'defects'),
     eq(apprvRequests.screenId, DEFECTS_VERIFICATION_SCREEN),
-    eq(apprvRequests.status, 'returned'),
+    inArray(apprvRequests.status, ['approved', 'returned']),
   ));
   const pendingRequests = Array.from(new Map(pendingWithSlots.map((r) => [r.requuid, {
     requuid: r.requuid, subjectRef: r.subjectRef, vesselId: r.vesselId,
@@ -258,12 +268,22 @@ export async function getDefectApprovalDiagnostics() {
       };
     }));
   const defectById = new Map(defectRows.map((d) => [d.duuid, d]));
+  const vesselNameById = new Map<string, string>();
+  for (const defect of defectRows) {
+    if (defect.vesselId && defect.vesselName) vesselNameById.set(defect.vesselId, defect.vesselName);
+  }
+  const displayVesselName = (vesselId: string | null | undefined) =>
+    (vesselId && vesselNameById.get(vesselId)) || 'Unknown vessel (no longer in the vessel list)';
+  const displayReportId = (defectId: string) =>
+    defectById.get(defectId)?.reportId || 'Unknown defect (report ID unavailable)';
   const stalledRequests = pendingRequests.filter((r) =>
     activeSlots.filter((s) => s.requuid === r.requuid)
       .some((s) => !Array.isArray(s.resolved) || s.resolved.length === 0)
     && defectById.has(r.subjectRef))
     .map((r) => ({
       requestUuid: r.requuid, defectId: r.subjectRef, vesselId: r.vesselId ?? defectById.get(r.subjectRef)?.vesselId ?? null,
+      defectReportId: displayReportId(r.subjectRef),
+      vesselName: displayVesselName(r.vesselId ?? defectById.get(r.subjectRef)?.vesselId),
       screenId: r.screenId, submittedAt: r.submittedAt,
       daysPending: Math.max(0, Math.floor((Date.now() - new Date(r.submittedAt).getTime()) / 86_400_000)),
       consequence: 'The active approval step has no resolved approver; this request cannot advance until assignment is fixed.',
@@ -280,25 +300,67 @@ export async function getDefectApprovalDiagnostics() {
       return requested.filter((e: any) => e?.id !== correspondingId)
       .map((e: any) => ({
         defectId: d.duuid, vesselId: d.vesselId, entryId: e.id ?? null,
+        defectReportId: d.reportId || 'Unknown defect (report ID unavailable)',
+        vesselName: displayVesselName(d.vesselId),
         requestedAt: e.requestedAt ?? null, newTargetDate: e.newTargetDate ?? null,
         consequence: 'Requested extension has no pending engine request; it does not block closeout and needs review.',
       }));
     });
-  const returnedVerificationStillVerified = returnedVerificationRows
-    .filter((request) => defectById.get(request.subjectRef)?.verified === true)
+  const terminalVerificationsByDefect = new Map<string, typeof terminalVerificationRows>();
+  for (const request of terminalVerificationRows) {
+    const existing = terminalVerificationsByDefect.get(request.subjectRef) ?? [];
+    existing.push(request);
+    terminalVerificationsByDefect.set(request.subjectRef, existing);
+  }
+  const returnedVerificationStillVerified = Array.from(terminalVerificationsByDefect.entries())
+    .flatMap(([defectId, requests]) => {
+      if (defectById.get(defectId)?.verified !== true) return [];
+      const timestamped = requests.map((request) => {
+        const effectiveTimestamp = request.finalizedAt ?? request.submittedAt;
+        const epoch = effectiveTimestamp ? new Date(effectiveTimestamp).getTime() : Number.NaN;
+        return { request, epoch };
+      });
+      const determinate = timestamped.filter(({ epoch }) => Number.isFinite(epoch));
+      const hasUnknownTimestamp = determinate.length !== timestamped.length;
+      const latestEpoch = determinate.length ? Math.max(...determinate.map(({ epoch }) => epoch)) : null;
+      const latest = latestEpoch === null ? [] : determinate.filter(({ epoch }) => epoch === latestEpoch);
+      const latestIsUnambiguousApproval = !hasUnknownTimestamp && latest.length > 0 &&
+        latest.every(({ request }) => request.status === 'approved');
+      if (latestIsUnambiguousApproval) return [];
+      const returned = requests.filter((request) => request.status === 'returned');
+      return returned.length ? [returned.reduce((selected, request) => {
+        const selectedEpoch = new Date(selected.finalizedAt ?? selected.submittedAt ?? 0).getTime();
+        const requestEpoch = new Date(request.finalizedAt ?? request.submittedAt ?? 0).getTime();
+        return requestEpoch > selectedEpoch ? request : selected;
+      })] : [];
+    })
     .map((request) => ({
       requestUuid: request.requuid,
       defectId: request.subjectRef,
       vesselId: request.vesselId ?? defectById.get(request.subjectRef)?.vesselId ?? null,
+      defectReportId: displayReportId(request.subjectRef),
+      vesselName: displayVesselName(request.vesselId ?? defectById.get(request.subjectRef)?.vesselId),
       finalizedAt: request.finalizedAt,
       consequence: 'Verification was returned by the Approval Engine, but the defect still carries verified closure state. The Defects reopen callback failed or was not applied and requires reconciliation.',
     }));
-  const unresolvedApprovers = roleCoverage.flatMap((role) =>
+  const unresolvedApproverRows = roleCoverage.flatMap((role) =>
     role.zeroApproverVessels.map((vesselId) => ({
-      roleId: role.roleId, roleLabel: role.roleLabel, vesselId,
+      roleId: role.roleId,
+      roleLabel: role.roleLabel || 'Unknown role (removed from the role list)',
+      issue: activeRoleIds.has(role.roleId) ? 'missing-vessel-membership' as const : 'missing-workflow-role' as const,
+      vesselId,
       workflowScopes: role.workflowScopes,
-      consequence: role.consequence,
     })));
+  const unresolvedApprovers = Array.from(new Set(unresolvedApproverRows.map((row) => row.vesselId))).map((vesselId) => {
+    const rows = unresolvedApproverRows.filter((row) => row.vesselId === vesselId);
+    return {
+      vesselId,
+      vesselName: displayVesselName(vesselId),
+      roles: rows.map((row) => ({ roleId: row.roleId, roleName: row.roleLabel, issue: row.issue })),
+      workflowScopes: Array.from(new Set(rows.flatMap((row) => row.workflowScopes))),
+      consequence: 'Until these roles are assigned, approval requests for this vessel will wait with nobody able to action them.',
+    };
+  });
   const resolverPairs = roleMap.size * vessels.length;
   const expectedQueries = queryPlan.fixedReads + resolverPairs * queryPlan.resolverQueriesPerPair;
   return {

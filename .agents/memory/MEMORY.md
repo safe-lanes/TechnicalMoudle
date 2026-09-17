@@ -5,3 +5,4 @@
 - [Defect extension approval correspondence](defect-extension-approval-correspondence.md) — a pending defect-level request governs only the oldest Requested extension; later Requested entries are orphans.
 - [Defect extension history correlation](defect-extension-history-correlation.md) — engine requests lack extension IDs; historical chains must use conservative ordering and leave ambiguous entries unmatched.
 - [Rejected defect closure attempts](rejected-defect-closure-attempts.md) — returned C2 snapshots are immutable shore-authored history; reopening preserves approved deferment and target date.
+- [Verification decision ordering](verification-decision-ordering.md) — compare terminal verification timestamps explicitly and flag ambiguity rather than trusting engine row order.

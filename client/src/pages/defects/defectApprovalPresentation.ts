@@ -488,14 +488,14 @@ export function projectDiagnosticsSummary(summary: {
   orphanRequestedExtensions?: number;
   returnedVerificationStillVerified?: number;
 } | null | undefined): DiagnosticsSummaryProjection {
-  const chips = [
-    { key: "workflowGaps" as const, label: "Workflow gaps", count: summary?.workflowGaps ?? summary?.missingWorkflows ?? 0 },
-    { key: "unresolvedApprovers" as const, label: "Unresolved approvers", count: summary?.unresolvedApprovers ?? 0 },
-    { key: "stalledRequests" as const, label: "Stalled requests", count: summary?.stalledRequests ?? 0 },
-    { key: "orphanRequestedExtensions" as const, label: "Orphan requested extensions", count: summary?.orphanRequestedExtensions ?? 0 },
-    { key: "returnedVerificationStillVerified" as const, label: "Returned verifications still verified", count: summary?.returnedVerificationStillVerified ?? 0 },
+  const allChips = [
+    { key: "returnedVerificationStillVerified" as const, label: "defects have an incorrect verification state", count: summary?.returnedVerificationStillVerified ?? 0 },
+    { key: "stalledRequests" as const, label: "approvals are waiting with nobody able to approve them", count: summary?.stalledRequests ?? 0 },
+    { key: "orphanRequestedExtensions" as const, label: "extension requests were never sent for approval", count: summary?.orphanRequestedExtensions ?? 0 },
+    { key: "workflowGaps" as const, label: "approval steps are not set up", count: summary?.workflowGaps ?? summary?.missingWorkflows ?? 0 },
+    { key: "unresolvedApprovers" as const, label: "vessels need approvers", count: summary?.unresolvedApprovers ?? 0 },
   ];
-  return { healthy: chips.every((chip) => chip.count === 0), chips };
+  return { healthy: allChips.every((chip) => chip.count === 0), chips: allChips.filter((chip) => chip.count > 0) };
 }
 
 export function resolveDiagnosticsGroupState(
@@ -507,31 +507,56 @@ export function resolveDiagnosticsGroupState(
 }
 
 export function formatDiagnosticsUnresolved(row: {
-  vesselId: string; roleId: string; roleLabel: string; workflowScopes?: string[]; consequence: string;
+  vesselName: string;
+  roles: Array<{ roleName: string; issue: "missing-workflow-role" | "missing-vessel-membership" }>;
+  consequence: string;
 }): string {
-  return `Vessel ${row.vesselId} — ${row.roleLabel} (${row.roleId}); scopes: ${(row.workflowScopes ?? []).join(", ") || "none"} — ${row.consequence}`;
+  const missingRoles = row.roles.filter((role) => role.issue === "missing-workflow-role").map((role) => role.roleName);
+  const membershipRoles = row.roles.filter((role) => role.issue === "missing-vessel-membership").map((role) => role.roleName);
+  const instructions = [
+    missingRoles.length
+      ? `Replace the removed roles (${missingRoles.join(", ")}) in the Approval Engine builder on this page and save a new workflow version.`
+      : "",
+    membershipRoles.length
+      ? `Update vessel access for users in these roles (${membershipRoles.join(", ")}) in SAILERP's user identity or profile source, then ask them to sign out and back in.`
+      : "",
+  ].filter(Boolean).join(" ");
+  return `${row.vesselName} — no approver assigned. Roles needing attention for this vessel: ${row.roles.map((role) => role.roleName).join(", ")}. ${row.consequence} ${instructions}`;
 }
 
 export function formatDiagnosticsOrphan(row: {
-  defectId: string; vesselId: string; entryId: string; requestedAt: string; newTargetDate: string; consequence: string;
+  defectReportId: string; vesselName: string; requestedAt: string; newTargetDate: string; consequence: string;
 }): string {
-  return `Defect ${row.defectId} on vessel ${row.vesselId}; extension ${row.entryId}, requested ${row.requestedAt}, new target ${row.newTargetDate} — ${row.consequence}`;
+  return `${row.defectReportId} on ${row.vesselName} has an extension request that was never sent for approval. Review the extension in SAILERP under Defects and either submit it for approval or remove it.`;
 }
 
 export function formatDiagnosticsStalled(row: {
-  requestUuid: string; defectId: string; vesselId: string; screenId: string; submittedAt: string; daysPending: number; consequence: string;
+  defectReportId: string; vesselName: string; submittedAt: string; daysPending: number; consequence: string;
 }): string {
-  return `Request ${row.requestUuid} for defect ${row.defectId} on vessel ${row.vesselId}; scope ${row.screenId}, submitted ${row.submittedAt}, ${row.daysPending} days pending — ${row.consequence}`;
+  return `${row.defectReportId} on ${row.vesselName} has waited ${row.daysPending} days with nobody able to approve it. Open this defect as a Super Admin and use its approval decision controls to approve or return the stalled request. Then correct its workflow role in the Approval Engine builder or its users' vessel access in the SAILERP identity or profile source before the next request.`;
 }
 
 export function formatDiagnosticsReturnedVerificationStillVerified(row: {
-  requestUuid: string;
-  defectId: string;
-  vesselId: string;
+  defectReportId: string;
+  vesselName: string;
   finalizedAt: string;
   consequence: string;
 }): string {
-  return `Request ${row.requestUuid} for defect ${row.defectId} on vessel ${row.vesselId}; finalized ${row.finalizedAt} while verification remained recorded — ${row.consequence}`;
+  return `${row.defectReportId} on ${row.vesselName} is still marked verified after verification was rejected. Reconcile this defect in SAILERP under Defects before relying on its closure status.`;
+}
+
+const DIAGNOSTIC_WORKFLOW_NAMES: Record<string, string> = {
+  "defects-extension": "Initial defect extension",
+  "defects-repeat-extension": "Repeat defect extension",
+  "defects-verification": "Defect verification",
+};
+
+export function formatDiagnosticsMissingWorkflow(row: {
+  screenId: string;
+  classification: string;
+}): string {
+  const workflowName = DIAGNOSTIC_WORKFLOW_NAMES[row.screenId] ?? "Unknown approval step";
+  return `${workflowName} for ${row.classification} defects is not set up. Configure this approval step in the Approval Engine builder on this page.`;
 }
 
 export function projectRejectedClosureHistory<T extends { id: string | number; attemptNumber?: number | null }>(

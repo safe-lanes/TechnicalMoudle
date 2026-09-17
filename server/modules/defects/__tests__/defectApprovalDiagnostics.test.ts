@@ -27,17 +27,19 @@ import { getDefectApprovalDiagnostics } from '../services/defectsService';
 
 function mockDb(data: {
   workflows?: any[]; nodes?: any[]; slots?: any[]; defects?: any[];
-  requests?: any[]; returnedRequests?: any[]; requestSlots?: any[];
+  roles?: any[]; requests?: any[]; terminalRequests?: any[]; returnedRequests?: any[]; requestSlots?: any[];
 }) {
   const rows = {
     workflows: data.workflows ?? [], nodes: data.nodes ?? [], slots: data.slots ?? [],
+    roles: data.roles ?? [{ roleId: 'role-1', roleName: 'Master' }],
     defects: data.defects ?? [], requests: data.requests ?? [],
-    returnedRequests: data.returnedRequests ?? [], requestSlots: data.requestSlots ?? [],
+    returnedRequests: data.terminalRequests ?? data.returnedRequests ?? [], requestSlots: data.requestSlots ?? [],
   };
   mocks.select.mockImplementation((fields: any) => ({
     from: () => {
       const keys = Object.keys(fields);
        const group = keys.includes('classification') ? 'workflows'
+         : keys.includes('roleName') ? 'roles'
          : keys.includes('finalizedAt') ? 'returnedRequests'
          : keys.includes('subjectRef') ? 'requests'
             : keys.includes('duuid') ? 'defects'
@@ -97,8 +99,8 @@ describe('Defects approval diagnostics aggregation', () => {
       expect.objectContaining({ defectId: 'D-open', requestedAt: '2026-01-02' }),
       expect.objectContaining({ defectId: 'D-pending', entryId: 'extra', requestedAt: '2026-01-04' }),
     ]));
-     expect(result.queryPlan.expectedQueries).toBe(6 + 3 * 2);
-     expect(mocks.select).toHaveBeenCalledTimes(6);
+     expect(result.queryPlan.expectedQueries).toBe(7 + 3 * 2);
+     expect(mocks.select).toHaveBeenCalledTimes(7);
     expect(result.missingActiveWorkflows.find((gap) =>
       gap.screenId === 'defects-repeat-extension' && gap.classification === 'Normal')?.consequence)
       .toBe('Repeat extensions in this classification will fall back to the initial extension workflow until this is configured.');
@@ -125,7 +127,7 @@ describe('Defects approval diagnostics aggregation', () => {
     expect(result.stalledRequests).toEqual([]);
     expect(result.orphanRequestedExtensions).toEqual([]);
     expect(mocks.resolveRoleApproverUserIds).not.toHaveBeenCalled();
-     expect(result.queryPlan.expectedQueries).toBe(6);
+     expect(result.queryPlan.expectedQueries).toBe(7);
   });
 
   it('flags returned verification requests whose defect remains verified', async () => {
@@ -136,6 +138,7 @@ describe('Defects approval diagnostics aggregation', () => {
       }],
       returnedRequests: [{
         requuid: 'R-returned', subjectRef: 'D-split', vesselId: 'V1',
+        status: 'returned', submittedAt: '2026-09-16T07:55:00.000Z',
         finalizedAt: '2026-09-16T08:00:00.000Z',
       }],
     });
@@ -150,5 +153,90 @@ describe('Defects approval diagnostics aggregation', () => {
     ]);
     expect(result.summary.returnedVerificationStillVerified).toBe(1);
     expect(result.healthy).toBe(false);
+  });
+
+  it('does not flag an older return when a later verification was approved', async () => {
+    mockDb({
+      defects: [{ duuid: 'D-reclosed', vesselId: 'V1', status: 'Closed', verified: true, isDeleted: false, targetDateExtensions: [] }],
+      terminalRequests: [
+        { requuid: 'R-returned', subjectRef: 'D-reclosed', vesselId: 'V1', status: 'returned', submittedAt: '2026-09-16T08:00:00Z', finalizedAt: '2026-09-16T08:05:00Z' },
+        { requuid: 'R-approved', subjectRef: 'D-reclosed', vesselId: 'V1', status: 'approved', submittedAt: '2026-09-16T09:00:00Z', finalizedAt: '2026-09-16T09:05:00Z' },
+      ],
+    });
+    const result = await getDefectApprovalDiagnostics();
+    expect(result.returnedVerificationStillVerified).toEqual([]);
+  });
+
+  it('does not flag a returned request when the defect is correctly unverified', async () => {
+    mockDb({
+      defects: [{ duuid: 'D-open', vesselId: 'V1', status: 'Open', verified: false, isDeleted: false, targetDateExtensions: [] }],
+      terminalRequests: [{ requuid: 'R-returned', subjectRef: 'D-open', vesselId: 'V1', status: 'returned', submittedAt: '2026-09-16T08:00:00Z', finalizedAt: '2026-09-16T08:05:00Z' }],
+    });
+    const result = await getDefectApprovalDiagnostics();
+    expect(result.returnedVerificationStillVerified).toEqual([]);
+  });
+
+  it('uses timestamps rather than returned row order to find the latest decision', async () => {
+    mockDb({
+      defects: [{ duuid: 'D-order', vesselId: 'V1', status: 'Closed', verified: true, isDeleted: false, targetDateExtensions: [] }],
+      terminalRequests: [
+        { requuid: 'R-approved-latest', subjectRef: 'D-order', vesselId: 'V1', status: 'approved', submittedAt: '2026-09-16T10:00:00Z', finalizedAt: '2026-09-16T10:05:00Z' },
+        { requuid: 'R-returned-older', subjectRef: 'D-order', vesselId: 'V1', status: 'returned', submittedAt: '2026-09-16T08:00:00Z', finalizedAt: '2026-09-16T08:05:00Z' },
+      ],
+    });
+    const result = await getDefectApprovalDiagnostics();
+    expect(result.returnedVerificationStillVerified).toEqual([]);
+  });
+
+  it('falls back to submitted time when finalization time is null', async () => {
+    mockDb({
+      defects: [{ duuid: 'D-null-finalized', vesselId: 'V1', status: 'Closed', verified: true, isDeleted: false, targetDateExtensions: [] }],
+      terminalRequests: [
+        { requuid: 'R-returned', subjectRef: 'D-null-finalized', vesselId: 'V1', status: 'returned', submittedAt: '2026-09-16T08:00:00Z', finalizedAt: '2026-09-16T08:05:00Z' },
+        { requuid: 'R-approved', subjectRef: 'D-null-finalized', vesselId: 'V1', status: 'approved', submittedAt: '2026-09-16T10:00:00Z', finalizedAt: null },
+      ],
+    });
+    const result = await getDefectApprovalDiagnostics();
+    expect(result.returnedVerificationStillVerified).toEqual([]);
+  });
+
+  it('flags conservatively when latest effective timestamps tie across decisions', async () => {
+    mockDb({
+      defects: [{ duuid: 'D-tie', vesselId: 'V1', status: 'Closed', verified: true, isDeleted: false, targetDateExtensions: [] }],
+      terminalRequests: [
+        { requuid: 'R-returned', subjectRef: 'D-tie', vesselId: 'V1', status: 'returned', submittedAt: '2026-09-16T08:00:00Z', finalizedAt: '2026-09-16T09:00:00Z' },
+        { requuid: 'R-approved', subjectRef: 'D-tie', vesselId: 'V1', status: 'approved', submittedAt: '2026-09-16T08:30:00Z', finalizedAt: '2026-09-16T09:00:00Z' },
+      ],
+    });
+    const result = await getDefectApprovalDiagnostics();
+    expect(result.returnedVerificationStillVerified).toHaveLength(1);
+  });
+
+  it('flags conservatively when a terminal request has no usable timestamp', async () => {
+    mockDb({
+      defects: [{ duuid: 'D-unknown-time', vesselId: 'V1', status: 'Closed', verified: true, isDeleted: false, targetDateExtensions: [] }],
+      terminalRequests: [
+        { requuid: 'R-returned', subjectRef: 'D-unknown-time', vesselId: 'V1', status: 'returned', submittedAt: null, finalizedAt: null },
+        { requuid: 'R-approved', subjectRef: 'D-unknown-time', vesselId: 'V1', status: 'approved', submittedAt: '2026-09-16T10:00:00Z', finalizedAt: '2026-09-16T10:05:00Z' },
+      ],
+    });
+    const result = await getDefectApprovalDiagnostics();
+    expect(result.returnedVerificationStillVerified).toHaveLength(1);
+  });
+
+  it('supplies a visible fallback when a vessel name cannot be resolved', async () => {
+    mocks.resolveRoleApproverUserIds.mockResolvedValue([]);
+    mockDb({
+      workflows: [{ wfuuid: 'wf-1', screenId: 'defects-verification', classification: 'Normal' }],
+      nodes: [{ workflowWfuuid: 'wf-1', nodeKey: 'step-1' }],
+      slots: [{ workflowWfuuid: 'wf-1', nodeKey: 'step-1', roleId: 'role-1', roleLabel: '' }],
+      roles: [],
+      defects: [{ duuid: 'D-unknown-vessel', id: null, vesselId: 'missing-vessel-uuid', vesselName: null, status: 'Open', verified: false, isDeleted: false, targetDateExtensions: [] }],
+    });
+    const result = await getDefectApprovalDiagnostics();
+    expect(result.unresolvedApprovers[0]).toMatchObject({
+      vesselName: 'Unknown vessel (no longer in the vessel list)',
+      roles: [{ roleId: 'role-1', roleName: 'Unknown role (removed from the role list)', issue: 'missing-workflow-role' }],
+    });
   });
 });
