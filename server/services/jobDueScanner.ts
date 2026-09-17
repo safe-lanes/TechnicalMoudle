@@ -13,7 +13,13 @@ import {
   findBlockingWOForJob
 } from "../utils/workOrderStatus";
 import type { InsertWorkOrder, Job, PmsVesselSettings, Component } from "@shared/schema";
-import { parseWorkOrderDate } from "@shared/workOrders/dateParse";
+import {
+  addWorkOrderCalendarDays,
+  currentWorkOrderCalendarDate,
+  formatWorkOrderCalendarDate,
+  normalizeWorkOrderCalendarDate,
+  parseWorkOrderDate,
+} from "@shared/workOrders/dateParse";
 import { getEffectiveInstanceId } from "../modules/sync/syncRole";
 
 /**
@@ -632,8 +638,7 @@ export class JobDueScannerService {
     const dualLinksMap = await storage.getLinkedComponentsForJobs(dualJobs.map(j => j.juuid));
 
     let generated = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = currentWorkOrderCalendarDate();
 
     for (const job of dualJobs) {
       // Must have component for RH resolution (D3)
@@ -657,14 +662,15 @@ export class JobDueScannerService {
 
       // Calendar leg values — SHARED parser (dateParse.ts contract): raw
       // new Date() invalidated/swapped DD-MM-YYYY dates. Unparseable → skip.
-      const dueDate = parseWorkOrderDate(job.nextDueDate);
+      const dueDate = normalizeWorkOrderCalendarDate(job.nextDueDate);
       if (!dueDate) {
         skipReasons.missingCalendarData++;
         continue;
       }
-      dueDate.setHours(0, 0, 0, 0);
-      const generateDate = new Date(dueDate);
-      generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+      const generateDate = addWorkOrderCalendarDays(
+        dueDate,
+        -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS,
+      )!;
       const calendarDue = today >= generateDate;
 
       // RH leg values
@@ -716,8 +722,8 @@ export class JobDueScannerService {
         continue;
       }
 
-      const dueDateStr = dueDate.toISOString().split('T')[0];
-      const generateDateStr = generateDate.toISOString().split('T')[0];
+      const dueDateStr = formatWorkOrderCalendarDate(dueDate)!;
+      const generateDateStr = formatWorkOrderCalendarDate(generateDate)!;
 
       // Generate a WO for EACH linked component
       for (const linkedComponent of linkedComponents) {
@@ -987,16 +993,17 @@ export class JobDueScannerService {
       dueRH = dualRhDueValue;
 
       // Calendar values
-      const dualDueDate = parseWorkOrderDate(job.nextDueDate) ?? new Date(); // shared parser (dateParse.ts contract)
-      dualDueDate.setHours(0, 0, 0, 0);
-      const dualDueDateStr = dualDueDate.toISOString().split('T')[0];
-      const dualGenerateDate = new Date(dualDueDate);
-      dualGenerateDate.setDate(dualGenerateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
-      const dualGenerateDateStr = dualGenerateDate.toISOString().split('T')[0];
+      const dualDueDate = normalizeWorkOrderCalendarDate(job.nextDueDate)
+        ?? currentWorkOrderCalendarDate();
+      const dualDueDateStr = formatWorkOrderCalendarDate(dualDueDate)!;
+      const dualGenerateDate = addWorkOrderCalendarDays(
+        dualDueDate,
+        -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS,
+      )!;
+      const dualGenerateDateStr = formatWorkOrderCalendarDate(dualGenerateDate)!;
 
       // Determine which leg would trigger (for driverType) — manual trigger allows override
-      const dualToday = new Date();
-      dualToday.setHours(0, 0, 0, 0);
+      const dualToday = currentWorkOrderCalendarDate();
       const calLegDue = dualToday >= dualGenerateDate;
       const rhLegDue = currentRH >= dualRhGenerate;
       const dualTriggerLeg = calLegDue ? 'CALENDAR' : (rhLegDue ? 'RH' : 'CALENDAR');
@@ -1096,14 +1103,16 @@ export class JobDueScannerService {
       console.log(`   RH_due=${rhDueValue}, RH_generate=${rhGenerate}, RH_current=${currentRH}`);
     } else {
       // Calendar Job: compute cycle values
-      const dueDate = parseWorkOrderDate(job.nextDueDate) ?? new Date(); // shared parser (dateParse.ts contract)
-      dueDate.setHours(0, 0, 0, 0);
-      const dueDateStr = dueDate.toISOString().split('T')[0];
+      const dueDate = normalizeWorkOrderCalendarDate(job.nextDueDate)
+        ?? currentWorkOrderCalendarDate();
+      const dueDateStr = formatWorkOrderCalendarDate(dueDate)!;
       
       // Use FIXED 30-day generation advance (business rule: generation is fixed, not vessel-driven)
-      const generateDate = new Date(dueDate);
-      generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
-      const generateDateStr = generateDate.toISOString().split('T')[0];
+      const generateDate = addWorkOrderCalendarDays(
+        dueDate,
+        -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS,
+      )!;
+      const generateDateStr = formatWorkOrderCalendarDate(generateDate)!;
       
       // Step 3: CYCLE-LEVEL CHECK (Calendar) using Trigger 1's cycle map (direct lookup)
       // Key format: `${vesselId}|${jobNo}|${componentCode}|${cycleDueDateSnapshot}`
