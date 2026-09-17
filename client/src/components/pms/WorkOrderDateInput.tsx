@@ -1,4 +1,5 @@
 import React from 'react';
+import { CalendarDays } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   formatWorkOrderDateDDMMYYYY,
@@ -42,7 +43,7 @@ export function WorkOrderDateInput({
     disabled,
     tabIndex: -1,
     placeholder,
-    className: `${className} ${disabled ? '' : 'pointer-events-none'}`,
+    className: `${className} ${disabled ? '' : 'pointer-events-none pr-10 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2'}`,
     'aria-hidden': !disabled,
     'aria-invalid': ariaInvalid,
     'data-testid': disabled ? testId : testId ? `${testId}-display` : undefined,
@@ -51,16 +52,25 @@ export function WorkOrderDateInput({
   return React.createElement(
     'div',
     { className: `relative ${containerClassName}` },
-    React.createElement(Input, visibleInputProps),
     !disabled && React.createElement('input', {
       type: 'date',
       value: machineValue,
       max,
       onChange: (event: React.ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value),
-      className: 'absolute inset-0 h-full w-full cursor-pointer opacity-0',
+      className: 'peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0',
       'aria-label': ariaLabel || 'Select date',
       'aria-invalid': ariaInvalid,
       'data-testid': testId,
     }),
+    React.createElement(Input, visibleInputProps),
+    !disabled && React.createElement(
+      'span',
+      {
+        className: 'pointer-events-none absolute inset-y-0 right-3 z-20 flex items-center text-gray-500',
+        'aria-hidden': true,
+        'data-testid': testId ? `${testId}-picker-icon` : undefined,
+      },
+      React.createElement(CalendarDays, { className: 'h-4 w-4' }),
+    ),
   );
 }

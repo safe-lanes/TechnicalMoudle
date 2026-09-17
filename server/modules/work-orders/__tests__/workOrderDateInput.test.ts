@@ -23,6 +23,9 @@ describe('WorkOrderDateInput', () => {
     expect(markup).toContain('value="2026-09-18"');
     expect(markup).toContain('data-testid="work-order-date-display"');
     expect(markup).toContain('data-testid="work-order-date"');
+    expect(markup).toContain('data-testid="work-order-date-picker-icon"');
+    expect(markup).toContain('aria-label="Select date"');
+    expect(markup).toContain('cursor-pointer');
   });
 
   it('renders a disabled date as DD-MM-YYYY without an editable picker', () => {
@@ -37,5 +40,6 @@ describe('WorkOrderDateInput', () => {
     expect(markup).toContain('value="18-09-2026"');
     expect(markup).toContain('disabled=""');
     expect(markup).not.toContain('type="date"');
+    expect(markup).not.toContain('work-order-date-picker-icon');
   });
 });
