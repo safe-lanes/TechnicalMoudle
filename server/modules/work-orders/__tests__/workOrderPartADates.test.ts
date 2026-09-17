@@ -23,6 +23,14 @@ describe('Work Order Part A snapshot dates', () => {
     });
   });
 
+  it('keeps the displayed cycle due date unchanged after postponement', () => {
+    expect(resolveWorkOrderPartADates({
+      maintenanceBasis: 'Dual Frequency',
+      dueDateSnapshot: '05-Dec-2026',
+      dueDate: '20-Dec-2026',
+    }).nextDueDate).toBe('2026-12-05');
+  });
+
   it('uses dueDate before nextDueDate for legacy rows without a due snapshot', () => {
     expect(resolveWorkOrderPartADates({
       maintenanceBasis: 'Calendar',

@@ -5941,11 +5941,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm font-medium text-gray-700" data-testid="WOF.B2.4"><Marker id="WOF.B2.4" />B2.1 Work Duration:</h4>
                   {(() => {
-                    const woOrigDueDate = (workOrderContext as any)?.workOrder?.originalDueDate;
                     const woDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime;
                     const isCompleted = currentWorkOrderStatus === 'Completed';
-                    if (isCompleted && woOrigDueDate) {
-                      const formattedScheduled = formatWorkOrderDateDDMMYYYY(woOrigDueDate, woOrigDueDate);
+                    if (isCompleted && displayedPartANextDueDate) {
+                      const formattedScheduled = formatWorkOrderDateDDMMYYYY(displayedPartANextDueDate, displayedPartANextDueDate);
                       const formattedCompletion = formatWorkOrderDateDDMMYYYY(woDateCompleted, '-');
                       return (
                         <div className="text-sm text-gray-500 font-medium text-right" data-testid="text-due-date-detail">
@@ -5954,10 +5953,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         </div>
                       );
                     }
-                    if (workOrderDueDate) {
+                    if (displayedPartANextDueDate) {
                       return (
                         <span className="text-sm text-gray-500 font-medium" data-testid="text-due-date">
-                          Due Date: <span className="text-gray-700">{formatWorkOrderDateDDMMYYYY(workOrderDueDate, workOrderDueDate)}</span>
+                          Due Date: <span className="text-gray-700">{formatWorkOrderDateDDMMYYYY(displayedPartANextDueDate, displayedPartANextDueDate)}</span>
                         </span>
                       );
                     }
