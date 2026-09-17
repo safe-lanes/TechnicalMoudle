@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from "@shared/dateUtils";
+import { calculateNextDueDate, normalizeDateToDDMMMYYYY, formatWorkOrderDateDDMMYYYY, workOrderOverdueCompletionMessage } from "@shared/dateUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { useVessel } from "@/contexts/VesselContext";
@@ -42,6 +42,7 @@ import { FEATURES, IHM_ACTIONS } from '@/config/features';
 import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
 import { useRanks, ensureRankInOptions } from '@/hooks/useRanks';
 import { useResolvedUserName } from '@/hooks/useResolvedUserName';
+import { WorkOrderDateInput } from '@/components/pms/WorkOrderDateInput';
 
 // Type for history mode payload
 export interface HistoryWorkOrderPayload {
@@ -1287,7 +1288,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         const startDateCheck = new Date(startDate);
         startDateCheck.setHours(0, 0, 0, 0);
         if (startDateCheck < woCreationDate) {
-          const formattedCreationDate = woCreationDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          const formattedCreationDate = formatWorkOrderDateDDMMYYYY(woCreatedAtVal, String(woCreatedAtVal));
           toast({
             title: "Validation Error",
             description: `Start Date cannot be earlier than the Work Order creation date (${formattedCreationDate}).`,
@@ -1310,7 +1311,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
             if (!isNaN(nextDueDateObj.getTime()) && completionCheckObj > nextDueDateObj) {
               toast({
                 title: "Overdue Completion",
-                description: `Work was completed after the scheduled due date (${normalizedNextDue}). The record will be tagged as overdue.`,
+                description: workOrderOverdueCompletionMessage(templateData.nextDueDate),
               });
             }
           }
@@ -1989,13 +1990,13 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             : "Next Due Reading"}
                         </Label>
                         {(templateData.maintenanceBasis === "Calendar" || templateData.maintenanceBasis === "Dual Frequency") ? (
-                          <Input
-                            type="date"
+                          <WorkOrderDateInput
                             value={templateData.nextDueDate}
-                            onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
+                            onChange={(value) => handleTemplateChange('nextDueDate', value)}
+                            disabled={isPartAReadOnly}
                             className="text-sm"
                             placeholder="Leave empty to auto-calculate"
-                            disabled={isPartAReadOnly}
+                            aria-label="Next Due Date"
                           />
                         ) : (
                           <Input
@@ -2438,8 +2439,12 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                                 <div className="text-gray-900">{execution.assignedTo}</div>
                                 <div className="text-gray-900">{execution.performedBy}</div>
                                 <div className="text-gray-900">{execution.totalTimeHours}</div>
-                                <div className="text-gray-900">{execution.dueDate || execution.dueReading}</div>
-                                <div className="text-gray-900">{execution.completionDate}</div>
+                                <div className="text-gray-900">
+                                  {templateData.maintenanceBasis === "Calendar"
+                                    ? formatWorkOrderDateDDMMYYYY(execution.dueDate, '—')
+                                    : execution.dueReading}
+                                </div>
+                                <div className="text-gray-900">{formatWorkOrderDateDDMMYYYY(execution.completionDate, '—')}</div>
                                 <div className="flex items-center gap-2">
                                   <span className="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
                                     {execution.status}

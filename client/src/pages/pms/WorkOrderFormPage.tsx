@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { calculateNextDueDate, normalizeDateToDDMMMYYYY, calculateMissedCycles, formatRelativeTime, formatRHWithSeparators } from "@shared/dateUtils";
+import { calculateNextDueDate, normalizeDateToDDMMMYYYY, calculateMissedCycles, formatRelativeTime, formatRHWithSeparators, formatWorkOrderDateDDMMYYYY, workOrderOverdueCompletionMessage } from "@shared/dateUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,6 +74,7 @@ import { StatusPill } from '@/components/StatusPill';
 import { Marker } from "@/components/Marker";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { RejectionHistorySection } from "@/components/wo/RejectionHistorySection";
+import { WorkOrderDateInput } from "@/components/pms/WorkOrderDateInput";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -1501,7 +1502,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         setComponentActualRHStatus('loaded');
         setComponentActualRHLastUpdated(result.lastUpdated || null);
         setComponentActualRHHasBaseline(!!result.hasRealRhBaseline);
-        const fetchedDate = result.lastUpdated ? new Date(result.lastUpdated).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') : 'N/A';
+        const fetchedDate = formatWorkOrderDateDDMMYYYY(result.lastUpdated, 'N/A');
         toast({ title: "RH Fetched", description: `Running hours fetched: ${result.currentRH} hours as of ${fetchedDate}` });
         performRHValidation(String(result.currentRH));
       }
@@ -1574,10 +1575,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const prevMs = toUTCDay(prev.date);
       if (!isNaN(prevMs) && prevMs <= readingMs) return null;
     }
-    const fmt = (s: string) => {
-      const d = new Date(s);
-      return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
-    };
+    const fmt = (s: string) => formatWorkOrderDateDDMMYYYY(s, s);
     return `Current Reading Date (${fmt(readingStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
   }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, rhReadingDateAnchor, executionData.currentReading, rhValidation.previousEntry, rhValidation.componentActualRH]);
 
@@ -3036,7 +3034,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             if (!isNaN(nextDueDateObj.getTime()) && completionCheckObj > nextDueDateObj) {
               toast({
                 title: "Overdue Completion",
-                description: `Work was completed after the scheduled due date (${normalizedNextDue}). The record will be tagged as overdue.`,
+                description: workOrderOverdueCompletionMessage(templateData.nextDueDate),
               });
             }
           }
@@ -3140,7 +3138,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       if (!response.ok) {
         if (result.code === 'LOWER_THAN_CURRENT_RH') {
-          const currentDate = result.currentRHDate ? ` recorded on ${result.currentRHDate}` : '';
+          const currentDate = result.currentRHDate
+            ? ` recorded on ${formatWorkOrderDateDDMMYYYY(result.currentRHDate, result.currentRHDate)}`
+            : '';
           throw new Error(
             `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
             `(${result.currentRH} RH${currentDate}). Correct the Current Reading before completing this Work Order.`
@@ -3910,7 +3910,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       if (!response.ok) {
         if (result.code === 'LOWER_THAN_CURRENT_RH') {
-          const currentDate = result.currentRHDate ? ` recorded on ${result.currentRHDate}` : '';
+          const currentDate = result.currentRHDate
+            ? ` recorded on ${formatWorkOrderDateDDMMYYYY(result.currentRHDate, result.currentRHDate)}`
+            : '';
           throw new Error(
             `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
             `(${result.currentRH} RH${currentDate}). Correct the Current Reading before approving this Work Order.`
@@ -4299,7 +4301,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               {topAnomaly.missedCycles > 0 ? ` — ${topAnomaly.missedCycles} missed cycles` : ''}
             </span>
             <span className={`text-xs ${sc.text} opacity-70 ml-auto`}>
-              Detected: {topAnomaly.detectedAt ? new Date(topAnomaly.detectedAt).toLocaleDateString() : 'N/A'}
+              Detected: {formatWorkOrderDateDDMMYYYY(topAnomaly.detectedAt, 'N/A')}
             </span>
           </div>
         );
@@ -4507,8 +4509,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           const woOriginalDueDate = (workOrderContext as any)?.workOrder?.originalDueDate;
                           const jobNextDueDate = templateData?.nextDueDate;
                           if (woOriginalDueDate && jobNextDueDate) {
-                            const formattedOriginal = normalizeDateToDDMMMYYYY(woOriginalDueDate) || woOriginalDueDate;
-                            const formattedNextDue = normalizeDateToDDMMMYYYY(jobNextDueDate) || jobNextDueDate;
+                            const formattedOriginal = formatWorkOrderDateDDMMYYYY(woOriginalDueDate, woOriginalDueDate);
+                            const formattedNextDue = formatWorkOrderDateDDMMYYYY(jobNextDueDate, jobNextDueDate);
                             return (
                               <p className="text-sm mt-2" style={{ color: '#92400E' }} data-testid="text-next-due-corrected">
                                 The next due date has been automatically corrected to{' '}
@@ -4888,12 +4890,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   ) : (
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due Date</Label>
-                      <Input
-                        type="date"
+                      <WorkOrderDateInput
                         value={displayedPartANextDueDate}
-                        onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
-                        className={`text-sm ${isNewJobCreation && templateData.maintenanceBasis === 'Calendar' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                        onChange={(value) => handleTemplateChange('nextDueDate', value)}
                         disabled={isPartAReadOnly || (isNewJobCreation && templateData.maintenanceBasis === 'Calendar')}
+                        className={isNewJobCreation && templateData.maintenanceBasis === 'Calendar' ? 'text-sm bg-gray-50 text-gray-500 cursor-not-allowed' : 'text-sm'}
+                        aria-label="Next Due Date"
                         data-testid="WOF.A1.27"
                       />
                     </div>
@@ -4937,18 +4939,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       Last Completed On
                     </Label>
                     {isNewJobCreation ? (
-                      <Input
-                        type="date"
+                      <WorkOrderDateInput
                         value={(templateData as any).lastCompletedOn || ''}
-                        onChange={(e) => handleTemplateChange('lastCompletedOn', e.target.value)}
+                        onChange={(value) => handleTemplateChange('lastCompletedOn', value)}
                         className="text-sm"
+                        aria-label="Last Completed On"
                         data-testid="input-last-completed-on"
                       />
                     ) : (
                       <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
                         {(lastDoneDate || lastDoneDateForRH) ? (
                           <>
-                            {normalizeDateToDDMMMYYYY(lastDoneDateForRH || lastDoneDate) || lastDoneDateForRH || lastDoneDate}
+                            {formatWorkOrderDateDDMMYYYY(lastDoneDateForRH || lastDoneDate, lastDoneDateForRH || lastDoneDate)}
                             {formatRelativeTime(lastDoneDateForRH || lastDoneDate) && (
                               <span className="text-gray-500"> ({formatRelativeTime(lastDoneDateForRH || lastDoneDate)})</span>
                             )}
@@ -5398,7 +5400,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               const totalPages = Math.ceil(totalCount / WORK_HISTORY_PAGE_SIZE);
 
               const hasFilters = !!historyPeriod;
-              const fmtDate = (d: string | null | undefined) => d ? d.slice(0, 10) : '—';
+              const fmtDate = (d: string | null | undefined) =>
+                formatWorkOrderDateDDMMYYYY(d, '—');
 
               return (
                 <>
@@ -5516,7 +5519,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                         <>
                                           <div>
                                             <span className="font-medium text-gray-600">Completion Date:</span>{' '}
-                                            <span className="text-gray-800">{row.date || '—'}</span>
+                                            <span className="text-gray-800">{fmtDate(row.date)}</span>
                                           </div>
                                           <div>
                                             <span className="font-medium text-gray-600">Running Hours:</span>{' '}
@@ -5942,8 +5945,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     const woDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime;
                     const isCompleted = currentWorkOrderStatus === 'Completed';
                     if (isCompleted && woOrigDueDate) {
-                      const formattedScheduled = normalizeDateToDDMMMYYYY(woOrigDueDate) || woOrigDueDate;
-                      const formattedCompletion = woDateCompleted ? (normalizeDateToDDMMMYYYY(woDateCompleted) || woDateCompleted) : '-';
+                      const formattedScheduled = formatWorkOrderDateDDMMYYYY(woOrigDueDate, woOrigDueDate);
+                      const formattedCompletion = formatWorkOrderDateDDMMYYYY(woDateCompleted, '-');
                       return (
                         <div className="text-sm text-gray-500 font-medium text-right" data-testid="text-due-date-detail">
                           <div>Scheduled Due Date: <span className="text-gray-700">{formattedScheduled}</span></div>
@@ -5954,7 +5957,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     if (workOrderDueDate) {
                       return (
                         <span className="text-sm text-gray-500 font-medium" data-testid="text-due-date">
-                          Due Date: <span className="text-gray-700">{workOrderDueDate}</span>
+                          Due Date: <span className="text-gray-700">{formatWorkOrderDateDDMMYYYY(workOrderDueDate, workOrderDueDate)}</span>
                         </span>
                       );
                     }
@@ -5964,17 +5967,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.5"><Marker id="WOF.B2.5" />Start Date <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="date"
-                      value={executionData.startDateTime ? executionData.startDateTime.split('T')[0] : ''}
-                      onChange={(e) => {
+                    <WorkOrderDateInput
+                      value={executionData.startDateTime}
+                      onChange={(value) => {
                         const currentTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1] || '' : '';
-                        handleExecutionChange('startDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
+                        handleExecutionChange('startDateTime', currentTime ? `${value}T${currentTime}` : value);
                       }}
                       disabled={isPartBReadOnly}
                       className={`text-sm ${startDateBaselineError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                       aria-invalid={!!startDateBaselineError}
-                      placeholder="dd-mm-yyyy"
+                      aria-label="Start Date"
                       data-testid="WOF.B2.6"
                     />
                     {startDateBaselineError && (
@@ -6002,17 +6004,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.9"><Marker id="WOF.B2.9" />Completion Date <span className="text-red-500">*</span></Label>
                     <div className="flex items-center gap-2">
-                      <Input
-                        type="date"
-                        value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '')}
-                        onChange={(e) => {
+                      <WorkOrderDateInput
+                        value={executionData.completionDateTime || executionData.dateOfCompletion}
+                        onChange={(value) => {
                           const currentTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1] || '' : '';
-                          handleExecutionChange('completionDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
-                          handleExecutionChange('dateOfCompletion', e.target.value);
+                          handleExecutionChange('completionDateTime', currentTime ? `${value}T${currentTime}` : value);
+                          handleExecutionChange('dateOfCompletion', value);
                         }}
                         disabled={isPartBReadOnly}
-                        className="text-sm flex-1"
-                        placeholder="dd-mm-yyyy"
+                        className="text-sm"
+                        containerClassName="flex-1"
+                        aria-label="Completion Date"
                         data-testid="WOF.B2.10"
                       />
                       <Button
@@ -6435,13 +6437,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     Defaults to today, cannot be in the future. */}
                 <div className="space-y-1 mt-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="label-current-reading-date">Current Reading Date</Label>
-                  <Input
-                    type="date"
+                  <WorkOrderDateInput
                     value={executionData.currentReadingDate || new Date().toISOString().split('T')[0]}
                     max={new Date().toISOString().split('T')[0]}
-                    onChange={(e) => handleExecutionChange('currentReadingDate', e.target.value)}
+                    onChange={(value) => handleExecutionChange('currentReadingDate', value)}
                     disabled={isPartBReadOnly || isB3EditLocked}
                     className="text-sm"
+                    aria-label="Current Reading Date"
                     data-testid="input-current-reading-date"
                   />
                 </div>
@@ -6452,7 +6454,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     Valid range: {(() => { const vr = rhValidation.validRange!; const minStr = Number.isFinite(vr.min) ? vr.min.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `${minStr} to ${maxStr}`; })()} hours
                     {rhValidation.previousEntry && (
                       <span className="ml-1 text-blue-500">
-                        | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {formatWorkOrderDateDDMMYYYY(rhValidation.previousEntry.date, rhValidation.previousEntry.date)}
                       </span>
                     )}
                   </div>
@@ -6510,11 +6512,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {(rhBackdatedBanner ||
                   !!(workOrderContext as any)?.executionData?.rhBackdatedEntry ||
                   (workOrderContext as any)?.executionData?.rhUpdateOutcome === 'skipped_lower') && (() => {
-                  const fmt = (s: string) => {
-                    if (!s) return '';
-                    const d = new Date(s);
-                    return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
-                  };
+                  const fmt = (s: string) => formatWorkOrderDateDDMMYYYY(s, s);
                   const enteredRH = executionData.currentReading || '';
                   // The server's back-dated-lower skip is keyed on readingDateForRH, so this
                   // banner must report the reading date it actually compared.
@@ -7107,15 +7105,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
             const approveDisabled = isProcessingApproval || isSuptLocked || (approvalMissedCycles >= 1 && !justificationValid) || !ceRemarksValid;
 
-            const formatDateForDisplay = (dateStr: string) => {
-              if (!dateStr) return '—';
-              try {
-                const d = new Date(dateStr);
-                if (isNaN(d.getTime())) return dateStr;
-                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                return `${String(d.getDate()).padStart(2,'0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
-              } catch { return dateStr; }
-            };
+            const formatDateForDisplay = (dateStr: string) =>
+              formatWorkOrderDateDDMMYYYY(dateStr, dateStr || '—');
 
             const tierBannerConfig = (() => {
               switch (approvalTier) {
@@ -7444,7 +7435,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     )}
                     {(workOrderContext as any).workOrder.rejectionDate && (
                       <span className="text-xs text-amber-600">
-                        on {new Date((workOrderContext as any).workOrder.rejectionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        on {formatWorkOrderDateDDMMYYYY((workOrderContext as any).workOrder.rejectionDate, (workOrderContext as any).workOrder.rejectionDate)}
                       </span>
                     )}
                   </div>
@@ -7469,7 +7460,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     )}
                     {(workOrderContext as any).workOrder.reopenedAt && (
                       <span className="text-xs text-amber-600">
-                        on {new Date((workOrderContext as any).workOrder.reopenedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        on {formatWorkOrderDateDDMMYYYY((workOrderContext as any).workOrder.reopenedAt, (workOrderContext as any).workOrder.reopenedAt)}
                       </span>
                     )}
                   </div>
@@ -7662,7 +7653,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <div><strong>Submitted reading:</strong> {rhLowerApprovalNotice?.submittedRH} RH</div>
                   <div>
                     <strong>Latest live reading:</strong> {rhLowerApprovalNotice?.latestRH} RH
-                    {rhLowerApprovalNotice?.latestRHDate ? ` (${rhLowerApprovalNotice.latestRHDate})` : ''}
+                    {rhLowerApprovalNotice?.latestRHDate
+                      ? ` (${formatWorkOrderDateDDMMYYYY(rhLowerApprovalNotice.latestRHDate, rhLowerApprovalNotice.latestRHDate)})`
+                      : ''}
                   </div>
                 </div>
                 <p>The submitted value remains recorded on this Work Order for completion history.</p>
@@ -8099,10 +8092,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <div className="bg-red-50 p-3 rounded-lg space-y-1">
                 <div className="font-medium text-red-800">Issue: {rhErrorDetails.validationStatus?.replace(/_/g, ' ')}</div>
                 {rhErrorDetails.previousEntry && (
-                  <div className="text-red-700">Previous RH Entry: {rhErrorDetails.previousEntry.runningHours} hrs on {new Date(rhErrorDetails.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <div className="text-red-700">Previous RH Entry: {rhErrorDetails.previousEntry.runningHours} hrs on {formatWorkOrderDateDDMMYYYY(rhErrorDetails.previousEntry.date, rhErrorDetails.previousEntry.date)}</div>
                 )}
                 {rhErrorDetails.nextEntry && (
-                  <div className="text-red-700">Next RH Entry: {rhErrorDetails.nextEntry.runningHours} hrs on {new Date(rhErrorDetails.nextEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <div className="text-red-700">Next RH Entry: {rhErrorDetails.nextEntry.runningHours} hrs on {formatWorkOrderDateDDMMYYYY(rhErrorDetails.nextEntry.date, rhErrorDetails.nextEntry.date)}</div>
                 )}
                 {rhErrorDetails.daysBetweenPrevious > 0 && (
                   <>
