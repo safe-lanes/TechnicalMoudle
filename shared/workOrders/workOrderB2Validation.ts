@@ -16,6 +16,14 @@ export interface WorkOrderB2ValidationInput {
   rhLastDoneSnapshot?: string | number | null;
 }
 
+export interface WorkOrderB2PatchValidationContext {
+  existingStatus?: string | null;
+  requestedStatus?: string | null;
+  approvalAction?: string | null;
+  startDateChanged?: boolean;
+  completionRhChanged?: boolean;
+}
+
 const MONTH_NUMBER: Record<string, string> = {
   jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
   jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
@@ -89,4 +97,32 @@ export function validateWorkOrderB2Baselines(
   }
 
   return errors;
+}
+
+export function getWorkOrderB2PatchValidationScope(
+  context: WorkOrderB2PatchValidationContext,
+): { startDate: boolean; completionRh: boolean } {
+  const requestedStatus = String(context.requestedStatus || '').trim().toLowerCase();
+  const isStoredPendingApproval =
+    context.existingStatus === 'Pending Approval'
+    && requestedStatus === 'completed'
+    && context.approvalAction === 'approved';
+  const isSubmittingForApproval =
+    requestedStatus === 'pending approval'
+    && context.existingStatus !== 'Pending Approval';
+  const isFinalizing =
+    (requestedStatus === 'approved' || requestedStatus === 'completed')
+    && context.existingStatus !== 'Approved'
+    && context.existingStatus !== 'Completed';
+
+  return {
+    startDate:
+      context.startDateChanged === true
+      || isSubmittingForApproval
+      || (isFinalizing && !isStoredPendingApproval),
+    completionRh:
+      context.completionRhChanged === true
+      || isSubmittingForApproval
+      || (isFinalizing && !isStoredPendingApproval),
+  };
 }

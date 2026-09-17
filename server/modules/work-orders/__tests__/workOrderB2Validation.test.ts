@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
+import {
+  getWorkOrderB2PatchValidationScope,
+  validateWorkOrderB2Baselines,
+} from '@shared/workOrders/workOrderB2Validation';
 
 describe('Work Order B2 snapshot baseline validation', () => {
   it.each(['Calendar', 'Running Hours', 'Dual Frequency'])(
@@ -69,5 +72,26 @@ describe('Work Order B2 snapshot baseline validation', () => {
       startDateTime: '16/07/2026',
       lastDoneDateSnapshot: '15-Jul-2026',
     })).toEqual([]);
+  });
+
+  it('does not revalidate an unchanged stored Pending Approval record during approval', () => {
+    expect(getWorkOrderB2PatchValidationScope({
+      existingStatus: 'Pending Approval',
+      requestedStatus: 'Completed',
+      approvalAction: 'approved',
+    })).toEqual({ startDate: false, completionRh: false });
+  });
+
+  it.each([
+    ['new submission', 'Active', 'Pending Approval', 'submitted'],
+    ['direct completion', 'Active', 'Completed', undefined],
+    ['computed-only pending label', 'Due', 'Completed', 'approved'],
+    ['reopened resubmission', 'Reopened', 'Pending Approval', 'submitted'],
+  ])('keeps baseline validation on %s', (_label, existingStatus, requestedStatus, approvalAction) => {
+    expect(getWorkOrderB2PatchValidationScope({
+      existingStatus,
+      requestedStatus,
+      approvalAction,
+    })).toEqual({ startDate: true, completionRh: true });
   });
 });

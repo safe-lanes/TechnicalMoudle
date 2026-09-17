@@ -1062,8 +1062,12 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
           if (rhInterval && !isNaN(rhInterval)) {
             rhUpdates.nextDueRH = currentRH + rhInterval;
           }
-          await repo.updateJob(job.juuid, rhUpdates);
-          console.log(`✅ [Finalize] Updated RH job ${job.jobNo} lastDoneRH: ${currentRH}`);
+          const { preserveNewerJobRhState } = await import('@shared/workOrders/jobCycleCalc');
+          const guardedRhUpdates = preserveNewerJobRhState(job, rhUpdates);
+          if (Object.keys(guardedRhUpdates).length > 0) {
+            await repo.updateJob(job.juuid, guardedRhUpdates);
+            console.log(`✅ [Finalize] Updated RH job ${job.jobNo} cycle fields without reducing newer RH state`);
+          }
         }
       }
     }

@@ -87,7 +87,7 @@ describe('final approval date projection', () => {
     expect(finalizeWorkOrderCompletion).toHaveBeenCalledWith('wo-1');
   });
 
-  it('bulk approval refuses an invalid stored B2 boundary before persistence', async () => {
+  it('bulk approval accepts an invalid historical B2 boundary when stored Pending Approval', async () => {
     repo.findById.mockResolvedValueOnce({
       ...baseWorkOrder,
       status: 'Pending Approval',
@@ -98,14 +98,12 @@ describe('final approval date projection', () => {
 
     const result = await bulkApprove(['wo-1'], 'Chief Engineer');
 
-    expect(result.results.success).toEqual([]);
-    expect(result.results.failed[0]?.error).toBe(
-      'Start Date must be after Last Completed On (2026-07-15).',
-    );
-    expect(repo.update).not.toHaveBeenCalled();
+    expect(result.results.failed).toEqual([]);
+    expect(result.results.success).toEqual(['wo-1']);
+    expect(repo.update).toHaveBeenCalled();
   });
 
-  it('level-2 approval refuses an invalid stored B2 boundary before persistence', async () => {
+  it('level-2 approval accepts an invalid historical B2 boundary already in review', async () => {
     repo.findById.mockResolvedValueOnce({
       ...baseWorkOrder,
       status: 'Pending Office Review',
@@ -117,8 +115,27 @@ describe('final approval date projection', () => {
     });
     const { reviewerApprove } = await import('../services/workOrderBulkService');
 
-    await expect(reviewerApprove('wo-1', 'Reviewed', 'reviewer-1'))
-      .rejects.toThrow('WO Completion RH must be greater than Last Completed At (5000 Hours).');
+    await expect(reviewerApprove('wo-1', 'Reviewed', 'reviewer-1')).resolves.toEqual({
+      message: 'Work order approved by reviewer',
+      workOrderId: 'wo-1',
+    });
+    expect(repo.update).toHaveBeenCalled();
+  });
+
+  it('bulk approval rejects a computed-only Pending Approval label', async () => {
+    repo.findById.mockResolvedValueOnce({
+      ...baseWorkOrder,
+      status: 'Due',
+      computedStatus: 'Pending Approval',
+    });
+    const { bulkApprove } = await import('../services/workOrderBulkService');
+
+    const result = await bulkApprove(['wo-1'], 'Chief Engineer');
+
+    expect(result.results.success).toEqual([]);
+    expect(result.results.failed[0]?.error).toBe(
+      'Work order is not pending approval (status: Due)',
+    );
     expect(repo.update).not.toHaveBeenCalled();
   });
 });

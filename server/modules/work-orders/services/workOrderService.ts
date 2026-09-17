@@ -21,7 +21,10 @@ import {
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { classifyApprovalTransition } from '../utils/approvalTransition';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
-import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
+import {
+  getWorkOrderB2PatchValidationScope,
+  validateWorkOrderB2Baselines,
+} from '@shared/workOrders/workOrderB2Validation';
 import {
   ensureCompletedWorkOrderDate,
   getJobCompletionDate,
@@ -1160,20 +1163,80 @@ export async function updateWorkOrder(id: string, body: any) {
       );
     }
 
-    const PENDING_APPROVAL_IMMUTABLE_FIELDS = [
+    const PENDING_APPROVAL_SUBMITTED_FIELDS = [
+      // B1 — submitted checklist / document decisions
+      'riskAssessmentStatus', 'safetyChecklistsStatus', 'operationalFormsStatus',
+      'uploadedDocuments',
+      // B2 — submitted execution details
+      'startDateTime', 'completionDateTime', 'dateCompleted', 'dateOfCompletion',
+      'executionAssignedTo', 'performedBy', 'noOfPersons', 'totalTimeHours',
+      'manhours', 'workCarriedOut', 'jobExperienceNotes', 'remarks',
+      'completionRemarks',
       // B3 Running Hours — drive the delta cascade at approval; immutable post-submission
       'runningHours', 'previousReading', 'runningHoursDifference',
-      'readingDate', 'currentReadingDate', 'currentReading', 'woCompletionRh',
+      'readingDate', 'currentReadingDate', 'currentReading', 'completionRH',
+      'woCompletionRh', 'completionRHSource', 'completionRHValidationDetails',
+      'completionRHValidated', 'rhJustification', 'rhJustificationProvidedBy',
+      'rhJustificationDate', 'rhBackdatedEntry',
+      // Execution identity is assigned before submission and must not change at approval.
+      'woExecutionId',
       // B4 Consumed Spare Parts — inventory already applied; reversal requires reject/resubmit
       'consumedSpareParts',
     ];
-    const attempted = Object.keys(body).filter((k: string) => PENDING_APPROVAL_IMMUTABLE_FIELDS.includes(k));
-    if (attempted.length > 0) {
-      console.warn(`⚠️ Blocked attempt to modify protected fields on Pending Approval WO ${existingWO.workOrderNo}: ${attempted.join(', ')}`);
+
+    const sameSubmittedValue = (field: string, incoming: any): boolean => {
+      if (field === 'dateOfCompletion' || field === 'dateCompleted' || field === 'completionDateTime') {
+        const incomingDate = parseWorkOrderDate(incoming);
+        if (!incomingDate) return false;
+        const storedDates = [
+          parseWorkOrderDate(existingWO.completionDateTime),
+          parseWorkOrderDate(existingWO.dateCompleted),
+        ].filter((value): value is Date => value !== null);
+        if (field === 'dateOfCompletion') {
+          const incomingDay = incomingDate.toISOString().slice(0, 10);
+          return storedDates.some(
+            (storedDate) => storedDate.toISOString().slice(0, 10) === incomingDay,
+          );
+        }
+        return storedDates.some(
+          (storedDate) => storedDate.getTime() === incomingDate.getTime(),
+        );
+      }
+      const stored = (existingWO as any)[field];
+      if (stored === incoming) return true;
+      if (stored == null || incoming == null) return stored == null && incoming == null;
+      if (typeof stored === 'object' || typeof incoming === 'object') {
+        try {
+          return JSON.stringify(stored) === JSON.stringify(incoming);
+        } catch {
+          return false;
+        }
+      }
+      return String(stored) === String(incoming);
+    };
+
+    const submittedFieldsInPayload = Object.keys(body)
+      .filter((key: string) => PENDING_APPROVAL_SUBMITTED_FIELDS.includes(key));
+    const changedSubmittedFields = submittedFieldsInPayload
+      .filter((key: string) => !sameSubmittedValue(key, body[key]));
+    if (changedSubmittedFields.length > 0) {
+      console.warn(`⚠️ Blocked attempt to modify submitted fields on Pending Approval WO ${existingWO.workOrderNo}: ${changedSubmittedFields.join(', ')}`);
       throw new ValidationError(
-        `Cannot modify [${attempted.join(', ')}] on a Pending Approval work order. ` +
-        `Running Hours and consumed spare parts are locked until the work order is approved or rejected.`
+        `Cannot modify [${changedSubmittedFields.join(', ')}] on a Pending Approval work order. ` +
+        `Submitted execution data is locked until the work order is approved or rejected.`,
+        {
+          code: 'PENDING_APPROVAL_EXECUTION_FIELDS_READ_ONLY',
+          disallowedFields: changedSubmittedFields,
+        },
       );
+    }
+
+    // Approval clients may echo stored execution values. Strip those exact
+    // echoes so approval persists workflow fields only and never rewrites Part B.
+    if (actionClassification.explicitApproval) {
+      for (const key of submittedFieldsInPayload) {
+        delete body[key];
+      }
     }
 
     if (body.superintendentAck) {
@@ -1463,11 +1526,6 @@ export async function updateWorkOrder(id: string, body: any) {
   const isSubmittingForApproval =
     updateData.status === 'Pending Approval' &&
     existingWO.status !== 'Pending Approval';
-  const normalizedIncomingStatus = String(updateData.status || '').trim().toLowerCase();
-  const isFinalizingApproval =
-    (normalizedIncomingStatus === 'approved' || normalizedIncomingStatus === 'completed')
-    && existingWO.status !== 'Approved'
-    && existingWO.status !== 'Completed';
   const effectiveCompletionRh = updateData.woCompletionRh ?? (existingWO as any).woCompletionRh;
   const effectiveCounterType = resolvedComponent?.rhCounterType || 'MASTER';
   if (
@@ -1481,17 +1539,20 @@ export async function updateWorkOrder(id: string, body: any) {
     );
   }
 
-  const shouldValidateStartBaseline =
-    updateData.startDateTime !== undefined || isSubmittingForApproval || isFinalizingApproval;
-  const shouldValidateRhBaseline =
-    updateData.woCompletionRh !== undefined || isSubmittingForApproval || isFinalizingApproval;
+  const validationScope = getWorkOrderB2PatchValidationScope({
+    existingStatus: existingWO.status,
+    requestedStatus: updateData.status,
+    approvalAction: updateData.approvalAction,
+    startDateChanged: updateData.startDateTime !== undefined,
+    completionRhChanged: updateData.woCompletionRh !== undefined,
+  });
   const b2BaselineError = validateWorkOrderB2Baselines({
     maintenanceBasis: existingWO.maintenanceBasis,
-    startDateTime: shouldValidateStartBaseline
+    startDateTime: validationScope.startDate
       ? (updateData.startDateTime ?? existingWO.startDateTime)
       : null,
     lastDoneDateSnapshot: existingWO.lastDoneDateSnapshot,
-    woCompletionRh: shouldValidateRhBaseline ? effectiveCompletionRh : null,
+    woCompletionRh: validationScope.completionRh ? effectiveCompletionRh : null,
     rhLastDoneSnapshot: existingWO.rhLastDoneSnapshot,
   })[0];
   if (b2BaselineError) {
@@ -2446,7 +2507,11 @@ export async function updateWorkOrder(id: string, body: any) {
                   console.log(`✅ Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
                 }
 
-                await repo.updateJob(job.juuid, rhUpdates);
+                const { preserveNewerJobRhState } = await import('@shared/workOrders/jobCycleCalc');
+                const guardedRhUpdates = preserveNewerJobRhState(job, rhUpdates);
+                if (Object.keys(guardedRhUpdates).length > 0) {
+                  await repo.updateJob(job.juuid, guardedRhUpdates);
+                }
 
                 // Layer 7 ISOLATION: Work orders NEVER write back to the RH Module
                 // Only create a read-only audit trail entry as a snapshot
@@ -2484,7 +2549,11 @@ export async function updateWorkOrder(id: string, body: any) {
                 console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
               }
 
-              await repo.updateJob(job.juuid, dualUpdates);
+              const { preserveNewerJobRhState } = await import('@shared/workOrders/jobCycleCalc');
+              const guardedDualUpdates = preserveNewerJobRhState(job, dualUpdates);
+              if (Object.keys(guardedDualUpdates).length > 0) {
+                await repo.updateJob(job.juuid, guardedDualUpdates);
+              }
               console.log(`✅ [Dual] Updated job ${job.jobNo} with lastDoneDate: ${dateOfCompletionNorm}${runningHours ? ', lastDoneRH: ' + runningHours : ' (RH unchanged)'}`);
             }
           }

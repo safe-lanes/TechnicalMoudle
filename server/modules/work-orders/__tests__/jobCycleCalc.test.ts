@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { computeJobCycleUpdates } from '@shared/workOrders/jobCycleCalc';
+import {
+  computeJobCycleUpdates,
+  preserveNewerJobRhState,
+} from '@shared/workOrders/jobCycleCalc';
 
 const calJob = { frequencyValue: 3, frequencyUnit: 'Months', intervalRunningHour: null };
 const rhJob = { frequencyValue: null, frequencyUnit: null, intervalRunningHour: 500 };
@@ -82,5 +85,21 @@ describe('computeJobCycleUpdates', () => {
       maintenanceBasis: 'Condition', dateOfCompletion: '01-Aug-2026', completionRH: '100', job: calJob,
     });
     expect(Object.keys(jobUpdates)).toHaveLength(0);
+  });
+});
+
+describe('preserveNewerJobRhState', () => {
+  it('keeps newer Job RH cycle values when approving an older completion', () => {
+    expect(preserveNewerJobRhState(
+      { lastDoneRH: 6000, nextDueRH: 6500 },
+      { lastDoneDate: '01-Sep-2026', lastDoneRH: 5000, nextDueRH: 5500 },
+    )).toEqual({ lastDoneDate: '01-Sep-2026' });
+  });
+
+  it('allows RH cycle values to advance', () => {
+    expect(preserveNewerJobRhState(
+      { lastDoneRH: 5000, nextDueRH: 5500 },
+      { lastDoneRH: 6000, nextDueRH: 6500 },
+    )).toEqual({ lastDoneRH: 6000, nextDueRH: 6500 });
   });
 });
