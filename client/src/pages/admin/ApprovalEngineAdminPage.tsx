@@ -14,8 +14,8 @@ import {
   formatDiagnosticsOrphan,
   formatDiagnosticsMissingWorkflow,
   formatDiagnosticsStalled,
-  formatDiagnosticsUnresolved,
   formatDiagnosticsReturnedVerificationStillVerified,
+  projectDiagnosticsUnresolvedBlocks,
   projectDiagnosticsSummary,
 } from "../defects/defectApprovalPresentation";
 
@@ -102,17 +102,24 @@ function DefectApprovalDiagnosticsPanel() {
                   title="Defects still marked verified after verification was rejected"
                   rows={data.returnedVerificationStillVerified ?? []}
                   format={formatDiagnosticsReturnedVerificationStillVerified}
+                  consequence="These defects are still marked verified after verification was rejected."
+                  instruction="What to do: reconcile these defects in SAILERP under Defects before relying on their closure status."
                   technical={(row) => <>Request: {row.requestUuid}<br />Defect: {row.defectId}<br />Vessel: {row.vesselId}<br />Finalized: {row.finalizedAt || "unknown"}</>}
                 />
                 <DiagnosticsGroup title="Approvals waiting with nobody able to approve them" rows={data.stalledRequests} format={formatDiagnosticsStalled}
+                  consequence="These approval requests cannot advance because nobody can approve them."
+                  instruction="What to do: open each defect as a Super Admin and use its approval decision controls to approve or return the stalled request. Then correct its workflow role in the Approval Engine builder or its users' vessel access in the SAILERP identity or profile source before the next request."
                   technical={(row) => <>Request: {row.requestUuid}<br />Defect: {row.defectId}<br />Vessel: {row.vesselId}<br />Scope: {row.screenId}</>} />
                 <DiagnosticsGroup title="Extension requests that were never sent for approval" rows={data.orphanRequestedExtensions} format={formatDiagnosticsOrphan}
+                  consequence="These extension requests were never sent for approval."
+                  instruction="What to do: review them in SAILERP under Defects and either submit them for approval or remove them."
                   technical={(row) => <>Extension: {row.entryId}<br />Defect: {row.defectId}<br />Vessel: {row.vesselId}</>} />
                 <DiagnosticsGroup title="Approval steps not yet set up" rows={data.missingActiveWorkflows ?? []}
                   format={formatDiagnosticsMissingWorkflow}
+                  consequence="These approval steps are not set up."
+                  instruction="What to do: configure them in the Approval Engine builder on this page."
                   technical={(row) => <>Scope: {row.screenId}<br />Classification: {row.classification}</>} />
-                <DiagnosticsGroup title="Vessels with no approver assigned" rows={data.unresolvedApprovers} format={formatDiagnosticsUnresolved}
-                  technical={(row) => <>Vessel: {row.vesselId}<br />Roles: {row.roles.map((role) => `${role.roleName} (${role.roleId})`).join(", ")}<br />Scopes: {(row.workflowScopes ?? []).join(", ") || "none"}</>} />
+                <UnresolvedApproversGroup rows={data.unresolvedApprovers} />
               </div>
             </DialogContent>
           </Dialog>
@@ -122,8 +129,13 @@ function DefectApprovalDiagnosticsPanel() {
   );
 }
 
-function DiagnosticsGroup<T>({ title, rows, format, technical }: {
-  title: string; rows: T[]; format: (row: T) => string; technical: (row: T) => React.ReactNode;
+function DiagnosticsGroup<T>({ title, rows, format, consequence, instruction, technical }: {
+  title: string;
+  rows: T[];
+  format: (row: T) => string;
+  consequence: string;
+  instruction: string;
+  technical: (row: T) => React.ReactNode;
 }) {
   if (!rows.length) return null;
   return (
@@ -131,15 +143,49 @@ function DiagnosticsGroup<T>({ title, rows, format, technical }: {
       <h3 style={{ margin: "0 0 4px", fontSize: 13 }}>{title} ({rows.length})</h3>
       <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: "#344054" }}>
         {rows.slice(0, 25).map((row, index) => (
-          <li key={`${title}-${index}`} className="mb-2">
-            <div>{format(row)}</div>
-            <details className="mt-1 text-xs text-slate-500">
-              <summary className="cursor-pointer">Technical details</summary>
-              <div className="mt-1 pl-2">{technical(row)}</div>
-            </details>
-          </li>
+          <li key={`${title}-${index}`}>{format(row)}</li>
         ))}
       </ul>
+      <p className="mb-1 mt-2 text-xs text-slate-700">{consequence}</p>
+      <p className="mb-1 text-xs text-slate-700">{instruction}</p>
+      <details className="mt-1 text-xs text-slate-500">
+        <summary className="cursor-pointer">Technical details</summary>
+        <div className="mt-1 space-y-2 pl-2">
+          {rows.slice(0, 25).map((row, index) => <div key={`${title}-technical-${index}`}>{technical(row)}</div>)}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function UnresolvedApproversGroup({ rows }: { rows: DefectApprovalDiagnostics["unresolvedApprovers"] }) {
+  if (!rows.length) return null;
+  const blocks = projectDiagnosticsUnresolvedBlocks(rows);
+  return (
+    <div style={{ marginTop: 10 }}>
+      <h3 style={{ margin: "0 0 4px", fontSize: 13 }}>Vessels with no approver assigned ({rows.length})</h3>
+      <div className="space-y-3 text-xs text-slate-700">
+        {blocks.map((block) => (
+          <div key={block.key}>
+            <div>{block.vesselNames.join(", ")}</div>
+            <p className="mb-1 mt-2">{block.consequence}</p>
+            {block.instructions.map((instruction) => <p key={instruction} className="mb-1">{instruction}</p>)}
+            <details className="mt-1 text-slate-500">
+              <summary className="cursor-pointer">Technical details</summary>
+              <div className="mt-1 space-y-2 pl-2">
+                {block.rows.map((row) => (
+                  <div key={row.vesselId}>
+                    {row.vesselName}<br />
+                    Vessel: {row.vesselId}<br />
+                    Roles: {row.roles.map((role) => `${role.roleName} (${role.roleId})`).join(", ")}<br />
+                    Scopes: {(row.workflowScopes ?? []).join(", ") || "none"}
+                  </div>
+                ))}
+              </div>
+            </details>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

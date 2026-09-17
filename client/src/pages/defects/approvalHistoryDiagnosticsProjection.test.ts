@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDecidedSlotRemark, formatDefectAuditTimestamp, formatDiagnosticsMissingWorkflow, formatDiagnosticsReturnedVerificationStillVerified, formatDiagnosticsUnresolved, formatInlineApprovalSlotRemark, formatMaritimeUtcDateTime, formatRejectionHeading, projectDiagnosticsSummary, projectExtensionCardPresentation, projectExtensionHistory } from "./defectApprovalPresentation";
+import { formatDecidedSlotRemark, formatDefectAuditTimestamp, formatDiagnosticsMissingWorkflow, formatDiagnosticsReturnedVerificationStillVerified, formatInlineApprovalSlotRemark, formatMaritimeUtcDateTime, formatRejectionHeading, projectDiagnosticsSummary, projectDiagnosticsUnresolvedBlocks, projectExtensionCardPresentation, projectExtensionHistory } from "./defectApprovalPresentation";
 
 describe("approval history and diagnostics projections", () => {
   it("keeps three mixed extension entries oldest-first with every label", () => {
@@ -129,22 +129,26 @@ describe("approval history and diagnostics projections", () => {
       finalizedAt: "2026-09-16T13:29:50Z",
       consequence: "technical",
     } as any);
-    expect(returned).toBe("D004-26-0005 on WATER TIGER is still marked verified after verification was rejected. Reconcile this defect in SAILERP under Defects before relying on its closure status.");
+    expect(returned).toBe("D004-26-0005 on WATER TIGER");
     expect(returned).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
 
-    expect(formatDiagnosticsUnresolved({
-      vesselName: "Unknown vessel (no longer in the vessel list)",
-      roles: [{ roleName: "Unknown role (removed from the role list)", issue: "missing-workflow-role" }],
-      consequence: "Until these roles are assigned, approval requests for this vessel will wait with nobody able to action them.",
-    })).toBe("Unknown vessel (no longer in the vessel list) — no approver assigned. Roles needing attention for this vessel: Unknown role (removed from the role list). Until these roles are assigned, approval requests for this vessel will wait with nobody able to action them. Replace the removed roles (Unknown role (removed from the role list)) in the Approval Engine builder on this page and save a new workflow version.");
   });
 
-  it("gives distinct recovery instructions for stalled requests and future vessel membership", () => {
-    expect(formatDiagnosticsUnresolved({
-      vesselName: "WATER LILY",
-      roles: [{ roleName: "Super Admin", issue: "missing-vessel-membership" }],
-      consequence: "Until these roles are assigned, approval requests for this vessel will wait with nobody able to action them.",
-    })).toContain("SAILERP's user identity or profile source");
+  it("groups unresolved vessels by role set with one shared remedy per block", () => {
+    const role = { roleId: "role-super", roleName: "Super Admin", issue: "missing-vessel-membership" as const };
+    const blocks = projectDiagnosticsUnresolvedBlocks([
+      { vesselId: "v3", vesselName: "Vessel 3", roles: [role], workflowScopes: ["verification"], consequence: "Shared consequence." },
+      { vesselId: "v2", vesselName: "Vessel 2", roles: [role], workflowScopes: ["extension"], consequence: "Shared consequence." },
+      { vesselId: "v9", vesselName: "Vessel 9", roles: [{ roleId: "removed", roleName: "Removed role", issue: "missing-workflow-role" }], consequence: "Other consequence." },
+    ]);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toMatchObject({
+      vesselNames: ["Vessel 2", "Vessel 3"],
+      consequence: "Approval requests for these vessels will wait with nobody able to action them.",
+      instructions: ["What to do: in SAILERP, assign users holding the roles Super Admin to these vessels, then ask them to sign out and back in."],
+    });
+    expect(blocks[0].rows).toHaveLength(2);
+    expect(blocks[1].instructions[0]).toContain("Approval Engine builder");
   });
 
   it("directs repeat-extension workflow gaps to the Approval Engine builder", () => {
@@ -152,7 +156,7 @@ describe("approval history and diagnostics projections", () => {
       screenId: "defects-repeat-extension",
       classification: "Normal",
     });
-    expect(message).toBe("Repeat defect extension for Normal defects is not set up. Configure this approval step in the Approval Engine builder on this page.");
+    expect(message).toBe("Repeat defect extension for Normal defects");
     expect(message).not.toContain("Approval Workflow");
   });
 });

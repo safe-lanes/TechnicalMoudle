@@ -506,34 +506,70 @@ export function resolveDiagnosticsGroupState(
   return rows?.length ? "warnings" : "healthy";
 }
 
-export function formatDiagnosticsUnresolved(row: {
+export type DiagnosticsUnresolvedRow = {
+  vesselId: string;
   vesselName: string;
-  roles: Array<{ roleName: string; issue: "missing-workflow-role" | "missing-vessel-membership" }>;
+  roles: Array<{ roleId: string; roleName: string; issue: "missing-workflow-role" | "missing-vessel-membership" }>;
+  workflowScopes?: string[];
   consequence: string;
-}): string {
-  const missingRoles = row.roles.filter((role) => role.issue === "missing-workflow-role").map((role) => role.roleName);
-  const membershipRoles = row.roles.filter((role) => role.issue === "missing-vessel-membership").map((role) => role.roleName);
-  const instructions = [
-    missingRoles.length
-      ? `Replace the removed roles (${missingRoles.join(", ")}) in the Approval Engine builder on this page and save a new workflow version.`
-      : "",
-    membershipRoles.length
-      ? `Update vessel access for users in these roles (${membershipRoles.join(", ")}) in SAILERP's user identity or profile source, then ask them to sign out and back in.`
-      : "",
-  ].filter(Boolean).join(" ");
-  return `${row.vesselName} — no approver assigned. Roles needing attention for this vessel: ${row.roles.map((role) => role.roleName).join(", ")}. ${row.consequence} ${instructions}`;
+};
+
+export type DiagnosticsUnresolvedBlock = {
+  key: string;
+  vesselNames: string[];
+  roles: DiagnosticsUnresolvedRow["roles"];
+  rows: DiagnosticsUnresolvedRow[];
+  consequence: string;
+  instructions: string[];
+};
+
+function joinNames(names: string[]): string {
+  if (names.length < 2) return names[0] ?? "";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} or ${names.at(-1)}`;
+}
+
+export function projectDiagnosticsUnresolvedBlocks(rows: DiagnosticsUnresolvedRow[]): DiagnosticsUnresolvedBlock[] {
+  const grouped = new Map<string, DiagnosticsUnresolvedRow[]>();
+  for (const row of rows) {
+    const key = [...row.roles]
+      .sort((a, b) => `${a.issue}:${a.roleName}:${a.roleId}`.localeCompare(`${b.issue}:${b.roleName}:${b.roleId}`))
+      .map((role) => `${role.issue}:${role.roleId}`)
+      .join("|");
+    grouped.set(key, [...(grouped.get(key) ?? []), row]);
+  }
+  return Array.from(grouped.entries()).map(([key, blockRows]) => {
+    const roles = [...blockRows[0].roles];
+    const missingRoles = roles.filter((role) => role.issue === "missing-workflow-role").map((role) => role.roleName);
+    const membershipRoles = roles.filter((role) => role.issue === "missing-vessel-membership").map((role) => role.roleName);
+    return {
+      key,
+      vesselNames: blockRows.map((row) => row.vesselName).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+      roles,
+      rows: blockRows,
+      consequence: "Approval requests for these vessels will wait with nobody able to action them.",
+      instructions: [
+        missingRoles.length
+          ? `What to do: replace the removed ${joinNames(missingRoles)} ${missingRoles.length === 1 ? "role" : "roles"} in the Approval Engine builder on this page and save a new workflow version.`
+          : "",
+        membershipRoles.length
+          ? `What to do: in SAILERP, assign users holding the roles ${joinNames(membershipRoles)} to these vessels, then ask them to sign out and back in.`
+          : "",
+      ].filter(Boolean),
+    };
+  });
 }
 
 export function formatDiagnosticsOrphan(row: {
   defectReportId: string; vesselName: string; requestedAt: string; newTargetDate: string; consequence: string;
 }): string {
-  return `${row.defectReportId} on ${row.vesselName} has an extension request that was never sent for approval. Review the extension in SAILERP under Defects and either submit it for approval or remove it.`;
+  return `${row.defectReportId} on ${row.vesselName}${row.requestedAt ? ` — requested ${row.requestedAt}` : ""}`;
 }
 
 export function formatDiagnosticsStalled(row: {
   defectReportId: string; vesselName: string; submittedAt: string; daysPending: number; consequence: string;
 }): string {
-  return `${row.defectReportId} on ${row.vesselName} has waited ${row.daysPending} days with nobody able to approve it. Open this defect as a Super Admin and use its approval decision controls to approve or return the stalled request. Then correct its workflow role in the Approval Engine builder or its users' vessel access in the SAILERP identity or profile source before the next request.`;
+  return `${row.defectReportId} on ${row.vesselName} — waiting ${row.daysPending} days`;
 }
 
 export function formatDiagnosticsReturnedVerificationStillVerified(row: {
@@ -542,7 +578,7 @@ export function formatDiagnosticsReturnedVerificationStillVerified(row: {
   finalizedAt: string;
   consequence: string;
 }): string {
-  return `${row.defectReportId} on ${row.vesselName} is still marked verified after verification was rejected. Reconcile this defect in SAILERP under Defects before relying on its closure status.`;
+  return `${row.defectReportId} on ${row.vesselName}`;
 }
 
 const DIAGNOSTIC_WORKFLOW_NAMES: Record<string, string> = {
@@ -556,7 +592,7 @@ export function formatDiagnosticsMissingWorkflow(row: {
   classification: string;
 }): string {
   const workflowName = DIAGNOSTIC_WORKFLOW_NAMES[row.screenId] ?? "Unknown approval step";
-  return `${workflowName} for ${row.classification} defects is not set up. Configure this approval step in the Approval Engine builder on this page.`;
+  return `${workflowName} for ${row.classification} defects`;
 }
 
 export function projectRejectedClosureHistory<T extends { id: string | number; attemptNumber?: number | null }>(
