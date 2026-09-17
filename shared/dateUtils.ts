@@ -71,6 +71,27 @@ export function workOrderDateInputValue(
   return `${match[3]}-${match[2]}-${match[1]}`;
 }
 
+export function parseWorkOrderDateDDMMYYYYInput(value: string): string | null {
+  const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return null;
+
+  const displayValue = validatedCalendarParts(
+    Number(match[3]),
+    Number(match[2]),
+    Number(match[1]),
+  );
+  if (!displayValue) return null;
+
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+
+export function normalizeWorkOrderDateTyping(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
+}
+
 export function workOrderOverdueCompletionMessage(
   dueDate: string | number | Date | null | undefined,
 ): string {

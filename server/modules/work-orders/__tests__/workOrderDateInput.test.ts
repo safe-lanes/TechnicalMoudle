@@ -9,7 +9,7 @@ vi.mock('@/components/ui/input', () => ({
 }));
 
 describe('WorkOrderDateInput', () => {
-  it('renders DD-MM-YYYY visibly while keeping an editable YYYY-MM-DD picker', () => {
+  it('renders an editable DD-MM-YYYY field with a separate YYYY-MM-DD picker', () => {
     const markup = renderToStaticMarkup(
       React.createElement(WorkOrderDateInput, {
         value: '2026-09-18',
@@ -21,10 +21,12 @@ describe('WorkOrderDateInput', () => {
     expect(markup).toContain('value="18-09-2026"');
     expect(markup).toContain('type="date"');
     expect(markup).toContain('value="2026-09-18"');
-    expect(markup).toContain('data-testid="work-order-date-display"');
     expect(markup).toContain('data-testid="work-order-date"');
+    expect(markup).toContain('data-testid="work-order-date-picker"');
     expect(markup).toContain('data-testid="work-order-date-picker-icon"');
-    expect(markup).toContain('aria-label="Select date"');
+    expect(markup).toContain('aria-label="Open date picker"');
+    expect(markup).toContain('inputMode="numeric"');
+    expect(markup).not.toContain('readonly=""');
     expect(markup).toContain('cursor-pointer');
   });
 

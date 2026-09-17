@@ -7,6 +7,8 @@ import {
 } from '@shared/workOrders/dateParse';
 import {
   formatWorkOrderDateDDMMYYYY,
+  normalizeWorkOrderDateTyping,
+  parseWorkOrderDateDDMMYYYYInput,
   workOrderOverdueCompletionMessage,
   workOrderDateInputValue,
 } from '@shared/dateUtils';
@@ -44,6 +46,25 @@ describe('Work Order date-only calendar handling', () => {
     expect(workOrderDateInputValue('18-09-2026')).toBe('2026-09-18');
     expect(workOrderDateInputValue('2026-09-18T23:30:00.000Z')).toBe('2026-09-18');
     expect(workOrderDateInputValue('2026-02-30')).toBe('');
+  });
+
+  it('converts only complete valid DD-MM-YYYY manual input', () => {
+    expect(parseWorkOrderDateDDMMYYYYInput('18-09-2026')).toBe('2026-09-18');
+    expect(parseWorkOrderDateDDMMYYYYInput('')).toBeNull();
+    expect(parseWorkOrderDateDDMMYYYYInput('18-09-26')).toBeNull();
+    expect(parseWorkOrderDateDDMMYYYYInput('2026-09-18')).toBeNull();
+    expect(parseWorkOrderDateDDMMYYYYInput('30-02-2026')).toBeNull();
+    expect(parseWorkOrderDateDDMMYYYYInput('31-04-2026')).toBeNull();
+  });
+
+  it('normalizes manual typing and pasted digits into DD-MM-YYYY', () => {
+    expect(normalizeWorkOrderDateTyping('')).toBe('');
+    expect(normalizeWorkOrderDateTyping('1')).toBe('1');
+    expect(normalizeWorkOrderDateTyping('180')).toBe('18-0');
+    expect(normalizeWorkOrderDateTyping('1809')).toBe('18-09');
+    expect(normalizeWorkOrderDateTyping('18092026')).toBe('18-09-2026');
+    expect(normalizeWorkOrderDateTyping('18/09/2026')).toBe('18-09-2026');
+    expect(normalizeWorkOrderDateTyping('18-09-2026123')).toBe('18-09-2026');
   });
 
   it('uses DD-MM-YYYY in the shared overdue completion warning', () => {
