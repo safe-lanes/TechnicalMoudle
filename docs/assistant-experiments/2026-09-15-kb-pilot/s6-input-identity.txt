@@ -1,0 +1,42 @@
+questions captured: E0 101  E1 101  union 101
+
+questions whose captured excerpts are IDENTICAL in both arms: 99
+questions whose captured excerpts DIFFER:                     2
+
+DIFFERS (3 vs 3 captures): Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+     only E0: (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.6.1 HOW TO ACCESS RUNNING HOURS (p.38))
+     only E0: (Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders Is a Per-Vessel Switch)
+     only E1: (Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders — Conditions by Action)
+DIFFERS (3 vs 3 captures): Who can generate work orders from the office, and what happens if the vessel's switch is off?
+     only E0: (Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.28))
+     only E0: (Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders Is a Per-Vessel Switch)
+     only E1: (Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders — Conditions by Action)
+
+== Verdict stability on the 99 questions whose model input was byte-identical ==
+paired runs compared: 297
+runs where the two arms disagree (pure answer variance): 25  (8.4%)
+   answers    7                run 1: E0=False E1=True
+   generated  13               run 1: E0=True E1=False
+   manuals    certsurveys-1    run 3: E0=True E1=False
+   manuals    certsurveys-3    run 3: E0=False E1=True
+   manuals    crewing-2        run 1: E0=True E1=False
+   manuals    crewing-3        run 2: E0=False E1=True
+   manuals    defects-2        run 1: E0=False E1=True
+   manuals    fs-ves-1         run 1: E0=True E1=False
+   manuals    fs-ves-1         run 3: E0=False E1=True
+   manuals    hist-3           run 1: E0=True E1=False
+   manuals    inc-1            run 1: E0=True E1=False
+   manuals    moc-office-1     run 2: E0=True E1=False
+   manuals    moc-office-1     run 3: E0=True E1=False
+   manuals    moc-office-2     run 1: E0=False E1=True
+   manuals    nm-1             run 2: E0=False E1=True
+   manuals    nm-1             run 3: E0=False E1=True
+   manuals    pmsoffice-1      run 1: E0=False E1=True
+   manuals    pmsvessel-2      run 1: E0=False E1=True
+   manuals    pmsvessel-2      run 3: E0=False E1=True
+   manuals    prep-2           run 3: E0=True E1=False
+   manuals    ra-office-3      run 3: E0=True E1=False
+   manuals    ra-vessel-1      run 1: E0=True E1=False
+   manuals    ra-vessel-1      run 2: E0=True E1=False
+   wo         wo-phr-01        run 2: E0=False E1=True
+   wo         wo-phr-01        run 3: E0=False E1=True

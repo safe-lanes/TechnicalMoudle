@@ -1,0 +1,46 @@
+Re-scored from stored answers with the current judges: base 2026-09-14.4/.7, work-order judge .12, corrected-claims cases 2026-09-18.3. No model calls.
+
+== answers  (12 cases, pass rule used by the runner: majority)
+   B0               majority  11/12   all-runs  11/12   runs  33/36  <- rule used
+   D5               majority  12/12   all-runs  10/12   runs  34/36  <- rule used
+   D5a              majority  12/12   all-runs  12/12   runs  36/36  <- rule used
+      GAIN  case 5                  B0 [fff] -> D5a [PPP]
+
+== fresh  (10 cases, pass rule used by the runner: all)
+   B0               majority  10/10   all-runs   9/10   runs  29/30  <- rule used
+   D5               majority  10/10   all-runs  10/10   runs  30/30  <- rule used
+   D5a              majority  10/10   all-runs  10/10   runs  30/30  <- rule used
+      GAIN  case fresh-audit-1      B0 [fPP] -> D5a [PPP]
+
+== generated  (14 cases, pass rule used by the runner: majority)
+   B0               majority  12/14   all-runs  11/14   runs  36/42  <- rule used
+   D5               majority  12/14   all-runs  11/14   runs  35/42  <- rule used
+   D5a              majority  12/14   all-runs  12/14   runs  36/42  <- rule used
+
+== manuals  (57 cases, pass rule used by the runner: all)
+   B0               majority  37/57   all-runs  34/57   runs 112/171  <- rule used
+   D5               majority  40/57   all-runs  33/57   runs 117/171  <- rule used
+   D5a              majority  40/57   all-runs  35/57   runs 119/171  <- rule used
+      LOSS  case crewing-1          B0 [PPP] -> D5a [fPP]
+      GAIN  case crewing-2          B0 [Pff] -> D5a [PPP]
+      LOSS  case fn-1               B0 [PPP] -> D5a [fPP]
+      GAIN  case pmsoffice-1        B0 [fff] -> D5a [PPP]
+      GAIN  case pmsvessel-2        B0 [fPP] -> D5a [PPP]
+
+== routing  (13 cases, pass rule used by the runner: all)
+   B0               majority   8/13   all-runs   8/13   runs   8/13  <- rule used
+   D5               majority  13/13   all-runs  13/13   runs  13/13  <- rule used
+   D5a              majority  13/13   all-runs  13/13   runs  13/13  <- rule used
+      GAIN  case rt-05-ctx-safety   B0 [f] -> D5a [P]
+      GAIN  case rt-05-ctx-technical B0 [f] -> D5a [P]
+      GAIN  case rt-05-no-ctx       B0 [f] -> D5a [P]
+      GAIN  case rt-general-02      B0 [f] -> D5a [P]
+      GAIN  case rt-pump-01         B0 [f] -> D5a [P]
+
+== wo  (8 cases, pass rule used by the runner: all)
+   B0               majority   6/8   all-runs   6/8   runs  19/24  <- rule used
+   D5               majority   8/8   all-runs   7/8   runs  23/24  <- rule used
+   D5a              majority   8/8   all-runs   8/8   runs  24/24  <- rule used
+      GAIN  case wo-generic-03      B0 [fff] -> D5a [PPP]
+      GAIN  case wo-phr-02          B0 [Pff] -> D5a [PPP]
+

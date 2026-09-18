@@ -1,0 +1,40 @@
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s5-answers-dump.jsonl
+   B0             runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+   D5             runs passing:  A .6/case06 published  34/36   B .7/case06 published  34/36   C .7/case06 corrected  34/36
+   D5a            runs passing:  A .6/case06 published  36/36   B .7/case06 published  36/36   C .7/case06 corrected  36/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s5-generated-dump.jsonl
+   B0             runs passing:  A .6/case06 published  37/42   B .7/case06 published  37/42   C .7/case06 corrected  36/42
+   D5             runs passing:  A .6/case06 published  36/42   B .7/case06 published  36/42   C .7/case06 corrected  35/42
+   D5a            runs passing:  A .6/case06 published  36/42   B .7/case06 published  36/42   C .7/case06 corrected  36/42
+      CASE  CHANGE  generated B0 case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated D5 case 6 run 2: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s5-manuals-dump.jsonl
+   B0             runs passing:  A .6/case06 published 112/171   B .7/case06 published 112/171   C .7/case06 corrected 112/171
+   D5             runs passing:  A .6/case06 published 117/171   B .7/case06 published 117/171   C .7/case06 corrected 117/171
+   D5a            runs passing:  A .6/case06 published 120/171   B .7/case06 published 119/171   C .7/case06 corrected 119/171
+      JUDGE CHANGE  manuals D5a case pmsvessel-3 run 3: (True, True, True) -> (False, True, True)
+
+JUDGE .6 -> .7 changed verdicts: 1
+CASE 06 change changed verdicts: 2
+
+== decline-phrase audit: 5 asserted occurrences in the stored answers
+   contradicted-by-own-citation 1
+   limitation       4
+
+  [contradicted-by-own-citation] manuals D5a case pmsvessel-3 run 3 | phrase 'not covered' | expected source 'Technical - PMS User Manual_Vessel Specific_R3_08.07.2026'
+     the detailed store transaction steps are not covered in the provided documentation.
+
+  [limitation] generated D5a case 6 run 3 | phrase 'does not cover' | expected source 'Recent Updates'
+     the sail admin restriction and switch requirements come from the operational notes and draft code-derived guidance; the june pms user manual excerpt only defines work orders and does not cover these office-generation rul
+
+  [limitation] generated D5a case 7 run 3 | phrase 'not covered' | expected source 'Roles'
+     therefore, those capabilities are not covered as available to that role.
+
+  [limitation] manuals B0 case certsurveys-3 run 2 | phrase 'not covered' | expected source 'Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026'
+     therefore, whether the process differs from certificates is not covered in the technical documentation beyond that instruction.
+
+  [limitation] manuals D5a case certsurveys-3 run 3 | phrase 'not covered' | expected source 'Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026'
+     therefore, whether the survey process is exactly the same as the certificate process is not covered in the technical documentation beyond the survey section’s pointer.

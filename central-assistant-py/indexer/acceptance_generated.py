@@ -26,7 +26,16 @@ from acceptance_answers import ask, judge  # noqa: E402
 #     count, not as a colour"); must_not now uses the R2 wording that a wrong answer would reproduce. 09 — the official
 #     PMS manual §1.1.3.4 answers this question and uses the term 'Vessel Admin'; the case now requires the manual's
 #     answer (Operation tab) and no longer forbids that term. Case 08 unchanged.
-GEN_SUITE_VERSION = "2026-09-14.2"
+# .3 (18-Sep-2026, reported — reviewer finding, §15.7A): case 06's expectation was DEFECTIVE. Requiring only
+#     "sail admin" + "not enabled" rewarded the over-broad answer "only a Sail Admin can generate work orders from the
+#     office", which two of nine stored runs gave and the judge passed. The code says the conditions differ by action.
+#     The case now requires the split: the Generate Now role rule AND that the per-job 'Generate WO' route carries no
+#     role check (any of several wordings, via the judge's '||' alternation). This makes the case HARDER.
+#     No must_not clause was added for the blanket sentence: every wording that would catch it also matches the
+#     verbatim refusal message the corrected document now documents ("Only a Sail Admin may generate work orders
+#     directly from the office."), which a correct answer may quote. The required split rejects the blanket answer on
+#     its own — a blanket answer cannot state the per-job exception.
+GEN_SUITE_VERSION = "2026-09-18.3"
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (class, question, module, expected manual substring, pages, must, must_not, source)
 CASES: list[tuple[str, str, str, str, tuple[int, ...] | None, list[str], list[str], str]] = [
@@ -46,8 +55,17 @@ CASES: list[tuple[str, str, str, str, tuple[int, ...] | None, list[str], list[st
      "technical", "Recent Updates", None, ["provision"], NOT_COVERED + ["sync masters"],
      "R3 §1.1.14.1: vessel code reaches a ship only through provisioning; 'Sync All' does not (SYNC-ARCHITECTURE.md:24-27). R2 said run Sync Masters."),
     ("gen", "Who can generate work orders from the office, and what happens if the vessel's switch is off?",
-     "technical", "Recent Updates", None, ["sail admin", "not enabled"], NOT_COVERED,
-     "R3 §1.1.14.6: only a Sail Admin; message says not enabled for the vessel; other roles refused (workOrderGenerationGate.ts:44,141-161)."),
+     "technical", "Recent Updates", None,
+     ["generate now", "sail admin", "not enabled", "generate wo",
+      "no role check||no role-check||does not require a specific role||no specific role||without a role check"
+      "||no role restriction||not restricted by role||does not check the role||no special role||no particular role"
+      "||no role is required||any signed-in user||any user with access"],
+     NOT_COVERED,
+     "R4 §1.1.14.6 (corrected 18-Sep-2026, see generated-docs/R4/PROVENANCE.md): the conditions differ BY ACTION — "
+     "office 'Generate Now' needs role Sail Admin AND the vessel's office work-order generation switch "
+     "(workOrderController.ts:133 → workOrderGenerationGate.evaluateDirectGeneration, PROVISIONING_ROLE='Sail Admin'); "
+     "office per-job 'Generate WO' needs the switch and the job state but carries NO role check "
+     "(jobService.ts:555-580); unplanned needs neither. Switch off → 'not enabled for this vessel'."),
     ("gen", "Can a Head of Department do everything an office user can do for their department?",
      "technical", "Roles", None, ["no", "postponement"], NOT_COVERED + ["yes, a head of department can do everything"],
      "R3 §1.1.12.6: No — Head of Dept = Me/My Team on the dashboard; excluded from postponement approval when no steps configured. R2 claimed full office rights per department."),

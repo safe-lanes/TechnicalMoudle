@@ -1,0 +1,35 @@
+Re-scored from stored answers with the current judges: base 2026-09-14.4/.7, work-order judge .12, corrected-claims cases 2026-09-18.3. No model calls.
+
+== answers  (12 cases, pass rule used by the runner: majority)
+   E0               majority  12/12   all-runs  11/12   runs  35/36  <- rule used
+   E1               majority  12/12   all-runs  12/12   runs  36/36  <- rule used
+
+== fresh  (10 cases, pass rule used by the runner: all)
+   E0               majority  10/10   all-runs  10/10   runs  30/30  <- rule used
+   E1               majority  10/10   all-runs  10/10   runs  30/30  <- rule used
+
+== generated  (14 cases, pass rule used by the runner: majority)
+   E0               majority  12/14   all-runs  12/14   runs  36/42  <- rule used
+   E1               majority  11/14   all-runs  10/14   runs  32/42  <- rule used
+      LOSS  case 6                  E0 [PPP] -> E1 [fff]
+
+== manuals  (57 cases, pass rule used by the runner: all)
+   E0               majority  40/57   all-runs  33/57   runs 116/171  <- rule used
+   E1               majority  38/57   all-runs  34/57   runs 115/171  <- rule used
+      LOSS  case crewing-2          E0 [PPP] -> E1 [fPP]
+      GAIN  case defects-2          E0 [fPP] -> E1 [PPP]
+      LOSS  case moc-office-1       E0 [PPP] -> E1 [Pff]
+      GAIN  case moc-office-2       E0 [fPP] -> E1 [PPP]
+      GAIN  case pmsoffice-1        E0 [fPP] -> E1 [PPP]
+      GAIN  case pmsvessel-2        E0 [fPf] -> E1 [PPP]
+      LOSS  case prep-2             E0 [PPP] -> E1 [PPf]
+
+== routing  (13 cases, pass rule used by the runner: all)
+   E0               majority  13/13   all-runs  13/13   runs  13/13  <- rule used
+   E1               majority  13/13   all-runs  13/13   runs  13/13  <- rule used
+
+== wo  (8 cases, pass rule used by the runner: all)
+   E0               majority   7/8   all-runs   7/8   runs  22/24  <- rule used
+   E1               majority   8/8   all-runs   8/8   runs  24/24  <- rule used
+      GAIN  case wo-phr-01          E0 [Pff] -> E1 [PPP]
+

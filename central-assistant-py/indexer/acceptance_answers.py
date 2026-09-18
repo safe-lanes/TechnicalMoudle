@@ -50,6 +50,108 @@ JUDGE_MD_NORMALISE = True
 # JUDGE_CITATION_ANY=False and JUDGE_NEGATION_AWARE=False reproduce the .4 behaviour exactly.
 JUDGE_CITATION_ANY = True
 JUDGE_NEGATION_AWARE = True
+# .6 (18-Sep-2026, reported, cases UNCHANGED — third demonstrated judge defect, reviewer's second pass, §15.7):
+#   The "not covered" family exists to catch an assistant that DECLINES to answer. It also fires on an accurate statement
+#   about a SOURCE inside a full answer — "the June PMS user manual excerpt … does not cover these office-generation rules"
+#   (which prompt v5 explicitly asks for), or "those capabilities are not covered as available to that role" (which IS the
+#   correct answer). Such a phrase is ignored when the answer carries substantive content: two or more instruction lines, or
+#   more than 300 characters of body besides the sentence itself. A real refusal has neither, so it still fails.
+#   JUDGE_DECLINE_AWARE=False reproduces the .5 behaviour.
+JUDGE_DECLINE_AWARE = True
+# .7 (18-Sep-2026, reported — the reviewer rejected .6's shortcut: "a long answer can still falsely claim evidence is
+#   missing", and length is not evidence of anything). The length/steps test is REMOVED. Each sentence carrying a decline
+#   phrase is now classified by WHAT IT IS ABOUT, and only two classes are violations:
+#     refusal        — first-person inability, or "no information": the assistant declines.
+#     false-evidence — the sentence says a NAMED source does not carry the answer, and that source is the very one the
+#                      case expects to carry it. The case's own ground truth makes the claim false.
+#     contradicted-by-own-citation — the sentence says the evidence base AS A WHOLE ("the provided documentation", "the
+#                      supplied excerpts") lacks it, while the answer cites the expected manual and page. The answer's
+#                      own citations contradict the claim, so it is unsupported. This is the class the reviewer asked
+#                      for: a long answer that falsely claims evidence is missing.
+#   and two that are not violations:
+#     limitation-not-retrieved — the same whole-evidence claim when the expected source was NOT among the citations.
+#                      The assistant is describing what it was actually given, which is honest and is what the prompt
+#                      asks for; the retrieval failure is scored by the citation check, not twice by the answer check.
+#     limitation     — the gap is scoped to some OTHER named source ("the June PMS user manual excerpt does not cover
+#                      these office-generation rules"), which prompt v5 asks for and which is accurate; or it is about
+#                      an attribute rather than the evidence ("those capabilities are not covered as available to that
+#                      role", the substance of a correct "No").
+#   JUDGE_DECLINE_SCOPE=False falls back to .6 (has_substance), and with JUDGE_DECLINE_AWARE=False to .5.
+JUDGE_DECLINE_SCOPE = True
+JUDGE_VERSION = "7"
+DECLINE_PHRASES = {"not covered", "isn't covered", "not documented", "does not cover", "no information",
+                   "do not describe", "does not describe", "not described"}
+# A sentence "names a source" when it points at a specific document, module or section.
+_SOURCE_NAMED = re.compile(
+    r"(§\s*[\d.]+|\bp\.?\s?\d{1,3}\b"
+    r"|\b(pms|crewing|safety|technical|audit|incident|sms|moc|master review|risk assessment|near miss|defects?|"
+    r"fleet sharing|recent updates|bulk data import|ship-side|roles?(?= manual| document)|preparation|inspection)\b"
+    r"[^.]{0,40}?\b(manual|documentation|document|notes|guide|excerpt|excerpts|section|file)\b"
+    r"|\b(manual|documentation|document|notes|guide|excerpt|excerpts|section|file)\b[^.]{0,30}?"
+    r"\b(pms|crewing|safety|technical|audit|incident|sms|moc|master review|risk assessment|near miss|defects?|"
+    r"fleet sharing|recent updates|bulk data import|ship-side)\b)", re.I)
+# The evidence base as a whole, with no document named.
+_GLOBAL_EVIDENCE = re.compile(
+    r"\b(i (do not|don't|cannot|can't|am unable|was unable)|no information\b|not enough information"
+    r"|(the |these |any |all )?(provided|supplied|available|given|attached|retrieved)\s+"
+    r"(documentation|manuals?|documents?|excerpts?|sources?|material|content)"
+    r"|(the )?(documentation|manuals?|excerpts?|sources?) (provided|supplied|available|given|retrieved)"
+    r"|\b(this|that|it|the question|the topic|the answer) (is|was) not (covered|documented|described))\b", re.I)
+
+
+def present(ans: str, phrase: str) -> bool:
+    """A required phrase. 'a||b||c' is satisfied by ANY alternative — used where one fact has several natural
+    wordings ("no role check" / "does not require a specific role" / "any user with access"). A phrase without
+    '||' behaves exactly as before, so no existing case changes."""
+    return any(alt.strip().lower() in ans for alt in phrase.split("||"))
+
+
+def _sentences(text: str) -> list[str]:
+    return [s for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
+
+
+VIOLATING_DECLINES = ("refusal", "false-evidence", "contradicted-by-own-citation")
+
+
+def decline_class(sentence: str, expected_source: str, cited_expected: bool = False) -> str:
+    """What a decline phrase in this sentence is about:
+
+      refusal                      — first-person inability, or "no information": the assistant declines. Violation.
+      false-evidence               — says the case's OWN expected source does not carry the answer. Violation.
+      contradicted-by-own-citation — says the evidence base as a whole ("the provided documentation") lacks it, while
+                                     the answer cites the expected manual and page. The answer's own citations
+                                     contradict the claim, so it is unsupported. Violation.
+      limitation-not-retrieved     — the same whole-evidence claim when the expected source was NOT retrieved. The
+                                     assistant is describing what it was actually given; honest. Not a violation.
+      limitation                   — the gap is scoped to some OTHER named source, or to an attribute rather than to
+                                     the evidence. Not a violation.
+    """
+    named = _SOURCE_NAMED.search(sentence)
+    if named:
+        tok = named.group(0).lower()
+        exp = (expected_source or "").lower().strip()
+        words = [w for w in re.findall(r"[a-z]{3,}", exp) if w not in {"the", "and", "manual", "office", "user", "notes", "operational"}]
+        if exp and words and all(w in tok for w in words):
+            return "false-evidence"
+        return "limitation"
+    if re.search(r"\b(i (do not|don't|cannot|can't|am unable|was unable)|no information\b|not enough information)", sentence, re.I):
+        return "refusal"
+    if _GLOBAL_EVIDENCE.search(sentence):
+        return "contradicted-by-own-citation" if cited_expected else "limitation-not-retrieved"
+    return "limitation"
+
+
+def decline_violates(text: str, phrase: str, expected_source: str, cited_expected: bool = False) -> bool:
+    """True when at least one sentence asserting `phrase` is a refusal or an unsupported missing-evidence claim."""
+    hits = [s for s in _sentences(text) if phrase.lower() in s.lower() and not negated(s.lower(), phrase)]
+    return any(decline_class(s, expected_source, cited_expected) in VIOLATING_DECLINES for s in hits)
+
+
+def has_substance(text: str) -> bool:
+    """.6 only, kept so JUDGE_DECLINE_SCOPE=False reproduces the published .6 scores exactly."""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    steps = sum(1 for ln in lines if re.match(r"^(\d+[.)]|[-*•]|\d+\.\d+)\s+\S", ln))
+    return steps >= 2 or len(re.sub(r"\s+", " ", text)) > 300
 
 
 def negated(text: str, phrase: str) -> bool:
@@ -128,15 +230,25 @@ def judge(j: dict, manual: str, page: tuple[int, ...] | int | None, must: list[s
     labels pulled-in text with its source section and page)."""
     raw = j.get("response") or ""
     ans = md_plain(raw).lower() if JUDGE_MD_NORMALISE else raw.lower()
-    forbidden_hit = [p for p in must_not if p.lower() in ans and not (JUDGE_NEGATION_AWARE and negated(ans, p))]
-    ok_answer = all(p.lower() in ans for p in must) and not forbidden_hit and j.get("gate") == "answer"
-    if cls == "xref" and re.search(r"refer to the ['‘\"]?[\w &-]+['’\"]? (sub-)?(sub-)?module", ans) and not re.search(r"^\s*\d+\.\s+(click|go to|select|open|use|enter)", ans, re.M):
-        ok_answer = False  # judge tightened 14-Sep-2026: parroting the manual's pointer ("Refer to the X sub-module, follow the same procedure") is NOT an answer
     cits = j.get("citations") or []
     top = cits[0] if cits else {}
     pages = (page,) if isinstance(page, int) else page
     def cite_matches(ci: dict) -> bool:
         return manual.lower() in str(ci.get("manual", "")).lower() and (pages is None or page_of(ci) in pages)
+    cited_expected = any(cite_matches(ci) for ci in cits)
+    def excused(p: str) -> bool:
+        if not (JUDGE_DECLINE_AWARE and p.lower() in DECLINE_PHRASES):
+            return False
+        if JUDGE_DECLINE_SCOPE:
+            return not decline_violates(ans, p, manual, cited_expected)
+        return has_substance(ans)
+    forbidden_hit = [p for p in must_not
+                     if p.lower() in ans
+                     and not (JUDGE_NEGATION_AWARE and negated(ans, p))
+                     and not excused(p)]
+    ok_answer = all(present(ans, p) for p in must) and not forbidden_hit and j.get("gate") == "answer"
+    if cls == "xref" and re.search(r"refer to the ['‘\"]?[\w &-]+['’\"]? (sub-)?(sub-)?module", ans) and not re.search(r"^\s*\d+\.\s+(click|go to|select|open|use|enter)", ans, re.M):
+        ok_answer = False  # judge tightened 14-Sep-2026: parroting the manual's pointer ("Refer to the X sub-module, follow the same procedure") is NOT an answer
     ok_cite_top = cite_matches(top)
     # Citation-anywhere applies ONLY to page-anchored cases. With pages=None the test is a manual-name substring, and a
     # name can match a DIFFERENT document ("(Operational)" matches both the Sync and the Ship-Side notes), which would
@@ -149,6 +261,7 @@ def judge(j: dict, manual: str, page: tuple[int, ...] | int | None, must: list[s
     detail = (f"gate={j.get('gate')} cite={str(top.get('manual', '-'))[:26]} p{page_of(top)}"
               + ("" if ok_cite_top or not ok_cite else " [expected page cited, not first]")
               + (f" [must_not in negation: {forbidden_neg}]" if (forbidden_neg := [p for p in must_not if p.lower() in ans and JUDGE_NEGATION_AWARE and negated(ans, p)]) else "")
+              + (f" [decline scoped to another source, not a refusal: {excused_dec}]" if (excused_dec := [p for p in must_not if p.lower() in ans and p.lower() in DECLINE_PHRASES and p not in forbidden_hit and not (JUDGE_NEGATION_AWARE and negated(ans, p))]) else "")
               + f" | {raw[:64]!r}")
     return ok_answer, ok_cite, ok_attr, detail
 

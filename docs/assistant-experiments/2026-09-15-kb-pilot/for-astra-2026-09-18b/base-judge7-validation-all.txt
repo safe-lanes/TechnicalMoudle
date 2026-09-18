@@ -1,0 +1,293 @@
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/abc-answers-dump.jsonl
+   A-manuals      runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+   B-corrected    runs passing:  A .6/case06 published  32/36   B .7/case06 published  32/36   C .7/case06 corrected  32/36
+   C-kbpilot      runs passing:  A .6/case06 published  32/36   B .7/case06 published  32/36   C .7/case06 corrected  32/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/kb-answers-dump.jsonl
+   A-kb-base      runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+   B-kb-pilot     runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+   C-pilot-6      runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/kb2-answers-dump.jsonl
+   A-kb-base      runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+   B-kb-pilot     runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/kb3-answers-dump.jsonl
+   A-kb-base      runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+   B-kb-pilot     runs passing:  A .6/case06 published  32/36   B .7/case06 published  32/36   C .7/case06 corrected  32/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/luna-answers-dump.jsonl
+   A-v2-4omini    runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+   B-v5-luna      runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s4-answers-dump.jsonl
+   D2-hybrid      runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s4b-answers-dump.jsonl
+   D1-intent      runs passing:  A .6/case06 published  35/36   B .7/case06 published  35/36   C .7/case06 corrected  35/36
+   D3-a07         runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s4c-answers-dump.jsonl
+   D4-rescue      runs passing:  A .6/case06 published  35/36   B .7/case06 published  35/36   C .7/case06 corrected  35/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s5-answers-dump.jsonl
+   B0             runs passing:  A .6/case06 published  33/36   B .7/case06 published  33/36   C .7/case06 corrected  33/36
+   D5             runs passing:  A .6/case06 published  34/36   B .7/case06 published  34/36   C .7/case06 corrected  34/36
+   D5a            runs passing:  A .6/case06 published  36/36   B .7/case06 published  36/36   C .7/case06 corrected  36/36
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/abc-generated-dump.jsonl
+   A-manuals      runs passing:  A .6/case06 published   6/42   B .7/case06 published   6/42   C .7/case06 corrected   6/42
+   B-corrected    runs passing:  A .6/case06 published  35/42   B .7/case06 published  34/42   C .7/case06 corrected  31/42
+   C-kbpilot      runs passing:  A .6/case06 published  35/42   B .7/case06 published  35/42   C .7/case06 corrected  34/42
+      CASE  CHANGE  generated B-corrected case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-corrected case 6 run 2: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-corrected case 6 run 3: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated C-kbpilot case 6 run 1: (True, True, True) -> (False, True, True)
+      JUDGE CHANGE  generated B-corrected case 7 run 2: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/kb-generated-dump.jsonl
+   A-kb-base      runs passing:  A .6/case06 published  36/42   B .7/case06 published  36/42   C .7/case06 corrected  33/42
+   B-kb-pilot     runs passing:  A .6/case06 published  39/42   B .7/case06 published  39/42   C .7/case06 corrected  36/42
+   C-pilot-6      runs passing:  A .6/case06 published  39/42   B .7/case06 published  39/42   C .7/case06 corrected  36/42
+      CASE  CHANGE  generated A-kb-base case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated A-kb-base case 6 run 2: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated A-kb-base case 6 run 3: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-kb-pilot case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-kb-pilot case 6 run 2: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-kb-pilot case 6 run 3: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated C-pilot-6 case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated C-pilot-6 case 6 run 2: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated C-pilot-6 case 6 run 3: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/kb2-generated-dump.jsonl
+   A-kb-base      runs passing:  A .6/case06 published  39/42   B .7/case06 published  39/42   C .7/case06 corrected  36/42
+   B-kb-pilot     runs passing:  A .6/case06 published  38/42   B .7/case06 published  38/42   C .7/case06 corrected  35/42
+      CASE  CHANGE  generated A-kb-base case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated A-kb-base case 6 run 2: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated A-kb-base case 6 run 3: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-kb-pilot case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-kb-pilot case 6 run 2: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-kb-pilot case 6 run 3: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/kb3-generated-dump.jsonl
+   A-kb-base      runs passing:  A .6/case06 published  38/42   B .7/case06 published  38/42   C .7/case06 corrected  35/42
+   B-kb-pilot     runs passing:  A .6/case06 published  38/42   B .7/case06 published  38/42   C .7/case06 corrected  35/42
+      CASE  CHANGE  generated A-kb-base case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated A-kb-base case 6 run 2: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated A-kb-base case 6 run 3: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-kb-pilot case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-kb-pilot case 6 run 2: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated B-kb-pilot case 6 run 3: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/luna-generated-dump.jsonl
+   A-v2-4omini    runs passing:  A .6/case06 published  37/42   B .7/case06 published  37/42   C .7/case06 corrected  34/42
+   B-v5-luna      runs passing:  A .6/case06 published  36/42   B .7/case06 published  36/42   C .7/case06 corrected  36/42
+      CASE  CHANGE  generated A-v2-4omini case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated A-v2-4omini case 6 run 2: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated A-v2-4omini case 6 run 3: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s4-generated-dump.jsonl
+   D2-hybrid      runs passing:  A .6/case06 published  29/42   B .7/case06 published  29/42   C .7/case06 corrected  29/42
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s4c-generated-dump.jsonl
+   D1-intent      runs passing:  A .6/case06 published  36/42   B .7/case06 published  36/42   C .7/case06 corrected  35/42
+   D4-rescue      runs passing:  A .6/case06 published  35/42   B .7/case06 published  35/42   C .7/case06 corrected  35/42
+      CASE  CHANGE  generated D1-intent case 6 run 2: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s5-generated-dump.jsonl
+   B0             runs passing:  A .6/case06 published  37/42   B .7/case06 published  37/42   C .7/case06 corrected  36/42
+   D5             runs passing:  A .6/case06 published  36/42   B .7/case06 published  36/42   C .7/case06 corrected  35/42
+   D5a            runs passing:  A .6/case06 published  36/42   B .7/case06 published  36/42   C .7/case06 corrected  36/42
+      CASE  CHANGE  generated B0 case 6 run 1: (True, True, True) -> (False, True, True)
+      CASE  CHANGE  generated D5 case 6 run 2: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/abc-manuals-dump.jsonl
+   A-manuals      runs passing:  A .6/case06 published 111/171   B .7/case06 published 111/171   C .7/case06 corrected 111/171
+   B-corrected    runs passing:  A .6/case06 published 118/171   B .7/case06 published 117/171   C .7/case06 corrected 117/171
+   C-kbpilot      runs passing:  A .6/case06 published 114/171   B .7/case06 published 114/171   C .7/case06 corrected 114/171
+      JUDGE CHANGE  manuals B-corrected case safety-meeting-1 run 3: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s4-manuals-dump.jsonl
+   D2-hybrid      runs passing:  A .6/case06 published 103/171   B .7/case06 published 103/171   C .7/case06 corrected 103/171
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s4c-manuals-dump.jsonl
+   D1-intent      runs passing:  A .6/case06 published 119/171   B .7/case06 published 119/171   C .7/case06 corrected 119/171
+   D4-rescue      runs passing:  A .6/case06 published 113/171   B .7/case06 published 112/171   C .7/case06 corrected 112/171
+      JUDGE CHANGE  manuals D4-rescue case safety-meeting-1 run 2: (True, True, True) -> (False, True, True)
+
+== ../docs/assistant-experiments/2026-09-15-kb-pilot/s5-manuals-dump.jsonl
+   B0             runs passing:  A .6/case06 published 112/171   B .7/case06 published 112/171   C .7/case06 corrected 112/171
+   D5             runs passing:  A .6/case06 published 117/171   B .7/case06 published 117/171   C .7/case06 corrected 117/171
+   D5a            runs passing:  A .6/case06 published 120/171   B .7/case06 published 119/171   C .7/case06 corrected 119/171
+      JUDGE CHANGE  manuals D5a case pmsvessel-3 run 3: (True, True, True) -> (False, True, True)
+
+JUDGE .6 -> .7 changed verdicts: 4
+CASE 06 change changed verdicts: 31
+
+== decline-phrase audit: 54 asserted occurrences in the stored answers
+   contradicted-by-own-citation 4
+   false-evidence   2
+   limitation       48
+
+  [contradicted-by-own-citation] generated B-corrected case 7 run 2 | phrase 'not documented' | expected source 'Roles'
+     the office-user capabilities—such as managing maintenance, approving or rejecting work according to approval configuration, reopening completed work orders, and exporting records—are not documented for heads of departmen
+
+  [contradicted-by-own-citation] manuals D5a case pmsvessel-3 run 3 | phrase 'not covered' | expected source 'Technical - PMS User Manual_Vessel Specific_R3_08.07.2026'
+     the detailed store transaction steps are not covered in the provided documentation.
+
+  [contradicted-by-own-citation] manuals B-corrected case safety-meeting-1 run 3 | phrase 'not covered' | expected source 'Safety - Safety Meeting User Manual_R1_31.05.2026'
+     the provided excerpts do not include the full part c or monthly safety meeting instructions, so those details are not covered here.
+
+  [contradicted-by-own-citation] manuals D4-rescue case safety-meeting-1 run 2 | phrase 'not covered' | expected source 'Safety - Safety Meeting User Manual_R1_31.05.2026'
+     the provided excerpts do not include the detailed monthly safety meeting instructions for parts b, c, or office closeout, so those details are not covered here.
+
+  [false-evidence] manuals D2-hybrid case inc-2 run 2 | phrase 'not covered' | expected source 'Incident - Incident User Manual R0_20.05.2026'
+     the meaning of the overdue-action status icon is not covered in the incident documentation excerpts provided.
+
+  [false-evidence] manuals D2-hybrid case inc-2 run 3 | phrase 'not covered' | expected source 'Incident - Incident User Manual R0_20.05.2026'
+     it is not covered in the provided incident documentation.
+
+  [limitation] answers C-kbpilot case 11 run 3 | phrase 'not covered' | expected source 'PMS User Manual'
+     a separate way to add a component outside the components panel is not covered in the technical documentation.
+
+  [limitation] answers D2-hybrid case 6 run 3 | phrase 'not covered' | expected source 'Near Miss'
+     the meanings of the yellow m and red circle icons are also not covered.
+
+  [limitation] generated A-manuals case 1 run 1 | phrase "isn't covered" | expected source 'Bulk Data Import'
+     that isn't covered in the module documentation i have.
+
+  [limitation] generated A-manuals case 1 run 2 | phrase "isn't covered" | expected source 'Bulk Data Import'
+     that isn't covered in the module documentation i have.
+
+  [limitation] generated A-manuals case 1 run 3 | phrase "isn't covered" | expected source 'Bulk Data Import'
+     that isn't covered in the module documentation i have.
+
+  [limitation] generated A-manuals case 13 run 1 | phrase 'not covered' | expected source 'Ship-Side'
+     this is not covered in the technical documentation provided.
+
+  [limitation] generated A-manuals case 13 run 2 | phrase 'not covered' | expected source 'Ship-Side'
+     this is not covered in the technical documentation.
+
+  [limitation] generated A-manuals case 13 run 3 | phrase 'not covered' | expected source 'Ship-Side'
+     this is not covered in the technical documentation.
+
+  [limitation] generated A-manuals case 14 run 1 | phrase 'not covered' | expected source '(Operational)'
+     this is not covered in the technical documentation excerpts provided.
+
+  [limitation] generated A-manuals case 14 run 2 | phrase 'does not cover' | expected source '(Operational)'
+     the technical documentation does not cover an office screen containing per-vessel switches for office work-order generation or running-hours entry.
+
+  [limitation] generated A-manuals case 14 run 3 | phrase 'not covered' | expected source '(Operational)'
+     this is not covered in the technical documentation.
+
+  [limitation] generated A-manuals case 3 run 1 | phrase "isn't covered" | expected source 'Bulk Data Import'
+     that isn't covered in the module documentation i have.
+
+  [limitation] generated A-manuals case 3 run 2 | phrase "isn't covered" | expected source 'Bulk Data Import'
+     that isn't covered in the module documentation i have.
+
+  [limitation] generated A-manuals case 3 run 3 | phrase "isn't covered" | expected source 'Bulk Data Import'
+     that isn't covered in the module documentation i have.
+
+  [limitation] generated A-manuals case 4 run 3 | phrase 'not covered' | expected source '(Operational)'
+     this is not covered in the technical documentation excerpts provided.
+
+  [limitation] generated A-manuals case 5 run 1 | phrase 'does not cover' | expected source 'Recent Updates'
+     the technical documentation does not cover how the vessel code is assigned or transferred to the ship, or how it affects new work-order numbering.
+
+  [limitation] generated A-manuals case 5 run 2 | phrase 'does not cover' | expected source 'Recent Updates'
+     the technical documentation does not cover how the vessel code is added to new work order numbers or transferred to the ship.
+
+  [limitation] generated A-manuals case 5 run 3 | phrase 'not covered' | expected source 'Recent Updates'
+     this is not covered in the technical documentation provided.
+
+  [limitation] generated A-manuals case 6 run 1 | phrase 'not covered' | expected source 'Recent Updates'
+     this is not covered in the technical documentation excerpts provided.
+
+  [limitation] generated A-manuals case 6 run 3 | phrase 'not covered' | expected source 'Recent Updates'
+     this is not covered in the technical documentation excerpts provided.
+
+  [limitation] generated D5a case 6 run 3 | phrase 'does not cover' | expected source 'Recent Updates'
+     the sail admin restriction and switch requirements come from the operational notes and draft code-derived guidance; the june pms user manual excerpt only defines work orders and does not cover these office-generation rul
+
+  [limitation] generated A-manuals case 7 run 1 | phrase "isn't covered" | expected source 'Roles'
+     that isn't covered in the module documentation i have.
+
+  [limitation] generated A-manuals case 7 run 2 | phrase "isn't covered" | expected source 'Roles'
+     that isn't covered in the module documentation i have.
+
+  [limitation] generated A-manuals case 7 run 3 | phrase "isn't covered" | expected source 'Roles'
+     that isn't covered in the module documentation i have.
+
+  [limitation] generated D5a case 7 run 3 | phrase 'not covered' | expected source 'Roles'
+     therefore, those capabilities are not covered as available to that role.
+
+  [limitation] generated A-manuals case 8 run 1 | phrase 'not covered' | expected source 'Roles'
+     this is not covered in the technical documentation provided.
+
+  [limitation] generated A-manuals case 8 run 2 | phrase 'not covered' | expected source 'Roles'
+     this is not covered in the technical documentation.
+
+  [limitation] generated A-manuals case 8 run 3 | phrase 'not covered' | expected source 'Roles'
+     this is not covered in the technical documentation.
+
+  [limitation] manuals A-manuals case certsurveys-3 run 1 | phrase 'not covered' | expected source 'Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026'
+     the survey attachment procedure is not covered in enough detail in the technical documentation.
+
+  [limitation] manuals C-kbpilot case certsurveys-3 run 3 | phrase 'not covered' | expected source 'Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026'
+     it does not reproduce or resolve the survey procedure, so the detailed survey process is not covered in the provided technical documentation.
+
+  [limitation] manuals D4-rescue case certsurveys-3 run 2 | phrase 'not covered' | expected source 'Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026'
+     the survey-specific procedure is not covered in the technical documentation.
+
+  [limitation] manuals B0 case certsurveys-3 run 2 | phrase 'not covered' | expected source 'Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026'
+     therefore, whether the process differs from certificates is not covered in the technical documentation beyond that instruction.
+
+  [limitation] manuals D5a case certsurveys-3 run 3 | phrase 'not covered' | expected source 'Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026'
+     therefore, whether the survey process is exactly the same as the certificate process is not covered in the technical documentation beyond the survey section’s pointer.
+
+  [limitation] manuals D2-hybrid case fs-ves-1 run 2 | phrase 'not covered' | expected source 'Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026'
+     this is not covered in the audit documentation.
+
+  [limitation] manuals D2-hybrid case master-review-2 run 1 | phrase 'not covered' | expected source 'Safety - Master Review Manual R1_10.06.2026'
+     part e of a master review record is not covered in the provided safety documentation.
+
+  [limitation] manuals D2-hybrid case master-review-2 run 2 | phrase 'not covered' | expected source 'Safety - Master Review Manual R1_10.06.2026'
+     part e of a master review record is not covered in the provided safety documentation excerpts.
+
+  [limitation] manuals D2-hybrid case master-review-2 run 3 | phrase 'does not cover' | expected source 'Safety - Master Review Manual R1_10.06.2026'
+     the provided safety documentation does not cover who uses part e of a master review record or what actions are available there.
+
+  [limitation] manuals D4-rescue case master-review-2 run 1 | phrase 'not covered' | expected source 'Safety - Master Review Manual R1_10.06.2026'
+     this is not covered in the provided safety documentation.
+
+  [limitation] manuals D4-rescue case master-review-2 run 2 | phrase 'not covered' | expected source 'Safety - Master Review Manual R1_10.06.2026'
+     this is not covered in the safety documentation provided.
+
+  [limitation] manuals D4-rescue case master-review-2 run 3 | phrase 'does not cover' | expected source 'Safety - Master Review Manual R1_10.06.2026'
+     the safety documentation provided does not cover who uses part e of a master review record or what they can do there.
+
+  [limitation] manuals A-manuals case nm-1 run 2 | phrase 'not covered' | expected source 'Incident - Near Miss User Manual R1_30.05.2026'
+     the significant near miss form’s completion steps are not covered in the incident documentation.
+
+  [limitation] manuals B-corrected case pmsoffice-5 run 1 | phrase 'not covered' | expected source 'Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026'
+     a vessel-side dashboard filter set is not covered in the technical documentation.
+
+  [limitation] manuals D2-hybrid case pmsoffice-5 run 1 | phrase 'not covered' | expected source 'Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026'
+     the excerpts do not state whether the vessel-side dashboard provides the same set of filters, so this is not covered in the technical documentation.
+
+  [limitation] manuals D2-hybrid case pmsoffice-5 run 2 | phrase 'not covered' | expected source 'Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026'
+     the excerpts do not state whether the same set of filters is available on the vessel/ship side, so this is not covered in the technical documentation.
+
+  [limitation] manuals D4-rescue case pmsoffice-5 run 1 | phrase 'not covered' | expected source 'Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026'
+     whether the vessel-side dashboard has the same filters is not covered in the technical documentation.
+
+  [limitation] manuals D2-hybrid case sms-office-1 run 2 | phrase 'does not cover' | expected source 'Safety - SMS User Manual_Office_R0_31.01.2026'
+     the safety documentation does not cover what the approver must do to approve a revision of an already-uploaded sms document under section 4.2.2.
+
+  [limitation] manuals D2-hybrid case sms-office-1 run 3 | phrase 'does not cover' | expected source 'Safety - SMS User Manual_Office_R0_31.01.2026'
+     the safety documentation does not cover what the approver must do to approve a revision of an already-uploaded sms document (section 4.2.2).
+
+  [limitation] manuals D4-rescue case sms-office-1 run 3 | phrase 'not covered' | expected source 'Safety - SMS User Manual_Office_R0_31.01.2026'
+     section 4.2.2 is not included in the excerpts, so the specific approval procedure for an already-uploaded revision is not covered in the safety documentation provided.

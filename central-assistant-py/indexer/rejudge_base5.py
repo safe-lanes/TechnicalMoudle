@@ -33,8 +33,9 @@ def case_spec(row):
     return manual, page, must, must_not, cls
 
 
-def score(rows, cit_any, neg):
+def score(rows, cit_any, neg, decline=None):
     A.JUDGE_CITATION_ANY, A.JUDGE_NEGATION_AWARE = cit_any, neg
+    A.JUDGE_DECLINE_AWARE = neg if decline is None else decline
     out = {}
     for r in rows:
         manual, pages, must, must_not, cls = case_spec(r)
@@ -46,7 +47,7 @@ def score(rows, cit_any, neg):
 changed = defaultdict(list)
 for path in sys.argv[1:]:
     rows = [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
-    old, new = score(rows, False, False), score(rows, True, True)
+    old, new = score(rows, True, True, decline=False), score(rows, True, True, decline=True)
     for k in old:
         if old[k] != new[k]:
             changed[path].append((k, old[k], new[k]))
@@ -60,7 +61,7 @@ for path in sys.argv[1:]:
         tot_new[k[1]][1] += 1
     print(f"\n== {path}")
     for st in sorted(tot_old):
-        print(f"   {st:<14} runs passing: .4 {tot_old[st][0]}/{tot_old[st][1]}   ->   .5 {tot_new[st][0]}/{tot_new[st][1]}")
+        print(f"   {st:<14} runs passing: .5 {tot_old[st][0]}/{tot_old[st][1]}   ->   .6 {tot_new[st][0]}/{tot_new[st][1]}")
     for k, o, n in changed[path]:
         print(f"      CHANGED {k[0]} {k[1]} case {k[2]} run {k[3]}: answer/cite/attr {o} -> {n}")
 print(f"\nTOTAL changed verdicts: {sum(len(v) for v in changed.values())}")

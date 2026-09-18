@@ -1,0 +1,35 @@
+
+===== s5-wo-dump.jsonl
+case           set          judge .3   judge .4   judge .5   judge .6   judge .7   judge .8   judge .9   judge .10  judge .11  judge .12  last-run .12 reason
+wo-generic-01  B0           0/3 fail  0/3 fail  0/3 fail  1/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-generic-01  D5           2/3 fail  2/3 fail  2/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-generic-01  D5a          1/3 fail  1/3 fail  1/3 fail  0/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-generic-02  B0           3/3 PASS  3/3 PASS  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  3/3 PASS   automatic generation ✓; user need not create ✓; Generate Now described with its conditions
+wo-generic-02  D5           3/3 PASS  3/3 PASS  2/3 fail  2/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; user need not create ✓; Generate Now described with its conditions
+wo-generic-02  D5a          3/3 PASS  3/3 PASS  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  3/3 PASS   automatic generation ✓; user need not create ✓; Generate Now described with its conditions
+wo-generic-03  B0           0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail  0/3 fail   automatic generation MISSING; pairing ✗: Generate Now not described; per-job Generate WO n
+wo-generic-03  D5           1/3 fail  1/3 fail  1/3 fail  1/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-generic-03  D5a          3/3 PASS  3/3 PASS  3/3 PASS  0/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-01      B0           0/3 fail  0/3 fail  0/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-01      D5           0/3 fail  0/3 fail  0/3 fail  3/3 PASS  2/3 fail  2/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-01      D5a          1/3 fail  1/3 fail  1/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-02      B0           1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail   unplanned procedure ✓; note of the other ways MISSING
+wo-phr-02      D5           3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   unplanned procedure ✓; note of the other ways ✓
+wo-phr-02      D5a          3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   unplanned procedure ✓; note of the other ways ✓
+wo-phr-03      B0           0/3 fail  0/3 fail  0/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-03      D5           0/3 fail  1/3 fail  1/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-03      D5a          0/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  2/3 fail  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-04      B0           0/3 fail  0/3 fail  0/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-04      D5           0/3 fail  0/3 fail  0/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  2/3 fail  2/3 fail   automatic generation ✓; pairing ✓
+wo-phr-04      D5a          0/3 fail  0/3 fail  0/3 fail  1/3 fail  2/3 fail  2/3 fail  2/3 fail  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-05      B0           1/3 fail  1/3 fail  1/3 fail  3/3 PASS  2/3 fail  2/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-05      D5           0/3 fail  0/3 fail  0/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  1/3 fail  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+wo-phr-05      D5a          0/3 fail  0/3 fail  0/3 fail  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS  3/3 PASS   automatic generation ✓; pairing ✓
+
+== RULE-level outcome changes .11 → .12 (2) ==
+s5-wo- wo-generic-02 B0 run 1: rule .11=False (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✗ (Sail Admin + switch missing)) → .12=True (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)
+s5-wo- wo-generic-02 D5a run 2: rule .11=False (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✗ (Sail Admin + switch missing)) → .12=True (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)
+
+== overall PASS/fail changes per run .11 → .12 (2) ==
+s5-wo- wo-generic-02 B0 run 1: .11 fail → .12 PASS
+s5-wo- wo-generic-02 D5a run 2: .11 fail → .12 PASS

@@ -23,7 +23,7 @@ import httpx2 as httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).parent))
-from acceptance_answers import md_plain, negated, page_of  # noqa: E402
+from acceptance_answers import DECLINE_PHRASES, JUDGE_DECLINE_SCOPE, decline_violates, md_plain, negated, page_of  # noqa: E402
 from app.identity import sign_identity  # noqa: E402
 
 _n = 0
@@ -43,7 +43,15 @@ async def ask(client: httpx.AsyncClient, base: str, key: str, q: str, module: st
 def judge(case: dict, resp: dict) -> tuple[bool, bool, bool, str]:
     ans = md_plain(resp.get("response") or "").lower()
     must = [m for m in case["must"] if m.lower() not in ans]
-    forbidden = [p for p in case["must_not"] if p.lower() in ans and not negated(ans, p)]
+    # judge .7: a decline phrase scoped to another named source is an accurate limitation, not a refusal (see
+    # acceptance_answers.py). The expected source here is the case's own file, when it names one.
+    exp_src = (case.get("file") or "").rsplit(".", 1)[0]
+    _cits = resp.get("citations") or []
+    _cited_exp = bool(exp_src) and any(exp_src.lower()[:40] in str(c.get("manual", "")).lower() for c in _cits)
+    forbidden = [p for p in case["must_not"]
+                 if p.lower() in ans and not negated(ans, p)
+                 and not (JUDGE_DECLINE_SCOPE and p.lower() in DECLINE_PHRASES
+                          and not decline_violates(ans, p, exp_src, _cited_exp))]
     ok_answer = not must and not forbidden and resp.get("gate") == "answer"
     exp_mod = case.get("expected_module")
     ok_module = True

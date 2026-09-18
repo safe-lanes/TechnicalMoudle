@@ -75,7 +75,7 @@ from acceptance_answers import ask, judge  # noqa: E402
 #      source-comparison sentences ("the office-switch details come from draft code-derived guidance", "the manuals do not state
 #      the role or switch conditions") were being read as conditions attached to the unplanned procedure.
 WO_SUITE_VERSION = "2026-09-14.11"
-JUDGE_VERSION = 11
+JUDGE_VERSION = 12
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -239,6 +239,16 @@ def scopes_v7(body: str, version: int = 7) -> dict[str, str]:
             current = named
             for a in current:
                 scopes[a].extend(pending + [blk])
+            # .12: a block that names one action may END with a lead-in sentence introducing ANOTHER action's steps
+            # ("In the office, planned work orders are not generated automatically. A Sail Admin can:"). That trailing
+            # sentence belongs to what follows, not to the action just named, so it travels forward as well.
+            if version >= 12:
+                tail = blk.rstrip()
+                if tail.endswith(":"):
+                    lead = re.split(r"(?<=[.!?])\s+", tail)[-1]
+                    if lead and not any(re.search(pat, lead) for _a, pat in ACTIONS):
+                        pending = [lead]
+                        continue
         else:  # several actions in one block: unit-level attribution inside it, heading text goes to all of them
             inner = scopes_of(blk)
             for a in named:
