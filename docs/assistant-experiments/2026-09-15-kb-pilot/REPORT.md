@@ -898,7 +898,8 @@ Validated by re-scoring **eight stored dumps** under .4 and .5. Old scores are p
 | citation: expected page was cited, but not first | 260 |
 | answer: forbidden phrase was inside a negation | 9 |
 | both | 1 |
-| **total verdicts changed** | **270** |
+| **total component results changed** | **270** |
+| **overall pass/fail verdicts flipped** | **220** (the figure §15.5 first quoted as 270 — corrected, see §15.7) |
 | corrected-claims suite (the lookalike-name risk) | unchanged: 36/42 and 35/42 |
 
 ### 15.6 Step 6 — final verification against a clearly identified baseline (`run-s5-suites.sh` → `s5-runs.txt`, `s5-*-dump.jsonl`, `s5-{b0,d5a,d5}-capture.jsonl`, `s5-manuals-rejudge.txt`)
@@ -976,6 +977,87 @@ If a candidate is ever promoted, rollback is an environment change, not a rebuil
 2. If the image itself must be rolled back, redeploy the previous tag and point `ASSISTANT_INDEX_SET` at `repaired`; the index sets are separate rows in the same table, so no data is migrated or deleted in either direction.
 3. Verification after rollback: `/health` must report the expected `indexSet`, `chunks`, `prompt.version` and `docsPromptSha`, and the retrieval-18 probe must return 18/18 with no model calls.
 4. The dedicated key is scoped to the two models it needs; no shared key is revoked or rotated by any of this.
+
+### 15.7 Reviewer's second pass (18-Sep) — the requested full answers, read (`s5-evidence-pack.txt`, split per suite in `for-astra-2026-09-18/`; no new model calls)
+
+The reviewer asked for the complete stored answers and their captured inputs for the corrected-claims losses, the remaining work-order failure, the manual-coverage losses and the fresh validation cases, plus the judging rule for corrected-claims case 06, and asked that genuine answer defects be separated from scoring defects. All of it below comes from the stored run; nothing was re-asked.
+
+**Reporting correction accepted.** The judge validation changed **270 component results** but **220 overall pass/fail verdicts**. §15.5 quoted the component figure as if it were the verdict figure. Both numbers are now stated: 270 component changes, 220 verdict flips.
+
+#### A. Corrected-claims case 06 — the reviewer was right, and the problem is larger than the answer
+
+The case asks "Who can generate work orders from the office, and what happens if the vessel's switch is off?" and its rule is: the answer **must** contain "sail admin" and "not enabled".
+
+The two sources supplied in the same request disagree:
+
+| source in the excerpts | what it says |
+|---|---|
+| corrected code-derived doc, Recent Updates §1.1.14.6 | "**Only a Sail Admin can generate work orders directly from the office**, and only for a vessel whose 'office work-order generation' switch is enabled" |
+| KB pilot file, "How work orders are created" | "Who can do it (role): … office 'Generate Now': Sail Admin only; (2) per-job 'Generate WO': **no role check**; (3) unplanned: no role check" |
+
+So the blanket sentence in the corrected document is **over-broad**: the per-job Generate WO route is also performed from the office and has no role check. Reading all nine stored runs of case 06:
+
+| arm · run | what the answer says | verdict |
+|---|---|---|
+| B0 r1 | "From the office, only a Sail Admin can generate work orders", then describes only Generate Now | **over-broad — real defect, and the judge PASSED it** |
+| D5 r2 | "Only a Sail Admin can generate work orders directly from the office", then only Generate Now | **over-broad — real defect, judge PASSED it** |
+| B0 r2, r3 · D5a r1, r2 · D5 r1, r3 | split by action: Generate Now = Sail Admin only; per-job Generate WO = no role check | correct |
+| D5a r3 | split by action, correct | **failed on a scoring defect** (below) |
+
+Three consequences, none of which needs a model call:
+1. **The case expectation is defective.** Requiring "sail admin" without requiring the per-action split rewards the over-broad answer. The case must require both the Generate Now role rule **and** that the per-job route carries no role check, and must forbid presenting Sail Admin as the condition for all office generation. This changes an acceptance requirement, so it is proposed here rather than applied — and it makes the suite **harder**, not easier.
+2. **The corrected code-derived document has an over-broad sentence.** Recent Updates §1.1.14.6 should be qualified to "only a Sail Admin can use the office **Generate Now** action". That is a documentation change and needs the owner's approval; it also means the earlier §14 statement that the corrected documents "add exactly the code-derived claims" was too generous about this one sentence.
+3. **Two stored runs are real answer defects** that the current judge passes, so the corrected-claims scores in §15.6 are optimistic by one case on B0 and one on D5.
+
+#### B. The two corrected-claims losses on the routing candidate are scoring defects
+
+| case · run | the sentence that failed it | why it is not an answer defect |
+|---|---|---|
+| 06 · D5a r3 | "the June PMS user manual excerpt only defines work orders and **does not cover** these office-generation rules" | an accurate statement about one source, which prompt v5 explicitly asks for. "does not cover" is on the forbidden list, whose purpose is to catch the assistant declining to answer |
+| 07 · D5a r3 | "those capabilities are **not covered** as available to that role" | this is the substance of the correct answer ("No, a Head of Department cannot do everything"), not a refusal |
+
+Both answers are complete and correct by reading. The forbidden list fires on a phrase describing **a source's** coverage rather than the assistant's own inability. Reported as a judge defect; a narrow rule (ignore a not-covered phrase that is scoped to a named source, keep it when the answer declines outright) is **proposed, not applied**, because it would move published scores.
+
+By reading, the corrected-claims column of §15.6 becomes: B0 11, D5a 12, D5 11 — the reverse of the automatic 12 / 10 / 12.
+
+#### C. The remaining work-order failure is also a scoring defect
+
+D5, wo-phr-04 run 1, judged "Generate WO switch stated without the office qualifier". The answer says, inside that very step: "In the **Office**, select the vessel and ensure its **office work-order generation switch is ON**. This switch is not required on the Ship." The qualifier is present and correct; the judge's scope window missed it. By reading, D5 is **8/8** on work orders.
+
+The genuine work-order content gaps in this run are on the other arms: the baseline misses the overview entirely on wo-generic-03 (all three runs) and omits the note of other methods on wo-phr-02 (two runs); one run each of B0 and D5a describes Generate Now without its Sail Admin and switch conditions.
+
+#### D. The two manual-coverage losses on the routing candidate are scoring defects
+
+| case · run | required phrase | what the answer said |
+|---|---|---|
+| crewing-1 · D5a r1 | "recruitment application" | answers both halves of the question (click "+ New Crew"; yes, Save Draft at any stage). The form's name was not asked for |
+| fn-1 · D5a r1 | "all actions" | "Updated the Date Closed/completion date and status for **all pending actions**" |
+
+Both correct by reading. This is the same literal-matching gap already reported, and it is why §15.6 reports the automatic figure and the reading separately.
+
+#### E. The fresh set — the reviewer is right that the automatic pass is not a review
+
+Read against each case's own rubric, the module-context conflict case reverses:
+
+| arm | what happened | rubric verdict |
+|---|---|---|
+| B0 baseline | routed to **Technical** and gave the Technical add-component procedure, while noting the Safety framing is not covered | **fails** — the rubric's acceptable outcomes are routing to Safety and saying it is not covered there, or asking which module is meant |
+| D5a, D5 | routed to **Safety** and answered "Adding a new component to the component tree is not covered in the provided Safety documentation" | correct |
+
+The automatic runner passed the baseline because this case has no required phrases and its expected module is deliberately "Safety or a clarification", which the runner does not score. So the fresh-set result by reading is **baseline 8/10, both candidates 10/10** — a wider gap than the automatic 9 / 10 / 10. The other module-context case (safety meeting minutes asked from a Technical screen) routes to Safety on all three arms and answers from the Safety Meeting manual.
+
+#### F. Where this leaves the comparison
+
+| suite | B0 automatic → by reading | D5a automatic → by reading | D5 automatic → by reading |
+|---|---|---|---|
+| corrected claims 14 | 12 → **11** | 10 → **12** | 12 → **11** |
+| work orders 8 | 5 → 5 | 7 → 7 | 7 → **8** |
+| fresh validation 10 | 9 → **8** | 10 → 10 | 10 → 10 |
+| routing 13, retrieval 18 | 8, 18 | 13, 18 | 13, 18 |
+
+The manual-coverage and frozen suites were not re-read in full for this run; the differences examined (two on D5a, five on D5, plus the two frozen drops) are described in §15.6 and above. Reading moves every examined difference in the same direction: the candidates gain and the baseline loses, because the baseline's failures are content gaps while the candidates' are wording and scope artefacts of the judges.
+
+**The recommendation does not change: deploy nothing yet.** Two items now block any promotion decision, and neither requires a model call: the case-06 expectation must be corrected and the over-broad sentence in the corrected document decided by the owner; and the two judge defects above should be settled before any score is quoted as final.
 
 ### 8.6 Not changed / open
 
