@@ -1,0 +1,41 @@
+==============================================================================================================
+1. wo-phr-01, F1 run 1 — 'Generate WO switch stated without the office qualifier'
+==============================================================================================================
+The rule requires EVERY unit of the per-job block that mentions 'switch' to be office-qualified.
+Units mentioning 'switch' in that block:
+
+   office-qualified=YES | - in the **office**, the vessel’s **office work-order generation** switch must be on.
+   office-qualified=NO  | the ship does not have this switch requirement.
+
+Same block with ONLY the ship-contrast sentence removed → qualifier test = True
+
+READING: the requirement sentence is correctly office-qualified —
+    "in the **office**, the vessel's **office work-order generation** switch must be on."
+The block fails because of a SECOND, correct sentence that contrasts the ship —
+    "The Ship does not have this switch requirement."
+which mentions 'switch' without 'office'. The test has no negation awareness; the base judge has had it since .5.
+This is a judge gap, not an answer defect. NOT PATCHED — it was found after the run, on the arm it would help.
+
+==============================================================================================================
+2. wo-phr-05, F1 run 3 — 'Sail Admin wrongly attached to Generate WO'
+==============================================================================================================
+The rule (acceptance_wo.py:293) is a bare substring test:
+    if "sail admin" in gw_role and "generate now" not in gw_role: FAIL
+
+The only sentence in the per-job block containing 'sail admin':
+
+   the draft code-derived guidance says the office switch and sail admin restriction apply only to the relevant planned-generation actions, not to per-job **generate wo** or unplanned work orders.
+
+READING: that sentence says the Sail Admin restriction applies "only to the relevant planned-generation actions,
+NOT to per-job Generate WO or unplanned work orders" — it is the correct statement, and it is the very distinction
+the corrected document was written to make. The test flags the phrase's presence, with no negation awareness and
+no requirement-wording test (the sibling test `wrongly_conditioned` has had both since .10/.11).
+This is a judge gap, not an answer defect. NOT PATCHED — same reason.
+
+==============================================================================================================
+NOTE ON A WRONG FIRST DIAGNOSIS (recorded rather than dropped)
+==============================================================================================================
+My first hypothesis was that both failed on markdown emphasis, because the base judge strips '**' and the
+work-order judge does not. That was WRONG and was tested before being written up: re-running both answers through
+the rule with every '**' removed still fails, identically. The causes are the two above.
+

@@ -78,7 +78,29 @@ JUDGE_DECLINE_AWARE = True
 #                      role", the substance of a correct "No").
 #   JUDGE_DECLINE_SCOPE=False falls back to .6 (has_substance), and with JUDGE_DECLINE_AWARE=False to .5.
 JUDGE_DECLINE_SCOPE = True
-JUDGE_VERSION = "7"
+# .8 (18-Sep-2026, second reviewer GO — three corrections, all validated on stored answers before any model call):
+#   CITATION (JUDGE_CITE_EXACT): a supporting citation is accepted ANYWHERE in the user-visible list, but it must be
+#     the expected document by EXACT identity — the case's manual substring is resolved against the corpus document
+#     list (indexer/corpus_documents.txt) and the citation's document name must equal the resolved name — plus the
+#     section/page when the case gives one. Name similarity alone is no longer enough: "(Operational)" matches four
+#     different documents. Where the captured model input is available the cited document's text must ALSO have been
+#     supplied and must support the answer; a citation to a document whose text never reached the model does not
+#     count. First-source ranking is computed and reported SEPARATELY and never folded into the pass.
+#   MISSING EVIDENCE (JUDGE_EVIDENCE_CHECK): a claim that evidence is missing is tested against the SUPPLIED
+#     EXCERPTS — not against citation presence, answer length, or the absence of a preferred citation. If the
+#     excerpts do carry what the sentence says is missing, the claim is false and the run fails. If they do not, the
+#     statement is honest. If the excerpts are not available, the case is marked REVIEW-NEEDED (source-based review)
+#     instead of being passed or failed silently. .7's citation-based proxy is retired.
+#   EQUIVALENCE (JUDGE_PHRASE_EQUIV): a documented, versioned table of wordings that satisfy a required phrase —
+#     "mandatory" is satisfied by "fields marked with *", "marked with an asterisk", "marked (*)" and so on. This
+#     changes how an answer is MATCHED, not what the question requires, so a frozen suite can take it; it is applied
+#     identically to every arm and the old scores are preserved.
+#   Each flag reverts independently: JUDGE_CITE_EXACT=False, JUDGE_EVIDENCE_CHECK=False, JUDGE_PHRASE_EQUIV=False
+#   restore .7 behaviour exactly.
+JUDGE_CITE_EXACT = True
+JUDGE_EVIDENCE_CHECK = True
+JUDGE_PHRASE_EQUIV = True
+JUDGE_VERSION = "8"
 DECLINE_PHRASES = {"not covered", "isn't covered", "not documented", "does not cover", "no information",
                    "do not describe", "does not describe", "not described"}
 # A sentence "names a source" when it points at a specific document, module or section.
@@ -99,11 +121,111 @@ _GLOBAL_EVIDENCE = re.compile(
     r"|\b(this|that|it|the question|the topic|the answer) (is|was) not (covered|documented|described))\b", re.I)
 
 
+# ── .8 required-phrase equivalence ───────────────────────────────────────────────────────────────────────────────
+# A documented table of wordings that mean the same thing as a required phrase. It changes only how an answer is
+# MATCHED, never what the question requires, so it can be applied to a frozen suite; it applies to every arm.
+# Each entry is justified by a stored answer that was right and was failed on the literal word.
+PHRASE_EQUIV: dict[str, list[str]] = {
+    # fresh-audit-1: "Complete all inspection-detail fields marked with *." is exactly the manual's own wording
+    # ("Complete all mandatory fields marked with (*)"), and was failed because the literal word was absent.
+    "mandatory": ["marked with *", "marked with (*)", "marked with an asterisk", "marked with a red asterisk",
+                  "marked (*)", "marked with *.", "fields marked *", "required fields"],
+}
+
+
 def present(ans: str, phrase: str) -> bool:
     """A required phrase. 'a||b||c' is satisfied by ANY alternative — used where one fact has several natural
     wordings ("no role check" / "does not require a specific role" / "any user with access"). A phrase without
-    '||' behaves exactly as before, so no existing case changes."""
-    return any(alt.strip().lower() in ans for alt in phrase.split("||"))
+    '||' behaves exactly as before. .8 additionally accepts the documented equivalents in PHRASE_EQUIV."""
+    for alt in phrase.split("||"):
+        a = alt.strip().lower()
+        if a in ans:
+            return True
+        if JUDGE_PHRASE_EQUIV and any(e in ans for e in PHRASE_EQUIV.get(a, ())):
+            return True
+    return False
+
+
+# ── .8 exact document identity ───────────────────────────────────────────────────────────────────────────────────
+_CORPUS_PATH = Path(__file__).with_name("corpus_documents.txt")
+
+
+def doc_stem(name: str) -> str:
+    """Citations and captured excerpt headers name a document without its extension for PDFs but WITH it for the
+    KB markdown files; the corpus list carries the file name. Compare on the stem so identity is exact but the
+    extension convention cannot make two names for the same document look different."""
+    n = (name or "").strip()
+    for ext in (".pdf", ".docx", ".md", ".html"):
+        if n.lower().endswith(ext):
+            return n[: -len(ext)]
+    return n
+
+
+CORPUS_DOCS: list[str] = ([doc_stem(ln.strip()) for ln in _CORPUS_PATH.read_text(encoding="utf-8").splitlines() if ln.strip()]
+                          if _CORPUS_PATH.exists() else [])
+
+
+def resolve_documents(expected: str) -> list[str]:
+    """The corpus documents a case's `manual` substring names. One → exact identity is required. Several → the
+    substring is ambiguous (e.g. '(Operational)' names four documents); the citation must still equal one of them
+    exactly, and the ambiguity is reported. None → the corpus list does not cover this case, fall back to substring."""
+    e = (expected or "").lower()
+    return [d for d in CORPUS_DOCS if e and e in d.lower()]
+
+
+# ── .8 the supplied excerpts (the captured model input) ──────────────────────────────────────────────────────────
+_EXCERPT_HEAD = re.compile(r"^\[(\d+)\]\s*\((.+?)(?:\s+—\s+(.*?))?\)\s*$", re.M)
+
+
+def supplied_blocks(supplied: str | None) -> list[dict]:
+    """Parse a captured 'Manual excerpts:' block into [{n, document, section, page, text}]. This is what the model
+    was actually given — the only sound basis for judging a claim that evidence is missing."""
+    if not supplied:
+        return []
+    heads = list(_EXCERPT_HEAD.finditer(supplied))
+    out = []
+    for i, m in enumerate(heads):
+        body = supplied[m.end():(heads[i + 1].start() if i + 1 < len(heads) else len(supplied))]
+        sec = (m.group(3) or "").strip()
+        pg = re.search(r"\(p\.(\d+)\)", sec)
+        out.append({"n": int(m.group(1)), "document": m.group(2).strip(), "section": sec,
+                    "page": int(pg.group(1)) if pg else None, "text": body.strip()})
+    return out
+
+
+_GENERIC = {"the", "and", "for", "are", "any", "all", "not", "was", "were", "this", "that", "those", "these", "with",
+            "from", "into", "provided", "supplied", "available", "given", "retrieved", "documentation", "document",
+            "documents", "manual", "manuals", "excerpt", "excerpts", "source", "sources", "detail", "detailed",
+            "details", "information", "instruction", "instructions", "full", "specific", "covered", "cover",
+            "described", "describe", "here", "beyond", "about", "does", "there", "further", "content", "material"}
+
+
+def _stem(w: str) -> str:
+    for suf in ("ies", "es", "s", "ing", "ed"):
+        if len(w) > 4 and w.endswith(suf):
+            return w[: -len(suf)]
+    return w
+
+
+def content_terms_of(text: str) -> set[str]:
+    return {_stem(w) for w in re.findall(r"[a-z][a-z-]{2,}", text.lower()) if w not in _GENERIC}
+
+
+def evidence_claim_class(sentence: str, blocks: list[dict]) -> str:
+    """.8 — test a missing-evidence sentence against what was actually supplied.
+      'false-claim'  the supplied excerpts do carry what the sentence says is missing
+      'honest'       they do not
+      'review'       not decidable automatically (no excerpts captured, or too few distinctive terms)
+    """
+    if not blocks:
+        return "review"
+    terms = content_terms_of(re.sub(r"|".join(re.escape(p) for p in DECLINE_PHRASES), " ", sentence.lower()))
+    terms = {t for t in terms if len(t) > 3}
+    if len(terms) < 2:
+        return "review"
+    supplied_terms = content_terms_of(" ".join(b["text"] + " " + b["section"] for b in blocks))
+    missing = terms - supplied_terms
+    return "false-claim" if not missing else "honest"
 
 
 def _sentences(text: str) -> list[str]:
@@ -113,7 +235,8 @@ def _sentences(text: str) -> list[str]:
 VIOLATING_DECLINES = ("refusal", "false-evidence", "contradicted-by-own-citation")
 
 
-def decline_class(sentence: str, expected_source: str, cited_expected: bool = False) -> str:
+def decline_class(sentence: str, expected_source: str, cited_expected: bool = False,
+                  blocks: list[dict] | None = None) -> str:
     """What a decline phrase in this sentence is about:
 
       refusal                      — first-person inability, or "no information": the assistant declines. Violation.
@@ -126,7 +249,14 @@ def decline_class(sentence: str, expected_source: str, cited_expected: bool = Fa
       limitation                   — the gap is scoped to some OTHER named source, or to an attribute rather than to
                                      the evidence. Not a violation.
     """
+    if re.search(r"\b(i (do not|don't|cannot|can't|am unable|was unable)|no information\b|not enough information)", sentence, re.I):
+        return "refusal"
     named = _SOURCE_NAMED.search(sentence)
+    is_evidence_claim = bool(named or _GLOBAL_EVIDENCE.search(sentence))
+    if JUDGE_EVIDENCE_CHECK and is_evidence_claim:
+        # .8 — decide against what was SUPPLIED, whatever the sentence names and whatever the answer cited.
+        cls = evidence_claim_class(sentence, blocks or [])
+        return {"false-claim": "false-evidence", "honest": "limitation", "review": "review-needed"}[cls]
     if named:
         tok = named.group(0).lower()
         exp = (expected_source or "").lower().strip()
@@ -134,17 +264,18 @@ def decline_class(sentence: str, expected_source: str, cited_expected: bool = Fa
         if exp and words and all(w in tok for w in words):
             return "false-evidence"
         return "limitation"
-    if re.search(r"\b(i (do not|don't|cannot|can't|am unable|was unable)|no information\b|not enough information)", sentence, re.I):
-        return "refusal"
     if _GLOBAL_EVIDENCE.search(sentence):
         return "contradicted-by-own-citation" if cited_expected else "limitation-not-retrieved"
     return "limitation"
 
 
-def decline_violates(text: str, phrase: str, expected_source: str, cited_expected: bool = False) -> bool:
-    """True when at least one sentence asserting `phrase` is a refusal or an unsupported missing-evidence claim."""
+def decline_violates(text: str, phrase: str, expected_source: str, cited_expected: bool = False,
+                     blocks: list[dict] | None = None) -> tuple[bool, list[str]]:
+    """(violates, classes) for every sentence asserting `phrase`. 'review-needed' is NOT a violation — it is a
+    flag for source-based review, so nothing is passed or failed on a guess."""
     hits = [s for s in _sentences(text) if phrase.lower() in s.lower() and not negated(s.lower(), phrase)]
-    return any(decline_class(s, expected_source, cited_expected) in VIOLATING_DECLINES for s in hits)
+    classes = [decline_class(s, expected_source, cited_expected, blocks) for s in hits]
+    return any(c in VIOLATING_DECLINES for c in classes), classes
 
 
 def has_substance(text: str) -> bool:
@@ -224,46 +355,113 @@ def page_of(citation: dict) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def judge(j: dict, manual: str, page: tuple[int, ...] | int | None, must: list[str], must_not: list[str], cls: str) -> tuple[bool, bool, bool, str]:
-    """(answer ok, citation ok, attribution ok, detail). Attribution matters for xref cases:
-    an answer built from another section's text must name where it came from (the resolver
-    labels pulled-in text with its source section and page)."""
+def judge_ex(j: dict, manual: str, page: tuple[int, ...] | int | None, must: list[str], must_not: list[str], cls: str,
+             supplied: str | None = None, scoped_must: dict[str, list[str]] | None = None) -> dict:
+    """The full verdict record. `supplied` is the captured model input for this run, when available; without it the
+    support and missing-evidence tests cannot be decided and the run is flagged for source-based review instead."""
     raw = j.get("response") or ""
     ans = md_plain(raw).lower() if JUDGE_MD_NORMALISE else raw.lower()
     cits = j.get("citations") or []
     top = cits[0] if cits else {}
     pages = (page,) if isinstance(page, int) else page
+    blocks = supplied_blocks(supplied)
+    review: list[str] = []
+
+    # ── citation: exact document identity, page where given, anywhere in the list, text actually supplied ──
+    exact = resolve_documents(manual) if JUDGE_CITE_EXACT else []
+
+    def doc_matches(ci: dict) -> bool:
+        name = doc_stem(str(ci.get("manual", "")))
+        if JUDGE_CITE_EXACT and exact:
+            return name in exact                      # exact identity, not a name substring
+        return manual.lower() in name.lower()
+
     def cite_matches(ci: dict) -> bool:
-        return manual.lower() in str(ci.get("manual", "")).lower() and (pages is None or page_of(ci) in pages)
-    cited_expected = any(cite_matches(ci) for ci in cits)
+        return doc_matches(ci) and (pages is None or page_of(ci) in pages)
+
+    supporting = [ci for ci in cits if cite_matches(ci)]
+    cite_first = bool(cits) and cite_matches(top)     # reported separately, never folded into the pass
+    support = "not-checked"
+    if supporting and JUDGE_CITE_EXACT:
+        if not blocks:
+            support, _ = "unverified", review.append("citation support unverified (no captured model input)")
+        else:
+            names = {doc_stem(str(ci.get("manual", ""))) for ci in supporting}
+            mine = [b for b in blocks if doc_stem(b["document"]) in names
+                    and (pages is None or b["page"] is None or b["page"] in pages)]
+            if not mine:
+                support = "not-supplied"              # the cited document's text never reached the model
+            else:
+                txt = " ".join(b["text"] + " " + b["section"] for b in mine).lower()
+                if must and any(present(txt, p) for p in must):
+                    support = "supported"
+                elif not must and len(content_terms_of(txt) & content_terms_of(ans)) >= 10:
+                    support = "supported"
+                else:
+                    support, _ = "unverified", review.append(
+                        "cited document supplied but its text does not carry a required phrase — source-based review")
+    if JUDGE_CITE_EXACT and len(exact) > 1 and support != "supported":
+        review.append(f"ambiguous expected manual {manual!r} → {len(exact)} corpus documents, support={support}")
+    ok_cite = bool(supporting) if (JUDGE_CITATION_ANY and (JUDGE_CITE_EXACT or pages is not None)) else cite_first
+    if JUDGE_CITE_EXACT and support == "not-supplied":
+        ok_cite = False                                # a filename with no supplied text is not support
+
+    # ── answer ──
+    cited_expected = bool(supporting)
+    decl_classes: dict[str, list[str]] = {}
+
     def excused(p: str) -> bool:
         if not (JUDGE_DECLINE_AWARE and p.lower() in DECLINE_PHRASES):
             return False
         if JUDGE_DECLINE_SCOPE:
-            return not decline_violates(ans, p, manual, cited_expected)
+            bad, classes = decline_violates(ans, p, manual, cited_expected, blocks)
+            decl_classes[p] = classes
+            if "review-needed" in classes:
+                review.append(f"missing-evidence claim not decidable automatically ({p!r}) — source-based review")
+            return not bad
         return has_substance(ans)
+
     forbidden_hit = [p for p in must_not
                      if p.lower() in ans
                      and not (JUDGE_NEGATION_AWARE and negated(ans, p))
                      and not excused(p)]
     ok_answer = all(present(ans, p) for p in must) and not forbidden_hit and j.get("gate") == "answer"
+    # .8 — action-specific checks: a required phrase must sit in the block that names ITS action, so an answer
+    # cannot pass because the words appear somewhere else in the text.
+    scope_fail: list[str] = []
+    if ok_answer and scoped_must:
+        from acceptance_wo import body_of, scopes_v7  # local import: the scoping machinery lives with the WO judge
+        sc = scopes_v7(body_of(raw, version=7))
+        for action, phrases in scoped_must.items():
+            blk = md_plain(sc.get(action, "")).lower()
+            for p in phrases:
+                if not present(blk, p):
+                    scope_fail.append(f"{action}:{p.split('||')[0]}")
+        if scope_fail:
+            ok_answer = False
     if cls == "xref" and re.search(r"refer to the ['‘\"]?[\w &-]+['’\"]? (sub-)?(sub-)?module", ans) and not re.search(r"^\s*\d+\.\s+(click|go to|select|open|use|enter)", ans, re.M):
         ok_answer = False  # judge tightened 14-Sep-2026: parroting the manual's pointer ("Refer to the X sub-module, follow the same procedure") is NOT an answer
-    ok_cite_top = cite_matches(top)
-    # Citation-anywhere applies ONLY to page-anchored cases. With pages=None the test is a manual-name substring, and a
-    # name can match a DIFFERENT document ("(Operational)" matches both the Sync and the Ship-Side notes), which would
-    # let a filename appearing anywhere in the citation list stand in for support. Page-anchored cases do not have that
-    # hole: manual + accepted page identifies one section.
-    ok_cite = (any(cite_matches(ci) for ci in cits) if (JUDGE_CITATION_ANY and pages is not None) else ok_cite_top)
     ok_attr = True
     if cls == "xref" and ok_answer:
         ok_attr = bool(re.search(r"(taken from|same as|from section|section \d+(\.\d+)+|see (the )?'?[\w &-]+'? (sub-)?(sub-)?module)", raw, re.I))
-    detail = (f"gate={j.get('gate')} cite={str(top.get('manual', '-'))[:26]} p{page_of(top)}"
-              + ("" if ok_cite_top or not ok_cite else " [expected page cited, not first]")
+
+    detail = (f"gate={j.get('gate')} cite={str(top.get('manual', '-'))[:26]} p{page_of(top)} support={support}"
+              + ("" if cite_first or not ok_cite else " [supporting citation present, not first]")
+              + (f" [scope fail: {scope_fail}]" if scope_fail else "")
               + (f" [must_not in negation: {forbidden_neg}]" if (forbidden_neg := [p for p in must_not if p.lower() in ans and JUDGE_NEGATION_AWARE and negated(ans, p)]) else "")
-              + (f" [decline scoped to another source, not a refusal: {excused_dec}]" if (excused_dec := [p for p in must_not if p.lower() in ans and p.lower() in DECLINE_PHRASES and p not in forbidden_hit and not (JUDGE_NEGATION_AWARE and negated(ans, p))]) else "")
+              + (f" [decline classes: {decl_classes}]" if decl_classes else "")
+              + (f" [REVIEW: {review}]" if review else "")
               + f" | {raw[:64]!r}")
-    return ok_answer, ok_cite, ok_attr, detail
+    return {"answer": ok_answer, "citation": ok_cite, "attribution": ok_attr, "detail": detail,
+            "cite_first": cite_first, "support": support, "review": review, "decline": decl_classes,
+            "scope_fail": scope_fail}
+
+
+def judge(j: dict, manual: str, page: tuple[int, ...] | int | None, must: list[str], must_not: list[str], cls: str,
+          supplied: str | None = None, scoped_must: dict[str, list[str]] | None = None) -> tuple[bool, bool, bool, str]:
+    """(answer ok, citation ok, attribution ok, detail) — the 4-tuple the runners use. See judge_ex for the rest."""
+    v = judge_ex(j, manual, page, must, must_not, cls, supplied, scoped_must)
+    return v["answer"], v["citation"], v["attribution"], v["detail"]
 
 
 async def main() -> int:

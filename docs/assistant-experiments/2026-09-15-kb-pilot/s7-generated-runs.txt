@@ -1,0 +1,78 @@
+===== S7 CORRECTED-CLAIMS RERUN 2026-09-18T18:09:10Z =====
+generated-docs suite 2026-09-18.4 · 14 cases · repeat=3
+
+[01 gen] In Bulk Data Import for jobs, do I have to fill in the Job Code column?
+   F0             answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'No. In Bulk Data Import for Jobs, the **Job Code** column is opt'
+   F1             answer ✗  cite ✓  PASS ✗ [0/3]  gate=answer cite=Technical - Bulk Data Impo pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'No. For Jobs, the **Job Code** column is optional. You may leave'
+
+[02 gen] Where do I find Bulk Data Import in the application?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p63 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical -' → 14 corpus documents, support=unverified"]] | 'In the PMS module:\n\n1. Open **Admin**.\n2. Select the **Bulk Data'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p63 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical -' → 14 corpus documents, support=unverified"]] | '1. In the PMS module, open **Admin**.\n2. Select the **Bulk Data '
+
+[03 gen] What does the dry-run show for each row in a bulk import, and when do I see the created and updated counts?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'The dry-run shows each row as:\n\n- **OK**\n- **Warning** — the row'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Bulk Data Impo pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'The dry-run shows each row as:\n\n- **OK** — valid for import.\n- *'
+
+[04 gen] In work-order numbers, what do the vessel code and the segment after it mean, and what does an unplanned work order number look like?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Ship-Side (Ves pNone support=unverified [supporting citation present, not first] [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual '(Operational)' → 4 corpus documents, support=unverified"]] | '- **Vessel code:** the code identifying the vessel; it appears a'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Ship-Side (Ves pNone support=unverified [supporting citation present, not first] [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual '(Operational)' → 4 corpus documents, support=unverified"]] | '- The **vessel code** is the vessel’s code, used as the prefix o'
+
+[05 gen] A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'The vessel code gets onto the ship through **provisioning**. If '
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'The vessel code reaches the ship through **provisioning**:\n\n1. *'
+
+[06 gen] Who can generate work orders from the office, and what happens if the vessel's switch is off?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'The excerpts support three office-side ways to create work order'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - KB pilot: Offi pNone support=unverified [supporting citation present, not first] [REVIEW: ['citation support unverified (no captured model input)']] | 'The office supports three ways to create work orders:\n\n1. **Gene'
+
+[07 gen] Can a Head of Department do everything an office user can do for their department?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'No. The excerpts do not show that a Head of Department can do ev'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'No. The excerpts do not support that a Head of Department can do'
+
+[08 gen] Is Level 2 Reviewer a user role I can assign?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'No. **Level 2 Reviewer is not a user role that a Sail Admin assi'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Roles & Permis pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'No. **Level 2 Reviewer is not a user role that a Sail Admin assi'
+
+[09 gen] Where is the Me / My Team toggle and who can use it?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p11 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical -' → 14 corpus documents, support=unverified"]] | '1. Open the **PMS Dashboard** and select the **Operation** tab. '
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p11 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical -' → 14 corpus documents, support=unverified"]] | 'The **Me / My Team** toggle is located in the **PMS Dashboard, o'
+
+[10 gen] On the Fleet Sync Overview, what does an amber status mean?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'Amber means the vessel has not synced for more than 24 hours. It'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'Amber means the vessel has not synced for more than 24 hours. It'
+
+[11 gen] Does one press of Sync Now clear a long backlog on the ship?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'No. One press of **Sync Now** may not clear a long backlog.\n\n1. '
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'Not necessarily. On the ship, one **Sync Now** press repeats pus'
+
+[12 gen] If a ship's vessel master data changes, how is the ship refreshed?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'If a ship’s vessel master data changes:\n\n1. A Sail Admin re-prov'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Sync (Operatio pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'If a ship’s vessel master data changes:\n\n1. On the office side, '
+
+[13 gen] On the ship, what happens if I enter a running-hours reading lower than the component's current hours when completing a work order?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Ship-Side (Ves pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'On the ship:\n\n1. **Normal entry:** The completion is refused wit'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Ship-Side (Ves pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'When completing a running-hours work order on the ship:\n\n1. If t'
+
+[14 gen] Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+   F0             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual '(Operational)' → 4 corpus documents, support=unverified"]] | 'The per-vessel switches are held on the **Lead Time & Grace Peri'
+   F1             answer ✓  cite ✓  PASS ✓ [3/3]  gate=answer cite=Technical - Recent Updates pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual '(Operational)' → 4 corpus documents, support=unverified"]] | 'The per-vessel switches are held on the **Lead Time & Grace Peri'
+
+== per-case (answer ∧ citation), out of 14 ==
+   case            F0           F1
+   01               ✗            ✗
+   02               ✓            ✓
+   03               ✓            ✓
+   04               ✓            ✓
+   05               ✓            ✓
+   06               ✓            ✓
+   07               ✓            ✓
+   08               ✓            ✓
+   09               ✓            ✓
+   10               ✓            ✓
+   11               ✓            ✓
+   12               ✓            ✓
+   13               ✓            ✓
+   14               ✓            ✓
+   F0             13/14
+   F1             13/14
+===== DONE 2026-09-18T18:11:44Z =====

@@ -1387,3 +1387,269 @@ one from §15.6 and is unchanged by this work.
 | earlier candidate containers `b0`/`d5a`/`d5` (8029–8031) | still running. They were stopped for about two minutes during this session by a container-stop filter of mine that matched more than intended, and restarted immediately; both were verified healthy afterwards. No live service was in that filter |
 | documents on the server | `documents/` untouched; the corrected file is staged in a separate `documents-r4/` |
 | keys | the dedicated `assistant-luna.env` key was used for the 4 new embeddings and for every answer; no key was borrowed, moved, written to disk or printed |
+
+## 17. Second reviewer GO of 18-Sep — bounded corrections and verification (candidate only; live, nginx, SMS RAG, other sites and shared credentials untouched; nothing deployed)
+
+Five bounded items: correct the citation scoring, keep each action's conditions and qualification together, finish
+the demonstrated scoring corrections, record the authorization finding separately, and rebuild and verify. Judge
+changes were validated on stored answers **before** any model call, as instructed. Every container operation in
+this session used an explicit container name — no `--filter` was used to stop anything.
+
+### 17.1 Item 1 — citation scoring corrected (base judge .8; `indexer/validate_judge8.py` → `base-judge8-validation.txt`)
+
+A supporting citation is now accepted **anywhere** in the user-visible list, and the acceptance is made stricter,
+not looser, in three ways:
+
+| | .7 | .8 |
+|---|---|---|
+| which document counts | the case's manual string appears **as a substring** of the citation name | the string is resolved against the corpus document list (`indexer/corpus_documents.txt`, 30 documents) and the citation must be that document **exactly** |
+| section / page | required only for page-anchored cases | unchanged — required wherever the case gives one |
+| does the cited text support the answer? | not tested | the cited document's text must have been **supplied to the model** and must carry a required phrase; otherwise the citation does not count |
+| first place in the list | conflated with the pass for unpaged cases | computed and reported **separately**, never folded into the pass |
+| undecidable | — | flagged REVIEW-NEEDED for source-based review, not passed or failed on a guess |
+
+"(Operational)" names four different corpus documents; "Technical -" names fourteen. A name-substring rule cannot
+tell them apart, which is why exact identity and a supplied-text test were added together.
+
+**Validated on 1,245 stored runs** across the 15-Sep and 18-Sep runs (1,239 of them with the captured model input).
+**18 verdicts change, all citation false → true, every one with `support=supported` and `first-source=False`** —
+that is, the answer was supported by the expected document, which was not listed first. They are corrected-claims
+case 04 on all three arms of both runs, and case 06 on the corrected-document arm, which is the case the reviewer
+raised. No verdict moves in the other direction.
+
+**Negative controls** (fixtures built from real stored answers — they show what the rule rejects, not that the
+situation occurs):
+
+| control | .7 citation | .8 citation |
+|---|---|---|
+| wrong document substituted in every citation | False | False |
+| **lookalike document** — another document matching the same name substring | **True** | **False** (support=not-supplied) |
+| lookalike document and its text not supplied | **True** | **False** |
+| right document cited, its text never supplied | True (on an unpaged case) | **False** |
+| page-anchored case, every page forced to 999 | False | False |
+
+The second row is the point of the change: under .7 a citation naming *any* "(Operational)" document satisfied an
+"(Operational)" case. Under .8 it does not, because the name must resolve to that exact document and its text must
+have reached the model.
+
+### 17.2 Item 2 — conditions and qualification kept together (`generated-docs/R5/`, `build_r5.py`, `R5/PROVENANCE.md`; KB files in `kb/technical/work-orders/`)
+
+**The defect, measured.** The captured input for the generation question ended:
+
+```
+* Applies to all of the above: n
+```
+
+Cause, in the chunker (`indexer/chunking.py`, unchanged): it splits **each page's** markdown by headings, then cuts
+each section into 1200-character pieces with 150 overlap. R4's single section was ~1,900 characters and crossed a
+page break, so it was char-split *and* its tail was orphaned into a headingless "Preamble" chunk.
+
+**The fix is structural, not editorial.** §1.1.14.6 is now a short lead plus **five sub-sections, one per action**,
+each on its own page, each carrying its own role, switch and job-state conditions **and its own enforcement
+qualification**. The document got longer, not shorter (38 → 50 paragraphs, 4 → 7 parsed pages); nothing was cut to
+improve ranking, and every `[code: …]` reference is preserved. Every paragraph outside the section is
+byte-identical to the revision it was built from.
+
+Measured in the new index set:
+
+| page | section | chars | carries its enforcement note |
+|---|---|---|---|
+| 2 | 1.1.14.6 lead | 342 | yes |
+| 3 | 1.1.14.6.1 Generate Now | 1087 | **yes** |
+| 4 | 1.1.14.6.2 refusal messages | 635 | (messages) |
+| 5 | 1.1.14.6.3 per-job Generate WO | 1006 | **yes** |
+| 6 | 1.1.14.6.4 Unplanned | 550 | **yes** |
+| 7 | 1.1.14.6.5 Ship generation | 251 | (no role or switch condition) |
+
+**Headingless "Preamble" chunks for this document: 0** (R4 produced one), and no section exceeds the 1200-character
+piece, so no action can be char-split away from its qualification.
+
+**KB files reconciled.** The KB pilot procedures stated the refusal unconditionally ("the other two roles see a
+button whose every click is refused"). Three files now carry the same enforcement qualification as the document,
+with the policy wording unchanged and every code reference preserved: `office-generate-now.md`,
+`how-work-orders-are-created.md`, `office-generate-wo-per-job.md`. The other two KB files were not changed and
+their stored vectors were reused.
+
+### 17.3 Item 3 — the demonstrated scoring corrections, finished
+
+**(a) Missing-evidence claims are now tested against the supplied excerpts.** .7 used a proxy — "does the answer
+cite the expected manual?" — which is exactly what the reviewer said not to use. .8 parses the captured
+`Manual excerpts:` block, takes the distinctive content words of the sentence that claims something is missing, and
+asks whether those words are in what was supplied:
+
+| result | meaning | verdict |
+|---|---|---|
+| the supplied excerpts do carry it | the claim is false | fail |
+| they do not | the statement is honest | not a violation |
+| no captured input, or fewer than two distinctive terms | not decidable | **REVIEW-NEEDED**, neither passed nor failed |
+
+Over the stored runs, seven sentences assert a missing-evidence phrase. Five keep their class; **two change, and in
+opposite directions** — which is the point:
+
+| run | sentence | .7 | .8 |
+|---|---|---|---|
+| s5 · D5a · pmsvessel-3 r3 | "The detailed Store transaction steps are not covered in the provided documentation." | contradicted-by-own-citation | **false-evidence** — the supplied text carries "Store", "transaction" and "steps" |
+| s6 · E1 · pmsvessel-3 r1 | "…it is not documented as a completely separate update workflow." | contradicted-by-own-citation | **limitation** — the supplied text really does not say that |
+
+Answer length, citation presence and the absence of a preferred citation no longer enter the test at all.
+
+**(b) The "mandatory" / "fields marked *" correction is applied.** `PHRASE_EQUIV` is a documented, versioned table
+of wordings that satisfy a required phrase; "mandatory" is satisfied by "fields marked with *", "marked with an
+asterisk", "marked (*)" and so on. This changes how an answer is **matched**, not what the question requires, which
+is why a frozen suite can take it. It is applied identically to both arms and the earlier scores are preserved
+(`JUDGE_PHRASE_EQUIV=False` reproduces them). Its effect on the 18-Sep run: fresh validation `fresh-audit-1` stops
+failing on the literal word — a gain for the **baseline** arm, not for the candidate.
+
+**(c) Action-specific permission checks are retained and tightened.** Corrected-claims case 06 previously required
+its phrases anywhere in the answer. In suite version `2026-09-18.4` the requirements are **action-scoped** through
+the same block-scoping machinery the work-order judge uses (`acceptance_wo.scopes_v7`): "sail admin" must sit in the
+block that names **Generate Now**, and the no-role-check statement must sit in the block that names **per-job
+Generate WO**. An answer can no longer pass because the required words exist somewhere in the text.
+
+### 17.4 Item 4 — the authorization finding, recorded separately (`docs/SECURITY-FINDING-2026-09-18-wo-generation-role.md`)
+
+Written as its own note rather than as a line in a user document. In summary, all **READ** from source at
+`origin/replit_dev` @ `44c8fccad`:
+
+- **Intended policy:** office 'Generate Now' is restricted to Sail Admin, on top of a per-vessel switch that is off
+  by default and fails closed.
+- **Effective enforcement:** the gate resolves the role as `forwardedRole || user.role`. `forwardedRole` comes from
+  the `x-user-role` request header; `user.role` is the fixed string `"Sail Admin"`. **A request with no role header
+  is evaluated as a Sail Admin.** Every other condition in the same function fails closed; this one fails open.
+- The gate reads `req.user`, the legacy field the middleware comment reserves for business logic, rather than
+  `req.rbac`, the Phase-0 identity that reports `role: null` when nothing was forwarded and would have refused.
+- `PMS_AUTH_MOCK_RBAC` drives `req.rbac` and therefore does **not** affect this gate. An earlier draft of the
+  document correction cited it here and was wrong; that is recorded rather than quietly fixed.
+- **Limits, stated in the note:** no production or customer installation was accessed; whether a proxy strips or
+  sets `x-user-role` before requests reach the application was not inspected; the local pilot was down and its
+  authentication does not generalise. **No claim is made that production exposure exists.** The note says what one
+  request against an owner-nominated deployment would settle, and names a one-function candidate fix — neither was
+  done.
+- Roughly a dozen other server files read `user.role`; whether any has the same open fallback was **not**
+  determined and no claim is made about them.
+
+No application authentication or permission code was changed by this work.
+
+### 17.5 Item 5 — rebuild and verification (`run-s7-suites.sh` → `s7-runs.txt`, `s7-generated-runs.txt`, `s7-*-dump.jsonl`, `s7-{f0,f1}-capture.jsonl`, `score8.py` → `score8-s7.txt`, `s7-input-identity.txt`, `s7-evidence-pack.txt`)
+
+**Exact candidate identities.** Both arms differ in the index set and in nothing else; the health endpoint confirms
+the prompt hash on each.
+
+| | F0 — pre-change v5 candidate | F1 — corrected |
+|---|---|---|
+| container name | `sail-assistant-py-f0` | `sail-assistant-py-f1` |
+| container id | `45647f6ba64fe6d2114a25abb752c0bb8291e35d81f66e6f40522d16a25d4966` | `3d78d1e6efab926f7b67c884cc4cbea8f8ea88393d7437b988f35d6a4de982c1` |
+| image | `sail-assistant-py:v6-r7` | `sail-assistant-py:v6-r7` |
+| prompt | v5, `docsPromptSha=ff9ee87141ac1362` | v5, `docsPromptSha=ff9ee87141ac1362` |
+| model | gpt-5.6-luna, `CHAT_TEMPERATURE=default` | same |
+| routing / selection | `ASSISTANT_ROUTE_INTENT=on`, `ASSISTANT_HYBRID=rescue` | same |
+| index set | `kb-pilot-c`, 916 chunks | **`kb-pilot-e`, 921 chunks** |
+| port | 127.0.0.1:8034 | 127.0.0.1:8035 |
+| capture | `~/central-assistant-py/s7-captures/f0` | `~/central-assistant-py/s7-captures/f1` |
+
+`kb-pilot-e` was built from the **exact indexed source revisions**: a row-for-row copy of `kb-pilot-c`, then only
+the changed sources re-indexed. Verified in the database — 0 chunk differences in every document that was not
+changed, exactly three KB files differ, and 9 of the re-indexed chunks' vectors came from the stored-vector cache
+(7 document + 2 KB) with 14 embedded. Nothing else was re-parsed or re-embedded.
+
+**Totals, both rules reported separately.** Scored offline with judge .8 against the captured inputs
+(`score8-s7.txt`); the rule each runner applies is named.
+
+| suite | runner's rule | F0 | F1 | the other rule (F0 → F1) | first-source (F0 → F1) |
+|---|---|---|---|---|---|
+| routing 13 | all three | 13 | 13 | — | — |
+| retrieval 18 | all three | 18 | 18 | — | — |
+| frozen 12 | majority | 12 | 12 | all-three 11 → **12** | 33/36 → 33/36 |
+| corrected claims 14 | majority | 13 | 13 | all-three 13 → 13 | 39/42 → **36/42** |
+| work orders 8 | all three | **8** | **6** | majority 8 → 8 | 24/24 → 24/24 |
+| manual coverage 57 | all three | **35** | **34** | majority 39 → 39 | 120/171 → 120/171 |
+| fresh validation 10 | all three | 10 | 10 | majority 10 → 10 | — |
+
+**Corrected-claims case 06 now passes on both arms**, which was the object of item 1: the answer is right, the
+corrected section is cited but not first, and the citation is accepted because its text was supplied and supports
+the answer. The first-source column carries the regression openly — 39/42 → 36/42, exactly the three runs of case
+06. Nothing is hidden by the pass.
+
+The only corrected-claims case failing anywhere is case 01 (Bulk Data Import job code), failing on all three runs
+of **both** arms, on the answer check with `support=supported`. Unchanged by this work and equal on both arms.
+
+**Attribution: which differences can be the change at all.** Of the 101 questions, **87 received byte-identical
+supplied excerpts in both arms; 14 received different ones** — every one of them a work-order or office-generation
+question, which is what restructuring that section should affect. On the 87 identical-input questions the two arms
+disagree on **18 of 228 paired runs**. That figure is the **observed pass/fail disagreement on identical supplied
+excerpts** for this run. It is not an accuracy margin and it is not a reason to dismiss any individual failure; it
+is used below only to say which differences *cannot* be attributed to the change.
+
+| changed case | inputs | reading |
+|---|---|---|
+| frozen case 8 (gain, all-three) | identical | inside the identical-input disagreement set |
+| manuals: `certsurveys-1`, `crewing-3`, `prep-2` (majority losses); `fs-ves-1`, `ra-office-3`, `ra-vessel-1` (majority gains); `master-review-1` (all-three loss) | identical, all seven | all seven appear individually in the identical-input disagreement list in `s7-input-identity.txt` |
+| **work orders `wo-phr-01` and `wo-phr-05` (all-three losses)** | **different** | **real — examined below** |
+
+**The two work-order losses, read against the full answers and the supplied excerpts**
+(`wo-judge-defects-s7.txt`, full text in `s7-evidence-pack.txt`). Both are one failing run of three, so both pass
+under the majority rule and fail under all-three. Both are **judge gaps, not answer defects**:
+
+1. `wo-phr-01` run 1 — "Generate WO switch stated without the office qualifier". The requirement sentence in the
+   per-job block *is* office-qualified: "in the **office**, the vessel's **office work-order generation** switch
+   must be on." The block fails because of a second, correct sentence — "The Ship does not have this switch
+   requirement." — which mentions "switch" without "office". The test requires every unit mentioning the word to
+   be office-qualified and has no negation awareness (the base judge has had it since .5). Removing only that
+   contrast sentence makes the test pass; the demonstration is in the file.
+2. `wo-phr-05` run 3 — "Sail Admin wrongly attached to Generate WO". The check at `acceptance_wo.py:293` is a bare
+   substring test. The only sentence in the per-job block containing "sail admin" says the restriction applies
+   "only to the relevant planned-generation actions, **not** to per-job Generate WO or unplanned work orders" —
+   the correct statement, and precisely the distinction the corrected document exists to make.
+
+Both were found **after** the run, on the arm they would help. Neither was patched. They are reported for the
+owner's decision, with the failing sentence quoted in each case.
+
+A first diagnosis of mine was wrong and is recorded rather than dropped: I first attributed both to markdown
+emphasis (the base judge strips `**`, the work-order judge does not). Re-running both answers with every `**`
+removed fails identically, so that explanation is false. The two causes above are the tested ones.
+
+**Confirmation that the complete qualification now reaches the model** (`chunking-before-after.txt`, from the
+captured requests, not from the document):
+
+- before (R4, arm E1): the section arrived in two pieces and the second ended `* Applies to all of the above: n`;
+- after (R5, arm F1): the model receives `1.1.14.6.1 Office 'Generate Now' — a whole vessel` as one block carrying
+  what it does, both conditions **and** the enforcement note in full, and `1.1.14.6` as a separate lead block.
+
+**Cases marked for source-based review rather than scored on a guess: 46**, all on runs that pass, in two groups —
+23 "cited document supplied but its text does not carry a required phrase" and 23 "ambiguous expected manual
+'Technical' → 14 corpus documents". Both belong to the work-order suite, whose cases name the expected manual as
+the bare string "Technical". That is a case-definition weakness the new exactness rule exposes; it is listed as an
+open defect rather than patched.
+
+### 17.6 Remaining defects
+
+1. **Two work-order judge gaps** (§17.5): no negation awareness in the office-qualifier test, and a bare substring
+   test for "sail admin" in the per-job block. Both demonstrated, neither patched.
+2. **The work-order cases name their expected manual as "Technical"**, which resolves to 14 corpus documents. Under
+   judge .8 those runs pass but are flagged for source-based review (46 flags). The cases should name the document
+   they mean; that is a case change and was not made here.
+3. **Corrected-claims case 01** fails on all three runs of both arms on the answer check, with the expected
+   document supplied and supporting. Pre-existing, unchanged, equal on both arms.
+4. **Corrected-claims case 04** expects the manual string "(Operational)", which names four documents; it passes
+   now under exact identity plus supplied-text support, but the case should name its document.
+5. **First-source ranking for case 06 is still behind the KB pilot file** (36/42 vs 39/42 on that suite). The
+   restructure did not restore first place and was not intended to — the owner's instruction was explicitly not to
+   shorten the document for ranking. Reported as a ranking fact, separate from the pass.
+6. **The Audit History routing defect** is unchanged and still open.
+7. **Observed pass/fail disagreement on identical supplied excerpts: 18 of 228 paired runs (7.9 %)** in this run
+   (25 of 297, 8.4 %, in the previous one). Comparisons on these suites need paired identical-input analysis or
+   many more repeats; single-run deltas are not evidence either way.
+
+### 17.7 State of the environment
+
+| what | state |
+|---|---|
+| live assistant (`sail-assistant-py-cand` :8017, `sail-assistant-py` :8015), nginx, SMS RAG, every other site | untouched; no configuration, route or credential changed |
+| application authentication and permissions | unchanged; code read only |
+| containers created | `sail-assistant-py-f0` (127.0.0.1:8034, `kb-pilot-c`) and `sail-assistant-py-f1` (127.0.0.1:8035, `kb-pilot-e`), loopback-bound, candidate-only |
+| earlier containers (`…-b0`, `…-d5a`, `…-d5`, `…-e0`, `…-e1`, 8029–8033) | left running, untouched |
+| container operations | every `docker run` / `docker rm` in this session named its container explicitly; no `--filter` was used to stop anything |
+| index sets | `kb-pilot-e` created (921). `kb-pilot-c`, `kb-pilot-d` and every other set untouched |
+| documents on the server | `documents/` untouched; R5 staged separately in `documents-r5/`, the reconciled KB files in `kb-r5/` |
+| keys | the dedicated `assistant-luna.env` key was used for the 14 new embeddings and every answer; no key borrowed, moved, written to disk or printed |
+| deployment | none |

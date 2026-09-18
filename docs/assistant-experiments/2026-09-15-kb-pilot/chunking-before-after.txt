@@ -1,0 +1,58 @@
+QUESTION: Who can generate work orders from the office, and what happens if the vessel's switch is off?
+
+==============================================================================================================
+BEFORE — R4, single section (arm E1, index kb-pilot-d)
+==============================================================================================================
+
+[2] (Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders — Conditions by Action)
+Generation, codes ROLE_NOT_PERMITTED, OFFICE_GENERATION_DISABLED, VESSEL_STATE_UNKNOWN]
+
+* Office per-job 'Generate WO' (Components → the component's job, choose a reason) — the vessel's 'office work-order generation' switch must be enabled, and the job must exist, be active and not already have an active work order; the reason must be Planning, Breakdown or Other. There is NO action-specific role check on this path: it does not go through the role gate. Any signed-in user with access to the vessel may use it while the switch is on. [code: jobService.generateWorkOrder → isOfficeWoGenerationEnabled only; jobDueScanner.generateWorkOrderForJob for the active-work-order check]
+
+* Unplanned work order ('+ Unplanned W\.O' on the Work Orders screen) — neither the Sail Admin rule nor the office generation switch applies to it. Normal sign-in and vessel access still apply. [code: the create path does not call the generation gate]
+
+* Ships always generate their own work orders on their daily scan, regardless of this switch; a ship instance is allowed through the gate without the role or switch test. [code: evaluateDirectGeneration returns allowed for isShip]
+
+* Applies to all of the above: n
+
+---
+
+[4] (Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders — Conditions by Action)
+* Office 'Generate Now' (Work Orders screen, one vessel selected) — runs an immediate, vessel-scoped generation instead of waiting for the daily sweep. Two conditions apply, both on the server: the caller's role must be Sail Admin, and that vessel's 'office work-order generation' switch must be enabled. The switch is off by default and is set on the 'Lead Time & Grace Period Settings' screen. [code: workOrderController.generateNow → workOrderGenerationGate.evaluateDirectGeneration; PROVISIONING_ROLE = 'Sail Admin'; isOfficeWoGenerationEnabled]
+
+* Refusals for 'Generate Now' are distinct. A caller who is not a Sail Admin is refused with: "Only a Sail Admin may generate work orders directly from the office." A Sail Admin acting on a vessel whose switch is off is refused with: "Office work-order generation is not enabled for this vessel. A Sail Admin can enable it per vessel on the Lead Time & Grace Period Settings screen." A vessel whose provisioning state cannot be read is refused as well — the check fails closed. [code: evaluateDirectGeneration, codes ROLE_NOT_PERMITTED, OFFICE_GENERATION_DISABLED, VESSEL_STATE_UNKNOWN]
+
+* Office per-job 'Generate WO' (Components → the component's
+
+---
+
+(excerpt blocks from this document in the supplied input: 2)
+
+==============================================================================================================
+AFTER  — R5, one page per action (arm F1, index kb-pilot-e)
+==============================================================================================================
+
+[3] (Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders — Conditions by Action)
+* Work orders can be produced from the office in two different ways, and created directly in a third. The conditions are NOT the same for all of them, so each is stated separately below with its own role, switch and job-state conditions and its own enforcement note. Normal sign-in and access to the vessel are required for every one of them.
+
+---
+
+[4] (Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6.1 Office 'Generate Now' — a whole vessel)
+* What it does: on the Work Orders screen, with one vessel selected, 'Generate Now' runs an immediate, vessel-scoped generation instead of waiting for the daily sweep. [code: `workOrderController.generateNow` → `workOrderGenerationGate.evaluateDirectGeneration`]
+
+* Conditions, both checked on the server: the caller's role must be Sail Admin, and that vessel's 'office work-order generation' switch must be enabled. The switch is off by default and a Sail Admin sets it per vessel on the 'Lead Time & Grace Period Settings' screen. [code: `PROVISIONING_ROLE = 'Sail Admin'`; `isOfficeWoGenerationEnabled`]
+
+* Enforcement: the gate tests the role the client forwards in the 'x-user-role' header; with no role header the server falls back to the built-in identity, which reports 'Sail Admin'. So this condition restricts only callers whose client forwards a role, and that value is caller-supplied, not verified. Read from source code; not measured on a running installation. [code: `resolveGateRole = forwardedRole || user.role`; `middleware/auth.ts` sets `req.user.role = 'Sail Admin'`]
+
+---
+
+(excerpt blocks from this document in the supplied input: 2)
+
+
+READING
+  BEFORE: the section was supplied in two pieces, and the second ends "* Applies to all of the above: n" — the
+  enforcement qualification is cut off after one character. Cause: the chunker splits each PAGE by headings and
+  then cuts each section at 1200 characters; the section was ~1,900 characters and crossed a page break.
+  AFTER: each action is its own section on its own page, so each excerpt block carries that action's conditions
+  AND its enforcement note, complete. No headingless fragment of this document exists in the new index.
+

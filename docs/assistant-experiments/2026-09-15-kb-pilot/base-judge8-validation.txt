@@ -1,0 +1,52 @@
+== A. judge .7 → .8 on 1245 stored runs (1239 with a captured model input)
+
+  CHANGED s6     generated  E0             case 4                  run 1: citation False→True (support=supported, first-source=False)
+  CHANGED s6     generated  E0             case 4                  run 2: citation False→True (support=supported, first-source=False)
+  CHANGED s6     generated  E0             case 4                  run 3: citation False→True (support=supported, first-source=False)
+  CHANGED s6     generated  E1             case 4                  run 1: citation False→True (support=supported, first-source=False)
+  CHANGED s6     generated  E1             case 4                  run 2: citation False→True (support=supported, first-source=False)
+  CHANGED s6     generated  E1             case 4                  run 3: citation False→True (support=supported, first-source=False)
+  CHANGED s6     generated  E1             case 6                  run 1: citation False→True (support=supported, first-source=False)
+  CHANGED s6     generated  E1             case 6                  run 2: citation False→True (support=supported, first-source=False)
+  CHANGED s6     generated  E1             case 6                  run 3: citation False→True (support=supported, first-source=False)
+  CHANGED s5     generated  B0             case 4                  run 1: citation False→True (support=supported, first-source=False)
+  CHANGED s5     generated  B0             case 4                  run 2: citation False→True (support=supported, first-source=False)
+  CHANGED s5     generated  B0             case 4                  run 3: citation False→True (support=supported, first-source=False)
+  CHANGED s5     generated  D5a            case 4                  run 1: citation False→True (support=supported, first-source=False)
+  CHANGED s5     generated  D5a            case 4                  run 2: citation False→True (support=supported, first-source=False)
+  CHANGED s5     generated  D5a            case 4                  run 3: citation False→True (support=supported, first-source=False)
+  CHANGED s5     generated  D5             case 4                  run 1: citation False→True (support=supported, first-source=False)
+  CHANGED s5     generated  D5             case 4                  run 2: citation False→True (support=supported, first-source=False)
+  CHANGED s5     generated  D5             case 4                  run 3: citation False→True (support=supported, first-source=False)
+
+  total changed verdicts: 18
+  review-needed flags: 3
+        3  ambiguous expected manual 'Risk Assessment'
+
+== B. negative controls (FIXTURES built from real stored answers — they show what the rule rejects,
+      not that the situation occurs in production)
+
+  control base: generated case 4 E0 run 1 — expected '(Operational)'
+    wrong document (a different corpus document substituted in every citation)
+       .7 citation=False   .8 citation=False (support=not-checked, first-source=False)
+    lookalike document (another document matching the same name substring)
+       .7 citation=True   .8 citation=False (support=not-supplied, first-source=True)
+    lookalike document AND its text not supplied (the combination a name rule cannot catch)
+       .7 citation=True   .8 citation=False (support=not-supplied, first-source=True)
+    right document cited, its text never supplied (excerpts emptied)
+       .7 citation=False   .8 citation=False (support=not-supplied, first-source=False)
+
+  page-anchored control: frozen case 1 E0 run 1 (expected 'Preparation' p(15,)) with every page forced to 999
+       .7 citation=False   .8 citation=False
+
+== C. every asserted missing-evidence sentence: .7 class → .8 class (decided on the supplied excerpts)
+
+  s6     manuals   E1             case pmsvessel-3      run 1: contradicted-by-own-citation → limitation
+     so, stores has its own entry point and button, but it is not documented as a completely separate update workflow.
+  s5     manuals   D5a            case pmsvessel-3      run 3: contradicted-by-own-citation → false-evidence
+     the detailed store transaction steps are not covered in the provided documentation.
+
+  transition counts (.7 → .8):
+        5  limitation → limitation
+        1  contradicted-by-own-citation → limitation
+        1  contradicted-by-own-citation → false-evidence

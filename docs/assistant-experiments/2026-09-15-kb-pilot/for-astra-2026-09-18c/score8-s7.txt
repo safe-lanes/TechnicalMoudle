@@ -1,0 +1,84 @@
+Judge .8 (exact document identity + supplied-excerpt support + supplied-excerpt missing-evidence test + documented phrase equivalence), work-order judge .12, corrected-claims cases 2026-09-18.4.
+Captures loaded for: F0, F1. Scored from stored answers; no model calls.
+
+== answers  (12 cases; the runner applies: majority)
+   F0               majority  12/12   all-three  11/12   runs  35/36   first-source 33/36 runs
+   F1               majority  12/12   all-three  12/12   runs  36/36   first-source 33/36 runs
+      [all] GAIN  case 8                  F0 [PPf] -> F1 [PPP]
+
+== fresh  (10 cases; the runner applies: all)
+   F0               majority  10/10   all-three  10/10   runs  30/30
+   F1               majority  10/10   all-three  10/10   runs  30/30
+
+== generated  (14 cases; the runner applies: majority)
+   F0               majority  13/14   all-three  13/14   runs  39/42   first-source 39/42 runs
+   F1               majority  13/14   all-three  13/14   runs  39/42   first-source 36/42 runs
+
+== manuals  (57 cases; the runner applies: all)
+   F0               majority  39/57   all-three  35/57   runs 119/171   first-source 120/171 runs
+   F1               majority  39/57   all-three  34/57   runs 117/171   first-source 120/171 runs
+      [majority] LOSS  case certsurveys-1      F0 [PPf] -> F1 [fPf]
+      [majority] LOSS  case crewing-3          F0 [PfP] -> F1 [Pff]
+      [majority] GAIN  case fs-ves-1           F0 [ffP] -> F1 [PfP]
+      [majority] LOSS  case prep-2             F0 [PfP] -> F1 [fff]
+      [majority] GAIN  case ra-office-3        F0 [Pff] -> F1 [PfP]
+      [majority] GAIN  case ra-vessel-1        F0 [Pff] -> F1 [fPP]
+      [all] LOSS  case master-review-1    F0 [PPP] -> F1 [PPf]
+
+== routing  (13 cases; the runner applies: all)
+   F0               majority  13/13   all-three  13/13   runs  13/13
+   F1               majority  13/13   all-three  13/13   runs  13/13
+
+== wo  (8 cases; the runner applies: all)
+   F0               majority   8/8   all-three   8/8   runs  24/24   first-source 24/24 runs
+   F1               majority   8/8   all-three   6/8   runs  22/24   first-source 24/24 runs
+      [all] LOSS  case wo-phr-01          F0 [PPP] -> F1 [fPP]
+      [all] LOSS  case wo-phr-05          F0 [PPP] -> F1 [PPf]
+
+== REVIEW-NEEDED (not decided automatically; source-based review required): 46
+   wo         F0     case wo-generic-01      run 1: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-generic-01      run 1: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-generic-01      run 2: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-generic-01      run 2: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-generic-01      run 3: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-generic-01      run 3: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-generic-03      run 1: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-generic-03      run 1: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-generic-03      run 2: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-generic-03      run 2: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-generic-03      run 3: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-generic-03      run 3: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-phr-01          run 1: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-phr-01          run 1: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-phr-01          run 2: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-phr-01          run 2: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-phr-01          run 3: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-phr-01          run 3: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-phr-03          run 1: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-phr-03          run 1: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-phr-03          run 2: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-phr-03          run 2: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F0     case wo-phr-03          run 3: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F0     case wo-phr-03          run 3: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-generic-01      run 1: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-generic-01      run 1: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-generic-01      run 2: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-generic-01      run 2: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-generic-01      run 3: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-generic-01      run 3: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-generic-03      run 1: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-generic-03      run 1: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-generic-03      run 2: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-generic-03      run 2: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-generic-03      run 3: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-generic-03      run 3: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-phr-01          run 2: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-phr-01          run 2: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-phr-01          run 3: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-phr-01          run 3: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-phr-03          run 1: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-phr-03          run 1: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-phr-03          run 2: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-phr-03          run 2: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified
+   wo         F1     case wo-phr-03          run 3: cited document supplied but its text does not carry a required phrase — source-based review
+   wo         F1     case wo-phr-03          run 3: ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified

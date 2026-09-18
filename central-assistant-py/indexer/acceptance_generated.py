@@ -35,7 +35,18 @@ from acceptance_answers import ask, judge  # noqa: E402
 #     verbatim refusal message the corrected document now documents ("Only a Sail Admin may generate work orders
 #     directly from the office."), which a correct answer may quote. The required split rejects the blanket answer on
 #     its own — a blanket answer cannot state the per-job exception.
-GEN_SUITE_VERSION = "2026-09-18.3"
+# .4 (18-Sep-2026, second reviewer GO): the case-06 requirements are now ACTION-SCOPED. Requiring the phrases
+#     anywhere in the answer let a text pass because the words existed somewhere; each condition must now sit in the
+#     block that names its own action (scoping machinery shared with the work-order judge, acceptance_wo.scopes_v7).
+#     SCOPED_MUST below is applied on top of the flat `must` list, never instead of it.
+GEN_SUITE_VERSION = "2026-09-18.4"
+NO_ROLE_CHECK = ("no role check||no role-check||does not require a specific role||no specific role"
+                 "||without a role check||no role restriction||not restricted by role||does not check the role"
+                 "||no special role||no particular role||no role is required||any signed-in user||any user with access")
+# case number -> {action key (acceptance_wo.ACTIONS): required phrases inside THAT action's block}
+SCOPED_MUST: dict[int, dict[str, list[str]]] = {
+    6: {"GN": ["sail admin"], "GW": [NO_ROLE_CHECK]},
+}
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (class, question, module, expected manual substring, pages, must, must_not, source)
 CASES: list[tuple[str, str, str, str, tuple[int, ...] | None, list[str], list[str], str]] = [
@@ -56,10 +67,7 @@ CASES: list[tuple[str, str, str, str, tuple[int, ...] | None, list[str], list[st
      "R3 §1.1.14.1: vessel code reaches a ship only through provisioning; 'Sync All' does not (SYNC-ARCHITECTURE.md:24-27). R2 said run Sync Masters."),
     ("gen", "Who can generate work orders from the office, and what happens if the vessel's switch is off?",
      "technical", "Recent Updates", None,
-     ["generate now", "sail admin", "not enabled", "generate wo",
-      "no role check||no role-check||does not require a specific role||no specific role||without a role check"
-      "||no role restriction||not restricted by role||does not check the role||no special role||no particular role"
-      "||no role is required||any signed-in user||any user with access"],
+     ["generate now", "sail admin", "not enabled", "generate wo", NO_ROLE_CHECK],
      NOT_COVERED,
      "R4 §1.1.14.6 (corrected 18-Sep-2026, see generated-docs/R4/PROVENANCE.md): the conditions differ BY ACTION — "
      "office 'Generate Now' needs role Sail Admin AND the vessel's office work-order generation switch "
@@ -111,7 +119,8 @@ async def main() -> int:
             runs = [await asyncio.gather(*(ask(c, u, key, q, module) for _, u in sets)) for _ in range(args.repeat)]
             row: dict[str, bool] = {}
             for si, (n, _) in enumerate(sets):
-                verdicts = [judge(runs[r][si], manual, page, must, must_not, cls) for r in range(args.repeat)]
+                verdicts = [judge(runs[r][si], manual, page, must, must_not, cls,
+                                  scoped_must=SCOPED_MUST.get(i)) for r in range(args.repeat)]
                 if dump:
                     for r in range(args.repeat):
                         dump.write(json.dumps({"suite": "generated", "case": i, "question": q, "set": n, "run": r + 1,
