@@ -43,6 +43,7 @@ export function WorkOrderDateInput({
   const inputId = React.useId();
   const errorId = `${inputId}-error`;
   const lastEmittedValue = React.useRef<string | null>(null);
+  const pickerRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     const canonicalValue = workOrderDateInputValue(value);
@@ -95,6 +96,20 @@ export function WorkOrderDateInput({
     }
   };
 
+  const openDatePicker = () => {
+    const picker = pickerRef.current;
+    if (!picker) return;
+
+    if (typeof picker.showPicker === 'function') {
+      picker.showPicker();
+      return;
+    }
+
+    // Older browsers do not expose showPicker(), but still open the native
+    // date control when it receives a click from this user interaction.
+    picker.click();
+  };
+
   const invalid = Boolean(ariaInvalid || manualError);
   const visibleInputProps = {
     type: 'text',
@@ -120,6 +135,7 @@ export function WorkOrderDateInput({
       { className: 'relative' },
       React.createElement(Input, visibleInputProps),
       !disabled && React.createElement('input', {
+        ref: pickerRef,
         type: 'date',
         value: machineValue,
         max,
@@ -128,19 +144,26 @@ export function WorkOrderDateInput({
           setDraftValue(formatWorkOrderDateDDMMYYYY(event.target.value));
           emitChange(event.target.value);
         },
-        className: 'absolute inset-y-0 right-0 z-10 h-full w-10 cursor-pointer opacity-0',
-        'aria-label': ariaLabel ? `${ariaLabel} calendar` : 'Open date picker',
+        className: 'sr-only',
+        tabIndex: -1,
+        'aria-hidden': true,
         'aria-invalid': invalid,
         'data-testid': testId ? `${testId}-picker` : undefined,
       }),
       !disabled && React.createElement(
-        'span',
+        'button',
         {
-          className: 'pointer-events-none absolute inset-y-0 right-3 z-20 flex items-center text-gray-500',
+          type: 'button',
+          onClick: openDatePicker,
+          className: 'absolute inset-y-0 right-0 z-10 inline-flex w-10 cursor-pointer items-center justify-center rounded-r-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          'aria-label': ariaLabel ? `Open ${ariaLabel} calendar` : 'Open date picker',
+          'data-testid': testId ? `${testId}-picker-trigger` : undefined,
+        },
+        React.createElement(CalendarDays, {
+          className: 'h-4 w-4',
           'aria-hidden': true,
           'data-testid': testId ? `${testId}-picker-icon` : undefined,
-        },
-        React.createElement(CalendarDays, { className: 'h-4 w-4' }),
+        }),
       ),
     ),
     manualError && React.createElement(
