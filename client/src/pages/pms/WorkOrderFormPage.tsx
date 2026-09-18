@@ -320,7 +320,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const displayedPartANextDueRH =
     resolvedMode !== 'template'
       && !isNewJobCreation
-      && templateData.maintenanceBasis === 'Running Hours'
+      && (templateData.maintenanceBasis === 'Running Hours' || templateData.maintenanceBasis === 'Dual Frequency')
       ? ((workOrderContext as any)?.templateData?.partANextDueRH || '')
       : templateData.nextDueReading;
 
@@ -5857,26 +5857,35 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm font-medium text-gray-700" data-testid="WOF.B2.4"><Marker id="WOF.B2.4" />B2.1 Work Duration:</h4>
                   {(() => {
+                    const maintenanceBasis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
+                    const hasCalendarDue = maintenanceBasis !== 'Running Hours' && !!displayedPartANextDueDate;
+                    const hasRhDue =
+                      (maintenanceBasis === 'Running Hours' || maintenanceBasis === 'Dual Frequency')
+                      && !!displayedPartANextDueRH;
                     const woDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime;
                     const isCompleted = currentWorkOrderStatus === 'Completed';
-                    if (isCompleted && displayedPartANextDueDate) {
+                    if (!hasCalendarDue && !hasRhDue) return null;
+                    if (isCompleted && hasCalendarDue) {
                       const formattedScheduled = formatWorkOrderDateDDMMYYYY(displayedPartANextDueDate, displayedPartANextDueDate);
                       const formattedCompletion = formatWorkOrderDateDDMMYYYY(woDateCompleted, '-');
                       return (
-                        <div className="text-sm text-gray-500 font-medium text-right" data-testid="text-due-date-detail">
+                        <div className="text-sm text-gray-500 font-medium text-right" data-testid="text-due-target-detail">
                           <div>Scheduled Due Date: <span className="text-gray-700">{formattedScheduled}</span></div>
+                          {hasRhDue && <div>Due RH: <span className="text-gray-700">{displayedPartANextDueRH} Hours</span></div>}
                           <div>Actual Completion: <span className="text-gray-700">{formattedCompletion}</span></div>
                         </div>
                       );
                     }
-                    if (displayedPartANextDueDate) {
-                      return (
-                        <span className="text-sm text-gray-500 font-medium" data-testid="text-due-date">
+                    return (
+                      <div className="text-sm text-gray-500 font-medium text-right" data-testid="text-due-target">
+                        {hasCalendarDue && <div>
                           Due Date: <span className="text-gray-700">{formatWorkOrderDateDDMMYYYY(displayedPartANextDueDate, displayedPartANextDueDate)}</span>
-                        </span>
-                      );
-                    }
-                    return null;
+                        </div>}
+                        {hasRhDue && <div>
+                          Due RH: <span className="text-gray-700">{displayedPartANextDueRH} Hours</span>
+                        </div>}
+                      </div>
+                    );
                   })()}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -185,26 +185,28 @@ export function normalizePartADateForInput(
 export function resolveWorkOrderPartADates(
   workOrder: WorkOrderPartADateSource,
 ): WorkOrderPartADates {
-  const isRunningHoursOnly =
-    workOrder.maintenanceBasis?.trim().toLowerCase() === 'running hours';
+  const normalizedBasis = workOrder.maintenanceBasis?.trim().toLowerCase();
+  const hasCalendarLeg = normalizedBasis !== 'running hours';
+  const hasRunningHoursLeg =
+    normalizedBasis === 'running hours' || normalizedBasis === 'dual frequency';
 
   return {
     lastCompletedOn: normalizePartADateForInput(
       firstNonEmptyDate(workOrder.lastDoneDateSnapshot),
     ),
-    nextDueDate: isRunningHoursOnly
-      ? ''
-      : normalizePartADateForInput(
+    nextDueDate: hasCalendarLeg
+      ? normalizePartADateForInput(
           firstNonEmptyDate(
             workOrder.dueDateSnapshot,
             workOrder.dueDate,
             workOrder.nextDueDate,
           ),
-        ),
+        )
+      : '',
     lastCompletedRH: normalizePartARunningHours(
       firstNonEmptyRH(workOrder.rhLastDoneSnapshot),
     ),
-    nextDueRH: isRunningHoursOnly
+    nextDueRH: hasRunningHoursLeg
       ? normalizePartARunningHours(
           firstNonEmptyRH(
             workOrder.dueRhSnapshot,

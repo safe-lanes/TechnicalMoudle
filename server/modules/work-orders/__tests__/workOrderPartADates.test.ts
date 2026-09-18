@@ -72,16 +72,30 @@ describe('Work Order Part A snapshot dates', () => {
     });
   });
 
-  it('keeps calendar snapshots available for Dual Frequency work orders', () => {
+  it('keeps both calendar and RH snapshots available for Dual Frequency work orders', () => {
     expect(resolveWorkOrderPartADates({
       maintenanceBasis: 'Dual Frequency',
       lastDoneDateSnapshot: '01-Jan-2026',
       dueDateSnapshot: '01-Jul-2026',
+      dueRhSnapshot: '9500.00',
     })).toEqual({
       lastCompletedOn: '2026-01-01',
       nextDueDate: '2026-07-01',
       lastCompletedRH: '',
-      nextDueRH: '',
+      nextDueRH: '9500',
+    });
+  });
+
+  it('uses only Work Order-owned RH due fields for the Dual Frequency RH leg', () => {
+    expect(resolveWorkOrderPartADates({
+      maintenanceBasis: 'Dual Frequency',
+      dueDateSnapshot: '01-Jul-2026',
+      dueRhSnapshot: null,
+      cycleDueRhSnapshot: '9600.50',
+      nextDueReading: '9700',
+    })).toMatchObject({
+      nextDueDate: '2026-07-01',
+      nextDueRH: '9600.5',
     });
   });
 
