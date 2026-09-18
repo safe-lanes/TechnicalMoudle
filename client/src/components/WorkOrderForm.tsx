@@ -43,6 +43,7 @@ import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
 import { useRanks, ensureRankInOptions } from '@/hooks/useRanks';
 import { useResolvedUserName } from '@/hooks/useResolvedUserName';
 import { WorkOrderDateInput } from '@/components/pms/WorkOrderDateInput';
+import { isWorkOrderB3Applicable, sanitizeWorkOrderB3Fields } from '@shared/workOrderPayload';
 
 // Type for history mode payload
 export interface HistoryWorkOrderPayload {
@@ -59,6 +60,7 @@ interface WorkOrderFormProps {
   component?: {
     code: string;
     name: string;
+    rhCounterType?: string | null;
   };
   workOrder?: any; // For template/execution modes
   workOrderHistory?: HistoryWorkOrderPayload; // For history mode
@@ -232,6 +234,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   const isPartAReadOnly = mode === 'execution' || executionMode || isReadOnly;
 
   const isPartBReadOnly = isReadOnly || workOrder?.status === 'Completed' || workOrder?.status === 'Pending Approval';
+  const componentRhCounterType =
+    workOrder?.componentRhCounterType ?? workOrder?.rhCounterType ?? component?.rhCounterType;
+  const isB3Applicable = isWorkOrderB3Applicable(componentRhCounterType);
 
   // Template data (Part A)
   const [templateData, setTemplateData] = useState({
@@ -1438,11 +1443,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         return;
       }
 
-      if (templateData.maintenanceBasis === "Running Hours") {
-        if (!executionData.previousReading || !executionData.currentReading) {
+      if (isB3Applicable && templateData.maintenanceBasis === "Running Hours") {
+        if (!executionData.currentReading) {
           toast({
             title: "Validation Error",
-            description: "Previous and Current readings are required for Running Hours based WOs",
+            description: "Current Reading is required for Running Hours based WOs",
             variant: "destructive"
           });
           return;
@@ -1450,7 +1455,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       }
 
       // Current Reading must be a positive number ≥ 0
-      if (executionData.currentReading) {
+      if (isB3Applicable && executionData.currentReading) {
         const currentRHNum = parseFloat(executionData.currentReading);
         if (isNaN(currentRHNum) || currentRHNum < 0) {
           toast({
@@ -1461,29 +1466,6 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
           return;
         }
 
-        // Current Reading must be ≥ Previous Reading
-        if (executionData.previousReading) {
-          const previousRHNum = parseFloat(executionData.previousReading);
-          if (!isNaN(currentRHNum) && !isNaN(previousRHNum) && currentRHNum < previousRHNum) {
-            toast({
-              title: "Validation Error",
-              description: `Current Reading (${currentRHNum}) cannot be less than Previous Reading (${previousRHNum}). Running hours can only increase.`,
-              variant: "destructive"
-            });
-            return;
-          }
-
-          // Soft warning: large jump (> 2000 hrs above previous) may indicate a typo
-          if (!isNaN(currentRHNum) && !isNaN(previousRHNum) && (currentRHNum - previousRHNum) > 2000 && !currentReadingWarningAcknowledged) {
-            toast({
-              title: "Warning — Large Reading Jump",
-              description: `Current Reading (${currentRHNum}) exceeds Previous Reading (${previousRHNum}) by ${(currentRHNum - previousRHNum).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
-              variant: "destructive"
-            });
-            setCurrentReadingWarningAcknowledged(true);
-            return;
-          }
-        }
       }
 
       // B4 Validation: Qty Used must be a positive integer ≥ 1 if spare part row has data
@@ -1554,7 +1536,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         }
 
         const workOrderId = workOrder?.id || `new-${Date.now()}`;
-        const executionRecord = {
+        const executionRecord = sanitizeWorkOrderB3Fields({
           ...templateData,
           ...executionData,
           nextDueDate: recalculatedNextDueDate,
@@ -1564,7 +1546,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
           woExecutionId: executionData.woExecutionId || generateWOExecutionId(),
           templateCode: templateData.woTemplateCode || workOrder?.templateCode,
           submittedDate: new Date().toISOString().split('T')[0]
-        };
+        }, componentRhCounterType);
         
         onSubmit(workOrderId, { type: 'execution', data: executionRecord });
         
@@ -2902,22 +2884,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                   </div>
 
                   {/* B3. Running Hours (Conditional - for Running Hours and Dual Frequency WOs) */}
-                  {(templateData.maintenanceBasis === "Running Hours" || templateData.maintenanceBasis === "Dual Frequency") && (
+                  {isB3Applicable && (
                     <div className="border border-gray-200 rounded-lg p-4 mb-6">
                       <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>B3. Running Hours</h4>
                       
-                      <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label className="text-sm text-[#8798ad]">Previous reading *</Label>
-                          <Input 
-                            type="number" 
-                            value={executionData.previousReading}
-                            onChange={(e) => handleExecutionChange('previousReading', e.target.value)}
-                            disabled={isPartBReadOnly}
-                            placeholder="Enter previous hours reading"
-                            className="w-full" 
-                          />
-                        </div>
+                      <div className="grid grid-cols-1 gap-6">
                         <div className="space-y-2">
                           <Label className="text-sm text-[#8798ad]">Current Reading *</Label>
                           <Input 

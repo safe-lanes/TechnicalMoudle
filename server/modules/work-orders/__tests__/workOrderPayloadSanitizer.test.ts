@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   SERVER_MANAGED_WORK_ORDER_RH_FIELDS,
+  WORK_ORDER_B3_FIELDS,
+  isWorkOrderB3Applicable,
+  sanitizeWorkOrderB3Fields,
   stripServerManagedWorkOrderRhFields,
 } from '@shared/workOrderPayload';
 
@@ -47,4 +50,57 @@ describe('stripServerManagedWorkOrderRhFields', () => {
       rhSkipLatestRh: '725',
     });
   });
+});
+
+describe('Work Order B3 applicability', () => {
+  it.each([
+    ['MASTER', true],
+    ['master', true],
+    ['INHERITED', true],
+    ['NOT_RH_DRIVEN', false],
+    ['', false],
+    [undefined, false],
+  ])('maps counter type %s to applicability %s', (counterType, expected) => {
+    expect(isWorkOrderB3Applicable(counterType)).toBe(expected);
+  });
+
+  it('removes every B3 field for a Not Driven component without removing Completion RH', () => {
+    const input = {
+      runningHours: '700',
+      previousReading: '650',
+      runningHoursDifference: '50',
+      readingDate: '2026-04-20',
+      currentReadingDate: '2026-04-20',
+      currentReading: '700',
+      woCompletionRh: '675',
+      workCarriedOut: 'Completed planned maintenance safely.',
+    };
+
+    const result = sanitizeWorkOrderB3Fields(input, 'NOT_RH_DRIVEN');
+
+    for (const field of WORK_ORDER_B3_FIELDS) {
+      expect(result).not.toHaveProperty(field);
+    }
+    expect(result).toMatchObject({
+      woCompletionRh: '675',
+      workCarriedOut: input.workCarriedOut,
+    });
+    expect(input).toHaveProperty('currentReading', '700');
+  });
+
+  it.each(['MASTER', 'INHERITED'])(
+    'keeps applicable B3 values but removes Previous Reading for %s',
+    (counterType) => {
+      const result = sanitizeWorkOrderB3Fields({
+        currentReading: '700',
+        currentReadingDate: '2026-04-20',
+        previousReading: '650',
+      }, counterType);
+
+      expect(result).toEqual({
+        currentReading: '700',
+        currentReadingDate: '2026-04-20',
+      });
+    },
+  );
 });

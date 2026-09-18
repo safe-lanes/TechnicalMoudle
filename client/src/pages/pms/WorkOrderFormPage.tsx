@@ -64,7 +64,11 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { generateSuggestions, extractContextFromWorkOrder, type WorkOrderContext } from "@/utils/suggestionEngine";
 import { FEATURES, IHM_ACTIONS } from '@/config/features';
 import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
-import { stripServerManagedWorkOrderRhFields } from '@shared/workOrderPayload';
+import {
+  isWorkOrderB3Applicable,
+  sanitizeWorkOrderB3Fields,
+  stripServerManagedWorkOrderRhFields,
+} from '@shared/workOrderPayload';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
 import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
 import { SectionBlock } from '@/components/SectionBlock';
@@ -971,7 +975,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Task #245: RH-required/load gates fire ONLY for explicitly RH-driven counter types.
   // Unknown ('') and NOT_RH_DRIVEN are treated as non-blocking so a slow/failed
   // /running-hours/current call can never wrongly block a NOT_RH_DRIVEN work order.
-  const isRhDrivenCounter = componentRhCounterType === 'MASTER' || componentRhCounterType === 'INHERITED';
+  const isRhDrivenCounter = isWorkOrderB3Applicable(componentRhCounterType);
   const isWoCompletionRhRequired = requiresWoCompletionRh(
     templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis,
     componentRhCounterType,
@@ -1457,7 +1461,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const res = await fetch('/technical/api/running-hours/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ machineryId: componentId, completionDate: dateToUse, runningHours: Number(rhValue), previousReading: executionData.previousReading ? Number(executionData.previousReading) : undefined })
+        body: JSON.stringify({ machineryId: componentId, completionDate: dateToUse, runningHours: Number(rhValue) })
       });
       const result = await res.json();
       if (result.rhCounterType) setComponentRhCounterType(String(result.rhCounterType).toUpperCase());
@@ -2713,7 +2717,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if (currentRHValue) {
+      if (isRhDrivenCounter && currentRHValue) {
         const currentRHNum = parseFloat(currentRHValue);
         if (isNaN(currentRHNum) || currentRHNum < 0) {
           hardErrors.push("Current Reading must be a positive number (≥ 0).");
@@ -2834,22 +2838,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter) {
-        if (!draftIntent && componentActualRHStatus === 'loading') {
-          hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
-        } else if (!draftIntent && componentActualRHStatus === 'error') {
-          hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
-        }
-        // The flat "exceeds component actual RH" ceiling was removed (Task #245). MASTER readings
-        // advance the counter and INHERITED is governed by timeline validation, so the only RH gate
-        // here is the server timeline result surfaced via rhValidation.status below.
-      }
-
-      if (rhBackdateError && !isRejectedWO) {
+      if (isRhDrivenCounter && rhBackdateError && !isRejectedWO) {
         hardErrors.push(rhBackdateError);
       }
 
-      if (rhValidation.status === 'invalid' && !isRejectedWO) {
+      if (isRhDrivenCounter && rhValidation.status === 'invalid' && !isRejectedWO) {
         hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
       }
 
@@ -2882,8 +2875,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       if (draftIntent) {
         const saveExecutionData = {
-          ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
-          runningHours: currentRHValue || executionData.runningHours,
+          ...sanitizeWorkOrderB3Fields(
+            stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
+            componentRhCounterType,
+          ),
+          ...(isRhDrivenCounter ? { runningHours: currentRHValue || executionData.runningHours } : {}),
           riskAssessmentStatus: executionData.riskAssessment,
           safetyChecklistsStatus: executionData.safetyChecklists,
           operationalFormsStatus: executionData.operationalForms,
@@ -2935,8 +2931,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       } else {
         if (isDraftSave && !hasCompletionData) {
           const saveExecutionData = {
-            ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
-            runningHours: currentRHValue || executionData.runningHours,
+            ...sanitizeWorkOrderB3Fields(
+              stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
+              componentRhCounterType,
+            ),
+            ...(isRhDrivenCounter ? { runningHours: currentRHValue || executionData.runningHours } : {}),
             riskAssessmentStatus: executionData.riskAssessment,
             safetyChecklistsStatus: executionData.safetyChecklists,
             operationalFormsStatus: executionData.operationalForms,
@@ -2979,45 +2978,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             description: `The following fields are required: ${missingFields.join(', ')}.`,
             variant: "destructive",
           });
-          return;
-        }
-      }
-
-      if (currentRHValue && executionData.previousReading) {
-        const currentRH = parseFloat(currentRHValue);
-        const previousRH = parseFloat(executionData.previousReading);
-
-        if (!isNaN(currentRH) && !isNaN(previousRH) && currentRH < previousRH) {
-          toast({
-            title: "Validation Error",
-            description: `Current Reading (${currentRH}) cannot be less than Previous Reading (${previousRH}). Running hours can only increase.`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Warning-only: compute the "large jump" against the component's ACTUAL current RH, not a
-        // previousReading that can still be 0/empty on the first submit (which produced a false
-        // "0 → 9500" jump). Prefer previousReading when it holds a real value; otherwise fall back to
-        // the already-loaded component RH (lastCompletedCurrentReading / currentCumulativeRH), which is
-        // available before the first submit. Skip the warning if no valid baseline exists rather than
-        // compute against 0. Does NOT affect the save or the range validation above.
-        const jumpBaselineRaw =
-          (executionData.previousReading && parseFloat(executionData.previousReading) > 0)
-            ? executionData.previousReading
-            : ((workOrderContext as any)?.templateData?.lastCompletedCurrentReading
-                ?? ((workOrderContext as any)?.component?.currentCumulativeRH != null
-                     ? String((workOrderContext as any).component.currentCumulativeRH)
-                     : undefined));
-        const jumpBaseline = jumpBaselineRaw != null ? parseFloat(jumpBaselineRaw) : NaN;
-
-        if (!isNaN(currentRH) && !isNaN(jumpBaseline) && jumpBaseline > 0 && (currentRH - jumpBaseline) > 2000 && !currentReadingWarningAcknowledged) {
-          toast({
-            title: "Warning — Large Reading Jump",
-            description: `Current Reading (${currentRH}) exceeds Previous Reading (${jumpBaseline}) by ${(currentRH - jumpBaseline).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
-            variant: "destructive",
-          });
-          setCurrentReadingWarningAcknowledged(true);
           return;
         }
       }
@@ -3101,11 +3061,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       const saveExecutionData = {
-        ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
-        runningHours: currentRHValue || executionData.runningHours,
+        ...sanitizeWorkOrderB3Fields(
+          stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
+          componentRhCounterType,
+        ),
+        ...(isRhDrivenCounter ? { runningHours: currentRHValue || executionData.runningHours } : {}),
         // RH accuracy (migration 139): materialize the DISPLAYED defaults so what the
         // user sees is what is stored — reading date defaults to today in the UI.
-        currentReadingDate: executionData.currentReadingDate || new Date().toISOString().split('T')[0],
+        ...(isRhDrivenCounter ? {
+          currentReadingDate: executionData.currentReadingDate || new Date().toISOString().split('T')[0],
+        } : {}),
         riskAssessmentStatus: executionData.riskAssessment,
         safetyChecklistsStatus: executionData.safetyChecklists,
         operationalFormsStatus: executionData.operationalForms,
@@ -3394,7 +3359,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
 
     const currentRHValue = executionData.currentReading || executionData.runningHours;
-    const woPayload: Record<string, unknown> = {
+    const woPayload: Record<string, unknown> = sanitizeWorkOrderB3Fields({
       vesselId: contextVesselId,
       component: templateData.componentName,
       componentCode: templateData.componentCode,
@@ -3436,7 +3401,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       consumedSpareParts: executionData.consumedSpareParts.filter(s => s.partNo || s.description),
       requiredSpareParts: templateData.requiredSpareParts || [],
       requiredTools: templateData.requiredTools || [],
-    };
+    }, componentRhCounterType);
 
     setIsDraftSaving(true);
     try {
@@ -3555,27 +3520,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       hardErrors.push('Work Carried Out must be at least 20 characters to provide a meaningful description.');
     }
 
-    if (currentRHValue) {
+    if (isRhDrivenCounter && currentRHValue) {
       const currentRHNum = parseFloat(currentRHValue);
       if (isNaN(currentRHNum) || currentRHNum < 0) hardErrors.push('Current Reading must be a positive number (≥ 0).');
     }
 
-    // RH validation state checks (mirrors handleSave pipeline).
-    // Unplanned WOs use maintenanceBasis='Calendar' so these are no-ops in practice,
-    // but are included for full parity with the execution save path.
-    if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter) {
-      if (componentActualRHStatus === 'loading') {
-        hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
-      } else if (componentActualRHStatus === 'error') {
-        hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
-      }
-      // Flat "exceeds component actual RH" ceiling removed (Task #245); timeline validation
-      // (rhValidation.status below) is the sole RH gate for MASTER and INHERITED components.
-    }
-    if (rhBackdateError && !isRejectedWO) {
+    if (isRhDrivenCounter && rhBackdateError && !isRejectedWO) {
       hardErrors.push(rhBackdateError);
     }
-    if (rhValidation.status === 'invalid' && !isRejectedWO) {
+    if (isRhDrivenCounter && rhValidation.status === 'invalid' && !isRejectedWO) {
       hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
     }
 
@@ -3656,43 +3609,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (hardErrors.length > 0) {
       toast({ title: 'Validation Error', description: hardErrors[0], variant: 'destructive' });
       return;
-    }
-
-    // Current vs previous RH regression and large-jump acknowledgment (mirrors handleSave)
-    if (currentRHValue && executionData.previousReading) {
-      const currentRH = parseFloat(currentRHValue);
-      const previousRH = parseFloat(executionData.previousReading);
-      if (!isNaN(currentRH) && !isNaN(previousRH) && currentRH < previousRH) {
-        toast({
-          title: 'Validation Error',
-          description: `Current Reading (${currentRH}) cannot be less than Previous Reading (${previousRH}). Running hours can only increase.`,
-          variant: 'destructive',
-        });
-        return;
-      }
-      // Warning-only: compute the "large jump" against the component's ACTUAL current RH, not a
-      // previousReading that can still be 0/empty on the first submit (false "0 → 9500" jump). Prefer
-      // previousReading when it holds a real value; otherwise fall back to the already-loaded component
-      // RH. Skip the warning if no valid baseline exists rather than compute against 0. Does NOT affect
-      // the save or the range validation above.
-      const jumpBaselineRaw =
-        (executionData.previousReading && parseFloat(executionData.previousReading) > 0)
-          ? executionData.previousReading
-          : ((workOrderContext as any)?.templateData?.lastCompletedCurrentReading
-              ?? ((workOrderContext as any)?.component?.currentCumulativeRH != null
-                   ? String((workOrderContext as any).component.currentCumulativeRH)
-                   : undefined));
-      const jumpBaseline = jumpBaselineRaw != null ? parseFloat(jumpBaselineRaw) : NaN;
-
-      if (!isNaN(currentRH) && !isNaN(jumpBaseline) && jumpBaseline > 0 && (currentRH - jumpBaseline) > 2000 && !currentReadingWarningAcknowledged) {
-        toast({
-          title: 'Warning — Large Reading Jump',
-          description: `Current Reading (${currentRH}) exceeds Previous Reading (${jumpBaseline}) by ${(currentRH - jumpBaseline).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
-          variant: 'destructive',
-        });
-        setCurrentReadingWarningAcknowledged(true);
-        return;
-      }
     }
 
     // Determine submission status based on Part B completeness
@@ -6330,6 +6246,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
+          {isRhDrivenCounter && (<>
           {/* B3. Running Hours */}
           <div data-testid="WOF.B3.1"><Marker id="WOF.B3.1" /></div>
           <div data-testid="WOF.B3.2"><Marker id="WOF.B3.2" /></div>
@@ -6345,60 +6262,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <span>Running Hours cannot be edited after submission — changes would affect the child component RH cascade at approval.</span>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.3"><Marker id="WOF.B3.3" />Previous reading</Label>
-                <Input
-                  value={executionData.previousReading}
-                  className="text-sm bg-gray-50"
-                  disabled
-                  data-testid="WOF.B3.4"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]" data-testid="text-component-actual-rh-label">Component Actual RH</Label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    value={
-                      componentActualRHStatus === 'loading' ? 'Loading...' :
-                      componentActualRHStatus === 'error' ? 'Failed to load' :
-                      rhValidation.componentActualRH !== null ? `${rhValidation.componentActualRH.toLocaleString()} hrs` : 'N/A'
-                    }
-                    className={`text-sm font-semibold flex-1 ${
-                      componentActualRHStatus === 'loaded' && rhValidation.componentActualRH !== null ? 'bg-green-50 border-green-300 text-green-800' :
-                      componentActualRHStatus === 'error' ? 'bg-red-50 border-red-300 text-red-700' :
-                      'bg-gray-50 border-gray-200 text-gray-400 italic'
-                    }`}
-                    disabled
-                    data-testid="text-component-actual-rh"
-                  />
-                  {componentActualRHStatus === 'error' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={fetchComponentActualRH}
-                      className="shrink-0 text-xs border-red-300 text-red-600 hover:bg-red-50"
-                      data-testid="button-retry-rh-fetch"
-                      title="Retry loading component RH"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                      Retry
-                    </Button>
-                  )}
-                </div>
-                {componentActualRHStatus === 'error' && (
-                  <div className="text-xs text-red-600" data-testid="text-rh-fetch-error">
-                    Unable to fetch component RH. Please retry or refresh the page.
-                  </div>
-                )}
-                {componentActualRHStatus === 'loading' && (
-                  <div className="text-xs text-gray-500 flex items-center gap-1" data-testid="text-rh-loading">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Fetching component running hours...
-                  </div>
-                )}
-              </div>
-
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading{(workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && <span className="text-red-500"> *</span>}</Label>
                 <div className="flex gap-2">
@@ -6606,6 +6470,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             )}
           </SectionBlock>
+          </>)}
 
           {/* B4. Spare Parts Consumed */}
           <div data-testid="WOF.B4.1"><Marker id="WOF.B4.1" /></div>

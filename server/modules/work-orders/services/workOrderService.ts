@@ -21,6 +21,7 @@ import {
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { classifyApprovalTransition } from '../utils/approvalTransition';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
+import { sanitizeWorkOrderB3Fields } from '@shared/workOrderPayload';
 import {
   getWorkOrderB2PatchValidationScope,
   validateWorkOrderB2Baselines,
@@ -780,6 +781,7 @@ export async function getWorkOrder(id: string) {
 export async function createWorkOrder(body: any) {
   const { insertWorkOrderSchema } = await import('@shared/schema');
   let workOrderData = insertWorkOrderSchema.parse(body);
+  let resolvedRhCounterType: string | null | undefined;
 
   if (!workOrderData.vesselId) {
     throw new ValidationError('Vessel ID is required to generate a work order number', {
@@ -806,6 +808,7 @@ export async function createWorkOrder(body: any) {
     }
 
     if (resolvedComponent) {
+      resolvedRhCounterType = resolvedComponent.rhCounterType;
       if (workOrderData.componentCode && workOrderData.componentCode !== resolvedComponent.componentCode) {
         console.warn(`⚠️ AUTO-CORRECTING componentCode mismatch: passed "${workOrderData.componentCode}" but component "${resolvedComponent.name}" has code "${resolvedComponent.componentCode}"`);
       }
@@ -813,6 +816,7 @@ export async function createWorkOrder(body: any) {
       console.log(`✅ Auto-resolved componentCode: ${resolvedComponent.componentCode} for component "${resolvedComponent.name}"`);
     }
   }
+  workOrderData = sanitizeWorkOrderB3Fields(workOrderData, resolvedRhCounterType);
 
   // Convert ISO date (YYYY-MM-DD) to DD-MM-YYYY if provided by frontend
   if (workOrderData.dueDate && workOrderData.dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
@@ -1338,6 +1342,34 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   });
 
+  // Resolve the component before draft handling and numeric validation so B3
+  // applicability is enforced consistently on every PATCH path.
+  const componentRef = updateData.component || existingWO.component;
+  const componentCodeRef = updateData.componentCode || existingWO.componentCode;
+  const vesselId = updateData.vesselId || existingWO.vesselId;
+  let resolvedComponent: any = null;
+  if (vesselId && (componentRef || componentCodeRef)) {
+    if (componentRef) resolvedComponent = await repo.findComponent(componentRef);
+    if (!resolvedComponent && componentCodeRef) {
+      resolvedComponent = await repo.findComponentByCode(componentCodeRef, vesselId);
+    }
+    if (!resolvedComponent && componentRef) {
+      const vesselComponents = await repo.findComponents(vesselId);
+      resolvedComponent = vesselComponents.find((c: any) => c.name === componentRef);
+    }
+    if (resolvedComponent) {
+      updateData.componentCode = resolvedComponent.componentCode;
+    }
+  }
+  const effectiveRhCounterType = resolvedComponent?.rhCounterType;
+  if (updateData.draftExecutionData && typeof updateData.draftExecutionData === 'object' && !Array.isArray(updateData.draftExecutionData)) {
+    updateData.draftExecutionData = sanitizeWorkOrderB3Fields(
+      updateData.draftExecutionData,
+      effectiveRhCounterType,
+    );
+  }
+  updateData = sanitizeWorkOrderB3Fields(updateData, effectiveRhCounterType);
+
   // ── Save as Draft (migration 165, Task #402) ──────────────────────────────
   // A draft save sends ONLY draftExecutionData (a non-null JSON document) and
   // no status/completion fields. It writes exclusively to the draft column so
@@ -1445,32 +1477,6 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   }
 
-  // AUTO-CORRECT: Fetch correct componentCode from database
-  const componentRef = updateData.component || existingWO.component;
-  const componentCodeRef = updateData.componentCode || existingWO.componentCode;
-  const vesselId = updateData.vesselId || existingWO.vesselId;
-  let resolvedComponent: any = null;
-  if (vesselId && (componentRef || componentCodeRef)) {
-    if (componentRef) {
-      resolvedComponent = await repo.findComponent(componentRef);
-    }
-    if (!resolvedComponent && componentCodeRef) {
-      resolvedComponent = await repo.findComponentByCode(componentCodeRef, vesselId);
-    }
-    if (!resolvedComponent && componentRef) {
-      const vesselComponents = await repo.findComponents(vesselId);
-      resolvedComponent = vesselComponents.find((c: any) => c.name === componentRef);
-    }
-
-    if (resolvedComponent) {
-      if (componentCodeRef && componentCodeRef !== resolvedComponent.componentCode) {
-        console.warn(`⚠️ AUTO-CORRECTING WO PATCH componentCode mismatch: current "${componentCodeRef}" but component "${resolvedComponent.name}" has code "${resolvedComponent.componentCode}"`);
-      }
-      updateData.componentCode = resolvedComponent.componentCode;
-      console.log(`✅ Auto-resolved componentCode in PATCH: ${resolvedComponent.componentCode} for component "${resolvedComponent.name}"`);
-    }
-  }
-
   // SAFEGUARD: Auto-set 'Pending Approval' if completion data provided without explicit status
   const hasCompletionData = !!(updateData.completionDateTime || updateData.dateOfCompletion);
   const hasExplicitStatus = updateData.status !== undefined;
@@ -1564,7 +1570,12 @@ export async function updateWorkOrder(id: string, body: any) {
 
   // ── RH accuracy validations (migration 139) — PATCH path mirror of the
   // completion-service checks (the ship Part-B save submits via PATCH). ──
-  if (updateData.woCompletionRh !== undefined && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== '') {
+  if (
+    isWorkOrderB3Applicable(effectiveCounterType) &&
+    updateData.woCompletionRh !== undefined &&
+    updateData.woCompletionRh !== null &&
+    String(updateData.woCompletionRh).trim() !== ''
+  ) {
     const woRhNum = parseFloat(String(updateData.woCompletionRh));
     const readingRaw = updateData.runningHours ?? updateData.currentReading ?? existingWO.runningHours ?? existingWO.currentReading;
     const readingNum = readingRaw !== undefined && readingRaw !== null && String(readingRaw).trim() !== '' ? parseFloat(String(readingRaw)) : NaN;
@@ -1576,7 +1587,7 @@ export async function updateWorkOrder(id: string, body: any) {
       );
     }
   }
-  if (updateData.currentReadingDate) {
+  if (isWorkOrderB3Applicable(effectiveCounterType) && updateData.currentReadingDate) {
     const rdParsed = new Date(String(updateData.currentReadingDate));
     const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
     if (isNaN(rdParsed.getTime())) {

@@ -9,6 +9,7 @@ import { logFieldChanges } from '../../sync';
 import { isShipInstance } from '../../sync/syncRole';
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
+import { isWorkOrderB3Applicable } from '@shared/workOrderPayload';
 import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
 import {
   ensureCompletedWorkOrderDate,
@@ -157,7 +158,8 @@ export async function completeWorkOrder(
 
   // Enforce running hours requirement only for RH-driven completions (Task #245):
   // NOT_RH_DRIVEN components treat running hours as not applicable — never required, never blocking.
-  const counterType = (component.rhCounterType || 'MASTER').toUpperCase();
+  const counterType = (component.rhCounterType || '').toUpperCase();
+  const isB3Applicable = isWorkOrderB3Applicable(counterType);
   if (workOrder.maintenanceBasis === 'Running Hours' && counterType !== 'NOT_RH_DRIVEN' && !runningHours) {
     throw new ValidationError('Running hours is required for RH-based maintenance work orders');
   }
@@ -171,7 +173,7 @@ export async function completeWorkOrder(
   // ── RH accuracy validations (migration 139) ──
   // BLOCK: completion RH cannot exceed the current reading — the machine cannot
   // have had MORE hours at job completion than its latest meter reading.
-  if (woCompletionRh && runningHours) {
+  if (isB3Applicable && woCompletionRh && runningHours) {
     const woRhNum = parseFloat(woCompletionRh);
     const readingNum = parseFloat(runningHours);
     if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
@@ -183,7 +185,7 @@ export async function completeWorkOrder(
     }
   }
   // BLOCK: the reading date cannot be in the future.
-  if (currentReadingDate) {
+  if (isB3Applicable && currentReadingDate) {
     const readingDateParsed = new Date(currentReadingDate);
     const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
     if (isNaN(readingDateParsed.getTime())) {

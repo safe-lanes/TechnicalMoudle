@@ -4,3 +4,4 @@
 - [RH Work Order snapshots](rh-work-order-snapshots.md) — Part A is immutable per-cycle history; completion dates update Job metadata but never RH math or the completed WO.
 - [Completed Work Order dates](completed-work-order-dates.md) — final Completed state requires a valid completion date without changing pre-approval date behavior.
 - [Work Order B2 baselines](work-order-b2-baselines.md) — Start Date and RH completion boundaries are strict and use immutable Part A snapshots.
+- [Work Order B3 applicability](work-order-b3-applicability.md) — B3 exists only for MASTER/INHERITED counters; hidden fields must be stripped on every write path.
