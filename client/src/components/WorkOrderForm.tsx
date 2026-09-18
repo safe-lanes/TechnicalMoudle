@@ -307,6 +307,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     jobExperienceNotes: "",
     previousReading: "",
     currentReading: "",
+    currentReadingDate: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
     consumedSpareParts: [] as Array<{
       spareId: number | null;
@@ -467,6 +468,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         jobExperienceNotes: execution.remarks || '',
         previousReading: '',
         currentReading: '',
+        currentReadingDate: execution.currentReadingDate || '',
         uploadedDocuments: Array.isArray(execution.uploadedDocuments) ? execution.uploadedDocuments : [],
         consumedSpareParts: Array.isArray(execution.consumedSpareParts) ? execution.consumedSpareParts : [],
         ihmUpdate: {
@@ -2888,7 +2890,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                     <div className="border border-gray-200 rounded-lg p-4 mb-6">
                       <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>B3. Running Hours</h4>
                       
-                      <div className="grid grid-cols-1 gap-6">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-end">
                         <div className="space-y-2">
                           <Label className="text-sm text-[#8798ad]">Current Reading *</Label>
                           <Input 
@@ -2899,6 +2901,18 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             disabled={isPartBReadOnly}
                             placeholder="Enter current hours reading"
                             className="w-full" 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm text-[#8798ad]">Current Reading Date</Label>
+                          <WorkOrderDateInput
+                            value={executionData.currentReadingDate || workOrder?.currentReadingDate || new Date().toISOString().split('T')[0]}
+                            max={new Date().toISOString().split('T')[0]}
+                            onChange={(value) => handleExecutionChange('currentReadingDate', value)}
+                            disabled={isPartBReadOnly}
+                            className="w-full"
+                            aria-label="Current Reading Date"
+                            data-testid="input-current-reading-date"
                           />
                         </div>
                       </div>

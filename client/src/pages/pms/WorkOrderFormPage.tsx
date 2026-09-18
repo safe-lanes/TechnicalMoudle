@@ -6246,7 +6246,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
-          {isRhDrivenCounter && (<>
+          {isRhDrivenCounter && (<div className="contents">
           {/* B3. Running Hours */}
           <div data-testid="WOF.B3.1"><Marker id="WOF.B3.1" /></div>
           <div data-testid="WOF.B3.2"><Marker id="WOF.B3.2" /></div>
@@ -6262,55 +6262,57 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <span>Running Hours cannot be edited after submission — changes would affect the child component RH cascade at approval.</span>
               </div>
             )}
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
               <div className="space-y-2">
                 <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading{(workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && <span className="text-red-500"> *</span>}</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    value={executionData.currentReading}
-                    onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
-                    disabled={isPartBReadOnly || isB3EditLocked}
-                    className={`text-sm flex-1 ${
-                      rhValidation.status === 'valid' ? 'border-green-400 focus:ring-green-400' :
-                      rhValidation.status === 'invalid' ? 'border-red-400 focus:ring-red-400' :
-                      rhValidation.status === 'warning' ? 'border-orange-400 focus:ring-orange-400' :
-                      ''
-                    }`}
-                    data-testid="WOF.B3.6"
-                  />
-                  {!isPartBReadOnly && !isB3EditLocked && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={fetchCurrentRHFromModule}
-                      className="shrink-0 text-xs"
-                      data-testid="button-fetch-rh"
-                      title="Fetch Current RH from Module"
-                    >
-                      <BarChart3 className="h-3.5 w-3.5 mr-1" />
-                      Fetch RH
-                    </Button>
-                  )}
-                </div>
+                <Input
+                  type="number"
+                  min="0"
+                  value={executionData.currentReading}
+                  onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
+                  disabled={isPartBReadOnly || isB3EditLocked}
+                  className={`text-sm w-full ${
+                    rhValidation.status === 'valid' ? 'border-green-400 focus:ring-green-400' :
+                    rhValidation.status === 'invalid' ? 'border-red-400 focus:ring-red-400' :
+                    rhValidation.status === 'warning' ? 'border-orange-400 focus:ring-orange-400' :
+                    ''
+                  }`}
+                  data-testid="WOF.B3.6"
+                />
+              </div>
 
-                {/* RH accuracy (migration 139): date the reading was TAKEN — becomes the
-                    RH module's Last Updated date instead of the WO completion date.
-                    Defaults to today, cannot be in the future. */}
-                <div className="space-y-1 mt-2">
-                  <Label className="text-sm text-[#8798ad]" data-testid="label-current-reading-date">Current Reading Date</Label>
-                  <WorkOrderDateInput
-                    value={executionData.currentReadingDate || new Date().toISOString().split('T')[0]}
-                    max={new Date().toISOString().split('T')[0]}
-                    onChange={(value) => handleExecutionChange('currentReadingDate', value)}
-                    disabled={isPartBReadOnly || isB3EditLocked}
-                    className="text-sm"
-                    aria-label="Current Reading Date"
-                    data-testid="input-current-reading-date"
-                  />
-                </div>
+              {/* RH accuracy (migration 139): date the reading was TAKEN — becomes the
+                  RH module's Last Updated date instead of the WO completion date.
+                  Defaults to today, cannot be in the future. */}
+              <div className="space-y-2">
+                <Label className="text-sm text-[#8798ad]" data-testid="label-current-reading-date">Current Reading Date</Label>
+                <WorkOrderDateInput
+                  value={executionData.currentReadingDate || new Date().toISOString().split('T')[0]}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={(value) => handleExecutionChange('currentReadingDate', value)}
+                  disabled={isPartBReadOnly || isB3EditLocked}
+                  className="text-sm w-full"
+                  aria-label="Current Reading Date"
+                  data-testid="input-current-reading-date"
+                />
+              </div>
 
+              {!isPartBReadOnly && !isB3EditLocked && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchCurrentRHFromModule}
+                  className="w-full shrink-0 text-xs md:w-auto"
+                  data-testid="button-fetch-rh"
+                  title="Fetch Current RH from Module"
+                >
+                  <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                  Fetch RH
+                </Button>
+              )}
+            </div>
+
+            <div className="mt-3 space-y-2">
                 {/* RH Valid Range Helper */}
                 {rhValidation.validRange && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
@@ -6424,7 +6426,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </a>
                   </div>
                 )}
-              </div>
             </div>
 
             {/* HOD Approval Remarks (for completed WOs) */}
@@ -6470,7 +6471,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             )}
           </SectionBlock>
-          </>)}
+          </div>)}
 
           {/* B4. Spare Parts Consumed */}
           <div data-testid="WOF.B4.1"><Marker id="WOF.B4.1" /></div>
