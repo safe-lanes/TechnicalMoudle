@@ -2906,7 +2906,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         <div className="space-y-2">
                           <Label className="text-sm text-[#8798ad]">Current Reading Date</Label>
                           <WorkOrderDateInput
-                            value={executionData.currentReadingDate || workOrder?.currentReadingDate || new Date().toISOString().split('T')[0]}
+                            value={executionData.currentReadingDate || new Date().toISOString().split('T')[0]}
                             max={new Date().toISOString().split('T')[0]}
                             onChange={(value) => handleExecutionChange('currentReadingDate', value)}
                             disabled={isPartBReadOnly}

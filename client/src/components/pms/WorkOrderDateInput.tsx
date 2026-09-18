@@ -159,11 +159,16 @@ export function WorkOrderDateInput({
           'aria-label': ariaLabel ? `Open ${ariaLabel} calendar` : 'Open date picker',
           'data-testid': testId ? `${testId}-picker-trigger` : undefined,
         },
-        React.createElement(CalendarDays, {
-          className: 'h-4 w-4',
-          'aria-hidden': true,
-          'data-testid': testId ? `${testId}-picker-icon` : undefined,
-        }),
+        React.createElement(
+          'span',
+          {
+            'data-testid': testId ? `${testId}-picker-icon` : undefined,
+            'aria-hidden': true,
+          },
+          React.createElement(CalendarDays, {
+            className: 'h-4 w-4',
+          }),
+        ),
       ),
     ),
     manualError && React.createElement(

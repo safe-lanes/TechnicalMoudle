@@ -21,7 +21,7 @@ import {
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { classifyApprovalTransition } from '../utils/approvalTransition';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
-import { sanitizeWorkOrderB3Fields } from '@shared/workOrderPayload';
+import { isWorkOrderB3Applicable, sanitizeWorkOrderB3Fields } from '@shared/workOrderPayload';
 import {
   getWorkOrderB2PatchValidationScope,
   validateWorkOrderB2Baselines,
