@@ -1,0 +1,133 @@
+{
+  "suite": "fresh-validation",
+  "version": "2026-09-18.1",
+  "frozen": "2026-09-18, BEFORE any fix of the demonstrated defects. Authored from the official manual chunk text (manuals-only index, 855 chunks); every required phrase and page was checked against that text at authoring time. Pages refer to the manual's own printed page labels. These questions are held out of tuning: if any of them is later used to guide a fix, its status changes from validation to development and must be relabelled in the report.",
+  "kinds": "procedure | condition | table | alternatives | module-context",
+  "cases": [
+    {
+      "id": "fresh-audit-1",
+      "file": "Audit - History Manual_R1_30.06.2026.pdf",
+      "kind": "procedure",
+      "module": "audit",
+      "question": "After I create an inspection record in Audit History, what do the Save, Upload and Next buttons do, and which fields must I complete?",
+      "pages": [8],
+      "section": "2.1.1 Inspection Record Page",
+      "must": ["mandatory", "save", "upload", "next"],
+      "must_not": ["not covered", "not documented", "does not describe"],
+      "evidence": "An inspection record will be created. Complete all mandatory fields marked with (*). Click Save to save the inspection details. Click Upload to attach the required supporting documents. Click Next to proceed to the Observation page and enter the observation details, as applicable."
+    },
+    {
+      "id": "fresh-incident-1",
+      "file": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf",
+      "kind": "procedure",
+      "module": "incident",
+      "question": "As a vessel user, how do I filter the fleet notifications shared by the office, and what can I do with a notification from that list?",
+      "pages": [5],
+      "section": "2. Fleet Notification Overview",
+      "must": ["filters", "period", "apply", "clear"],
+      "must_not": ["not covered", "not documented", "does not describe"],
+      "evidence": "The Fleet Notification screen displays notifications shared by the Office. Click Filters to access filtering options. Select the required Period or search using the title field. Click Apply to filter the records or Clear to reset. Use the action icons to view or edit the selected notification."
+    },
+    {
+      "id": "fresh-safety-1",
+      "file": "Safety - Master Review Manual R1_10.06.2026.pdf",
+      "kind": "condition",
+      "module": "safety",
+      "question": "In Master Review, what is the difference between the All tab and the Response Pending tab?",
+      "pages": [5],
+      "section": "2. Master Review - Overview",
+      "must": ["response pending", "office"],
+      "must_not": ["not covered", "not documented", "does not describe"],
+      "evidence": "Toggle between the All and Response Pending tabs to view either all reports or only those awaiting an office response."
+    },
+    {
+      "id": "fresh-crewing-1",
+      "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+      "kind": "procedure",
+      "module": "crewing",
+      "question": "How do I filter candidate records in Crewing, and is there a way to filter an individual column?",
+      "pages": [13],
+      "section": "1.2.1.2 How to apply filters",
+      "must": ["filter", "apply", "clear", "column"],
+      "must_not": ["not covered", "not documented", "does not describe"],
+      "evidence": "Click on the 'Filter' button. Use the search field along with filters such as Rank Applied, Vessel Type, Nationality, Status, and Manning Agent to filter candidate data. Click 'Apply' to filter the results or 'Clear' to reset the selection. Users can also click the filter icon in each column header of the table."
+    },
+    {
+      "id": "fresh-technical-1",
+      "file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+      "kind": "procedure",
+      "module": "technical",
+      "question": "In the Office Certificates screen, which filters can I use to narrow the certificate records, and how do I reset them?",
+      "pages": [7],
+      "section": "1.1.3.2 How to apply filter",
+      "must": ["vessel", "due status", "clear"],
+      "must_not": ["not covered", "not documented", "does not describe"],
+      "evidence": "Click on the 'Filter' button. Select the required vessel from the 'Vessel' dropdown to view vessel-specific certificate records. Use the 'Fleet', 'Add Group', and 'Due Status' filters to refine and view the displayed records. Click the 'Clear' button to reset all applied filters."
+    },
+    {
+      "id": "fresh-moc-alt-1",
+      "file": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf",
+      "kind": "alternatives",
+      "module": "safety",
+      "question": "What are the ways to start a new MoC from the office?",
+      "pages": [8],
+      "section": "4. How to create a new MoC",
+      "must": ["dashboard", "moc log", "new moc"],
+      "must_not": ["not covered", "not documented", "only one way"],
+      "evidence": "A new MoC can be created using any of the following methods: click '+ New MoC' on the Dashboard page; navigate to MoC Log and select '+ New MoC' on the top right corner; select New MoC from the menu.",
+      "note": "Broad question whose manual answer is a list of alternatives — the manual-side analogue of the broad work-order question."
+    },
+    {
+      "id": "fresh-wo-broad-1",
+      "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+      "kind": "alternatives",
+      "module": "technical",
+      "question": "What are the different ways a work order can come into existence in PMS?",
+      "pages": [18, 28, 29],
+      "section": "Components 'Generate WO' (p.18) and 1.1.5.2 How to create an unplanned work order (p.29)",
+      "must": ["generate wo", "unplanned"],
+      "must_not": ["only way", "not covered"],
+      "evidence": "The official manuals describe TWO creation paths: (a) Components screen — 'The user can click the Generate WO button to create a WO manually for the selected component', then choose a reason (Office manual p.18; Vessel manual p.16); (b) Work Orders screen — '+ Unplanned W.O' (Office p.29, Vessel p.24). The manuals do NOT describe the ship's automatic daily generation or the office 'Generate Now' bulk action (0 chunks contain 'Generate Now', 'job due' or 'daily scan'): those exist only in the code-derived guidance, and an answer that includes them must attribute them to that source.",
+      "note": "Broad creation question. A correct answer names both manual paths; it is a defect to present unplanned creation as the only way."
+    },
+    {
+      "id": "fresh-wo-named-1",
+      "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+      "kind": "procedure",
+      "module": "technical",
+      "question": "From the Components screen, how do I raise a work order for one job on a component?",
+      "pages": [18],
+      "section": "Components — Generate WO",
+      "must": ["generate wo", "reason"],
+      "must_not": ["unplanned w.o", "not covered"],
+      "evidence": "The user can click the 'Generate WO' button to create a WO manually for the selected component. The Generate Work Order pop-up appears; choose the appropriate reason for generating the work order from the listed options, and the Work Order will be generated. (Office p.18, Vessel p.16.)",
+      "note": "Explicitly named method — the answer must be this procedure, not the unplanned one."
+    },
+    {
+      "id": "fresh-ctx-1",
+      "file": "Safety - Safety Meeting User Manual_Vessel_R1_30.05.2026.pdf",
+      "kind": "module-context",
+      "module": "technical",
+      "question": "How do I record the minutes of a safety meeting?",
+      "pages": null,
+      "section": "Safety Meeting manual",
+      "must": ["safety meeting"],
+      "must_not": ["not covered", "not documented"],
+      "evidence": "Asked with the originating module set to technical (the widget always sends the screen the user is on). The topic is Safety. Expected: the answer comes from the Safety Meeting manual; the originating module must not drag it to Technical.",
+      "note": "Module-context test: context is the screen, not the topic."
+    },
+    {
+      "id": "fresh-ctx-conflict-1",
+      "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+      "kind": "module-context",
+      "module": "technical",
+      "question": "In the Safety module, how do I add a new component to the component tree?",
+      "pages": null,
+      "section": "n/a — the question names Safety but the subject is a Technical procedure",
+      "must": [],
+      "must_not": [],
+      "evidence": "Conflict case with no single right answer in the corpus: the explicitly named module (Safety) does not document adding components, which is a Technical PMS procedure. Acceptable outcomes: (a) route to Safety and state honestly that the Safety documentation does not cover adding components, optionally pointing to Technical; or (b) ask which module is meant. Unacceptable: silently answering from the Technical manual as though the question had named Technical, or inventing a Safety procedure.",
+      "note": "Judged by reading, not by phrase matching."
+    }
+  ]
+}

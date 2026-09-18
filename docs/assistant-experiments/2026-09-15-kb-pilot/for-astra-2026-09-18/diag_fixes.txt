@@ -1,0 +1,162 @@
+
+==============================================================================================================
+hist-1: Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?
+  routed -> answer / technical  reason=vector routing  (explicit=None: no module named)
+  per-module best distance (top-40): {'technical': 0.8754, 'safety': 1.0019, 'audit': 1.0204, 'incident': 1.0247, 'crewing': 1.0796}
+  vector top-10:
+     1 d=0.8754 [technical] Technical - Ship-Side (Vessel Crew) Operatio p2 · 1.1.13.3 Approvals as Seen From the Ship
+     2 d=0.9725 [technical] Technical - PMS User Manual For Office_Sail  p13 · TECHNICAL USER MANUAL
+     3 d=1.0019 [safety] Safety - Master Review Manual R1_10.06.2026. p10 · Part – D : Any Other Improvement Suggestion/
+     4 d=1.0169 [technical] Technical - Sync (Operational) User Manual.d p2 · 1.2.8 What Happens When Ship and Office Edit
+     5 d=1.0204 [audit] Audit - History Manual_R1_30.06.2026.pdf p16 · 3.3 REVIEW PAGE:   <== EXPECTED
+     6 d=1.0247 [incident] Incident - Near Miss User Manual R1_30.05.20 p11 · 6. OFFICE CLOSEOUT
+     7 d=1.0256 [audit] Audit - History Manual_R1_30.06.2026.pdf p9 · 2.1.3 ADDING VESSEL COMMENTS AND CAUSE ANALY
+     8 d=1.0412 [audit] Audit - History Manual_R1_30.06.2026.pdf p7 · 2.1 METHOD 1: MANUAL DATA ENTRY
+     9 d=1.0424 [audit] Audit - Fleet Sharing Manual- Vessel_R1_30.0 p5 · Step 2 – Discussion Record
+    10 d=1.0471 [technical] Technical - PMS User Manual For Office_Sail  p35 · TECHNICAL USER MANUAL
+  EXPECTED chunk vector rank 5 of 40, distance 1.0204
+  lexical top-5 in [audit]:
+    1 lex=1.900 d=1.1643 Audit - History Manual_R1_30.06.2026.pdf p14 · 3.0 DATA ENTRY ACROSS INSPECTION TYPES
+    2 lex=1.800 d=1.0204 Audit - History Manual_R1_30.06.2026.pdf p16 · 3.3 REVIEW PAGE:   <== EXPECTED
+    3 lex=1.400 d=1.1813 Audit - History Manual_R1_30.06.2026.pdf p6 · 1.3 HISTORY SUB-MODULE OVERVIEW
+    4 lex=1.300 d=1.0412 Audit - History Manual_R1_30.06.2026.pdf p7 · 2.1 METHOD 1: MANUAL DATA ENTRY
+    5 lex=1.300 d=1.0256 Audit - History Manual_R1_30.06.2026.pdf p9 · 2.1.3 ADDING VESSEL COMMENTS AND CAUSE A
+    expected chunk lexical rank in audit: 2
+  lexical top-5 in [technical]:
+    1 lex=1.900 d=1.1819 Technical - KB pilot: Office 'Generate Now pNone · Office 'Generate Now' — generate a vesse
+    2 lex=1.300 d=1.1954 Technical - PMS User Manual_Vessel Specifi p18 · TECHNICAL USER MANUAL
+    3 lex=1.300 d=1.2179 Technical - KB pilot: How work orders are  pNone · How work orders are created — the three 
+    4 lex=1.300 d=1.2687 Technical - PMS User Manual For Office_Sai p41 · 1.1.6.4 HOW TO VIEW HISTORY
+    5 lex=1.200 d=1.2090 Technical - PMS User Manual For Office_Sai p24 · 1.1.4.3 HOW TO ADD COMPONENTS
+    expected chunk lexical rank in technical: None
+  five excerpts under r6 (rescue):
+    1 d=0.8754 Technical - Ship-Side (Vessel Crew) Operat p2 · 1.1.13.3 Approvals as Seen From the Ship
+    2 d=0.9725 Technical - PMS User Manual For Office_Sai p13 · TECHNICAL USER MANUAL
+    3 d=1.0169 Technical - Sync (Operational) User Manual p2 · 1.2.8 What Happens When Ship and Office 
+    4 d=1.0471 Technical - PMS User Manual For Office_Sai p35 · TECHNICAL USER MANUAL
+    5 d=1.1435 Technical - Cert. & Surveys User Manual Fo p13 · 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFI
+    rescue displaced: d=1.0709 Technical - Ship-Side (Vessel Crew) Operat p1 · TECHNICAL USER MANUAL — SHIP-SIDE (VESSE   (rescued chunk d=1.1435, lex=1.200)
+
+==============================================================================================================
+master-review-2: Who is meant to use Part E of a Master Review record, and what can they do there?
+  routed -> answer / safety  reason=explicit: manual/sub-module name in question  (explicit=safety: manual/sub-module name in question)
+  per-module best distance (top-40): {'safety': 0.8572, 'incident': 1.0672, 'crewing': 1.0888, 'technical': 1.1312}
+  vector top-10:
+     1 d=0.8572 [safety] Safety - Master Review Manual R1_10.06.2026. p7 · Part – A : Overview
+     2 d=0.9138 [safety] Safety - MOC User Manual_Office_R0_31.03.202 p16 · 9. HOW TO FILL MOC FORM – PART E & PART F
+     3 d=0.9410 [safety] Safety - MOC User Manual_Vessel_R0_31.03.202 p12 · 8. HOW TO FILL MOC FORM – PART E & PART F
+     4 d=0.9415 [safety] Safety - Master Review Manual R1_10.06.2026. p2 · Table of Contents
+     5 d=0.9513 [safety] Safety - Master Review Manual R1_10.06.2026. p11 · 4. OFFICE CLOSEOUT FOR MASTER REVIEW FORM   <== EXPECTED
+     6 d=0.9555 [safety] Safety - MOC User Manual_Office_R0_31.03.202 p16 · 9. HOW TO FILL MOC FORM – PART E & PART F
+     7 d=0.9670 [safety] Safety - MOC User Manual_Vessel_R0_31.03.202 p12 · 8. HOW TO FILL MOC FORM – PART E & PART F
+     8 d=0.9933 [safety] Safety - Master Review Manual R1_10.06.2026. p5 · 2. MASTER REVIEW - OVERVIEW
+     9 d=1.0074 [safety] Safety - Master Review Manual R1_10.06.2026. p6 · MASTER REVIEW USER MANUAL
+    10 d=1.0227 [safety] Safety - MOC User Manual_Vessel_R0_31.03.202 p14 · MOC USER MANUAL
+  EXPECTED chunk vector rank 5 of 40, distance 0.9513
+  lexical top-5 in [safety]:
+    1 lex=1.800 d=1.0074 Safety - Master Review Manual R1_10.06.202 p6 · MASTER REVIEW USER MANUAL
+    2 lex=1.700 d=0.9933 Safety - Master Review Manual R1_10.06.202 p5 · 2. MASTER REVIEW - OVERVIEW
+    3 lex=1.500 d=1.0730 Safety - MOC User Manual_Vessel_R0_31.03.2 p15 · 9. HOW TO FILL MOC FORM – PART G
+    4 lex=1.400 d=1.0465 Safety - MOC User Manual_Office_R0_31.03.2 p19 · 10. HOW TO FILL MOC FORM – PART G
+    5 lex=1.300 d=1.1210 Safety - Risk Assessment User Manual_Offic p9 · 5.1 REVIEWING A DUE GENERIC RISK ASSESSM
+    expected chunk lexical rank in safety: None
+  five excerpts under r6 (rescue):
+    1 d=0.8572 Safety - Master Review Manual R1_10.06.202 p7 · Part – A : Overview
+    2 d=0.9138 Safety - MOC User Manual_Office_R0_31.03.2 p16 · 9. HOW TO FILL MOC FORM – PART E & PART 
+    3 d=0.9410 Safety - MOC User Manual_Vessel_R0_31.03.2 p12 · 8. HOW TO FILL MOC FORM – PART E & PART 
+    4 d=0.9415 Safety - Master Review Manual R1_10.06.202 p2 · Table of Contents
+    5 d=1.0074 Safety - Master Review Manual R1_10.06.202 p6 · MASTER REVIEW USER MANUAL
+    rescue displaced: d=0.9513 Safety - Master Review Manual R1_10.06.202 p11 · 4. OFFICE CLOSEOUT FOR MASTER REVIEW FOR   (rescued chunk d=1.0074, lex=1.800)
+
+==============================================================================================================
+prep-3: On the preparation checklist, how do I add a new attachment to a question, and what can I do with it afterward?
+  routed -> answer / audit  reason=vector routing  (explicit=None: no module named)
+  per-module best distance (top-40): {'audit': 0.7122, 'technical': 1.0232, 'crewing': 1.1995, 'incident': 1.2025, 'safety': 1.2085}
+  vector top-10:
+     1 d=0.7122 [audit] Audit - Preparation Manual_Office_R1_30.06.2 p19 · 4.3.4 Adding Attachment(s)
+     2 d=0.9115 [audit] Audit - Preparation Manual_Office_R1_30.06.2 p7 · 2.3 ATTACHMENT ICON
+     3 d=0.9923 [audit] Audit - Preparation Manual_Office_R1_30.06.2 p26 · 4.6 SAVE THE PREPARATION CHECKLIST
+     4 d=1.0232 [technical] Technical - Cert. & Surveys User Manual For  p9 · 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS
+     5 d=1.0434 [audit] Audit - Preparation Manual_Office_R1_30.06.2 p21 · 4.3.5 Delete Attachments
+     6 d=1.0573 [technical] Technical - Cert. & Surveys User Manual For  p9 · 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS
+     7 d=1.0779 [audit] Audit - History Manual_R1_30.06.2026.pdf p10 · 2.1.4 ADDING ATTACHMENTS
+     8 d=1.0900 [audit] Audit - Preparation Manual_Office_R1_30.06.2 p14 · 3.2 ACCESSING THE PREPARATION CHECKLIST
+     9 d=1.1230 [technical] Technical - Cert. & Surveys User Manual For  p11 · 1.1.4.5 HOW TO ADD AND VIEW ATTACHMENTS
+    10 d=1.1282 [audit] Audit - Preparation Manual_Office_R1_30.06.2 p20 · Document   <== EXPECTED
+  EXPECTED chunk vector rank 10 of 40, distance 1.1282
+  lexical top-5 in [audit]:
+    1 lex=1.900 d=1.2378 Audit - Preparation Manual_Office_R1_30.06 p5 · 2. PREPARATION SUB- MODULE OVERVIEW
+    2 lex=1.800 d=1.1471 Audit - Preparation Manual_Office_R1_30.06 p13 · 3.1 HOW TO CREATE NEW PREPARATION
+    3 lex=1.600 d=1.0900 Audit - Preparation Manual_Office_R1_30.06 p14 · 3.2 ACCESSING THE PREPARATION CHECKLIST
+    4 lex=1.400 d=0.7122 Audit - Preparation Manual_Office_R1_30.06 p19 · 4.3.4 Adding Attachment(s)
+    5 lex=0.900 d=1.2352 Audit - Preparation Manual_Office_R1_30.06 p9 · 2.5 EMAIL NOTIFICATION ICON
+    expected chunk lexical rank in audit: None
+  five excerpts under r6 (rescue):
+    1 d=0.7122 Audit - Preparation Manual_Office_R1_30.06 p19 · 4.3.4 Adding Attachment(s)
+    2 d=0.9115 Audit - Preparation Manual_Office_R1_30.06 p7 · 2.3 ATTACHMENT ICON
+    3 d=0.9923 Audit - Preparation Manual_Office_R1_30.06 p26 · 4.6 SAVE THE PREPARATION CHECKLIST
+    4 d=1.0434 Audit - Preparation Manual_Office_R1_30.06 p21 · 4.3.5 Delete Attachments
+    5 d=1.1471 Audit - Preparation Manual_Office_R1_30.06 p13 · 3.1 HOW TO CREATE NEW PREPARATION
+    rescue displaced: d=1.0779 Audit - History Manual_R1_30.06.2026.pdf p10 · 2.1.4 ADDING ATTACHMENTS   (rescued chunk d=1.1471, lex=1.800)
+
+==============================================================================================================
+sms-office-1: For approving a revision of an already-uploaded SMS document (Section 4.2.2), what does the manual tell the Approver to do?
+  routed -> answer / safety  reason=explicit: manual/sub-module name in question  (explicit=safety: manual/sub-module name in question)
+  per-module best distance (top-40): {'safety': 0.631, 'technical': 0.8509, 'crewing': 0.872}
+  vector top-10:
+     1 d=0.6310 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p16 · Document
+     2 d=0.6447 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p18 · 4.2 UPLOADING REVISIONS OF ALREADY UPLOADED 
+     3 d=0.6555 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p18 · 4.2.1 Proposal
+     4 d=0.6753 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p17 · 4.1.2 Approval
+     5 d=0.6914 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p20 · Document
+     6 d=0.7128 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p21 · 4.2.2 Approval   <== EXPECTED
+     7 d=0.7386 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p19 · Document
+     8 d=0.7549 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p7 · 3.1.3 Details of SMS documents
+     9 d=0.8074 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p14 · 4.1 UPLOADING A DOCUMENT FOR THE FIRST TIME 
+    10 d=0.8102 [safety] Safety - SMS User Manual_Office_R0_31.01.202 p2 · TABLE OF CONTENTS
+  EXPECTED chunk vector rank 6 of 40, distance 0.7128
+  lexical top-5 in [safety]:
+    1 lex=2.300 d=0.9301 Safety - SMS User Manual_Office_R0_31.01.2 p12 · 3.2 DASHBOARD
+    2 lex=2.000 d=0.8236 Safety - SMS User Manual_Office_R0_31.01.2 p16 · Document
+    3 lex=2.000 d=1.0333 Safety - SMS User Manual_Office_R0_31.01.2 p10 · 3.1.6 Hyperlinking in SMS documents
+    4 lex=1.800 d=0.7549 Safety - SMS User Manual_Office_R0_31.01.2 p7 · 3.1.3 Details of SMS documents
+    5 lex=1.600 d=1.0738 Safety - Risk Assessment User Manual_Offic p25 · 8. KEY PERSONNEL – MANAGING APPROVERS
+    expected chunk lexical rank in safety: None
+  five excerpts under r6 (rescue):
+    1 d=0.6310 Safety - SMS User Manual_Office_R0_31.01.2 p16 · Document
+    2 d=0.6447 Safety - SMS User Manual_Office_R0_31.01.2 p18 · 4.2 UPLOADING REVISIONS OF ALREADY UPLOA
+    3 d=0.6555 Safety - SMS User Manual_Office_R0_31.01.2 p18 · 4.2.1 Proposal
+    4 d=0.6753 Safety - SMS User Manual_Office_R0_31.01.2 p17 · 4.1.2 Approval
+    5 d=0.9301 Safety - SMS User Manual_Office_R0_31.01.2 p12 · 3.2 DASHBOARD
+    rescue displaced: d=0.6914 Safety - SMS User Manual_Office_R0_31.01.2 p20 · Document   (rescued chunk d=0.9301, lex=2.300)
+
+==============================================================================================================
+pmsoffice-5: On the PMS Dashboard, what fields can I filter by — and is that the same set of filters available on the vessel side?
+  routed -> answer / technical  reason=explicit: module name in question  (explicit=technical: module name in question)
+  per-module best distance (top-40): {'technical': 0.7447, 'crewing': 0.9086, 'safety': 1.0105}
+  vector top-10:
+     1 d=0.7447 [technical] Technical - PMS User Manual For Office_Sail  p9 · 1.1.3.2 HOW TO USE FILTER   <== EXPECTED
+     2 d=0.7646 [technical] Technical - PMS User Manual For Office_Sail  p53 · 1.1.9.3 HOW TO APPLY FILTER
+     3 d=0.8487 [technical] Technical - PMS User Manual_Vessel Specific_ p46 · 1.1.9.3 HOW TO APPLY FILTER
+     4 d=0.8585 [technical] Technical - PMS User Manual For Office_Sail  p27 · 1.1.4.6 HOW TO SEARCH AND APPLY A FILTER
+     5 d=0.9013 [technical] Technical - PMS User Manual For Office_Sail  p38 · 1.1.6.2 HOW TO APPLY FILTER
+     6 d=0.9086 [crewing] Crewing - Crewing User Manual R2_10.06.2026. p76 · 1.9.1.2 HOW TO APPLY FILTER
+     7 d=0.9234 [technical] Technical - PMS User Manual_Vessel Specific_ p22 · 1.1.4.3 HOW TO SEARCH AND APPLY A FILTER
+     8 d=0.9287 [technical] Technical - PMS User Manual For Office_Sail  p47 · 1.1.7.7 HOW TO APPLY FILTER
+     9 d=0.9298 [technical] Technical - PMS User Manual_Vessel Specific_ p9 · 1.1.3.2 HOW TO USE FILTER
+    10 d=0.9425 [technical] Technical - PMS User Manual_Vessel Specific_ p40 · 1.1.7.5 HOW TO APPLY FILTER
+  EXPECTED chunk vector rank 1 of 40, distance 0.7447
+  lexical top-5 in [technical]:
+    1 lex=1.800 d=1.0352 Technical - Cert. & Surveys User Manual Fo p10 · 1.1.4.2 HOW TO APPLY FILTER
+    2 lex=1.800 d=1.0319 Technical - Defects User Manual For Office p11 · 1.1.3.6 HOW TO APPLY FILTER
+    3 lex=1.700 d=1.0592 Technical - Defects User Manual For Office p19 · 1.1.5.3 HOW TO APPLY FILTER
+    4 lex=1.600 d=0.7447 Technical - PMS User Manual For Office_Sai p9 · 1.1.3.2 HOW TO USE FILTER   <== EXPECTED
+    5 lex=1.600 d=0.8585 Technical - PMS User Manual For Office_Sai p27 · 1.1.4.6 HOW TO SEARCH AND APPLY A FILTER
+    expected chunk lexical rank in technical: 4
+  five excerpts under r6 (rescue):
+    1 d=0.7447 Technical - PMS User Manual For Office_Sai p9 · 1.1.3.2 HOW TO USE FILTER   <== EXPECTED
+    2 d=0.7646 Technical - PMS User Manual For Office_Sai p53 · 1.1.9.3 HOW TO APPLY FILTER
+    3 d=0.8487 Technical - PMS User Manual_Vessel Specifi p46 · 1.1.9.3 HOW TO APPLY FILTER
+    4 d=0.8585 Technical - PMS User Manual For Office_Sai p27 · 1.1.4.6 HOW TO SEARCH AND APPLY A FILTER
+    5 d=1.0352 Technical - Cert. & Surveys User Manual Fo p10 · 1.1.4.2 HOW TO APPLY FILTER
+    rescue displaced: d=0.9013 Technical - PMS User Manual For Office_Sai p38 · 1.1.6.2 HOW TO APPLY FILTER   (rescued chunk d=1.0352, lex=1.800)

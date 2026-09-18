@@ -1,0 +1,4918 @@
+{
+ "what": "Per-run verdicts for all 171 stored D4 manual-coverage runs, judged against the UNTRUNCATED excerpts.",
+ "summary": {
+  "runs": 171,
+  "by_verdict": {
+   "correct": 105,
+   "correct_paraphrase": 52,
+   "honest_limit_but_evidence_supplied": 1,
+   "honest_limit_correct": 5,
+   "partial": 5,
+   "wrong": 3
+  },
+  "by_defect_class": {
+   "false_claim_of_missing_evidence": 4,
+   "none": 154,
+   "procedural_mistake": 1,
+   "retrieval_defect": 8,
+   "routing_defect": 3,
+   "unsupported_comparison": 1
+  },
+  "runs_with_answer_defect": [
+   "certsurveys-3 r2",
+   "hist-3 r1",
+   "pmsoffice-5 r3",
+   "pmsvessel-3 r2",
+   "safety-meeting-1 r1",
+   "safety-meeting-1 r2"
+  ],
+  "runs_with_retrieval_or_routing_defect": [
+   "hist-1 r1",
+   "hist-1 r2",
+   "hist-1 r3",
+   "master-review-2 r1",
+   "master-review-2 r2",
+   "master-review-2 r3",
+   "pmsoffice-5 r1",
+   "pmsoffice-5 r2",
+   "sms-office-1 r1",
+   "sms-office-1 r2",
+   "sms-office-1 r3"
+  ],
+  "cases_clean_in_all_three_runs": [
+   "certsurveys-1",
+   "certsurveys-2",
+   "crewing-1",
+   "crewing-2",
+   "crewing-3",
+   "crewing-4",
+   "crewing-5",
+   "crewing-6",
+   "defects-1",
+   "defects-2",
+   "defects-3",
+   "fn-1",
+   "fn-2",
+   "fs-off-1",
+   "fs-off-2",
+   "fs-ves-1",
+   "fs-ves-2",
+   "hist-2",
+   "inc-1",
+   "inc-2",
+   "inc-3",
+   "ll-1",
+   "ll-2",
+   "master-review-1",
+   "moc-office-1",
+   "moc-office-2",
+   "moc-vessel-1",
+   "moc-vessel-2",
+   "nm-1",
+   "nm-2",
+   "nm-3",
+   "pmsoffice-1",
+   "pmsoffice-2",
+   "pmsoffice-3",
+   "pmsoffice-4",
+   "pmsvessel-1",
+   "pmsvessel-2",
+   "pmsvessel-4",
+   "prep-1",
+   "prep-2",
+   "prep-3",
+   "ra-office-1",
+   "ra-office-2",
+   "ra-office-3",
+   "ra-vessel-1",
+   "ra-vessel-2",
+   "safety-meeting-2",
+   "sms-office-2",
+   "sms-office-3"
+  ],
+  "cases_clean_count": 49
+ },
+ "records": [
+  {
+   "case": "fs-off-1",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Draft-only deletion rule reproduced from the supplied Fleet Sharing Office p.5 excerpt.",
+   "expected_source": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf p[5]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 2.0 FLEET SHARING – OVERVIEW (p.4)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.1 DESCRIPTION (p.6)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-off-1",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Draft-only deletion rule reproduced from the supplied Fleet Sharing Office p.5 excerpt.",
+   "expected_source": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf p[5]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 2.0 FLEET SHARING – OVERVIEW (p.4)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.1 DESCRIPTION (p.6)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-off-1",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Draft-only deletion rule reproduced from the supplied Fleet Sharing Office p.5 excerpt.",
+   "expected_source": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf p[5]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 2.0 FLEET SHARING – OVERVIEW (p.4)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.1 DESCRIPTION (p.6)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-off-2",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add-action steps match the supplied §3.2 Actions p.6 excerpt; expected source cited, though not first.",
+   "expected_source": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-off-2",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add-action steps match the supplied §3.2 Actions p.6 excerpt; expected source cited, though not first.",
+   "expected_source": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-off-2",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add-action steps match the supplied §3.2 Actions p.6 excerpt; expected source cited, though not first.",
+   "expected_source": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-ves-1",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Read-only Step 1 restriction matches the supplied Vessel p.5 excerpt.",
+   "expected_source": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf p[5]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 1 – Description (p.5)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — 1.2 FLEET SHARING – OVERVIEW (p.4)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-ves-1",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Read-only Step 1 restriction matches the supplied Vessel p.5 excerpt.",
+   "expected_source": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf p[5]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 1 – Description (p.5)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — 1.2 FLEET SHARING – OVERVIEW (p.4)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-ves-1",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Read-only Step 1 restriction matches the supplied Vessel p.5 excerpt.",
+   "expected_source": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf p[5]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 1 – Description (p.5)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)",
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — 1.2 FLEET SHARING – OVERVIEW (p.4)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-ves-2",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Close-out steps (Date Completed, attachments, Submit) match the supplied Vessel p.6 excerpt.",
+   "expected_source": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-ves-2",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Close-out steps (Date Completed, attachments, Submit) match the supplied Vessel p.6 excerpt.",
+   "expected_source": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fs-ves-2",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Close-out steps (Date Completed, attachments, Submit) match the supplied Vessel p.6 excerpt.",
+   "expected_source": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)",
+    "Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "hist-1",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "wrong",
+   "citation_assessment": "unsupported",
+   "defect_class": "routing_defect",
+   "reason": "Routed to Technical: all five excerpts are PMS work-order-review text; the Audit History Review page (p.16, indexed) was never a candidate, so the answer describes the wrong module's review field.",
+   "expected_source": "Audit - History Manual_R1_30.06.2026.pdf p[16]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Technical - Ship-Side (Vessel Crew) Operational Notes — 1.1.13.3 Approvals as Seen From the Ship",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)",
+    "Technical - Sync (Operational) User Manual — 1.2.8 What Happens When Ship and Office Edit the Same Record",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.35)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "hist-1",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "wrong",
+   "citation_assessment": "unsupported",
+   "defect_class": "routing_defect",
+   "reason": "Routed to Technical: all five excerpts are PMS work-order-review text; the Audit History Review page (p.16, indexed) was never a candidate, so the answer describes the wrong module's review field.",
+   "expected_source": "Audit - History Manual_R1_30.06.2026.pdf p[16]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Technical - Ship-Side (Vessel Crew) Operational Notes — 1.1.13.3 Approvals as Seen From the Ship",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)",
+    "Technical - Sync (Operational) User Manual — 1.2.8 What Happens When Ship and Office Edit the Same Record",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.35)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "hist-1",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "wrong",
+   "citation_assessment": "unsupported",
+   "defect_class": "routing_defect",
+   "reason": "Routed to Technical: all five excerpts are PMS work-order-review text; the Audit History Review page (p.16, indexed) was never a candidate, so the answer describes the wrong module's review field.",
+   "expected_source": "Audit - History Manual_R1_30.06.2026.pdf p[16]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Technical - Ship-Side (Vessel Crew) Operational Notes — 1.1.13.3 Approvals as Seen From the Ship",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)",
+    "Technical - Sync (Operational) User Manual — 1.2.8 What Happens When Ship and Office Edit the Same Record",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.35)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "hist-2",
+   "kind": "table",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Pencil icon described as opening the record for editing — the action-icon table's wording in other words.",
+   "expected_source": "Audit - History Manual_R1_30.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - History Manual_R1_30.06.2026 — 1.4 ACTION ICONS. (p.6)",
+    "Audit - History Manual_R1_30.06.2026 — 2.1.1 INSPECTION RECORD PAGE: (p.8)",
+    "Audit - History Manual_R1_30.06.2026 — 3.0 DATA ENTRY ACROSS INSPECTION TYPES (p.14)",
+    "Audit - History Manual_R1_30.06.2026 — Preamble (p.15)",
+    "Audit - History Manual_R1_30.06.2026 — 3.1 INSPECTION PAGE: (p.14)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "hist-2",
+   "kind": "table",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Pencil icon described as opening the record for editing — the action-icon table's wording in other words.",
+   "expected_source": "Audit - History Manual_R1_30.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - History Manual_R1_30.06.2026 — 1.4 ACTION ICONS. (p.6)",
+    "Audit - History Manual_R1_30.06.2026 — 2.1.1 INSPECTION RECORD PAGE: (p.8)",
+    "Audit - History Manual_R1_30.06.2026 — 3.0 DATA ENTRY ACROSS INSPECTION TYPES (p.14)",
+    "Audit - History Manual_R1_30.06.2026 — Preamble (p.15)",
+    "Audit - History Manual_R1_30.06.2026 — 3.1 INSPECTION PAGE: (p.14)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "hist-2",
+   "kind": "table",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Pencil icon described as opening the record for editing — the action-icon table's wording in other words.",
+   "expected_source": "Audit - History Manual_R1_30.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - History Manual_R1_30.06.2026 — 1.4 ACTION ICONS. (p.6)",
+    "Audit - History Manual_R1_30.06.2026 — 2.1.1 INSPECTION RECORD PAGE: (p.8)",
+    "Audit - History Manual_R1_30.06.2026 — 3.0 DATA ENTRY ACROSS INSPECTION TYPES (p.14)",
+    "Audit - History Manual_R1_30.06.2026 — Preamble (p.15)",
+    "Audit - History Manual_R1_30.06.2026 — 3.1 INSPECTION PAGE: (p.14)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "hist-3",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "partial",
+   "citation_assessment": "supports",
+   "defect_class": "procedural_mistake",
+   "reason": "ADJUDICATED defect: step 3 still says 'Enter the Negative observation' although the question is about a Positive Observation or LAE finding, and the Observation / Positive Finding / LAE page toggle in the supplied p.9 screenshot text is omitted. Runs 2 and 3 generalise the step correctly.",
+   "expected_source": "Audit - History Manual_R1_30.06.2026.pdf p[10]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)",
+    "Audit - History Manual_R1_30.06.2026 — Document (p.13)",
+    "Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)",
+    "Audit - History Manual_R1_30.06.2026 — Preamble (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "hist-3",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Confirms the attachment procedure applies to Positive Observation and LAE findings, per the p.10 note.",
+   "expected_source": "Audit - History Manual_R1_30.06.2026.pdf p[10]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)",
+    "Audit - History Manual_R1_30.06.2026 — Document (p.13)",
+    "Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)",
+    "Audit - History Manual_R1_30.06.2026 — Preamble (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "hist-3",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Confirms the attachment procedure applies to Positive Observation and LAE findings, per the p.10 note.",
+   "expected_source": "Audit - History Manual_R1_30.06.2026.pdf p[10]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)",
+    "Audit - History Manual_R1_30.06.2026 — Document (p.13)",
+    "Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)",
+    "Audit - History Manual_R1_30.06.2026 — Preamble (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "prep-1",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Creation steps and the email-notification note both appear in the supplied §3.1 p.13 excerpt.",
+   "expected_source": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)",
+    "Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\\CDI UPLOAD (p.11)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "prep-1",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Creation steps and the email-notification note both appear in the supplied §3.1 p.13 excerpt.",
+   "expected_source": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)",
+    "Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\\CDI UPLOAD (p.11)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "prep-1",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Creation steps and the email-notification note both appear in the supplied §3.1 p.13 excerpt.",
+   "expected_source": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)",
+    "Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\\CDI UPLOAD (p.11)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "prep-2",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Locked fields and the removal of vessel answers match the supplied §2.7 p.11 excerpt.",
+   "expected_source": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2.7 EDITING EXISTING PREPARATION (p.11)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.12)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)",
+    "Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2.4 PIQ ICON (p.8)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "prep-2",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Locked fields and the removal of vessel answers match the supplied §2.7 p.11 excerpt.",
+   "expected_source": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2.7 EDITING EXISTING PREPARATION (p.11)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.12)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)",
+    "Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2.4 PIQ ICON (p.8)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "prep-2",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Locked fields and the removal of vessel answers match the supplied §2.7 p.11 excerpt.",
+   "expected_source": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2.7 EDITING EXISTING PREPARATION (p.11)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.12)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)",
+    "Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2.4 PIQ ICON (p.8)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "prep-3",
+   "kind": "screenshot",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add/view/download/delete all supported by the supplied §4.3.4 p.19 excerpt ('uploaded attachments … can be viewed, downloaded, or deleted'); the preferred p.20 screenshot chunk was not retrieved but nothing in the answer is unsupported.",
+   "expected_source": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf p[20]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2.3 ATTACHMENT ICON (p.7)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.6 SAVE THE PREPARATION CHECKLIST (p.26)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.5 Delete Attachments (p.21)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "prep-3",
+   "kind": "screenshot",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add/view/download/delete all supported by the supplied §4.3.4 p.19 excerpt ('uploaded attachments … can be viewed, downloaded, or deleted'); the preferred p.20 screenshot chunk was not retrieved but nothing in the answer is unsupported.",
+   "expected_source": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf p[20]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2.3 ATTACHMENT ICON (p.7)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.6 SAVE THE PREPARATION CHECKLIST (p.26)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.5 Delete Attachments (p.21)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "prep-3",
+   "kind": "screenshot",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add/view/download/delete all supported by the supplied §4.3.4 p.19 excerpt ('uploaded attachments … can be viewed, downloaded, or deleted'); the preferred p.20 screenshot chunk was not retrieved but nothing in the answer is unsupported.",
+   "expected_source": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf p[20]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 2.3 ATTACHMENT ICON (p.7)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.6 SAVE THE PREPARATION CHECKLIST (p.26)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.5 Delete Attachments (p.21)",
+    "Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "inc-1",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Office-only closeout conveyed in other words; supported by the supplied Part K p.18 excerpt.",
+   "expected_source": "Incident - Incident User Manual R0_20.05.2026.pdf p[18]",
+   "expected_source_supplied_as_excerpt": [
+    5
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2,
+    5
+   ],
+   "citations_shown": [
+    "Incident - Incident User Manual R0_20.05.2026 — Report Closed (p.19)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 6. OFFICE CLOSEOUT (p.11)",
+    "Incident - Incident User Manual R0_20.05.2026 — Pending Office Closure (p.19)",
+    "Incident - Incident User Manual R0_20.05.2026 — Part A: Description (p.6)",
+    "Incident - Incident User Manual R0_20.05.2026 — Part K: Office Closeout (p.18)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "inc-1",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Office-only closeout conveyed in other words; supported by the supplied Part K p.18 excerpt.",
+   "expected_source": "Incident - Incident User Manual R0_20.05.2026.pdf p[18]",
+   "expected_source_supplied_as_excerpt": [
+    5
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2,
+    5
+   ],
+   "citations_shown": [
+    "Incident - Incident User Manual R0_20.05.2026 — Report Closed (p.19)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 6. OFFICE CLOSEOUT (p.11)",
+    "Incident - Incident User Manual R0_20.05.2026 — Pending Office Closure (p.19)",
+    "Incident - Incident User Manual R0_20.05.2026 — Part A: Description (p.6)",
+    "Incident - Incident User Manual R0_20.05.2026 — Part K: Office Closeout (p.18)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "inc-1",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Office-only closeout conveyed in other words; supported by the supplied Part K p.18 excerpt.",
+   "expected_source": "Incident - Incident User Manual R0_20.05.2026.pdf p[18]",
+   "expected_source_supplied_as_excerpt": [
+    5
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2,
+    5
+   ],
+   "citations_shown": [
+    "Incident - Incident User Manual R0_20.05.2026 — Report Closed (p.19)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 6. OFFICE CLOSEOUT (p.11)",
+    "Incident - Incident User Manual R0_20.05.2026 — Pending Office Closure (p.19)",
+    "Incident - Incident User Manual R0_20.05.2026 — Part A: Description (p.6)",
+    "Incident - Incident User Manual R0_20.05.2026 — Part K: Office Closeout (p.18)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "inc-2",
+   "kind": "table",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Overdue-action meaning reproduced from the supplied p.19 excerpt.",
+   "expected_source": "Incident - Incident User Manual R0_20.05.2026.pdf p[19]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3,
+    4,
+    5
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Incident - Incident User Manual R0_20.05.2026 — Overdue Action (p.19)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Incident User Manual R0_20.05.2026 — Action Due (p.19)",
+    "Incident - Incident User Manual R0_20.05.2026 — 14. STATUS INDICATORS (p.19)",
+    "Incident - Incident User Manual R0_20.05.2026 — 14. STATUS INDICATORS (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "inc-2",
+   "kind": "table",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Overdue-action meaning reproduced from the supplied p.19 excerpt.",
+   "expected_source": "Incident - Incident User Manual R0_20.05.2026.pdf p[19]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3,
+    4,
+    5
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Incident - Incident User Manual R0_20.05.2026 — Overdue Action (p.19)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Incident User Manual R0_20.05.2026 — Action Due (p.19)",
+    "Incident - Incident User Manual R0_20.05.2026 — 14. STATUS INDICATORS (p.19)",
+    "Incident - Incident User Manual R0_20.05.2026 — 14. STATUS INDICATORS (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "inc-2",
+   "kind": "table",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Overdue-action meaning reproduced from the supplied p.19 excerpt.",
+   "expected_source": "Incident - Incident User Manual R0_20.05.2026.pdf p[19]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3,
+    4,
+    5
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Incident - Incident User Manual R0_20.05.2026 — Overdue Action (p.19)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Incident User Manual R0_20.05.2026 — Action Due (p.19)",
+    "Incident - Incident User Manual R0_20.05.2026 — 14. STATUS INDICATORS (p.19)",
+    "Incident - Incident User Manual R0_20.05.2026 — 14. STATUS INDICATORS (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "inc-3",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Method 2 sequence-of-events steps match the supplied p.9 excerpt.",
+   "expected_source": "Incident - Incident User Manual R0_20.05.2026.pdf p[9]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Incident - Incident User Manual R0_20.05.2026 — Part D: Sequence of Events (p.9)",
+    "Incident - Incident User Manual R0_20.05.2026 — ⮚ METHOD 2: (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "inc-3",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Method 2 sequence-of-events steps match the supplied p.9 excerpt.",
+   "expected_source": "Incident - Incident User Manual R0_20.05.2026.pdf p[9]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Incident - Incident User Manual R0_20.05.2026 — Part D: Sequence of Events (p.9)",
+    "Incident - Incident User Manual R0_20.05.2026 — ⮚ METHOD 2: (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "inc-3",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Method 2 sequence-of-events steps match the supplied p.9 excerpt.",
+   "expected_source": "Incident - Incident User Manual R0_20.05.2026.pdf p[9]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Incident - Incident User Manual R0_20.05.2026 — Part D: Sequence of Events (p.9)",
+    "Incident - Incident User Manual R0_20.05.2026 — ⮚ METHOD 2: (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fn-1",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Submit-after-all-dates condition matches the supplied Vessel p.7 note.",
+   "expected_source": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    4
+   ],
+   "citations_shown": [
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Document (p.7)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — 3. Actions (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — FLEET NOTIFICATION - USER MANUAL (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — Document (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Fleet Notification (p.8)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fn-1",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Submit-after-all-dates condition matches the supplied Vessel p.7 note.",
+   "expected_source": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    4
+   ],
+   "citations_shown": [
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Document (p.7)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — 3. Actions (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — FLEET NOTIFICATION - USER MANUAL (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — Document (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Fleet Notification (p.8)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fn-1",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Submit-after-all-dates condition matches the supplied Vessel p.7 note.",
+   "expected_source": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    4
+   ],
+   "citations_shown": [
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Document (p.7)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — 3. Actions (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — FLEET NOTIFICATION - USER MANUAL (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — Document (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Fleet Notification (p.8)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fn-2",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Discussion-record steps match the supplied Vessel p.6 excerpt.",
+   "expected_source": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — FLEET NOTIFICATION - USER MANUAL (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.7)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Fleet Notification (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Fleet Notification (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — 2. FLEET NOTIFICATION OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fn-2",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Discussion-record steps match the supplied Vessel p.6 excerpt.",
+   "expected_source": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — FLEET NOTIFICATION - USER MANUAL (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.7)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Fleet Notification (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Fleet Notification (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — 2. FLEET NOTIFICATION OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "fn-2",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Discussion-record steps match the supplied Vessel p.6 excerpt.",
+   "expected_source": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — FLEET NOTIFICATION - USER MANUAL (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.7)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Fleet Notification (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Fleet Notification (p.8)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — 2. FLEET NOTIFICATION OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ll-1",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "View-only restriction for vessel users conveyed in other words; supported by the supplied p.6 excerpt.",
+   "expected_source": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — 3. LESSON LEARNT FORM (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.9)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.7)",
+    "Incident - Incident User Manual R0_20.05.2026 — Part H: Lessons Learnt (p.16)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — Document (p.8)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ll-1",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "View-only restriction for vessel users conveyed in other words; supported by the supplied p.6 excerpt.",
+   "expected_source": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — 3. LESSON LEARNT FORM (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.9)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.7)",
+    "Incident - Incident User Manual R0_20.05.2026 — Part H: Lessons Learnt (p.16)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — Document (p.8)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ll-1",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "View-only restriction for vessel users conveyed in other words; supported by the supplied p.6 excerpt.",
+   "expected_source": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — 3. LESSON LEARNT FORM (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.9)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.7)",
+    "Incident - Incident User Manual R0_20.05.2026 — Part H: Lessons Learnt (p.16)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — Document (p.8)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ll-2",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Discussion and submission steps match the supplied p.7 excerpt.",
+   "expected_source": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    4
+   ],
+   "citations_shown": [
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.7)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.9)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — Table of Contents (p.2)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — FLEET NOTIFICATION - USER MANUAL (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — 2. LESSON LEARNT – OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ll-2",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Discussion and submission steps match the supplied p.7 excerpt.",
+   "expected_source": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    4
+   ],
+   "citations_shown": [
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.7)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.9)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — Table of Contents (p.2)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — FLEET NOTIFICATION - USER MANUAL (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — 2. LESSON LEARNT – OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ll-2",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Discussion and submission steps match the supplied p.7 excerpt.",
+   "expected_source": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    4
+   ],
+   "citations_shown": [
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.7)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — LESSON LEARNT USER MANUAL (p.9)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — Table of Contents (p.2)",
+    "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — FLEET NOTIFICATION - USER MANUAL (p.6)",
+    "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026 — 2. LESSON LEARNT – OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "nm-1",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Directs the user to the Significant Near Miss form per the supplied p.8 note.",
+   "expected_source": "Incident - Near Miss User Manual R1_30.05.2026.pdf p[8]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Incident - Near Miss User Manual R1_30.05.2026 — 4. HOW TO FILL NEAR MISS FORM – PART A (p.6)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — Document (p.8)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — NEAR MISS USER MANUAL (p.7)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "nm-1",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Directs the user to the Significant Near Miss form per the supplied p.8 note.",
+   "expected_source": "Incident - Near Miss User Manual R1_30.05.2026.pdf p[8]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Incident - Near Miss User Manual R1_30.05.2026 — 4. HOW TO FILL NEAR MISS FORM – PART A (p.6)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — Document (p.8)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — NEAR MISS USER MANUAL (p.7)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "nm-1",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Directs the user to the Significant Near Miss form per the supplied p.8 note.",
+   "expected_source": "Incident - Near Miss User Manual R1_30.05.2026.pdf p[8]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Incident - Near Miss User Manual R1_30.05.2026 — 4. HOW TO FILL NEAR MISS FORM – PART A (p.6)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — Document (p.8)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — NEAR MISS USER MANUAL (p.7)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "nm-2",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Office-only closeout restriction conveyed in other words; supported by the supplied p.11 excerpt.",
+   "expected_source": "Incident - Near Miss User Manual R1_30.05.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Incident - Near Miss User Manual R1_30.05.2026 — 6. OFFICE CLOSEOUT (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — Document (p.8)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 4. HOW TO FILL NEAR MISS FORM – PART A (p.6)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — NEAR MISS USER MANUAL (p.7)",
+    "Incident - Incident User Manual R0_20.05.2026 — Pending Office Closure (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "nm-2",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Office-only closeout restriction conveyed in other words; supported by the supplied p.11 excerpt.",
+   "expected_source": "Incident - Near Miss User Manual R1_30.05.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Incident - Near Miss User Manual R1_30.05.2026 — 6. OFFICE CLOSEOUT (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — Document (p.8)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 4. HOW TO FILL NEAR MISS FORM – PART A (p.6)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — NEAR MISS USER MANUAL (p.7)",
+    "Incident - Incident User Manual R0_20.05.2026 — Pending Office Closure (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "nm-2",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Office-only closeout restriction conveyed in other words; supported by the supplied p.11 excerpt.",
+   "expected_source": "Incident - Near Miss User Manual R1_30.05.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Incident - Near Miss User Manual R1_30.05.2026 — 6. OFFICE CLOSEOUT (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — Document (p.8)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 4. HOW TO FILL NEAR MISS FORM – PART A (p.6)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — NEAR MISS USER MANUAL (p.7)",
+    "Incident - Incident User Manual R0_20.05.2026 — Pending Office Closure (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "nm-3",
+   "kind": "table",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Actions-due indicator meaning matches the supplied p.11 excerpt.",
+   "expected_source": "Incident - Near Miss User Manual R1_30.05.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "nm-3",
+   "kind": "table",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Actions-due indicator meaning matches the supplied p.11 excerpt.",
+   "expected_source": "Incident - Near Miss User Manual R1_30.05.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "nm-3",
+   "kind": "table",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Actions-due indicator meaning matches the supplied p.11 excerpt.",
+   "expected_source": "Incident - Near Miss User Manual R1_30.05.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 7. STATUS INDICATORS (p.11)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)",
+    "Incident - Near Miss User Manual R1_30.05.2026 — 2. NEAR MISS - OVERVIEW (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-1",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "New-crew button and Save Draft both match the supplied p.14 excerpt.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[14]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.5 HOW TO EXPORT CREW DETAILS (p.19)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD (p.19)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.9.2.3 HOW TO ENTER RECORDS (p.78)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-1",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "New-crew button and Save Draft both match the supplied p.14 excerpt.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[14]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.5 HOW TO EXPORT CREW DETAILS (p.19)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD (p.19)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.9.2.3 HOW TO ENTER RECORDS (p.78)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-1",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "New-crew button and Save Draft both match the supplied p.14 excerpt.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[14]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.5 HOW TO EXPORT CREW DETAILS (p.19)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.4 HOW TO EDIT OR DELETE A CREW RECORD (p.19)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.9.2.3 HOW TO ENTER RECORDS (p.78)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-2",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Admin-created-and-released form requirement matches the supplied p.48 excerpt; the answer's source line lists another page first.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[48]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.3 HOW TO REVIEW A PROMOTION RECORD (p.46)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.5 HOW TO EXECUTE A PROMOTION (p.48)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Introduction (p.45)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Document (p.100)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.1 HOW TO ACCESS PROMOTIONS (p.45)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-2",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Admin-created-and-released form requirement matches the supplied p.48 excerpt; the answer's source line lists another page first.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[48]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.3 HOW TO REVIEW A PROMOTION RECORD (p.46)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.5 HOW TO EXECUTE A PROMOTION (p.48)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Introduction (p.45)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Document (p.100)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.1 HOW TO ACCESS PROMOTIONS (p.45)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-2",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Admin-created-and-released form requirement matches the supplied p.48 excerpt; the answer's source line lists another page first.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[48]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.3 HOW TO REVIEW A PROMOTION RECORD (p.46)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.5 HOW TO EXECUTE A PROMOTION (p.48)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Introduction (p.45)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Document (p.100)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.1 HOW TO ACCESS PROMOTIONS (p.45)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-3",
+   "kind": "table",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Colour meanings match the supplied p.39 excerpt.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[39]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.1.1 HOW TO ACCESS CREW DUE / OVERDUE STATUS (p.39)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.41)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Introduction (p.39)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.27)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.72)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-3",
+   "kind": "table",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Colour meanings match the supplied p.39 excerpt.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[39]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.1.1 HOW TO ACCESS CREW DUE / OVERDUE STATUS (p.39)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.41)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Introduction (p.39)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.27)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.72)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-3",
+   "kind": "table",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Colour meanings match the supplied p.39 excerpt.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[39]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.1.1 HOW TO ACCESS CREW DUE / OVERDUE STATUS (p.39)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.41)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Introduction (p.39)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.27)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.72)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-4",
+   "kind": "screenshot",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Compliance check matches the supplied p.41 annotation.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[41]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.41)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Introduction (p.40)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.2.2 HOW TO CREATE NEW ROTATION PLANS (p.40)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.3.3 HOW TO APPROVE OR REJECT A ROTATION PLAN (p.43)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.3.2 HOW TO APPLY FILTER (p.42)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-4",
+   "kind": "screenshot",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Compliance check matches the supplied p.41 annotation.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[41]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.41)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Introduction (p.40)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.2.2 HOW TO CREATE NEW ROTATION PLANS (p.40)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.3.3 HOW TO APPROVE OR REJECT A ROTATION PLAN (p.43)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.3.2 HOW TO APPLY FILTER (p.42)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-4",
+   "kind": "screenshot",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Compliance check matches the supplied p.41 annotation.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[41]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.41)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Introduction (p.40)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.2.2 HOW TO CREATE NEW ROTATION PLANS (p.40)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.3.3 HOW TO APPROVE OR REJECT A ROTATION PLAN (p.43)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.5.3.2 HOW TO APPLY FILTER (p.42)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-5",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Cross-reference resolved to the In-Progress steps exactly as the supplied p.29 note directs; the reproduced steps are the In-Progress ones from p.14, not a widened scope.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[29]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    5
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW POOL (p.29)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.1 HOW TO ACCESS CREW POOL (p.25)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-5",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Cross-reference resolved to the In-Progress steps exactly as the supplied p.29 note directs; the reproduced steps are the In-Progress ones from p.14, not a widened scope.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[29]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    5
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW POOL (p.29)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.1 HOW TO ACCESS CREW POOL (p.25)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-5",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Cross-reference resolved to the In-Progress steps exactly as the supplied p.29 note directs; the reproduced steps are the In-Progress ones from p.14, not a widened scope.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[29]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    5
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW POOL (p.29)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.1 HOW TO ACCESS CREW POOL (p.25)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-6",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "New training record steps match the supplied p.110 excerpt.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[110]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.12.3.3 HOW TO ADD A NEW TRAINING RECORD (p.110)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Preamble (p.89)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.10.1.2 HOW TO CREATE A NEW TRAINING NEED RECORD (p.88)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.12.3.4 HOW TO EDIT TRAINING RECORDS (p.111)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.12.3.1 HOW TO ACCESS TRAINING MATRIX (p.109)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-6",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "New training record steps match the supplied p.110 excerpt.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[110]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.12.3.3 HOW TO ADD A NEW TRAINING RECORD (p.110)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Preamble (p.89)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.10.1.2 HOW TO CREATE A NEW TRAINING NEED RECORD (p.88)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.12.3.4 HOW TO EDIT TRAINING RECORDS (p.111)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.12.3.1 HOW TO ACCESS TRAINING MATRIX (p.109)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "crewing-6",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "New training record steps match the supplied p.110 excerpt.",
+   "expected_source": "Crewing - Crewing User Manual R2_10.06.2026.pdf p[110]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.12.3.3 HOW TO ADD A NEW TRAINING RECORD (p.110)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — Preamble (p.89)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.10.1.2 HOW TO CREATE A NEW TRAINING NEED RECORD (p.88)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.12.3.4 HOW TO EDIT TRAINING RECORDS (p.111)",
+    "Crewing - Crewing User Manual R2_10.06.2026 — 1.12.3.1 HOW TO ACCESS TRAINING MATRIX (p.109)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-office-1",
+   "kind": "table",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Office view/edit/export versus Vessel view-attachments contrast matches the two supplied table excerpts.",
+   "expected_source": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 3. MoC LOG – OVERVIEW (p.7)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 2. MoC LOG - OVERVIEW (p.5)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 2. MoC LOG - OVERVIEW (p.5)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 3. MoC LOG – OVERVIEW (p.7)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 1. OPENING SCREEN (p.4)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-office-1",
+   "kind": "table",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Office view/edit/export versus Vessel view-attachments contrast matches the two supplied table excerpts.",
+   "expected_source": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 3. MoC LOG – OVERVIEW (p.7)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 2. MoC LOG - OVERVIEW (p.5)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 2. MoC LOG - OVERVIEW (p.5)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 3. MoC LOG – OVERVIEW (p.7)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 1. OPENING SCREEN (p.4)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-office-1",
+   "kind": "table",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Office view/edit/export versus Vessel view-attachments contrast matches the two supplied table excerpts.",
+   "expected_source": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 3. MoC LOG – OVERVIEW (p.7)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 2. MoC LOG - OVERVIEW (p.5)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 2. MoC LOG - OVERVIEW (p.5)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 3. MoC LOG – OVERVIEW (p.7)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 1. OPENING SCREEN (p.4)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-office-2",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Link → RA form → stored in the corresponding RA sub-module, supported by the supplied MoC p.13 and Risk Assessment §3 p.6 excerpts.",
+   "expected_source": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.3 COMPLETING OFFICE RA - PART A (OVERVIEW) (p.12)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — PART – C (Continued) (p.13)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.6 COMPLETING OFFICE RA - PART C (CHECKOUT) (p.16)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.1 HOW TO CREATE A OFFICE RISK ASSESSMENT (p.11)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 3. NAVIGATING THE RISK ASSESSMENT SUB-MODULE (p.6)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-office-2",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "ADJUDICATED not a defect: the Office RA / Vessel RA mapping is supported by supplied excerpt [5] (Risk Assessment §3 p.6); the answer's own source line cites only MoC p.13, so the citation is incomplete rather than wrong.",
+   "expected_source": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.3 COMPLETING OFFICE RA - PART A (OVERVIEW) (p.12)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — PART – C (Continued) (p.13)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.6 COMPLETING OFFICE RA - PART C (CHECKOUT) (p.16)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.1 HOW TO CREATE A OFFICE RISK ASSESSMENT (p.11)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 3. NAVIGATING THE RISK ASSESSMENT SUB-MODULE (p.6)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-office-2",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Link → RA form → stored in the corresponding RA sub-module, supported by the supplied MoC p.13 and Risk Assessment §3 p.6 excerpts.",
+   "expected_source": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.3 COMPLETING OFFICE RA - PART A (OVERVIEW) (p.12)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — PART – C (Continued) (p.13)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.6 COMPLETING OFFICE RA - PART C (CHECKOUT) (p.16)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.1 HOW TO CREATE A OFFICE RISK ASSESSMENT (p.11)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 3. NAVIGATING THE RISK ASSESSMENT SUB-MODULE (p.6)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-vessel-1",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "'Not Approved' outcome matches the supplied Vessel Part D p.11 note; correctly avoids the Part B 'Not Processed' rule.",
+   "expected_source": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    3
+   ],
+   "citations_shown": [
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 7. HOW TO FILL MOC FORM – PART D (p.11)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — Approval (p.15)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 7. HOW TO FILL MOC FORM – PART D (p.11)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — Approval (p.15)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 5. HOW TO FILL MOC FORM – PART B (p.7)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-vessel-1",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "'Not Approved' outcome matches the supplied Vessel Part D p.11 note; correctly avoids the Part B 'Not Processed' rule.",
+   "expected_source": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    3
+   ],
+   "citations_shown": [
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 7. HOW TO FILL MOC FORM – PART D (p.11)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — Approval (p.15)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 7. HOW TO FILL MOC FORM – PART D (p.11)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — Approval (p.15)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 5. HOW TO FILL MOC FORM – PART B (p.7)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-vessel-1",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "'Not Approved' outcome matches the supplied Vessel Part D p.11 note; correctly avoids the Part B 'Not Processed' rule.",
+   "expected_source": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    3
+   ],
+   "citations_shown": [
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 7. HOW TO FILL MOC FORM – PART D (p.11)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — Approval (p.15)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 7. HOW TO FILL MOC FORM – PART D (p.11)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — Approval (p.15)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 5. HOW TO FILL MOC FORM – PART B (p.7)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-vessel-2",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Part A steps match the supplied Vessel p.6 excerpt.",
+   "expected_source": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 3. HOW TO FILL MOC FORM – PART A (p.6)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 5. HOW TO FILL MOC FORM – PART A (p.9)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 5. HOW TO FILL MOC FORM – PART A (p.9)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 7. HOW TO FILL MOC FORM – PART D (p.11)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — Contents (p.2)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-vessel-2",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Part A steps match the supplied Vessel p.6 excerpt.",
+   "expected_source": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 3. HOW TO FILL MOC FORM – PART A (p.6)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 5. HOW TO FILL MOC FORM – PART A (p.9)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 5. HOW TO FILL MOC FORM – PART A (p.9)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 7. HOW TO FILL MOC FORM – PART D (p.11)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — Contents (p.2)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "moc-vessel-2",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Part A steps match the supplied Vessel p.6 excerpt.",
+   "expected_source": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 3. HOW TO FILL MOC FORM – PART A (p.6)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 5. HOW TO FILL MOC FORM – PART A (p.9)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 5. HOW TO FILL MOC FORM – PART A (p.9)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 7. HOW TO FILL MOC FORM – PART D (p.11)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — Contents (p.2)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "master-review-1",
+   "kind": "table",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add Attachment / View Attachments / Edit Record match the supplied p.6 action-icon table.",
+   "expected_source": "Safety - Master Review Manual R1_10.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)",
+    "Safety - Master Review Manual R1_10.06.2026 — 2. MASTER REVIEW - OVERVIEW (p.5)",
+    "Safety - Master Review Manual R1_10.06.2026 — 3. HOW TO CREATE A NEW RECORD (p.7)",
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)",
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "master-review-1",
+   "kind": "table",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add Attachment / View Attachments / Edit Record match the supplied p.6 action-icon table.",
+   "expected_source": "Safety - Master Review Manual R1_10.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)",
+    "Safety - Master Review Manual R1_10.06.2026 — 2. MASTER REVIEW - OVERVIEW (p.5)",
+    "Safety - Master Review Manual R1_10.06.2026 — 3. HOW TO CREATE A NEW RECORD (p.7)",
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)",
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "master-review-1",
+   "kind": "table",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add Attachment / View Attachments / Edit Record match the supplied p.6 action-icon table.",
+   "expected_source": "Safety - Master Review Manual R1_10.06.2026.pdf p[6]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)",
+    "Safety - Master Review Manual R1_10.06.2026 — 2. MASTER REVIEW - OVERVIEW (p.5)",
+    "Safety - Master Review Manual R1_10.06.2026 — 3. HOW TO CREATE A NEW RECORD (p.7)",
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)",
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.9)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "master-review-2",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "honest_limit_correct",
+   "citation_assessment": "unsupported",
+   "defect_class": "retrieval_defect",
+   "reason": "Declines honestly: the Part E / Office Closeout chunk (Master Review p.11) is indexed but was displaced from the five excerpts by the lexical rescue.",
+   "expected_source": "Safety - Master Review Manual R1_10.06.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Safety - Master Review Manual R1_10.06.2026 — Part – A : Overview (p.7)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 9. HOW TO FILL MOC FORM – PART E & PART F (p.16)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 8. HOW TO FILL MOC FORM – PART E & PART F (p.12)",
+    "Safety - Master Review Manual R1_10.06.2026 — Table of Contents (p.2)",
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "master-review-2",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "honest_limit_correct",
+   "citation_assessment": "unsupported",
+   "defect_class": "retrieval_defect",
+   "reason": "Declines honestly: the Part E / Office Closeout chunk (Master Review p.11) is indexed but was displaced from the five excerpts by the lexical rescue.",
+   "expected_source": "Safety - Master Review Manual R1_10.06.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Safety - Master Review Manual R1_10.06.2026 — Part – A : Overview (p.7)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 9. HOW TO FILL MOC FORM – PART E & PART F (p.16)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 8. HOW TO FILL MOC FORM – PART E & PART F (p.12)",
+    "Safety - Master Review Manual R1_10.06.2026 — Table of Contents (p.2)",
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "master-review-2",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "honest_limit_correct",
+   "citation_assessment": "unsupported",
+   "defect_class": "retrieval_defect",
+   "reason": "Declines honestly: the Part E / Office Closeout chunk (Master Review p.11) is indexed but was displaced from the five excerpts by the lexical rescue.",
+   "expected_source": "Safety - Master Review Manual R1_10.06.2026.pdf p[11]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Safety - Master Review Manual R1_10.06.2026 — Part – A : Overview (p.7)",
+    "Safety - MOC User Manual_Office_R0_31.03.2026 — 9. HOW TO FILL MOC FORM – PART E & PART F (p.16)",
+    "Safety - MOC User Manual_Vessel_R0_31.03.2026 — 8. HOW TO FILL MOC FORM – PART E & PART F (p.12)",
+    "Safety - Master Review Manual R1_10.06.2026 — Table of Contents (p.2)",
+    "Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-office-1",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "One approval level per rank, edit the existing record — matches the supplied p.25 excerpt.",
+   "expected_source": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf p[25]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 8. KEY PERSONNEL – MANAGING APPROVERS (p.25)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — Approval Level Configuration (Applicable to GRA, Office RA & Vessel RA) (p.24)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — Approval Level Configuration (Applicable to GRA, Office RA & Vessel RA) (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-office-1",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "One approval level per rank, edit the existing record — matches the supplied p.25 excerpt.",
+   "expected_source": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf p[25]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 8. KEY PERSONNEL – MANAGING APPROVERS (p.25)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — Approval Level Configuration (Applicable to GRA, Office RA & Vessel RA) (p.24)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — Approval Level Configuration (Applicable to GRA, Office RA & Vessel RA) (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-office-1",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "One approval level per rank, edit the existing record — matches the supplied p.25 excerpt.",
+   "expected_source": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf p[25]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 8. KEY PERSONNEL – MANAGING APPROVERS (p.25)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — Approval Level Configuration (Applicable to GRA, Office RA & Vessel RA) (p.24)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — Approval Level Configuration (Applicable to GRA, Office RA & Vessel RA) (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-office-2",
+   "kind": "screenshot",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "All six hazard categories match the supplied Figure 15 transcription (Office p.13).",
+   "expected_source": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2,
+    3
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.4 COMPLETING OFFICE RA - PART B (HAZARD ASSESSMENT) (p.12)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — Document (p.13)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 8. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART B (p.12)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 8. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART B (p.12)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — ⮚ Method 1: Add Hazards from Database. *(See Figure 26)* (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-office-2",
+   "kind": "screenshot",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "All six hazard categories match the supplied Figure 15 transcription (Office p.13).",
+   "expected_source": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2,
+    3
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.4 COMPLETING OFFICE RA - PART B (HAZARD ASSESSMENT) (p.12)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — Document (p.13)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 8. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART B (p.12)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 8. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART B (p.12)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — ⮚ Method 1: Add Hazards from Database. *(See Figure 26)* (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-office-2",
+   "kind": "screenshot",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "All six hazard categories match the supplied Figure 15 transcription (Office p.13).",
+   "expected_source": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2,
+    3
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 6.4 COMPLETING OFFICE RA - PART B (HAZARD ASSESSMENT) (p.12)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — Document (p.13)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 8. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART B (p.12)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 8. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART B (p.12)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — ⮚ Method 1: Add Hazards from Database. *(See Figure 26)* (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-office-3",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Filtering the same across the three sections, with differing field sets — supported by the supplied p.7 excerpt.",
+   "expected_source": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 4. HOW TO APPLY FILTERS (p.7)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 3. HOW TO APPLY FILTERS (p.6)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 4. HOW TO VIEW GENERIC RISK ASSESSMENT REPORT (p.7)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-office-3",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Filtering the same across the three sections, with differing field sets — supported by the supplied p.7 excerpt.",
+   "expected_source": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 4. HOW TO APPLY FILTERS (p.7)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 3. HOW TO APPLY FILTERS (p.6)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 4. HOW TO VIEW GENERIC RISK ASSESSMENT REPORT (p.7)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-office-3",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Filtering the same across the three sections, with differing field sets — supported by the supplied p.7 excerpt.",
+   "expected_source": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 4. HOW TO APPLY FILTERS (p.7)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 3. HOW TO APPLY FILTERS (p.6)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 4. HOW TO VIEW GENERIC RISK ASSESSMENT REPORT (p.7)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-vessel-1",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Generic RA library view-only for vessel users; the Office edit action is correctly scoped out.",
+   "expected_source": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 4. HOW TO VIEW GENERIC RISK ASSESSMENT REPORT (p.7)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 5. ACCESSING THE GENERIC RISK ASSESSMENT LIBRARY (p.8)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7. VESSEL RISK ASSESSMENT (VRA) OVERVIEW (p.17)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 6. HOW TO CREATE NEW VESSEL RISK ASSESSMENT (p.10)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7.1 CREATING VESSEL RISK ASSESSMENT (VRA) (p.18)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-vessel-1",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Generic RA library view-only for vessel users; the Office edit action is correctly scoped out.",
+   "expected_source": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 4. HOW TO VIEW GENERIC RISK ASSESSMENT REPORT (p.7)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 5. ACCESSING THE GENERIC RISK ASSESSMENT LIBRARY (p.8)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7. VESSEL RISK ASSESSMENT (VRA) OVERVIEW (p.17)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 6. HOW TO CREATE NEW VESSEL RISK ASSESSMENT (p.10)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7.1 CREATING VESSEL RISK ASSESSMENT (VRA) (p.18)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-vessel-1",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Generic RA library view-only for vessel users; the Office edit action is correctly scoped out.",
+   "expected_source": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf p[7]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 4. HOW TO VIEW GENERIC RISK ASSESSMENT REPORT (p.7)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 5. ACCESSING THE GENERIC RISK ASSESSMENT LIBRARY (p.8)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7. VESSEL RISK ASSESSMENT (VRA) OVERVIEW (p.17)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 6. HOW TO CREATE NEW VESSEL RISK ASSESSMENT (p.10)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7.1 CREATING VESSEL RISK ASSESSMENT (VRA) (p.18)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-vessel-2",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Three creation routes match the supplied Vessel p.10 excerpt.",
+   "expected_source": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf p[10]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7.1 CREATING VESSEL RISK ASSESSMENT (VRA) (p.18)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 6. HOW TO CREATE NEW VESSEL RISK ASSESSMENT (p.10)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 7. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART A (p.11)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 5. VESSEL RISK ASSESSMENT (VRA) OVERVIEW (p.9)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7.2 COMPLETING VESSEL RA - PART A (OVERVIEW) (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-vessel-2",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Three creation routes match the supplied Vessel p.10 excerpt.",
+   "expected_source": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf p[10]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7.1 CREATING VESSEL RISK ASSESSMENT (VRA) (p.18)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 6. HOW TO CREATE NEW VESSEL RISK ASSESSMENT (p.10)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 7. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART A (p.11)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 5. VESSEL RISK ASSESSMENT (VRA) OVERVIEW (p.9)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7.2 COMPLETING VESSEL RA - PART A (OVERVIEW) (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "ra-vessel-2",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Three creation routes match the supplied Vessel p.10 excerpt.",
+   "expected_source": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf p[10]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7.1 CREATING VESSEL RISK ASSESSMENT (VRA) (p.18)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 6. HOW TO CREATE NEW VESSEL RISK ASSESSMENT (p.10)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 7. HOW TO FILL VESSEL RISK ASSESSMENT FORM – PART A (p.11)",
+    "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026 — 5. VESSEL RISK ASSESSMENT (VRA) OVERVIEW (p.9)",
+    "Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 7.2 COMPLETING VESSEL RA - PART A (OVERVIEW) (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "sms-office-1",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "wrong_page",
+   "defect_class": "retrieval_defect",
+   "reason": "States honestly that section 4.2.2's own text was not supplied and gives the 4.1.2 steps it did receive; the expected chunk (SMS Office p.21) is indexed but was not retrieved.",
+   "expected_source": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf p[21]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.16)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.2 UPLOADING REVISIONS OF ALREADY UPLOADED DOCUMENTS (p.18)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.2.1 Proposal (p.18)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.1.2 Approval (p.17)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.2 DASHBOARD (p.12)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "sms-office-1",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "wrong_page",
+   "defect_class": "retrieval_defect",
+   "reason": "States honestly that section 4.2.2's own text was not supplied and gives the 4.1.2 steps it did receive; the expected chunk (SMS Office p.21) is indexed but was not retrieved.",
+   "expected_source": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf p[21]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.16)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.2 UPLOADING REVISIONS OF ALREADY UPLOADED DOCUMENTS (p.18)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.2.1 Proposal (p.18)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.1.2 Approval (p.17)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.2 DASHBOARD (p.12)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "sms-office-1",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "wrong_page",
+   "defect_class": "retrieval_defect",
+   "reason": "States honestly that section 4.2.2's own text was not supplied and gives the 4.1.2 steps it did receive; the expected chunk (SMS Office p.21) is indexed but was not retrieved.",
+   "expected_source": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf p[21]",
+   "expected_source_supplied_as_excerpt": null,
+   "excerpts_carrying_all_required_phrases": null,
+   "citations_shown": [
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.16)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.2 UPLOADING REVISIONS OF ALREADY UPLOADED DOCUMENTS (p.18)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.2.1 Proposal (p.18)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.1.2 Approval (p.17)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.2 DASHBOARD (p.12)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "sms-office-2",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Is-Form folder behaviour matches the supplied p.15 excerpt.",
+   "expected_source": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf p[14, 15]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.15)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.16)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.2 How to download forms and checklists (p.6)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.1 UPLOADING A DOCUMENT FOR THE FIRST TIME IN SAIL (p.14)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — TABLE OF CONTENTS (p.2)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "sms-office-2",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Is-Form folder behaviour matches the supplied p.15 excerpt.",
+   "expected_source": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf p[14, 15]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.15)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.16)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.2 How to download forms and checklists (p.6)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.1 UPLOADING A DOCUMENT FOR THE FIRST TIME IN SAIL (p.14)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — TABLE OF CONTENTS (p.2)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "sms-office-2",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Is-Form folder behaviour matches the supplied p.15 excerpt.",
+   "expected_source": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf p[14, 15]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.15)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.16)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.2 How to download forms and checklists (p.6)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 4.1 UPLOADING A DOCUMENT FOR THE FIRST TIME IN SAIL (p.14)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — TABLE OF CONTENTS (p.2)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "sms-office-3",
+   "kind": "screenshot",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Document reference 'Doc 4.2.03' matches the supplied §3.1.6 p.10 excerpt.",
+   "expected_source": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf p[10]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.6 Hyperlinking in SMS documents (p.10)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Preamble (p.6)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.9)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.3 Details of SMS documents (p.7)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.1 How to open any SMS procedure file (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "sms-office-3",
+   "kind": "screenshot",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Document reference 'Doc 4.2.03' matches the supplied §3.1.6 p.10 excerpt.",
+   "expected_source": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf p[10]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.6 Hyperlinking in SMS documents (p.10)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Preamble (p.6)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.9)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.3 Details of SMS documents (p.7)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.1 How to open any SMS procedure file (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "sms-office-3",
+   "kind": "screenshot",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Document reference 'Doc 4.2.03' matches the supplied §3.1.6 p.10 excerpt.",
+   "expected_source": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf p[10]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.6 Hyperlinking in SMS documents (p.10)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Preamble (p.6)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.9)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.3 Details of SMS documents (p.7)",
+    "Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.1 How to open any SMS procedure file (p.5)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "safety-meeting-1",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "partial",
+   "citation_assessment": "supports",
+   "defect_class": "false_claim_of_missing_evidence",
+   "reason": "ADJUDICATED defect: the closing sentence 'the provided excerpts do not include the detailed Monthly Safety Meeting instructions' is false — supplied excerpt [4] (Part B, p.11) gives exactly those steps (unresolved actions in B1.1, + Add Action, Save). The routing part of the answer is correct.",
+   "expected_source": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf p[18]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — 2.2 HOW TO FILL ADD SM FORM (p.18)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — 2.1 HOW TO OPEN NEW ADDITIONAL SAFETY COMMITTE MEETING (ADD SM) (p.17)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — 1.6 HOW TO FILL SAFETY MEETING FORM (p.10)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — PART – B: Enter Safety Meeting Minutes (p.11)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — PART D: Action Status (p.14)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "safety-meeting-1",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "partial",
+   "citation_assessment": "supports",
+   "defect_class": "false_claim_of_missing_evidence",
+   "reason": "ADJUDICATED defect: same false statement about Part B as run 1, with the same supplied p.11 excerpt available. Run 3 uses that excerpt correctly.",
+   "expected_source": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf p[18]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — 2.2 HOW TO FILL ADD SM FORM (p.18)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — 2.1 HOW TO OPEN NEW ADDITIONAL SAFETY COMMITTE MEETING (ADD SM) (p.17)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — 1.6 HOW TO FILL SAFETY MEETING FORM (p.10)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — PART – B: Enter Safety Meeting Minutes (p.11)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — PART D: Action Status (p.14)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "safety-meeting-1",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Parts B and C follow the Monthly Safety Meeting form and Part D is office-only, per the supplied §2.2 p.18 excerpt.",
+   "expected_source": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf p[18]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — 2.2 HOW TO FILL ADD SM FORM (p.18)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — 2.1 HOW TO OPEN NEW ADDITIONAL SAFETY COMMITTE MEETING (ADD SM) (p.17)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — 1.6 HOW TO FILL SAFETY MEETING FORM (p.10)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — PART – B: Enter Safety Meeting Minutes (p.11)",
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — PART D: Action Status (p.14)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "safety-meeting-2",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Carried-forward advisory behaviour matches the supplied Part C p.13 note.",
+   "expected_source": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — PART C: Advisories & Circulars (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "safety-meeting-2",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Carried-forward advisory behaviour matches the supplied Part C p.13 note.",
+   "expected_source": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — PART C: Advisories & Circulars (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "safety-meeting-2",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Carried-forward advisory behaviour matches the supplied Part C p.13 note.",
+   "expected_source": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf p[13]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Safety - Safety Meeting User Manual_R1_31.05.2026 — PART C: Advisories & Circulars (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "certsurveys-1",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add-certificate steps and the auto-generated Master ID match the supplied p.17/p.18 excerpts.",
+   "expected_source": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[17, 18]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    3
+   ],
+   "citations_shown": [
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.4 HOW TO ADD A NEW MASTER CERTIFICATE (p.17)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.3 HOW TO APPLY A NEW CERTIFICATE TYPE FLEET-WIDE (p.15)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1 SHIP’S CERTIFICATES (p.13)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "certsurveys-1",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add-certificate steps and the auto-generated Master ID match the supplied p.17/p.18 excerpts.",
+   "expected_source": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[17, 18]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    3
+   ],
+   "citations_shown": [
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.4 HOW TO ADD A NEW MASTER CERTIFICATE (p.17)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.3 HOW TO APPLY A NEW CERTIFICATE TYPE FLEET-WIDE (p.15)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1 SHIP’S CERTIFICATES (p.13)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "certsurveys-1",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Add-certificate steps and the auto-generated Master ID match the supplied p.17/p.18 excerpts.",
+   "expected_source": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[17, 18]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    3
+   ],
+   "citations_shown": [
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.4 HOW TO ADD A NEW MASTER CERTIFICATE (p.17)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.3 HOW TO APPLY A NEW CERTIFICATE TYPE FLEET-WIDE (p.15)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1 SHIP’S CERTIFICATES (p.13)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "certsurveys-2",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Asterisk-marked mandatory fields must be completed before saving — matches the supplied p.18 excerpt.",
+   "expected_source": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[18]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "certsurveys-2",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Asterisk-marked mandatory fields must be completed before saving — matches the supplied p.18 excerpt.",
+   "expected_source": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[18]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "certsurveys-2",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Asterisk-marked mandatory fields must be completed before saving — matches the supplied p.18 excerpt.",
+   "expected_source": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[18]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "certsurveys-3",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Resolves the cross-reference correctly: survey attachments follow the certificate steps, exactly the operation the p.11 note covers.",
+   "expected_source": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[11, 9]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.5 HOW TO ADD AND VIEW ATTACHMENTS (p.11)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — Table of Contents (p.2)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "certsurveys-3",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "honest_limit_but_evidence_supplied",
+   "citation_assessment": "unsupported",
+   "defect_class": "false_claim_of_missing_evidence",
+   "reason": "ADJUDICATED defect: the answer says the manual 'does not establish whether the survey process is identical or different', but the supplied p.11 excerpt says 'refer to the Certificates sub-sub-module for the add or view attachment and follow the same steps' — the cross-reference covers exactly the asked operation (add or view attachment), so the claimed limitation is false.",
+   "expected_source": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[11, 9]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.5 HOW TO ADD AND VIEW ATTACHMENTS (p.11)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — Table of Contents (p.2)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "certsurveys-3",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Resolves the cross-reference correctly: survey attachments follow the certificate steps, exactly the operation the p.11 note covers.",
+   "expected_source": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[11, 9]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2
+   ],
+   "citations_shown": [
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.5 HOW TO ADD AND VIEW ATTACHMENTS (p.11)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — Table of Contents (p.2)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "defects-1",
+   "kind": "screenshot",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Row-level Edit icon and the view-then-edit route both match the supplied p.16 excerpt.",
+   "expected_source": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf p[16]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    3
+   ],
+   "citations_shown": [
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT (p.16)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.3.8 HOW TO EDIT A DEFECT REPORT (p.11)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.19)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.6 HOW TO EXPORT AN INDIVIDUAL DEFECT REPORT (p.17)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "defects-1",
+   "kind": "screenshot",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Row-level Edit icon and the view-then-edit route both match the supplied p.16 excerpt.",
+   "expected_source": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf p[16]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    3
+   ],
+   "citations_shown": [
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT (p.16)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.3.8 HOW TO EDIT A DEFECT REPORT (p.11)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.19)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.6 HOW TO EXPORT AN INDIVIDUAL DEFECT REPORT (p.17)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "defects-1",
+   "kind": "screenshot",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Row-level Edit icon and the view-then-edit route both match the supplied p.16 excerpt.",
+   "expected_source": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf p[16]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    3
+   ],
+   "citations_shown": [
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT (p.16)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.3.8 HOW TO EDIT A DEFECT REPORT (p.11)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.19)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.6 HOW TO EXPORT AN INDIVIDUAL DEFECT REPORT (p.17)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.19)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "defects-2",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Submit saves and forwards to the next workflow stage — matches the supplied p.15 excerpt.",
+   "expected_source": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf p[15]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "citations_shown": [
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — TECHNICAL USER MANUAL (p.12)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.19)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD (p.19)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "defects-2",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Submit saves and forwards to the next workflow stage — matches the supplied p.15 excerpt.",
+   "expected_source": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf p[15]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "citations_shown": [
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — TECHNICAL USER MANUAL (p.12)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.19)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD (p.19)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "defects-2",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Submit saves and forwards to the next workflow stage — matches the supplied p.15 excerpt.",
+   "expected_source": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf p[15]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "citations_shown": [
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.3 HOW TO CREATE A NEW DEFECT (p.15)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — TECHNICAL USER MANUAL (p.12)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECORDS (p.19)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD (p.19)",
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT (p.16)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "defects-3",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Bulk export of Condition of Class records matches the supplied p.20 excerpt with its resolved cross-reference.",
+   "expected_source": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf p[20, 17]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.5 HOW TO EXPORT ALL COC RECORDS (p.20)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "defects-3",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Bulk export of Condition of Class records matches the supplied p.20 excerpt with its resolved cross-reference.",
+   "expected_source": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf p[20, 17]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.5 HOW TO EXPORT ALL COC RECORDS (p.20)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "defects-3",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Bulk export of Condition of Class records matches the supplied p.20 excerpt with its resolved cross-reference.",
+   "expected_source": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf p[20, 17]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.5 HOW TO EXPORT ALL COC RECORDS (p.20)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-1",
+   "kind": "table",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Due and Overdue definitions match the supplied p.28 excerpt; the expected page is cited second.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[28]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O) (p.23)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O) (p.28)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — TECHNICAL USER MANUAL (p.29)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-1",
+   "kind": "table",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Due and Overdue definitions match the supplied p.28 excerpt; the expected page is cited second.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[28]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O) (p.23)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O) (p.28)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — TECHNICAL USER MANUAL (p.29)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-1",
+   "kind": "table",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Due and Overdue definitions match the supplied p.28 excerpt; the expected page is cited second.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[28]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O) (p.23)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O) (p.28)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.6 HOW TO COMPLETE THE WORK ORDER (p.27)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — TECHNICAL USER MANUAL (p.29)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-2",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "ROB cannot be changed without selecting a location — matches the supplied p.45 excerpt, cited fourth.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[45]",
+   "expected_source_supplied_as_excerpt": [
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    4
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTORY TRANSACTIONS (p.44)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.3 HOW TO UPDATE SPARES BY LOCATION (p.39)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.45)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-2",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "ROB cannot be changed without selecting a location — matches the supplied p.45 excerpt, cited fourth.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[45]",
+   "expected_source_supplied_as_excerpt": [
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    4
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTORY TRANSACTIONS (p.44)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.3 HOW TO UPDATE SPARES BY LOCATION (p.39)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.45)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-2",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "ROB cannot be changed without selecting a location — matches the supplied p.45 excerpt, cited fourth.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[45]",
+   "expected_source_supplied_as_excerpt": [
+    4
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    4
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTORY TRANSACTIONS (p.44)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.3 HOW TO UPDATE SPARES BY LOCATION (p.39)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.45)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.2 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS (p.38)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-3",
+   "kind": "procedure",
+   "run": 1,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Drag-and-drop component move matches the supplied p.26 excerpt.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[26]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.5 HOW TO EDIT THE COMPONENT TREE VIEW (p.26)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-3",
+   "kind": "procedure",
+   "run": 2,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Drag-and-drop component move matches the supplied p.26 excerpt.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[26]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.5 HOW TO EDIT THE COMPONENT TREE VIEW (p.26)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-3",
+   "kind": "procedure",
+   "run": 3,
+   "verdict": "correct",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Drag-and-drop component move matches the supplied p.26 excerpt.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[26]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.5 HOW TO EDIT THE COMPONENT TREE VIEW (p.26)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-4",
+   "kind": "screenshot",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Locked work orders need Tech Superintendent acknowledgement then HOD approval — matches the supplied p.34 banner.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[34]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.30)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.34)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.30)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO APPROVE WORK ORDERS (LEVEL 2 REVIEWER ROLE) (p.12)",
+    "Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-4",
+   "kind": "screenshot",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Locked work orders need Tech Superintendent acknowledgement then HOD approval — matches the supplied p.34 banner.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[34]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.30)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.34)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.30)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO APPROVE WORK ORDERS (LEVEL 2 REVIEWER ROLE) (p.12)",
+    "Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-4",
+   "kind": "screenshot",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Locked work orders need Tech Superintendent acknowledgement then HOD approval — matches the supplied p.34 banner.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[34]",
+   "expected_source_supplied_as_excerpt": [
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.30)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.34)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.30)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO APPROVE WORK ORDERS (LEVEL 2 REVIEWER ROLE) (p.12)",
+    "Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-5",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "honest_limit_correct",
+   "citation_assessment": "supports",
+   "defect_class": "retrieval_defect",
+   "reason": "Office dashboard filters correct; states honestly that the vessel-side dashboard was not supplied. That section exists and is indexed (Vessel manual p.9, 'select the required criticality level') but was not retrieved.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[9]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.2 HOW TO USE FILTER (p.9)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.53)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.46)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.6 HOW TO SEARCH AND APPLY A FILTER (p.27)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.2 HOW TO APPLY FILTER (p.10)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-5",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "honest_limit_correct",
+   "citation_assessment": "supports",
+   "defect_class": "retrieval_defect",
+   "reason": "Office dashboard filters correct; states honestly that the vessel-side dashboard was not supplied. That section exists and is indexed (Vessel manual p.9, 'select the required criticality level') but was not retrieved.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[9]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.2 HOW TO USE FILTER (p.9)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.53)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.46)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.6 HOW TO SEARCH AND APPLY A FILTER (p.27)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.2 HOW TO APPLY FILTER (p.10)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsoffice-5",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "partial",
+   "citation_assessment": "supports",
+   "defect_class": "unsupported_comparison",
+   "reason": "ADJUDICATED defect: asserts 'the vessel-side set is not the same as the PMS Dashboard set' by comparing the Office dashboard with the vessel REPORTS screen, a different screen, and drops the caveat runs 1 and 2 include. The vessel dashboard filter section exists and is indexed but was not supplied to this run.",
+   "expected_source": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf p[9]",
+   "expected_source_supplied_as_excerpt": [
+    1
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.2 HOW TO USE FILTER (p.9)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.53)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.46)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.6 HOW TO SEARCH AND APPLY A FILTER (p.27)",
+    "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.2 HOW TO APPLY FILTER (p.10)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-1",
+   "kind": "table",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Stores item categories match the supplied Vessel p.42 excerpt; 'Stores' itself honestly flagged as not further described.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[42]",
+   "expected_source_supplied_as_excerpt": [
+    2,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    4,
+    5
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.49)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.42)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.42)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.4 HOW TO ADD ITEM (p.50)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.4 HOW TO ADD ITEM (p.43)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-1",
+   "kind": "table",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Stores item categories match the supplied Vessel p.42 excerpt; 'Stores' itself honestly flagged as not further described.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[42]",
+   "expected_source_supplied_as_excerpt": [
+    2,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    4,
+    5
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.49)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.42)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.42)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.4 HOW TO ADD ITEM (p.50)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.4 HOW TO ADD ITEM (p.43)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-1",
+   "kind": "table",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Stores item categories match the supplied Vessel p.42 excerpt; 'Stores' itself honestly flagged as not further described.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[42]",
+   "expected_source_supplied_as_excerpt": [
+    2,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2,
+    4,
+    5
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.49)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.42)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.42)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.4 HOW TO ADD ITEM (p.50)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.4 HOW TO ADD ITEM (p.43)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-2",
+   "kind": "screenshot",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Change request not available to a vessel user, only to the head of department — matches the supplied p.47 excerpt.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[47]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.10.1 HOW TO ACCESS MODIFY PMS (p.47)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.47)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.54)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.10.2 HOW TO CREATE A CHANGE REQUEST FOR COMPONENTS (p.48)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.10.1 HOW TO ACCESS MODIFY PMS (p.54)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-2",
+   "kind": "screenshot",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Change request not available to a vessel user, only to the head of department — matches the supplied p.47 excerpt.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[47]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.10.1 HOW TO ACCESS MODIFY PMS (p.47)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.47)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.54)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.10.2 HOW TO CREATE A CHANGE REQUEST FOR COMPONENTS (p.48)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.10.1 HOW TO ACCESS MODIFY PMS (p.54)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-2",
+   "kind": "screenshot",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Change request not available to a vessel user, only to the head of department — matches the supplied p.47 excerpt.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[47]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    2
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.10.1 HOW TO ACCESS MODIFY PMS (p.47)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.47)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.54)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.10.2 HOW TO CREATE A CHANGE REQUEST FOR COMPONENTS (p.48)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.10.1 HOW TO ACCESS MODIFY PMS (p.54)"
+   ],
+   "automatic_verdict": {
+    "answer": true,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-3",
+   "kind": "xref",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Resolves the cross-reference: Stores has its own entry button and then follows the Spares steps.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[43, 40]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.50)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.48)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-3",
+   "kind": "xref",
+   "run": 2,
+   "verdict": "partial",
+   "citation_assessment": "supports",
+   "defect_class": "false_claim_of_missing_evidence",
+   "reason": "ADJUDICATED defect (milder than first reported): the answer quotes the 'refer to Spares and follow the same steps' direction and then contradicts itself with 'the excerpts do not fully document whether the Stores form operates identically to the Spares form'. Internally inconsistent; runs 1 and 3 state it cleanly.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[43, 40]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.50)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.48)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-3",
+   "kind": "xref",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "Resolves the cross-reference: Stores has its own entry button and then follows the Spares steps.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[43, 40]",
+   "expected_source_supplied_as_excerpt": [
+    1,
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    1,
+    2
+   ],
+   "citations_shown": [
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.50)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.48)"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": true,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-4",
+   "kind": "condition",
+   "run": 1,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Duplicate work order refused; both the published manuals and the draft guidance are named.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[16]",
+   "expected_source_supplied_as_excerpt": [
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2,
+    3
+   ],
+   "citations_shown": [
+    "Technical - KB pilot: 'Generate WO' for one job — from the Components page.md — 'Generate WO' for one job — from the Components page",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — TECHNICAL USER MANUAL (p.16)",
+    "Technical - KB pilot: Planned work orders — generated automatically by the ship's daily job-due scan.md — Planned work orders — generated automatically by the ship's daily job-due scan",
+    "Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-4",
+   "kind": "condition",
+   "run": 2,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports_but_not_first",
+   "defect_class": "none",
+   "reason": "Duplicate work order refused; both the published manuals and the draft guidance are named.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[16]",
+   "expected_source_supplied_as_excerpt": [
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2,
+    3
+   ],
+   "citations_shown": [
+    "Technical - KB pilot: 'Generate WO' for one job — from the Components page.md — 'Generate WO' for one job — from the Components page",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — TECHNICAL USER MANUAL (p.16)",
+    "Technical - KB pilot: Planned work orders — generated automatically by the ship's daily job-due scan.md — Planned work orders — generated automatically by the ship's daily job-due scan",
+    "Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  },
+  {
+   "case": "pmsvessel-4",
+   "kind": "condition",
+   "run": 3,
+   "verdict": "correct_paraphrase",
+   "citation_assessment": "supports",
+   "defect_class": "none",
+   "reason": "ADJUDICATED not a defect: the source list labels the draft code-derived guidance separately from the two manuals, and both sources state the same rule, so no misattribution occurs. Runs 1 and 2 additionally attribute per claim in the prose, which is better practice.",
+   "expected_source": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf p[16]",
+   "expected_source_supplied_as_excerpt": [
+    3
+   ],
+   "excerpts_carrying_all_required_phrases": [
+    2,
+    3
+   ],
+   "citations_shown": [
+    "Technical - KB pilot: 'Generate WO' for one job — from the Components page.md — 'Generate WO' for one job — from the Components page",
+    "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.18)",
+    "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — TECHNICAL USER MANUAL (p.16)",
+    "Technical - KB pilot: Planned work orders — generated automatically by the ship's daily job-due scan.md — Planned work orders — generated automatically by the ship's daily job-due scan",
+    "Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order"
+   ],
+   "automatic_verdict": {
+    "answer": false,
+    "citation": false,
+    "support": "not captured"
+   }
+  }
+ ]
+}
