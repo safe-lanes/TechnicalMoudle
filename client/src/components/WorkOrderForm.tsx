@@ -468,7 +468,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         jobExperienceNotes: execution.remarks || '',
         previousReading: '',
         currentReading: '',
-        currentReadingDate: execution.currentReadingDate || '',
+        currentReadingDate: template.currentReadingDate || '',
         uploadedDocuments: Array.isArray(execution.uploadedDocuments) ? execution.uploadedDocuments : [],
         consumedSpareParts: Array.isArray(execution.consumedSpareParts) ? execution.consumedSpareParts : [],
         ihmUpdate: {
