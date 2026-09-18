@@ -1,0 +1,32 @@
+{
+  "what": "Step 2 of the owner brief of 18-Sep — every one of the 171 stored D4 manual-coverage runs (57 cases x 3) judged on its own text, not inherited from the earlier set-C reading or from the automatic verdict.",
+  "method": "A reviewable pack (review_pack_d4.py) was built from the stored dump plus the captured request bodies, so each run shows the question, the expected manual evidence, the citations the user sees, EVERY supplied excerpt, and the full answer. Four reviewers (one per module group) classified every run; every claimed defect was then re-verified by hand against the FULL captured excerpt text.",
+  "verification_correction": "The pack truncated each excerpt at 700 characters. Three claimed answer defects were artefacts of that truncation and are RETRACTED: prep-1 runs 1 and 3 (the email-notification sentence IS in the supplied excerpt), crewing-5 run 3 (the Part A/B/C breakdown IS in the supplied excerpt), master-review-1 run 3 ('view or edit the selected notification' IS in the supplied overview excerpt). Lesson recorded: an unsupported-claim finding must always be checked against the untruncated excerpt.",
+  "totals_by_run": {
+    "runs": 171,
+    "correct_or_correct_paraphrase": 153,
+    "real_answer_defect": 4,
+    "retrieval_or_routing_defect": 14,
+    "wrong_statement_of_fact": 0
+  },
+  "real_answer_defects": [
+    {"case": "certsurveys-3", "run": 2, "type": "hedge contradicted by the supplied evidence", "detail": "The answer says the manual 'does not establish whether the survey process is identical or different', but the supplied excerpt says: refer to the 'Certificates' sub-sub-module for the add or view attachment and follow the same steps. Runs 1 and 3 answer it correctly, so this is answer variation, not a missing source."},
+    {"case": "pmsvessel-3", "run": 2, "type": "hedge contradicted by the supplied evidence", "detail": "The answer says the excerpts 'do not fully document whether the Stores form operates identically to the Spares form', but the supplied excerpt says: refer to the 'Spares' sub-sub-module and follow the same steps. Runs 1 and 3 state it correctly."},
+    {"case": "pmsoffice-5", "run": 3, "type": "inaccurate source comparison stated as established", "detail": "Run 3 asserts 'the vessel-side set is not the same as the PMS Dashboard set' by comparing the Office Dashboard filters with the vessel REPORTS screen — a different screen. Runs 1 and 2 handle the same excerpts correctly by stating that the vessel-side Dashboard is not documented in what was supplied."},
+    {"case": "hist-3", "run": 1, "type": "steps not adapted to the asked record type", "detail": "The question asks whether the attachment procedure also applies to a Positive Observation or LAE finding. The answer correctly says yes, but its step 3 still instructs 'Enter the Negative observation', and it omits the page toggle (Observation / Positive Finding / LAE) that the supplied screenshot text describes. Runs 2 and 3 generalise the step correctly."}
+  ],
+  "retrieval_and_routing_defects": [
+    {"case": "hist-1", "runs": [1, 2, 3], "class": "routing", "evidence_in_index": true, "detail": "The evidence sentence 'Comments in the Review section can be added by office users only' IS indexed, in Audit History Manual p.16, section 3.3 REVIEW PAGE. All three runs were routed to Technical and received five PMS work-order-review excerpts instead. The answer's conclusion happens to be directionally right but rests on the wrong document."},
+    {"case": "prep-3", "runs": [1, 2, 3], "class": "not retrieved", "evidence_in_index": true, "detail": "The expected chunk (Audit Preparation Office p.20, 'Document') IS indexed and contains BOTH required phrases. It was not among the five excerpts in any run. The model answered correctly from adjacent sections, so the answers are sound but unsupported by the expected source."},
+    {"case": "sms-office-1", "runs": [1, 2, 3], "class": "not retrieved", "evidence_in_index": true, "detail": "The expected chunk (SMS Office p.21, section 4.2.2 Approval) IS indexed and contains the cross-reference to 4.1.2. It was not retrieved; only 4.1.2's own content was. All three runs state honestly that the link is not in what they were given."},
+    {"case": "master-review-2", "runs": [1, 2, 3], "class": "not retrieved", "evidence_in_index": true, "detail": "The expected chunk (Master Review p.11, '4. OFFICE CLOSEOUT FOR MASTER REVIEW') IS indexed and contains both required phrases. On D4 the lexical rescue displaces it from the five. All three runs decline honestly rather than guess."},
+    {"case": "pmsoffice-5", "runs": [1, 2], "class": "not retrieved", "evidence_in_index": null, "detail": "The vessel-side PMS Dashboard filter section was not supplied; runs 1 and 2 say so explicitly, which is the correct behaviour. Run 3 is the answer defect listed above."}
+  ],
+  "correction_to_earlier_reports": "Section 14.8 listed as a limitation: 'two manual sentences exist in no retrievable chunk (prep-3 attachment actions, sms-office-1 section 4.1.2)'. That is WRONG. Both sentences are present in the index, in exactly the expected chunk. So are the master-review-2 and hist-1 sentences. All four are retrieval or routing failures, not gaps in the corpus. The three states must be kept apart: absent from the manual, absent from the index, and present but not retrieved. All four of these are the third state.",
+  "judge_artefacts_observed": [
+    "literal phrase matching fails on markdown emphasis inside the phrase, on tense ('permanently removes' vs 'removed'), on singular/plural, and on inserted words",
+    "the citation check reads only the first of the five citations; the expected manual and page is often cited in position 2 to 5 and in the answer's own source line",
+    "a forbidden phrase fires inside a negation ('Do not create a new approver record', 'does not require exporting them one at a time')",
+    "a forbidden phrase fires when the answer names the alternative method correctly rather than claiming it"
+  ]
+}

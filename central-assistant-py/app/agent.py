@@ -267,7 +267,18 @@ class LoopResult:
 #      explanations with requirements next to the action; explicit Office/Ship differences; no labels; one final source list)
 #      + the cross-reference statement restricted to excerpts that contain the resolved text. CANDIDATE ONLY (reviewer + owner
 #      15-Sep) until measured on all suites and approved. Wording is hashed at import so /health shows what is running.
-PROMPT_VERSION = "v5-plain-coverage-2026-09-15"
+def _prompt_version() -> str:
+    from .config import settings
+    return "v6-evidence-rules-2026-09-18" if settings().assistant_docs_prompt.lower() == "v6" else "v5-plain-coverage-2026-09-15"
+
+
+class _PV(str):
+    """PROMPT_VERSION stays a string for every existing reader, but reflects the configured prompt."""
+    def __new__(cls):
+        return super().__new__(cls, _prompt_version())
+
+
+PROMPT_VERSION = _PV()
 
 TOOL_LOOP_INSTRUCTIONS = (
     "You are the SAIL Maritime PMS assistant for the {module} module. "

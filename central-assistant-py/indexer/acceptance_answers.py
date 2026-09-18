@@ -38,6 +38,27 @@ SUITE_VERSION = "2026-09-14.4"  # .3 (post-freeze, reported): case 08 also requi
 #     gpt-5.6-luna writes "the **Operation** tab", which the literal check read as "operation** tab" and failed. Re-scored on
 #     every stored dump (rejudge_base.py); JUDGE_MD_NORMALISE=False reproduces the .3 matching.
 JUDGE_MD_NORMALISE = True
+# .5 (18-Sep-2026, reported, cases UNCHANGED — two demonstrated judge defects from the 171-answer review, §15.2):
+#   CITATION: the expected manual+page may appear at ANY position in the citation list shown to the user, not only first.
+#     Frozen case 05 lists the six hazard categories, is supported by two supplied excerpts and names the expected pages in
+#     its own Source line, yet failed because citations[0] happened to be another section of the SAME manual. The check now
+#     passes when any shown citation names the expected manual and an accepted page; the top-citation result is still
+#     computed and reported separately so nothing is hidden.
+#   MUST_NOT: a forbidden phrase inside a negation is not a violation — "Do not create a new approver record" states the
+#     manual's own rule. A must_not hit is ignored when a negation ("do not", "does not", "cannot", "never", "no ", "not")
+#     appears within 40 characters before it.
+# JUDGE_CITATION_ANY=False and JUDGE_NEGATION_AWARE=False reproduce the .4 behaviour exactly.
+JUDGE_CITATION_ANY = True
+JUDGE_NEGATION_AWARE = True
+
+
+def negated(text: str, phrase: str) -> bool:
+    """True when every occurrence of `phrase` sits inside a negation (so it is not an assertion of that phrase)."""
+    low, p = text.lower(), phrase.lower()
+    starts = [m.start() for m in re.finditer(re.escape(p), low)]
+    if not starts:
+        return False
+    return all(re.search(r"\b(do not|does not|don't|doesn't|cannot|can't|never|no|not|without)\b[^.]{0,40}$", low[max(0, i - 60):i]) for i in starts)
 
 
 def md_plain(text: str) -> str:
@@ -107,17 +128,28 @@ def judge(j: dict, manual: str, page: tuple[int, ...] | int | None, must: list[s
     labels pulled-in text with its source section and page)."""
     raw = j.get("response") or ""
     ans = md_plain(raw).lower() if JUDGE_MD_NORMALISE else raw.lower()
-    ok_answer = all(p.lower() in ans for p in must) and not any(p.lower() in ans for p in must_not) and j.get("gate") == "answer"
+    forbidden_hit = [p for p in must_not if p.lower() in ans and not (JUDGE_NEGATION_AWARE and negated(ans, p))]
+    ok_answer = all(p.lower() in ans for p in must) and not forbidden_hit and j.get("gate") == "answer"
     if cls == "xref" and re.search(r"refer to the ['‘\"]?[\w &-]+['’\"]? (sub-)?(sub-)?module", ans) and not re.search(r"^\s*\d+\.\s+(click|go to|select|open|use|enter)", ans, re.M):
         ok_answer = False  # judge tightened 14-Sep-2026: parroting the manual's pointer ("Refer to the X sub-module, follow the same procedure") is NOT an answer
     cits = j.get("citations") or []
     top = cits[0] if cits else {}
     pages = (page,) if isinstance(page, int) else page
-    ok_cite = manual.lower() in str(top.get("manual", "")).lower() and (pages is None or page_of(top) in pages)
+    def cite_matches(ci: dict) -> bool:
+        return manual.lower() in str(ci.get("manual", "")).lower() and (pages is None or page_of(ci) in pages)
+    ok_cite_top = cite_matches(top)
+    # Citation-anywhere applies ONLY to page-anchored cases. With pages=None the test is a manual-name substring, and a
+    # name can match a DIFFERENT document ("(Operational)" matches both the Sync and the Ship-Side notes), which would
+    # let a filename appearing anywhere in the citation list stand in for support. Page-anchored cases do not have that
+    # hole: manual + accepted page identifies one section.
+    ok_cite = (any(cite_matches(ci) for ci in cits) if (JUDGE_CITATION_ANY and pages is not None) else ok_cite_top)
     ok_attr = True
     if cls == "xref" and ok_answer:
         ok_attr = bool(re.search(r"(taken from|same as|from section|section \d+(\.\d+)+|see (the )?'?[\w &-]+'? (sub-)?(sub-)?module)", raw, re.I))
-    detail = f"gate={j.get('gate')} cite={str(top.get('manual', '-'))[:26]} p{page_of(top)} | {raw[:64]!r}"
+    detail = (f"gate={j.get('gate')} cite={str(top.get('manual', '-'))[:26]} p{page_of(top)}"
+              + ("" if ok_cite_top or not ok_cite else " [expected page cited, not first]")
+              + (f" [must_not in negation: {forbidden_neg}]" if (forbidden_neg := [p for p in must_not if p.lower() in ans and JUDGE_NEGATION_AWARE and negated(ans, p)]) else "")
+              + f" | {raw[:64]!r}")
     return ok_answer, ok_cite, ok_attr, detail
 
 

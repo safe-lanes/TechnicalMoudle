@@ -102,13 +102,27 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         terms = await retrieval.title_terms() if s.assistant_route_intent.lower() == "on" else None
         routed = retrieval.route(hits, message, ui_module, terms)
         hybrid = s.assistant_hybrid.lower()
+        reasons: list[str] = []
         if routed.gate == "answer" and hybrid in ("on", "rescue") and routed.module:
             vec = [h for h in hits if h.module == routed.module and h.distance <= s.route_sim_floor]
             lex = [h for h in await db.search_lexical(emb, masker.mask_text(message) if masker else message, routed.module, s.route_top_k) if h.distance <= s.route_sim_floor]
-            if hybrid == "rescue":   # r6: served selection kept, the lexical leader takes the last slot when absent
-                routed.hits = retrieval.lexical_rescue(vec, lex, s.answer_chunks)
-            else:                    # r5: convex score fusion (measured, superseded by r6 — kept for reproducibility)
+            if hybrid == "rescue":
+                # r7: served selection kept; the lexical leader takes the last slot only if it earns it on relevance
+                # (score per content word) AND does not displace materially nearer evidence.
+                n_terms = len(retrieval.content_terms(masker.mask_text(message) if masker else message))
+                routed.hits, rescued, dropped = retrieval.guarded_lexical_rescue(
+                    vec, lex, s.answer_chunks, n_terms, s.assistant_rescue_lex_per_term, s.assistant_rescue_max_penalty)
+                if rescued is not None:
+                    reasons.append(f"lexical rescue: {str(rescued.meta.get('section_title'))[:40]}")
+            else:                    # r5: convex score fusion (measured, superseded — kept for reproducibility)
                 routed.hits = retrieval.score_fuse(vec, lex, s.answer_chunks, s.assistant_hybrid_alpha, s.route_sim_floor)
+        if routed.gate == "answer" and routed.module and s.assistant_second_opinion_gap > 0:
+            # r8: a close module decision widens the evidence by one chunk from the runner-up module (documentation
+            # scope only; identity, tenant and vessel checks are untouched).
+            routed.hits, second, _dropped2 = retrieval.second_opinion(
+                hits, routed.module, list(routed.hits), s.assistant_second_opinion_gap, s.route_sim_floor)
+            if second is not None:
+                reasons.append(f"second opinion: {second.module} {str(second.meta.get('section_title'))[:34]}")
         if routed.gate == "not_documented":
             log("not_documented", NOT_DOC_MSG, confidence=routed.confidence)
             return 200, {"response": NOT_DOC_MSG, "gate": "not_documented", "module": None, "citations": [], "confidence": routed.confidence}
@@ -116,6 +130,8 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
             msg = f"Your question could relate to more than one module — is this about {' or '.join(routed.candidates)}?"
             log("clarify", msg, confidence=routed.confidence)
             return 200, {"response": msg, "gate": "clarify", "module": None, "candidates": routed.candidates, "citations": [], "confidence": routed.confidence}
+        if reasons:
+            routed.reason = getattr(routed, "reason", "vector routing") + " | " + " | ".join(reasons)  # type: ignore[attr-defined]
         citations = retrieval.citations_of(routed)
         label = MODULE_LABELS.get(routed.module or "", routed.module)
         if body.get("routeOnly") is True:

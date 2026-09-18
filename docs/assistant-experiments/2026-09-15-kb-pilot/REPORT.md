@@ -601,7 +601,10 @@ What each part does (D1 vs C0 = routing; D2 vs D1 = excerpt selection): case 05 
 
 Retrieval-18 on the three (top-1 source check, expectations v1/v2): C0 18/18 · D1 18/18 · **D2 16/18** — two top-1 changes, both reorderings within the five excerpts, not losses: "how do I create a work order" now leads with the KB overview (then the two manual unplanned sections, the KB unplanned and planned files — the two "complete the work order" sections dropped out); "why did the running hours not go down…" now leads with the Ship-Side notes §1.1.13.2 (the Recent Updates §1.1.14.2/§1.1.14.3 chunks stay at positions 3–4). The suite's expectations predate the KB files; a v3 expectation for the first query would name the overview — reported, not changed. Answer-level effect measured in §14.7.
 
-### 14.7 Step 5 — routing and excerpt selection measured separately at answer level (`s4-runs.txt`, `s4b-runs.txt`, `s4-*-dump.jsonl`, `s4b-*-dump.jsonl`, captures `s4-{c0,d1,d2,d3}-capture.jsonl`, `lexdiag3.txt`, `selectdiag.txt/.json`, `s4-manuals-rejudge-D2.txt`, `usage.py`)
+### 14.7 Step 5 — routing and excerpt selection measured separately at answer level
+
+> **CORRECTED — see §15.1** (18-Sep). The numbers below are kept as the historical record. Three corrections apply: the frozen and corrected suites score by MAJORITY of three runs, not all three; the C0 column's frozen/corrected/manual cells were not run on C0 but on set C (image `prompt-v5`); and the routing figure combines module selection with expected-source presence, which §15.1 separates.
+ (`s4-runs.txt`, `s4b-runs.txt`, `s4-*-dump.jsonl`, `s4b-*-dump.jsonl`, captures `s4-{c0,d1,d2,d3}-capture.jsonl`, `lexdiag3.txt`, `selectdiag.txt/.json`, `s4-manuals-rejudge-D2.txt`, `usage.py`)
 
 Four containers, one image (`sail-assistant-py:prompt-v5-r5` fd97292862b4), one index (`kb-pilot-c` 916), one model and prompt (gpt-5.6-luna, default temperature, v5 `ff9ee87141ac1362`), the dedicated key; only the two flags differ. Each step is compared with the preceding candidate. All answer suites ×3, all runs required.
 
@@ -632,7 +635,10 @@ Variant comparison before any further answer-model call (`selectdiag.py`, 104 su
 
 VB keeps 95 % of the served excerpts, supplies the overview for both work-order misses (fifth excerpt) and loses one manual case at retrieval level (master-review-2: the p.11 Part E chunk was the fifth vector hit and gives way to the lexical leader p.6). It changes one slot, no threshold, no count, no prompt, and does not prefer any source type — the slot goes to whichever chunk leads the lexical ranking. Adopted as **r6 = `ASSISTANT_HYBRID=rescue`** (`retrieval.lexical_rescue`; r5 kept as `on` for reproducibility), image `sail-assistant-py:prompt-v5-r6` 58d02521e6ae, container `sail-assistant-py-s4-d4` :8028 (routing on, rescue, kb-pilot-c, capture bind-mounted). Measured against D1 in §14.7a.
 
-### 14.7a r6 (D4) against D1 — same model, prompt, key, index; only excerpt selection differs (`s4c-runs.txt`, `s4c-*-dump.jsonl`, `s4-d1-capture.jsonl`, `s4-d4-capture.jsonl`, `s4c-manuals-rejudge.txt`)
+### 14.7a r6 (D4) against D1 — same model, prompt, key, index; only excerpt selection differs
+
+> **CORRECTED — see §15.1** (18-Sep). The six manual-coverage losses are five run-to-run variations plus one selection change (pmsoffice-5). The seventh item named below, master-review-2, is a retrieval-level regression that does NOT change the score because the case already failed on D1. The pass rules per suite are as stated in §15.1.
+ (`s4c-runs.txt`, `s4c-*-dump.jsonl`, `s4-d1-capture.jsonl`, `s4-d4-capture.jsonl`, `s4c-manuals-rejudge.txt`)
 
 | suite (×3, all runs required) | D1 routing only | D4 routing + rescue (r6) | reading of every difference |
 |---|---|---|---|
@@ -646,7 +652,10 @@ VB keeps 95 % of the served excerpts, supplies the overview for both work-order 
 
 What r6 changes, measured: the two work-order intents the brief names (general creation → overview and alternatives; the pump question is no longer an unplanned-only instruction: "You can raise a pump work order in three supported ways…" 3/3), nothing on retrieval-18, frozen or corrected, and one manual case at retrieval level. What it does not change: hist-1 (Audit History question routed to Technical — no manual term the router recognises), pmsoffice-1 (clarify), prep-3 and sms-office-1 (the must phrases are in no supplied excerpt on any set), certsurveys-3 (model reasoning, §14.5a).
 
-### 14.8 Step 6 — the final candidate package, verified as one unit (nothing deployed; live, nginx, SMS RAG, shared keys untouched)
+### 14.8 Step 6 — the final candidate package, verified as one unit
+
+> **CORRECTED — see §15.1** (18-Sep). "×3, all runs required" is true only of the work-order and manual-coverage suites; frozen and corrected score by majority of three. Under all-runs, D4 frozen is 10/12 and corrected 11/14. Neither D1 nor D4 is approved for deployment.
+ (nothing deployed; live, nginx, SMS RAG, shared keys untouched)
 
 Recommended package = D4. The alternative D1 (routing only, no excerpt change) is fully measured in the same tables should the owner prefer to keep the served excerpt selection.
 
@@ -665,6 +674,308 @@ Recommended package = D4. The alternative D1 (routing only, no excerpt change) i
 | estimated cost per 1,000 questions | **≈ $0.67** at the READ list price $0.20 / $1.20 per 1M (input $0.31 + output $0.36); embeddings add < $0.01; step 4–6 today: 903 answers over the five candidates ≈ $0.66 |
 | latency | D4: mean 4.7 s, median 4.3 s, p95 9.4 s over 273 answers with two candidates served concurrently from one host (single-candidate latency not measured separately; live gpt-4o-mini was 2.5 s mean in §13.4) |
 | remaining limitations | (1) a question naming only a generic word ("history", "sync") is routed by vector distance alone — hist-1 goes to Technical; (2) the clarify gate still fires for pmsoffice-1 (Due/Overdue, technical context, margin < 0.07 between Technical manuals — context breaks a tie only when the originating module is a candidate, which it is not here); (3) two manual pages whose sentence is not in any served chunk (prep-3 attachment actions, sms-office-1 §4.1.2); (4) r6 costs master-review-2; (5) answers vary run to run at default temperature — automatic totals on ×3 carry a band of about ±4–8 cases on the 57-case suite; (6) judge gaps reported, not changed: heading-scoped prerequisites (WO), literal must phrases and `must_not` inside negation (manual suite), the page read from a "(p.N)" section label (frozen 05); (7) the response now carries a `routing` field (additive; the widget ignores it) |
+
+## 15. Owner brief of 18-Sep — reliability of the final candidate (candidate only; D1 and D4 both unapproved)
+
+### 15.1 Step 1 — reconciliation of §14.7/§14.7a/§14.8 against the stored runs (`reconcile.py` → `reconcile.txt`; no service or model calls)
+
+Everything below is recomputed from the saved dumps and captures. Where a published figure was wrong or ambiguous, the original wording is kept in §14 and corrected here; the corrected figures are authoritative from now on.
+
+**Correction 1 — the suites do not all use the same pass rule (this is the single biggest cause of confusion in §14).** The work-order and manual-coverage suites require **all three runs** to pass. The frozen and corrected-claims suites take the **majority of three** (`sum(votes)*2 > len(votes)`), so a case that passes 2 of 3 counts as a pass. §14.7, §14.7a and §14.8 labelled every suite "×3, all runs required". That label was wrong for two of the four suites. Both rules are now reported.
+
+| suite (image r5 unless noted) | rule | C-kbpilot (no flags, image prompt-v5) | C0 flags off (r5) | D1 routing | D2 fusion α0.5 | D3 fusion α0.7 | D4 rescue (r6) |
+|---|---|---|---|---|---|---|---|
+| work-order 8 | all runs | 6/8 (rejudged .11) | 6/8 | **5/8** | 8/8 | 5/8 | 7/8 |
+| frozen 12 | majority (suite's own) | 11/12 | not run | 11/12 | 8/12 | 9/12 | 11/12 |
+| frozen 12 | all runs | 9/12 | not run | 10/12 | 8/12 | 9/12 | 10/12 |
+| corrected 14 | majority (suite's own) | 11/14 | not run | 12/14 | 10/14 | — | 12/14 |
+| corrected 14 | all runs | 10/14 | not run | 12/14 | 9/14 | — | 11/14 |
+| manual coverage 57 | all runs | 24/57 | not run | 24/57 | 16/57 | — | 18/57 |
+
+**Correction 2 — three published C0 cells were never measured on C0.** C0 (flags off on image r5) has stored runs for the work-order suite and the routing probes only. The frozen, corrected and manual-coverage cells printed in the §14.7 "C0 flags off" column came from set C (`abc-c`, image `prompt-v5`, same index `kb-pilot-c`, before the flags existed). Same index and same model, different image. Relabelled above.
+
+**Correction 3 — the set-C work-order column mixes judge versions.** The stored set-C verdicts were written by the judge of the day; §14.3 quoted 6/8 after re-judging with .11. Re-judging the stored answers with .11 (`rejudge_wo.py … --from 11`) confirms **6/8** and changes nothing else, so the C column above is comparable with C0/D1/D4.
+
+#### Why D1 work-order falls from 6/8 to 5/8 although routing "costs nothing"
+
+The single lost case is **wo-phr-04** ("Steps to create a new work order"). The excerpt lists on C0 and D1 are **byte-identical** (same five, same order), and the routing reason is "vector routing" on both. Runs 1 and 2 pass on D1; run 3 produces a different answer that the judge fails. So this is **run-to-run variation of the answer model at default temperature, not a routing effect** — and because the work-order suite requires all three runs, one varying run drops a whole case. The same mechanism works in the other direction on D4, where the identical excerpts give 3/3.
+
+Comparing inputs rather than scores: on 8 of 8 work-order cases the five excerpts are identical between C0 and D1. Routing changed only the *reason* recorded for wo-generic-03 ("explicit: module name in question", from the word PMS) while selecting the same module and the same excerpts. **Routing changes no work-order input at all; the 6→5 difference is noise.** The honest statement is therefore: routing is input-neutral on this suite, and the suite cannot resolve a one-case difference at ×3.
+
+#### Which frozen case fails when case 05 improves
+
+**Case 05 itself is still the failing case**, on C, D1 and D4 alike. Routing fixed the *gate*: with flags off the question returns a clarification in all three runs (no answer, no citations); with routing on it answers from the Risk Assessment manual and lists all six hazard categories in all three runs. The case still fails because the **top citation is the "Method 1: Add Hazards from Database" chunk**, whose page label is not one of the accepted pages (12, 13). D2 and D3 pass the case only because the score fusion happens to put the "How to fill Vessel Risk Assessment form" chunk (page 12) first. So:
+- under the majority rule the frozen total is 11/12 for C, D1 and D4, and the one failing case is 05 in each;
+- under the all-runs rule the total is 9/12 for C and 10/12 for D1 and D4, because **case 08** (Crewing waitlist export) passes only 2 of 3 runs on those three candidates;
+- the improvement at case 05 is real but invisible in the total, because the case moves from "clarification, nothing cited" to "correct answer, wrong page cited" — both score zero.
+
+#### The manual-coverage loss count (the published "six losses" versus the seven items listed)
+
+Recomputed from the dumps: **D1 → D4 is 6 losses and 0 gains** — inc-3, crewing-1, pmsoffice-5, pmsvessel-2, moc-office-1, safety-meeting-1. Their composition:
+
+| case | excerpts D1 vs D4 | what changed | class |
+|---|---|---|---|
+| inc-3 | identical | run 3 wording only | run-to-run variation |
+| crewing-1 | identical | run 1 omits a required phrase | run-to-run variation |
+| pmsvessel-2 | identical | runs 1–2 omit a required phrase | run-to-run variation |
+| moc-office-1 | identical | run 2 wording only | run-to-run variation |
+| safety-meeting-1 | identical | run 2 wording only | run-to-run variation |
+| pmsoffice-5 | **fifth excerpt swapped** (PMS p.38 filter → Cert. & Surveys p.10 filter) | 1 of 3 runs fails | selection change, effect ambiguous |
+
+So the correct arithmetic is **five run-to-run variations plus one selection change**. The seventh item in the §14.7a text, **master-review-2**, is a genuine retrieval-level regression from the rescued slot (the page-11 Part E chunk leaves the five) but it is **not** one of the six losses: the case already failed on C, D1 and D2 for other reasons, so it cannot fall further. §14.7a mixed a score loss with a retrieval loss and so appeared to list seven items for six. Both facts stand; the classification does not.
+
+#### Routing-13: module selection and source presence are two different measurements
+
+The suite has 13 checks. All 13 assert the module (or the gate, for the conflicting-module case); **12 of them additionally assert that a named source is among the five excerpts**. The published single number combined both. Split, from the stored responses:
+
+| measurement | C0 flags off | D1 routing | D2 fusion | D3 fusion | D4 rescue |
+|---|---|---|---|---|---|
+| module selected correctly (13 checks) | 10/13 | **13/13** | 13/13 | 13/13 | 13/13 |
+| expected source among the five (12 checks) | 7/12 | 10/12 | 12/12 | 12/12 | **12/12** |
+| published joint number | 8/13 | 11/13 | 13/13 | 13/13 | 13/13 |
+
+Reading: **routing alone fixes module selection** — the three failures on C0 are the three variants of frozen case 05, which returned a clarification instead of choosing Safety. Routing also carries those three cases' sources with it (7 → 10), because once the module is right the Risk Assessment chunks are the only candidates. The remaining two source failures, `rt-general-02` ("How to create work order in PMS?") and `rt-pump-01`, are **excerpt-selection** failures that routing does not touch and that only the selection change fixes (10 → 12). The two effects must not be added together as "routing improved 8 → 13".
+
+### 15.1a Reviewer's four follow-up points on the reconciliation (18-Sep), answered from stored evidence
+
+**(1) "Variation" is not a synonym for "harmless".** Accepted as a rule for step 2: identical excerpts rule out a *retrieval* change, they do not excuse a wrong or incomplete answer. Every run in §15.2 is therefore judged on its own text, and each missing required phrase is classified as either a correct paraphrase or a genuinely missing instruction, prerequisite or applicability statement.
+
+**(2) Case 05's citation failure is a judge defect — now fully diagnosed (`s4c-answers-dump.jsonl`, `s4-d4-capture.jsonl`).** The reviewer was right that a wrong *first* retrieval result does not prove the answer cites the wrong page. For D4 run 1 (runs 2 and 3 identical in the respects that matter):
+
+| what | value |
+|---|---|
+| citations shown to the user | [1] Office manual "Method 1: Add Hazards from Database (p.19)" · [2] Office "6.4 Completing Office RA – Part B (p.12)" · [3] Office "Document (p.13)" · [4] Vessel "8. How to fill Vessel RA form – Part B (p.12)" · [5] Vessel same section (p.12) |
+| expected by the case | Office p.13 **or** Vessel p.12 |
+| excerpts containing all six category names | excerpt [3] (Office p.13) and excerpt [4] (Vessel p.12) — both were supplied |
+| the answer's own Source line | "Office … Figure 15, **p.13**" and "Vessel … Section 8, Figure 14, **p.12**" — both correct |
+| judge behaviour | `acceptance_answers.judge` reads `citations[0]` only; it never inspects positions 2–5 or the answer's Source line |
+
+So the answer lists all six categories, is supported by two of the five supplied excerpts, and cites the correct pages both in the structured citation list (positions 3 and 4) and in its own Source line. **The failure is entirely an artefact of checking only the first citation.** Recorded as a demonstrated judge defect; the fix and its validation over all stored answers are in §15.4, and the old scores are preserved.
+
+**(3) The third failing frozen case on set C is case 11** ("In PMS, is there another way to add a component besides the components panel?"). Per-run outcomes, answer / citation / attribution:
+
+| candidate | case 05 | case 08 | case 11 |
+|---|---|---|---|
+| C (no flags, image prompt-v5) | 0/3 — clarify gate in all three runs, no citations | 2/3 — run 2 answer fails | **2/3 — run 3 answer fails** |
+| D1 routing | 0/3 — answers 3/3, citation fails 3/3 (see point 2) | 2/3 — run 2 answer fails | 3/3 |
+| D4 rescue | 0/3 — answers 3/3, citation fails 3/3 (see point 2) | 2/3 — run 2 answer fails | 3/3 |
+
+That closes the arithmetic: set C all-runs 9/12 = 12 − (05, 08, 11); D1 and D4 all-runs 10/12 = 12 − (05, 08).
+
+**(4) The missing C0 cells stay "not run".** Set C is not a controlled baseline for frozen, corrected or manual coverage: same model, same index, different image. Those cells are marked "not run" in the §15.1 table and no C0 figure is quoted for them anywhere. Before any promotion, the selected candidate is to be compared against a baseline that is explicitly identified and, where the comparison matters, measured on the same image with the flags off.
+
+**Status of the §14 tables.** §14.7, §14.7a and §14.8 keep their original numbers as a historical record and now carry a pointer to this section; every figure they state that this reconciliation changes is corrected above. Nothing in §14.1–§14.6 (steps 1–3) is affected: those sections report set A/B/C, which this reconciliation reproduces unchanged.
+
+### 15.2 Step 2 — all 171 stored D4 answers reviewed on their own merits, twice (`review_pack_d4.py`, `review-d4-pack-full.txt`, `build_verdicts.py`, `review-d4-verdicts-full.json`)
+
+Method. A pack was built from the stored dump plus the captured request bodies, so every run shows the question, the verified manual evidence, the citations the user sees, **every supplied excerpt in full** and the complete answer. Every run was judged on its own text; no verdict was inherited from the set-C reading or from the automatic score. Four reviewers covered one module group each, and I adjudicated every disputed or defective run myself against the untruncated excerpt.
+
+**First pass retracted and repeated.** The first pack trimmed each excerpt to 700 characters, which made three correct answers look fabricated (prep-1 runs 1 and 3, crewing-5 run 3, master-review-1 run 3 — the disputed sentences are all present in the supplied text). The pack was regenerated untruncated and the whole review repeated. The numbers below supersede the first-pass table; the earlier counts (153 / 4 / 14) are kept here as the superseded record.
+
+| verdict (per run) | count of 171 |
+|---|---|
+| correct | 105 |
+| correct paraphrase of the manual | 52 |
+| honest limitation, and the evidence genuinely was not supplied | 5 |
+| honest limitation although the evidence WAS supplied | 1 |
+| partial | 5 |
+| wrong (answer built on the wrong module's text) | 3 |
+
+| defect class | runs | cases affected |
+|---|---|---|
+| none | 154 | — |
+| false claim that evidence is missing | 4 | certsurveys-3 r2 · pmsvessel-3 r2 · safety-meeting-1 r1, r2 |
+| unsupported comparison stated as established | 1 | pmsoffice-5 r3 |
+| procedural mistake | 1 | hist-3 r1 |
+| retrieval defect (evidence indexed, not supplied) | 8 | master-review-2 ×3 · sms-office-1 ×3 · pmsoffice-5 r1, r2 |
+| routing defect (wrong module) | 3 | hist-1 ×3 |
+
+**49 of the 57 cases are clean in all three runs.** The per-run record for all 171 — case, run, verdict, which supplied excerpt supports the answer, citation assessment, defect class and reason, alongside the automatic verdict — is `review-d4-verdicts-full.json`.
+
+#### The six substantive answer defects, by kind
+
+**Procedural mistake (1 run).** hist-3 run 1: the question asks whether the attachment procedure also covers a Positive Observation or LAE finding. The answer correctly says yes, but its step 3 still reads "Enter the **Negative** observation", and it omits the Observation / Positive Finding / LAE page toggle that the supplied screenshot text describes. A user following those steps would enter the wrong record type. Runs 2 and 3 generalise the step correctly.
+
+**Unsupported comparison (1 run).** pmsoffice-5 run 3: asserts "the vessel-side set is **not the same** as the PMS Dashboard set" by comparing the Office dashboard against the vessel **Reports** screen — a different screen — and drops the caveat that runs 1 and 2 state. The conclusion may even be true, but it is not established by the evidence supplied.
+
+**False claims that evidence is missing (4 runs).** These are the opposite failure to fabrication: the model declines or hedges although the supplied text answers the question.
+- certsurveys-3 run 2 — says the manual "does not establish whether the survey process is identical or different"; the supplied p.11 note says "refer to the Certificates sub-sub-module **for the add or view attachment** and follow the same steps", which is exactly the operation asked about.
+- pmsvessel-3 run 2 — quotes the "refer to Spares and follow the same steps" direction, then contradicts itself with "the excerpts do not fully document whether the Stores form operates identically".
+- safety-meeting-1 runs 1 and 2 — close with "the provided excerpts do not include the detailed Monthly Safety Meeting instructions" although supplied excerpt [4] (Part B, p.11) contains them; run 3 uses that excerpt properly.
+
+**Cross-reference scope, checked case by case.** A "follow the same steps" note licenses only the operation it names. The Certificates note covers adding or viewing an attachment, not the survey workflow; the Stores note covers the bulk-update steps after its own entry button; the Crew Pool note covers filling the form via the In-Progress steps. No run widened a cross-reference to a whole form or module; the defects above are the reverse, declining to apply a reference that does cover the asked operation.
+
+#### The two uncertain classifications, resolved
+
+**prep-3 — not an answer failure.** The preferred chunk (Audit Preparation Office p.20) was not retrieved, but the supplied §4.3.4 p.19 excerpt states "uploaded attachments are displayed under the corresponding question, where they can be **viewed, downloaded, or deleted**", and the same excerpts give the upload action. Every required claim is supported; nothing in the answers is unsupported. Recorded as correct, with a note that the expected chunk was not the one retrieved.
+
+**pmsoffice-5 — evidence exists, is indexed, and was not retrieved.** The vessel-side dashboard filter section is in the corpus and in the index: Technical PMS Vessel manual p.9, §1.1.3.2 "How to use filter" — "Select the required criticality level to filter equipment or work orders." It was not among the five excerpts in any of the three runs; the vessel **Reports** filter section (p.46) was retrieved instead. So this is a retrieval defect, not an unknown. Runs 1 and 2 were right to state the limitation; run 3 was wrong to conclude a difference from the wrong screen.
+
+#### Correction to §14.8: no manual sentence is missing from the index
+
+§14.8 listed "two manual sentences exist in no retrievable chunk". **That is wrong.** Checked against the indexed chunk text:
+
+| case | expected chunk | indexed? | holds the required phrases? | what actually happened |
+|---|---|---|---|---|
+| prep-3 | Audit Preparation Office p.20 "Document" | yes | yes, both | not retrieved; adjacent sections supplied the same facts |
+| sms-office-1 | SMS Office p.21 "4.2.2 Approval" | yes | yes | not retrieved; only 4.1.2's own content was |
+| master-review-2 | Master Review p.11 "4. Office closeout" | yes | yes, both | displaced from the five by the lexical rescue |
+| hist-1 | Audit History p.16 "3.3 Review page" | yes | yes | question routed to Technical, so this manual was never a candidate |
+| pmsoffice-5 | PMS Vessel p.9 "1.1.3.2 How to use filter" | yes | n/a (comparison case) | not retrieved; the Reports filter section came instead |
+
+Three states must be kept apart: **absent from the manual**, **absent from the index**, **present but not retrieved**. All five are the third state, so all five are addressable by routing and selection rather than by re-extraction. No manual is re-parsed.
+
+#### Judge artefacts observed while reading (fixes in §15.5)
+
+Literal phrase matching fails on markdown emphasis inside a phrase, on tense, on singular versus plural and on inserted words. The citation check reads only the first of five citations. A forbidden phrase fires inside a negation ("Do not create a new approver record"; "does not require exporting them one at a time"). None of these is an answer fault.
+
+### 15.3 Step 3 — the fresh validation set, corrected before its first run (`indexer/fresh_cases.json` 2026-09-18.2; the original kept verbatim as `fresh_cases.v1.json`)
+
+Ten source-backed questions authored from the manual chunk text on 18-Sep and frozen before any fix was tested: five ordinary procedures and conditions (Audit History, Fleet Notification vessel side, Master Review tabs, Crewing filters, Certificates filters), one alternatives case on the manual side (three ways to start a MoC), the broad versus named work-order pair, and two module-context cases. They are held out of tuning — the selection calibration in §15.4 deliberately excludes them — and if a result later guides a fix, the affected case is relabelled a development case.
+
+Corrections made before the first run, each preserved in the file's own change log:
+
+| case | correction |
+|---|---|
+| fresh-wo-named-1 | the forbidden item is no longer the string "Unplanned W.O". What fails is an **instruction** to use the unplanned route for a question about the Components "Generate WO" action; a one-line note that other methods exist is allowed, as prompt v5 permits |
+| fresh-incident-1 | now also checks the view and edit actions on a notification, not only the filtering |
+| fresh-technical-1 | now also checks the Fleet and Add Group filters alongside Vessel, Due Status and Clear |
+| fresh-audit-1 | "next" replaced by the destination it leads to (the Observation page), so an unrelated use of the word cannot satisfy it |
+| fresh-safety-1 | both sides of the All / Response Pending contrast are required |
+| fresh-crewing-1 | the named filter fields and the column-header filter behaviour are required, not the bare word "column" |
+| fresh-moc-alt-1 | all three creation routes required |
+| fresh-wo-broad-1 | adds the attribution rule: automatic generation and the office Generate Now action may appear only if attributed to the draft code-derived guidance |
+| fresh-ctx-1 | adds the module expectation (Safety), so the context test is scored rather than the topic words |
+| all cases | a `score_by` rubric decides the verdict — meaning, conditions and source support. Literal phrase matching is an aid to the reader, never the verdict on its own |
+
+### 15.4 Step 4 — the demonstrated fixes, chosen on measurement (`diag_fixes.txt`, `calib_select.py`, `replay-v6.json`)
+
+**Diagnosis first (embeddings only, no answer calls).** Each defective question was re-run through the real retrieval path and the position of the expected chunk recorded:
+
+| defect | what the measurement shows |
+|---|---|
+| hist-1 routed to Technical | Technical's nearest chunk is 0.875 (a Ship-Side operational note about approvals); the correct Audit History page is at 1.020, vector rank 5 overall. No corpus-derived term distinguishes the question — "history" is a generic word the intent router deliberately drops |
+| master-review-2 evidence displaced | the expected Part E chunk is the **fifth** vector hit (0.951); the unguarded rescue replaced it with the lexical leader at 1.007 |
+| prep-3, sms-office-1, pmsoffice-5 not retrieved | in each case the rescue also displaced a nearer chunk with a farther one (1.078 → 1.147, 0.691 → 0.930, 0.901 → 1.035) |
+
+**The rescue was the common cause.** Across 77 suite questions the unguarded rescue made 23 swaps and **22 of them displaced a nearer chunk**. The four swaps that actually helped all scored 0.6 to 0.93 per content word and cost at most 0.12 of distance; the harmful ones scored below 0.45 per word or cost more.
+
+**Fix adopted — r7, a guarded rescue.** The lexical leader may take the last slot only when it earns it on both counts: score per content word at least 0.45, and distance no more than 0.15 worse than the excerpt it would displace. Measured on the same 77 questions:
+
+| selection variant | expected source among the five | swaps | swaps that lost a nearer chunk | total distance lost |
+|---|---|---|---|---|
+| vector only (served) | 69/77 | 0 | 0 | 0.00 |
+| r6 unguarded rescue (D4) | 72/77 | 23 | 22 | 1.90 |
+| **r7 guarded rescue** | **73/77** | **8** | 8 | 0.41 |
+
+r7 beats both: it keeps the Master Review evidence r6 lost **and** keeps all four work-order and routing gains.
+
+**Routing fix attempted and NOT adopted.** Two "second opinion" variants were implemented and measured — give the last slot to the runner-up module's best chunk when the module decision is close (r8), or choose that module by lexical strength (r8c). Neither recovers hist-1, because the nearest runner-up is Safety at 1.002 rather than Audit at 1.020, and both cost the r7 gains. The code stays behind `ASSISTANT_SECOND_OPINION_GAP`, default 0 = off, with the measurement recorded. **hist-1 remains an open defect** and is reported as such rather than claimed fixed.
+
+**Prompt v6, versioned and compared on identical captured inputs.** Three sentences were added to v5, each answering a demonstrated defect: use the evidence you were given before claiming something is missing; adapt steps to the variant the question asks about; compare two things only when both are in the excerpts. v5 keeps its hash `ff9ee87141ac1362`; v6 is `d372abf3b93cc481`, which is v5 plus a 955-character block with nothing removed. Replayed on the stored requests for the six defective runs plus ten controls (32 calls, 52,532 in / 9,353 out tokens, about $0.02):
+
+| run | v5 on this replay | v6 |
+|---|---|---|
+| pmsvessel-3 r2 | still hedges: "does not provide a separate transaction-entry flow" | "Bulk updating Stores items follows the same process as Spares, not a separate process" |
+| safety-meeting-1 r1 and r2 | no longer states the false limitation, but adds no Part B detail | uses the supplied Part B excerpt (unresolved actions, + Add Action, Save) |
+| pmsoffice-5 r3 | "These are not the same fields listed for the PMS Dashboard" | "The excerpts do not document a vessel-side PMS Dashboard filter set, so they do not establish whether it is the same … a different documented interface, not evidence about the vessel-side Dashboard" |
+| certsurveys-3 r2, hist-3 r1 | correct on this replay — the original defects did not reproduce, which is answer variance | correct, and the variant steps are adapted explicitly |
+| 10 controls incl. master-review-2 and sms-office-1 | correct | correct — both honest limitations stay honest; v6 does not turn a limitation into a guess |
+
+**No manual was re-parsed** and the index is unchanged: every sentence involved is already indexed (§15.2).
+
+### 15.5 Step 5 — judge .5, validated on stored answers only (`indexer/rejudge_base5.py`, `judge5-validation.txt`)
+
+Two demonstrated judge defects fixed. No acceptance requirement was relaxed and no case text changed.
+
+- **Citation.** The expected manual and page may appear at **any** position in the citation list shown to the user, not only first. The top-citation result is still computed and reported, so nothing is hidden. Guard: citation-anywhere applies **only to page-anchored cases**. Where a case matches a manual name with no page, such as "(Operational)", a name can match a different document, which would let a filename stand in for support; those cases keep the strict top-citation rule. That guard is what keeps corrected-claims case 4 failing instead of passing on a lookalike name.
+- **Forbidden phrases.** A forbidden phrase inside a negation is not a violation: "Do not create a new approver record" states the manual's own rule.
+
+Validated by re-scoring **eight stored dumps** under .4 and .5. Old scores are preserved and the dumps are untouched.
+
+| change | count |
+|---|---|
+| citation: expected page was cited, but not first | 260 |
+| answer: forbidden phrase was inside a negation | 9 |
+| both | 1 |
+| **total verdicts changed** | **270** |
+| corrected-claims suite (the lookalike-name risk) | unchanged: 36/42 and 35/42 |
+
+### 15.6 Step 6 — final verification against a clearly identified baseline (`run-s5-suites.sh` → `s5-runs.txt`, `s5-*-dump.jsonl`, `s5-{b0,d5a,d5}-capture.jsonl`, `s5-manuals-rejudge.txt`)
+
+One image, one index, one model, one key; the three arms differ only in two environment flags and the prompt version, so every difference is attributable.
+
+| arm | routing | excerpt selection | prompt | role |
+|---|---|---|---|---|
+| **B0** | off | off (vector five) | v5 `ff9ee87141ac1362` | the controlled baseline that was missing in §14 — measured on the same build, not borrowed from an older image |
+| **D5a** | on | guarded rescue (r7) | v5 | routing + selection only |
+| **D5** | on | guarded rescue (r7) | v6 `d372abf3b93cc481` | final candidate |
+
+#### Results, all suites, all-runs-required (the stricter of the two rules; the suites' own majority rule is noted where it differs)
+
+| suite | B0 | D5a | D5 | notes |
+|---|---|---|---|---|
+| routing probes 13 (embeddings only, deterministic) | 8 | **13** | **13** | the three case-05 context variants plus the two work-order intents |
+| retrieval 18 (top-1 source) | 18 | 18 | 18 | no regression from either change |
+| frozen 12 ×3 | 11 | **12** | 10 (11 by reading) | D5a fixes case 05. D5's two drops: case 7 run 1 is a judge artefact ("the same procedure as Spares" does not match the attribution phrase list); case 8 run 3 is a **real defect** — it offers the Crew Database export, which the case forbids as a different sub-module |
+| corrected claims 14 ×3 | 12 | 10 | 12 | D5a's two drops are single runs (2/3) on cases B0 and D5 pass; variance, not a measured effect of the selection change |
+| work-order 8 ×3 | 5 | **7** | **7** | generic-03 0/3 → 3/3 and phr-02 1/3 → 3/3 are repeatable gains; phr-04 (D5) and generic-02 (B0, D5a) are 2/3 variance |
+| fresh validation 10 ×3 (first run, held out of tuning) | 9 | **10** | **10** | the only baseline failure is fresh-audit-1 at 2/3 |
+| manual coverage 57 ×3 (support re-checked against the captures) | 34 | **35** | 32 | every one of D5's five losses is a single run failing a literal phrase while answering correctly: "cannot edit" for "cannot modify", "Actions Due" for "action(s) due", "has passed its due date" for "past their due date", "before … can be modified" for "cannot be modified", and one honest caveat about a sub-category that trips the not-covered word list |
+| **total cases (101)** | **71** | **74** | **71** | |
+
+#### What is repeatable and what is noise
+
+Deterministic, no model variance: **routing 8 → 13 of 13** and **retrieval unchanged at 18/18**. Repeatable across all three runs: the two work-order intents, frozen case 05, fresh-audit-1. Everything else that moves between arms is a single run of three on a case the other arms pass — the ±4–8 band on the 57-case suite measured in §15.1.
+
+**On prompt v6 the suite evidence is neutral to slightly negative**, while its benefit was demonstrated only on the replay of the six defective inputs (§15.4). D5 and B0 finish level on the aggregate (71 each) and D5a is ahead (74). The defects v6 targets are 6 runs in 171 — about 3 % — which this suite cannot resolve at ×3.
+
+#### Cost, latency and usage, measured on this run (`convlog-s5.jsonl`, `usage.py`)
+
+| arm | answers | tokens in / out per answer | cost per 1,000 questions | latency mean / median / p95 |
+|---|---|---|---|---|
+| B0 | 297 | 1,534 / 308 | $0.68 | 3.96 s / 3.43 s / 7.84 s |
+| D5a | 303 | 1,542 / 311 | $0.68 | 4.00 s / 3.39 s / 8.43 s |
+| D5 | 303 | 1,734 / 281 | $0.68 | 3.78 s / 3.18 s / 8.01 s |
+
+Measured with three arms answering concurrently on one host. The whole step-6 run cost about $0.62 for 903 answers; the step-4 diagnosis and the v6 replay together cost about $0.02.
+
+#### Package identity
+
+| item | value |
+|---|---|
+| image | `sail-assistant-py:v6-r7` **bd71948a7fdf** (server build of this branch's `app/`; Dockerfile unchanged; runs as uid 10001) |
+| model / sampling | `gpt-5.6-luna`, `CHAT_TEMPERATURE=default` |
+| embedding model | `text-embedding-3-large`, 3072 dims, one call per question |
+| key | the dedicated assistant key (`~/central-assistant/assistant-luna.env`, mode 600) |
+| prompt | D5a: v5 `ff9ee87141ac1362` · D5: v6 `d372abf3b93cc481`; tool-loop `7a028346c1c2fdf0` unchanged |
+| retrieval configuration | floor 1.15 · margin 0.07 · top_k 10 · 5 excerpts · `ASSISTANT_ROUTE_INTENT=on` · `ASSISTANT_HYBRID=rescue` with `ASSISTANT_RESCUE_LEX_PER_TERM=0.45` and `ASSISTANT_RESCUE_MAX_PENALTY=0.15` · `ASSISTANT_SECOND_OPINION_GAP=0` (measured, not adopted) |
+| index identity | `kb-pilot-c`, 916 chunks, 30 documents — unchanged; no manual re-parsed, no chunk re-embedded |
+| judges | base .5 (citation-anywhere for page-anchored cases, negation-aware forbidden phrases), work-order .11, manual suite 2026-09-15.1, fresh 2026-09-18.2 |
+
+#### Remaining limitations
+
+1. **hist-1 routing is unfixed.** The Audit History review question still goes to Technical. Two second-opinion variants were measured and neither works; the module-level signal is genuinely against us (the wrong module's nearest chunk is closer).
+2. **Answer variance dominates the suites at ×3.** Differences of one to three cases between arms are not evidence. A larger repeat count, or judging by reading, is needed to resolve changes of that size.
+3. **Judge gaps still reported, not patched:** the attribution phrase list misses "the same procedure as"; the not-covered word list fires on an honest caveat about one sub-item; literal phrase matching still undercounts paraphrases (five cases in this run alone).
+4. **Two manual pages are still not retrieved** (prep-3's preferred chunk, sms-office-1's section 4.2.2) although both are indexed; the answers are correct from adjacent sections.
+5. **One real answer defect in this run:** frozen case 8 run 3 offers the Crew Database export as an alternative, which the case forbids.
+
+#### Recommendation
+
+**Do not deploy anything yet.** If a candidate is to be promoted, the evidence supports **D5a — routing on, guarded rescue, prompt v5**: it is the only arm that improves every deterministic measure with no measured regression outside the variance band, and it is ahead on the aggregate (74 of 101 against 71 for the baseline).
+
+**Prompt v6 should be held.** Its three rules demonstrably fix the wording defects on the exact inputs that produced them, but the full suites show no aggregate gain and one real new defect. The cheap way to settle it is to replay v5 against v6 on all 171 stored manual-coverage inputs (about 342 calls, roughly $0.12, no service change) and judge the differences by reading. That decides v6 on evidence rather than on a 3 % subset.
+
+#### Rollback procedure (for review; nothing is deployed)
+
+Nothing has been deployed, so today's rollback is simply `docker rm -f` on the candidate containers; the live service on 8017 has never been touched and keeps its own image, index (`repaired`, 911), prompt v2, gpt-4o-mini and the borrowed key.
+
+If a candidate is ever promoted, rollback is an environment change, not a rebuild, because every change in this package is flag-driven:
+1. `ASSISTANT_ROUTE_INTENT=off`, `ASSISTANT_HYBRID=off`, `ASSISTANT_DOCS_PROMPT=v5` restores the served behaviour byte for byte inside the same image; restart the container (about 10 seconds).
+2. If the image itself must be rolled back, redeploy the previous tag and point `ASSISTANT_INDEX_SET` at `repaired`; the index sets are separate rows in the same table, so no data is migrated or deleted in either direction.
+3. Verification after rollback: `/health` must report the expected `indexSet`, `chunks`, `prompt.version` and `docsPromptSha`, and the retrieval-18 probe must return 18/18 with no model calls.
+4. The dedicated key is scoped to the two models it needs; no shared key is revoked or rotated by any of this.
 
 ### 8.6 Not changed / open
 

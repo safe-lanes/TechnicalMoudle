@@ -170,6 +170,43 @@ def score_fuse(vector_hits: list[Hit], lexical_hits: list[Hit], k: int, alpha: f
     return [keep[kk] for kk in order[:k]]
 
 
+def content_terms(message: str) -> list[str]:
+    """The question's content words — the same tokens the lexical query is built from (db._STOPWORDS)."""
+    from .db import _STOPWORDS
+    return [w for w in re.findall(r"[a-z0-9][a-z0-9'&-]{1,}", (message or "").lower()) if w not in _STOPWORDS]
+
+
+def guarded_lexical_rescue(vector_hits: list[Hit], lexical_hits: list[Hit], k: int, n_terms: int,
+                           lex_per_term_min: float, max_distance_penalty: float) -> tuple[list[Hit], Hit | None, Hit | None]:
+    """Step 4 r7 (ASSISTANT_HYBRID=rescue): the served vector selection is kept; the lexical leader may take the LAST slot
+    only when it earns it on BOTH counts:
+      (1) lexical dominance — leader score per content word of the question >= lex_per_term_min. ts_rank_cd grows with the
+          number of matched terms, so dividing by the question's term count makes the test independent of question length;
+      (2) proximity — the leader is not materially farther than the excerpt it would displace:
+          leader.distance <= displaced.distance + max_distance_penalty.
+    Measured on 77 suite questions (calib_select.py, embeddings only): unguarded rescue made 23 swaps, 22 of which
+    displaced a NEARER chunk, and it lost the Master Review Part E evidence. Every swap that actually helped scored
+    >= 0.6 per term with a penalty <= 0.12; every harmful one scored <= 0.41 per term or cost more than 0.13 distance.
+    Returns (five, rescued_or_None, displaced_or_None) so callers can log why a slot changed."""
+    five = list(vector_hits[:k])
+    if not lexical_hits:
+        return five, None, None
+    leader = lexical_hits[0]
+
+    def ident(h: Hit) -> tuple:
+        return (str(h.meta.get("file")), str(h.meta.get("breadcrumb")), str(h.meta.get("chunk_index")))
+    if any(ident(leader) == ident(h) for h in five):
+        return five, None, None                      # already selected — nothing to do
+    displaced = five[k - 1] if len(five) >= k else None
+    lex = float(leader.meta.get("lexical_rank_score", 0.0))
+    if n_terms > 0 and (lex / n_terms) < lex_per_term_min:
+        return five, None, displaced                 # word overlap alone is not relevance
+    if displaced is not None and leader.distance > displaced.distance + max_distance_penalty:
+        return five, None, displaced                 # would cost more evidence than it adds
+    out = (five[:k - 1] if len(five) >= k else five) + [leader]
+    return out, leader, displaced
+
+
 def lexical_rescue(vector_hits: list[Hit], lexical_hits: list[Hit], k: int) -> list[Hit]:
     """Step 4 r6 (ASSISTANT_HYBRID=rescue): the served vector selection is kept as it is, except that the chunk leading the
     lexical ranking inside the routed module, when it is not already among the k excerpts, takes the LAST slot. Measured
@@ -183,6 +220,35 @@ def lexical_rescue(vector_hits: list[Hit], lexical_hits: list[Hit], k: int) -> l
     if lexical_hits and all(key(lexical_hits[0]) != key(h) for h in five):
         five = (five[:k - 1] if len(five) >= k else five) + [lexical_hits[0]]
     return five
+
+
+def second_opinion(all_hits: list[Hit], routed_module: str, five: list[Hit], gap: float, floor: float) -> tuple[list[Hit], Hit | None, Hit | None]:
+    """Step 4 r8 (ASSISTANT_SECOND_OPINION_GAP > 0): when the module decision was CLOSE, give the runner-up module's best
+    chunk the last excerpt slot. Module routing keeps a single winner; this only widens the evidence the answer model sees
+    when the winner was not clear-cut, so the model can say which manual covers what instead of answering from the wrong one.
+
+    Trigger: best distance of the runner-up module <= best distance of the routed module + gap, and the chunk is within the
+    distance floor. Demonstrated case: the Audit History review question routes to Technical (best 0.875) while the correct
+    Audit History page sits at 1.020 — inside a 0.15 gap. Documentation scope only: this selects among documentation chunks
+    and never touches identity, tenant or vessel checks."""
+    if gap <= 0 or not five:
+        return five, None, None
+    best_routed = min((h.distance for h in all_hits if h.module == routed_module), default=None)
+    if best_routed is None:
+        return five, None, None
+    other = [h for h in all_hits if h.module != routed_module and h.distance <= floor]
+    if not other:
+        return five, None, None
+    cand = min(other, key=lambda h: h.distance)
+    if cand.distance > best_routed + gap:
+        return five, None, None
+
+    def ident(h: Hit) -> tuple:
+        return (str(h.meta.get("file")), str(h.meta.get("breadcrumb")), str(h.meta.get("chunk_index")))
+    if any(ident(cand) == ident(h) for h in five):
+        return five, None, None
+    displaced = five[-1]
+    return five[:-1] + [cand], cand, displaced
 
 
 def rrf_fuse(vector_hits: list[Hit], lexical_hits: list[Hit], k: int, c: int = 60) -> list[Hit]:
@@ -268,4 +334,18 @@ def docs_prompt(message: str, routed: Routed) -> tuple[str, str]:
               "name each source; where an excerpt is marked draft, unverified or revision-specific, say so in one clause. "
               "Keep it short and plain; do not use 'Method' / 'Applies to' / 'Requirements' labels. "
               'End with ONE "Source:" list naming, for each method, the manual or guidance and section that supports it.')
+    if settings().assistant_docs_prompt.lower() == "v6":
+        # v6 (candidate, owner brief 18-Sep-2026): three sentences added to v5, each answering a defect demonstrated in the
+        # 171-answer review (§15.2). Nothing in v5 is removed or reworded, so v6 differs from v5 only by this block.
+        system += (
+            " RULE — use what you were given: before you say that something is not covered, not documented or not established, "
+            "check every excerpt above. If an excerpt answers it — including a cross-reference that names the very operation "
+            "asked about, or a section that gives the steps — use that excerpt and answer. Never say the excerpts do not "
+            "include something they do include. "
+            "RULE — variants: when the question asks about a variant of what an excerpt describes (another record type, "
+            "observation type, form, tab or category) and an excerpt says the same procedure applies, give the steps ADAPTED "
+            "to the variant asked about; do not repeat a step that names the other variant. "
+            "RULE — comparisons: only state that two things are the same or different when the excerpts describe BOTH of them. "
+            "If only one side is present, give that side and say plainly that the other is not in these excerpts — do not infer "
+            "a difference from a neighbouring screen, section or manual.")
     return system, f"Manual excerpts:\n\n{context}\n\nQuestion: {message}"

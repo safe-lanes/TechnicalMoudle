@@ -1,0 +1,1227 @@
+==============================================================================================================
+CASE fs-off-1 [condition] run 1   stored verdict: answer=True citation=True support=not captured
+Q: Can an office user delete a fleet sharing record after it's already been submitted, or only while it's still a draft?
+EXPECTED manual: Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf  pages [5]  section Document
+MANUAL EVIDENCE (verified when the case was written): Records can only be deleted while they are in Draft status. Submitted Fleet Sharing cannot be deleted.
+REQUIRED phrases: ['draft', 'cannot be deleted']   (in answer: ['draft', 'cannot be deleted'])
+FORBIDDEN phrases: ['can be deleted after submission', 'any time']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)  <== expected manual+page
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 2.0 FLEET SHARING – OVERVIEW (p.4)
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.1 DESCRIPTION (p.6)
+  [5] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)  <== expected source
+      required phrases present here: ['draft', 'cannot be deleted']
+      text: screenshot_from_computer: Fleet Sharing software interface showing a list of records with callouts for "To create new Fleet Sharing", "Click Filters", "Select Period or Search by Title", "Click Apply or Clear the Filters", and "Using Icons to view, edit or delete records" Figure 2 ☞ Records can only be deleted while they are in **Draft** status. Submitted Fleet Sharing cannot be deleted. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Upload &#x26; View Attachment</td> <td>Upload and view supporting documents for Fleet Sharing.</td> </tr> <tr> <td>[icon: eye]</td> <td>View FS record</td> <td>View the Fleet Sha…
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+      required phrases present here: []
+      text: This section allows users to update the recipient notification which is shared by the office. * <u>Select the recipient(s) by All Vessels, Vessel, Fleet Group, Group, or Vessel Type.</u> * <u>Select the issuer from the Issued By drop-down list.</u> * <u>Click **Save** to save the submission details or **Submit** to complete and share the Fleet sharing with the</u> <u>selected recipient(s).</u> <u>(See Figure 6)</u> screenshot: Fleet Sharing software interface showing the Submission step with callouts for selecting recipients and clicking the submit button Figure 6 [icon: hand pointing right] Users can edit the Fleet Sharing record until it has been submitted. [icon: hand pointing right] Once…
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 2.0 FLEET SHARING – OVERVIEW (p.4)
+      required phrases present here: []
+      text: <u>The **Fleet Sharing submodule** allows users to create, manage, and monitor fleet sharing records.</u> * <u>Click on **+ New fleet sharing** for creating new record</u> * <u>Click **Filters** to access filtering options.</u> * <u>Search for the required Fleet sharing by selecting the desired **Period** or by entering the subject in</u> <u>the **Search by tittle.**</u> * <u>Click **Apply** to filter the records or **Clear** to reset the filters.</u> * <u>Use the action icons to manage the selected Fleet sharing (See Figure 2).</u>
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.1 DESCRIPTION (p.6)
+      required phrases present here: []
+      text: * <u>Enter the mandatory details, including the **Title** and **Date**.</u> * <u>Enter the Fleet Sharing **Description** in the description field.</u> * <u>Upload supporting attachments, if applicable.</u> * <u>Click **View** to open the uploaded attachments.</u> * <u>Click **Save** to save the Fleet Sharing record. (*See Figure 3*).</u> screenshot: Fleet Sharing form interface showing mandatory fields, description box, and upload/save buttons Figure 3 <mark>icon: pointing hand **Report ID** is generated after clicking Save button.</mark>
+  [5] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+      required phrases present here: []
+      text: * <u>Enter the required Discussion Date under **Step 2**.</u> * <u>Click **Submit** to confirm that the Fleet Sharing record has been discussed onboard. (See Figure 3)</u> [icon: hand pointing right] Once the record is submitted, the **Confirmation** column in the Fleet Sharing overview table is automatically updated for both **Vessel** and **Office** users, indicating that the discussion has been completed.
+
+ANSWER (verbatim):
+An office user can delete a Fleet Sharing record **only while it is in Draft status**. Once submitted, it **cannot be deleted**; submitted records also cannot be edited.
+
+**Source:** Fleet Sharing Manual – Office, Figure 2 (p. 5); Section 3.3 Submission (p. 8).
+
+==============================================================================================================
+CASE fs-off-1 [condition] run 2   stored verdict: answer=True citation=True support=not captured
+Q: Can an office user delete a fleet sharing record after it's already been submitted, or only while it's still a draft?
+EXPECTED manual: Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf  pages [5]  section Document
+MANUAL EVIDENCE (verified when the case was written): Records can only be deleted while they are in Draft status. Submitted Fleet Sharing cannot be deleted.
+REQUIRED phrases: ['draft', 'cannot be deleted']   (in answer: ['draft', 'cannot be deleted'])
+FORBIDDEN phrases: ['can be deleted after submission', 'any time']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)  <== expected manual+page
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 2.0 FLEET SHARING – OVERVIEW (p.4)
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.1 DESCRIPTION (p.6)
+  [5] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)  <== expected source
+      required phrases present here: ['draft', 'cannot be deleted']
+      text: screenshot_from_computer: Fleet Sharing software interface showing a list of records with callouts for "To create new Fleet Sharing", "Click Filters", "Select Period or Search by Title", "Click Apply or Clear the Filters", and "Using Icons to view, edit or delete records" Figure 2 ☞ Records can only be deleted while they are in **Draft** status. Submitted Fleet Sharing cannot be deleted. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Upload &#x26; View Attachment</td> <td>Upload and view supporting documents for Fleet Sharing.</td> </tr> <tr> <td>[icon: eye]</td> <td>View FS record</td> <td>View the Fleet Sha…
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+      required phrases present here: []
+      text: This section allows users to update the recipient notification which is shared by the office. * <u>Select the recipient(s) by All Vessels, Vessel, Fleet Group, Group, or Vessel Type.</u> * <u>Select the issuer from the Issued By drop-down list.</u> * <u>Click **Save** to save the submission details or **Submit** to complete and share the Fleet sharing with the</u> <u>selected recipient(s).</u> <u>(See Figure 6)</u> screenshot: Fleet Sharing software interface showing the Submission step with callouts for selecting recipients and clicking the submit button Figure 6 [icon: hand pointing right] Users can edit the Fleet Sharing record until it has been submitted. [icon: hand pointing right] Once…
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 2.0 FLEET SHARING – OVERVIEW (p.4)
+      required phrases present here: []
+      text: <u>The **Fleet Sharing submodule** allows users to create, manage, and monitor fleet sharing records.</u> * <u>Click on **+ New fleet sharing** for creating new record</u> * <u>Click **Filters** to access filtering options.</u> * <u>Search for the required Fleet sharing by selecting the desired **Period** or by entering the subject in</u> <u>the **Search by tittle.**</u> * <u>Click **Apply** to filter the records or **Clear** to reset the filters.</u> * <u>Use the action icons to manage the selected Fleet sharing (See Figure 2).</u>
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.1 DESCRIPTION (p.6)
+      required phrases present here: []
+      text: * <u>Enter the mandatory details, including the **Title** and **Date**.</u> * <u>Enter the Fleet Sharing **Description** in the description field.</u> * <u>Upload supporting attachments, if applicable.</u> * <u>Click **View** to open the uploaded attachments.</u> * <u>Click **Save** to save the Fleet Sharing record. (*See Figure 3*).</u> screenshot: Fleet Sharing form interface showing mandatory fields, description box, and upload/save buttons Figure 3 <mark>icon: pointing hand **Report ID** is generated after clicking Save button.</mark>
+  [5] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+      required phrases present here: []
+      text: * <u>Enter the required Discussion Date under **Step 2**.</u> * <u>Click **Submit** to confirm that the Fleet Sharing record has been discussed onboard. (See Figure 3)</u> [icon: hand pointing right] Once the record is submitted, the **Confirmation** column in the Fleet Sharing overview table is automatically updated for both **Vessel** and **Office** users, indicating that the discussion has been completed.
+
+ANSWER (verbatim):
+An office user can delete a Fleet Sharing record **only while it is in Draft status**. Once submitted, it **cannot be deleted**.  
+
+**Source:** Fleet Sharing Manual—Office, Figure 2 (p. 5).
+
+==============================================================================================================
+CASE fs-off-1 [condition] run 3   stored verdict: answer=True citation=True support=not captured
+Q: Can an office user delete a fleet sharing record after it's already been submitted, or only while it's still a draft?
+EXPECTED manual: Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf  pages [5]  section Document
+MANUAL EVIDENCE (verified when the case was written): Records can only be deleted while they are in Draft status. Submitted Fleet Sharing cannot be deleted.
+REQUIRED phrases: ['draft', 'cannot be deleted']   (in answer: ['draft', 'cannot be deleted'])
+FORBIDDEN phrases: ['can be deleted after submission', 'any time']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)  <== expected manual+page
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 2.0 FLEET SHARING – OVERVIEW (p.4)
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.1 DESCRIPTION (p.6)
+  [5] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)  <== expected source
+      required phrases present here: ['draft', 'cannot be deleted']
+      text: screenshot_from_computer: Fleet Sharing software interface showing a list of records with callouts for "To create new Fleet Sharing", "Click Filters", "Select Period or Search by Title", "Click Apply or Clear the Filters", and "Using Icons to view, edit or delete records" Figure 2 ☞ Records can only be deleted while they are in **Draft** status. Submitted Fleet Sharing cannot be deleted. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Upload &#x26; View Attachment</td> <td>Upload and view supporting documents for Fleet Sharing.</td> </tr> <tr> <td>[icon: eye]</td> <td>View FS record</td> <td>View the Fleet Sha…
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+      required phrases present here: []
+      text: This section allows users to update the recipient notification which is shared by the office. * <u>Select the recipient(s) by All Vessels, Vessel, Fleet Group, Group, or Vessel Type.</u> * <u>Select the issuer from the Issued By drop-down list.</u> * <u>Click **Save** to save the submission details or **Submit** to complete and share the Fleet sharing with the</u> <u>selected recipient(s).</u> <u>(See Figure 6)</u> screenshot: Fleet Sharing software interface showing the Submission step with callouts for selecting recipients and clicking the submit button Figure 6 [icon: hand pointing right] Users can edit the Fleet Sharing record until it has been submitted. [icon: hand pointing right] Once…
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 2.0 FLEET SHARING – OVERVIEW (p.4)
+      required phrases present here: []
+      text: <u>The **Fleet Sharing submodule** allows users to create, manage, and monitor fleet sharing records.</u> * <u>Click on **+ New fleet sharing** for creating new record</u> * <u>Click **Filters** to access filtering options.</u> * <u>Search for the required Fleet sharing by selecting the desired **Period** or by entering the subject in</u> <u>the **Search by tittle.**</u> * <u>Click **Apply** to filter the records or **Clear** to reset the filters.</u> * <u>Use the action icons to manage the selected Fleet sharing (See Figure 2).</u>
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.1 DESCRIPTION (p.6)
+      required phrases present here: []
+      text: * <u>Enter the mandatory details, including the **Title** and **Date**.</u> * <u>Enter the Fleet Sharing **Description** in the description field.</u> * <u>Upload supporting attachments, if applicable.</u> * <u>Click **View** to open the uploaded attachments.</u> * <u>Click **Save** to save the Fleet Sharing record. (*See Figure 3*).</u> screenshot: Fleet Sharing form interface showing mandatory fields, description box, and upload/save buttons Figure 3 <mark>icon: pointing hand **Report ID** is generated after clicking Save button.</mark>
+  [5] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+      required phrases present here: []
+      text: * <u>Enter the required Discussion Date under **Step 2**.</u> * <u>Click **Submit** to confirm that the Fleet Sharing record has been discussed onboard. (See Figure 3)</u> [icon: hand pointing right] Once the record is submitted, the **Confirmation** column in the Fleet Sharing overview table is automatically updated for both **Vessel** and **Office** users, indicating that the discussion has been completed.
+
+ANSWER (verbatim):
+An office user can delete a Fleet Sharing record **only while it is in Draft status**. A submitted record **cannot be deleted**.
+
+Source: Fleet Sharing Manual—Office, Figure 2 (p. 5).
+
+==============================================================================================================
+CASE fs-off-2 [procedure] run 1   stored verdict: answer=True citation=False support=not captured
+Q: What are the steps to add an action item that vessels need to complete on a fleet sharing record?
+EXPECTED manual: Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf  pages [6]  section 3.2 ACTIONS
+MANUAL EVIDENCE (verified when the case was written): Click + Add Action to create a new action. In the Add Action window, enter the mandatory details marked with (*), including the Nature of Action and Due Date. Click Save to add the action to the Fleet Sharing record.
+REQUIRED phrases: ['+ add action', 'nature of action', 'due date']   (in answer: ['+ add action', 'nature of action', 'due date'])
+FORBIDDEN phrases: ['edit icon', 'delete icon']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)  <== expected manual+page
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)
+      required phrases present here: []
+      text: * Enter the **Date Completed** for the action in the **Update Action** window. * Upload the required supporting attachments, if applicable. * Click **Submit** to submit the Fleet Sharing record. (See Figure 4) ☞ After updating the Date Closed for all actions, click **Submit** to submit the record. ☞ The Actions Completed and Date Completed columns in the Fleet Sharing table will be updated accordingly. screenshot: Actions section of the Fleet Sharing interface showing a table of actions with status icons and callouts for editing, adding comments, and uploading attachments. Figure 4
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)  <== expected source
+      required phrases present here: ['+ add action', 'nature of action', 'due date']
+      text: <u>This section allows users to create and manage actions that are required to be completed by the vessels.</u> * Click **+ Add Action** to create a new action. (See Figure 4) * In the **Add Action window**, enter the mandatory details marked with (**\***), including the Nature of Action and Due Date. (See figure 5) * Click **Save** to add the action to the Fleet Sharing record. * Repeat the above steps to add additional actions, if required. * Click the **Edit** icon to modify an existing action. * Click the **Delete** icon to remove an action. * Click **Upload** to attach supporting documents related to the action. * Click **View** to open or delete the uploaded attachments. (See Figure 4,…
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+      required phrases present here: []
+      text: * <u>Enter the required Discussion Date under **Step 2**.</u> * <u>Click **Submit** to confirm that the Fleet Sharing record has been discussed onboard. (See Figure 3)</u> [icon: hand pointing right] Once the record is submitted, the **Confirmation** column in the Fleet Sharing overview table is automatically updated for both **Vessel** and **Office** users, indicating that the discussion has been completed.
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+      required phrases present here: ['nature of action', 'due date']
+      text: screenshot: Fleet Sharing interface showing the Actions Required section with a table of actions and an Add Action button. Figure 4 screenshot: Add Action pop-up window with fields for Nature of Action and Due Date. Figure 5 <mark>☞ Multiple supporting documents can be uploaded and viewed using the Upload and View options.</mark>
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+      required phrases present here: []
+      text: * <u>Click the **List** icon under the **Actions** column to display the vessel-wise action completion status.</u> * <u>The **Actions Completed** column displays the number of vessels that have completed all assigned actions</u> <u>against the total number of vessels to which the Fleet sharing was shared.</u> * <u>Review the **Action Completed** and **Date Completed** columns to monitor the action progress for each</u> <u>vessel.</u> <u>(See Figure 7)</u> screenshot: Fleet Sharing Audit Dashboard showing vessel-wise action completion status with callouts for tracking responses and expanding details. Figure 7 <mark>☞ The Actions Completed count is updated automatically as vessels close their …
+
+ANSWER (verbatim):
+In the **Office Fleet Sharing interface**:
+
+1. Click **+ Add Action**.
+2. In the **Add Action** window, enter all mandatory fields marked with **\***, including **Nature of Action** and **Due Date**.
+3. Click **Save** to add the action to the Fleet Sharing record.
+4. Repeat these steps for any additional actions.
+5. If needed, click **Upload** to attach supporting documents; use **View** to open or delete uploaded attachments.
+
+Source: **Audit – Fleet Sharing Manual – Office_R1_30.06.2026**, section **3.2 ACTIONS**, p. 6–7.
+
+==============================================================================================================
+CASE fs-off-2 [procedure] run 2   stored verdict: answer=True citation=False support=not captured
+Q: What are the steps to add an action item that vessels need to complete on a fleet sharing record?
+EXPECTED manual: Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf  pages [6]  section 3.2 ACTIONS
+MANUAL EVIDENCE (verified when the case was written): Click + Add Action to create a new action. In the Add Action window, enter the mandatory details marked with (*), including the Nature of Action and Due Date. Click Save to add the action to the Fleet Sharing record.
+REQUIRED phrases: ['+ add action', 'nature of action', 'due date']   (in answer: ['+ add action', 'nature of action', 'due date'])
+FORBIDDEN phrases: ['edit icon', 'delete icon']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)  <== expected manual+page
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)
+      required phrases present here: []
+      text: * Enter the **Date Completed** for the action in the **Update Action** window. * Upload the required supporting attachments, if applicable. * Click **Submit** to submit the Fleet Sharing record. (See Figure 4) ☞ After updating the Date Closed for all actions, click **Submit** to submit the record. ☞ The Actions Completed and Date Completed columns in the Fleet Sharing table will be updated accordingly. screenshot: Actions section of the Fleet Sharing interface showing a table of actions with status icons and callouts for editing, adding comments, and uploading attachments. Figure 4
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)  <== expected source
+      required phrases present here: ['+ add action', 'nature of action', 'due date']
+      text: <u>This section allows users to create and manage actions that are required to be completed by the vessels.</u> * Click **+ Add Action** to create a new action. (See Figure 4) * In the **Add Action window**, enter the mandatory details marked with (**\***), including the Nature of Action and Due Date. (See figure 5) * Click **Save** to add the action to the Fleet Sharing record. * Repeat the above steps to add additional actions, if required. * Click the **Edit** icon to modify an existing action. * Click the **Delete** icon to remove an action. * Click **Upload** to attach supporting documents related to the action. * Click **View** to open or delete the uploaded attachments. (See Figure 4,…
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+      required phrases present here: []
+      text: * <u>Enter the required Discussion Date under **Step 2**.</u> * <u>Click **Submit** to confirm that the Fleet Sharing record has been discussed onboard. (See Figure 3)</u> [icon: hand pointing right] Once the record is submitted, the **Confirmation** column in the Fleet Sharing overview table is automatically updated for both **Vessel** and **Office** users, indicating that the discussion has been completed.
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+      required phrases present here: ['nature of action', 'due date']
+      text: screenshot: Fleet Sharing interface showing the Actions Required section with a table of actions and an Add Action button. Figure 4 screenshot: Add Action pop-up window with fields for Nature of Action and Due Date. Figure 5 <mark>☞ Multiple supporting documents can be uploaded and viewed using the Upload and View options.</mark>
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+      required phrases present here: []
+      text: * <u>Click the **List** icon under the **Actions** column to display the vessel-wise action completion status.</u> * <u>The **Actions Completed** column displays the number of vessels that have completed all assigned actions</u> <u>against the total number of vessels to which the Fleet sharing was shared.</u> * <u>Review the **Action Completed** and **Date Completed** columns to monitor the action progress for each</u> <u>vessel.</u> <u>(See Figure 7)</u> screenshot: Fleet Sharing Audit Dashboard showing vessel-wise action completion status with callouts for tracking responses and expanding details. Figure 7 <mark>☞ The Actions Completed count is updated automatically as vessels close their …
+
+ANSWER (verbatim):
+On the **Office** fleet sharing record:
+
+1. Click **+ Add Action**.
+2. In the **Add Action** window, enter all mandatory fields marked with **\***, including **Nature of Action** and **Due Date**.
+3. Click **Save** to add the action.
+4. Repeat these steps for additional actions, if required.
+5. If needed, use **Upload** to attach supporting documents; use **View** to open or delete them.
+
+The Vessel procedure covers completing and submitting assigned actions, not adding them.
+
+**Source:** *Audit - Fleet Sharing Manual- Office_R1_30.06.2026*, §3.2 “ACTIONS,” p.6; Document, p.7.
+
+==============================================================================================================
+CASE fs-off-2 [procedure] run 3   stored verdict: answer=True citation=False support=not captured
+Q: What are the steps to add an action item that vessels need to complete on a fleet sharing record?
+EXPECTED manual: Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf  pages [6]  section 3.2 ACTIONS
+MANUAL EVIDENCE (verified when the case was written): Click + Add Action to create a new action. In the Add Action window, enter the mandatory details marked with (*), including the Nature of Action and Due Date. Click Save to add the action to the Fleet Sharing record.
+REQUIRED phrases: ['+ add action', 'nature of action', 'due date']   (in answer: ['+ add action', 'nature of action', 'due date'])
+FORBIDDEN phrases: ['edit icon', 'delete icon']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)  <== expected manual+page
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)
+      required phrases present here: []
+      text: * Enter the **Date Completed** for the action in the **Update Action** window. * Upload the required supporting attachments, if applicable. * Click **Submit** to submit the Fleet Sharing record. (See Figure 4) ☞ After updating the Date Closed for all actions, click **Submit** to submit the record. ☞ The Actions Completed and Date Completed columns in the Fleet Sharing table will be updated accordingly. screenshot: Actions section of the Fleet Sharing interface showing a table of actions with status icons and callouts for editing, adding comments, and uploading attachments. Figure 4
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)  <== expected source
+      required phrases present here: ['+ add action', 'nature of action', 'due date']
+      text: <u>This section allows users to create and manage actions that are required to be completed by the vessels.</u> * Click **+ Add Action** to create a new action. (See Figure 4) * In the **Add Action window**, enter the mandatory details marked with (**\***), including the Nature of Action and Due Date. (See figure 5) * Click **Save** to add the action to the Fleet Sharing record. * Repeat the above steps to add additional actions, if required. * Click the **Edit** icon to modify an existing action. * Click the **Delete** icon to remove an action. * Click **Upload** to attach supporting documents related to the action. * Click **View** to open or delete the uploaded attachments. (See Figure 4,…
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)
+      required phrases present here: []
+      text: * <u>Enter the required Discussion Date under **Step 2**.</u> * <u>Click **Submit** to confirm that the Fleet Sharing record has been discussed onboard. (See Figure 3)</u> [icon: hand pointing right] Once the record is submitted, the **Confirmation** column in the Fleet Sharing overview table is automatically updated for both **Vessel** and **Office** users, indicating that the discussion has been completed.
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+      required phrases present here: ['nature of action', 'due date']
+      text: screenshot: Fleet Sharing interface showing the Actions Required section with a table of actions and an Add Action button. Figure 4 screenshot: Add Action pop-up window with fields for Nature of Action and Due Date. Figure 5 <mark>☞ Multiple supporting documents can be uploaded and viewed using the Upload and View options.</mark>
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+      required phrases present here: []
+      text: * <u>Click the **List** icon under the **Actions** column to display the vessel-wise action completion status.</u> * <u>The **Actions Completed** column displays the number of vessels that have completed all assigned actions</u> <u>against the total number of vessels to which the Fleet sharing was shared.</u> * <u>Review the **Action Completed** and **Date Completed** columns to monitor the action progress for each</u> <u>vessel.</u> <u>(See Figure 7)</u> screenshot: Fleet Sharing Audit Dashboard showing vessel-wise action completion status with callouts for tracking responses and expanding details. Figure 7 <mark>☞ The Actions Completed count is updated automatically as vessels close their …
+
+ANSWER (verbatim):
+1. In the **Office** Fleet Sharing record, click **+ Add Action**.
+2. In the **Add Action** window, enter the mandatory fields marked with **\***, including **Nature of Action** and **Due Date**.
+3. Click **Save** to add the action to the Fleet Sharing record.
+4. Repeat these steps to add additional actions, if required.
+
+The action is created for completion by the vessels.
+
+**Source:** Audit – Fleet Sharing Manual- Office_R1_30.06.2026, §3.2 “Actions,” p.6.
+
+==============================================================================================================
+CASE fs-ves-1 [condition] run 1   stored verdict: answer=False citation=True support=not captured
+Q: As a ship user, am I able to edit the information the office entered under Step 1 of a fleet sharing record?
+EXPECTED manual: Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf  pages [5]  section Step 1 – Description
+MANUAL EVIDENCE (verified when the case was written): The information displayed under Step 1 is shared by the Office for reference and is read-only. Vessel users cannot modify this information.
+REQUIRED phrases: ['read-only', 'cannot modify']   (in answer: ['read-only'])
+FORBIDDEN phrases: ['can be edited', 'editable by users']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 1 – Description (p.5)  <== expected manual+page
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)  <== expected manual+page
+  [4] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — 1.2 FLEET SHARING – OVERVIEW (p.4)
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 1 – Description (p.5)  <== expected source
+      required phrases present here: ['read-only', 'cannot modify']
+      text: * <u>The information displayed under **Step 1** is shared by the Office for reference and is **read-only**.</u> * <u>Vessel users cannot modify this information.</u>
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+      required phrases present here: []
+      text: This section allows users to update the recipient notification which is shared by the office. * <u>Select the recipient(s) by All Vessels, Vessel, Fleet Group, Group, or Vessel Type.</u> * <u>Select the issuer from the Issued By drop-down list.</u> * <u>Click **Save** to save the submission details or **Submit** to complete and share the Fleet sharing with the</u> <u>selected recipient(s).</u> <u>(See Figure 6)</u> screenshot: Fleet Sharing software interface showing the Submission step with callouts for selecting recipients and clicking the submit button Figure 6 [icon: hand pointing right] Users can edit the Fleet Sharing record until it has been submitted. [icon: hand pointing right] Once…
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)  <== expected source
+      required phrases present here: []
+      text: * <u>Enter the required Discussion Date under **Step 2**.</u> * <u>Click **Submit** to confirm that the Fleet Sharing record has been discussed onboard. (See Figure 3)</u> [icon: hand pointing right] Once the record is submitted, the **Confirmation** column in the Fleet Sharing overview table is automatically updated for both **Vessel** and **Office** users, indicating that the discussion has been completed.
+  [4] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — 1.2 FLEET SHARING – OVERVIEW (p.4)
+      required phrases present here: []
+      text: The **Fleet Sharing** sub-module provides a consolidated view of Fleet Sharing records received from Office. The information displayed in this sub-module is automatically synchronized with the **Vessel Fleet Sharing** form whenever updates are made. * <u>Use the **Filters** option to refine the displayed records.</u> * <u>Click **Apply** to filter the records or click **Clear** to reset the filters.</u> * <u>Use the **Actions** column to view or edit Fleet Sharing records. (See Figure 2).</u>
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+      required phrases present here: []
+      text: screenshot_from_computer: Fleet Sharing software interface showing a list of records with callouts for "To create new Fleet Sharing", "Click Filters", "Select Period or Search by Title", "Click Apply or Clear the Filters", and "Using Icons to view, edit or delete records" Figure 2 ☞ Records can only be deleted while they are in **Draft** status. Submitted Fleet Sharing cannot be deleted. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Upload &#x26; View Attachment</td> <td>Upload and view supporting documents for Fleet Sharing.</td> </tr> <tr> <td>[icon: eye]</td> <td>View FS record</td> <td>View the Fleet Sha…
+
+ANSWER (verbatim):
+No. As a ship user, you cannot edit the information entered by the Office under Step 1. It is shared for reference and is read-only for vessel users.
+
+Source: Fleet Sharing Manual—Vessel, “Step 1 – Description,” p. 5.
+
+==============================================================================================================
+CASE fs-ves-1 [condition] run 2   stored verdict: answer=True citation=True support=not captured
+Q: As a ship user, am I able to edit the information the office entered under Step 1 of a fleet sharing record?
+EXPECTED manual: Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf  pages [5]  section Step 1 – Description
+MANUAL EVIDENCE (verified when the case was written): The information displayed under Step 1 is shared by the Office for reference and is read-only. Vessel users cannot modify this information.
+REQUIRED phrases: ['read-only', 'cannot modify']   (in answer: ['read-only', 'cannot modify'])
+FORBIDDEN phrases: ['can be edited', 'editable by users']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 1 – Description (p.5)  <== expected manual+page
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)  <== expected manual+page
+  [4] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — 1.2 FLEET SHARING – OVERVIEW (p.4)
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 1 – Description (p.5)  <== expected source
+      required phrases present here: ['read-only', 'cannot modify']
+      text: * <u>The information displayed under **Step 1** is shared by the Office for reference and is **read-only**.</u> * <u>Vessel users cannot modify this information.</u>
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+      required phrases present here: []
+      text: This section allows users to update the recipient notification which is shared by the office. * <u>Select the recipient(s) by All Vessels, Vessel, Fleet Group, Group, or Vessel Type.</u> * <u>Select the issuer from the Issued By drop-down list.</u> * <u>Click **Save** to save the submission details or **Submit** to complete and share the Fleet sharing with the</u> <u>selected recipient(s).</u> <u>(See Figure 6)</u> screenshot: Fleet Sharing software interface showing the Submission step with callouts for selecting recipients and clicking the submit button Figure 6 [icon: hand pointing right] Users can edit the Fleet Sharing record until it has been submitted. [icon: hand pointing right] Once…
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)  <== expected source
+      required phrases present here: []
+      text: * <u>Enter the required Discussion Date under **Step 2**.</u> * <u>Click **Submit** to confirm that the Fleet Sharing record has been discussed onboard. (See Figure 3)</u> [icon: hand pointing right] Once the record is submitted, the **Confirmation** column in the Fleet Sharing overview table is automatically updated for both **Vessel** and **Office** users, indicating that the discussion has been completed.
+  [4] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — 1.2 FLEET SHARING – OVERVIEW (p.4)
+      required phrases present here: []
+      text: The **Fleet Sharing** sub-module provides a consolidated view of Fleet Sharing records received from Office. The information displayed in this sub-module is automatically synchronized with the **Vessel Fleet Sharing** form whenever updates are made. * <u>Use the **Filters** option to refine the displayed records.</u> * <u>Click **Apply** to filter the records or click **Clear** to reset the filters.</u> * <u>Use the **Actions** column to view or edit Fleet Sharing records. (See Figure 2).</u>
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+      required phrases present here: []
+      text: screenshot_from_computer: Fleet Sharing software interface showing a list of records with callouts for "To create new Fleet Sharing", "Click Filters", "Select Period or Search by Title", "Click Apply or Clear the Filters", and "Using Icons to view, edit or delete records" Figure 2 ☞ Records can only be deleted while they are in **Draft** status. Submitted Fleet Sharing cannot be deleted. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Upload &#x26; View Attachment</td> <td>Upload and view supporting documents for Fleet Sharing.</td> </tr> <tr> <td>[icon: eye]</td> <td>View FS record</td> <td>View the Fleet Sha…
+
+ANSWER (verbatim):
+No. Under Step 1, the information entered by the Office is shared for reference and is read-only. Vessel users cannot modify it.  
+
+Source: Fleet Sharing Manual—Vessel, “Step 1 – Description,” p. 5.
+
+==============================================================================================================
+CASE fs-ves-1 [condition] run 3   stored verdict: answer=False citation=True support=not captured
+Q: As a ship user, am I able to edit the information the office entered under Step 1 of a fleet sharing record?
+EXPECTED manual: Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf  pages [5]  section Step 1 – Description
+MANUAL EVIDENCE (verified when the case was written): The information displayed under Step 1 is shared by the Office for reference and is read-only. Vessel users cannot modify this information.
+REQUIRED phrases: ['read-only', 'cannot modify']   (in answer: ['read-only'])
+FORBIDDEN phrases: ['can be edited', 'editable by users']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 1 – Description (p.5)  <== expected manual+page
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)  <== expected manual+page
+  [4] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — 1.2 FLEET SHARING – OVERVIEW (p.4)
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 1 – Description (p.5)  <== expected source
+      required phrases present here: ['read-only', 'cannot modify']
+      text: * <u>The information displayed under **Step 1** is shared by the Office for reference and is **read-only**.</u> * <u>Vessel users cannot modify this information.</u>
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.3 SUBMISSION (p.8)
+      required phrases present here: []
+      text: This section allows users to update the recipient notification which is shared by the office. * <u>Select the recipient(s) by All Vessels, Vessel, Fleet Group, Group, or Vessel Type.</u> * <u>Select the issuer from the Issued By drop-down list.</u> * <u>Click **Save** to save the submission details or **Submit** to complete and share the Fleet sharing with the</u> <u>selected recipient(s).</u> <u>(See Figure 6)</u> screenshot: Fleet Sharing software interface showing the Submission step with callouts for selecting recipients and clicking the submit button Figure 6 [icon: hand pointing right] Users can edit the Fleet Sharing record until it has been submitted. [icon: hand pointing right] Once…
+  [3] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 2 – Discussion Record (p.5)  <== expected source
+      required phrases present here: []
+      text: * <u>Enter the required Discussion Date under **Step 2**.</u> * <u>Click **Submit** to confirm that the Fleet Sharing record has been discussed onboard. (See Figure 3)</u> [icon: hand pointing right] Once the record is submitted, the **Confirmation** column in the Fleet Sharing overview table is automatically updated for both **Vessel** and **Office** users, indicating that the discussion has been completed.
+  [4] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — 1.2 FLEET SHARING – OVERVIEW (p.4)
+      required phrases present here: []
+      text: The **Fleet Sharing** sub-module provides a consolidated view of Fleet Sharing records received from Office. The information displayed in this sub-module is automatically synchronized with the **Vessel Fleet Sharing** form whenever updates are made. * <u>Use the **Filters** option to refine the displayed records.</u> * <u>Click **Apply** to filter the records or click **Clear** to reset the filters.</u> * <u>Use the **Actions** column to view or edit Fleet Sharing records. (See Figure 2).</u>
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+      required phrases present here: []
+      text: screenshot_from_computer: Fleet Sharing software interface showing a list of records with callouts for "To create new Fleet Sharing", "Click Filters", "Select Period or Search by Title", "Click Apply or Clear the Filters", and "Using Icons to view, edit or delete records" Figure 2 ☞ Records can only be deleted while they are in **Draft** status. Submitted Fleet Sharing cannot be deleted. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Upload &#x26; View Attachment</td> <td>Upload and view supporting documents for Fleet Sharing.</td> </tr> <tr> <td>[icon: eye]</td> <td>View FS record</td> <td>View the Fleet Sha…
+
+ANSWER (verbatim):
+No. As a ship user, you cannot edit the information entered by the Office under Step 1. It is shared for reference and is read-only for vessel users.
+
+Source: Audit - Fleet Sharing Manual—Vessel, “Step 1 – Description,” p. 5.
+
+==============================================================================================================
+CASE fs-ves-2 [procedure] run 1   stored verdict: answer=True citation=True support=not captured
+Q: After closing out all the actions the office assigned in a fleet sharing record, what do I need to do to finish it off?
+EXPECTED manual: Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf  pages [6]  section Step 3 – Actions
+MANUAL EVIDENCE (verified when the case was written): Enter the Date Completed for the action in the Update Action window. Upload the required supporting attachments, if applicable. Click Submit to submit the Fleet Sharing record. After updating the Date Closed for all actions, click Submit to submit the record.
+REQUIRED phrases: ['date completed', 'submit']   (in answer: ['date completed', 'submit'])
+FORBIDDEN phrases: ['save only', 'no submission needed']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)  <== expected manual+page
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)  <== expected source
+      required phrases present here: ['date completed', 'submit']
+      text: * Enter the **Date Completed** for the action in the **Update Action** window. * Upload the required supporting attachments, if applicable. * Click **Submit** to submit the Fleet Sharing record. (See Figure 4) ☞ After updating the Date Closed for all actions, click **Submit** to submit the record. ☞ The Actions Completed and Date Completed columns in the Fleet Sharing table will be updated accordingly. screenshot: Actions section of the Fleet Sharing interface showing a table of actions with status icons and callouts for editing, adding comments, and uploading attachments. Figure 4
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+      required phrases present here: []
+      text: screenshot: Fleet Sharing interface showing the Actions Required section with a table of actions and an Add Action button. Figure 4 screenshot: Add Action pop-up window with fields for Nature of Action and Due Date. Figure 5 <mark>☞ Multiple supporting documents can be uploaded and viewed using the Upload and View options.</mark>
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+      required phrases present here: ['date completed']
+      text: * <u>Click the **List** icon under the **Actions** column to display the vessel-wise action completion status.</u> * <u>The **Actions Completed** column displays the number of vessels that have completed all assigned actions</u> <u>against the total number of vessels to which the Fleet sharing was shared.</u> * <u>Review the **Action Completed** and **Date Completed** columns to monitor the action progress for each</u> <u>vessel.</u> <u>(See Figure 7)</u> screenshot: Fleet Sharing Audit Dashboard showing vessel-wise action completion status with callouts for tracking responses and expanding details. Figure 7 <mark>☞ The Actions Completed count is updated automatically as vessels close their …
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)
+      required phrases present here: []
+      text: <u>This section allows users to create and manage actions that are required to be completed by the vessels.</u> * Click **+ Add Action** to create a new action. (See Figure 4) * In the **Add Action window**, enter the mandatory details marked with (**\***), including the Nature of Action and Due Date. (See figure 5) * Click **Save** to add the action to the Fleet Sharing record. * Repeat the above steps to add additional actions, if required. * Click the **Edit** icon to modify an existing action. * Click the **Delete** icon to remove an action. * Click **Upload** to attach supporting documents related to the action. * Click **View** to open or delete the uploaded attachments. (See Figure 4,…
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+      required phrases present here: ['submit']
+      text: screenshot_from_computer: Fleet Sharing software interface showing a list of records with callouts for "To create new Fleet Sharing", "Click Filters", "Select Period or Search by Title", "Click Apply or Clear the Filters", and "Using Icons to view, edit or delete records" Figure 2 ☞ Records can only be deleted while they are in **Draft** status. Submitted Fleet Sharing cannot be deleted. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Upload &#x26; View Attachment</td> <td>Upload and view supporting documents for Fleet Sharing.</td> </tr> <tr> <td>[icon: eye]</td> <td>View FS record</td> <td>View the Fleet Sha…
+
+ANSWER (verbatim):
+After all assigned actions are closed:
+
+1. Enter the **Date Completed** for each action in the **Update Action** window.
+2. Upload any required supporting attachments, if applicable.
+3. After updating the **Date Closed** for all actions, click **Submit** to submit the Fleet Sharing record.
+
+The **Actions Completed** and **Date Completed** columns will then update in the Fleet Sharing table.
+
+**Source:** Fleet Sharing Manual – Vessel, “Step 3 – Actions,” p. 6.
+
+==============================================================================================================
+CASE fs-ves-2 [procedure] run 2   stored verdict: answer=True citation=True support=not captured
+Q: After closing out all the actions the office assigned in a fleet sharing record, what do I need to do to finish it off?
+EXPECTED manual: Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf  pages [6]  section Step 3 – Actions
+MANUAL EVIDENCE (verified when the case was written): Enter the Date Completed for the action in the Update Action window. Upload the required supporting attachments, if applicable. Click Submit to submit the Fleet Sharing record. After updating the Date Closed for all actions, click Submit to submit the record.
+REQUIRED phrases: ['date completed', 'submit']   (in answer: ['date completed', 'submit'])
+FORBIDDEN phrases: ['save only', 'no submission needed']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)  <== expected manual+page
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)  <== expected source
+      required phrases present here: ['date completed', 'submit']
+      text: * Enter the **Date Completed** for the action in the **Update Action** window. * Upload the required supporting attachments, if applicable. * Click **Submit** to submit the Fleet Sharing record. (See Figure 4) ☞ After updating the Date Closed for all actions, click **Submit** to submit the record. ☞ The Actions Completed and Date Completed columns in the Fleet Sharing table will be updated accordingly. screenshot: Actions section of the Fleet Sharing interface showing a table of actions with status icons and callouts for editing, adding comments, and uploading attachments. Figure 4
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+      required phrases present here: []
+      text: screenshot: Fleet Sharing interface showing the Actions Required section with a table of actions and an Add Action button. Figure 4 screenshot: Add Action pop-up window with fields for Nature of Action and Due Date. Figure 5 <mark>☞ Multiple supporting documents can be uploaded and viewed using the Upload and View options.</mark>
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+      required phrases present here: ['date completed']
+      text: * <u>Click the **List** icon under the **Actions** column to display the vessel-wise action completion status.</u> * <u>The **Actions Completed** column displays the number of vessels that have completed all assigned actions</u> <u>against the total number of vessels to which the Fleet sharing was shared.</u> * <u>Review the **Action Completed** and **Date Completed** columns to monitor the action progress for each</u> <u>vessel.</u> <u>(See Figure 7)</u> screenshot: Fleet Sharing Audit Dashboard showing vessel-wise action completion status with callouts for tracking responses and expanding details. Figure 7 <mark>☞ The Actions Completed count is updated automatically as vessels close their …
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)
+      required phrases present here: []
+      text: <u>This section allows users to create and manage actions that are required to be completed by the vessels.</u> * Click **+ Add Action** to create a new action. (See Figure 4) * In the **Add Action window**, enter the mandatory details marked with (**\***), including the Nature of Action and Due Date. (See figure 5) * Click **Save** to add the action to the Fleet Sharing record. * Repeat the above steps to add additional actions, if required. * Click the **Edit** icon to modify an existing action. * Click the **Delete** icon to remove an action. * Click **Upload** to attach supporting documents related to the action. * Click **View** to open or delete the uploaded attachments. (See Figure 4,…
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+      required phrases present here: ['submit']
+      text: screenshot_from_computer: Fleet Sharing software interface showing a list of records with callouts for "To create new Fleet Sharing", "Click Filters", "Select Period or Search by Title", "Click Apply or Clear the Filters", and "Using Icons to view, edit or delete records" Figure 2 ☞ Records can only be deleted while they are in **Draft** status. Submitted Fleet Sharing cannot be deleted. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Upload &#x26; View Attachment</td> <td>Upload and view supporting documents for Fleet Sharing.</td> </tr> <tr> <td>[icon: eye]</td> <td>View FS record</td> <td>View the Fleet Sha…
+
+ANSWER (verbatim):
+To finish the Fleet Sharing record:
+
+1. For each assigned action, enter the **Date Completed** in the **Update Action** window.
+2. Upload any required supporting attachments, if applicable.
+3. After all actions are closed/completed, click **Submit** to submit the Fleet Sharing record. The **Actions Completed** and **Date Completed** columns will then update.
+
+**Source:** Fleet Sharing Manual—Vessel, “Step 3 – Actions,” p. 6.
+
+==============================================================================================================
+CASE fs-ves-2 [procedure] run 3   stored verdict: answer=True citation=True support=not captured
+Q: After closing out all the actions the office assigned in a fleet sharing record, what do I need to do to finish it off?
+EXPECTED manual: Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf  pages [6]  section Step 3 – Actions
+MANUAL EVIDENCE (verified when the case was written): Enter the Date Completed for the action in the Update Action window. Upload the required supporting attachments, if applicable. Click Submit to submit the Fleet Sharing record. After updating the Date Closed for all actions, click Submit to submit the record.
+REQUIRED phrases: ['date completed', 'submit']   (in answer: ['date completed', 'submit'])
+FORBIDDEN phrases: ['save only', 'no submission needed']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)  <== expected manual+page
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026 — Step 3 – Actions (p.6)  <== expected source
+      required phrases present here: ['date completed', 'submit']
+      text: * Enter the **Date Completed** for the action in the **Update Action** window. * Upload the required supporting attachments, if applicable. * Click **Submit** to submit the Fleet Sharing record. (See Figure 4) ☞ After updating the Date Closed for all actions, click **Submit** to submit the record. ☞ The Actions Completed and Date Completed columns in the Fleet Sharing table will be updated accordingly. screenshot: Actions section of the Fleet Sharing interface showing a table of actions with status icons and callouts for editing, adding comments, and uploading attachments. Figure 4
+  [2] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.7)
+      required phrases present here: []
+      text: screenshot: Fleet Sharing interface showing the Actions Required section with a table of actions and an Add Action button. Figure 4 screenshot: Add Action pop-up window with fields for Nature of Action and Due Date. Figure 5 <mark>☞ Multiple supporting documents can be uploaded and viewed using the Upload and View options.</mark>
+  [3] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 4.0 STATUS INDICATOR (p.9)
+      required phrases present here: ['date completed']
+      text: * <u>Click the **List** icon under the **Actions** column to display the vessel-wise action completion status.</u> * <u>The **Actions Completed** column displays the number of vessels that have completed all assigned actions</u> <u>against the total number of vessels to which the Fleet sharing was shared.</u> * <u>Review the **Action Completed** and **Date Completed** columns to monitor the action progress for each</u> <u>vessel.</u> <u>(See Figure 7)</u> screenshot: Fleet Sharing Audit Dashboard showing vessel-wise action completion status with callouts for tracking responses and expanding details. Figure 7 <mark>☞ The Actions Completed count is updated automatically as vessels close their …
+  [4] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — 3.2 ACTIONS (p.6)
+      required phrases present here: []
+      text: <u>This section allows users to create and manage actions that are required to be completed by the vessels.</u> * Click **+ Add Action** to create a new action. (See Figure 4) * In the **Add Action window**, enter the mandatory details marked with (**\***), including the Nature of Action and Due Date. (See figure 5) * Click **Save** to add the action to the Fleet Sharing record. * Repeat the above steps to add additional actions, if required. * Click the **Edit** icon to modify an existing action. * Click the **Delete** icon to remove an action. * Click **Upload** to attach supporting documents related to the action. * Click **View** to open or delete the uploaded attachments. (See Figure 4,…
+  [5] Audit - Fleet Sharing Manual- Office_R1_30.06.2026 — Document (p.5)
+      required phrases present here: ['submit']
+      text: screenshot_from_computer: Fleet Sharing software interface showing a list of records with callouts for "To create new Fleet Sharing", "Click Filters", "Select Period or Search by Title", "Click Apply or Clear the Filters", and "Using Icons to view, edit or delete records" Figure 2 ☞ Records can only be deleted while they are in **Draft** status. Submitted Fleet Sharing cannot be deleted. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Upload &#x26; View Attachment</td> <td>Upload and view supporting documents for Fleet Sharing.</td> </tr> <tr> <td>[icon: eye]</td> <td>View FS record</td> <td>View the Fleet Sha…
+
+ANSWER (verbatim):
+1. For each action, enter the **Date Completed** in the **Update Action** window.
+2. Upload any required supporting attachments, if applicable.
+3. After updating the **Date Closed** for all actions, click **Submit** to submit the Fleet Sharing record. The **Actions Completed** and **Date Completed** columns will then update.
+
+**Source:** Vessel Fleet Sharing Manual, “Step 3 – Actions,” p. 6.
+
+==============================================================================================================
+CASE hist-1 [condition] run 1   stored verdict: answer=False citation=False support=not captured
+Q: Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [16]  section 3.3 REVIEW PAGE:
+MANUAL EVIDENCE (verified when the case was written): The Review section is intended for office users only.
+REQUIRED phrases: ['office users only']   (in answer: [])
+FORBIDDEN phrases: ['vessel users', 'both vessel and office']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Technical - Ship-Side (Vessel Crew) Operational Notes — 1.1.13.3 Approvals as Seen From the Ship
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+  [3] Technical - Sync (Operational) User Manual — 1.2.8 What Happens When Ship and Office Edit the Same Record
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.35)
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Technical - Ship-Side (Vessel Crew) Operational Notes — 1.1.13.3 Approvals as Seen From the Ship
+      required phrases present here: []
+      text: * Work sent for approval (a completed work order awaiting review, a postponement request) is decided on the office side. The ship submits; the office approves or rejects with remarks. * A completion rejected by the office comes back to the vessel with remarks — correct it and resubmit. * A postponed work order stays postponed until someone acts on it — postponements do not revert automatically when their period expires.
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+      required phrases present here: []
+      text: * Upon clicking on the 'Note' icon, the screen below will appear. (Ref Figure 15) * Review the Work Order details and supporting information provided. (Ref Figure 15) * If required, enter comments in the Reviewer Comments field. (Ref Figure 15) * Click 'Reviewed' to complete the review process or 'Reopen' to return the work order for further action. (Ref Figure 15) Screenshot of the Review Work Order interface with callouts: 1. Review the information and enter comments, if required. 2. Click here to complete or reopen the WO. Figure 15 <mark>Hand icon The user interface shown in Ref. Figures 12, 13, 14, and 15 are applicable to the **Office** side.</mark>
+  [3] Technical - Sync (Operational) User Manual — 1.2.8 What Happens When Ship and Office Edit the Same Record
+      required phrases present here: []
+      text: * Audience: Office / Sail Admin. * Ship and office changes to different fields of the same record both survive — the system merges them field by field.
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.35)
+      required phrases present here: []
+      text: * The screen below appears after clicking the 'Edit' icon. (Ref Figure 55) * Scroll to the end of the form, review the work completion details and supporting information provided in the record. (Ref Figure 55) * If required, enter comments in the 'CE Approval Remarks' field. (Ref Figure 55) * If the work completion is not acceptable, enter the reason in the 'Rejection Comments' field. (Ref Figure 55) * Click 'Approve' to approve the work completion record, or click 'Reject' to reject the record. (Ref Figure 55) Screenshot of the PENDING CHIEF ENGINEER APPROVAL section showing fields for CE Approval Remarks and Rejection Comments, with Approve and Reject buttons. Annotations indicate where to…
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)
+      required phrases present here: []
+      text: * Click on the ‘Admin’ sub-module. (Ref Figure 12) * Click the ‘Ship’s Certificates’ sub-submodule to view certificate details; the ‘Master’ tab is displayed by default. (Ref Figure 12) * Upon entering the ‘Ship’s Certificates’ sub-submodule, the system automatically opens the ‘Master’ tab by default, allowing users to view all certificate details: * **Master Tab**: The Master tab serves as the central repository for all certificate master records available in the system. It allows administrators to define and maintain certificate types, categories, groups, regulatory references, and certificate labels. This view establishes the standard certificate structure that can be applied across compa…
+
+ANSWER (verbatim):
+The **office** is allowed to add comments in the Review section. The office user reviews the record and may enter comments in **Reviewer Comments**; the interface is applicable to the **Office** side. The ship submits the work for office review.
+
+Source: [2] PMS User Manual for Office/Sail Admin, p. 13, Figure 15; [1] Ship-Side Operational Notes, §1.1.13.3.
+
+==============================================================================================================
+CASE hist-1 [condition] run 2   stored verdict: answer=False citation=False support=not captured
+Q: Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [16]  section 3.3 REVIEW PAGE:
+MANUAL EVIDENCE (verified when the case was written): The Review section is intended for office users only.
+REQUIRED phrases: ['office users only']   (in answer: [])
+FORBIDDEN phrases: ['vessel users', 'both vessel and office']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Technical - Ship-Side (Vessel Crew) Operational Notes — 1.1.13.3 Approvals as Seen From the Ship
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+  [3] Technical - Sync (Operational) User Manual — 1.2.8 What Happens When Ship and Office Edit the Same Record
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.35)
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Technical - Ship-Side (Vessel Crew) Operational Notes — 1.1.13.3 Approvals as Seen From the Ship
+      required phrases present here: []
+      text: * Work sent for approval (a completed work order awaiting review, a postponement request) is decided on the office side. The ship submits; the office approves or rejects with remarks. * A completion rejected by the office comes back to the vessel with remarks — correct it and resubmit. * A postponed work order stays postponed until someone acts on it — postponements do not revert automatically when their period expires.
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+      required phrases present here: []
+      text: * Upon clicking on the 'Note' icon, the screen below will appear. (Ref Figure 15) * Review the Work Order details and supporting information provided. (Ref Figure 15) * If required, enter comments in the Reviewer Comments field. (Ref Figure 15) * Click 'Reviewed' to complete the review process or 'Reopen' to return the work order for further action. (Ref Figure 15) Screenshot of the Review Work Order interface with callouts: 1. Review the information and enter comments, if required. 2. Click here to complete or reopen the WO. Figure 15 <mark>Hand icon The user interface shown in Ref. Figures 12, 13, 14, and 15 are applicable to the **Office** side.</mark>
+  [3] Technical - Sync (Operational) User Manual — 1.2.8 What Happens When Ship and Office Edit the Same Record
+      required phrases present here: []
+      text: * Audience: Office / Sail Admin. * Ship and office changes to different fields of the same record both survive — the system merges them field by field.
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.35)
+      required phrases present here: []
+      text: * The screen below appears after clicking the 'Edit' icon. (Ref Figure 55) * Scroll to the end of the form, review the work completion details and supporting information provided in the record. (Ref Figure 55) * If required, enter comments in the 'CE Approval Remarks' field. (Ref Figure 55) * If the work completion is not acceptable, enter the reason in the 'Rejection Comments' field. (Ref Figure 55) * Click 'Approve' to approve the work completion record, or click 'Reject' to reject the record. (Ref Figure 55) Screenshot of the PENDING CHIEF ENGINEER APPROVAL section showing fields for CE Approval Remarks and Rejection Comments, with Approve and Reject buttons. Annotations indicate where to…
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)
+      required phrases present here: []
+      text: * Click on the ‘Admin’ sub-module. (Ref Figure 12) * Click the ‘Ship’s Certificates’ sub-submodule to view certificate details; the ‘Master’ tab is displayed by default. (Ref Figure 12) * Upon entering the ‘Ship’s Certificates’ sub-submodule, the system automatically opens the ‘Master’ tab by default, allowing users to view all certificate details: * **Master Tab**: The Master tab serves as the central repository for all certificate master records available in the system. It allows administrators to define and maintain certificate types, categories, groups, regulatory references, and certificate labels. This view establishes the standard certificate structure that can be applied across compa…
+
+ANSWER (verbatim):
+The **office** is allowed to add comments in the Review section. The Review Work Order interface includes a **Reviewer Comments** field and is applicable to the **Office** side. The ship submits the work for office review but does not perform the approval review.
+
+Source: [2] PMS User Manual for Office/Sail Admin, p. 13; [1] Ship-Side Operational Notes, §1.1.13.3.
+
+==============================================================================================================
+CASE hist-1 [condition] run 3   stored verdict: answer=False citation=False support=not captured
+Q: Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [16]  section 3.3 REVIEW PAGE:
+MANUAL EVIDENCE (verified when the case was written): The Review section is intended for office users only.
+REQUIRED phrases: ['office users only']   (in answer: [])
+FORBIDDEN phrases: ['vessel users', 'both vessel and office']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Technical - Ship-Side (Vessel Crew) Operational Notes — 1.1.13.3 Approvals as Seen From the Ship
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+  [3] Technical - Sync (Operational) User Manual — 1.2.8 What Happens When Ship and Office Edit the Same Record
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.35)
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Technical - Ship-Side (Vessel Crew) Operational Notes — 1.1.13.3 Approvals as Seen From the Ship
+      required phrases present here: []
+      text: * Work sent for approval (a completed work order awaiting review, a postponement request) is decided on the office side. The ship submits; the office approves or rejects with remarks. * A completion rejected by the office comes back to the vessel with remarks — correct it and resubmit. * A postponed work order stays postponed until someone acts on it — postponements do not revert automatically when their period expires.
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+      required phrases present here: []
+      text: * Upon clicking on the 'Note' icon, the screen below will appear. (Ref Figure 15) * Review the Work Order details and supporting information provided. (Ref Figure 15) * If required, enter comments in the Reviewer Comments field. (Ref Figure 15) * Click 'Reviewed' to complete the review process or 'Reopen' to return the work order for further action. (Ref Figure 15) Screenshot of the Review Work Order interface with callouts: 1. Review the information and enter comments, if required. 2. Click here to complete or reopen the WO. Figure 15 <mark>Hand icon The user interface shown in Ref. Figures 12, 13, 14, and 15 are applicable to the **Office** side.</mark>
+  [3] Technical - Sync (Operational) User Manual — 1.2.8 What Happens When Ship and Office Edit the Same Record
+      required phrases present here: []
+      text: * Audience: Office / Sail Admin. * Ship and office changes to different fields of the same record both survive — the system merges them field by field.
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.35)
+      required phrases present here: []
+      text: * The screen below appears after clicking the 'Edit' icon. (Ref Figure 55) * Scroll to the end of the form, review the work completion details and supporting information provided in the record. (Ref Figure 55) * If required, enter comments in the 'CE Approval Remarks' field. (Ref Figure 55) * If the work completion is not acceptable, enter the reason in the 'Rejection Comments' field. (Ref Figure 55) * Click 'Approve' to approve the work completion record, or click 'Reject' to reject the record. (Ref Figure 55) Screenshot of the PENDING CHIEF ENGINEER APPROVAL section showing fields for CE Approval Remarks and Rejection Comments, with Approve and Reject buttons. Annotations indicate where to…
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)
+      required phrases present here: []
+      text: * Click on the ‘Admin’ sub-module. (Ref Figure 12) * Click the ‘Ship’s Certificates’ sub-submodule to view certificate details; the ‘Master’ tab is displayed by default. (Ref Figure 12) * Upon entering the ‘Ship’s Certificates’ sub-submodule, the system automatically opens the ‘Master’ tab by default, allowing users to view all certificate details: * **Master Tab**: The Master tab serves as the central repository for all certificate master records available in the system. It allows administrators to define and maintain certificate types, categories, groups, regulatory references, and certificate labels. This view establishes the standard certificate structure that can be applied across compa…
+
+ANSWER (verbatim):
+The **office** is allowed to add comments in the Review section. The Review Work Order interface includes a **Reviewer Comments** field and is applicable to the **Office** side. The ship submits the work, while the office reviews it and may add remarks.
+
+Source: PMS User Manual for Office_Sail Admin, p. 13; Ship-Side Operational Notes, §1.1.13.3.
+
+==============================================================================================================
+CASE hist-2 [table] run 1   stored verdict: answer=False citation=True support=not captured
+Q: What does the pencil icon do on the inspection records list?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [6]  section 1.4 ACTION ICONS.
+MANUAL EVIDENCE (verified when the case was written): [icon: pencil] Edit Record — Open and edit the selected Inspection record.
+REQUIRED phrases: ['edit record', 'open and edit']   (in answer: [])
+FORBIDDEN phrases: ['delete the selected', 'view attachment']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 1.4 ACTION ICONS. (p.6)  <== expected manual+page
+  [2] Audit - History Manual_R1_30.06.2026 — 2.1.1 INSPECTION RECORD PAGE: (p.8)
+  [3] Audit - History Manual_R1_30.06.2026 — 3.0 DATA ENTRY ACROSS INSPECTION TYPES (p.14)
+  [4] Audit - History Manual_R1_30.06.2026 — Preamble (p.15)
+  [5] Audit - History Manual_R1_30.06.2026 — 3.1 INSPECTION PAGE: (p.14)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 1.4 ACTION ICONS. (p.6)  <== expected source
+      required phrases present here: ['edit record', 'open and edit']
+      text: <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>View Attachment</td> <td>Upload and view supporting documents for the <strong>Inspection</strong> record.</td> </tr> <tr> <td>[icon: eye]</td> <td>View Inspection</td> <td>View the inspection record, including observations, causes, and actions.</td> </tr> <tr> <td>[icon: pencil]</td> <td>Edit Record</td> <td>Open and edit the selected <strong>Inspection</strong> record.</td> </tr> <tr> <td>[icon: trash can]</td> <td>Delete Record</td> <td>Delete the selected <strong>Inspection</strong> record from the system</td> </tr> </tbody> </table>
+  [2] Audit - History Manual_R1_30.06.2026 — 2.1.1 INSPECTION RECORD PAGE: (p.8)
+      required phrases present here: []
+      text: * An inspection record will be created. Complete all mandatory fields marked with (**\***). * <u>Click **Save** to save the inspection details.</u> * <u>Click **Upload** to attach the required supporting documents.</u> * <u>Click **Next** to proceed to the **Observation** page and enter the observation details, as</u> applicable. (See **Figure 6.**) screenshot: SIRE 2.0 BETA Inspection Details form with annotations pointing to Save, Next, and Upload buttons Figure 6 <mark>All attachments related to the inspection record are displayed under the Upload icon.</mark>
+  [3] Audit - History Manual_R1_30.06.2026 — 3.0 DATA ENTRY ACROSS INSPECTION TYPES (p.14)
+      required phrases present here: []
+      text: * On the History page, the default inspection type is set to **SIRE 2.0** (See **Figure 16.**) * <u>To view another inspection type, click the **drop-down** and select the required inspection</u> type. * <u>The system displays all inspections records for the selected inspection type.</u> * <u>Click **+New Record** to create the inspection record.</u> screenshot_from_computer: History page interface showing inspection records with callouts for 'Click History', 'Click Inspection Type', and 'Click + New record' Figure 16
+  [4] Audit - History Manual_R1_30.06.2026 — Preamble (p.15)
+      required phrases present here: []
+      text: screenshot: Internal Audit Inspection Details page with annotations: "Save the record", "Go to the Observation page.", and "Click 'Upload' button to add attachments." Figure 17 <mark>☞ All attachments related to the inspection record are displayed under the Upload icon.</mark>
+  [5] Audit - History Manual_R1_30.06.2026 — 3.1 INSPECTION PAGE: (p.14)
+      required phrases present here: []
+      text: * An inspection record will be created. Complete all mandatory fields marked with **(\*)**. * <u>Click **Save** to save the inspection details.</u> * <u>Click **Upload** to attach the required supporting attachments.</u> * <u>Click **Next** to proceed to the **Observation** page and enter the observation details, as</u> applicable. (See **Figure 17.**)
+
+ANSWER (verbatim):
+The pencil icon **opens the selected inspection record for editing**.
+
+Source: Audit - History Manual_R1_30.06.2026, section 1.4 “Action Icons,” p. 6.
+
+==============================================================================================================
+CASE hist-2 [table] run 2   stored verdict: answer=False citation=True support=not captured
+Q: What does the pencil icon do on the inspection records list?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [6]  section 1.4 ACTION ICONS.
+MANUAL EVIDENCE (verified when the case was written): [icon: pencil] Edit Record — Open and edit the selected Inspection record.
+REQUIRED phrases: ['edit record', 'open and edit']   (in answer: [])
+FORBIDDEN phrases: ['delete the selected', 'view attachment']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 1.4 ACTION ICONS. (p.6)  <== expected manual+page
+  [2] Audit - History Manual_R1_30.06.2026 — 2.1.1 INSPECTION RECORD PAGE: (p.8)
+  [3] Audit - History Manual_R1_30.06.2026 — 3.0 DATA ENTRY ACROSS INSPECTION TYPES (p.14)
+  [4] Audit - History Manual_R1_30.06.2026 — Preamble (p.15)
+  [5] Audit - History Manual_R1_30.06.2026 — 3.1 INSPECTION PAGE: (p.14)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 1.4 ACTION ICONS. (p.6)  <== expected source
+      required phrases present here: ['edit record', 'open and edit']
+      text: <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>View Attachment</td> <td>Upload and view supporting documents for the <strong>Inspection</strong> record.</td> </tr> <tr> <td>[icon: eye]</td> <td>View Inspection</td> <td>View the inspection record, including observations, causes, and actions.</td> </tr> <tr> <td>[icon: pencil]</td> <td>Edit Record</td> <td>Open and edit the selected <strong>Inspection</strong> record.</td> </tr> <tr> <td>[icon: trash can]</td> <td>Delete Record</td> <td>Delete the selected <strong>Inspection</strong> record from the system</td> </tr> </tbody> </table>
+  [2] Audit - History Manual_R1_30.06.2026 — 2.1.1 INSPECTION RECORD PAGE: (p.8)
+      required phrases present here: []
+      text: * An inspection record will be created. Complete all mandatory fields marked with (**\***). * <u>Click **Save** to save the inspection details.</u> * <u>Click **Upload** to attach the required supporting documents.</u> * <u>Click **Next** to proceed to the **Observation** page and enter the observation details, as</u> applicable. (See **Figure 6.**) screenshot: SIRE 2.0 BETA Inspection Details form with annotations pointing to Save, Next, and Upload buttons Figure 6 <mark>All attachments related to the inspection record are displayed under the Upload icon.</mark>
+  [3] Audit - History Manual_R1_30.06.2026 — 3.0 DATA ENTRY ACROSS INSPECTION TYPES (p.14)
+      required phrases present here: []
+      text: * On the History page, the default inspection type is set to **SIRE 2.0** (See **Figure 16.**) * <u>To view another inspection type, click the **drop-down** and select the required inspection</u> type. * <u>The system displays all inspections records for the selected inspection type.</u> * <u>Click **+New Record** to create the inspection record.</u> screenshot_from_computer: History page interface showing inspection records with callouts for 'Click History', 'Click Inspection Type', and 'Click + New record' Figure 16
+  [4] Audit - History Manual_R1_30.06.2026 — Preamble (p.15)
+      required phrases present here: []
+      text: screenshot: Internal Audit Inspection Details page with annotations: "Save the record", "Go to the Observation page.", and "Click 'Upload' button to add attachments." Figure 17 <mark>☞ All attachments related to the inspection record are displayed under the Upload icon.</mark>
+  [5] Audit - History Manual_R1_30.06.2026 — 3.1 INSPECTION PAGE: (p.14)
+      required phrases present here: []
+      text: * An inspection record will be created. Complete all mandatory fields marked with **(\*)**. * <u>Click **Save** to save the inspection details.</u> * <u>Click **Upload** to attach the required supporting attachments.</u> * <u>Click **Next** to proceed to the **Observation** page and enter the observation details, as</u> applicable. (See **Figure 17.**)
+
+ANSWER (verbatim):
+The pencil icon opens the selected inspection record so you can edit it.
+
+Source: Audit - History Manual_R1_30.06.2026, §1.4 “Action Icons,” p. 6.
+
+==============================================================================================================
+CASE hist-2 [table] run 3   stored verdict: answer=False citation=True support=not captured
+Q: What does the pencil icon do on the inspection records list?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [6]  section 1.4 ACTION ICONS.
+MANUAL EVIDENCE (verified when the case was written): [icon: pencil] Edit Record — Open and edit the selected Inspection record.
+REQUIRED phrases: ['edit record', 'open and edit']   (in answer: ['edit record'])
+FORBIDDEN phrases: ['delete the selected', 'view attachment']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 1.4 ACTION ICONS. (p.6)  <== expected manual+page
+  [2] Audit - History Manual_R1_30.06.2026 — 2.1.1 INSPECTION RECORD PAGE: (p.8)
+  [3] Audit - History Manual_R1_30.06.2026 — 3.0 DATA ENTRY ACROSS INSPECTION TYPES (p.14)
+  [4] Audit - History Manual_R1_30.06.2026 — Preamble (p.15)
+  [5] Audit - History Manual_R1_30.06.2026 — 3.1 INSPECTION PAGE: (p.14)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 1.4 ACTION ICONS. (p.6)  <== expected source
+      required phrases present here: ['edit record', 'open and edit']
+      text: <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>View Attachment</td> <td>Upload and view supporting documents for the <strong>Inspection</strong> record.</td> </tr> <tr> <td>[icon: eye]</td> <td>View Inspection</td> <td>View the inspection record, including observations, causes, and actions.</td> </tr> <tr> <td>[icon: pencil]</td> <td>Edit Record</td> <td>Open and edit the selected <strong>Inspection</strong> record.</td> </tr> <tr> <td>[icon: trash can]</td> <td>Delete Record</td> <td>Delete the selected <strong>Inspection</strong> record from the system</td> </tr> </tbody> </table>
+  [2] Audit - History Manual_R1_30.06.2026 — 2.1.1 INSPECTION RECORD PAGE: (p.8)
+      required phrases present here: []
+      text: * An inspection record will be created. Complete all mandatory fields marked with (**\***). * <u>Click **Save** to save the inspection details.</u> * <u>Click **Upload** to attach the required supporting documents.</u> * <u>Click **Next** to proceed to the **Observation** page and enter the observation details, as</u> applicable. (See **Figure 6.**) screenshot: SIRE 2.0 BETA Inspection Details form with annotations pointing to Save, Next, and Upload buttons Figure 6 <mark>All attachments related to the inspection record are displayed under the Upload icon.</mark>
+  [3] Audit - History Manual_R1_30.06.2026 — 3.0 DATA ENTRY ACROSS INSPECTION TYPES (p.14)
+      required phrases present here: []
+      text: * On the History page, the default inspection type is set to **SIRE 2.0** (See **Figure 16.**) * <u>To view another inspection type, click the **drop-down** and select the required inspection</u> type. * <u>The system displays all inspections records for the selected inspection type.</u> * <u>Click **+New Record** to create the inspection record.</u> screenshot_from_computer: History page interface showing inspection records with callouts for 'Click History', 'Click Inspection Type', and 'Click + New record' Figure 16
+  [4] Audit - History Manual_R1_30.06.2026 — Preamble (p.15)
+      required phrases present here: []
+      text: screenshot: Internal Audit Inspection Details page with annotations: "Save the record", "Go to the Observation page.", and "Click 'Upload' button to add attachments." Figure 17 <mark>☞ All attachments related to the inspection record are displayed under the Upload icon.</mark>
+  [5] Audit - History Manual_R1_30.06.2026 — 3.1 INSPECTION PAGE: (p.14)
+      required phrases present here: []
+      text: * An inspection record will be created. Complete all mandatory fields marked with **(\*)**. * <u>Click **Save** to save the inspection details.</u> * <u>Click **Upload** to attach the required supporting attachments.</u> * <u>Click **Next** to proceed to the **Observation** page and enter the observation details, as</u> applicable. (See **Figure 17.**)
+
+ANSWER (verbatim):
+The pencil icon (**Edit Record**) opens the selected inspection record so you can edit it.
+
+Source: Audit - History Manual_R1_30.06.2026, section 1.4 Action Icons, p.6.
+
+==============================================================================================================
+CASE hist-3 [xref] run 1   stored verdict: answer=False citation=True support=not captured
+Q: The manual explains how to record a negative observation with attachments — does that same process apply when I want to add a Positive Observation or LAE finding instead?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [10]  section 2.1.4 ADDING ATTACHMENTS
+MANUAL EVIDENCE (verified when the case was written): Follow the above procedure for adding Positive Observations and LAE finding details. Various types of inspection records can be created using the same procedure in SAIL.
+REQUIRED phrases: ['follow the above procedure', 'positive observations', 'lae']   (in answer: ['positive observations', 'lae'])
+FORBIDDEN phrases: ['different procedure', 'not supported']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)  <== expected manual+page
+  [2] Audit - History Manual_R1_30.06.2026 — Document (p.13)
+  [3] Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)
+  [5] Audit - History Manual_R1_30.06.2026 — Preamble (p.9)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)  <== expected source
+      required phrases present here: ['follow the above procedure', 'positive observations', 'lae']
+      text: * <u>Click **Upload** to add the required observation attachments.</u> * <u>Click **Save** (available at the top or bottom of the page) to save the finding details.</u> * Click **Inspection** to return to the Inspection Records page. (See **Figure 10.**) screenshot: Findings Details page with annotations pointing to Inspection, Upload, and Save buttons Figure 10 ☞ Follow the above procedure for adding Positive Observations and LAE finding details. ☞ Various types of inspection records can be created using the same procedure in SAIL.
+  [2] Audit - History Manual_R1_30.06.2026 — Document (p.13)
+      required phrases present here: ['lae']
+      text: * <u>The inspection and observation details are automatically imported, and an inspection record</u> <u>is created.</u> * Click **Upload** to add supporting attachments manually, if required. (See **Figure 15.**) screenshot_from_computer: SIRE 2.0 interface showing Inspection Details form with callouts: "The system automatically imports the Inspection and Observation details and creates the corresponding inspection record." and "Click on 'Upload' to add the attachments manually." Figure 15 [icon: pointing hand] Observation details, including **Positive** and **LAE** findings, are automatically populated from the uploaded JSON file. [icon: pointing hand] Additional supporting attachments, if …
+  [3] Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)
+      required phrases present here: []
+      text: * <u>Select the desired **VIQ Ref.** The system will automatically populate the related fields,</u> <u>including **TMSA Ref**, **Initial Risk**, **Final Risk**, and **VIQ Question**.</u> * <u>Add the **Ques Category**, **SOC**, and **NOC** related to the observation.</u> * <u>Add a **Negative observation** in the text box.</u> * <u>Click **Add New** to add the observation.</u> * <u>Click the **Delete icon** to remove the current observation.</u>
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)
+      required phrases present here: []
+      text: * <u>Click the **Grounds for -ve Obs** icon to view potential grounds for negative observations</u> <u>related to the question (See Figure 33).</u> screenshot: SIRE 2.0 Questionnaire showing Potential Grounds for Neg Obs pop-up Figure 33
+  [5] Audit - History Manual_R1_30.06.2026 — Preamble (p.9)
+      required phrases present here: ['lae']
+      text: screenshot: SIRE 2.0 Findings Details interface with annotations: Toggle between the Observation, Positive Finding & LAE page; Click "Save" to save the details; Select VIQ Ref from the dropdown; Delete current observation; Click here to "Add New" observation; Select Ques category, SOC, NOC from dropdown; Add "Negative Comments" here. Figure 7
+
+ANSWER (verbatim):
+Yes. The manual states that the procedure for adding attachments and saving finding details also applies to **Positive Observations and LAE finding details**.
+
+1. Select the **VIQ Ref.**; the related TMSA Ref, Initial Risk, Final Risk, and VIQ Question populate automatically.
+2. Add the **Ques Category**, **SOC**, and **NOC**.
+3. Enter the **Negative observation** and click **Add New**.
+4. Click **Upload** to add the required attachments.
+5. Click **Save** to save the finding details.
+6. Click **Inspection** to return to the Inspection Records page.
+
+For a JSON-file import, the inspection and observation details—including **Positive** and **LAE** findings—are populated automatically and the inspection record is created. Any additional supporting attachments must still be uploaded manually.
+
+Source:  
+- Manual entry: *Audit - History Manual_R1_30.06.2026*, sections **2.1.2 Observation Page** (p.8) and **2.1.4 Adding Attachments** (p.10).  
+- Positive/LAE applicability: *Audit - History Manual_R1_30.06.2026*, **2.1.4 Adding Attachments** (p.10).  
+- JSON import: *Audit - History Manual_R1_30.06.2026*, **Document** (p.13).
+
+==============================================================================================================
+CASE hist-3 [xref] run 2   stored verdict: answer=False citation=True support=not captured
+Q: The manual explains how to record a negative observation with attachments — does that same process apply when I want to add a Positive Observation or LAE finding instead?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [10]  section 2.1.4 ADDING ATTACHMENTS
+MANUAL EVIDENCE (verified when the case was written): Follow the above procedure for adding Positive Observations and LAE finding details. Various types of inspection records can be created using the same procedure in SAIL.
+REQUIRED phrases: ['follow the above procedure', 'positive observations', 'lae']   (in answer: ['positive observations', 'lae'])
+FORBIDDEN phrases: ['different procedure', 'not supported']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)  <== expected manual+page
+  [2] Audit - History Manual_R1_30.06.2026 — Document (p.13)
+  [3] Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)
+  [5] Audit - History Manual_R1_30.06.2026 — Preamble (p.9)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)  <== expected source
+      required phrases present here: ['follow the above procedure', 'positive observations', 'lae']
+      text: * <u>Click **Upload** to add the required observation attachments.</u> * <u>Click **Save** (available at the top or bottom of the page) to save the finding details.</u> * Click **Inspection** to return to the Inspection Records page. (See **Figure 10.**) screenshot: Findings Details page with annotations pointing to Inspection, Upload, and Save buttons Figure 10 ☞ Follow the above procedure for adding Positive Observations and LAE finding details. ☞ Various types of inspection records can be created using the same procedure in SAIL.
+  [2] Audit - History Manual_R1_30.06.2026 — Document (p.13)
+      required phrases present here: ['lae']
+      text: * <u>The inspection and observation details are automatically imported, and an inspection record</u> <u>is created.</u> * Click **Upload** to add supporting attachments manually, if required. (See **Figure 15.**) screenshot_from_computer: SIRE 2.0 interface showing Inspection Details form with callouts: "The system automatically imports the Inspection and Observation details and creates the corresponding inspection record." and "Click on 'Upload' to add the attachments manually." Figure 15 [icon: pointing hand] Observation details, including **Positive** and **LAE** findings, are automatically populated from the uploaded JSON file. [icon: pointing hand] Additional supporting attachments, if …
+  [3] Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)
+      required phrases present here: []
+      text: * <u>Select the desired **VIQ Ref.** The system will automatically populate the related fields,</u> <u>including **TMSA Ref**, **Initial Risk**, **Final Risk**, and **VIQ Question**.</u> * <u>Add the **Ques Category**, **SOC**, and **NOC** related to the observation.</u> * <u>Add a **Negative observation** in the text box.</u> * <u>Click **Add New** to add the observation.</u> * <u>Click the **Delete icon** to remove the current observation.</u>
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)
+      required phrases present here: []
+      text: * <u>Click the **Grounds for -ve Obs** icon to view potential grounds for negative observations</u> <u>related to the question (See Figure 33).</u> screenshot: SIRE 2.0 Questionnaire showing Potential Grounds for Neg Obs pop-up Figure 33
+  [5] Audit - History Manual_R1_30.06.2026 — Preamble (p.9)
+      required phrases present here: ['lae']
+      text: screenshot: SIRE 2.0 Findings Details interface with annotations: Toggle between the Observation, Positive Finding & LAE page; Click "Save" to save the details; Select VIQ Ref from the dropdown; Delete current observation; Click here to "Add New" observation; Select Ques category, SOC, NOC from dropdown; Add "Negative Comments" here. Figure 7
+
+ANSWER (verbatim):
+Yes. The manual explicitly says to follow the same procedure for adding **Positive Observations and LAE finding details**.
+
+1. Select the **VIQ Ref.**; the related TMSA Ref, Initial Risk, Final Risk, and VIQ Question populate automatically.
+2. Add the **Ques Category, SOC, and NOC**.
+3. Enter the observation or finding details.
+4. Click **Add New**.
+5. Click **Upload** to add the required attachments.
+6. Click **Save** at the top or bottom of the page.
+7. Click **Inspection** to return to the Inspection Records page.
+
+A separate supported route is to upload a JSON file: the inspection and observation details—including Positive and LAE findings—are imported automatically and the inspection record is created. Any additional attachments must still be uploaded manually.
+
+**Source:**  
+- Manual entry: *Audit - History Manual_R1_30.06.2026*, sections 2.1.2 “Observation Page” (p.8) and 2.1.4 “Adding Attachments” (p.10).  
+- JSON import: *Audit - History Manual_R1_30.06.2026*, “Document” (p.13).
+
+==============================================================================================================
+CASE hist-3 [xref] run 3   stored verdict: answer=False citation=True support=not captured
+Q: The manual explains how to record a negative observation with attachments — does that same process apply when I want to add a Positive Observation or LAE finding instead?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [10]  section 2.1.4 ADDING ATTACHMENTS
+MANUAL EVIDENCE (verified when the case was written): Follow the above procedure for adding Positive Observations and LAE finding details. Various types of inspection records can be created using the same procedure in SAIL.
+REQUIRED phrases: ['follow the above procedure', 'positive observations', 'lae']   (in answer: ['positive observations', 'lae'])
+FORBIDDEN phrases: ['different procedure', 'not supported']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)  <== expected manual+page
+  [2] Audit - History Manual_R1_30.06.2026 — Document (p.13)
+  [3] Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)
+  [5] Audit - History Manual_R1_30.06.2026 — Preamble (p.9)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)  <== expected source
+      required phrases present here: ['follow the above procedure', 'positive observations', 'lae']
+      text: * <u>Click **Upload** to add the required observation attachments.</u> * <u>Click **Save** (available at the top or bottom of the page) to save the finding details.</u> * Click **Inspection** to return to the Inspection Records page. (See **Figure 10.**) screenshot: Findings Details page with annotations pointing to Inspection, Upload, and Save buttons Figure 10 ☞ Follow the above procedure for adding Positive Observations and LAE finding details. ☞ Various types of inspection records can be created using the same procedure in SAIL.
+  [2] Audit - History Manual_R1_30.06.2026 — Document (p.13)
+      required phrases present here: ['lae']
+      text: * <u>The inspection and observation details are automatically imported, and an inspection record</u> <u>is created.</u> * Click **Upload** to add supporting attachments manually, if required. (See **Figure 15.**) screenshot_from_computer: SIRE 2.0 interface showing Inspection Details form with callouts: "The system automatically imports the Inspection and Observation details and creates the corresponding inspection record." and "Click on 'Upload' to add the attachments manually." Figure 15 [icon: pointing hand] Observation details, including **Positive** and **LAE** findings, are automatically populated from the uploaded JSON file. [icon: pointing hand] Additional supporting attachments, if …
+  [3] Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)
+      required phrases present here: []
+      text: * <u>Select the desired **VIQ Ref.** The system will automatically populate the related fields,</u> <u>including **TMSA Ref**, **Initial Risk**, **Final Risk**, and **VIQ Question**.</u> * <u>Add the **Ques Category**, **SOC**, and **NOC** related to the observation.</u> * <u>Add a **Negative observation** in the text box.</u> * <u>Click **Add New** to add the observation.</u> * <u>Click the **Delete icon** to remove the current observation.</u>
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)
+      required phrases present here: []
+      text: * <u>Click the **Grounds for -ve Obs** icon to view potential grounds for negative observations</u> <u>related to the question (See Figure 33).</u> screenshot: SIRE 2.0 Questionnaire showing Potential Grounds for Neg Obs pop-up Figure 33
+  [5] Audit - History Manual_R1_30.06.2026 — Preamble (p.9)
+      required phrases present here: ['lae']
+      text: screenshot: SIRE 2.0 Findings Details interface with annotations: Toggle between the Observation, Positive Finding & LAE page; Click "Save" to save the details; Select VIQ Ref from the dropdown; Delete current observation; Click here to "Add New" observation; Select Ques category, SOC, NOC from dropdown; Add "Negative Comments" here. Figure 7
+
+ANSWER (verbatim):
+Yes. The manual explicitly says to follow the attachment procedure for **Positive Observations and LAE finding details** as well.
+
+1. Select the **VIQ Ref.**; related fields such as TMSA Ref, Initial Risk, Final Risk, and VIQ Question are populated automatically.
+2. Add the **Ques Category**, **SOC**, and **NOC**.
+3. Enter the negative observation text, or the relevant Positive Observation or LAE finding details.
+4. Click **Add New** to add the observation.
+5. Click **Upload** to add the required attachments.
+6. Click **Save** to save the finding details.
+7. Click **Inspection** to return to the Inspection Records page.
+
+The manual also states that various inspection record types can be created using the same procedure in SAIL.
+
+**Source:**  
+- Negative observation: *Audit - History Manual_R1_30.06.2026*, “Observation Page,” p. 8; “Adding Attachments,” §2.1.4, p. 10.  
+- Positive Observation and LAE finding: *Audit - History Manual_R1_30.06.2026*, “Adding Attachments,” §2.1.4, p. 10.
+
+==============================================================================================================
+CASE prep-1 [procedure] run 1   stored verdict: answer=True citation=False support=not captured
+Q: What are the steps to start a brand new SIRE preparation record for a vessel?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [13]  section 3.1 HOW TO CREATE NEW PREPARATION
+MANUAL EVIDENCE (verified when the case was written): Click '+ New Preparation' to create a new preparation record. A Preparation Details window is displayed. Select the required Inspection Type. Complete all mandatory preparation details... Click Save Changes to create the preparation record or Discard to cancel without saving.
+REQUIRED phrases: ['save changes', 'discard']   (in answer: ['save changes', 'discard'])
+FORBIDDEN phrases: ['only save, no discard option', 'automatic without clicking']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)  <== expected manual+page
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)
+  [4] Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+      required phrases present here: []
+      text: * Click **+ New Record** to add an inspection record. (See **Figure 4.**) screenshot: SIRE 2.0 History page showing the + New Record button Figure 4 * <u>Select the **Vessel** from the dropdown menu.</u> * <u>Select the desired **Inspection Type** from the dropdown menu.</u> * Click **Add New** to create the inspection record. (See **Figure 5.**) screenshot: Manual Data Entry modal with Vessel and Inspection Type dropdowns and Add New button Figure 5
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)  <== expected source
+      required phrases present here: ['save changes', 'discard']
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)
+      required phrases present here: []
+      text: screenshot: SIRE 2.0 - PIQ interface showing vessel information and a "Please Select One Option" pop-up window with instructions to select an option and click continue. Figure 43
+  [4] Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11)
+      required phrases present here: []
+      text: * Click **New Record** to create a new inspection record. (See **Figure 11.**) screenshot: SAIL application interface showing the History tab and a highlighted "+ New Record" button with a callout "Click here to add new inspection." Figure 11 * <u>Select **SIRE 2.0 JSON**, **CDI XML**, or **SIRE XML** from the dropdown, as applicable.</u> * <u>Click **Choose File**. The system prompts the user to select the required file from the storage</u> <u>location.</u> * <u>Click **Upload** to upload the selected file.</u> * An inspection record will be automatically created in **SAIL**. (See **Figure 12.**) screenshot: New Record dialog box showing a dropdown for file type selection, a "CHOOSE FILE" b…
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)
+      required phrases present here: []
+      text: * <u>The **Preparation** sub-module displays all preparation records along with key details such as</u> <u>Vessel Name, Inspection Type, Progress, Due Date, Port, and available actions icons.</u> * <u>Users can create new preparations, search and filter existing records, monitor preparation</u> progress, access the Checklist and PIQ, upload attachments, and manage preparation-<u>related activities from this sub-module.</u> * <u>The screen consists of the following components:</u> * <u>**Inspection Type** – Use the drop-down list to display preparation records for a specific</u> <u>inspection type (**All, SIRE, RISQ, or PSC**).</u> * <u>**Search** – Enter keywords to quickly locate preparatio…
+
+ANSWER (verbatim):
+The supported way is to create it from the **Preparation** sub-module:
+
+1. In the **Office** Preparation sub-module, click **+ New Preparation**.
+2. When the **Preparation Details** window appears, select **SIRE** as the **Inspection Type**.
+3. Complete all mandatory preparation details using the drop-down lists and required entries.
+4. Click **Save Changes** to create the record. Click **Discard** instead if you want to cancel without saving.
+5. The new preparation record is added to the Preparation listing for further actions.
+6. An email notification is automatically sent to the **Vessel** when the record is created.
+
+Source: Preparation Manual_Office_R1_30.06.2026, §2 “Preparation Sub-Module Overview” (p.5) and §3.1 “How to Create New Preparation” (p.13).
+
+==============================================================================================================
+CASE prep-1 [procedure] run 2   stored verdict: answer=True citation=False support=not captured
+Q: What are the steps to start a brand new SIRE preparation record for a vessel?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [13]  section 3.1 HOW TO CREATE NEW PREPARATION
+MANUAL EVIDENCE (verified when the case was written): Click '+ New Preparation' to create a new preparation record. A Preparation Details window is displayed. Select the required Inspection Type. Complete all mandatory preparation details... Click Save Changes to create the preparation record or Discard to cancel without saving.
+REQUIRED phrases: ['save changes', 'discard']   (in answer: ['save changes', 'discard'])
+FORBIDDEN phrases: ['only save, no discard option', 'automatic without clicking']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)  <== expected manual+page
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)
+  [4] Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+      required phrases present here: []
+      text: * Click **+ New Record** to add an inspection record. (See **Figure 4.**) screenshot: SIRE 2.0 History page showing the + New Record button Figure 4 * <u>Select the **Vessel** from the dropdown menu.</u> * <u>Select the desired **Inspection Type** from the dropdown menu.</u> * Click **Add New** to create the inspection record. (See **Figure 5.**) screenshot: Manual Data Entry modal with Vessel and Inspection Type dropdowns and Add New button Figure 5
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)  <== expected source
+      required phrases present here: ['save changes', 'discard']
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)
+      required phrases present here: []
+      text: screenshot: SIRE 2.0 - PIQ interface showing vessel information and a "Please Select One Option" pop-up window with instructions to select an option and click continue. Figure 43
+  [4] Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11)
+      required phrases present here: []
+      text: * Click **New Record** to create a new inspection record. (See **Figure 11.**) screenshot: SAIL application interface showing the History tab and a highlighted "+ New Record" button with a callout "Click here to add new inspection." Figure 11 * <u>Select **SIRE 2.0 JSON**, **CDI XML**, or **SIRE XML** from the dropdown, as applicable.</u> * <u>Click **Choose File**. The system prompts the user to select the required file from the storage</u> <u>location.</u> * <u>Click **Upload** to upload the selected file.</u> * An inspection record will be automatically created in **SAIL**. (See **Figure 12.**) screenshot: New Record dialog box showing a dropdown for file type selection, a "CHOOSE FILE" b…
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)
+      required phrases present here: []
+      text: * <u>The **Preparation** sub-module displays all preparation records along with key details such as</u> <u>Vessel Name, Inspection Type, Progress, Due Date, Port, and available actions icons.</u> * <u>Users can create new preparations, search and filter existing records, monitor preparation</u> progress, access the Checklist and PIQ, upload attachments, and manage preparation-<u>related activities from this sub-module.</u> * <u>The screen consists of the following components:</u> * <u>**Inspection Type** – Use the drop-down list to display preparation records for a specific</u> <u>inspection type (**All, SIRE, RISQ, or PSC**).</u> * <u>**Search** – Enter keywords to quickly locate preparatio…
+
+ANSWER (verbatim):
+1. In the **Preparation** sub-module, click **+ New Preparation**.
+2. In the **Preparation Details** window, select **SIRE** as the **Inspection Type**.
+3. Complete all mandatory preparation details by selecting values from the drop-down lists and entering the required information for the vessel.
+4. Click **Save Changes** to create the record. Click **Discard** to cancel without saving.
+5. The new preparation record is added to the Preparation listing for further actions. An email notification is automatically sent to the vessel.
+
+The excerpt does not specify a separate vessel-selection button; the vessel information is completed among the mandatory preparation details.
+
+**Source:** Preparation Manual_Office_R1_30.06.2026, §3.1 “How to Create New Preparation,” p.13; §2 “Preparation Sub-Module Overview,” p.5.
+
+==============================================================================================================
+CASE prep-1 [procedure] run 3   stored verdict: answer=True citation=False support=not captured
+Q: What are the steps to start a brand new SIRE preparation record for a vessel?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [13]  section 3.1 HOW TO CREATE NEW PREPARATION
+MANUAL EVIDENCE (verified when the case was written): Click '+ New Preparation' to create a new preparation record. A Preparation Details window is displayed. Select the required Inspection Type. Complete all mandatory preparation details... Click Save Changes to create the preparation record or Discard to cancel without saving.
+REQUIRED phrases: ['save changes', 'discard']   (in answer: ['save changes', 'discard'])
+FORBIDDEN phrases: ['only save, no discard option', 'automatic without clicking']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)  <== expected manual+page
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)
+  [4] Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+      required phrases present here: []
+      text: * Click **+ New Record** to add an inspection record. (See **Figure 4.**) screenshot: SIRE 2.0 History page showing the + New Record button Figure 4 * <u>Select the **Vessel** from the dropdown menu.</u> * <u>Select the desired **Inspection Type** from the dropdown menu.</u> * Click **Add New** to create the inspection record. (See **Figure 5.**) screenshot: Manual Data Entry modal with Vessel and Inspection Type dropdowns and Add New button Figure 5
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)  <== expected source
+      required phrases present here: ['save changes', 'discard']
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)
+      required phrases present here: []
+      text: screenshot: SIRE 2.0 - PIQ interface showing vessel information and a "Please Select One Option" pop-up window with instructions to select an option and click continue. Figure 43
+  [4] Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11)
+      required phrases present here: []
+      text: * Click **New Record** to create a new inspection record. (See **Figure 11.**) screenshot: SAIL application interface showing the History tab and a highlighted "+ New Record" button with a callout "Click here to add new inspection." Figure 11 * <u>Select **SIRE 2.0 JSON**, **CDI XML**, or **SIRE XML** from the dropdown, as applicable.</u> * <u>Click **Choose File**. The system prompts the user to select the required file from the storage</u> <u>location.</u> * <u>Click **Upload** to upload the selected file.</u> * An inspection record will be automatically created in **SAIL**. (See **Figure 12.**) screenshot: New Record dialog box showing a dropdown for file type selection, a "CHOOSE FILE" b…
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)
+      required phrases present here: []
+      text: * <u>The **Preparation** sub-module displays all preparation records along with key details such as</u> <u>Vessel Name, Inspection Type, Progress, Due Date, Port, and available actions icons.</u> * <u>Users can create new preparations, search and filter existing records, monitor preparation</u> progress, access the Checklist and PIQ, upload attachments, and manage preparation-<u>related activities from this sub-module.</u> * <u>The screen consists of the following components:</u> * <u>**Inspection Type** – Use the drop-down list to display preparation records for a specific</u> <u>inspection type (**All, SIRE, RISQ, or PSC**).</u> * <u>**Search** – Enter keywords to quickly locate preparatio…
+
+ANSWER (verbatim):
+For the **Office Preparation** sub-module:
+
+1. Click **+ New Preparation**.
+2. In the **Preparation Details** window, select **SIRE** as the **Inspection Type**.
+3. Complete all mandatory preparation details by selecting values from the drop-down lists and entering the required information.
+4. Click **Save Changes** to create the record. Click **Discard** instead to cancel without saving.
+5. The new preparation record is added to the Preparation listing for further actions.
+6. An email notification is automatically sent to the **Vessel** when the record is created.
+
+The excerpt does not specify a separate step for selecting the vessel during creation.
+
+**Source:** Audit - Preparation Manual_Office_R1_30.06.2026, §3.1 “How to Create New Preparation,” p.13; §2 “Preparation Sub-Module Overview,” p.5.
+
+==============================================================================================================
+CASE prep-2 [condition] run 1   stored verdict: answer=False citation=True support=not captured
+Q: If I change the assigned inspector on an existing preparation record, which fields can't be changed, and what happens to the vessel's answers that were already entered?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [11]  section 2.7 EDITING EXISTING PREPARATION
+MANUAL EVIDENCE (verified when the case was written): All fields can be edited except VIQ Version and VIQ Group. Important: Changing the Inspector permanently removes all vessel responses associated with the previously assigned Inspector for that preparation.
+REQUIRED phrases: ['viq version', 'viq group', 'permanently removes']   (in answer: ['viq version', 'viq group'])
+FORBIDDEN phrases: ['responses are retained', 'no impact']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.7 EDITING EXISTING PREPARATION (p.11)  <== expected manual+page
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.12)
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+  [4] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.4 PIQ ICON (p.8)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.7 EDITING EXISTING PREPARATION (p.11)  <== expected source
+      required phrases present here: ['viq version', 'viq group', 'permanently removes']
+      text: * <u>Click the **Edit** icon to make changes to the initial information of the existing preparation.</u> <u>(See Figure 13)</u> screenshot: Preparation dashboard showing a list of vessels with an arrow pointing to the Edit icon Figure 13 <mark>Click Edit icon</mark> * <u>A pop-up window will appear, modify the required preparation details. All fields can be</u> <u>edited **except VIQ Version** and **VIQ Group**. (See Figure 14)</u> * <u>If the **Inspector** has been changed, click **Confirm** in the confirmation message to proceed.</u> * <u>Click **Save Changes** to update the preparation record.</u> [icon: hand pointing right] If the Inspector is changed, an email notification is automatica…
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.12)
+      required phrases present here: []
+      text: screenshot: Vessel inspection preparation form with a confirmation dialog for changing the inspector. A yellow callout points to the "Save Changes" button. Figure 14
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+      required phrases present here: []
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+  [4] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+      required phrases present here: []
+      text: * Click **+ New Record** to add an inspection record. (See **Figure 4.**) screenshot: SIRE 2.0 History page showing the + New Record button Figure 4 * <u>Select the **Vessel** from the dropdown menu.</u> * <u>Select the desired **Inspection Type** from the dropdown menu.</u> * Click **Add New** to create the inspection record. (See **Figure 5.**) screenshot: Manual Data Entry modal with Vessel and Inspection Type dropdowns and Add New button Figure 5
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.4 PIQ ICON (p.8)
+      required phrases present here: []
+      text: * <u>Click the **PIQ** button corresponding to a preparation record to open the **Pre-Inspection</u> Questionnaire (PIQ)**. * <u>The percentage displayed on the **PIQ** button indicates the current completion progress of</u> <u>the questionnaire.</u> (See Figure 8) screenshot: Table showing vessel inspection details with a highlighted PIQ button showing 99% progress. Figure 8 ☞ A **Pre-Inspection Questionnaire (PIQ)** is created automatically with every new preparation. ☞ The **PIQ responses from the previous Preparation** are automatically copied to the new PIQ. Users can review and modify the copied responses as required. ☞ The completion percentage is updated automatically as the PIQ is c…
+
+ANSWER (verbatim):
+When editing an existing preparation:
+
+1. Click **Edit** and modify the preparation details. All fields can be changed **except VIQ Version and VIQ Group**.
+2. If you change the **Inspector**, click **Confirm** in the confirmation message, then click **Save Changes**.
+3. All vessel responses associated with the previously assigned Inspector are **permanently removed**.
+
+Source: *Audit – Preparation Manual_Office_R1_30.06.2026*, §2.7 “Editing Existing Preparation,” p.11.
+
+==============================================================================================================
+CASE prep-2 [condition] run 2   stored verdict: answer=False citation=True support=not captured
+Q: If I change the assigned inspector on an existing preparation record, which fields can't be changed, and what happens to the vessel's answers that were already entered?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [11]  section 2.7 EDITING EXISTING PREPARATION
+MANUAL EVIDENCE (verified when the case was written): All fields can be edited except VIQ Version and VIQ Group. Important: Changing the Inspector permanently removes all vessel responses associated with the previously assigned Inspector for that preparation.
+REQUIRED phrases: ['viq version', 'viq group', 'permanently removes']   (in answer: ['viq version', 'viq group'])
+FORBIDDEN phrases: ['responses are retained', 'no impact']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.7 EDITING EXISTING PREPARATION (p.11)  <== expected manual+page
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.12)
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+  [4] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.4 PIQ ICON (p.8)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.7 EDITING EXISTING PREPARATION (p.11)  <== expected source
+      required phrases present here: ['viq version', 'viq group', 'permanently removes']
+      text: * <u>Click the **Edit** icon to make changes to the initial information of the existing preparation.</u> <u>(See Figure 13)</u> screenshot: Preparation dashboard showing a list of vessels with an arrow pointing to the Edit icon Figure 13 <mark>Click Edit icon</mark> * <u>A pop-up window will appear, modify the required preparation details. All fields can be</u> <u>edited **except VIQ Version** and **VIQ Group**. (See Figure 14)</u> * <u>If the **Inspector** has been changed, click **Confirm** in the confirmation message to proceed.</u> * <u>Click **Save Changes** to update the preparation record.</u> [icon: hand pointing right] If the Inspector is changed, an email notification is automatica…
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.12)
+      required phrases present here: []
+      text: screenshot: Vessel inspection preparation form with a confirmation dialog for changing the inspector. A yellow callout points to the "Save Changes" button. Figure 14
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+      required phrases present here: []
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+  [4] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+      required phrases present here: []
+      text: * Click **+ New Record** to add an inspection record. (See **Figure 4.**) screenshot: SIRE 2.0 History page showing the + New Record button Figure 4 * <u>Select the **Vessel** from the dropdown menu.</u> * <u>Select the desired **Inspection Type** from the dropdown menu.</u> * Click **Add New** to create the inspection record. (See **Figure 5.**) screenshot: Manual Data Entry modal with Vessel and Inspection Type dropdowns and Add New button Figure 5
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.4 PIQ ICON (p.8)
+      required phrases present here: []
+      text: * <u>Click the **PIQ** button corresponding to a preparation record to open the **Pre-Inspection</u> Questionnaire (PIQ)**. * <u>The percentage displayed on the **PIQ** button indicates the current completion progress of</u> <u>the questionnaire.</u> (See Figure 8) screenshot: Table showing vessel inspection details with a highlighted PIQ button showing 99% progress. Figure 8 ☞ A **Pre-Inspection Questionnaire (PIQ)** is created automatically with every new preparation. ☞ The **PIQ responses from the previous Preparation** are automatically copied to the new PIQ. Users can review and modify the copied responses as required. ☞ The completion percentage is updated automatically as the PIQ is c…
+
+ANSWER (verbatim):
+1. Click **Edit** on the existing preparation. In the pop-up, all fields can be changed **except VIQ Version and VIQ Group**.
+2. If you change the **Inspector**, click **Confirm** in the confirmation message, then click **Save Changes**.
+3. All vessel responses associated with the previously assigned Inspector are **permanently removed**.
+
+**Source:** Audit - Preparation Manual_Office_R1_30.06.2026, §2.7 “Editing Existing Preparation,” p.11.
+
+==============================================================================================================
+CASE prep-2 [condition] run 3   stored verdict: answer=True citation=True support=not captured
+Q: If I change the assigned inspector on an existing preparation record, which fields can't be changed, and what happens to the vessel's answers that were already entered?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [11]  section 2.7 EDITING EXISTING PREPARATION
+MANUAL EVIDENCE (verified when the case was written): All fields can be edited except VIQ Version and VIQ Group. Important: Changing the Inspector permanently removes all vessel responses associated with the previously assigned Inspector for that preparation.
+REQUIRED phrases: ['viq version', 'viq group', 'permanently removes']   (in answer: ['viq version', 'viq group', 'permanently removes'])
+FORBIDDEN phrases: ['responses are retained', 'no impact']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.7 EDITING EXISTING PREPARATION (p.11)  <== expected manual+page
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.12)
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+  [4] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.4 PIQ ICON (p.8)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.7 EDITING EXISTING PREPARATION (p.11)  <== expected source
+      required phrases present here: ['viq version', 'viq group', 'permanently removes']
+      text: * <u>Click the **Edit** icon to make changes to the initial information of the existing preparation.</u> <u>(See Figure 13)</u> screenshot: Preparation dashboard showing a list of vessels with an arrow pointing to the Edit icon Figure 13 <mark>Click Edit icon</mark> * <u>A pop-up window will appear, modify the required preparation details. All fields can be</u> <u>edited **except VIQ Version** and **VIQ Group**. (See Figure 14)</u> * <u>If the **Inspector** has been changed, click **Confirm** in the confirmation message to proceed.</u> * <u>Click **Save Changes** to update the preparation record.</u> [icon: hand pointing right] If the Inspector is changed, an email notification is automatica…
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.12)
+      required phrases present here: []
+      text: screenshot: Vessel inspection preparation form with a confirmation dialog for changing the inspector. A yellow callout points to the "Save Changes" button. Figure 14
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+      required phrases present here: []
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+  [4] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+      required phrases present here: []
+      text: * Click **+ New Record** to add an inspection record. (See **Figure 4.**) screenshot: SIRE 2.0 History page showing the + New Record button Figure 4 * <u>Select the **Vessel** from the dropdown menu.</u> * <u>Select the desired **Inspection Type** from the dropdown menu.</u> * Click **Add New** to create the inspection record. (See **Figure 5.**) screenshot: Manual Data Entry modal with Vessel and Inspection Type dropdowns and Add New button Figure 5
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.4 PIQ ICON (p.8)
+      required phrases present here: []
+      text: * <u>Click the **PIQ** button corresponding to a preparation record to open the **Pre-Inspection</u> Questionnaire (PIQ)**. * <u>The percentage displayed on the **PIQ** button indicates the current completion progress of</u> <u>the questionnaire.</u> (See Figure 8) screenshot: Table showing vessel inspection details with a highlighted PIQ button showing 99% progress. Figure 8 ☞ A **Pre-Inspection Questionnaire (PIQ)** is created automatically with every new preparation. ☞ The **PIQ responses from the previous Preparation** are automatically copied to the new PIQ. Users can review and modify the copied responses as required. ☞ The completion percentage is updated automatically as the PIQ is c…
+
+ANSWER (verbatim):
+1. Open the existing preparation and click **Edit**.
+2. Modify the preparation details. All fields can be changed **except VIQ Version and VIQ Group**.
+3. If you change the **Inspector**, click **Confirm** in the confirmation message, then click **Save Changes**.
+4. Changing the Inspector **permanently removes all vessel responses** associated with the previously assigned Inspector for that preparation.
+
+An email notification is automatically sent to the Vessel and Office when the Inspector is changed.
+
+**Source:** Audit – Preparation Manual_Office_R1_30.06.2026, §2.7 “Editing Existing Preparation,” p.11.
+
+==============================================================================================================
+CASE prep-3 [screenshot] run 1   stored verdict: answer=False citation=False support=not captured
+Q: On the preparation checklist, how do I add a new attachment to a question, and what can I do with it afterward?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [20]  section Document
+MANUAL EVIDENCE (verified when the case was written): screenshot_from_computer: SIRE 2.0 Questionnaire interface showing uploaded attachments with callouts for 'Uploaded attachments are displayed here', 'Delete and Download icon', 'Click to add attachment'.
+REQUIRED phrases: ['click to add attachment', 'delete and download']   (in answer: [])
+FORBIDDEN phrases: ['upload not possible', 'read only attachments']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.3 ATTACHMENT ICON (p.7)
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.6 SAVE THE PREPARATION CHECKLIST (p.26)
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.5 Delete Attachments (p.21)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)
+      required phrases present here: []
+      text: * <u>Click the **Attachments** icon to upload a document or image for the selected checklist</u> question. * <u>Uploaded attachments are displayed under the corresponding question, where they can be</u> <u>**viewed, downloaded, or deleted.** (See Figures 28).</u> [icon: hand pointing right] Chapter 11 includes an Example section that displays a sample image for reference. [icon: hand pointing right] Images related to a specific question can be uploaded using the attachment function described above. [icon: hand pointing right] Once uploaded, the images will be displayed under the Uploaded section (see Figure 29). **!!** For optimum application performance, it is recommended that the **combine…
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.3 ATTACHMENT ICON (p.7)
+      required phrases present here: []
+      text: * <u>Click the Attachment icon to add attachments/supporting documents.</u> * <u>Click Browse to select a file or drag and drop it into the upload area.</u> <u>(See Figures 6,7)</u> screenshot_from_computer: UI showing the "Add Attachments" callout pointing to the paperclip icon in the action column of the preparation list. Figure 6
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.6 SAVE THE PREPARATION CHECKLIST (p.26)
+      required phrases present here: []
+      text: * <u>Click the **Save** icon to save the checklist (See Figure 38).</u> screenshot: SIRE 2.0 Questionnaire interface with a callout pointing to the Save button Figure 38
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.5 Delete Attachments (p.21)
+      required phrases present here: []
+      text: * <u>Click on the delete icon to delete uploaded attachments. (See Figure 30)</u> screenshot_from_computer: SIRE 2.0 Questionnaire interface showing a PDF attachment with a red delete icon highlighted by a yellow box and arrow labeled "Delete icon for Attachments." Figure 30
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+      required phrases present here: []
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+
+ANSWER (verbatim):
+1. On the preparation checklist, select the question and click its **Attachments** (paperclip) icon.
+2. Click **Browse** to select a document or image, or drag and drop the file into the upload area. Multiple attachments may be added to the question.
+3. Save periodically when uploading multiple or large attachments. Keep the combined size of files in one upload at **20 MB or less**, and the combined size between consecutive saves or Offline-to-Online synchronizations at **150 MB or less**.
+4. After uploading, the attachment appears under the corresponding question. You can **view, download, or delete** it by clicking the delete icon.
+
+**Source:** Audit – Preparation Manual_Office_R1_30.06.2026, §§2.3 “Attachment Icon” (p.7), 4.3.4 “Adding Attachment(s)” (p.19), and 4.3.5 “Delete Attachments” (p.21).
+
+==============================================================================================================
+CASE prep-3 [screenshot] run 2   stored verdict: answer=False citation=False support=not captured
+Q: On the preparation checklist, how do I add a new attachment to a question, and what can I do with it afterward?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [20]  section Document
+MANUAL EVIDENCE (verified when the case was written): screenshot_from_computer: SIRE 2.0 Questionnaire interface showing uploaded attachments with callouts for 'Uploaded attachments are displayed here', 'Delete and Download icon', 'Click to add attachment'.
+REQUIRED phrases: ['click to add attachment', 'delete and download']   (in answer: [])
+FORBIDDEN phrases: ['upload not possible', 'read only attachments']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.3 ATTACHMENT ICON (p.7)
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.6 SAVE THE PREPARATION CHECKLIST (p.26)
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.5 Delete Attachments (p.21)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)
+      required phrases present here: []
+      text: * <u>Click the **Attachments** icon to upload a document or image for the selected checklist</u> question. * <u>Uploaded attachments are displayed under the corresponding question, where they can be</u> <u>**viewed, downloaded, or deleted.** (See Figures 28).</u> [icon: hand pointing right] Chapter 11 includes an Example section that displays a sample image for reference. [icon: hand pointing right] Images related to a specific question can be uploaded using the attachment function described above. [icon: hand pointing right] Once uploaded, the images will be displayed under the Uploaded section (see Figure 29). **!!** For optimum application performance, it is recommended that the **combine…
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.3 ATTACHMENT ICON (p.7)
+      required phrases present here: []
+      text: * <u>Click the Attachment icon to add attachments/supporting documents.</u> * <u>Click Browse to select a file or drag and drop it into the upload area.</u> <u>(See Figures 6,7)</u> screenshot_from_computer: UI showing the "Add Attachments" callout pointing to the paperclip icon in the action column of the preparation list. Figure 6
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.6 SAVE THE PREPARATION CHECKLIST (p.26)
+      required phrases present here: []
+      text: * <u>Click the **Save** icon to save the checklist (See Figure 38).</u> screenshot: SIRE 2.0 Questionnaire interface with a callout pointing to the Save button Figure 38
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.5 Delete Attachments (p.21)
+      required phrases present here: []
+      text: * <u>Click on the delete icon to delete uploaded attachments. (See Figure 30)</u> screenshot_from_computer: SIRE 2.0 Questionnaire interface showing a PDF attachment with a red delete icon highlighted by a yellow box and arrow labeled "Delete icon for Attachments." Figure 30
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+      required phrases present here: []
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+
+ANSWER (verbatim):
+1. Select the checklist question and click its **Attachments** icon.
+2. Add the file by either:
+   - clicking **Browse** and selecting it; or
+   - dragging and dropping it into the upload area.
+3. Multiple attachments may be uploaded for the question. Keep the selected files in one upload within **20 MB**, and keep all attachments added between consecutive **Save** actions or Offline-to-Online synchronizations within **150 MB**.
+4. Save periodically, especially when uploading multiple or large files. Click the **Save** icon to save the checklist.
+5. After upload, the attachment appears under its corresponding question, in the **Uploaded** section. You can **view**, **download**, or **delete** it by clicking the delete icon.
+
+**Source:**  
+- Attachment upload and post-upload actions: *Audit – Preparation Manual_Office_R1_30.06.2026*, §§ 4.3.4 and 4.3.5, pp. 19, 21.  
+- Browse or drag-and-drop upload: same manual, § 2.3, p. 7.  
+- Saving and upload-size guidance: same manual, § 4.6, p. 26, and § 4.3.4, p. 19.
+
+==============================================================================================================
+CASE prep-3 [screenshot] run 3   stored verdict: answer=False citation=False support=not captured
+Q: On the preparation checklist, how do I add a new attachment to a question, and what can I do with it afterward?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [20]  section Document
+MANUAL EVIDENCE (verified when the case was written): screenshot_from_computer: SIRE 2.0 Questionnaire interface showing uploaded attachments with callouts for 'Uploaded attachments are displayed here', 'Delete and Download icon', 'Click to add attachment'.
+REQUIRED phrases: ['click to add attachment', 'delete and download']   (in answer: [])
+FORBIDDEN phrases: ['upload not possible', 'read only attachments']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.3 ATTACHMENT ICON (p.7)
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.6 SAVE THE PREPARATION CHECKLIST (p.26)
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.5 Delete Attachments (p.21)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)
+      required phrases present here: []
+      text: * <u>Click the **Attachments** icon to upload a document or image for the selected checklist</u> question. * <u>Uploaded attachments are displayed under the corresponding question, where they can be</u> <u>**viewed, downloaded, or deleted.** (See Figures 28).</u> [icon: hand pointing right] Chapter 11 includes an Example section that displays a sample image for reference. [icon: hand pointing right] Images related to a specific question can be uploaded using the attachment function described above. [icon: hand pointing right] Once uploaded, the images will be displayed under the Uploaded section (see Figure 29). **!!** For optimum application performance, it is recommended that the **combine…
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 2.3 ATTACHMENT ICON (p.7)
+      required phrases present here: []
+      text: * <u>Click the Attachment icon to add attachments/supporting documents.</u> * <u>Click Browse to select a file or drag and drop it into the upload area.</u> <u>(See Figures 6,7)</u> screenshot_from_computer: UI showing the "Add Attachments" callout pointing to the paperclip icon in the action column of the preparation list. Figure 6
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.6 SAVE THE PREPARATION CHECKLIST (p.26)
+      required phrases present here: []
+      text: * <u>Click the **Save** icon to save the checklist (See Figure 38).</u> screenshot: SIRE 2.0 Questionnaire interface with a callout pointing to the Save button Figure 38
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.5 Delete Attachments (p.21)
+      required phrases present here: []
+      text: * <u>Click on the delete icon to delete uploaded attachments. (See Figure 30)</u> screenshot_from_computer: SIRE 2.0 Questionnaire interface showing a PDF attachment with a red delete icon highlighted by a yellow box and arrow labeled "Delete icon for Attachments." Figure 30
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)
+      required phrases present here: []
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+
+ANSWER (verbatim):
+1. Select the checklist question and click its **Attachments** icon.
+2. Add the file by clicking **Browse** and selecting it, or by dragging and dropping it into the upload area.
+3. Multiple attachments may be added to the question. Keep the combined size of files in one upload at **20 MB or less**.
+4. Save periodically, especially when uploading multiple or large files. The combined size of all attachments between two consecutive **Save** actions or Offline-to-Online synchronizations should not exceed **150 MB**.
+5. After uploading, the attachment appears under the corresponding question in the **Uploaded** section. You can **view** or **download** it.
+6. To remove it, click its **delete** icon.
+
+**Source:** Audit – Preparation Manual_Office_R1_30.06.2026, sections 2.3 “Attachment Icon” (p.7), 4.3.4 “Adding Attachment(s)” (p.19), and 4.3.5 “Delete Attachments” (p.21).
+

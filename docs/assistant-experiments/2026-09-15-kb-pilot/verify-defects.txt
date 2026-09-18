@@ -1,0 +1,341 @@
+==============================================================================================================
+CASE hist-3 [xref] run 1   stored verdict: answer=False citation=True support=not captured
+Q: The manual explains how to record a negative observation with attachments — does that same process apply when I want to add a Positive Observation or LAE finding instead?
+EXPECTED manual: Audit - History Manual_R1_30.06.2026.pdf  pages [10]  section 2.1.4 ADDING ATTACHMENTS
+MANUAL EVIDENCE (verified when the case was written): Follow the above procedure for adding Positive Observations and LAE finding details. Various types of inspection records can be created using the same procedure in SAIL.
+REQUIRED phrases: ['follow the above procedure', 'positive observations', 'lae']   (in answer: ['positive observations', 'lae'])
+FORBIDDEN phrases: ['different procedure', 'not supported']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)  <== expected manual+page
+  [2] Audit - History Manual_R1_30.06.2026 — Document (p.13)
+  [3] Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)
+  [5] Audit - History Manual_R1_30.06.2026 — Preamble (p.9)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10)  <== expected source
+      required phrases present here: ['follow the above procedure', 'positive observations', 'lae']
+      text: * <u>Click **Upload** to add the required observation attachments.</u> * <u>Click **Save** (available at the top or bottom of the page) to save the finding details.</u> * Click **Inspection** to return to the Inspection Records page. (See **Figure 10.**) screenshot: Findings Details page with annotations pointing to Inspection, Upload, and Save buttons Figure 10 ☞ Follow the above procedure for adding Positive Observations and LAE finding details. ☞ Various types of inspection records can be created using the same procedure in SAIL.
+  [2] Audit - History Manual_R1_30.06.2026 — Document (p.13)
+      required phrases present here: ['lae']
+      text: * <u>The inspection and observation details are automatically imported, and an inspection record</u> <u>is created.</u> * Click **Upload** to add supporting attachments manually, if required. (See **Figure 15.**) screenshot_from_computer: SIRE 2.0 interface showing Inspection Details form with callouts: "The system automatically imports the Inspection and Observation details and creates the corresponding inspection record." and "Click on 'Upload' to add the attachments manually." Figure 15 [icon: pointing hand] Observation details, including **Positive** and **LAE** findings, are automatically populated from the uploaded JSON file. [icon: pointing hand] Additional supporting attachments, if …
+  [3] Audit - History Manual_R1_30.06.2026 — 2.1.2 OBSERVATION PAGE: (p.8)
+      required phrases present here: []
+      text: * <u>Select the desired **VIQ Ref.** The system will automatically populate the related fields,</u> <u>including **TMSA Ref**, **Initial Risk**, **Final Risk**, and **VIQ Question**.</u> * <u>Add the **Ques Category**, **SOC**, and **NOC** related to the observation.</u> * <u>Add a **Negative observation** in the text box.</u> * <u>Click **Add New** to add the observation.</u> * <u>Click the **Delete icon** to remove the current observation.</u>
+  [4] Audit - Preparation Manual_Office_R1_30.06.2026 — 4.4.3 View Grounds for Negative Observations (p.23)
+      required phrases present here: []
+      text: * <u>Click the **Grounds for -ve Obs** icon to view potential grounds for negative observations</u> <u>related to the question (See Figure 33).</u> screenshot: SIRE 2.0 Questionnaire showing Potential Grounds for Neg Obs pop-up Figure 33
+  [5] Audit - History Manual_R1_30.06.2026 — Preamble (p.9)
+      required phrases present here: ['lae']
+      text: screenshot: SIRE 2.0 Findings Details interface with annotations: Toggle between the Observation, Positive Finding & LAE page; Click "Save" to save the details; Select VIQ Ref from the dropdown; Delete current observation; Click here to "Add New" observation; Select Ques category, SOC, NOC from dropdown; Add "Negative Comments" here. Figure 7
+
+ANSWER (verbatim):
+Yes. The manual states that the procedure for adding attachments and saving finding details also applies to **Positive Observations and LAE finding details**.
+
+1. Select the **VIQ Ref.**; the related TMSA Ref, Initial Risk, Final Risk, and VIQ Question populate automatically.
+2. Add the **Ques Category**, **SOC**, and **NOC**.
+3. Enter the **Negative observation** and click **Add New**.
+4. Click **Upload** to add the required attachments.
+5. Click **Save** to save the finding details.
+6. Click **Inspection** to return to the Inspection Records page.
+
+For a JSON-file import, the inspection and observation details—including **Positive** and **LAE** findings—are populated automatically and the inspection record is created. Any additional supporting attachments must still be uploaded manually.
+
+Source:  
+- Manual entry: *Audit - History Manual_R1_30.06.2026*, sections **2.1.2 Observation Page** (p.8) and **2.1.4 Adding Attachments** (p.10).  
+- Positive/LAE applicability: *Audit - History Manual_R1_30.06.2026*, **2.1.4 Adding Attachments** (p.10).  
+- JSON import: *Audit - History Manual_R1_30.06.2026*, **Document** (p.13).
+
+==============================================================================================================
+CASE prep-1 [procedure] run 1   stored verdict: answer=True citation=False support=not captured
+Q: What are the steps to start a brand new SIRE preparation record for a vessel?
+EXPECTED manual: Audit - Preparation Manual_Office_R1_30.06.2026.pdf  pages [13]  section 3.1 HOW TO CREATE NEW PREPARATION
+MANUAL EVIDENCE (verified when the case was written): Click '+ New Preparation' to create a new preparation record. A Preparation Details window is displayed. Select the required Inspection Type. Complete all mandatory preparation details... Click Save Changes to create the preparation record or Discard to cancel without saving.
+REQUIRED phrases: ['save changes', 'discard']   (in answer: ['save changes', 'discard'])
+FORBIDDEN phrases: ['only save, no discard option', 'automatic without clicking']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)  <== expected manual+page
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)
+  [4] Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11)
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Audit - History Manual_R1_30.06.2026 — 2.1 METHOD 1: MANUAL DATA ENTRY (p.7)
+      required phrases present here: []
+      text: * Click **+ New Record** to add an inspection record. (See **Figure 4.**) screenshot: SIRE 2.0 History page showing the + New Record button Figure 4 * <u>Select the **Vessel** from the dropdown menu.</u> * <u>Select the desired **Inspection Type** from the dropdown menu.</u> * Click **Add New** to create the inspection record. (See **Figure 5.**) screenshot: Manual Data Entry modal with Vessel and Inspection Type dropdowns and Add New button Figure 5
+  [2] Audit - Preparation Manual_Office_R1_30.06.2026 — 3.1 HOW TO CREATE NEW PREPARATION (p.13)  <== expected source
+      required phrases present here: ['save changes', 'discard']
+      text: * Click '**+ New Preparation**' to create a new preparation record. * <u>A **Preparation Details** window is displayed. Select the required **Inspection Type**.</u> * <u>Complete all mandatory preparation details by selecting the appropriate values from</u> <u>the drop-down lists and entering the required information.</u> * <u>Click **Save Changes** to create the preparation record or **Discard** to cancel without saving.</u> * <u>The newly created preparation record is added to the Preparation listing and is ready for</u> <u>further actions.</u> (See Figure 18) screenshot_from_computer: Software interface showing the creation of a new preparation record with callouts explaining the steps. F…
+  [3] Audit - Preparation Manual_Office_R1_30.06.2026 — Preamble (p.30)
+      required phrases present here: []
+      text: screenshot: SIRE 2.0 - PIQ interface showing vessel information and a "Please Select One Option" pop-up window with instructions to select an option and click continue. Figure 43
+  [4] Audit - History Manual_R1_30.06.2026 — 2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11)
+      required phrases present here: []
+      text: * Click **New Record** to create a new inspection record. (See **Figure 11.**) screenshot: SAIL application interface showing the History tab and a highlighted "+ New Record" button with a callout "Click here to add new inspection." Figure 11 * <u>Select **SIRE 2.0 JSON**, **CDI XML**, or **SIRE XML** from the dropdown, as applicable.</u> * <u>Click **Choose File**. The system prompts the user to select the required file from the storage</u> <u>location.</u> * <u>Click **Upload** to upload the selected file.</u> * An inspection record will be automatically created in **SAIL**. (See **Figure 12.**) screenshot: New Record dialog box showing a dropdown for file type selection, a "CHOOSE FILE" b…
+  [5] Audit - Preparation Manual_Office_R1_30.06.2026 — 2. PREPARATION SUB- MODULE OVERVIEW (p.5)
+      required phrases present here: []
+      text: * <u>The **Preparation** sub-module displays all preparation records along with key details such as</u> <u>Vessel Name, Inspection Type, Progress, Due Date, Port, and available actions icons.</u> * <u>Users can create new preparations, search and filter existing records, monitor preparation</u> progress, access the Checklist and PIQ, upload attachments, and manage preparation-<u>related activities from this sub-module.</u> * <u>The screen consists of the following components:</u> * <u>**Inspection Type** – Use the drop-down list to display preparation records for a specific</u> <u>inspection type (**All, SIRE, RISQ, or PSC**).</u> * <u>**Search** – Enter keywords to quickly locate preparatio…
+
+ANSWER (verbatim):
+The supported way is to create it from the **Preparation** sub-module:
+
+1. In the **Office** Preparation sub-module, click **+ New Preparation**.
+2. When the **Preparation Details** window appears, select **SIRE** as the **Inspection Type**.
+3. Complete all mandatory preparation details using the drop-down lists and required entries.
+4. Click **Save Changes** to create the record. Click **Discard** instead if you want to cancel without saving.
+5. The new preparation record is added to the Preparation listing for further actions.
+6. An email notification is automatically sent to the **Vessel** when the record is created.
+
+Source: Preparation Manual_Office_R1_30.06.2026, §2 “Preparation Sub-Module Overview” (p.5) and §3.1 “How to Create New Preparation” (p.13).
+
+==============================================================================================================
+CASE crewing-5 [xref] run 3   stored verdict: answer=True citation=True support=not captured
+Q: After clicking '+ New Crew' in the Crew Database to add someone straight to the Crew Pool, which other section's steps am I supposed to follow to fill out the form?
+EXPECTED manual: Crewing - Crewing User Manual R2_10.06.2026.pdf  pages [29]  section 1.3.1.5 HOW TO ADD RECORDS TO CREW POOL
+MANUAL EVIDENCE (verified when the case was written): Refer to the 'In-Progress' sub-sub-module and follow the same steps to fill the Crew Pool Form. Fields marked with a red asterisk (*) are mandatory in the Crew Pool form.
+REQUIRED phrases: ['in-progress']   (in answer: ['in-progress'])
+FORBIDDEN phrases: ['annual', 'post incident']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW POOL (p.29)  <== expected manual+page
+  [2] Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)
+  [3] Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.1 HOW TO ACCESS CREW POOL (p.25)
+  [4] Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)
+  [5] Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.16)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW POOL (p.29)  <== expected source
+      required phrases present here: ['in-progress']
+      text: * Go to the ‘Crew Database’ sub – submodule. <u>(Ref Figure 29)</u> * Click on the ‘+ New Crew’ button to add a new crew record directly to the Crew Pool database. <u>(Ref Figure 29)</u> screenshot: Crew Database interface showing the 'Crew Database' selection and the '+ New Crew' button with instructional callouts. <u>Figure 29</u> ☞ Refer to the **‘In-Progress’** sub-sub-module and follow the same steps to fill the Crew Pool Form. ☞ Fields marked with a red asterisk (\*) are mandatory in the Crew Pool form.
+  [2] Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)
+      required phrases present here: ['in-progress']
+      text: * Go to the ‘In-Progress’ sub-sub module. (Ref Figure 10) * Click on the “+ New Crew” button to create a new crew record. (Ref Figure 10) screenshot: In Progress screen showing the 'In-Progress' module selected and the '+ New Crew' button highlighted. <a id="figure-10"></a><u>Figure 10</u> * The ‘Recruitment Application – New Candidate’ form below appears after clicking the ‘+ New Crew’ button. (Ref Figure 11) * Click the ‘Edit’ icon to enter and select the required information. (Ref Figure 11) * Users can save the form at any stage by clicking the ‘Save Draft’ button before final submission. (Ref Figure 11) screenshot: Recruitment Application - New Candidate form showing sections for Seafar…
+  [3] Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.1 HOW TO ACCESS CREW POOL (p.25)
+      required phrases present here: []
+      text: * Select the 'Crew Pool' sub-module to view recruited crew details. By default, the system opens the 'Crew Database' sub-submodule. (<u>Ref Figure 23</u>) screenshot_from_computer: Crew Database interface showing a list of crew members with a callout pointing to the Crew Pool sub-module and Crew Database sub-submodule. The callout text reads: "Click the 'Crew Pool' sub-module to open the 'Crew Database' sub-submodule by default." Figure 23
+  [4] Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW RECORD (p.14)
+      required phrases present here: []
+      text: pproval process.</u> [icon: hand pointing right] Click the edit icon (pencil) in the top-right corner of each sub-section of part A1 to toggle edit mode. Fields are read-only by default to prevent accidental changes. [icon: hand pointing right] Clicking anywhere outside the current editing section will automatically switch the section back to view mode.
+  [5] Crewing - Crewing User Manual R2_10.06.2026 — SAIL - CREWING MODULE USER MANUAL (p.16)
+      required phrases present here: ['in-progress']
+      text: * Additional information can be added in Section A5 using the ‘+ Add’ button. (Ref Figure 13) * Once all the required information has been entered, click the ‘Submit for Screening’ button to save and forward the application for the screening process. (Ref Figure 13) screenshot_from_computer: Recruitment Application - New Candidate interface showing Part A5 - Additional Information section with callouts for adding information and submitting for screening. Figure 13 [!NOTE] Upon clicking the ‘Submit for Screening’ button, the system automatically generates a formal file number (R-YYYY-XXXX) for the candidate and updates the status in the In-Progress table to Applied. The Part A data becomes th…
+
+ANSWER (verbatim):
+Follow the steps in the **In-Progress** sub-sub-module. The Crew Pool form uses the same steps as the **“How to Create a New Crew Record”** section.
+
+1. Go to **In-Progress**.
+2. Click **“+ New Crew.”**
+3. Complete the **Recruitment Application – New Candidate** form:
+   - Part A: applicant
+   - Part B: company application processing
+   - Part C: company approval process
+4. Click the **Edit** icon to enter information; fields are read-only by default.
+5. Use **Save Draft** to save the form at any stage.
+6. Fields marked with a red asterisk (*) in the Crew Pool form are mandatory.
+
+Source:  
+- Crew Pool — “How to Add Records to Crew Pool,” §1.3.1.5, p.29.  
+- New Crew Record — “How to Create a New Crew Record,” §1.2.1.3, p.14.
+
+==============================================================================================================
+CASE master-review-1 [table] run 3   stored verdict: answer=True citation=True support=not captured
+Q: What can I do with the action icons in the Master Review report table besides deleting a record?
+EXPECTED manual: Safety - Master Review Manual R1_10.06.2026.pdf  pages [6]  section MASTER REVIEW USER MANUAL
+MANUAL EVIDENCE (verified when the case was written): [eye icon] View Attachments – View the documents that have been attached to the History record. [trash can icon] Delete Record – Delete the selected History record from the system.
+REQUIRED phrases: ['attached', 'history record']   (in answer: ['attached', 'history record'])
+FORBIDDEN phrases: ['view, edit, or export']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)  <== expected manual+page
+  [2] Safety - Master Review Manual R1_10.06.2026 — 2. MASTER REVIEW - OVERVIEW (p.5)
+  [3] Safety - Master Review Manual R1_10.06.2026 — 3. HOW TO CREATE A NEW RECORD (p.7)
+  [4] Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)  <== expected manual+page
+  [5] Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.9)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)  <== expected source
+      required phrases present here: ['attached', 'history record']
+      text: screenshot: Master's Review interface showing a table of reports with callouts for switching between 'All Reports' and 'Response Pending', the 'Office Response' column, and 'Actions' icons. Figure 4 The following action icons are available in Master Review to manage Inspection records. <table> <thead> <tr> <th>Icon</th> <th>Action</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: paperclip]</td> <td>Add Attachment</td> <td>Upload and attach supporting documents to the History record.</td> </tr> <tr> <td>[icon: eye]</td> <td>View Attachments</td> <td>View the documents that have been attached to the History record.</td> </tr> <tr> <td>[icon: pencil]</td> <td>Edit Record</td> <t…
+  [2] Safety - Master Review Manual R1_10.06.2026 — 2. MASTER REVIEW - OVERVIEW (p.5)
+      required phrases present here: []
+      text: * The **Master Review** screen displays all Master Review records carried out on the vessel. 1. <u>Click **Filters** to access filtering options.</u> 2. <u>Select the required **Time Period** or **Review type**.</u> 3. <u>Click **Apply** to filter the records or **Clear** to reset.</u> <u>*(See Figure 3)*</u> screenshot_from_computer: Master's Review interface showing filtering options with instructional callouts: "Click 'Filters' to access filtering options.", "Select desired time 'Period' & 'Review' type filter.", and "Click 'Apply' or 'Clear' as required." Figure 3 * Toggle between the **All** and **Response Pending** tabs to view either **all reports** or only those **awaiting an office …
+  [3] Safety - Master Review Manual R1_10.06.2026 — 3. HOW TO CREATE A NEW RECORD (p.7)
+      required phrases present here: []
+      text: * Click on **"New Report"** to create a new Master review report. (*See Figure 5*) screenshot: Master's Review dashboard showing the "New Report" button highlighted with a yellow callout Figure 5
+  [4] Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.6)  <== expected source
+      required phrases present here: []
+      text: /tbody> </table> The **Office Response** column indicates the status of the office review: <table> <thead> <tr> <th>Icon</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td>[icon: grey circle with slash]</td> <td><strong>Grey Icon</strong> – Response Due</td> </tr> <tr> <td>[icon: red circle with slash]</td> <td><strong>Red Icon</strong> – Response Overdue</td> </tr> <tr> <td>[icon: green check mark]</td> <td><strong>Green Tick</strong> – Response Completed</td> </tr> </tbody> </table>
+  [5] Safety - Master Review Manual R1_10.06.2026 — MASTER REVIEW USER MANUAL (p.9)
+      required phrases present here: []
+      text: * Review the checklist items and select the applicable **Yes**, **No**, or **N/A** option for each item. * If a response requires further review, a pop-up window will appear allowing users to enter an **Improvement Suggestion** or **General Remarks**, or select an existing entry from the available list. (*See Figure 9*) * Enter "**Comments**" in the text box area and click "**SAVE**" to save the comments. (*See Figure 8*) screenshot: software interface showing checklist items with Yes/No/NA radio buttons and a comment box with a Save button Figure 8 screenshot: pop-up window for entering Improvement Suggestion or General Remarks with a Save button Figure 9 icon: pointing hand Saved entries a…
+
+ANSWER (verbatim):
+Besides deleting a record, the action icons let you:
+
+1. **Add an attachment** by uploading supporting documents to the History record.
+2. **View attachments** already attached to the History record.
+3. **Edit the record** by opening and modifying the selected History record.
+4. **View the selected notification**.
+
+Source:  
+- Add Attachment, View Attachments, Edit Record — *Master Review User Manual*, p. 6.  
+- View selected notification — *Master Review – Overview*, p. 5.
+
+==============================================================================================================
+CASE certsurveys-3 [xref] run 2   stored verdict: answer=False citation=True support=not captured
+Q: How do I add or view attachments for a survey record — is the process different from certificates?
+EXPECTED manual: Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf  pages [11, 9]  section 1.1.4.5 HOW TO ADD AND VIEW ATTACHMENTS
+MANUAL EVIDENCE (verified when the case was written): Refer to the 'Certificates' sub-sub-module for the add or view attachment and follow the same steps. [target, p.9, section 1.1.3.5]: Click the upload area to browse and upload attachment files for the selected certificate record in PDF, JPG, or PNG format.
+REQUIRED phrases: ['certificates', 'same steps']   (in answer: ['certificates'])
+FORBIDDEN phrases: ['not supported', 'different process']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)  <== expected manual+page
+  [2] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.5 HOW TO ADD AND VIEW ATTACHMENTS (p.11)  <== expected manual+page
+  [3] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)  <== expected manual+page
+  [4] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — Table of Contents (p.2)
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)  <== expected source
+      required phrases present here: ['certificates']
+      text: * Select the required vessel from the 'Vessel' dropdown. (Ref Figure 9) * Click the 'Attachment' icon available in the Actions column of the table. (Ref Figure 9) Screenshot of the Certificates interface showing how to select a vessel and access attachments. <u>Figure 9</u> * The screen below appears after clicking the 'Attachment' icon. (Ref Figure 10) * Click the upload area to browse and upload attachment files for the selected certificate record in PDF, JPG, or PNG format. (Ref Figure 10) * Click the 'View' icon to preview the attachment and the 'Delete' icon to remove the uploaded file. (Ref Figure 10) * Click the 'Done' button to save changes. (Ref Figure 10) Screenshot of the Manage A…
+  [2] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.5 HOW TO ADD AND VIEW ATTACHMENTS (p.11)  <== expected source
+      required phrases present here: ['certificates', 'same steps']
+      text: * Refer to the 'Certificates' sub-sub-module for the add or view attachment and follow the same steps. <mark>!! The system allows a maximum file size of 5 MB per attachment. Files larger than 5 MB or unsupported file types cannot be uploaded, and an appropriate validation message will be displayed.</mark> <mark>☞ If a survey is not available under the **'Surveys'** section for a vessel, it indicates that the corresponding master entry is not marked as **'Applicable'** for that vessel in the Admin sub-module.</mark>
+  [3] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)  <== expected source
+      required phrases present here: []
+      text: size of 5 MB per attachment. Files larger than 5 MB or unsupported file types cannot be uploaded, and an appropriate validation message will be displayed.
+  [4] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — Table of Contents (p.2)
+      required phrases present here: []
+      text: ................................................. 7 * 1.1.3.4 How To Edit A Certificate ............................................................................................................. 8 * 1.1.3.5 How To Add And View Attachments ............................................................................................ 9 * **1.1.4 SURVEYS**.................................................................................................................................................. **10** * 1.1.4.1 How To Access Surveys ............................................................................................................. 10 * 1.1.4.2 How to Apply Filter................…
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1.1 HOW TO ACCESS THE SHIP’S CERTIFICATES (p.13)
+      required phrases present here: ['certificates']
+      text: * Click on the ‘Admin’ sub-module. (Ref Figure 12) * Click the ‘Ship’s Certificates’ sub-submodule to view certificate details; the ‘Master’ tab is displayed by default. (Ref Figure 12) * Upon entering the ‘Ship’s Certificates’ sub-submodule, the system automatically opens the ‘Master’ tab by default, allowing users to view all certificate details: * **Master Tab**: The Master tab serves as the central repository for all certificate master records available in the system. It allows administrators to define and maintain certificate types, categories, groups, regulatory references, and certificate labels. This view establishes the standard certificate structure that can be applied across compa…
+
+ANSWER (verbatim):
+The survey-specific procedure is **not covered** in the Technical documentation. It only says to refer to the Certificates sub-sub-module; this does not establish whether the survey process is identical or different.
+
+The documented certificate attachment process is:
+
+1. Select the vessel from the **Vessel** dropdown.
+2. Click the **Attachment** icon for the certificate record.
+3. Click the upload area and select a **PDF, JPG, or PNG** file.
+4. Use **View** to preview or **Delete** to remove an attachment.
+5. Click **Done** to save the changes.
+6. Each attachment must be no larger than **5 MB**. Larger or unsupported files cannot be uploaded.
+7. If the survey record is unavailable under **Surveys**, its master entry is not marked **Applicable** for that vessel in the Admin sub-module.
+
+**Source:** Certificates attachment procedure — *Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026*, §1.1.3.5, p.9; survey attachment note — §1.1.4.5, p.11.
+
+==============================================================================================================
+CASE pmsoffice-5 [condition] run 3   stored verdict: answer=True citation=True support=not captured
+Q: On the PMS Dashboard, what fields can I filter by — and is that the same set of filters available on the vessel side?
+EXPECTED manual: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf  pages [9]  section 1.1.3.2 HOW TO USE FILTER
+MANUAL EVIDENCE (verified when the case was written): Office (p.9): Select the Vessel, Scope, and Criticality filters to refine the displayed records. ☞ When an office user selects 'My Vessel' as the Scope, only the vessels assigned to that user are displayed. Vessel manual (p.9, same section): Select the required criticality level to filter equipment or work orders.
+REQUIRED phrases: ['vessel', 'scope', 'criticality']   (in answer: ['vessel', 'scope', 'criticality'])
+FORBIDDEN phrases: ['criticality only']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.2 HOW TO USE FILTER (p.9)  <== expected manual+page
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.53)
+  [3] Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.46)
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.6 HOW TO SEARCH AND APPLY A FILTER (p.27)
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.2 HOW TO APPLY FILTER (p.10)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.2 HOW TO USE FILTER (p.9)  <== expected source
+      required phrases present here: ['vessel', 'scope', 'criticality']
+      text: * Click on the 'Filter' button. (Ref Figure 8) * Select the Vessel, Scope, and Criticality filters to refine the displayed records. (Ref Figure 8) * Click the 'Clear' button to reset all applied filters. (Ref Figure 8) Screenshot of the dashboard with the filter bar active. Callouts indicate the 'Filters' button to activate the menu and the dropdown fields for Vessel, Scope, and Criticality to filter results. Figure 8 ☞ When an office user selects 'My Vessel' as the Scope, only the vessels assigned to that user are displayed and available for selection.
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.53)
+      required phrases present here: ['vessel']
+      text: * Select the required vessel from the 'Vessel' dropdown to view vessel-specific records. (Ref Figure 89) * Use the Search field to locate specific components. (Ref Figure 89) * Select the desired Period (Year/Quarter/Month or Date Range), then click Apply to view filtered results. (Ref Figure 89) * Choose a department from the All Departments dropdown. (Ref Figure 89) Screenshot of the Reports interface highlighting the filter options with a callout: "1. Use the Vessel dropdown, Search, Period, and All Departments filters to refine the report data." Figure 89 Page 53 of 64
+  [3] Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.46)
+      required phrases present here: []
+      text: * Use the Search field to locate specific components. (Ref Figure 76) * Select the desired Period (Year/Quarter/Month or Date Range), then click Apply to view filtered results. (Ref Figure 76) * Choose a department from the All Departments dropdown. (Ref Figure 76) screenshot_from_computer: Software interface showing the Reports section with filtering options. A callout box labeled '1. Use the Search, Period, and All Departments filters to refine the report data.' points to the search bar, period selector, and department dropdown menu. Figure 76
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.6 HOW TO SEARCH AND APPLY A FILTER (p.27)
+      required phrases present here: ['vessel']
+      text: * Select the vessel from the 'Vessel' dropdown to view component details for the selected vessel. (Ref Figure 40) * From the 'Search' field, the user can search by entering the required component information in the search field to search for the desired component. (Ref Figure 40) * Select the 'Critical Item' from the dropdown menus to filter and view the relevant components. (Ref Figure 40) * Click on the 'Clear' button to reset the applied filters. (Ref Figure 40) Screenshot of the Components search and filter interface with callouts. One callout points to the filter bar stating "From here, the user can select the vessel, enter keywords in the search field, and choose the critical item type…
+  [5] Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.2 HOW TO APPLY FILTER (p.10)
+      required phrases present here: ['vessel']
+      text: * Refer to the ‘Certificates’ sub-sub-module for the filter process and follow the same steps. (Cross-reference resolved: the steps for Surveys › How To Apply Filter are the same as section 1.1.3.2 'How To Apply Filter' under Certificates, page 7. They are:) * Click on the 'Filter' button. (Ref Figure 5) * Select the required vessel from the 'Vessel' dropdown to view vessel-specific certificate records. (Ref Figure 5) * Use the 'Fleet', 'Add Group', and 'Due Status' filters to refine and view the displayed records based on the selected fleet, group, or certificate due status (e.g., All, Overdue, Upcoming Due). (Ref Figure 5) * Click the 'Clear' button to reset all applied filters. (Ref Figur…
+
+ANSWER (verbatim):
+On the **PMS Dashboard**, you can filter by:
+
+1. Click **Filter**.
+2. Select **Vessel**, **Scope**, and **Criticality**.
+3. Click **Clear** to reset the filters.
+4. For an office user, selecting **My Vessel** under Scope shows only vessels assigned to that user.
+
+On the **vessel side Reports interface**, the available filters are different:
+
+1. Use **Search** to locate components.
+2. Select a **Period**—Year, Quarter, Month, or Date Range—and click **Apply**.
+3. Select a **Department** from **All Departments**.
+
+Therefore, the vessel-side set is **not the same** as the PMS Dashboard set: the Dashboard has **Vessel, Scope, and Criticality**, while the vessel Reports interface has **Search, Period, and Department**.
+
+**Source:**  
+- PMS User Manual For Office, §1.1.3.2 “How to Use Filter,” p. 9 — Dashboard filters.  
+- PMS User Manual—Vessel Specific, §1.1.9.3 “How to Apply Filter,” p. 46 — vessel Reports filters.
+
+==============================================================================================================
+CASE pmsvessel-3 [xref] run 2   stored verdict: answer=False citation=True support=not captured
+Q: How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?
+EXPECTED manual: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf  pages [43, 40]  section 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK
+MANUAL EVIDENCE (verified when the case was written): Click the 'Store' sub-sub-module. Click on the '+ Bulk Updates Store' button. Refer to the 'Spares' sub-sub-module and follow the same steps. [target, p.40, section 1.1.7.6]: Click on the 'Spares' sub – sub module. Click on the 'Bulk Update Spares' button to update multiple spares at once.
+REQUIRED phrases: ['spares', 'same steps']   (in answer: ['spares'])
+FORBIDDEN phrases: ['separate process', 'not supported']   (in answer: [])
+
+CITATIONS SHOWN TO THE USER:
+  [1] Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)  <== expected manual+page
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.50)
+  [3] Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)  <== expected manual+page
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)
+  [5] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.48)
+
+EXCERPTS ACTUALLY SUPPLIED TO THE MODEL:
+  [1] Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)  <== expected source
+      required phrases present here: ['spares', 'same steps']
+      text: * Click the ‘Store’ sub-sub-module. <u>(Ref Figure 72)</u> * Click on the ‘+ Bulk Updates Store’ button. <u>(Ref Figure 72)</u> * Refer to the <u>‘Spares’</u> sub-sub-module and follow the same steps. screenshot: Stores Inventory dashboard showing bulk update process <u>Figure 72</u> ☞ Use the same steps as described above to perform bulk updates for the selected category (Stores, Lubes, Chemicals, or Others) and tab (Inventory, Location, or History).
+  [2] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.50)
+      required phrases present here: ['spares', 'same steps']
+      text: * Click the 'Store' sub-sub-module. (Ref Figure 85) * Click on the '+ Bulk Updates Store' button. (Ref Figure 85) * Refer to the 'Spares' sub-sub-module and follow the same steps. Screenshot of Stores Inventory interface showing how to perform bulk updates. A callout "1. Click here to enter the Store sub-sub module." points to the Store icon in the sidebar. Another callout "2. Click here to update in bulk." points to the "+ Bulk Update Stores" button. Figure 85 Use the same steps as described above to perform bulk updates for the selected category (Stores, Lubes, Chemicals, or Others) and tab (Inventory, Location, or History).
+  [3] Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)  <== expected source
+      required phrases present here: ['spares']
+      text: * Click on the 'Spares' sub – sub module. (Ref Figure 67) * Click on the 'Bulk Update Spares' button to update multiple spares at once. (Ref Figure 67) screenshot_from_computer: Spares Inventory screen highlighting the Bulk Update Spares button with callouts: 1. Click here to enter the Spares sub-sub module. 2. Click here to update multiple spares at once. <a id="figure-67"></a> Figure 67
+  [4] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)
+      required phrases present here: ['spares']
+      text: * Click on the 'Spares' sub – sub module. (Ref Figure 81) * Click on the 'Bulk Update Spares' button to update multiple spares at once. (Ref Figure 81) Screenshot of Spares Inventory interface showing the bulk update feature. Annotation 1 points to the Spares sub-sub module in the sidebar. Annotation 2 points to the 'Bulk Update Spares' button at the top right of the inventory list. Figure 81
+  [5] Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.48)
+      required phrases present here: ['spares']
+      text: * The screen below appears after clicking the ‘Bulk Update Spare’ button. (Ref Figure 82) * Select the transaction mode (Consume or Receive) (Ref Figure 82) * Enter the necessary details, update quantities in the table (Ref Figure 82) * Click Save Updates to record the changes. (Ref Figure 82) Screenshot of Bulk Update Spares interface with callouts: 1. Choose the transaction mode accordingly. 2. Enter & update details accordingly. 3. Click here to save the updated records. Figure 82
+
+ANSWER (verbatim):
+For **Stores**:
+
+1. Open the **Store** sub-sub-module.
+2. Click **+ Bulk Updates Store**.
+3. The manual then directs you to refer to the **Spares** sub-sub-module steps.
+4. The bulk-update process can be used for the selected category—**Stores, Lubes, Chemicals, or Others**—and for the **Inventory, Location, or History** tab.
+
+This is a separate entry point from Spares, but the Stores excerpt does not reproduce the subsequent transaction-entry steps. Therefore, the excerpts do not fully document whether the Stores form operates identically to the Spares form.
+
+For **Spares**, the documented process is:
+
+1. Open the **Spares** sub-sub-module.
+2. Click **Bulk Update Spares**.
+3. Select the transaction mode: **Consume** or **Receive**.
+4. Enter the required details and update the quantities in the table.
+5. Click **Save Updates** to record the changes.
+
+The excerpts support bulk updates for both **Stores** and **Spares**. The detailed transaction-entry and save steps are provided only for Spares.
+
+**Source:**
+- Stores bulk updates: *PMS User Manual_Vessel Specific*, §1.1.8.3, p.43; *PMS User Manual For Office_Sail Admin*, §1.1.8.3, p.50.
+- Spares bulk updates: *PMS User Manual_Vessel Specific*, §1.1.7.6, p.40; *PMS User Manual For Office_Sail Admin*, §§1.1.7.8 and Technical User Manual, p.48.
+

@@ -1,0 +1,354 @@
+[
+ {
+  "group": "DEFECT",
+  "case": "hist-3",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "Yes. The manual states that the same attachment-and-save procedure applies to **Positive Observations** and **LAE finding details**:\n\n1. Enter the relevant Positive Observation or LAE finding details.\n2. Click **Upload** to add the required attachments.\n3. Click **Save** at the top or bottom of the page.\n4. Click **Inspection** to return to the Inspection Records page.\n\nThe manual does not provide separate field-entry steps for Positive Observations or LAE findings in these excerpts. For records imported from JSON, the inspection and observation details—including Positive and LAE findings—are populated automatically; upload any additional attachments manually.\n\n**Source:**  \n- Positive Observation and LAE attachment procedure: *Audit - History Manual_R1_30.06.2026*, §2.1.4 “Adding Attachments,” p.10.  \n- JSON import and manual attachments: *Audit - History Manual_R1_30.06.2026*, “Document,” p.13.",
+  "usage": {
+   "prompt_tokens": 1261,
+   "completion_tokens": 469
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "hist-3",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "Yes. The manual says to follow the same procedure for **Positive Observations and LAE finding details**.\n\n1. Select the **VIQ Ref.** The related **TMSA Ref., Initial Risk, Final Risk, and VIQ Question** populate automatically.\n2. Add the **Ques Category, SOC, and NOC**.\n3. Enter the **Positive Observation** or **LAE finding details** in the appropriate page.\n4. Click **Add New** to add the entry.\n5. Click **Upload** to add the required attachments.\n6. Click **Save** to save the finding details.\n7. Click **Inspection** to return to the Inspection Records page.\n\nThe manual does not specify any different role, Office/Ship applicability, setting, or record-state requirement for the Positive Observation or LAE process.\n\n**Source:** Audit - History Manual_R1_30.06.2026, §2.1.2 “Observation Page” (p.8); §2.1.4 “Adding Attachments” (p.10); Preamble (p.9).",
+  "usage": {
+   "prompt_tokens": 1453,
+   "completion_tokens": 745
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "certsurveys-3",
+  "run": 2,
+  "prompt": "v5",
+  "answer": "For a survey record, the manual directs you to the **Certificates** sub-sub-module for attachment handling. It does not describe a separate survey-specific workflow.\n\n1. Select the required vessel from the **Vessel** dropdown.\n2. In the survey table, click the **Attachment** icon in the record’s **Actions** column.\n3. In the attachment window, click the upload area and select a **PDF, JPG, or PNG** file.\n4. Use **View** to preview an attachment or **Delete** to remove it.\n5. Click **Done** to save the changes.\n6. Each attachment must be **5 MB or smaller**. Larger files or unsupported formats cannot be uploaded.\n7. If the survey is not listed for the vessel, its corresponding master entry is not marked **Applicable** for that vessel in the **Admin** sub-module.\n\nThe survey documentation does not identify any process difference from the referenced certificate attachment instructions.\n\n**Source:**  \n- Survey attachments: *Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026*, §1.1.4.5, p.11.  \n- Attachment actions and file limits: same manual, §1.1.3.5, p.9.",
+  "usage": {
+   "prompt_tokens": 1597,
+   "completion_tokens": 781
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "certsurveys-3",
+  "run": 2,
+  "prompt": "v6",
+  "answer": "For a survey record, the manual directs you to the **Certificates** sub-sub-module and says to follow its attachment procedure:\n\n1. Select the required vessel from the **Vessel** dropdown.\n2. In the survey table, click the **Attachment** icon in the **Actions** column.\n3. In the attachment window, click the upload area and select a **PDF, JPG, or PNG** file.\n4. Click **View** to preview an attachment or **Delete** to remove it.\n5. Click **Done** to save the changes.\n\nThe attachment must not exceed **5 MB**. If the survey is not listed for the vessel, its corresponding master entry has not been marked **Applicable** for that vessel in the Admin sub-module. The excerpts do not specify a different survey-specific process.\n\n**Source:**  \n- Survey attachments: *Cert. & Surveys User Manual*, §1.1.4.5, p.11.  \n- Attachment actions and file limits: *Cert. & Surveys User Manual*, §1.1.3.5, p.9.",
+  "usage": {
+   "prompt_tokens": 1789,
+   "completion_tokens": 679
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "pmsvessel-3",
+  "run": 2,
+  "prompt": "v5",
+  "answer": "For **Stores**, the manual does not provide a separate transaction-entry flow. It directs you to the Spares procedure:\n\n1. Open the **Store** sub-sub-module.\n2. Click **+ Bulk Updates Store**.\n3. The manual then directs you to refer to the **Spares** sub-sub-module and follow the applicable procedure.\n4. The same Store bulk-update entry is used for **Stores, Lubes, Chemicals, or Others**, and for the **Inventory, Location, or History** tabs.\n\nThe documented **Spares** bulk-update steps are:\n\n1. Open the **Spares** sub-sub-module.\n2. Click **Bulk Update Spares**.\n3. Select the transaction mode: **Consume** or **Receive**.\n4. Enter the required details and update quantities in the table.\n5. Click **Save Updates**.\n\nThe excerpts provide these instructions for both **Vessel** and **Office** manuals. They do not state any different Office/Ship requirements or user-role conditions.\n\n**Source:** Stores bulk updates — *Technical - PMS User Manual_Vessel Specific*, §1.1.8.3, p.43; *Technical - PMS User Manual For Office_Sail Admin*, §1.1.8.3, p.50. Spares bulk updates — *Technical - PMS User Manual_Vessel Specific*, §1.1.7.6, p.40; *Technical - PMS User Manual For Office_Sail Admin*, §§1.1.7.8 and “TECHNICAL USER MANUAL,” pp.47–48.",
+  "usage": {
+   "prompt_tokens": 1370,
+   "completion_tokens": 831
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "pmsvessel-3",
+  "run": 2,
+  "prompt": "v6",
+  "answer": "Bulk updating **Stores items follows the same process as Spares**, not a separate process.\n\n1. Open the **Store** sub-sub-module.\n2. Click **“+ Bulk Updates Store.”**\n3. Select the transaction mode: **Consume** or **Receive**.\n4. Enter the required details and update the quantities in the table.\n5. Click **Save Updates** to record the changes.\n\nThis applies to the selected category—**Stores, Lubes, Chemicals, or Others**—and to the selected tab: **Inventory, Location, or History**. The Office and Vessel manuals describe the same steps; no difference between them is stated.\n\n**Source:** Stores bulk updates — *Technical - PMS User Manual_Vessel Specific*, §1.1.8.3, p.43; *Technical - PMS User Manual For Office_Sail Admin*, §1.1.8.3, p.50. Spares bulk update steps — *Technical - PMS User Manual For Office_Sail Admin*, §1.1.7.8, p.47–48.",
+  "usage": {
+   "prompt_tokens": 1562,
+   "completion_tokens": 498
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "safety-meeting-1",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "For an **Additional Safety Meeting (Add SM)** form:\n\n1. **Parts B and C:** They do not have separate Add SM instructions in this section. Follow the instructions in the **Monthly Safety Meeting** form.\n\n2. **Part D:** It is **for Office use only**. Follow the **Monthly Safety Meeting – Office Closeout** procedure.\n\n**Source:**\n- Parts B and C — *Safety Meeting User Manual*, section **2.2 How to Fill Add SM Form**, p. 18.\n- Part D — *Safety Meeting User Manual*, section **2.2 How to Fill Add SM Form**, p. 18.",
+  "usage": {
+   "prompt_tokens": 1475,
+   "completion_tokens": 273
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "safety-meeting-1",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "For an **Additional Safety Meeting (Add SM)** form, look elsewhere in the manual:\n\n1. **Part B:** Follow the instructions in the **Monthly Safety Meeting** form. The general Safety Meeting instructions cover unresolved actions, adding actions, and saving comments.\n2. **Part C:** Follow the instructions in the **Monthly Safety Meeting** form.\n3. **Section D:** It is **for office use only**. Follow **Monthly Safety Meeting – Office Closeout**.\n\nThe Add SM section itself provides instructions for Part A, but directs you to the Monthly Safety Meeting procedures for Parts B and C and to Office Closeout for Section D.\n\n**Source:** Safety Meeting User Manual, §2.2 “How to Fill Add SM Form,” p.18; §1.6 “How to Fill Safety Meeting Form,” p.10; “Part B: Enter Safety Meeting Minutes,” p.11; “Part D: Action Status,” p.14.",
+  "usage": {
+   "prompt_tokens": 1667,
+   "completion_tokens": 496
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "safety-meeting-1",
+  "run": 2,
+  "prompt": "v5",
+  "answer": "For an Additional Safety Meeting form:\n\n1. **Parts B and C:** The Add SM form does not provide separate instructions. Follow the instructions in the **Monthly Safety Meeting** form.\n2. **Part D:** This section is **for Office use only**. Follow the **Monthly Safety Meeting – Office Closeout** procedure.\n\nTherefore, look elsewhere in the manual for Parts B, C, and D rather than treating them as separate Add SM procedures.\n\n**Source:** Safety Meeting User Manual, **2.2 How to Fill ADD SM Form**, p. 18; **Part D: Action Status**, p. 14.",
+  "usage": {
+   "prompt_tokens": 1475,
+   "completion_tokens": 286
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "safety-meeting-1",
+  "run": 2,
+  "prompt": "v6",
+  "answer": "For an **Additional Safety Meeting (Add SM)** form, look elsewhere for Parts B, C, and D:\n\n1. **Part B:** Follow the instructions in the **Monthly Safety Meeting** form.\n2. **Part C:** Follow the instructions in the **Monthly Safety Meeting** form.\n3. **Part D:** It is **for Office use only**. Follow **Monthly Safety Meeting – Office Closeout**.\n\nThe general Safety Meeting instructions also state that actions from Parts B and C appear in **Part D – Action Status**, where they can be edited or deleted.\n\n**Source:**  \n- Parts B and C: *Safety Meeting User Manual*, §2.2 “How to Fill Add SM Form,” p.18.  \n- Part D: *Safety Meeting User Manual*, §2.2, p.18.  \n- Part D action status: *Safety Meeting User Manual*, “Part D: Action Status,” p.14.",
+  "usage": {
+   "prompt_tokens": 1667,
+   "completion_tokens": 464
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "pmsoffice-5",
+  "run": 3,
+  "prompt": "v5",
+  "answer": "On the PMS Dashboard, you can filter by:\n\n1. Click **Filter**.\n2. Select **Vessel**, **Scope**, and **Criticality**.\n3. Click **Clear** to reset the filters. For an office user, selecting **My Vessel** under Scope shows only vessels assigned to that user.\n\nThe vessel-side documentation does **not** describe PMS Dashboard filters, so it does not confirm that the same set is available there. It does describe filters for the vessel-side **Reports** interface: **Search**, **Period** (Year/Quarter/Month or Date Range), and **All Departments**, followed by **Apply**. These are not the same fields listed for the PMS Dashboard.\n\n**Source:**  \n- PMS User Manual For Office_Sail Admin, §1.1.3.2 “How to Use Filter,” p.9 — Dashboard filters.  \n- PMS User Manual_Vessel Specific, §1.1.9.3 “How to Apply Filter,” p.46 — vessel-side Reports filters.",
+  "usage": {
+   "prompt_tokens": 1586,
+   "completion_tokens": 415
+  }
+ },
+ {
+  "group": "DEFECT",
+  "case": "pmsoffice-5",
+  "run": 3,
+  "prompt": "v6",
+  "answer": "On the **PMS Dashboard**, you can filter by:\n\n1. Click **Filter**.\n2. Select **Vessel**, **Scope**, and **Criticality**.\n3. Click **Clear** to reset the filters.\n4. For an office user, selecting **My Vessel** under Scope limits the available vessels to those assigned to that user.\n\nThe excerpts do **not document a vessel-side PMS Dashboard filter set**, so they do not establish whether it is the same. The vessel-side interface documented here is **Reports**, where you can filter by **Search**, **Period**, and **All Departments**; the office Reports interface additionally includes a **Vessel** dropdown. This is a different documented interface, not evidence about the vessel-side Dashboard.\n\n**Source:**  \n- PMS Dashboard filters — *PMS User Manual For Office_Sail Admin*, §1.1.3.2, p.9.  \n- Vessel-side Reports filters — *PMS User Manual_Vessel Specific*, §1.1.9.3, p.46.  \n- Office Reports filters — *PMS User Manual For Office_Sail Admin*, §1.1.9.3, p.53.",
+  "usage": {
+   "prompt_tokens": 1778,
+   "completion_tokens": 543
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "master-review-2",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "This is not covered in the Safety documentation provided. The excerpts describe Part E for MOC records, not Master Review records.",
+  "usage": {
+   "prompt_tokens": 1412,
+   "completion_tokens": 99
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "master-review-2",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "The Safety documentation excerpts do not cover who uses **Part E of a Master Review record** or what they can do there. The Part E instructions provided are for the **MOC form**, not Master Review.\n\n**Source:** No provided excerpt covers Part E of a Master Review record.",
+  "usage": {
+   "prompt_tokens": 1604,
+   "completion_tokens": 163
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "sms-office-1",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "The Approver must:\n\n1. Select the appropriate response: **Need Improvement**, **Approved**, or **Rejected**.\n2. Enter the **Approval Date**.\n3. Select the **Username** from the drop-down list.\n4. Click **Submit** to forward the revision to the releasing authority for release to vessel or office users.\n\n**Source:** Safety - SMS User Manual_Office_R0_31.01.2026, Section 4.1.2 “Approval,” p.17.",
+  "usage": {
+   "prompt_tokens": 1264,
+   "completion_tokens": 266
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "sms-office-1",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "For the Approver completing Part B:\n\n1. Select the appropriate checkbox: **Need Improvement**, **Approved**, or **Rejected**.\n2. Enter the **Approval Date** and select the **Username** from the drop-down list.\n3. Click **Submit** to forward the revision to the releasing authority for release to vessel or office users.\n\n**Source:** Safety - SMS User Manual_Office, §4.1.2 “Approval,” p.17.",
+  "usage": {
+   "prompt_tokens": 1456,
+   "completion_tokens": 384
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "moc-vessel-1",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "If the MoC Approver selects **“No”** in Part D, the Vessel MoC is automatically marked as **“Not Approved.”**\n\n**Source:** Safety - MOC User Manual_Vessel_R0_31.03.2026, §7 “How to Fill MOC Form – Part D,” p.11.",
+  "usage": {
+   "prompt_tokens": 1687,
+   "completion_tokens": 71
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "moc-vessel-1",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "If the MoC Approver selects **“No”** in Part D, the Vessel MoC is automatically marked as **“Not Approved.”**\n\nSource: Safety - MOC User Manual_Vessel_R0_31.03.2026, Section 7, Part D, p. 11.",
+  "usage": {
+   "prompt_tokens": 1879,
+   "completion_tokens": 65
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "ra-office-2",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "For **Add Hazards from Database** in an Office RA Part B:\n\n1. Click **+ Add Hazards From Database**.\n2. The hazard-selection pop-up has these tabs:\n   - **Work Environment**\n   - **Equipment**\n   - **Programs/Procedures**\n   - **Processes (Act)**\n   - **People**\n   - **Organization**\n\nThe provided excerpts support no other hazard-adding method.\n\n**Source:** Office Risk Assessment User Manual, **6.4 Completing Office RA – Part B (Hazard Assessment), p. 12–13**.",
+  "usage": {
+   "prompt_tokens": 1715,
+   "completion_tokens": 239
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "ra-office-2",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "The hazard-selection pop-up has these tab categories:\n\n1. Work Environment  \n2. Equipment  \n3. Programs/Procedures  \n4. Processes (Act)  \n5. People  \n6. Organization  \n\nSource: Safety – Risk Assessment User Manual_Office_R1_30.05.2026, Section 6.4, Part B, Figure 15 (p.13).",
+  "usage": {
+   "prompt_tokens": 1907,
+   "completion_tokens": 121
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "pmsoffice-1",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "- **Due:** Jobs that are due within the current period.\n- **Overdue:** Jobs past their due date that have not been completed.\n\nFor an overdue work order, the manual also provides a **“+ Set Reason”** option to select an overdue reason, add remarks if required, and save it.\n\nSource: Vessel Specific Technical User Manual, section 1.1.5.1 “How to Access Work Orders,” p. 23; section “Technical User Manual,” pp. 29.",
+  "usage": {
+   "prompt_tokens": 1673,
+   "completion_tokens": 106
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "pmsoffice-1",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "- **Due:** Jobs that are due within the current period.\n- **Overdue:** Jobs past their due date that have not been completed.\n\n**Source:** Technical PMS User Manual—Vessel Specific, §1.1.5.1 “How to Access Work Orders,” p.23; Technical PMS User Manual for Office—Sail Admin, §1.1.5.1, p.28.",
+  "usage": {
+   "prompt_tokens": 1865,
+   "completion_tokens": 87
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "fs-off-1",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "An office user can delete a Fleet Sharing record **only while it is in Draft status**. A submitted Fleet Sharing record **cannot be deleted**. After submission, it also cannot be edited.\n\nSource: Fleet Sharing Manual—Office, Figure 2 (p.5) and §3.3 Submission (p.8).",
+  "usage": {
+   "prompt_tokens": 1576,
+   "completion_tokens": 69
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "fs-off-1",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "An office user can delete a Fleet Sharing record **only while it is in Draft status**. A submitted Fleet Sharing record **cannot be deleted**.\n\nSource: Fleet Sharing Manual—Office, Figure 2 (p. 5).",
+  "usage": {
+   "prompt_tokens": 1768,
+   "completion_tokens": 50
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "inc-2",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "It means the required actions are overdue. The vessel should take the necessary measures to complete them and update the report accordingly.\n\nSource: Incident User Manual, “Overdue Action” (p. 19); Near Miss User Manual, “7. Status Indicators” (p. 11).",
+  "usage": {
+   "prompt_tokens": 1618,
+   "completion_tokens": 61
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "inc-2",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "The overdue-action status icon means required actions are overdue. The vessel should take the necessary measures to complete them and update the incident report accordingly.\n\n**Source:** Incident User Manual R0_20.05.2026, “Overdue Action,” p. 19; “14. Status Indicators,” p. 19.",
+  "usage": {
+   "prompt_tokens": 1810,
+   "completion_tokens": 68
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "crewing-5",
+  "run": 3,
+  "prompt": "v5",
+  "answer": "Follow the steps in the **In-Progress** sub-sub-module. The Crew Pool form uses the same steps as the **“How to Create a New Crew Record”** procedure:\n\n1. Go to **In-Progress**.\n2. Click **“+ New Crew.”**\n3. In the **Recruitment Application – New Candidate** form, click **Edit** to enter the required information.\n4. Use **Save Draft** to save the form at any stage.\n5. Complete the relevant Parts A, B, and C as applicable.\n6. Submit Part A using **“Submit for Screening”** when all required information is entered.\n\nFields marked with a red asterisk are mandatory in the Crew Pool form.\n\n**Source:** Crew Pool — “How to Add Records to Crew Pool,” §1.3.1.5, p.29; In-Progress — “How to Create a New Crew Record,” §1.2.1.3, p.14; “SAIL - Crewing Module User Manual,” p.16.",
+  "usage": {
+   "prompt_tokens": 1658,
+   "completion_tokens": 217
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "crewing-5",
+  "run": 3,
+  "prompt": "v6",
+  "answer": "Follow the steps in the **In-Progress** sub-sub-module. The Crew Pool form requires the same steps, and fields marked with a red asterisk (*) are mandatory.\n\n**Source:** Crewing User Manual, section 1.3.1.5, “How to Add Records to Crew Pool,” p. 29.",
+  "usage": {
+   "prompt_tokens": 1850,
+   "completion_tokens": 70
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "defects-2",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "After you click **Submit** on a new defect report:\n\n1. The reporting details are saved.\n2. The updated defect report is forwarded to the next stage of the configured defect management workflow.\n\n**Source:** Technical – Defects User Manual for Office_Sail Admin_R2_13.06.2026, §1.1.4.3 “How to Create a New Defect,” p. 15.",
+  "usage": {
+   "prompt_tokens": 1855,
+   "completion_tokens": 88
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "defects-2",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "After you click **Submit** on a new defect report:\n\n1. The updated reporting details are saved.\n2. The defect report is forwarded to the next stage of the configured defect management workflow.\n\n**Source:** Technical – Defects User Manual for Office_Sail Admin_R2_13.06.2026, §1.1.4.3 “How to Create a New Defect,” p. 15.",
+  "usage": {
+   "prompt_tokens": 2047,
+   "completion_tokens": 88
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "prep-1",
+  "run": 1,
+  "prompt": "v5",
+  "answer": "To create a brand-new SIRE preparation record in the Office Preparation sub-module:\n\n1. Click **+ New Preparation**.\n2. In the **Preparation Details** window, select **SIRE** as the **Inspection Type**.\n3. Complete all mandatory preparation details by selecting values from the drop-down lists and entering the required information.\n4. Click **Save Changes** to create the record. Click **Discard** instead to cancel.\n5. The new preparation record is added to the Preparation listing for further actions.\n6. An email notification is automatically sent to the **Vessel** when the record is created.\n\nThe excerpt does not specify a separate vessel-selection step during creation.\n\n**Source:** Audit - Preparation Manual_Office_R1_30.06.2026, §3.1 “How to Create New Preparation,” p.13.",
+  "usage": {
+   "prompt_tokens": 1508,
+   "completion_tokens": 304
+  }
+ },
+ {
+  "group": "CONTROL",
+  "case": "prep-1",
+  "run": 1,
+  "prompt": "v6",
+  "answer": "1. Click **+ New Preparation**.\n2. In the **Preparation Details** window, select **SIRE** as the **Inspection Type**.\n3. Complete all mandatory preparation details using the drop-down lists and required fields. The excerpt does not specify a separate vessel-selection step.\n4. Click **Save Changes** to create the record, or **Discard** to cancel.\n5. The new preparation record is added to the Preparation listing and is ready for further actions. An email notification is automatically sent to the **Vessel**.\n\nSource: **Audit - Preparation Manual_Office_R1_30.06.2026**, section 3.1 “How to Create New Preparation,” p. 13; section 2 “Preparation Sub-Module Overview,” p. 5.",
+  "usage": {
+   "prompt_tokens": 1700,
+   "completion_tokens": 257
+  }
+ }
+]

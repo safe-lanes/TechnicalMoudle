@@ -52,6 +52,14 @@ class Settings(BaseSettings):
     assistant_route_intent: str = "off"
     assistant_hybrid: str = "off"          # off | rescue | on
     assistant_hybrid_alpha: float = 0.5   # weight of the vector side in the convex score fusion (r5 only); 1.0 = vector only
+    # r7 guards on the rescue (both must hold before the lexical leader may take the last excerpt slot). Calibrated on 77
+    # suite questions with embeddings only — see calib_select.py. 0 disables the guard (= the unguarded r6 behaviour).
+    assistant_rescue_lex_per_term: float = 0.45
+    assistant_rescue_max_penalty: float = 0.15
+    # r8: when the module decision was close, let the runner-up module's best chunk take the last slot (0 = off).
+    assistant_second_opinion_gap: float = 0.0
+    # answer prompt in use on the docs path: "v5" (measured baseline) or "v6" (v5 + three rules for the defects in §15.2)
+    assistant_docs_prompt: str = "v5"
 
     # budgets (§5.7)
     llm_timeout_ms: int = 30000
