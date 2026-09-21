@@ -1,0 +1,587 @@
+{
+ "answers/7/F1/r1/c06": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F1/r1/c11": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F1/r2/c07": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F1/r2/c13": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F1/r3/c02": {
+  "verdict": "unresolved",
+  "evidence": "A two-word heading label carried over from the manual's own heading; it asserts nothing on its own.",
+  "note": "kept visible rather than dropped, per the reviewer's instruction not to exclude short strings"
+ },
+ "answers/7/F1/r3/c06": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F1/r3/c11": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/8/F1/r1/c05": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.3.3 HOW TO EXPORT CREW DETAILS ( (p.22); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.3 HOW TO EXPORT CREW DETAILS ( (p.23)"
+ },
+ "answers/8/F1/r2/c01": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.3.3 HOW TO EXPORT CREW DETAILS ( (p.22); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.3 HOW TO EXPORT CREW DETAILS ( (p.23)"
+ },
+ "answers/8/F1/r3/c05": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.3.3 HOW TO EXPORT CREW DETAILS ( (p.22); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.3 HOW TO EXPORT CREW DETAILS ( (p.23)"
+ },
+ "answers/9/F1/r1/c01": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.2 HOW TO CREATE A NEW COC DEFE (p.19); Technical - Defects User Manual For Office_S — 1.1.5.4 HOW TO VIEW AND EDIT COC DEF (p.19)"
+ },
+ "answers/9/F1/r2/c01": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.2 HOW TO CREATE A NEW COC DEFE (p.19); Technical - Defects User Manual For Office_S — 1.1.5.4 HOW TO VIEW AND EDIT COC DEF (p.19)"
+ },
+ "answers/9/F1/r3/c01": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.2 HOW TO CREATE A NEW COC DEFE (p.19); Technical - Defects User Manual For Office_S — 1.1.5.4 HOW TO VIEW AND EDIT COC DEF (p.19)"
+ },
+ "fresh/fresh-crewing-1/F1/r1/c09": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.4 HOW TO APPLY FILTER (p.23) (p.23); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.2.4 HOW TO APPLY FILTER (p.21) (p.21)"
+ },
+ "fresh/fresh-crewing-1/F1/r2/c07": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.4 HOW TO APPLY FILTER (p.23) (p.23); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.2.4 HOW TO APPLY FILTER (p.21) (p.21)"
+ },
+ "fresh/fresh-crewing-1/F1/r2/c12": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.2.4 HOW TO APPLY FILTER (p.21) (p.21); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.4 HOW TO APPLY FILTER (p.23) (p.23)"
+ },
+ "fresh/fresh-crewing-1/F1/r3/c10": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.4 HOW TO APPLY FILTER (p.23) (p.23); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.2.4 HOW TO APPLY FILTER (p.21) (p.21)"
+ },
+ "fresh/fresh-wo-named-1/F1/r2/c14": {
+  "verdict": "supported",
+  "evidence": "KB pilot: 'Generate WO' for one job — 'On the SHIP instance: no switch and no role check'.",
+  "note": ""
+ },
+ "fresh/fresh-wo-named-1/F1/r3/c13": {
+  "verdict": "supported",
+  "evidence": "KB pilot: 'Generate WO' for one job — 'On the SHIP instance: no switch and no role check'.",
+  "note": ""
+ },
+ "generated/6/F1/r1/c10": {
+  "verdict": "supported",
+  "evidence": "KB pilot: How work orders are created — 'No role check on this path (sign-in and vessel access still apply)'.",
+  "note": ""
+ },
+ "generated/6/F1/r2/c07": {
+  "verdict": "supported",
+  "evidence": "KB pilot: How work orders are created — 'No role check on this path (sign-in and vessel access still apply)'.",
+  "note": ""
+ },
+ "generated/6/F1/r3/c16": {
+  "verdict": "supported",
+  "evidence": "Read in context: the sentence sits under heading '3. Unplanned work order', and the same answer states correctly under '2. Per-job Generate WO' that 'In the office, the vessel's switch must be ON'.",
+  "note": "counter-example to the wo-phr-05 conflation: the same distinction stated correctly in another run"
+ },
+ "generated/7/F1/r1/c02": {
+  "verdict": "supported",
+  "evidence": "Roles & Permissions §1.1.12.6: 'Head of Dept does not approve postponement requests when no approval steps are configured — that is reserved for office roles.'",
+  "note": ""
+ },
+ "generated/7/F1/r2/c02": {
+  "verdict": "supported",
+  "evidence": "Roles & Permissions §1.1.12.6: 'Head of Dept does not approve postponement requests when no approval steps are configured — that is reserved for office roles.'",
+  "note": ""
+ },
+ "generated/7/F1/r3/c02": {
+  "verdict": "supported",
+  "evidence": "Roles & Permissions §1.1.12.6: 'Head of Dept does not approve postponement requests when no approval steps are configured — that is reserved for office roles.'",
+  "note": ""
+ },
+ "manuals/fs-off-1/F1/r1/c01": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Audit - Fleet Sharing Manual-OFFICE_R1 (p.5): 'Records can only be deleted while they are in Draft status' and (p.8) 'Users can edit the Fleet Sharing record until it has been submitted.'",
+  "note": "the rule is stated; the actor 'office user' is inferred from which manual it is, not stated in the sentence"
+ },
+ "manuals/fs-off-1/F1/r2/c01": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Audit - Fleet Sharing Manual-OFFICE_R1 (p.5): 'Records can only be deleted while they are in Draft status' and (p.8) 'Users can edit the Fleet Sharing record until it has been submitted.'",
+  "note": "the rule is stated; the actor 'office user' is inferred from which manual it is, not stated in the sentence"
+ },
+ "manuals/fs-off-1/F1/r2/c03": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Audit - Fleet Sharing Manual-OFFICE_R1 (p.5): 'Records can only be deleted while they are in Draft status' and (p.8) 'Users can edit the Fleet Sharing record until it has been submitted.'",
+  "note": "the rule is stated; the actor 'office user' is inferred from which manual it is, not stated in the sentence"
+ },
+ "manuals/fs-off-1/F1/r3/c01": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Audit - Fleet Sharing Manual-OFFICE_R1 (p.5): 'Records can only be deleted while they are in Draft status' and (p.8) 'Users can edit the Fleet Sharing record until it has been submitted.'",
+  "note": "the rule is stated; the actor 'office user' is inferred from which manual it is, not stated in the sentence"
+ },
+ "manuals/fs-ves-1/F1/r1/c03": {
+  "verdict": "supported",
+  "evidence": "Audit - Fleet Sharing Manual-Vessel_R1 (p.5): 'Vessel users cannot modify this information.' 'Ship' and 'vessel' are the same side in this product.",
+  "note": ""
+ },
+ "manuals/fs-ves-1/F1/r3/c03": {
+  "verdict": "supported",
+  "evidence": "Audit - Fleet Sharing Manual-Vessel_R1 (p.5): 'Vessel users cannot modify this information.' 'Ship' and 'vessel' are the same side in this product.",
+  "note": ""
+ },
+ "manuals/hist-1/F1/r1/c01": {
+  "verdict": "unsupported",
+  "evidence": "The expected source (Audit - History Manual_R1 p.16, 'The Review section is intended for office users only') was NEVER SUPPLIED — the routing defect sent the question to Technical. The three supplied documents are the PMS Office manual, the Ship-Side notes and the Sync notes; the permission is derived from the PMS WORK-ORDER review section and from an audience label ('Audience: Office / Sail Admin').",
+  "note": "correct by coincidence; all three runs already fail the suite on the citation check"
+ },
+ "manuals/hist-1/F1/r2/c01": {
+  "verdict": "unsupported",
+  "evidence": "The expected source (Audit - History Manual_R1 p.16, 'The Review section is intended for office users only') was NEVER SUPPLIED — the routing defect sent the question to Technical. The three supplied documents are the PMS Office manual, the Ship-Side notes and the Sync notes; the permission is derived from the PMS WORK-ORDER review section and from an audience label ('Audience: Office / Sail Admin').",
+  "note": "correct by coincidence; all three runs already fail the suite on the citation check"
+ },
+ "manuals/hist-1/F1/r3/c01": {
+  "verdict": "unsupported",
+  "evidence": "The expected source (Audit - History Manual_R1 p.16, 'The Review section is intended for office users only') was NEVER SUPPLIED — the routing defect sent the question to Technical. The three supplied documents are the PMS Office manual, the Ship-Side notes and the Sync notes; the permission is derived from the PMS WORK-ORDER review section and from an audience label ('Audience: Office / Sail Admin').",
+  "note": "correct by coincidence; all three runs already fail the suite on the citation check"
+ },
+ "manuals/hist-3/F1/r1/c02": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10) (p.10); Audit - History Manual_R1_30.06.2026 — Preamble (p.9) (p.9)"
+ },
+ "manuals/hist-3/F1/r3/c02": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10) (p.10); Audit - History Manual_R1_30.06.2026 — Preamble (p.9) (p.9)"
+ },
+ "manuals/prep-3/F1/r1/c13": {
+  "verdict": "supported",
+  "evidence": "Audit - Preparation Manual_Office_R1 §4.3.4 (p.19): 'the combined size of the file(s) selected in a single upload should not exceed 20 MB'. The 150 MB figure in the same claim is the consecutive-save limit, also present.",
+  "note": "engine artefact: the 20 MB sentence sits outside the top-3 passage window"
+ },
+ "manuals/prep-3/F1/r2/c06": {
+  "verdict": "supported",
+  "evidence": "Audit - Preparation Manual_Office_R1 §4.3.4 (p.19): 'the combined size of the file(s) selected in a single upload should not exceed 20 MB'. The 150 MB figure in the same claim is the consecutive-save limit, also present.",
+  "note": "engine artefact: the 20 MB sentence sits outside the top-3 passage window"
+ },
+ "manuals/prep-3/F1/r3/c04": {
+  "verdict": "supported",
+  "evidence": "Audit - Preparation Manual_Office_R1 §4.3.4 (p.19): 'the combined size of the file(s) selected in a single upload should not exceed 20 MB'. The 150 MB figure in the same claim is the consecutive-save limit, also present.",
+  "note": "engine artefact: the 20 MB sentence sits outside the top-3 passage window"
+ },
+ "manuals/crewing-5/F1/r1/c02": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW P (p.29); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW REC (p.14)"
+ },
+ "manuals/crewing-5/F1/r3/c02": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW P (p.29); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW REC (p.14)"
+ },
+ "manuals/moc-office-1/F1/r3/c02": {
+  "verdict": "supported",
+  "evidence": "Safety - MOC User Manual_Office §3 (p.7) action table: 'View, edit, or export the selected MoC record.'",
+  "note": ""
+ },
+ "manuals/ra-vessel-1/F1/r1/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - RA User Manual_Vessel_R1 §4 (p.7), supplied in all three runs: 'The GRA Library is available to vessel users for viewing purposes only.' The Edit/Delete GRA rows the engine matched are from the OFFICE manual §5 (p.8) — a different environment, and the answer did not use them.",
+  "note": "environment check passes: the answer scoped the rule to the vessel manual and cited it"
+ },
+ "manuals/ra-vessel-1/F1/r1/c04": {
+  "verdict": "supported",
+  "evidence": "Safety - RA User Manual_Vessel_R1 §4 (p.7), supplied in all three runs: 'The GRA Library is available to vessel users for viewing purposes only.' The Edit/Delete GRA rows the engine matched are from the OFFICE manual §5 (p.8) — a different environment, and the answer did not use them.",
+  "note": "environment check passes: the answer scoped the rule to the vessel manual and cited it"
+ },
+ "manuals/ra-vessel-1/F1/r2/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - RA User Manual_Vessel_R1 §4 (p.7), supplied in all three runs: 'The GRA Library is available to vessel users for viewing purposes only.' The Edit/Delete GRA rows the engine matched are from the OFFICE manual §5 (p.8) — a different environment, and the answer did not use them.",
+  "note": "environment check passes: the answer scoped the rule to the vessel manual and cited it"
+ },
+ "manuals/ra-vessel-1/F1/r3/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - RA User Manual_Vessel_R1 §4 (p.7), supplied in all three runs: 'The GRA Library is available to vessel users for viewing purposes only.' The Edit/Delete GRA rows the engine matched are from the OFFICE manual §5 (p.8) — a different environment, and the answer did not use them.",
+  "note": "environment check passes: the answer scoped the rule to the vessel manual and cited it"
+ },
+ "manuals/sms-office-1/F1/r3/c01": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Safety - SMS User Manual_Office_R0_31.01.202 — 4.2.1 Proposal (p.18) (p.18); Safety - SMS User Manual_Office_R0_31.01.202 — 4.1.2 Approval (p.17) (p.17)"
+ },
+ "manuals/sms-office-3/F1/r1/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - SMS User Manual_Office_R0 §3.1.6 (p.16): a red-boxed 'Doc 4.2.03' link.",
+  "note": "engine artefact: the number tokeniser split '4.2.03' into '4.2' and '03'"
+ },
+ "manuals/sms-office-3/F1/r2/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - SMS User Manual_Office_R0 §3.1.6 (p.16): a red-boxed 'Doc 4.2.03' link.",
+  "note": "engine artefact: the number tokeniser split '4.2.03' into '4.2' and '03'"
+ },
+ "manuals/sms-office-3/F1/r3/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - SMS User Manual_Office_R0 §3.1.6 (p.16): a red-boxed 'Doc 4.2.03' link.",
+  "note": "engine artefact: the number tokeniser split '4.2.03' into '4.2' and '03'"
+ },
+ "manuals/certsurveys-1/F1/r1/c01": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Technical - Cert. & Surveys For Office §1.2.1 (p.13) 'enables authorized users to…' and §1.2.1.1 'Click on the Admin sub-module'.",
+  "note": "same qualification: the actor comes from the manual's audience, not the sentence"
+ },
+ "manuals/certsurveys-1/F1/r3/c02": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Technical - Cert. & Surveys For Office §1.2.1 (p.13) 'enables authorized users to…' and §1.2.1.1 'Click on the Admin sub-module'.",
+  "note": "same qualification: the actor comes from the manual's audience, not the sentence"
+ },
+ "manuals/defects-3/F1/r2/c06": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.5 HOW TO EXPORT ALL COC RECORD (p.20)"
+ },
+ "manuals/defects-3/F1/r3/c05": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.5 HOW TO EXPORT ALL COC RECORD (p.20)"
+ },
+ "manuals/pmsoffice-2/F1/r1/c06": {
+  "verdict": "supported",
+  "evidence": "'How to update spares by location' is supplied from BOTH environments — VESSEL §1.1.7.3 (p.39) and OFFICE §1.1.7.4 (p.45) — which is the procedure the claim is about.",
+  "note": "note: the inventory-transaction sections were supplied from the Vessel manual only, so a claim resting on THOSE applying to Office would be unresolved; these claims do not rest on them"
+ },
+ "manuals/pmsoffice-2/F1/r2/c08": {
+  "verdict": "supported",
+  "evidence": "'How to update spares by location' is supplied from BOTH environments — VESSEL §1.1.7.3 (p.39) and OFFICE §1.1.7.4 (p.45) — which is the procedure the claim is about.",
+  "note": "note: the inventory-transaction sections were supplied from the Vessel manual only, so a claim resting on THOSE applying to Office would be unresolved; these claims do not rest on them"
+ },
+ "manuals/pmsoffice-2/F1/r3/c09": {
+  "verdict": "supported",
+  "evidence": "'How to update spares by location' is supplied from BOTH environments — VESSEL §1.1.7.3 (p.39) and OFFICE §1.1.7.4 (p.45) — which is the procedure the claim is about.",
+  "note": "note: the inventory-transaction sections were supplied from the Vessel manual only, so a claim resting on THOSE applying to Office would be unresolved; these claims do not rest on them"
+ },
+ "manuals/pmsoffice-4/F1/r1/c05": {
+  "verdict": "unresolved",
+  "evidence": "The locked-WO restriction is quoted from OFFICE §1.1.5.7 (p.34). The Vessel §1.1.5.7 (p.30) passage is supplied but the engine's best sentence from it does not carry the restriction.",
+  "note": "cannot be settled from the top passages; the claim may be true but is not established here"
+ },
+ "manuals/pmsoffice-4/F1/r2/c05": {
+  "verdict": "unresolved",
+  "evidence": "The locked-WO restriction is quoted from OFFICE §1.1.5.7 (p.34). The Vessel §1.1.5.7 (p.30) passage is supplied but the engine's best sentence from it does not carry the restriction.",
+  "note": "cannot be settled from the top passages; the claim may be true but is not established here"
+ },
+ "manuals/pmsoffice-4/F1/r3/c05": {
+  "verdict": "unresolved",
+  "evidence": "The locked-WO restriction is quoted from OFFICE §1.1.5.7 (p.34). The Vessel §1.1.5.7 (p.30) passage is supplied but the engine's best sentence from it does not carry the restriction.",
+  "note": "cannot be settled from the top passages; the claim may be true but is not established here"
+ },
+ "manuals/pmsoffice-5/F1/r1/c15": {
+  "verdict": "supported",
+  "evidence": "Both supplied in all three runs and both concern applying a filter: OFFICE §1.1.3.2 (p.9) Dashboard filter and VESSEL §1.1.9.3 (p.46) Reports filter. Same action, the two environments named in the claim.",
+  "note": ""
+ },
+ "manuals/pmsoffice-5/F1/r1/c16": {
+  "verdict": "supported",
+  "evidence": "Both supplied in all three runs and both concern applying a filter: OFFICE §1.1.3.2 (p.9) Dashboard filter and VESSEL §1.1.9.3 (p.46) Reports filter. Same action, the two environments named in the claim.",
+  "note": ""
+ },
+ "manuals/pmsoffice-5/F1/r2/c06": {
+  "verdict": "supported",
+  "evidence": "Both supplied in all three runs and both concern applying a filter: OFFICE §1.1.3.2 (p.9) Dashboard filter and VESSEL §1.1.9.3 (p.46) Reports filter. Same action, the two environments named in the claim.",
+  "note": ""
+ },
+ "manuals/pmsoffice-5/F1/r2/c11": {
+  "verdict": "supported",
+  "evidence": "Both supplied in all three runs and both concern applying a filter: OFFICE §1.1.3.2 (p.9) Dashboard filter and VESSEL §1.1.9.3 (p.46) Reports filter. Same action, the two environments named in the claim.",
+  "note": ""
+ },
+ "manuals/pmsoffice-5/F1/r3/c06": {
+  "verdict": "supported",
+  "evidence": "Both supplied in all three runs and both concern applying a filter: OFFICE §1.1.3.2 (p.9) Dashboard filter and VESSEL §1.1.9.3 (p.46) Reports filter. Same action, the two environments named in the claim.",
+  "note": ""
+ },
+ "manuals/pmsoffice-5/F1/r3/c11": {
+  "verdict": "supported",
+  "evidence": "Both supplied in all three runs and both concern applying a filter: OFFICE §1.1.3.2 (p.9) Dashboard filter and VESSEL §1.1.9.3 (p.46) Reports filter. Same action, the two environments named in the claim.",
+  "note": ""
+ },
+ "manuals/pmsvessel-3/F1/r1/c09": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual_Vessel Specific_ — 1.1.8.3 HOW TO UPDATE STOCK TRANSACT (p.43); Technical - PMS User Manual For Office_Sail  — 1.1.8.3 HOW TO UPDATE STOCK TRANSACT (p.50)"
+ },
+ "manuals/pmsvessel-3/F1/r2/c05": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual_Vessel Specific_ — 1.1.8.3 HOW TO UPDATE STOCK TRANSACT (p.43); Technical - PMS User Manual For Office_Sail  — 1.1.8.3 HOW TO UPDATE STOCK TRANSACT (p.50)"
+ },
+ "manuals/pmsvessel-4/F1/r3/c03": {
+  "verdict": "supported",
+  "evidence": "Recent Updates §1.1.14.6.3: 'the job must exist, be active and not already have an active work order'.",
+  "note": ""
+ },
+ "wo/wo-generic-02/F1/r1/c04": {
+  "verdict": "supported",
+  "evidence": "KB pilot: Planned work orders — 'Nothing to do. The ship system runs the job-due scan once every 24 hours'.",
+  "note": "the engine matched an unrelated pre-planning passage"
+ },
+ "wo/wo-generic-02/F1/r2/c03": {
+  "verdict": "supported",
+  "evidence": "KB pilot: Planned work orders — 'Nothing to do. The ship system runs the job-due scan once every 24 hours'.",
+  "note": "the engine matched an unrelated pre-planning passage"
+ },
+ "wo/wo-generic-02/F1/r3/c03": {
+  "verdict": "supported",
+  "evidence": "KB pilot: Planned work orders — 'Nothing to do. The ship system runs the job-due scan once every 24 hours'.",
+  "note": "the engine matched an unrelated pre-planning passage"
+ },
+ "wo/wo-phr-05/F1/r3/c26": {
+  "verdict": "contradicted",
+  "evidence": "The same answer requires the switch for per-job Generate WO ('In the Office, the vessel's office work-order generation switch must be ON') and then excludes the switch from that route. KB pilot: 'Generate WO' for one job states the switch applies on the OFFICE instance.",
+  "note": "the genuine answer defect; stays a failure (work-order judge .13)"
+ },
+ "answers/7/F0/r1/c08": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F0/r1/c14": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F0/r2/c08": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F0/r2/c14": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F0/r3/c08": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/7/F0/r3/c14": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - PMS User Manual For Office_Sail  — 1.1.8.2 HOW TO APPLY FILTER (p.49) (p.49); Technical - PMS User Manual_Vessel Specific_ — 1.1.8.2 HOW TO APPLY FILTER (p.43) (p.43)"
+ },
+ "answers/8/F0/r1/c02": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.3.3 HOW TO EXPORT CREW DETAILS ( (p.22); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.3 HOW TO EXPORT CREW DETAILS ( (p.23)"
+ },
+ "answers/8/F0/r2/c05": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.3.3 HOW TO EXPORT CREW DETAILS ( (p.22); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.3 HOW TO EXPORT CREW DETAILS ( (p.23)"
+ },
+ "answers/8/F0/r3/c01": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.3.3 HOW TO EXPORT CREW DETAILS ( (p.22); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.3 HOW TO EXPORT CREW DETAILS ( (p.23)"
+ },
+ "answers/9/F0/r1/c01": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.2 HOW TO CREATE A NEW COC DEFE (p.19); Technical - Defects User Manual For Office_S — 1.1.5.4 HOW TO VIEW AND EDIT COC DEF (p.19)"
+ },
+ "answers/9/F0/r1/c06": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.2 HOW TO CREATE A NEW COC DEFE (p.19); Technical - Defects User Manual For Office_S — 1.1.5.4 HOW TO VIEW AND EDIT COC DEF (p.19)"
+ },
+ "answers/9/F0/r2/c06": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.2 HOW TO CREATE A NEW COC DEFE (p.19); Technical - Defects User Manual For Office_S — 1.1.5.4 HOW TO VIEW AND EDIT COC DEF (p.19)"
+ },
+ "answers/9/F0/r3/c01": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.2 HOW TO CREATE A NEW COC DEFE (p.19); Technical - Defects User Manual For Office_S — 1.1.5.4 HOW TO VIEW AND EDIT COC DEF (p.19)"
+ },
+ "fresh/fresh-crewing-1/F0/r1/c10": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.4 HOW TO APPLY FILTER (p.23) (p.23); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.2.4 HOW TO APPLY FILTER (p.21) (p.21)"
+ },
+ "fresh/fresh-crewing-1/F0/r2/c06": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.4 HOW TO APPLY FILTER (p.23) (p.23); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.2.4 HOW TO APPLY FILTER (p.21) (p.21)"
+ },
+ "fresh/fresh-crewing-1/F0/r3/c01": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.4 HOW TO APPLY FILTER (p.23) (p.23); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.2.4 HOW TO APPLY FILTER (p.21) (p.21)"
+ },
+ "fresh/fresh-crewing-1/F0/r3/c06": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.2.4.4 HOW TO APPLY FILTER (p.23) (p.23); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.2.4 HOW TO APPLY FILTER (p.21) (p.21)"
+ },
+ "fresh/fresh-wo-named-1/F0/r2/c08": {
+  "verdict": "supported",
+  "evidence": "KB pilot: 'Generate WO' for one job — 'On the SHIP instance: no switch and no role check'.",
+  "note": ""
+ },
+ "manuals/fs-off-1/F0/r1/c01": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Audit - Fleet Sharing Manual-OFFICE_R1 (p.5): 'Records can only be deleted while they are in Draft status' and (p.8) 'Users can edit the Fleet Sharing record until it has been submitted.'",
+  "note": "the rule is stated; the actor 'office user' is inferred from which manual it is, not stated in the sentence"
+ },
+ "manuals/fs-off-1/F0/r2/c01": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Audit - Fleet Sharing Manual-OFFICE_R1 (p.5): 'Records can only be deleted while they are in Draft status' and (p.8) 'Users can edit the Fleet Sharing record until it has been submitted.'",
+  "note": "the rule is stated; the actor 'office user' is inferred from which manual it is, not stated in the sentence"
+ },
+ "manuals/fs-off-1/F0/r3/c01": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Audit - Fleet Sharing Manual-OFFICE_R1 (p.5): 'Records can only be deleted while they are in Draft status' and (p.8) 'Users can edit the Fleet Sharing record until it has been submitted.'",
+  "note": "the rule is stated; the actor 'office user' is inferred from which manual it is, not stated in the sentence"
+ },
+ "manuals/fs-ves-1/F0/r3/c03": {
+  "verdict": "supported",
+  "evidence": "Audit - Fleet Sharing Manual-Vessel_R1 (p.5): 'Vessel users cannot modify this information.' 'Ship' and 'vessel' are the same side in this product.",
+  "note": ""
+ },
+ "manuals/hist-1/F0/r2/c01": {
+  "verdict": "unsupported",
+  "evidence": "The expected source (Audit - History Manual_R1 p.16, 'The Review section is intended for office users only') was NEVER SUPPLIED — the routing defect sent the question to Technical. The three supplied documents are the PMS Office manual, the Ship-Side notes and the Sync notes; the permission is derived from the PMS WORK-ORDER review section and from an audience label ('Audience: Office / Sail Admin').",
+  "note": "correct by coincidence; all three runs already fail the suite on the citation check"
+ },
+ "manuals/hist-3/F0/r1/c02": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Audit - History Manual_R1_30.06.2026 — 2.1.4 ADDING ATTACHMENTS (p.10) (p.10); Audit - History Manual_R1_30.06.2026 — Preamble (p.9) (p.9)"
+ },
+ "manuals/prep-3/F0/r1/c04": {
+  "verdict": "supported",
+  "evidence": "Audit - Preparation Manual_Office_R1 §4.3.4 (p.19): 'the combined size of the file(s) selected in a single upload should not exceed 20 MB'. The 150 MB figure in the same claim is the consecutive-save limit, also present.",
+  "note": "engine artefact: the 20 MB sentence sits outside the top-3 passage window"
+ },
+ "manuals/prep-3/F0/r2/c07": {
+  "verdict": "supported",
+  "evidence": "Audit - Preparation Manual_Office_R1 §4.3.4 (p.19): 'the combined size of the file(s) selected in a single upload should not exceed 20 MB'. The 150 MB figure in the same claim is the consecutive-save limit, also present.",
+  "note": "engine artefact: the 20 MB sentence sits outside the top-3 passage window"
+ },
+ "manuals/prep-3/F0/r3/c04": {
+  "verdict": "supported",
+  "evidence": "Audit - Preparation Manual_Office_R1 §4.3.4 (p.19): 'the combined size of the file(s) selected in a single upload should not exceed 20 MB'. The 150 MB figure in the same claim is the consecutive-save limit, also present.",
+  "note": "engine artefact: the 20 MB sentence sits outside the top-3 passage window"
+ },
+ "manuals/crewing-5/F0/r2/c02": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW P (p.29); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW REC (p.14)"
+ },
+ "manuals/crewing-5/F0/r2/c13": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW P (p.29); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW REC (p.14)"
+ },
+ "manuals/crewing-5/F0/r3/c02": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Crewing - Crewing User Manual R2_10.06.2026 — 1.3.1.5 HOW TO ADD RECORDS TO CREW P (p.29); Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.3 HOW TO CREATE A NEW CREW REC (p.14)"
+ },
+ "manuals/moc-office-1/F0/r3/c02": {
+  "verdict": "supported",
+  "evidence": "Safety - MOC User Manual_Office §3 (p.7) action table: 'View, edit, or export the selected MoC record.'",
+  "note": ""
+ },
+ "manuals/ra-vessel-1/F0/r1/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - RA User Manual_Vessel_R1 §4 (p.7), supplied in all three runs: 'The GRA Library is available to vessel users for viewing purposes only.' The Edit/Delete GRA rows the engine matched are from the OFFICE manual §5 (p.8) — a different environment, and the answer did not use them.",
+  "note": "environment check passes: the answer scoped the rule to the vessel manual and cited it"
+ },
+ "manuals/ra-vessel-1/F0/r2/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - RA User Manual_Vessel_R1 §4 (p.7), supplied in all three runs: 'The GRA Library is available to vessel users for viewing purposes only.' The Edit/Delete GRA rows the engine matched are from the OFFICE manual §5 (p.8) — a different environment, and the answer did not use them.",
+  "note": "environment check passes: the answer scoped the rule to the vessel manual and cited it"
+ },
+ "manuals/ra-vessel-1/F0/r2/c04": {
+  "verdict": "supported",
+  "evidence": "Safety - RA User Manual_Vessel_R1 §4 (p.7), supplied in all three runs: 'The GRA Library is available to vessel users for viewing purposes only.' The Edit/Delete GRA rows the engine matched are from the OFFICE manual §5 (p.8) — a different environment, and the answer did not use them.",
+  "note": "environment check passes: the answer scoped the rule to the vessel manual and cited it"
+ },
+ "manuals/sms-office-3/F0/r1/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - SMS User Manual_Office_R0 §3.1.6 (p.16): a red-boxed 'Doc 4.2.03' link.",
+  "note": "engine artefact: the number tokeniser split '4.2.03' into '4.2' and '03'"
+ },
+ "manuals/sms-office-3/F0/r2/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - SMS User Manual_Office_R0 §3.1.6 (p.16): a red-boxed 'Doc 4.2.03' link.",
+  "note": "engine artefact: the number tokeniser split '4.2.03' into '4.2' and '03'"
+ },
+ "manuals/sms-office-3/F0/r3/c01": {
+  "verdict": "supported",
+  "evidence": "Safety - SMS User Manual_Office_R0 §3.1.6 (p.16): a red-boxed 'Doc 4.2.03' link.",
+  "note": "engine artefact: the number tokeniser split '4.2.03' into '4.2' and '03'"
+ },
+ "manuals/certsurveys-1/F0/r1/c01": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Technical - Cert. & Surveys For Office §1.2.1 (p.13) 'enables authorized users to…' and §1.2.1.1 'Click on the Admin sub-module'.",
+  "note": "same qualification: the actor comes from the manual's audience, not the sentence"
+ },
+ "manuals/certsurveys-1/F0/r2/c09": {
+  "verdict": "supported-with-qualification",
+  "evidence": "Technical - Cert. & Surveys For Office §1.2.1 (p.13) 'enables authorized users to…' and §1.2.1.1 'Click on the Admin sub-module'.",
+  "note": "same qualification: the actor comes from the manual's audience, not the sentence"
+ },
+ "manuals/defects-3/F0/r2/c05": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.5 HOW TO EXPORT ALL COC RECORD (p.20)"
+ },
+ "manuals/defects-3/F0/r3/c06": {
+  "verdict": "supported",
+  "note": "restates the manual's own cross-reference; the target section is supplied in the same request",
+  "evidence": "Technical - Defects User Manual For Office_S — 1.1.5.5 HOW TO EXPORT ALL COC RECORD (p.20)"
+ },
+ "manuals/pmsoffice-2/F0/r1/c04": {
+  "verdict": "supported",
+  "evidence": "'How to update spares by location' is supplied from BOTH environments — VESSEL §1.1.7.3 (p.39) and OFFICE §1.1.7.4 (p.45) — which is the procedure the claim is about.",
+  "note": "note: the inventory-transaction sections were supplied from the Vessel manual only, so a claim resting on THOSE applying to Office would be unresolved; these claims do not rest on them"
+ },
+ "manuals/pmsoffice-2/F0/r1/c07": {
+  "verdict": "supported",
+  "evidence": "'How to update spares by location' is supplied from BOTH environments — VESSEL §1.1.7.3 (p.39) and OFFICE §1.1.7.4 (p.45) — which is the procedure the claim is about.",
+  "note": "note: the inventory-transaction sections were supplied from the Vessel manual only, so a claim resting on THOSE applying to Office would be unresolved; these claims do not rest on them"
+ },
+ "manuals/pmsoffice-4/F0/r3/c05": {
+  "verdict": "unresolved",
+  "evidence": "The locked-WO restriction is quoted from OFFICE §1.1.5.7 (p.34). The Vessel §1.1.5.7 (p.30) passage is supplied but the engine's best sentence from it does not carry the restriction.",
+  "note": "cannot be settled from the top passages; the claim may be true but is not established here"
+ }
+}

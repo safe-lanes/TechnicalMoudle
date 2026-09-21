@@ -1843,3 +1843,108 @@ and what it produces; corrected-claims case 01; two chunks indexed but never ret
 (case 06 first-source), test-suite quality (cases naming 14 or 4 documents; every citation pass provisional; 264
 partial claims not individually read) and measurement hygiene (the disagreement figure; the two corrected
 numbers; my parser bug). **Live unchanged, promote nothing, v6 held.**
+
+## 20. Reviewer's fourth pass (19-Sep) — corrected counts, the review extended, and the routing proposal
+
+No model calls; nothing deployed, reindexed or changed in application authentication. Live, nginx, SMS RAG and
+every other site untouched; v6 still held.
+
+### 20.1 Corrections to §19's conclusions and counts (item 1)
+
+- §19 and `citation-review-verdicts-s7.md` were titled "completed"; they were **screening plus a partial
+  review**. Both are retitled and the file carries a correction header.
+- "Three unsupported claims" → **"three unsupported claims identified among those reviewed"**. Unread claims
+  are not verified.
+- Section A: **8 grouped findings covering 9 occurrences** — `prep-3` contributes r2 and r3. Reconciled against
+  the raw records: the 31 flagged F1 occurrences are 9 (Section A) + 20 (comparisons) + 2 (`hist-1` r1, r3).
+  The third `hist-1` occurrence (r2) sat in the **partial** band and was folded into "3 unsupported" without
+  having been flagged — stated now rather than left implicit.
+- Every claim now carries a stable identifier `suite/case/arm/rRUN/cNN`, where `NN` is its position among all
+  extracted sentences so the id does not move when classification changes. Occurrences and grouped findings are
+  reported separately throughout (`review-ledger-s7.md`).
+
+### 20.2 The splitter no longer excludes substantive claims (item 3)
+
+`ledger.py` replaces `claim_review.py`. Nothing is dropped for being short or ending in a colon; a statement
+about a source is reviewed when it asserts a fact; navigation is reviewed when it names a screen, module or
+action, because choosing the wrong one changes the procedure. Only pure provenance boilerplate and bare
+fragments are set aside, and both are counted.
+
+Effect on the F1 population: 1,466 → **2,364 extracted sentences**, of which 1,854 are reviewable
+(1,633 substantive + 172 navigation-critical + 49 source-factual).
+
+### 20.3 What was reviewed, and what was not (items 2 and 4)
+
+Review population, defined before reading (`ledger.py stats`): all low-coverage claims (149), all partial (428),
+all high-coverage claims in the risk categories — permission, prerequisite, negation, number/limit, exclusivity
+(528) — and a reproducible 20 % sample of the remaining high-coverage claims (150, seed 20260919). **Total
+1,255 occurrences, 990 distinct.**
+
+A deterministic engine (`verdicts.py`, rules stated in the file) triaged them:
+
+| machine label | F1 occurrences |
+|---|---|
+| auto-supported (**not read, not verified**) | 495 |
+| UNRESOLVED (engine cannot decide) | 631 |
+| CHECK-COMPARISON | 82 |
+| CHECK-PERMISSION | 25 |
+| CHECK-NEGATION | 11 |
+| CHECK-NUMBER | 5 |
+
+**I read every CHECK-\* claim** — all 123 occurrences in the risk categories, which is where numbers, negation,
+permissions, exclusivity and comparisons live — and recorded verdicts with the supporting or conflicting text
+and its document, section and page (`review-ledger-s7.md`, `review-verdicts.json`): **73 supported, 6
+supported-with-qualification, 4 unresolved, 3 unsupported, 1 contradicted** across both arms.
+
+**I did not read the 631 UNRESOLVED or the 495 auto-supported claims.** They are reported as machine-labelled
+and **not verified**. That is a shortfall against the instruction to review all 264 partial claims: the partial
+band expanded to 428 occurrences under the wider splitter, and of those only the ones the engine surfaced into a
+CHECK-\* category were read. Stated plainly rather than papered over.
+
+**False acceptances found in the screening:** all five CHECK-NUMBER flags were engine artefacts, not answer
+defects — the 20 MB sentence sits outside the top-3 passage window, and the number tokeniser split "4.2.03".
+Conversely the engine's `auto-supported` rule was **not** validated against reading, so no claim is made for it.
+
+**Comparisons, checked for same action, screen and environment** as instructed. `pmsoffice-5`: Office Dashboard
+filter §1.1.3.2 p.9 **and** Vessel Reports filter §1.1.9.3 p.46 both supplied, same action — supported.
+`pmsoffice-2`: "update spares by location" supplied from both environments (Vessel §1.1.7.3 p.39, Office
+§1.1.7.4 p.45) — supported, with the note that the inventory-transaction sections came from the Vessel manual
+only. `pmsoffice-4` "stated for both vessel and Office": the restriction is quoted from the Office manual; the
+Vessel passage is supplied but does not carry it — **unresolved**, not assumed.
+
+**Environment check that changed a verdict:** `ra-vessel-1` "the library is view-only for vessel users" was
+flagged because the supplied text contains an Edit GRA row. Read: that row is from the **Office** RA manual §5
+p.8, while the Vessel manual §4 p.7 — supplied in all three runs — says "available to vessel users for viewing
+purposes only", and the answer cites the Vessel manual. **Supported**, correctly environment-scoped.
+
+**F0 was reviewed to the same standard** for every finding used in the comparison; automated scores and read
+verdicts are kept in separate columns of the ledger.
+
+### 20.4 The switch contradiction stands (item 3, last clause)
+
+`wo/wo-phr-05/F1/r3` is recorded as **contradicted** — correct steps earlier in the answer do not cancel the
+contradictory conclusion. It remains a failure under work-order judge `.13`. A counter-example is recorded
+alongside it: `generated/6/F1/r3` keeps the same two conditions apart correctly, so the defect is intermittent
+phrasing rather than a uniform misunderstanding.
+
+### 20.5 Audit History routing — traced and proposed (item 5, `ROUTING-PROPOSAL-audit-history.md`)
+
+Traced end to end. `explicit_module()` returns `(None, "no module named")` — **proven offline against the real
+corpus list**, and the cause is precise: `_GENERIC_TITLE_WORDS` contains `history` and `preparation`, so
+`_terms_from_title()` yields **`[]`** for the Audit History and Audit Preparation manuals. Those two documents
+contribute no routing term at all and cannot be reached by name. With no named module the decision is pure
+vector similarity over generic wording ("review", "comments", "ship", "office"), Technical wins at distance
+0.8754 with margin 0.1266 — above the 0.07 clarify threshold — and no Audit chunk is inside the 1.15 floor, so
+`audit` is never even a candidate. This also predicts the separately known `prep-*` retrieval failures.
+
+One correction proposed, with code locations, precedence rules (explicit name > originating-module context >
+vector), a two-stage verification plan whose first stage is offline over all 102 stored questions, and an
+explicit falsification condition. It does **not** hardcode the question and does **not** infer permissions from
+an audience label — that is an answer behaviour, listed separately. **Not implemented.**
+
+### 20.6 Document error kept separate from model error (item 6, `DOC-ERROR-both-refusals.md`)
+
+The R5 sentence "Both refusals belong to 'Generate Now' only" is wrong — only the role refusal is exclusive; the
+switch applies to per-job 'Generate WO' too. The correction is recorded with a text diff for later candidate
+work. **The failing answer never received that sentence**, so correcting it is **not** claimed to fix the
+observed contradiction; the causal link is not established.
