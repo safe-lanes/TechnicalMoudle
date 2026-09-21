@@ -1,0 +1,455 @@
+{
+ "settings": {
+  "index_set": "kb-pilot-e",
+  "route_sim_floor": 1.15,
+  "route_margin": 0.07,
+  "route_top_k": 10,
+  "answer_chunks": 5,
+  "route_intent": "on",
+  "hybrid": "rescue",
+  "second_opinion_gap": 0.0,
+  "rescue_lex_per_term": 0.45,
+  "rescue_max_penalty": 0.15
+ },
+ "title_terms": {
+  "pms": "technical",
+  "bulk data import": "technical",
+  "defects": "technical",
+  "fleet sharing": "audit",
+  "recent updates changed behaviours": "technical",
+  "sms": "safety",
+  "incident": "incident",
+  "master review": "safety",
+  "crewing": "crewing",
+  "near miss": "incident",
+  "roles permissions": "technical",
+  "safety meeting": "safety",
+  "lesson learnt": "incident",
+  "risk assessment": "safety",
+  "cert surveys": "technical",
+  "fleet notification": "incident",
+  "ship side": "technical",
+  "moc": "safety"
+ },
+ "module_labels": {
+  "technical": "Technical",
+  "audit": "Audit",
+  "safety": "Safety",
+  "incident": "Incident",
+  "crewing": "Crewing"
+ },
+ "module_aliases": {
+  "technical": "technical",
+  "pms": "technical",
+  "audit": "audit",
+  "safety": "safety",
+  "incident": "incident",
+  "crewing": "crewing"
+ },
+ "explicit_module": {
+  "answers/1": {
+   "named": "audit",
+   "why": "module name in question"
+  },
+  "answers/2": {
+   "named": "audit",
+   "why": "module name in question"
+  },
+  "answers/3": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "answers/4": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "answers/5": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "answers/6": {
+   "named": "incident",
+   "why": "manual/sub-module name in question"
+  },
+  "answers/7": {
+   "named": "technical",
+   "why": "module name in question"
+  },
+  "answers/8": {
+   "named": "crewing",
+   "why": "module name in question"
+  },
+  "answers/9": {
+   "named": null,
+   "why": "no module named"
+  },
+  "answers/10": {
+   "named": null,
+   "why": "no module named"
+  },
+  "answers/11": {
+   "named": "technical",
+   "why": "module name in question"
+  },
+  "answers/12": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/1": {
+   "named": "technical",
+   "why": "manual/sub-module name in question"
+  },
+  "generated/2": {
+   "named": "technical",
+   "why": "manual/sub-module name in question"
+  },
+  "generated/3": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/4": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/5": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/6": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/7": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/8": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/9": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/10": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/11": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/12": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/13": {
+   "named": null,
+   "why": "no module named"
+  },
+  "generated/14": {
+   "named": null,
+   "why": "no module named"
+  },
+  "wo/wo-generic-01": {
+   "named": null,
+   "why": "no module named"
+  },
+  "wo/wo-generic-02": {
+   "named": "technical",
+   "why": "module name in question"
+  },
+  "wo/wo-generic-03": {
+   "named": "technical",
+   "why": "module name in question"
+  },
+  "wo/wo-phr-01": {
+   "named": "technical",
+   "why": "module name in question"
+  },
+  "wo/wo-phr-02": {
+   "named": null,
+   "why": "no module named"
+  },
+  "wo/wo-phr-03": {
+   "named": null,
+   "why": "no module named"
+  },
+  "wo/wo-phr-04": {
+   "named": null,
+   "why": "no module named"
+  },
+  "wo/wo-phr-05": {
+   "named": "technical",
+   "why": "module name in question"
+  },
+  "manuals/fs-off-1": {
+   "named": "audit",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/fs-off-2": {
+   "named": "audit",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/fs-ves-1": {
+   "named": "audit",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/fs-ves-2": {
+   "named": "audit",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/hist-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/hist-2": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/hist-3": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/prep-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/prep-2": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/prep-3": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/inc-1": {
+   "named": "incident",
+   "why": "module name in question"
+  },
+  "manuals/inc-2": {
+   "named": "incident",
+   "why": "module name in question"
+  },
+  "manuals/inc-3": {
+   "named": "incident",
+   "why": "module name in question"
+  },
+  "manuals/fn-1": {
+   "named": "incident",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/fn-2": {
+   "named": "incident",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/ll-1": {
+   "named": "incident",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/ll-2": {
+   "named": "incident",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/nm-1": {
+   "named": "incident",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/nm-2": {
+   "named": "incident",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/nm-3": {
+   "named": "incident",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/crewing-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/crewing-2": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/crewing-3": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/crewing-4": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/crewing-5": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/crewing-6": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/moc-office-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/moc-office-2": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/moc-vessel-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/moc-vessel-2": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/master-review-1": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/master-review-2": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/ra-office-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/ra-office-2": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/ra-office-3": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/ra-vessel-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/ra-vessel-2": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/sms-office-1": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/sms-office-2": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/sms-office-3": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/safety-meeting-1": {
+   "named": "safety",
+   "why": "module name in question"
+  },
+  "manuals/safety-meeting-2": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/certsurveys-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/certsurveys-2": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/certsurveys-3": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/defects-1": {
+   "named": "technical",
+   "why": "manual/sub-module name in question"
+  },
+  "manuals/defects-2": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/defects-3": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/pmsoffice-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/pmsoffice-2": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/pmsoffice-3": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/pmsoffice-4": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/pmsoffice-5": {
+   "named": "technical",
+   "why": "module name in question"
+  },
+  "manuals/pmsvessel-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/pmsvessel-2": {
+   "named": "technical",
+   "why": "module name in question"
+  },
+  "manuals/pmsvessel-3": {
+   "named": null,
+   "why": "no module named"
+  },
+  "manuals/pmsvessel-4": {
+   "named": null,
+   "why": "no module named"
+  },
+  "fresh/fresh-audit-1": {
+   "named": "audit",
+   "why": "module name in question"
+  },
+  "fresh/fresh-incident-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "fresh/fresh-safety-1": {
+   "named": "safety",
+   "why": "manual/sub-module name in question"
+  },
+  "fresh/fresh-crewing-1": {
+   "named": "crewing",
+   "why": "module name in question"
+  },
+  "fresh/fresh-technical-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "fresh/fresh-moc-alt-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "fresh/fresh-wo-broad-1": {
+   "named": "technical",
+   "why": "module name in question"
+  },
+  "fresh/fresh-wo-named-1": {
+   "named": null,
+   "why": "no module named"
+  },
+  "fresh/fresh-ctx-1": {
+   "named": "safety",
+   "why": "module name in question"
+  },
+  "fresh/fresh-ctx-conflict-1": {
+   "named": "safety",
+   "why": "module name in question"
+  }
+ }
+}
