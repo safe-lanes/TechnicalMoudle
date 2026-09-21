@@ -1,0 +1,52 @@
+NAV pattern self-test: passed (detects curly-quote and straight-quote navigation, ignores button clicks)
+
+41 chunks carry a resolved cross-reference
+
+A. MISDIRECTING — the pasted steps tell the user to open the SOURCE sub-module while the section is about the DESTINATION: 13
+   crewing   p.21  1.2.2.2 HOW TO EDIT OR DELETE A CREW RECORD  Recruited -> told to open 'In-Progress'
+   crewing   p.21  1.2.2.3 HOW TO EXPORT CREW DETAILS           Recruited -> told to open 'In-Progress'
+   crewing   p.22  1.2.3.2 HOW TO EDIT OR DELETE A CREW RECORD  Waitlist -> told to open 'In-Progress'
+   crewing   p.22  1.2.3.3 HOW TO EXPORT CREW DETAILS           Waitlist -> told to open 'In-Progress'
+   crewing   p.23  1.2.4.2 HOW TO EDIT OR DELETE A CREW RECORD  Rejected -> told to open 'In-Progress'
+   crewing   p.23  1.2.4.3 HOW TO EXPORT CREW DETAILS           Rejected -> told to open 'In-Progress'
+   technical p.10  1.1.4.4 HOW TO EDIT A SURVEYS                Surveys -> told to open 'Certificates'
+   technical p.43  1.1.8.2 HOW TO APPLY FILTER                  Stores -> told to open 'Spares'
+   technical p.44  1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTOR Stores -> told to open 'Spares'
+   technical p.44  1.1.8.6 HOW TO EXPORT STORE ITEMS            Stores -> told to open 'Spares'
+   technical p.49  1.1.8.2 HOW TO APPLY FILTER                  Stores -> told to open 'Spares'
+   technical p.51  1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTOR Stores -> told to open 'Spares'
+   technical p.51  1.1.8.6 HOW TO EXPORT STORE ITEMS            Stores -> told to open 'Spares'
+
+B. NO SUB-MODULE NAVIGATION in the pasted steps (start at a button/field): 28
+   crewing   p.21  1.2.2.4 HOW TO APPLY FILTER                  nav=-
+   crewing   p.22  1.2.3.4 HOW TO APPLY FILTER                  nav=-
+   crewing   p.23  1.2.4.4 HOW TO APPLY FILTER                  nav=-
+   crewing   p.51  1.7.1.2 HOW TO APPLY FILTER                  nav=-
+   crewing   p.51  1.7.1.3 HOW TO EXPORT ALL CREW APPRAISALS    nav=-
+   crewing   p.59  1.8.1.3 HOW TO APPLY FILTER                  nav=-
+   crewing   p.61  1.8.2.2 HOW TO CREATE AND DELETE PERIODIC AL nav=-
+   crewing   p.61  1.8.2.3 HOW TO APPLY FILTER                  nav=-
+   crewing   p.61  1.8.2.4 HOW TO REVIEW AND EXPORT PERIODIC AL nav=-
+   crewing   p.62  1.8.3.2 HOW TO CREATE AND DELETE MONTHLY ALC nav=-
+   crewing   p.62  1.8.3.3 HOW TO APPLY FILTER                  nav=-
+   crewing   p.62  1.8.3.4 HOW TO REVIEW AND EXPORT MONTHLY ALC nav=-
+   crewing   p.63  1.8.4.2 HOW TO APPLY FILTER                  nav=-
+   crewing   p.66  1.8.5.3 HOW TO EDIT OTHER TEST RECORD        nav=-
+   crewing   p.66  1.8.5.4 HOW TO EXPORT OTHER TEST RECORD      nav=-
+   crewing   p.66  1.8.5.2 HOW TO CREATE A NEW OTHER TEST RECOR nav=-
+   crewing   p.66  1.8.5.5 HOW TO APPLY FILTER                  nav=-
+   crewing   p.68  1.8.6.3 HOW TO CREATE AND DELETE SUMMARY REC nav=-
+   crewing   p.68  1.8.6.4 HOW TO REVIEW AND EXPORT SUMMARY REC nav=-
+   crewing   p.90  1.10.1.5 HOW TO EXPORT ALL TRAINING NEEDS RE nav=-
+   technical p.10  1.1.4.2 HOW TO APPLY FILTER                  nav=-
+   technical p.10  1.1.4.3 HOW TO EXPORT SURVEYS                nav=-
+   technical p.11  1.1.3.6 HOW TO APPLY FILTER                  nav=-
+   technical p.19  1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECOR nav=-
+   technical p.19  1.1.5.3 HOW TO APPLY FILTER                  nav=-
+   technical p.19  1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT RECO nav=-
+   technical p.20  1.1.5.5 HOW TO EXPORT ALL COC RECORDS        nav=-
+   technical p.20  1.1.5.6 HOW TO EXPORT AN INDIVIDUAL COC RECO nav=-
+
+NOTE: group A is NOT automatically wrong. Some procedures genuinely require switching
+screens — Stores inventory is maintained from the Spares screen. Each entry needs a
+product decision: reused steps (rename the destination) vs real navigation (keep).

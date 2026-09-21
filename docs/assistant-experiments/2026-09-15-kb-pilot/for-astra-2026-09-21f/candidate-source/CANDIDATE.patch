@@ -1,0 +1,85 @@
+diff --git a/central-assistant-py/app/chat.py b/central-assistant-py/app/chat.py
+index 75e796daa..ed86fca3f 100644
+--- a/central-assistant-py/app/chat.py
++++ b/central-assistant-py/app/chat.py
+@@ -123,6 +123,13 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
+                 hits, routed.module, list(routed.hits), s.assistant_second_opinion_gap, s.route_sim_floor)
+             if second is not None:
+                 reasons.append(f"second opinion: {second.module} {str(second.meta.get('section_title'))[:34]}")
++        if routed.gate == "answer" and routed.module and s.assistant_cross_module_gap > 0:
++            # r9: nearest chunk of each other module within the gap, APPENDED — nothing selected is removed.
++            routed.hits, appended = retrieval.cross_module_append(
++                hits, routed.module, list(routed.hits), s.assistant_cross_module_gap,
++                s.assistant_cross_module_slots, s.route_sim_floor)
++            for a in appended:
++                reasons.append(f"cross-module: {a.module} {str(a.meta.get('section_title'))[:34]}")
+         if routed.gate == "not_documented":
+             log("not_documented", NOT_DOC_MSG, confidence=routed.confidence)
+             return 200, {"response": NOT_DOC_MSG, "gate": "not_documented", "module": None, "citations": [], "confidence": routed.confidence}
+diff --git a/central-assistant-py/app/config.py b/central-assistant-py/app/config.py
+index 115c1947d..5154eba32 100644
+--- a/central-assistant-py/app/config.py
++++ b/central-assistant-py/app/config.py
+@@ -58,6 +58,13 @@ class Settings(BaseSettings):
+     assistant_rescue_max_penalty: float = 0.15
+     # r8: when the module decision was close, let the runner-up module's best chunk take the last slot (0 = off).
+     assistant_second_opinion_gap: float = 0.0
++    # r9 (routing experiment 21-Sep-2026): append the nearest chunk of EACH other module within `gap` of the routed
++    # module's best, as EXTRA excerpts — never displacing one. Measured offline over 101 suite questions: the expected
++    # page is supplied on 63 of 65 instead of 62 of 65 (Audit History gains its page), no existing excerpt is removed,
++    # and 31 excerpts are added across 24 questions. r8 could not do this: it takes min(other), the single nearest
++    # non-routed chunk, which for that question is a Safety chunk and not the Audit page. 0 = off (served behaviour).
++    assistant_cross_module_gap: float = 0.0
++    assistant_cross_module_slots: int = 2
+     # answer prompt in use on the docs path: "v5" (measured baseline) or "v6" (v5 + three rules for the defects in §15.2)
+     assistant_docs_prompt: str = "v5"
+ 
+diff --git a/central-assistant-py/app/retrieval.py b/central-assistant-py/app/retrieval.py
+index cd02f68e4..7d3b8ef7b 100644
+--- a/central-assistant-py/app/retrieval.py
++++ b/central-assistant-py/app/retrieval.py
+@@ -279,8 +279,43 @@ def section_of(meta: dict[str, Any]) -> str:
+     return parts[0] if parts else "Document"
+ 
+ 
++def cross_module_append(all_hits: list[Hit], routed_module: str, chosen: list[Hit], gap: float, slots: int,
++                        floor: float) -> tuple[list[Hit], list[Hit]]:
++    """r9: give the answer the nearest chunk of EACH other module that is within `gap` of the routed module's best,
++    as ADDITIONAL excerpts. Nothing already selected is removed.
++
++    Why not r8 (`second_opinion`): that takes `min(other)` — the single nearest non-routed chunk. For the Audit
++    History review question the nearest non-routed chunk is a Safety chunk at 1.0019, so the Audit page at 1.0204 is
++    still never supplied. Ranging over modules rather than over chunks is what reaches it.
++
++    Why appended rather than substituted: measured offline, the substituting variants supplied the Audit page but
++    pushed Incident p.18 'Part K: Office Closeout' out of the fifth slot on a different question — they traded one
++    right answer for another. Appending removes nothing.
++
++    Documentation scope only; identity, tenant and vessel checks are untouched. Returns (excerpts, appended)."""
++    if gap <= 0 or slots <= 0 or not chosen:
++        return chosen, []
++    routed_best = min((h.distance for h in all_hits if h.module == routed_module), default=None)
++    if routed_best is None:
++        return chosen, []
++    limit = min(floor, routed_best + gap)
++
++    def ident(h: Hit) -> tuple:
++        return (str(h.meta.get("file")), str(h.meta.get("breadcrumb")), str(h.meta.get("chunk_index")))
++    nearest: dict[str, Hit] = {}
++    for h in all_hits:
++        if h.module != routed_module and h.distance <= limit:
++            if h.module not in nearest or h.distance < nearest[h.module].distance:
++                nearest[h.module] = h
++    have = {ident(h) for h in chosen}
++    add = [h for h in sorted(nearest.values(), key=lambda x: x.distance) if ident(h) not in have][:slots]
++    return chosen + add, add
++
++
+ def citations_of(routed: Routed) -> list[dict[str, Any]]:
+-    return [{"module": MODULE_LABELS.get(routed.module or "", routed.module), "manual": manual_of(h.meta),
++    # Each citation carries ITS OWN source module. It previously carried the routed module for every hit, which
++    # mislabels any cross-module excerpt — already wrong for r8 whenever its gap is above zero, and wrong for r9.
++    return [{"module": MODULE_LABELS.get(h.module or "", h.module), "manual": manual_of(h.meta),
+              "section": section_of(h.meta), "distance": round(h.distance, 4)} for h in routed.hits]
+ 
+ 

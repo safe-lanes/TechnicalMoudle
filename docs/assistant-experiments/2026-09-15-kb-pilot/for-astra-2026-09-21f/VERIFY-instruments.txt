@@ -1,0 +1,17 @@
+1. cite_module_ok — must detect a mislabel, not just agree
+   PASS  correct label                                  got True
+   PASS  MISLABELLED (the actual bug)                   got False
+   PASS  unknown manual prefix is not judged            got None
+
+2. supplied_expected — must separate right PAGE from merely right FILE
+   PASS  right file and page                            got (True, True)
+   PASS  right file, WRONG page                         got (True, False)
+   PASS  different file                                 got (False, False)
+
+3. the offline route() reproduction vs the LIVE baseline container
+   PASS  module matches live on all 34 tested questions got []
+
+4. the offline excerpt model vs BOTH live containers
+   PASS  excerpt counts match live on all 34, both arms got []
+
+ALL INSTRUMENTS VERIFIED
