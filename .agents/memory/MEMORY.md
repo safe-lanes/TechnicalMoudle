@@ -1,7 +1,0 @@
-- [Vessel Superintendent lock](superintendent-lock.md) — active approval enforcement is per-vessel, defaults OFF, and never falls back to the legacy global setting.
-- [Radix ScrollArea intrinsic width](radix-scrollarea-intrinsic-width.md) — long unbroken content can expand narrow modal lists despite truncation; constrain the viewport and row explicitly.
-- [Running Hours monotonicity](running-hours-monotonicity.md) — normal RH updates never decrease live counters; only explicit approved reset/replacement workflows may do so.
-- [RH Work Order snapshots](rh-work-order-snapshots.md) — Part A is immutable per-cycle history; completion dates update Job metadata but never RH math or the completed WO.
-- [Completed Work Order dates](completed-work-order-dates.md) — final Completed state requires a valid completion date without changing pre-approval date behavior.
-- [Work Order B2 baselines](work-order-b2-baselines.md) — Start Date and RH completion boundaries are strict and use immutable Part A snapshots.
-- [Work Order B3 applicability](work-order-b3-applicability.md) — B3 exists only for MASTER/INHERITED counters; hidden fields must be stripped on every write path.
