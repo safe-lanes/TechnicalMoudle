@@ -1,0 +1,76 @@
+# or a manual / sub-module name ("risk assessment", "near miss", "master review", …) derived from the served corpus's
+# document titles — never from test questions. The originating module (context.module, always "technical" from the
+# Technical widget) only breaks a clarify tie when it is one of the near candidates; it never overrides an explicit name
+# and never bypasses identity: module context is routing only, tenant and vessel permissions are enforced elsewhere.
+MODULE_ALIASES = {"technical": "technical", "pms": "technical", "audit": "audit", "safety": "safety", "incident": "incident", "crewing": "crewing"}
+_GENERIC_TITLE_WORDS = {"user", "manual", "manuals", "office", "vessel", "specific", "notes", "operational", "for", "sail", "admin", "history", "preparation", "sync", "kb", "pilot"}
+_title_terms: dict[str, str] | None = None  # term → module
+
+
+def _terms_from_title(file: str) -> list[str]:
+    """'Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf' → ['risk assessment']; single generic words dropped."""
+    name = re.sub(r"\.(pdf|docx|md)$", "", file, flags=re.I)
+    name = name.split(" - ", 1)[1] if " - " in name else name
+    name = re.split(r"\s+(user manual|manual|notes)\b|[_(:]|\bR\d\b", name, flags=re.I)[0]
+    name = re.sub(r"[^A-Za-z& ]+", " ", name).strip().lower()
+    words = [w for w in name.split() if w not in _GENERIC_TITLE_WORDS and w != "&"]
+    term = " ".join(words).strip()
+    if not term:
+        return []
+    if len(words) == 1 and len(term) < 4:   # 'moc', 'sms', 'pms' are fine only as explicit uppercase tokens
+        return [term]
+    return [term]
+
+
+async def title_terms() -> dict[str, str]:
+    global _title_terms
+    if _title_terms is None:
+        terms: dict[str, str] = {}
+        for module, file in await db.document_titles():
+            for t in _terms_from_title(file):
+                if t and terms.get(t, module) == module:
+                    terms[t] = module
+        # a term that maps to more than one module is dropped (ambiguous)
+        _title_terms = {t: m for t, m in terms.items() if m in MODULE_LABELS}
+    return _title_terms
+
+
+def explicit_module(message: str, terms: dict[str, str]) -> tuple[str | None, str]:
+    """The module the question itself names, and why. Module names/aliases win over manual titles; ties → None."""
+    low = " " + re.sub(r"[^a-z0-9&+ ]+", " ", message.lower()) + " "
+    named = {m for a, m in MODULE_ALIASES.items() if re.search(rf"\b{re.escape(a)}\b", low)}
+    if len(named) == 1:
+        return next(iter(named)), "module name in question"
+    if len(named) > 1:
+        return None, "several module names in question"
+    hits = {m for t, m in terms.items() if (len(t) >= 4 and f" {t} " in low) or (len(t) < 4 and re.search(rf"\b{t.upper()}\b", message))}
+    if len(hits) == 1:
+        return next(iter(hits)), "manual/sub-module name in question"
+    return None, ("several manual names" if hits else "no module named")
+
+
+def route(hits: list[Hit], message: str | None = None, ui_module: str | None = None, terms: dict[str, str] | None = None) -> Routed:
+    s = settings()
+    if not hits or hits[0].distance > s.route_sim_floor:
+        return Routed("not_documented", confidence=0.0)
+    best: dict[str, float] = {}
+    for h in hits:
+        if h.distance <= s.route_sim_floor and (h.module not in best or h.distance < best[h.module]):
+            best[h.module] = h.distance
+    ranked = sorted(best.items(), key=lambda kv: kv[1])
+    top_module, top_dist = ranked[0]
+    margin = (ranked[1][1] - top_dist) if len(ranked) > 1 else 1.0
+    reason = "vector routing"
+    if s.assistant_route_intent.lower() == "on" and message is not None:
+        named, why = explicit_module(message, terms or {})
+        if named and named in best:
+            top_module, reason = named, f"explicit: {why}"
+            margin = 1.0  # the question named it — no clarification
+        elif margin < s.route_margin and ui_module and ui_module.lower() in {m for m, _ in ranked[:3]}:
+            top_module, reason = ui_module.lower(), "originating-module context broke a clarify tie"
+            margin = s.route_margin
+    if margin < s.route_margin:
+        return Routed("clarify", candidates=[MODULE_LABELS.get(m, m) for m, _ in ranked[:3]], confidence=margin)
+    chosen = [h for h in hits if h.module == top_module and h.distance <= s.route_sim_floor][: s.answer_chunks]
+    r = Routed("answer", hits=chosen, module=top_module, confidence=margin)
+    r.reason = reason  # type: ignore[attr-defined]

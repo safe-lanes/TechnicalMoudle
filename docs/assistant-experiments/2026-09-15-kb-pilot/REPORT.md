@@ -1948,3 +1948,77 @@ The R5 sentence "Both refusals belong to 'Generate Now' only" is wrong — only 
 switch applies to per-job 'Generate WO' too. The correction is recorded with a text diff for later candidate
 work. **The failing answer never received that sentence**, so correcting it is **not** claimed to fix the
 observed contradiction; the causal link is not established.
+
+## 21. Reviewer's fifth pass (19-Sep) — the count overstatement corrected, review finished, routing split in two
+
+No model calls; nothing deployed or reindexed; live, nginx, SMS RAG and every other site untouched; v6 held.
+
+### 21.1 The count was overstated — corrected (item 1)
+
+§20.3 said "I read every CHECK-\* claim — all 123 occurrences". **That was false.** Verified against the JSON:
+117 verdicts were recorded in total (73 F1 + 44 F0), and F1 alone left **56** CHECK-\* claims unread
+(47 comparison, 7 permission, 2 negation). The overstatement came from describing the outcome of a
+regex-driven verdict table as though it covered every claim in the category; the table matched only the
+patterns I had written.
+
+**After finishing the work this round:** F1 **122 of 123** CHECK-\* read (1 unread), F0 **109 of 112**
+(3 unread). Total recorded verdicts **277**. Every remaining unread claim is named individually in
+`review-ledger-s7.md`.
+
+### 21.2 Two review decisions corrected (item 2)
+
+- **`sms-office-1`** — the reviewer spotted a verdict whose note contradicted the claim. Cause: my `XREF`
+  auto-rule matched "same as" **inside a negation** ("the manual does **not** state that its approval steps are
+  the same as Section 4.1.2") and attached the note "restates the manual's own cross-reference; the target is
+  supplied". Checked the full supplied text: no "4.2.2", no "same as 4.1.2", no "refer to 4.1" — the answer's
+  limitation is **accurate**. Verdict stays supported, the reason is replaced, and the rule is now
+  negation-aware. Same class of bug as the work-order judge's, in my own tooling.
+- **`pmsoffice-5`** — my note said the two passages share the "same action (apply filter)". They do not: Office
+  **Dashboard** filter §1.1.3.2 p.9 versus Vessel **Reports** filter §1.1.9.3 p.46 differ in **both screen and
+  environment**, so the comparison cannot attribute the difference to either. Downgraded to
+  **supported-with-qualification**, with the explicit note that any claim generalising to "the two Dashboard
+  screens differ" is **not** established.
+
+### 21.3 Review finished in batches — and two new findings on the pre-change arm
+
+Batches 2 and 3 cleared the outstanding CHECK-\* claims. Verdicts now: **232 supported, 21
+supported-with-qualification, 14 unresolved, 9 unsupported, 1 contradicted.**
+
+Two **new unsupported** claims, both on F0 and both the same shape as the `hist-1` audience-label error — a
+marker or a related form turned into a rule:
+
+| claim | why unsupported |
+|---|---|
+| `certsurveys-2` "the record cannot be saved while a mandatory (\*) field is blank" | the supplied text carries a "Mandatory field" marker and a save-icon callout, but **no** statement that saving is blocked. Searched for "cannot be saved", "not be saved", "required fields" — none present |
+| `fn-2` "the same recording steps are also documented for a Lesson Learnt" | **"Lesson Learnt" does not appear anywhere** in the supplied excerpts for that question |
+
+Also resolved: `generated/4` "the sequence continues across both numbering formats" → **unresolved**, an
+inference the supplied text does not carry.
+
+### 21.4 Wording corrected (item 4)
+
+"Only the unplanned route is exempt from the switch" was too broad — ship-side per-job generation does not
+require the office switch either. Both `DOC-ERROR-both-refusals.md` and `PROPOSED-FIX-switch-scope.md` now read:
+**"On the office instance BOTH 'Generate Now' and per-job 'Generate WO' require the switch; unplanned creation
+does not. On a ship instance neither route requires it."**
+
+### 21.5 Routing split into two independently testable changes (item 3, `ROUTING-PROPOSAL-v2-two-changes.md`)
+
+**"Root cause proven" was too strong and is withdrawn.** What is proven, offline and reproducibly, is a
+**recognition gap**: `_GENERIC_TITLE_WORDS` contains `history` and `preparation`, `_terms_from_title()` returns
+`[]` for both Audit manuals, and `explicit_module()` returns `(None, "no module named")`. Between that gap and
+the wrong answer sit the vector ranking, the floor, the clarify margin and the answer model — that chain is
+**not** established.
+
+- **Change A (recognition):** module-qualified title phrases (`audit history`), never the bare word — because
+  "history" is unique among titles but **not** unambiguous in a user's question ("running-hours history" is
+  Technical). Test A is offline over all 102 stored questions plus two false-positive probes; Change A stands or
+  falls on its own.
+- **Change B (clarification guard):** accepted that it can reject valid paraphrases. It must therefore be
+  measured on **three** outcomes — correct-from-right-module, clarify, wrong-module answer — never two.
+  "`hist-1` is no longer wrong" is not a result; whether it became *correct* or merely *clarified* is the result,
+  along with how many previously-correct questions became clarifications.
+
+`routing-evidence/` now ships the routing code, the title-term proof and the complete captured input for
+`hist-1`, so the claim can be checked without repository access — the reviewer could not verify it from the
+previous pack.

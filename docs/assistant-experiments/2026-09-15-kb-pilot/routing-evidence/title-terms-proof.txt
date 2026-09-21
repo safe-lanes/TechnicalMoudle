@@ -1,0 +1,37 @@
+_GENERIC_TITLE_WORDS = ['admin', 'for', 'history', 'kb', 'manual', 'manuals', 'notes', 'office', 'operational', 'pilot', 'preparation', 'sail', 'specific', 'sync', 'user', 'vessel']
+
+terms produced per corpus document (empty list = unreachable by name):
+
+  ['fleet sharing']          Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf
+  ['fleet sharing']          Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf
+  []                         Audit - History Manual_R1_30.06.2026.pdf
+  []                         Audit - Preparation Manual_Office_R1_30.06.2026.pdf
+  ['crewing']                Crewing - Crewing User Manual R2_10.06.2026.pdf
+  ['fleet notification']     Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf
+  ['incident']               Incident - Incident User Manual R0_20.05.2026.pdf
+  ['lesson learnt']          Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf
+  ['near miss']              Incident - Near Miss User Manual R1_30.05.2026.pdf
+  ['master review']          Safety - Master Review Manual R1_10.06.2026.pdf
+  ['moc']                    Safety - MOC User Manual_Office_R0_31.03.2026.pdf
+  ['moc']                    Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf
+  ['risk assessment']        Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf
+  ['risk assessment']        Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf
+  ['safety meeting']         Safety - Safety Meeting User Manual_R1_31.05.2026.pdf
+  ['sms']                    Safety - SMS User Manual_Office_R0_31.01.2026.pdf
+  ['bulk data import']       Technical - Bulk Data Import (Operational) User Manual.docx
+  ['cert surveys']           Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf
+  ['defects']                Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf
+  []                         Technical - KB pilot: Create an unplanned work order ('+ Unplanned W.O').md
+  []                         Technical - KB pilot: 'Generate WO' for one job — from the Components page.md
+  []                         Technical - KB pilot: How work orders are created — the three ways to create a work order.md
+  []                         Technical - KB pilot: Office 'Generate Now' — generate a vessel's due work orders from the office.md
+  []                         Technical - KB pilot: Planned work orders — generated automatically by the ship's daily job-due scan.md
+  ['pms']                    Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf
+  ['pms']                    Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf
+  ['recent updates changed behaviours'] Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx
+  ['roles permissions']      Technical - Roles & Permissions (Operational) User Manual.docx
+  ['ship side']              Technical - Ship-Side (Vessel Crew) Operational Notes.docx
+  []                         Technical - Sync (Operational) User Manual.docx
+
+question: Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?
+explicit_module -> (None, 'no module named')
