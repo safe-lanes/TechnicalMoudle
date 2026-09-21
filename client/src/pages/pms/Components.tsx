@@ -793,46 +793,89 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   const getLastUpdated = (comp: any) => {
     return comp?.lastUpdated || latestUpdate?.dateUpdatedLocal || latestUpdate?.updatedAt || '—';
   };
+
+  const runningHoursColumnDefs = React.useMemo<ColDef[]>(() => {
+    const header = (label: string, marker: string, testId: string) => () => (
+      <span className="flex items-center" data-testid={testId}>
+        <Marker id={marker} /> {label}
+      </span>
+    );
+
+    return [
+      {
+        headerName: 'RH Counter Type',
+        field: 'counterType',
+        minWidth: 180,
+        flex: 1,
+        headerComponent: header('RH Counter Type', 'B7.B.1', 'B7.B.1'),
+        cellRenderer: ({ value }: any) => (
+          <span data-testid="B7.B.5"><Marker id="B7.B.5" /> {value}</span>
+        ),
+        tooltipField: 'counterType',
+      },
+      {
+        headerName: 'RH Counter Source',
+        field: 'counterSource',
+        minWidth: 180,
+        flex: 1,
+        headerComponent: header('RH Counter Source', 'B7.B.2', 'B7.B.2'),
+        cellRenderer: ({ value }: any) => (
+          <span data-testid="B7.B.6"><Marker id="B7.B.6" /> {value}</span>
+        ),
+        tooltipField: 'counterSource',
+      },
+      {
+        headerName: 'Running Hours',
+        field: 'runningHours',
+        minWidth: 160,
+        flex: 1,
+        headerComponent: header('Running Hours', 'B7.B.3', 'B7.B.3'),
+        cellRenderer: ({ value }: any) => (
+          <span className="font-semibold" data-testid="B7.B.7"><Marker id="B7.B.7" /> {value}</span>
+        ),
+        tooltipField: 'runningHours',
+      },
+      {
+        headerName: 'Last Updated',
+        field: 'lastUpdated',
+        minWidth: 170,
+        flex: 1,
+        headerComponent: header('Last Updated', 'B7.B.4', 'B7.B.4'),
+        cellRenderer: ({ value }: any) => (
+          <span data-testid="B7.B.8"><Marker id="B7.B.8" /> {value}</span>
+        ),
+        tooltipField: 'lastUpdated',
+      },
+    ];
+  }, []);
   
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view running hours</div>;
   };
   
   const rhCounterType = getRHCounterType(selectedComponent);
+  const runningHoursRow = [{
+    id: selectedComponent.actualId || selectedComponent.id || selectedComponent.code,
+    counterType: rhCounterType === 'MASTER' ? 'Master'
+      : rhCounterType === 'INHERITED' ? 'Inherited'
+      : 'Not RH Driven',
+    counterSource: getRHCounterSource(selectedComponent),
+    runningHours: getDisplayRH(selectedComponent),
+    lastUpdated: getLastUpdated(selectedComponent),
+  }];
   
   return (
     <div className="space-y-4">
-      {/* Running Hours Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm" data-testid="table-running-hours">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.B.1"><Marker id="B7.B.1" /> RH Counter Type</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.B.2"><Marker id="B7.B.2" /> RH Counter Source</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.B.3"><Marker id="B7.B.3" /> Running Hours</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.B.4"><Marker id="B7.B.4" /> Last Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-gray-200">
-              <td className="py-2 px-3" data-testid="B7.B.5">
-                <Marker id="B7.B.5" /> {rhCounterType === 'MASTER' ? 'Master' :
-                 rhCounterType === 'INHERITED' ? 'Inherited' :
-                 'Not RH Driven'}
-              </td>
-              <td className="py-2 px-3" data-testid="B7.B.6">
-                <Marker id="B7.B.6" /> {getRHCounterSource(selectedComponent)}
-              </td>
-              <td className="py-2 px-3 font-semibold" data-testid="B7.B.7">
-                <Marker id="B7.B.7" /> {getDisplayRH(selectedComponent)}
-              </td>
-              <td className="py-2 px-3" data-testid="B7.B.8">
-                <Marker id="B7.B.8" /> {getLastUpdated(selectedComponent)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <WOAgGridTable
+        columnDefs={runningHoursColumnDefs}
+        rowData={runningHoursRow}
+        domLayout="autoHeight"
+        height="auto"
+        rowHeight={44}
+        headerHeight={44}
+        testId="component-running-hours-grid"
+        getRowId={({ data }) => String(data.id)}
+      />
     </div>
   );
 };
@@ -1322,82 +1365,122 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
     ? maintenanceHistory.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE)
     : maintenanceHistory.slice(0, COLLAPSED_ROWS);
 
+  const maintenanceColumnDefs = React.useMemo<ColDef[]>(() => {
+    const header = (label: string, marker: string, testId: string) => () => (
+      <span className="flex items-center" data-testid={testId}>
+        <Marker id={marker} /> {label}
+      </span>
+    );
+
+    return [
+      {
+        headerName: 'WO No',
+        field: 'workOrderNo',
+        minWidth: 140,
+        flex: 0.9,
+        headerComponent: header('WO No', 'B7.D.4', 'B7.D.4'),
+        cellClass: 'font-medium',
+        tooltipField: 'workOrderNo',
+      },
+      {
+        headerName: 'Job Title',
+        field: 'jobTitle',
+        minWidth: 220,
+        flex: 1.7,
+        headerComponent: header('Job Title', 'B7.D.5', 'B7.D.5'),
+        tooltipField: 'jobTitle',
+      },
+      {
+        headerName: 'Type',
+        field: 'maintenanceType',
+        minWidth: 130,
+        flex: 0.9,
+        headerComponent: header('Type', 'B7.D.6', 'B7.D.6'),
+        tooltipField: 'maintenanceType',
+      },
+      {
+        headerName: 'Date Completed',
+        field: 'dateCompleted',
+        minWidth: 155,
+        flex: 1,
+        headerComponent: header('Date Completed', 'B7.D.7', 'B7.D.7'),
+        tooltipField: 'dateCompleted',
+      },
+      {
+        headerName: 'Running Hours',
+        field: 'runningHoursAtCompletion',
+        minWidth: 145,
+        flex: 0.9,
+        headerComponent: header('Running Hours', 'B7.D.8', 'B7.D.8'),
+        valueFormatter: ({ value }) => value || '-',
+      },
+      {
+        headerName: 'Performed By',
+        field: 'performedBy',
+        minWidth: 155,
+        flex: 1,
+        headerComponent: header('Performed By', 'B7.D.9', 'B7.D.9'),
+        tooltipField: 'performedBy',
+      },
+      {
+        headerName: 'Approved By',
+        field: 'approvedBy',
+        minWidth: 155,
+        flex: 1,
+        headerComponent: header('Approved By', 'B7.D.10', 'B7.D.10'),
+        valueFormatter: ({ value }) => value || '-',
+        tooltipField: 'approvedBy',
+      },
+      {
+        headerName: 'Status',
+        field: 'status',
+        minWidth: 130,
+        flex: 0.8,
+        headerComponent: header('Status', 'B7.D.11', 'B7.D.11'),
+        cellRenderer: ({ value }: any) => (
+          <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            {value}
+          </span>
+        ),
+        tooltipField: 'status',
+      },
+    ];
+  }, []);
+
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view maintenance history</div>;
   }
   
-  if (isLoading) {
-    return <div className="text-sm text-gray-500">Loading maintenance history...</div>;
-  }
-
-  if (maintenanceHistory.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-gray-400 text-sm">
-          No maintenance history records found for this component
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
-          History records are automatically created when work orders are approved and completed
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-gray-600" data-testid="B7.D.2">
-          <Marker id="B7.D.2" /> <span className="font-semibold">{maintenanceHistory.length}</span> maintenance record(s) found
+      {maintenanceHistory.length > 0 && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-gray-600" data-testid="B7.D.2">
+            <Marker id="B7.D.2" /> <span className="font-semibold">{maintenanceHistory.length}</span> maintenance record(s) found
+          </div>
+          <div className="text-xs text-gray-500 italic" data-testid="B7.D.3">
+            <Marker id="B7.D.3" /> Records are immutable and cannot be edited or deleted
+          </div>
         </div>
-        <div className="text-xs text-gray-500 italic" data-testid="B7.D.3">
-          <Marker id="B7.D.3" /> Records are immutable and cannot be edited or deleted
-        </div>
-      </div>
+      )}
       
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b-2 border-gray-200">
-              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.4"><Marker id="B7.D.4" /> WO No</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.5"><Marker id="B7.D.5" /> Job Title</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.6"><Marker id="B7.D.6" /> Type</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.7"><Marker id="B7.D.7" /> Date Completed</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.8"><Marker id="B7.D.8" /> Running Hours</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.9"><Marker id="B7.D.9" /> Performed By</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.10"><Marker id="B7.D.10" /> Approved By</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.11"><Marker id="B7.D.11" /> Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRecords.map((record, index) => (
-              <tr 
-                key={index} 
-                className="border-b border-gray-100 hover:bg-blue-50 cursor-pointer"
-                onClick={() => setSelectedRecord(record)}
-                data-testid={`maintenance-record-${record.workOrderNo}`}
-              >
-                <td className="py-3 px-3 text-gray-900 font-medium" data-testid={`wo-no-${record.workOrderNo}`}>
-                  {record.workOrderNo}
-                </td>
-                <td className="py-3 px-3 text-gray-900" data-testid={`job-title-${record.workOrderNo}`}>
-                  {record.jobTitle}
-                </td>
-                <td className="py-3 px-3 text-gray-900">{record.maintenanceType}</td>
-                <td className="py-3 px-3 text-gray-900">{record.dateCompleted}</td>
-                <td className="py-3 px-3 text-gray-900">
-                  {record.runningHoursAtCompletion || '-'}
-                </td>
-                <td className="py-3 px-3 text-gray-900">{record.performedBy}</td>
-                <td className="py-3 px-3 text-gray-900">{record.approvedBy || '-'}</td>
-                <td className="py-3 px-3">
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {record.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div>
+        <WOAgGridTable
+          columnDefs={maintenanceColumnDefs}
+          rowData={visibleRecords}
+          loading={isLoading}
+          domLayout="autoHeight"
+          height="auto"
+          rowHeight={48}
+          headerHeight={44}
+          noRowsMessage="No maintenance history records found for this component — records are created when work orders are approved and completed"
+          testId="component-maintenance-history-grid"
+          getRowId={({ data }) => String(data.workOrderId || data.workOrderNo)}
+          getRowClass={() => 'cursor-pointer'}
+          onRowClicked={({ data }) => {
+            if (data) setSelectedRecord(data);
+          }}
+        />
         
         {/* Expand/Collapse and Pagination Controls */}
         {totalRecords > COLLAPSED_ROWS && (
@@ -1455,9 +1538,11 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
       </div>
       
       {/* Instruction hint */}
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700" data-testid="B7.D.20">
-        <Marker id="B7.D.20" /> Click on a record to view full details including work description, spares used, and remarks
-      </div>
+      {maintenanceHistory.length > 0 && (
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700" data-testid="B7.D.20">
+          <Marker id="B7.D.20" /> Click on a record to view full details including work description, spares used, and remarks
+        </div>
+      )}
 
       {/* Work Order Viewer Sheet - shows full completed work order form */}
       <WorkOrderViewerSheet
@@ -1552,153 +1637,257 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const visibleSpares = isTableExpanded 
     ? sparesWithInventory.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE)
     : sparesWithInventory.slice(0, COLLAPSED_ROWS);
+
+  const spareColumnDefs = React.useMemo<ColDef[]>(() => {
+    const header = (label: string, marker?: string, testId?: string) => () => (
+      <span className="flex items-center" data-testid={testId}>
+        {marker && <Marker id={marker} />} {label}
+      </span>
+    );
+    const firstRowMarker = (rowIndex: number | null, marker: string) =>
+      rowIndex === 0 ? <Marker id={marker} /> : null;
+
+    const columns: ColDef[] = [
+      {
+        headerName: 'Part Code',
+        minWidth: 145,
+        flex: 1,
+        headerComponent: header('Part Code', 'B7.E.2', 'B7.E.2'),
+        valueGetter: ({ data }) => data?.spare?.partCode || '—',
+        cellRenderer: ({ value, node }: any) => (
+          <span className="text-blue-600 hover:underline">
+            {firstRowMarker(node.rowIndex, 'B7.E.10')}{value}
+          </span>
+        ),
+        tooltipValueGetter: ({ value }) => value,
+      },
+      {
+        headerName: 'Part Name',
+        minWidth: 220,
+        flex: 1.6,
+        headerComponent: header('Part Name', 'B7.E.3', 'B7.E.3'),
+        valueGetter: ({ data }) => data?.spare?.partName || '—',
+        cellRenderer: ({ value, node }: any) => (
+          <span>{firstRowMarker(node.rowIndex, 'B7.E.11')}{value}</span>
+        ),
+        tooltipValueGetter: ({ value }) => value,
+      },
+      {
+        headerName: 'Component',
+        minWidth: 170,
+        flex: 1.2,
+        headerComponent: header('Component'),
+        cellRenderer: ({ data }: any) =>
+          data?.linkedComponents?.length > 1 ? (
+            <span className="px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">
+              Multi-linked
+            </span>
+          ) : getComponentDisplay(data?.linkedComponents || []),
+        tooltipValueGetter: ({ data }) => getComponentDisplay(data?.linkedComponents || []),
+      },
+      {
+        headerName: 'Part Number',
+        minWidth: 150,
+        flex: 1,
+        headerComponent: header('Part Number'),
+        valueGetter: ({ data }) => data?.spare?.partNumber || '-',
+        tooltipValueGetter: ({ value }) => value,
+      },
+      {
+        headerName: 'Critical',
+        minWidth: 120,
+        flex: 0.8,
+        headerComponent: header('Critical', 'B7.E.4', 'B7.E.4'),
+        cellRenderer: ({ data, node }: any) => {
+          const spare = data?.spare || {};
+          const isCritical =
+            spare.critical === 'Critical' ||
+            spare.critical === 'Yes' ||
+            spare.criticality === 'Yes';
+          return (
+            <span className="flex items-center">
+              {firstRowMarker(node.rowIndex, 'B7.E.12')}
+              {isCritical && (
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                  Critical
+                </span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: 'ROB',
+        minWidth: 100,
+        flex: 0.65,
+        headerComponent: header('ROB', 'B7.E.5', 'B7.E.5'),
+        field: 'robTotal',
+        cellRenderer: ({ value, node }: any) => (
+          <span className="font-medium">{firstRowMarker(node.rowIndex, 'B7.E.13')}{value}</span>
+        ),
+      },
+      {
+        headerName: 'Min',
+        minWidth: 100,
+        flex: 0.65,
+        headerComponent: header('Min', 'B7.E.6', 'B7.E.6'),
+        valueGetter: ({ data }) => data?.spare?.min || 0,
+        cellRenderer: ({ value, node }: any) => (
+          <span>{firstRowMarker(node.rowIndex, 'B7.E.14')}{value}</span>
+        ),
+      },
+      {
+        headerName: 'Stock',
+        minWidth: 120,
+        flex: 0.8,
+        headerComponent: header('Stock', 'B7.E.7', 'B7.E.7'),
+        field: 'stockStatus',
+        cellRenderer: ({ value, node }: any) => (
+          <span className="flex items-center">
+            {firstRowMarker(node.rowIndex, 'B7.E.15')}
+            {getStockStatusBadge(value)}
+          </span>
+        ),
+      },
+      {
+        headerName: 'Location',
+        minWidth: 145,
+        flex: 0.9,
+        sortable: false,
+        filter: false,
+        headerComponent: header('Location', 'B7.E.8', 'B7.E.8'),
+        cellRenderer: ({ data, node }: any) => (
+          <span className="flex items-center">
+            {firstRowMarker(node.rowIndex, 'B7.E.16')}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  data-testid={`location-popup-trigger-${node.rowIndex}`}
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span>View ({data.locations.length})</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-0" align="start">
+                <div className="p-3 border-b bg-gray-50">
+                  <h4 className="font-semibold text-sm text-gray-800">Storage Locations</h4>
+                </div>
+                <div className="p-3 space-y-3">
+                  {data.locations.length === 0 ? (
+                    <div className="text-sm text-gray-500 text-center py-2">No locations assigned</div>
+                  ) : data.locations.map((loc: any, locIdx: number) => (
+                    <div key={loc.locationId} className={`flex items-center justify-between p-2 rounded-lg border ${locIdx === 0 ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'}`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${locIdx === 0 ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+                        <span className="text-sm font-medium text-gray-700">{loc.locationName}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-gray-900">{loc.qty}</span>
+                        <span className="text-xs text-gray-500 ml-1">units</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-2 border-t text-xs text-gray-500">
+                    Total ROB: <span className="font-semibold text-gray-700">{data.robTotal}</span> units
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </span>
+        ),
+      },
+      {
+        headerName: 'Rotation',
+        minWidth: 120,
+        flex: 0.8,
+        headerComponent: header('Rotation'),
+        cellRenderer: ({ data }: any) => (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            data?.spare?.isRotationItem
+              ? 'bg-blue-100 text-blue-800'
+              : 'bg-gray-100 text-gray-600'
+          }`}>
+            {data?.spare?.isRotationItem ? 'Yes' : 'No'}
+          </span>
+        ),
+      },
+    ];
+
+    if (FEATURES.IHM) {
+      columns.push({
+        headerName: 'IHM',
+        minWidth: 95,
+        flex: 0.6,
+        headerComponent: header('IHM', 'B7.E.9', 'B7.E.9'),
+        cellRenderer: ({ data, node }: any) => {
+          const spare = data?.spare || {};
+          return (
+            <span className="flex items-center">
+              {firstRowMarker(node.rowIndex, 'B7.E.17')}
+              {(spare.ihmPresence === 'YES' || spare.ihm === 'Yes') ? (
+                <span title="IHM Present"><AlertCircle className="h-4 w-4 text-red-500" /></span>
+              ) : (spare.ihmPresence === 'NO' || spare.ihm === 'No') ? (
+                <span title="No IHM"><CheckCircle className="h-4 w-4 text-green-500" /></span>
+              ) : (
+                <span title="IHM Unknown"><HelpCircle className="h-4 w-4 text-gray-400" /></span>
+              )}
+            </span>
+          );
+        },
+      });
+    }
+
+    columns.push({
+      headerName: 'Actions',
+      minWidth: 110,
+      maxWidth: 140,
+      flex: 0.7,
+      sortable: false,
+      filter: false,
+      headerComponent: header('Actions'),
+      cellRenderer: ({ data }: any) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleViewSpareDetails(data);
+          }}
+          data-testid={`view-spare-details-${data.spare.id}`}
+        >
+          <FileText className="h-4 w-4" />
+        </Button>
+      ),
+    });
+
+    return columns;
+  }, []);
   
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view associated spares</div>;
   }
   
   return (
-    <div className="overflow-x-auto">
-      {sparesLoading ? (
-        <div className="py-8 text-center text-gray-500">Loading spares...</div>
-      ) : (
-      <>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200">
-            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.2"><Marker id="B7.E.2" /> Part Code</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.3"><Marker id="B7.E.3" /> Part Name</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Component</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Part Number</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.4"><Marker id="B7.E.4" /> Critical</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.5"><Marker id="B7.E.5" /> ROB</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.6"><Marker id="B7.E.6" /> Min</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.7"><Marker id="B7.E.7" /> Stock</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.8"><Marker id="B7.E.8" /> Location</th>
-            <th className="text-center py-2 px-3 font-medium text-gray-600">Rotation</th>
-            {FEATURES.IHM && (
-              <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.E.9" title="IHM Status"><Marker id="B7.E.9" /> IHM</th>
-            )}
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sparesWithInventory.length === 0 ? (
-            <tr>
-              <td colSpan={FEATURES.IHM ? 12 : 11} className="text-center py-8">
-                <div className="text-gray-400 text-sm">No spare parts linked to this component</div>
-                <p className="text-xs text-gray-500 mt-2">Navigate to the Spares module to manage spare parts inventory</p>
-              </td>
-            </tr>
-          ) : visibleSpares.map((spareData, index) => {
-            const spare = spareData.spare;
-            const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes' || spare.criticality === 'Yes';
-            return (
-            <tr key={spare.id || index} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => handleViewSpareDetails(spareData)}>
-              <td className="py-3 px-3 text-gray-900 text-blue-600 hover:underline" data-testid={index === 0 ? "B7.E.10" : undefined}>
-                {index === 0 && <Marker id="B7.E.10" />}
-                {spare.partCode}
-              </td>
-              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.11" : undefined}>
-                {index === 0 && <Marker id="B7.E.11" />}
-                {spare.partName}
-              </td>
-              <td className="py-3 px-3 text-gray-700">
-                {spareData.linkedComponents.length > 1 ? (
-                  <span className="px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">Multi-linked</span>
-                ) : (
-                  getComponentDisplay(spareData.linkedComponents)
-                )}
-              </td>
-              <td className="py-3 px-3 text-gray-700">{spare.partNumber || '-'}</td>
-              <td className="py-3 px-3" data-testid={index === 0 ? "B7.E.12" : undefined}>
-                {index === 0 && <Marker id="B7.E.12" />}
-                {isCritical && (
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-                    Critical
-                  </span>
-                )}
-              </td>
-              <td className="py-3 px-3 text-gray-900 font-medium" data-testid={index === 0 ? "B7.E.13" : undefined}>
-                {index === 0 && <Marker id="B7.E.13" />}
-                {spareData.robTotal}
-              </td>
-              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.14" : undefined}>
-                {index === 0 && <Marker id="B7.E.14" />}
-                {spare.min || 0}
-              </td>
-              <td className="py-3 px-3" data-testid={index === 0 ? "B7.E.15" : undefined}>
-                {index === 0 && <Marker id="B7.E.15" />}
-                {getStockStatusBadge(spareData.stockStatus)}
-              </td>
-              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.16" : undefined} onClick={(e) => e.stopPropagation()}>
-                {index === 0 && <Marker id="B7.E.16" />}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button 
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                      data-testid={`location-popup-trigger-${index}`}
-                    >
-                      <MapPin className="h-3.5 w-3.5" />
-                      <span>View ({spareData.locations.length})</span>
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 p-0" align="start">
-                    <div className="p-3 border-b bg-gray-50">
-                      <h4 className="font-semibold text-sm text-gray-800">Storage Locations</h4>
-                    </div>
-                    <div className="p-3 space-y-3">
-                      {spareData.locations.length === 0 ? (
-                        <div className="text-sm text-gray-500 text-center py-2">No locations assigned</div>
-                      ) : spareData.locations.map((loc, locIdx) => (
-                        <div key={loc.locationId} className={`flex items-center justify-between p-2 rounded-lg border ${locIdx === 0 ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'}`}>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${locIdx === 0 ? 'bg-blue-500' : 'bg-green-500'}`}></div>
-                            <span className="text-sm font-medium text-gray-700">{loc.locationName}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-sm font-bold text-gray-900">{loc.qty}</span>
-                            <span className="text-xs text-gray-500 ml-1">units</span>
-                          </div>
-                        </div>
-                      ))}
-                      <div className="pt-2 border-t text-xs text-gray-500">
-                        Total ROB: <span className="font-semibold text-gray-700">{spareData.robTotal}</span> units
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </td>
-              <td className="py-3 px-3 text-center">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  spare.isRotationItem
-                    ? "bg-blue-100 text-blue-800"
-                    : "bg-gray-100 text-gray-600"
-                }`}>
-                  {spare.isRotationItem ? "Yes" : "No"}
-                </span>
-              </td>
-              {FEATURES.IHM && (
-                <td className="py-3 px-3 text-center" data-testid={index === 0 ? "B7.E.17" : undefined}>
-                  {index === 0 && <Marker id="B7.E.17" />}
-                  {(spare.ihmPresence === 'YES' || spare.ihm === 'Yes') ? (
-                    <span title="IHM Present"><AlertCircle className="h-4 w-4 text-red-500 mx-auto" /></span>
-                  ) : (spare.ihmPresence === 'NO' || spare.ihm === 'No') ? (
-                    <span title="No IHM"><CheckCircle className="h-4 w-4 text-green-500 mx-auto" /></span>
-                  ) : (
-                    <span title="IHM Unknown"><HelpCircle className="h-4 w-4 text-gray-400 mx-auto" /></span>
-                  )}
-                </td>
-              )}
-              <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="sm" onClick={() => handleViewSpareDetails(spareData)} data-testid={`view-spare-details-${spare.id}`}>
-                  <FileText className="h-4 w-4" />
-                </Button>
-              </td>
-            </tr>
-          )})}
-        </tbody>
-      </table>
+    <div>
+      <WOAgGridTable
+        columnDefs={spareColumnDefs}
+        rowData={visibleSpares}
+        loading={sparesLoading}
+        domLayout="autoHeight"
+        height="auto"
+        rowHeight={48}
+        headerHeight={44}
+        noRowsMessage="No spare parts linked to this component — navigate to the Spares module to manage inventory"
+        testId="component-spares-grid"
+        getRowId={({ data }) => String(data.spare.id || data.spare.suuid || data.spare.partCode)}
+        getRowClass={() => 'cursor-pointer'}
+        onRowClicked={({ data, event }) => {
+          const target = event?.target as HTMLElement | null;
+          if (target?.closest('button, [role=\"dialog\"]')) return;
+          if (data) handleViewSpareDetails(data);
+        }}
+      />
       
       {/* Expand/Collapse and Pagination Controls */}
       {totalSpares > COLLAPSED_ROWS && (
@@ -1753,9 +1942,6 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
           )}
         </div>
       )}
-      </>
-      )}
-      
       {/* Spare Details Dialog (E1) */}
       <Dialog open={spareDetailsOpen} onOpenChange={setSpareDetailsOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
