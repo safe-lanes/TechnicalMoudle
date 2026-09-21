@@ -1,0 +1,44 @@
+================================================================================================================
+RULING 1 — wo-phr-01 F1 run 1: FALSE FAILURE. Corrected.
+================================================================================================================
+The two sentences in the per-job block that mention the switch:
+
+   * - in the **office**, the vessel’s **office work-order generation** switch must be on.
+   * the ship does not have this switch requirement.
+
+The first is the condition and it IS office-qualified. The second is the correct ship contrast. The .12 test
+required EVERY unit mentioning the switch to carry 'office', so the contrast sentence failed the answer.
+.13 judges only units that ASSERT the condition; a mention inside a negated clause is skipped.
+   .12: FAIL — automatic generation ✓; pairing ✗: Generate WO switch stated without the office qualifier [incorrect applicability]
+   .13: PASS — automatic generation ✓; pairing ✓
+
+================================================================================================================
+RULING 2 — wo-phr-05 F1 run 3: GENUINE ANSWER DEFECT. Verdict kept, reason corrected.
+================================================================================================================
+What the answer REQUIRES for per-job 'Generate WO', in its own steps:
+
+   * - in the office, the vessel’s **office work-order generation switch must be on**.
+
+What the same answer then CONCLUDES:
+
+   * the draft code-derived guidance says the office switch and sail admin restriction apply only to the relevant planned-generation actions, not to per-job **generate wo** or unplanned work orders.
+
+The office switch DOES apply to per-job 'Generate WO'; only the Sail Admin restriction does not. The answer
+requires the switch in its steps and then excludes it — it contradicts itself, and must fail.
+My earlier write-up called this a judge error and proposed no change. That was WRONG: the reviewer read the
+answer and identified the contradiction. The judge's stated REASON was also wrong ("Sail Admin wrongly attached
+to Generate WO" — a bare substring test firing on a correct negated sentence), so .13 does two things: it makes
+that test negation-aware, and it adds a test for the defect that is actually present.
+   .12: FAIL — automatic generation ✓; pairing ✗: Sail Admin wrongly attached to Generate WO [incorrect applicability]
+   .13: FAIL — automatic generation ✓; pairing ✗: self-contradiction: the office switch is required for per-job Generate WO in the steps and then excluded from it — "the draft code-derived guidance says the office switch and sail admin restricti
+
+================================================================================================================
+SIDE EFFECT — the new contradiction test caught a THIRD run, on a historical arm
+================================================================================================================
+  requires: in the office, the vessel’s **office work-order generation** switch must be on.
+  excludes: the draft code-derived guidance says that the office switch and sail admin requirement apply to office generation, not to unplanned work orders or per-job generation.
+  .12 PASS → .13 FAIL — the same self-contradiction, previously unnoticed.
+
+Validation over all ten stored work-order dumps: 3 rule-level changes, 2 overall verdict changes
+(wo-phr-01 F1 r1 fail→PASS, wo-generic-03 D2-hybrid r3 PASS→fail). wo-phr-05 F1 r3 stays FAIL.
+Full table: wo-judge13-validation.txt. JUDGE_VERSION=12 reproduces the previous scores exactly.

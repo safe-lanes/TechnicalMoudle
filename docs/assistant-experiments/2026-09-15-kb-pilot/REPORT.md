@@ -1770,3 +1770,76 @@ The reviewer asked what real chatbot fix is left once the tests stop moving. On 
    against the supplied text, which does not exist yet and is not built here.
 
 Position unchanged: **keep live as it is.** Nothing deployed, nothing pushed.
+
+## 19. The citation review, completed (19-Sep) — and the one targeted fix it points to
+
+The reviewer's remaining task: finish the source-based citation review from the existing full answers and
+captured excerpts, keep the switch contradiction as a real failure, propose **one** targeted fix afterwards
+rather than expanding scoring rules, and keep the other open issues visible. No model calls in this round;
+nothing deployed.
+
+### 19.1 Method and totals (`claim_review.py` → `claim-review-s7.txt`, verdicts in `citation-review-verdicts-s7.md`)
+
+Every stored answer is split into claims and each substantive claim scored by content-word coverage against the
+single best-matching **supplied** excerpt. Lead-ins, navigation steps and statements *about* the sources are
+reported separately rather than scored. Thresholds route attention; the verdict is the reading.
+
+| | F1 corrected | F0 pre-change |
+|---|---|---|
+| substantive claims scored | 1,245 | 1,235 |
+| supported by one excerpt (≥ 0.80) | 950 | 926 |
+| partial (0.50–0.79) | 264 | 280 |
+| flagged and read (< 0.50) | **31** | **29** |
+
+A first run of this review flagged 59; 28 of them were list lead-ins ("You can filter by:") that my splitter had
+scored as claims. That was fixed before the verdicts were written.
+
+### 19.2 Verdicts on the 31 flagged claims
+
+- **8 supported** — the metric under-scored them; the fact is in the supplied text verbatim. These are exactly
+  the claims worth checking hardest: `JOB-XXXXXXX` as the generated job code, "not exceed 20 MB" for a combined
+  upload, "5 MB per attachment", the "Doc 4.2.03" reference, "Save or Submittion is required for generating the
+  Request no.", auto-sync on the ship, "the latest date wins; a same-date tie goes to the ship", and the
+  Promotions 'All' sub-module opening by default. **No invented number, limit or identifier was found.**
+- **20 cross-excerpt syntheses** — "this applies to both Ship and Office", "the sets are different…", "not a
+  separate procedure for each section". In every case the components are present across two or more supplied
+  excerpts; a single-excerpt score cannot represent them. Legitimate, with the limit stated: this shows the
+  components were supplied, not that every comparison is logically sound.
+- **3 UNSUPPORTED** — all three runs of `hist-1`, all one root cause (§19.3).
+
+### 19.3 The only unsupported claims: the Audit History routing defect, and what it actually produces
+
+`hist-1` asks who may add comments in the Review section of an **inspection history** record. The expected
+source, `Audit - History Manual R1 p16` ("The Review section is intended for office users only"), **was never
+supplied**: the known routing defect sends the question to Technical, and the three supplied documents are the
+PMS Office manual, the Ship-Side notes and the Sync notes. The answer is built from the PMS **work-order** review
+section — a different feature that also has a "Reviewer Comments" field — and converts a document audience label
+("Audience: Office / Sail Admin") into a permission rule.
+
+The answers are **correct by coincidence**. That is the finding worth carrying: this routing defect does not
+merely fail to retrieve, it can produce a confident permission claim sourced from the wrong feature. All three
+runs already fail on the citation check, so no score moves.
+
+### 19.4 One targeted fix, proposed not applied (`PROPOSED-FIX-switch-scope.md`)
+
+Tracing the switch/role conflation: the failing run's **supplied** text was correct — "the **Sail Admin
+requirement** belongs to 'Generate Now' only" scopes the role alone, and the model widened it. But the corpus
+contains a sentence that asserts the error outright, and **I wrote it** in this work — R5 §1.1.14.6.2: "**Both
+refusals** belong to 'Generate Now' only." The switch refusal is not exclusive: the per-job route requires the
+same switch and returns the same message when it is off.
+
+The proposed fix is one change made at the two points that state the exclusivity — R5 §1.1.14.6.2 and the KB
+exceptions line — so the switch's scope is explicit wherever the role's exclusivity is stated. No scoring rule
+changes; the work-order contradiction test stays exactly as it is.
+
+It is **not** established that this removes the contradiction: the failing run never saw the wrong sentence, so
+this corrects a corpus error and a plausible contributing cause. Verifying it needs a re-index and a re-run of
+the work-order suite — new model calls, not started, owner's approval required.
+
+### 19.5 Everything else still open — `OPEN-ISSUES.md`
+
+A register is now kept alongside the report: answer defects (the switch conflation; the Audit History routing
+and what it produces; corrected-claims case 01; two chunks indexed but never retrieved), retrieval and ranking
+(case 06 first-source), test-suite quality (cases naming 14 or 4 documents; every citation pass provisional; 264
+partial claims not individually read) and measurement hygiene (the disagreement figure; the two corrected
+numbers; my parser bug). **Live unchanged, promote nothing, v6 held.**

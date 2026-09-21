@@ -1,0 +1,382 @@
+================================================================================================================
+ARM F1 — claim-level review of every stored answer against its captured excerpts
+================================================================================================================
+  substantive claims scored : 1245
+     supported   (>=0.80)   : 950
+     partial     (0.50-0.79): 264
+     UNSUPPORTED (<0.50)    : 31
+  source-commentary (reported, not scored for support): 183
+  navigational (no factual condition)                 : 303
+  too short to score                                  : 10
+
+  UNSUPPORTED claims: 31 occurrences in 31 distinct sentences — all printed below
+
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   answers/3 r3
+  CLAIM: Saving or submitting is required to generate the request number.
+  terms not found in any supplied excerpt: ['generate', 'number', 'sav', 'submitt']
+  closest supplied excerpt: Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.16)
+     screenshot: SAIL SMS Procedures interface showing how to add main folders and subfolders Figure 24 * Follow the steps below to add a new document to the relevant chapter (**Ref. Fig. 25**): * Click on the chapter name under which the document is to be uploaded. * Click on the "**File**" tab to upload the document from your local storage. <mark>☞ Repeat the above steps to upload additional document
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.00   answers/10 r2
+  CLAIM: This applies to both the Office and Vessel/Ship versions.
+  terms not found in any supplied excerpt: ['appl', 'both', 'office', 'ship', 'version', 'vessel']
+  closest supplied excerpt: None — None
+     
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.25   answers/11 r2
+  CLAIM: It does not provide separate steps for that button.
+  terms not found in any supplied excerpt: ['provide', 'separate', 'step']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.3 HOW TO ADD COMPONENTS (p.24)
+     * Select the required vessel from the 'Vessel' dropdown. (Ref Figure 34) * Click on the 'Add Component' button. (Ref Figure 34) Screenshot of the Components screen showing the vessel selection dropdown and the Add Component button. Annotated with: 1. Click here to select the vessel. 2. Click here to add a new component. <a id="figure-34"></a> Figure 34 * The screen below appears after clicking the
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.45   generated/1 r1
+  CLAIM: You may leave it blank; the system generates a code such as JOB-XXXXXXX during import.
+  terms not found in any supplied excerpt: ['dur', 'leave', 'may', 'such', 'system', 'you']
+  closest supplied excerpt: Technical - Bulk Data Import (Operational) User Manual — 1.1.11.3 How To Download the Import Template
+     * For the selected template click 'Download Template'. * Fill in your data keeping the column headings unchanged — rows are read by their exact column names. * Save the file as .csv, .xls or .xlsx (maximum 20 MB). * Vessel Code must match the vessel selected on screen; rows with another vessel code are rejected. * Component Code must already exist for the selected vessel; otherwise the row is reje
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.44   generated/11 r3
+  CLAIM: Auto-sync, when enabled on the ship, is the other supported way to continue synchronization.
+  terms not found in any supplied excerpt: ['continue', 'other', 'support', 'synchronization', 'way']
+  closest supplied excerpt: Technical - Sync (Operational) User Manual — 1.2.4 Auto-Sync vs Manual Sync (What's Normal)
+     * Audience: Office / Sail Admin + Ship. * Sync is always started by the ship; the office has no sync trigger. Auto-sync runs on the ship when enabled in the ship's Auto-Sync Settings (enabled by default, every 6 hours, first run about 3 minutes after the ship system starts). * A manual 'Sync Now' is available on the ship for an immediate sync — for example after a large data entry, or to confirm c
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.47   generated/13 r2
+  CLAIM: The same non-decrease rule also applies to direct ship/office entries and synchronization; synchronization reconciles readings by date, with the latest date winning and a same-date tie going to the ship.
+  terms not found in any supplied excerpt: ['also', 'appl', 'direct', 'entr', 'non-decrease', 'rule', 'same', 'synchronization', 'winn']
+  closest supplied excerpt: Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.3 Running Hours Never Move Backwards
+     * A component's running-hours counter is never reduced by a late, low or out-of-order reading from any source (ship entry, office entry, work-order completion or sync). A lower reading entered directly is refused; a lower reading that is back-dated is kept in the audit history and on the work order without changing the counter. * The only legitimate decreases are a meter replacement or a renewal r
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/hist-1 r1
+  CLAIM: Only the Office / Sail Admin is allowed to add comments in the Review section.
+  terms not found in any supplied excerpt: ['add', 'admin', 'allow', 'only', 'sail', 'section']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+     * Upon clicking on the 'Note' icon, the screen below will appear. (Ref Figure 15) * Review the Work Order details and supporting information provided. (Ref Figure 15) * If required, enter comments in the Reviewer Comments field. (Ref Figure 15) * Click 'Reviewed' to complete the review process or 'Reopen' to return the work order for further action. (Ref Figure 15) Screenshot of the Review Work Or
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.38   manuals/hist-1 r3
+  CLAIM: The office (Office/Sail Admin) is allowed to add comments in the Review section.
+  terms not found in any supplied excerpt: ['add', 'admin', 'allow', 'sail', 'section']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+     * Upon clicking on the 'Note' icon, the screen below will appear. (Ref Figure 15) * Review the Work Order details and supporting information provided. (Ref Figure 15) * If required, enter comments in the Reviewer Comments field. (Ref Figure 15) * Click 'Reviewed' to complete the review process or 'Reopen' to return the work order for further action. (Ref Figure 15) Screenshot of the Review Work Or
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.43   manuals/prep-3 r2
+  CLAIM: Keep the combined size of files in one upload at or below 20 MB.
+  terms not found in any supplied excerpt: ['below', 'fil', 'keep', 'one']
+  closest supplied excerpt: Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)
+     * <u>Click the **Attachments** icon to upload a document or image for the selected checklist</u> question. * <u>Uploaded attachments are displayed under the corresponding question, where they can be</u> <u>**viewed, downloaded, or deleted.** (See Figures 28).</u> [icon: hand pointing right] Chapter 11 includes an Example section that displays a sample image for reference. [icon: hand pointing righ
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/prep-3 r3
+  CLAIM: Keep files selected in one upload within 20 MB.
+  terms not found in any supplied excerpt: ['fil', 'keep', 'one', 'within']
+  closest supplied excerpt: Audit - Preparation Manual_Office_R1_30.06.2026 — 4.3.4 Adding Attachment(s) (p.19)
+     * <u>Click the **Attachments** icon to upload a document or image for the selected checklist</u> question. * <u>Uploaded attachments are displayed under the corresponding question, where they can be</u> <u>**viewed, downloaded, or deleted.** (See Figures 28).</u> [icon: hand pointing right] Chapter 11 includes an Example section that displays a sample image for reference. [icon: hand pointing righ
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.43   manuals/crewing-2 r2
+  CLAIM: It opens the All view by default, where the form can be filled.
+  terms not found in any supplied excerpt: ['default', 'open', 'view', 'where']
+  closest supplied excerpt: Crewing - Crewing User Manual R2_10.06.2026 — Document (p.100)
+     * The screen below appears after clicking the 'Edit' icon. (Ref Figure 127) * Enter and add all required information in 'Part A' and 'Part B' section before proceeding. (Ref Figure 127) * Click the 'Save Form' button to save the Promotion Review Form configuration. (Ref Figure 127) screenshot: Promotion Review Form - Form Builder interface showing configuration options for promotion criteria and c
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/crewing-2 r3
+  CLAIM: It does not appear directly by default.
+  terms not found in any supplied excerpt: ['default', 'directly']
+  closest supplied excerpt: Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.3 HOW TO REVIEW A PROMOTION RECORD (p.46)
+     * Select the required crew member and click the corresponding 'Edit' icon to access the promotion record for review. (Ref Figure 52) screenshot_from_computer: Crew Promotion dashboard showing a list of crew members with their promotion status and an 'Edit' icon. Annotations point to the filter button and the promotion checklist progress bar. <a id="figure-52">Figure 52</a> * The screen below appea
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.44   manuals/moc-office-2 r2
+  CLAIM: Thus, an Office MoC does not by itself determine the destination; it depends on the RA option selected.
+  terms not found in any supplied excerpt: ['depend', 'destination', 'determine', 'itself', 'thus']
+  closest supplied excerpt: Safety - MOC User Manual_Office_R0_31.03.2026 — PART – C (Continued) (p.13)
+     * To add any additional **Implication**, click on the **"+Add Implication"** icon. * Proceed to **Section C3 – Risk Assessment**, where you can either upload an existing RA using the **Upload** icon or link a new RA using the **Link** icon. * After clicking the Link icon, select either Office RA or Vessel RA as applicable. *(See Figure 12)* ☞ **Note:** Any additional implication can be deleted usi
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.44   manuals/ra-office-3 r1
+  CLAIM: It is not a completely separate procedure for each section, but the available filter options vary.
+  terms not found in any supplied excerpt: ['but', 'completely', 'each', 'procedure', 'separate']
+  closest supplied excerpt: Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 4. HOW TO APPLY FILTERS (p.7)
+     ☞ The filtering functionality is same across the **Generic RA Library**, **Office RA**, and **Vessels RA** sections. ☞ The available filter options vary depending on the selected section. ☞ The example below demonstrates the filtering process in the Office RA section. * In the Office RA section, click the **Filters** button to display the available filtering options. * Select the required filter o
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/ra-office-3 r2
+  CLAIM: So, the procedure is shared rather than entirely separate, but the filter choices depend on the selected section.
+  terms not found in any supplied excerpt: ['but', 'choic', 'entirely', 'procedure', 'rather', 'separate', 'shar', 'than']
+  closest supplied excerpt: Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 4. HOW TO APPLY FILTERS (p.7)
+     ☞ The filtering functionality is same across the **Generic RA Library**, **Office RA**, and **Vessels RA** sections. ☞ The available filter options vary depending on the selected section. ☞ The example below demonstrates the filtering process in the Office RA section. * In the Office RA section, click the **Filters** button to display the available filtering options. * Select the required filter o
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.25   manuals/ra-office-3 r3
+  CLAIM: It is not a separate procedure for each section.
+  terms not found in any supplied excerpt: ['each', 'procedure', 'separate']
+  closest supplied excerpt: Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 4. HOW TO APPLY FILTERS (p.7)
+     ☞ The filtering functionality is same across the **Generic RA Library**, **Office RA**, and **Vessels RA** sections. ☞ The available filter options vary depending on the selected section. ☞ The example below demonstrates the filtering process in the Office RA section. * In the Office RA section, click the **Filters** button to display the available filtering options. * Select the required filter o
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/sms-office-3 r3
+  CLAIM: The specific document reference shown is “Doc 4.2.03.”
+  terms not found in any supplied excerpt: ['reference', 'shown']
+  closest supplied excerpt: Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.6 Hyperlinking in SMS documents (p.10)
+     * Clicking on section or document references within the document will redirect you to the corresponding document or specific section. screenshot: SMS Procedures document view showing hyperlinked text. A callout box "Clicking here to go to this section" points to a red-boxed "sec 1" link. Another callout box "Click here to view this document" points to a red-boxed "Doc 4.2.03" link. The document he
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.38   manuals/safety-meeting-1 r2
+  CLAIM: The general Safety Meeting instructions say that actions from Parts B and C appear in Part D, where they can be edited or deleted, but the Add SM form directs you to the Monthly Safety Meeting procedures for completing these sections.
+  terms not found in any supplied excerpt: ['action', 'appear', 'but', 'complet', 'delet', 'direct', 'edit', 'general', 'procedur', 'say', 'they', 'where']
+  closest supplied excerpt: Safety - Safety Meeting User Manual_R1_31.05.2026 — 2.2 HOW TO FILL ADD SM FORM (p.18)
+     * Fill in all required information under **Part A – Overview**. * Select the applicable **Sub Type** from the dropdown menu. * Enter participant details manually or copy and paste the information into the **Participants** text box. * Click **Save** to save the Part A details and generate the **Report ID**. (Ref Figure 16) screenshot: Additional Safety Committee Meeting form interface with numbered
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.25   manuals/certsurveys-3 r2
+  CLAIM: Each attachment must be 5 MB or smaller.
+  terms not found in any supplied excerpt: ['each', 'must', 'smaller']
+  closest supplied excerpt: Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)
+     * Select the required vessel from the 'Vessel' dropdown. (Ref Figure 9) * Click the 'Attachment' icon available in the Actions column of the table. (Ref Figure 9) Screenshot of the Certificates interface showing how to select a vessel and access attachments. <u>Figure 9</u> * The screen below appears after clicking the 'Attachment' icon. (Ref Figure 10) * Click the upload area to browse and upload
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.00   manuals/pmsoffice-2 r1
+  CLAIM: This applies to both Ship and Office procedures.
+  terms not found in any supplied excerpt: ['appl', 'both', 'office', 'procedur', 'ship']
+  closest supplied excerpt: None — None
+     
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.00   manuals/pmsoffice-2 r2
+  CLAIM: This applies to both Ship and Office.
+  terms not found in any supplied excerpt: ['appl', 'both', 'office', 'ship']
+  closest supplied excerpt: None — None
+     
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.00   manuals/pmsoffice-2 r2
+  CLAIM: This procedure is also documented for both Ship and Office.
+  terms not found in any supplied excerpt: ['also', 'both', 'document', 'office', 'procedure', 'ship']
+  closest supplied excerpt: None — None
+     
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.00   manuals/pmsoffice-2 r3
+  CLAIM: This applies to both Vessel and Office use.
+  terms not found in any supplied excerpt: ['appl', 'both', 'office', 'use', 'vessel']
+  closest supplied excerpt: None — None
+     
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/pmsoffice-4 r1
+  CLAIM: This restriction is stated for both vessel and office users.
+  terms not found in any supplied excerpt: ['both', 'office', 'restriction', 'user']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.34)
+     * Click on the 'Work Order' sub – sub module. (Ref Figure 54) * Select the vessel from the 'Vessel' dropdown. (Ref Figure 54) * Choose the 'Pending Approval' from the Status tab. (Ref Figure 54) * Click to review the WO details via the 'Edit' icon. (Ref Figure 54) Screenshot of the Work Orders dashboard with numbered callouts: 1. Click on the 'Work Order'., 2. Click here to select a vessel., 3. Ch
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.43   manuals/pmsoffice-4 r2
+  CLAIM: This restriction is stated for both vessel and Office approval procedures.
+  terms not found in any supplied excerpt: ['both', 'office', 'procedur', 'restriction']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.34)
+     * Click on the 'Work Order' sub – sub module. (Ref Figure 54) * Select the vessel from the 'Vessel' dropdown. (Ref Figure 54) * Choose the 'Pending Approval' from the Status tab. (Ref Figure 54) * Click to review the WO details via the 'Edit' icon. (Ref Figure 54) Screenshot of the Work Orders dashboard with numbered callouts: 1. Click on the 'Work Order'., 2. Click here to select a vessel., 3. Ch
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.43   manuals/pmsoffice-4 r3
+  CLAIM: This restriction is stated for both the vessel and office approval workflows.
+  terms not found in any supplied excerpt: ['both', 'office', 'restriction', 'workflow']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.34)
+     * Click on the 'Work Order' sub – sub module. (Ref Figure 54) * Select the vessel from the 'Vessel' dropdown. (Ref Figure 54) * Choose the 'Pending Approval' from the Status tab. (Ref Figure 54) * Click to review the WO details via the 'Edit' icon. (Ref Figure 54) Screenshot of the Work Orders dashboard with numbered callouts: 1. Click on the 'Work Order'., 2. Click here to select a vessel., 3. Ch
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/pmsoffice-5 r1
+  CLAIM: Therefore, the vessel-side Reports filters are not the same set as the Office PMS Dashboard filters.
+  terms not found in any supplied excerpt: ['pms', 'report', 'same', 'set', 'therefore', 'vessel-side']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.2 HOW TO USE FILTER (p.9)
+     * Click on the 'Filter' button. (Ref Figure 8) * Select the Vessel, Scope, and Criticality filters to refine the displayed records. (Ref Figure 8) * Click the 'Clear' button to reset all applied filters. (Ref Figure 8) Screenshot of the dashboard with the filter bar active. Callouts indicate the 'Filters' button to activate the menu and the dropdown fields for Vessel, Scope, and Criticality to fil
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.43   manuals/pmsoffice-5 r2
+  CLAIM: The vessel-side Reports screen does not use the same filter set.
+  terms not found in any supplied excerpt: ['same', 'screen', 'set', 'vessel-side']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.53)
+     * Select the required vessel from the 'Vessel' dropdown to view vessel-specific records. (Ref Figure 89) * Use the Search field to locate specific components. (Ref Figure 89) * Select the desired Period (Year/Quarter/Month or Date Range), then click Apply to view filtered results. (Ref Figure 89) * Choose a department from the All Departments dropdown. (Ref Figure 89) Screenshot of the Reports int
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/pmsoffice-5 r2
+  CLAIM: Therefore, the sets are different: the Dashboard uses Vessel, Scope, and Criticality, while the vessel-side Reports screen uses Search, Period, and All Departments.
+  terms not found in any supplied excerpt: ['criticality', 'dashboard', 'different', 'scope', 'screen', 'sets', 'therefore', 'uses', 'vessel-side', 'while']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.53)
+     * Select the required vessel from the 'Vessel' dropdown to view vessel-specific records. (Ref Figure 89) * Use the Search field to locate specific components. (Ref Figure 89) * Select the desired Period (Year/Quarter/Month or Date Range), then click Apply to view filtered results. (Ref Figure 89) * Choose a department from the All Departments dropdown. (Ref Figure 89) Screenshot of the Reports int
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/pmsoffice-5 r3
+  CLAIM: The vessel-side Reports screen does not use the same set.
+  terms not found in any supplied excerpt: ['same', 'screen', 'set', 'vessel-side']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.9.3 HOW TO APPLY FILTER (p.53)
+     * Select the required vessel from the 'Vessel' dropdown to view vessel-specific records. (Ref Figure 89) * Use the Search field to locate specific components. (Ref Figure 89) * Select the desired Period (Year/Quarter/Month or Date Range), then click Apply to view filtered results. (Ref Figure 89) * Choose a department from the All Departments dropdown. (Ref Figure 89) Screenshot of the Reports int
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.25   wo/wo-generic-02 r2
+  CLAIM: These are separate from automatic planned-work-order creation.
+  terms not found in any supplied excerpt: ['creation', 'planned-work-order', 'separate']
+  closest supplied excerpt: Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create a work order
+     Provenance note: draft code-derived guidance, not a published manual. 3 statement(s) come from the June PMS manuals; 9 statement(s) about roles, switches and automatic generation were inspected in the Technical application code at repository revision cf5241ad6, which the application owner has confirmed is the code running in the Technical application. Where this guidance and a manual differ, say w
+
+================================================================================================================
+ARM F0 — claim-level review of every stored answer against its captured excerpts
+================================================================================================================
+  substantive claims scored : 1235
+     supported   (>=0.80)   : 926
+     partial     (0.50-0.79): 280
+     UNSUPPORTED (<0.50)    : 29
+  source-commentary (reported, not scored for support): 166
+  navigational (no factual condition)                 : 319
+  too short to score                                  : 5
+
+  UNSUPPORTED claims: 29 occurrences in 28 distinct sentences — all printed below
+
+----------------------------------------------------------------------------------------------------------------
+[2x] coverage 0.00   manuals/pmsoffice-2 r1
+  CLAIM: This applies to both Ship and Office.
+  terms not found in any supplied excerpt: ['appl', 'both', 'office', 'ship']
+  closest supplied excerpt: None — None
+     
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   answers/3 r1
+  CLAIM: Complete the required proposal information.
+  terms not found in any supplied excerpt: ['complete', 'requir']
+  closest supplied excerpt: Safety - SMS User Manual_Office_R0_31.01.2026 — 4.1 UPLOADING A DOCUMENT FOR THE FIRST TIME IN SAIL (p.14)
+     * Click on the **+New Document** tab to initiate the SMS change request (**Ref Fig 20**). screenshot: SAIL SMS Procedures interface showing the +New Document button Figure 20 ⓘ Clicking on the New Document tab redirects the user to the Change request form, which consists of three stages: * Proposal, * Approval, & * Release ---
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.40   answers/3 r1
+  CLAIM: Save or Submit to generate the request number.
+  terms not found in any supplied excerpt: ['generate', 'number', 'save']
+  closest supplied excerpt: Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.16)
+     screenshot: SAIL SMS Procedures interface showing how to add main folders and subfolders Figure 24 * Follow the steps below to add a new document to the relevant chapter (**Ref. Fig. 25**): * Click on the chapter name under which the document is to be uploaded. * Click on the "**File**" tab to upload the document from your local storage. <mark>☞ Repeat the above steps to upload additional document
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.40   answers/3 r1
+  CLAIM: For a normal viewable document, create a standard folder.
+  terms not found in any supplied excerpt: ['create', 'normal', 'standard']
+  closest supplied excerpt: Safety - SMS User Manual_Office_R0_31.01.2026 — Document (p.16)
+     screenshot: SAIL SMS Procedures interface showing how to add main folders and subfolders Figure 24 * Follow the steps below to add a new document to the relevant chapter (**Ref. Fig. 25**): * Click on the chapter name under which the document is to be uploaded. * Click on the "**File**" tab to upload the document from your local storage. <mark>☞ Repeat the above steps to upload additional document
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.25   answers/3 r2
+  CLAIM: Complete the proposal details, including the justification.
+  terms not found in any supplied excerpt: ['complete', 'includ', 'justification']
+  closest supplied excerpt: Safety - SMS User Manual_Office_R0_31.01.2026 — 4.1 UPLOADING A DOCUMENT FOR THE FIRST TIME IN SAIL (p.14)
+     * Click on the **+New Document** tab to initiate the SMS change request (**Ref Fig 20**). screenshot: SAIL SMS Procedures interface showing the +New Document button Figure 20 ⓘ Clicking on the New Document tab redirects the user to the Change request form, which consists of three stages: * Proposal, * Approval, & * Release ---
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.40   answers/3 r2
+  CLAIM: Save or submit the proposal to generate the Request No.
+  terms not found in any supplied excerpt: ['generate', 'save', 'submit']
+  closest supplied excerpt: Safety - SMS User Manual_Office_R0_31.01.2026 — 4.1 UPLOADING A DOCUMENT FOR THE FIRST TIME IN SAIL (p.14)
+     * Click on the **+New Document** tab to initiate the SMS change request (**Ref Fig 20**). screenshot: SAIL SMS Procedures interface showing the +New Document button Figure 20 ⓘ Clicking on the New Document tab redirects the user to the Change request form, which consists of three stages: * Proposal, * Approval, & * Release ---
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.38   answers/9 r1
+  CLAIM: The other supported creation procedure is the standard Defects Log new-defect process, which uses these same steps.
+  terms not found in any supplied excerpt: ['creation', 'new-defect', 'other', 'proces', 'standard', 'support', 'uses', 'which']
+  closest supplied excerpt: Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD (p.19)
+     * Refer to the 'Defect Log' sub-submodule and follow the same procedure to create a new record. (Cross-reference resolved: the steps for Condition Of Class Coc › How To Create A New Coc Defect Record are the same as section 1.1.4.3 'How To Create A New Defect' under Defects Logs, page 15. They are:) * Click the '+ New Defect' button to create a new defect record. (Ref Figure 22) Screenshot of Defe
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.44   answers/9 r3
+  CLAIM: The supported equivalent procedure is creating a standard defect through the Defect Log sub-submodule.
+  terms not found in any supplied excerpt: ['creat', 'equivalent', 'standard', 'support', 'through']
+  closest supplied excerpt: Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026 — 1.1.5.2 HOW TO CREATE A NEW COC DEFECT RECORD (p.19)
+     * Refer to the 'Defect Log' sub-submodule and follow the same procedure to create a new record. (Cross-reference resolved: the steps for Condition Of Class Coc › How To Create A New Coc Defect Record are the same as section 1.1.4.3 'How To Create A New Defect' under Defects Logs, page 15. They are:) * Click the '+ New Defect' button to create a new defect record. (Ref Figure 22) Screenshot of Defe
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.00   answers/10 r3
+  CLAIM: This applies to both the Office and Vessel/Ship versions.
+  terms not found in any supplied excerpt: ['appl', 'both', 'office', 'ship', 'version', 'vessel']
+  closest supplied excerpt: None — None
+     
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.17   generated/7 r2
+  CLAIM: Therefore, they cannot be assumed to have them.
+  terms not found in any supplied excerpt: ['assum', 'cannot', 'have', 'therefore', 'they']
+  closest supplied excerpt: Technical - Roles & Permissions (Operational) User Manual — 1.1.12.5 What a Superintendent (Office) User Can Do
+     * View and manage maintenance for assigned vessels (use the 'My Vessel' scope to focus on them). * Review dashboards, work orders, running hours, spares, stores, defects, certificates and surveys. * Review postponement requests and approve / reject work as permitted by the approval configuration. * Reopen a completed work order or reject a completion back to the vessel with remarks (available to t
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.44   manuals/hist-1 r1
+  CLAIM: The Office / Sail Admin side can add comments in the Review section.
+  terms not found in any supplied excerpt: ['add', 'admin', 'can', 'sail', 'section']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+     * Upon clicking on the 'Note' icon, the screen below will appear. (Ref Figure 15) * Review the Work Order details and supporting information provided. (Ref Figure 15) * If required, enter comments in the Reviewer Comments field. (Ref Figure 15) * Click 'Reviewed' to complete the review process or 'Reopen' to return the work order for further action. (Ref Figure 15) Screenshot of the Review Work Or
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.43   manuals/hist-1 r3
+  CLAIM: Only the Office can add comments in the Review section.
+  terms not found in any supplied excerpt: ['add', 'can', 'only', 'section']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — TECHNICAL USER MANUAL (p.13)
+     * Upon clicking on the 'Note' icon, the screen below will appear. (Ref Figure 15) * Review the Work Order details and supporting information provided. (Ref Figure 15) * If required, enter comments in the Reviewer Comments field. (Ref Figure 15) * Click 'Reviewed' to complete the review process or 'Reopen' to return the work order for further action. (Ref Figure 15) Screenshot of the Review Work Or
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.40   manuals/fn-1 r1
+  CLAIM: This finalizes the section and notifies the Office automatically.
+  terms not found in any supplied excerpt: ['automatically', 'finaliz', 'notif']
+  closest supplied excerpt: Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026 — Document (p.7)
+     * **Section 3 – Actions** : This section allows users to update and track the completion status of actions associated with the Fleet Notification. 1. <u>Click the **Edit icon** to update the action completion date and status.</u> 2. <u>Use the **Upload** button to attach supporting documents and **View** to open or</u> <u>download them.</u> * Attachments shared by the Office can be viewed using th
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.00   manuals/crewing-2 r3
+  CLAIM: Something has to happen first.
+  terms not found in any supplied excerpt: ['first', 'happen', 'has', 'someth']
+  closest supplied excerpt: None — None
+     
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.40   manuals/crewing-6 r2
+  CLAIM: A separate Training Needs process uses “+ New Entry”, followed by “Save”, but that creates a training need rather than a Training Matrix record.
+  terms not found in any supplied excerpt: ['but', 'creat', 'follow', 'matrix', 'proces', 'rather', 'separate', 'than', 'uses']
+  closest supplied excerpt: Crewing - Crewing User Manual R2_10.06.2026 — Preamble (p.89)
+     * The screen below appears after clicking the '+ New Entry' button. (<u>Ref Figure 110</u>) * Enter the required training details, including the crew member, training requirement, category, target date, and other applicable information. (<u>Ref Figure 110</u>) * Click on the 'Save' button to create the training need record. (<u>Ref Figure 110</u>) screenshot_from_computer: Add New Training modal w
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.29   manuals/ra-office-3 r1
+  CLAIM: The filters work the same way; they are not separate procedures.
+  terms not found in any supplied excerpt: ['procedur', 'separate', 'they', 'way', 'work']
+  closest supplied excerpt: Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 4. HOW TO APPLY FILTERS (p.7)
+     ☞ The filtering functionality is same across the **Generic RA Library**, **Office RA**, and **Vessels RA** sections. ☞ The available filter options vary depending on the selected section. ☞ The example below demonstrates the filtering process in the Office RA section. * In the Office RA section, click the **Filters** button to display the available filtering options. * Select the required filter o
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.40   manuals/ra-office-3 r2
+  CLAIM: So, the process is shared, but each section may present different filtering options.
+  terms not found in any supplied excerpt: ['but', 'different', 'each', 'may', 'present', 'shar']
+  closest supplied excerpt: Safety - Risk Assessment User Manual_Office_R1_30.05.2026 — 4. HOW TO APPLY FILTERS (p.7)
+     ☞ The filtering functionality is same across the **Generic RA Library**, **Office RA**, and **Vessels RA** sections. ☞ The available filter options vary depending on the selected section. ☞ The example below demonstrates the filtering process in the Office RA section. * In the Office RA section, click the **Filters** button to display the available filtering options. * Select the required filter o
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/sms-office-3 r2
+  CLAIM: The specific document reference shown is “Doc 4.2.03.”
+  terms not found in any supplied excerpt: ['reference', 'shown']
+  closest supplied excerpt: Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.6 Hyperlinking in SMS documents (p.10)
+     * Clicking on section or document references within the document will redirect you to the corresponding document or specific section. screenshot: SMS Procedures document view showing hyperlinked text. A callout box "Clicking here to go to this section" points to a red-boxed "sec 1" link. Another callout box "Click here to view this document" points to a red-boxed "Doc 4.2.03" link. The document he
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.40   manuals/sms-office-3 r3
+  CLAIM: The link is shown jumping to the document reference “Doc 4.2.03.”
+  terms not found in any supplied excerpt: ['jump', 'reference', 'shown']
+  closest supplied excerpt: Safety - SMS User Manual_Office_R0_31.01.2026 — 3.1.6 Hyperlinking in SMS documents (p.10)
+     * Clicking on section or document references within the document will redirect you to the corresponding document or specific section. screenshot: SMS Procedures document view showing hyperlinked text. A callout box "Clicking here to go to this section" points to a red-boxed "sec 1" link. Another callout box "Click here to view this document" points to a red-boxed "Doc 4.2.03" link. The document he
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.43   manuals/certsurveys-1 r2
+  CLAIM: This is performed by an authorized user in the Office Sail Admin module.
+  terms not found in any supplied excerpt: ['admin', 'office', 'perform', 'sail']
+  closest supplied excerpt: Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.2.1 SHIP’S CERTIFICATES (p.13)
+     **Introduction** * The ‘**Ship’s Certificates**’ sub-submodule is used to manage the master list of certificate types maintained within the system. It enables authorized users to create, configure, and maintain certificate definitions, including certificate names, categories, groups, regulatory references, and applicability settings. The module also allows administrators to control the assignment 
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/certsurveys-3 r2
+  CLAIM: Each attachment is limited to 5 MB.
+  terms not found in any supplied excerpt: ['each', 'limit']
+  closest supplied excerpt: Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.5 HOW TO ADD AND VIEW ATTACHMENTS (p.9)
+     * Select the required vessel from the 'Vessel' dropdown. (Ref Figure 9) * Click the 'Attachment' icon available in the Actions column of the table. (Ref Figure 9) Screenshot of the Certificates interface showing how to select a vessel and access attachments. <u>Figure 9</u> * The screen below appears after clicking the 'Attachment' icon. (Ref Figure 10) * Click the upload area to browse and upload
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/certsurveys-3 r3
+  CLAIM: No different survey-specific process is described.
+  terms not found in any supplied excerpt: ['different', 'survey-specific']
+  closest supplied excerpt: Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.4.4 HOW TO EDIT A SURVEYS (p.10)
+     * Refer to the ‘Certificates’ sub-sub-module for the edit process and follow the same steps. (Cross-reference resolved: the steps for Surveys › How To Edit A Surveys are the same as section 1.1.3.4 'How To Edit A Certificate' under Certificates, page 8. They are:) * Go to the 'Certificates' sub-sub module. (<u>Ref Figure 8</u>) * Select the required vessel from the 'Vessel' dropdown. (<u>Ref Figur
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.14   manuals/pmsoffice-4 r1
+  CLAIM: This restriction applies in both the vessel-specific and Office approval flows.
+  terms not found in any supplied excerpt: ['appl', 'both', 'flow', 'office', 'restriction', 'vessel-specific']
+  closest supplied excerpt: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.30)
+     * Click on the 'Work Order' sub – sub module. (<u>Ref Figure 46</u>) * Choose the 'Pending Approval' from the Status tab. (<u>Ref Figure 46</u>) * Click to review the WO details via the 'Edit' icon. (<u>Ref Figure 46</u>) screenshot: Work Orders (W\.O) interface showing steps to approve or reject a work order. Step 1: Click on the 'Work Order'. Step 2: Choose the Status tab from here. Step 3: Clic
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.33   manuals/pmsoffice-4 r3
+  CLAIM: This restriction is stated for both vessel and Office workflows.
+  terms not found in any supplied excerpt: ['both', 'office', 'restriction', 'workflow']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER (p.34)
+     * Click on the 'Work Order' sub – sub module. (Ref Figure 54) * Select the vessel from the 'Vessel' dropdown. (Ref Figure 54) * Choose the 'Pending Approval' from the Status tab. (Ref Figure 54) * Click to review the WO details via the 'Edit' icon. (Ref Figure 54) Screenshot of the Work Orders dashboard with numbered callouts: 1. Click on the 'Work Order'., 2. Click here to select a vessel., 3. Ch
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.36   manuals/pmsoffice-5 r3
+  CLAIM: Therefore, the documented vessel-side set is Search, Period, and All Departments, not Dashboard Vessel, Scope, and Criticality.
+  terms not found in any supplied excerpt: ['department', 'document', 'period', 'search', 'set', 'therefore', 'vessel-side']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.3.2 HOW TO USE FILTER (p.9)
+     * Click on the 'Filter' button. (Ref Figure 8) * Select the Vessel, Scope, and Criticality filters to refine the displayed records. (Ref Figure 8) * Click the 'Clear' button to reset all applied filters. (Ref Figure 8) Screenshot of the dashboard with the filter bar active. Callouts indicate the 'Filters' button to activate the menu and the dropdown fields for Vessel, Scope, and Criticality to fil
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.43   manuals/pmsvessel-1 r3
+  CLAIM: These categories are available in the Store sub-module for both Office and Vessel users.
+  terms not found in any supplied excerpt: ['both', 'office', 'user', 'vessel']
+  closest supplied excerpt: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.8.1 HOW TO ACCESS THE STORE (p.49)
+     * Click the ‘Store’ sub-sub-module to manage consumable items; the default landing page is ‘Stores Inventory’. (Ref Figure 84) * Choose the required category (Stores, Lubes, Chemicals, or Others), then select ‘Inventory, Location, or History’ to view the information. (Ref Figure 84) * In the Actions column of the table, click the ‘i’ icon to view the item details, the ‘Edit’ icon to modify the rec
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.17   manuals/pmsvessel-3 r1
+  CLAIM: They therefore do not document a separate, complete Stores procedure.
+  terms not found in any supplied excerpt: ['complete', 'procedure', 'separate', 'therefore', 'they']
+  closest supplied excerpt: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)
+     * Click the ‘Store’ sub-sub-module. <u>(Ref Figure 72)</u> * Click on the ‘+ Bulk Updates Store’ button. <u>(Ref Figure 72)</u> * Refer to the <u>‘Spares’</u> sub-sub-module and follow the same steps. screenshot: Stores Inventory dashboard showing bulk update process <u>Figure 72</u> ☞ Use the same steps as described above to perform bulk updates for the selected category (Stores, Lubes, Chemicals
+----------------------------------------------------------------------------------------------------------------
+[1x] coverage 0.29   manuals/pmsvessel-3 r2
+  CLAIM: Thus, Stores has its own entry point, but the Store instructions direct users to the Spares instructions for the rest of the process.
+  terms not found in any supplied excerpt: ['but', 'direct', 'entry', 'has', 'its', 'own', 'point', 'rest', 'thus', 'user']
+  closest supplied excerpt: Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)
+     * Click the ‘Store’ sub-sub-module. <u>(Ref Figure 72)</u> * Click on the ‘+ Bulk Updates Store’ button. <u>(Ref Figure 72)</u> * Refer to the <u>‘Spares’</u> sub-sub-module and follow the same steps. screenshot: Stores Inventory dashboard showing bulk update process <u>Figure 72</u> ☞ Use the same steps as described above to perform bulk updates for the selected category (Stores, Lubes, Chemicals
+
