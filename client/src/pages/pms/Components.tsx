@@ -708,27 +708,17 @@ const FleetComponentInformationSection: React.FC<{ selectedComponent: ComponentN
   const { isChangeMode } = useChangeMode();
   const canViewFleetMasterFields = isSailAdmin || isExternal || isChangeRequestMode || isChangeMode;
   const [data, setData] = useState<Record<string, string>>({});
-  const onDataChangeRef = useRef(onDataChange);
-
-  useEffect(() => {
-    onDataChangeRef.current = onDataChange;
-  }, [onDataChange]);
-
   const toYesNo = (value: unknown, defaultValue = "No") => {
     if (value === true || String(value).toLowerCase() === "yes") return "Yes";
     if (value === false || String(value).toLowerCase() === "no") return "No";
     return defaultValue;
   };
-
-  const updateField = useCallback((key: string, value: string) => {
-    setData(currentData => {
-      const next = { ...currentData, [key]: value };
-      const { vesselName: _displayOnlyVesselName, ...editableData } = next;
-      onDataChangeRef.current?.(editableData);
-      return next;
-    });
-  }, []);
-
+  const updateField = (key: string, value: string) => {
+    const next = { ...data, [key]: value };
+    setData(next);
+    const { vesselName: _displayOnlyVesselName, ...editableData } = next;
+    onDataChange?.(editableData);
+  };
   useEffect(() => {
     const c: any = selectedComponent || {};
     setData({
@@ -738,88 +728,27 @@ const FleetComponentInformationSection: React.FC<{ selectedComponent: ComponentN
       vesselName: vessels.find(v => v.id === (c.vesselId || c.vesselCode) || v.code === (c.vesselId || c.vesselCode))?.name || "",
     });
   }, [selectedComponent, vessels]);
-
-  const fleetInformationColumnDefs = React.useMemo<ColDef[]>(() => {
-    const fieldDefinitions = [
-      { key: "fleetEquipmentCode", label: "Fleet Equipment Code", testId: "B7.B.1", restricted: true, minWidth: 190 },
-      { key: "fleetEquipmentName", label: "Fleet Component Name", testId: "B7.B.2", restricted: true, minWidth: 220 },
-      { key: "makerCode", label: "Maker Code", testId: "B7.B.3", restricted: true, readOnly: true, minWidth: 150 },
-      { key: "modelCode", label: "Model Code", testId: "B7.B.4", restricted: true, minWidth: 170 },
-      { key: "serialNo", label: "Serial No.", testId: "B7.B.5", minWidth: 150 },
-      { key: "isActive", label: "Is Active", testId: "B7.B.6", minWidth: 125 },
-      { key: "isParent", label: "Is Parent", testId: "B7.B.7", restricted: true, minWidth: 125 },
-      { key: "vesselName", label: "Vessel Name", testId: "B7.B.8", restricted: true, minWidth: 160 },
-    ];
-
-    return fieldDefinitions
-      .filter(fieldDefinition => !fieldDefinition.restricted || canViewFleetMasterFields)
-      .map(fieldDefinition => ({
-        headerName: fieldDefinition.label,
-        field: fieldDefinition.key,
-        minWidth: fieldDefinition.minWidth,
-        flex: 1,
-        sortable: false,
-        filter: false,
-        tooltipField: fieldDefinition.key,
-        cellRenderer: ({ value }: any) => {
-          if (!isModifyMode || fieldDefinition.key === "vesselName") {
-            return (
-              <div className="text-sm text-gray-900 truncate" data-testid={fieldDefinition.testId}>
-                {value || "—"}
-              </div>
-            );
-          }
-
-          if (fieldDefinition.key === "isActive" || fieldDefinition.key === "isParent") {
-            return (
-              <select
-                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                value={value || "No"}
-                onChange={event => updateField(fieldDefinition.key, event.target.value)}
-                data-testid={fieldDefinition.testId}
-              >
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-              </select>
-            );
-          }
-
-          return (
-            <input
-              readOnly={fieldDefinition.readOnly}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                fieldDefinition.readOnly
-                  ? "bg-gray-50 text-gray-700 cursor-not-allowed border-gray-300"
-                  : "text-[#52BAF3] border-[#52BAF3]"
-              }`}
-              value={value || ""}
-              onChange={event => updateField(fieldDefinition.key, event.target.value)}
-              data-testid={fieldDefinition.testId}
-            />
-          );
-        },
-      }));
-  }, [canViewFleetMasterFields, isModifyMode, updateField]);
-
-  const rowId = selectedComponent?.actualId || selectedComponent?.id || selectedComponent?.code;
-  const rowData = selectedComponent ? [{ id: String(rowId), ...data }] : [];
-
-  return (
-    <div className="space-y-4">
-      <WOAgGridTable
-        columnDefs={fleetInformationColumnDefs}
-        rowData={rowData}
-        domLayout="autoHeight"
-        height="auto"
-        rowHeight={isModifyMode ? 52 : 44}
-        headerHeight={44}
-        noRowsMessage="Select a component to view fleet component information"
-        testId="component-fleet-information-grid"
-        getRowId={({ data: row }) => String(row.id)}
-        getRowClass={() => "cursor-default"}
-      />
+  const field = (key: string, label: string, testId: string, options?: { restricted?: boolean; readOnly?: boolean }) => {
+    if (options?.restricted && !canViewFleetMasterFields) return null;
+    return (
+    <div key={key}>
+      <label className="text-xs font-medium text-gray-600 block mb-1">{label}</label>
+      {isModifyMode && key !== "vesselName" ? key === "isActive" || key === "isParent" ? <select className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]" value={data[key] || "No"} onChange={e => updateField(key, e.target.value)} data-testid={testId}><option value="Yes">Yes</option><option value="No">No</option></select> : <input readOnly={options?.readOnly} className={`text-sm w-full px-2 py-1 border rounded ${options?.readOnly ? "bg-gray-50 text-gray-700 cursor-not-allowed border-gray-300" : "text-[#52BAF3] border-[#52BAF3]"}`} value={data[key] || ""} onChange={e => updateField(key, e.target.value)} data-testid={testId} /> : <div className="text-sm text-gray-900" data-testid={testId}>{data[key] || "—"}</div>}
     </div>
-  );
+    );
+  };
+  return <div className="space-y-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {field("fleetEquipmentCode", "Fleet Equipment Code", "B7.B.1", { restricted: true })}
+      {field("fleetEquipmentName", "Fleet Component Name", "B7.B.2", { restricted: true })}
+      {field("makerCode", "Maker Code", "B7.B.3", { restricted: true, readOnly: true })}
+      {field("modelCode", "Model Code", "B7.B.4", { restricted: true })}
+      {field("serialNo", "Serial No.", "B7.B.5")}
+      {field("isActive", "Is Active", "B7.B.6")}
+      {field("isParent", "Is Parent", "B7.B.7", { restricted: true })}
+      {field("vesselName", "Vessel Name", "B7.B.8", { restricted: true })}
+    </div>
+  </div>;
 };
 
 const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {

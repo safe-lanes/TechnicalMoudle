@@ -423,7 +423,6 @@
 
 /* Component Register data grids: match the restrained component section styling. */
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
@@ -434,7 +433,6 @@
 }
 
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
@@ -444,7 +442,6 @@
 }
 
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
@@ -455,7 +452,6 @@
 }
 
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
@@ -465,21 +461,18 @@
 }
 
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
   [data-testid="component-spares-grid"]
 ) .ag-header-cell-text,
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
   [data-testid="component-spares-grid"]
 ) .ag-header-cell .ag-header-icon,
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
@@ -489,7 +482,6 @@
 }
 
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
@@ -499,7 +491,6 @@
 }
 
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
@@ -511,7 +502,6 @@
 }
 
 .wo-ag-grid.ag-theme-alpine:is(
-  [data-testid="component-fleet-information-grid"],
   [data-testid="component-running-hours-grid"],
   [data-testid="component-jobs-grid"],
   [data-testid="component-maintenance-history-grid"],
