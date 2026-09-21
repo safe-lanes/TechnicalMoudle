@@ -1,0 +1,57 @@
+204 responses · 3 runs · 34 questions · errors 0
+
+MODULE SELECTION (answering module vs expected), per run
+   baseline   run 1: 33/34 correct module   gates answer=34
+   baseline   run 2: 33/34 correct module   gates answer=34
+   baseline   run 3: 33/34 correct module   gates answer=34
+   candidate  run 1: 33/34 correct module   gates answer=34
+   candidate  run 2: 33/34 correct module   gates answer=34
+   candidate  run 3: 33/34 correct module   gates answer=34
+
+CITATION MODULE LABELS (each citation against its own manual's module)
+   baseline   486/486 correctly labelled
+   candidate  579/579 correctly labelled
+
+COST
+   baseline   latency median 3355 ms, p90 5607 ms · excerpts/answer avg 4.76 · tokens not reported by the API
+   candidate  latency median 3210 ms, p90 5909 ms · excerpts/answer avg 5.68 · tokens not reported by the API
+
+ANSWERS THAT CHANGED (same question, same run, baseline vs candidate)
+   102 of 102 question-runs differ, across 34 questions
+      answers/1                    runs 1,2,3
+      answers/10                   runs 1,2,3
+      answers/11                   runs 1,2,3
+      answers/12                   runs 1,2,3
+      answers/2                    runs 1,2,3
+      answers/3                    runs 1,2,3
+      answers/4                    runs 1,2,3
+      answers/5                    runs 1,2,3
+      answers/6                    runs 1,2,3
+      answers/7                    runs 1,2,3
+      answers/8                    runs 1,2,3
+      answers/9                    runs 1,2,3
+      fresh/fresh-ctx-1            runs 1,2,3
+      fresh/fresh-ctx-conflict-1   runs 1,2,3
+      fresh/fresh-technical-1      runs 1,2,3
+      manuals/certsurveys-3        runs 1,2,3
+      manuals/crewing-3            runs 1,2,3
+      manuals/fn-1                 runs 1,2,3
+      manuals/fn-2                 runs 1,2,3
+      manuals/fs-off-2             runs 1,2,3
+      manuals/fs-ves-1             runs 1,2,3
+      manuals/fs-ves-2             runs 1,2,3
+      manuals/hist-1               runs 1,2,3
+      manuals/hist-2               runs 1,2,3
+      manuals/inc-1                runs 1,2,3
+      manuals/ll-1                 runs 1,2,3
+      manuals/ll-2                 runs 1,2,3
+      manuals/master-review-1      runs 1,2,3
+      manuals/moc-office-1         runs 1,2,3
+      manuals/pmsoffice-1          runs 1,2,3
+      manuals/pmsoffice-5          runs 1,2,3
+      manuals/prep-1               runs 1,2,3
+      manuals/ra-office-1          runs 1,2,3
+      manuals/ra-office-3          runs 1,2,3
+
+MODULE DRIFT (candidate answering module != baseline, same question+run)
+   0

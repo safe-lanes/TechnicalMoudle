@@ -1,0 +1,1085 @@
+[
+ {
+  "id": "answers/1",
+  "suite": "answers",
+  "question": "In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": null
+ },
+ {
+  "id": "answers/2",
+  "suite": "answers",
+  "question": "In Audit Preparation, what does the email notification icon do and is it configurable?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": null
+ },
+ {
+  "id": "answers/3",
+  "suite": "answers",
+  "question": "How do I upload a document for the first time in the SMS module?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": null
+ },
+ {
+  "id": "answers/4",
+  "suite": "answers",
+  "question": "In the Master Review module, what do the grey and red icons mean?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": null
+ },
+ {
+  "id": "answers/5",
+  "suite": "answers",
+  "question": "What are the hazard categories in a risk assessment?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": null
+ },
+ {
+  "id": "answers/6",
+  "suite": "answers",
+  "question": "What actions can I take on a near miss record from the list — what do the icons do?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": null
+ },
+ {
+  "id": "answers/7",
+  "suite": "answers",
+  "question": "How do I apply a filter in the Stores sub-module of PMS?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "answers/8",
+  "suite": "answers",
+  "question": "How do I export crew details from the Waitlist in Crewing?",
+  "expected_module": "crewing",
+  "ui_module": "crewing",
+  "expected_file": null
+ },
+ {
+  "id": "answers/9",
+  "suite": "answers",
+  "question": "How do I create a COC defect record?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "answers/10",
+  "suite": "answers",
+  "question": "When filling MoC Part B, what happens if I select No for further assessment?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": null
+ },
+ {
+  "id": "answers/11",
+  "suite": "answers",
+  "question": "In PMS, is there another way to add a component besides the components panel?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "answers/12",
+  "suite": "answers",
+  "question": "What should I review after deleting an implication in a vessel MoC?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": null
+ },
+ {
+  "id": "generated/1",
+  "suite": "generated",
+  "question": "In Bulk Data Import for jobs, do I have to fill in the Job Code column?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/2",
+  "suite": "generated",
+  "question": "Where do I find Bulk Data Import in the application?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/3",
+  "suite": "generated",
+  "question": "What does the dry-run show for each row in a bulk import, and when do I see the created and updated counts?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/4",
+  "suite": "generated",
+  "question": "In work-order numbers, what do the vessel code and the segment after it mean, and what does an unplanned work order number look like?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/5",
+  "suite": "generated",
+  "question": "A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/6",
+  "suite": "generated",
+  "question": "Who can generate work orders from the office, and what happens if the vessel's switch is off?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/7",
+  "suite": "generated",
+  "question": "Can a Head of Department do everything an office user can do for their department?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/8",
+  "suite": "generated",
+  "question": "Is Level 2 Reviewer a user role I can assign?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/9",
+  "suite": "generated",
+  "question": "Where is the Me / My Team toggle and who can use it?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/10",
+  "suite": "generated",
+  "question": "On the Fleet Sync Overview, what does an amber status mean?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/11",
+  "suite": "generated",
+  "question": "Does one press of Sync Now clear a long backlog on the ship?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/12",
+  "suite": "generated",
+  "question": "If a ship's vessel master data changes, how is the ship refreshed?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/13",
+  "suite": "generated",
+  "question": "On the ship, what happens if I enter a running-hours reading lower than the component's current hours when completing a work order?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "generated/14",
+  "suite": "generated",
+  "question": "Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "wo/wo-generic-01",
+  "suite": "wo",
+  "question": "How do I create a work order?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "wo/wo-generic-02",
+  "suite": "wo",
+  "question": "How are planned work orders created in PMS — do I have to create them myself?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "wo/wo-generic-03",
+  "suite": "wo",
+  "question": "How to create work order in PMS?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "wo/wo-phr-01",
+  "suite": "wo",
+  "question": "What are the different ways to create a work order in PMS?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "wo/wo-phr-02",
+  "suite": "wo",
+  "question": "I need to raise a work order for a pump — how do I do that?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "wo/wo-phr-03",
+  "suite": "wo",
+  "question": "Do I create work orders myself or does the system create them?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "wo/wo-phr-04",
+  "suite": "wo",
+  "question": "Steps to create a new work order",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "wo/wo-phr-05",
+  "suite": "wo",
+  "question": "How do work orders get created in the Technical module?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": null
+ },
+ {
+  "id": "manuals/fs-off-1",
+  "suite": "manuals",
+  "question": "Can an office user delete a fleet sharing record after it's already been submitted, or only while it's still a draft?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf",
+  "expected_pages": [
+   5
+  ],
+  "expected_section": "Document"
+ },
+ {
+  "id": "manuals/fs-off-2",
+  "suite": "manuals",
+  "question": "What are the steps to add an action item that vessels need to complete on a fleet sharing record?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf",
+  "expected_pages": [
+   6
+  ],
+  "expected_section": "3.2 ACTIONS"
+ },
+ {
+  "id": "manuals/fs-ves-1",
+  "suite": "manuals",
+  "question": "As a ship user, am I able to edit the information the office entered under Step 1 of a fleet sharing record?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf",
+  "expected_pages": [
+   5
+  ],
+  "expected_section": "Step 1 – Description"
+ },
+ {
+  "id": "manuals/fs-ves-2",
+  "suite": "manuals",
+  "question": "After closing out all the actions the office assigned in a fleet sharing record, what do I need to do to finish it off?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf",
+  "expected_pages": [
+   6
+  ],
+  "expected_section": "Step 3 – Actions"
+ },
+ {
+  "id": "manuals/hist-1",
+  "suite": "manuals",
+  "question": "Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - History Manual_R1_30.06.2026.pdf",
+  "expected_pages": [
+   16
+  ],
+  "expected_section": "3.3 REVIEW PAGE:"
+ },
+ {
+  "id": "manuals/hist-2",
+  "suite": "manuals",
+  "question": "What does the pencil icon do on the inspection records list?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - History Manual_R1_30.06.2026.pdf",
+  "expected_pages": [
+   6
+  ],
+  "expected_section": "1.4 ACTION ICONS."
+ },
+ {
+  "id": "manuals/hist-3",
+  "suite": "manuals",
+  "question": "The manual explains how to record a negative observation with attachments — does that same process apply when I want to add a Positive Observation or LAE finding instead?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - History Manual_R1_30.06.2026.pdf",
+  "expected_pages": [
+   10
+  ],
+  "expected_section": "2.1.4 ADDING ATTACHMENTS"
+ },
+ {
+  "id": "manuals/prep-1",
+  "suite": "manuals",
+  "question": "What are the steps to start a brand new SIRE preparation record for a vessel?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf",
+  "expected_pages": [
+   13
+  ],
+  "expected_section": "3.1 HOW TO CREATE NEW PREPARATION"
+ },
+ {
+  "id": "manuals/prep-2",
+  "suite": "manuals",
+  "question": "If I change the assigned inspector on an existing preparation record, which fields can't be changed, and what happens to the vessel's answers that were already entered?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf",
+  "expected_pages": [
+   11
+  ],
+  "expected_section": "2.7 EDITING EXISTING PREPARATION"
+ },
+ {
+  "id": "manuals/prep-3",
+  "suite": "manuals",
+  "question": "On the preparation checklist, how do I add a new attachment to a question, and what can I do with it afterward?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf",
+  "expected_pages": [
+   20
+  ],
+  "expected_section": "Document"
+ },
+ {
+  "id": "manuals/inc-1",
+  "suite": "manuals",
+  "question": "Can a vessel user fill in the closeout comments and close an incident report themselves?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Incident User Manual R0_20.05.2026.pdf",
+  "expected_pages": [
+   18
+  ],
+  "expected_section": "Part K: Office Closeout"
+ },
+ {
+  "id": "manuals/inc-2",
+  "suite": "manuals",
+  "question": "What does it mean if an incident report shows the overdue-action status icon?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Incident User Manual R0_20.05.2026.pdf",
+  "expected_pages": [
+   19
+  ],
+  "expected_section": "Overdue Action"
+ },
+ {
+  "id": "manuals/inc-3",
+  "suite": "manuals",
+  "question": "What's the second way to record the sequence of events for an incident, using separate date/time fields instead of typing it into one box?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Incident User Manual R0_20.05.2026.pdf",
+  "expected_pages": [
+   9
+  ],
+  "expected_section": "⮚ METHOD 2:"
+ },
+ {
+  "id": "manuals/fn-1",
+  "suite": "manuals",
+  "question": "When I'm updating the actions on a fleet notification, when exactly should I click Submit?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf",
+  "expected_pages": [
+   7
+  ],
+  "expected_section": "Document"
+ },
+ {
+  "id": "manuals/fn-2",
+  "suite": "manuals",
+  "question": "How do I record that a fleet notification was discussed onboard with the crew?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf",
+  "expected_pages": [
+   6
+  ],
+  "expected_section": "FLEET NOTIFICATION - USER MANUAL"
+ },
+ {
+  "id": "manuals/ll-1",
+  "suite": "manuals",
+  "question": "Can I, as a ship user, edit the description details the office shared in a lesson learnt record?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf",
+  "expected_pages": [
+   6
+  ],
+  "expected_section": "3. LESSON LEARNT FORM"
+ },
+ {
+  "id": "manuals/ll-2",
+  "suite": "manuals",
+  "question": "What steps confirm that a lesson learnt record has been discussed with the crew onboard?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf",
+  "expected_pages": [
+   7
+  ],
+  "expected_section": "LESSON LEARNT USER MANUAL"
+ },
+ {
+  "id": "manuals/nm-1",
+  "suite": "manuals",
+  "question": "I need to report a Significant Near Miss — do I fill it in on this same reporting form?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Near Miss User Manual R1_30.05.2026.pdf",
+  "expected_pages": [
+   8
+  ],
+  "expected_section": "Document"
+ },
+ {
+  "id": "manuals/nm-2",
+  "suite": "manuals",
+  "question": "Is a vessel user permitted to fill in the Office Closeout part of a near miss report?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Near Miss User Manual R1_30.05.2026.pdf",
+  "expected_pages": [
+   11
+  ],
+  "expected_section": "6. OFFICE CLOSEOUT"
+ },
+ {
+  "id": "manuals/nm-3",
+  "suite": "manuals",
+  "question": "What does the grey circle-with-slash icon mean next to a near miss report?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Near Miss User Manual R1_30.05.2026.pdf",
+  "expected_pages": [
+   11
+  ],
+  "expected_section": "7. STATUS INDICATORS"
+ },
+ {
+  "id": "manuals/crewing-1",
+  "suite": "manuals",
+  "question": "In the In-Progress screen, what do I click to start a new crew record, and can I save my work before I finish filling in the form?",
+  "expected_module": "crewing",
+  "ui_module": "crewing",
+  "expected_file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "expected_pages": [
+   14
+  ],
+  "expected_section": "1.2.1.3 HOW TO CREATE A NEW CREW RECORD"
+ },
+ {
+  "id": "manuals/crewing-2",
+  "suite": "manuals",
+  "question": "Does a crew promotion review form show up directly in the Promotion sub-module, or does something else have to happen first?",
+  "expected_module": "crewing",
+  "ui_module": "crewing",
+  "expected_file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "expected_pages": [
+   48
+  ],
+  "expected_section": "1.6.1.5 HOW TO EXECUTE A PROMOTION"
+ },
+ {
+  "id": "manuals/crewing-3",
+  "suite": "manuals",
+  "question": "On the Crew Due/Overdue timeline, what does it mean when a crew member's bar shows as green versus yellow versus red?",
+  "expected_module": "crewing",
+  "ui_module": "crewing",
+  "expected_file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "expected_pages": [
+   39
+  ],
+  "expected_section": "1.5.1.1 HOW TO ACCESS CREW DUE / OVERDUE STATUS"
+ },
+ {
+  "id": "manuals/crewing-4",
+  "suite": "manuals",
+  "question": "On the New Rotation Plan screen, besides picking the vessel, rank, and date range and then saving, is there anything else the annotated screenshot says I can do from that screen?",
+  "expected_module": "crewing",
+  "ui_module": "crewing",
+  "expected_file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "expected_pages": [
+   41
+  ],
+  "expected_section": "SAIL - CREWING MODULE USER MANUAL"
+ },
+ {
+  "id": "manuals/crewing-5",
+  "suite": "manuals",
+  "question": "After clicking '+ New Crew' in the Crew Database to add someone straight to the Crew Pool, which other section's steps am I supposed to follow to fill out the form?",
+  "expected_module": "crewing",
+  "ui_module": "crewing",
+  "expected_file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "expected_pages": [
+   29
+  ],
+  "expected_section": "1.3.1.5 HOW TO ADD RECORDS TO CREW POOL"
+ },
+ {
+  "id": "manuals/crewing-6",
+  "suite": "manuals",
+  "question": "What button do I press to add a brand-new record to the Training Matrix, and what do I click afterward to save it once the details are entered?",
+  "expected_module": "crewing",
+  "ui_module": "crewing",
+  "expected_file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "expected_pages": [
+   110
+  ],
+  "expected_section": "1.12.3.3 HOW TO ADD A NEW TRAINING RECORD"
+ },
+ {
+  "id": "manuals/moc-office-1",
+  "suite": "manuals",
+  "question": "In the MoC Log, what does clicking the eye icon actually do, and does that differ between the Office and Vessel versions of the manual?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf",
+  "expected_pages": [
+   7
+  ],
+  "expected_section": "3. MoC LOG – OVERVIEW"
+ },
+ {
+  "id": "manuals/moc-office-2",
+  "suite": "manuals",
+  "question": "When I click the Link icon in Part C's Risk Assessment section of an Office MoC, where does the saved RA actually end up?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf",
+  "expected_pages": [
+   13
+  ],
+  "expected_section": "PART – C (Continued)"
+ },
+ {
+  "id": "manuals/moc-vessel-1",
+  "suite": "manuals",
+  "question": "In a Vessel MoC, what happens automatically if the MoC Approver selects 'No' in Part D?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf",
+  "expected_pages": [
+   11
+  ],
+  "expected_section": "7. HOW TO FILL MOC FORM – PART D"
+ },
+ {
+  "id": "manuals/moc-vessel-2",
+  "suite": "manuals",
+  "question": "What are the steps to fill out and submit Part A of a Vessel MoC form?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf",
+  "expected_pages": [
+   6
+  ],
+  "expected_section": "3. HOW TO FILL MOC FORM – PART A"
+ },
+ {
+  "id": "manuals/master-review-1",
+  "suite": "manuals",
+  "question": "What can I do with the action icons in the Master Review report table besides deleting a record?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Master Review Manual R1_10.06.2026.pdf",
+  "expected_pages": [
+   6
+  ],
+  "expected_section": "MASTER REVIEW USER MANUAL"
+ },
+ {
+  "id": "manuals/master-review-2",
+  "suite": "manuals",
+  "question": "Who is meant to use Part E of a Master Review record, and what can they do there?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Master Review Manual R1_10.06.2026.pdf",
+  "expected_pages": [
+   11
+  ],
+  "expected_section": "4. OFFICE CLOSEOUT FOR MASTER REVIEW FORM"
+ },
+ {
+  "id": "manuals/ra-office-1",
+  "suite": "manuals",
+  "question": "Can the same Position/Rank hold two different Approval Levels for Risk Assessments, and what should I do if one needs to change?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf",
+  "expected_pages": [
+   25
+  ],
+  "expected_section": "8. KEY PERSONNEL – MANAGING APPROVERS"
+ },
+ {
+  "id": "manuals/ra-office-2",
+  "suite": "manuals",
+  "question": "When adding hazards from the database in Part B of an Office RA, what are the tab categories in the hazard-selection pop-up window?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf",
+  "expected_pages": [
+   13
+  ],
+  "expected_section": "Document"
+ },
+ {
+  "id": "manuals/ra-office-3",
+  "suite": "manuals",
+  "question": "Do the filters work the same way in the Generic RA Library, Office RA, and Vessels RA sections, or is each explained separately?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf",
+  "expected_pages": [
+   7
+  ],
+  "expected_section": "4. HOW TO APPLY FILTERS"
+ },
+ {
+  "id": "manuals/ra-vessel-1",
+  "suite": "manuals",
+  "question": "As a vessel user, can I edit Generic Risk Assessments in the Generic RA Library, or only look at them?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf",
+  "expected_pages": [
+   7
+  ],
+  "expected_section": "4. HOW TO VIEW GENERIC RISK ASSESSMENT REPORT"
+ },
+ {
+  "id": "manuals/ra-vessel-2",
+  "suite": "manuals",
+  "question": "What are the three ways offered for starting a brand-new Vessel Risk Assessment?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf",
+  "expected_pages": [
+   10
+  ],
+  "expected_section": "6. HOW TO CREATE NEW VESSEL RISK ASSESSMENT"
+ },
+ {
+  "id": "manuals/sms-office-1",
+  "suite": "manuals",
+  "question": "For approving a revision of an already-uploaded SMS document (Section 4.2.2), what does the manual tell the Approver to do?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf",
+  "expected_pages": [
+   21
+  ],
+  "expected_section": "4.2.2 Approval"
+ },
+ {
+  "id": "manuals/sms-office-2",
+  "suite": "manuals",
+  "question": "If I create a folder in SMS with the 'Is Form' checkbox selected, will the documents I upload there show up when users browse SMS?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf",
+  "expected_pages": [
+   14,
+   15
+  ],
+  "expected_section": "Document"
+ },
+ {
+  "id": "manuals/sms-office-3",
+  "suite": "manuals",
+  "question": "In the SMS hyperlinking example figure, what specific document reference is shown as something a link inside a document can jump straight to?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf",
+  "expected_pages": [
+   10
+  ],
+  "expected_section": "3.1.6 Hyperlinking in SMS documents"
+ },
+ {
+  "id": "manuals/safety-meeting-1",
+  "suite": "manuals",
+  "question": "For an Additional Safety Meeting (Add SM) form, do Parts B, C and D have their own instructions, or should I look elsewhere in the manual?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf",
+  "expected_pages": [
+   18
+  ],
+  "expected_section": "2.2 HOW TO FILL ADD SM FORM"
+ },
+ {
+  "id": "manuals/safety-meeting-2",
+  "suite": "manuals",
+  "question": "What happens to a circular in the Advisories & Circulars section if nobody marks it as discussed during the meeting?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf",
+  "expected_pages": [
+   13
+  ],
+  "expected_section": "PART C: Advisories & Circulars"
+ },
+ {
+  "id": "manuals/certsurveys-1",
+  "suite": "manuals",
+  "question": "What are the steps to add a brand-new certificate type to the Master list under Ship's Certificates?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   17,
+   18
+  ],
+  "expected_section": "1.2.1.4 HOW TO ADD A NEW MASTER CERTIFICATE"
+ },
+ {
+  "id": "manuals/certsurveys-2",
+  "suite": "manuals",
+  "question": "Is there anything that stops me from saving a new certificate master record if I leave some fields blank?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   18
+  ],
+  "expected_section": "1.2.1.4 HOW TO ADD A NEW MASTER CERTIFICATE"
+ },
+ {
+  "id": "manuals/certsurveys-3",
+  "suite": "manuals",
+  "question": "How do I add or view attachments for a survey record — is the process different from certificates?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   11,
+   9
+  ],
+  "expected_section": "1.1.4.5 HOW TO ADD AND VIEW ATTACHMENTS"
+ },
+ {
+  "id": "manuals/defects-1",
+  "suite": "manuals",
+  "question": "In the Defects Log list, is there a way to edit a report directly from its row without opening it via the Eye icon first?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+  "expected_pages": [
+   16
+  ],
+  "expected_section": "1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT"
+ },
+ {
+  "id": "manuals/defects-2",
+  "suite": "manuals",
+  "question": "What happens after I click Submit on a new defect report?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+  "expected_pages": [
+   15
+  ],
+  "expected_section": "1.1.4.3 HOW TO CREATE A NEW DEFECT"
+ },
+ {
+  "id": "manuals/defects-3",
+  "suite": "manuals",
+  "question": "How do I export all the Condition of Class records at once, or do I need to export them one at a time?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+  "expected_pages": [
+   20,
+   17
+  ],
+  "expected_section": "1.1.5.5 HOW TO EXPORT ALL COC RECORDS"
+ },
+ {
+  "id": "manuals/pmsoffice-1",
+  "suite": "manuals",
+  "question": "In the Work Orders section, what's the difference between a job showing 'Due' status versus 'Overdue' status?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   28
+  ],
+  "expected_section": "1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O)"
+ },
+ {
+  "id": "manuals/pmsoffice-2",
+  "suite": "manuals",
+  "question": "Can I update a spare part's ROB directly without selecting a storage location first?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   45
+  ],
+  "expected_section": "1.1.7.3 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS"
+ },
+ {
+  "id": "manuals/pmsoffice-3",
+  "suite": "manuals",
+  "question": "How can I reorder components within the Component Tree?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   26
+  ],
+  "expected_section": "1.1.4.5 HOW TO EDIT THE COMPONENT TREE VIEW"
+ },
+ {
+  "id": "manuals/pmsoffice-4",
+  "suite": "manuals",
+  "question": "Is there a special restriction on approving a locked work order?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   34
+  ],
+  "expected_section": "1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER"
+ },
+ {
+  "id": "manuals/pmsoffice-5",
+  "suite": "manuals",
+  "question": "On the PMS Dashboard, what fields can I filter by — and is that the same set of filters available on the vessel side?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   9
+  ],
+  "expected_section": "1.1.3.2 HOW TO USE FILTER"
+ },
+ {
+  "id": "manuals/pmsvessel-1",
+  "suite": "manuals",
+  "question": "What are the different item categories under Stores, and what does each one show?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "expected_pages": [
+   42
+  ],
+  "expected_section": "1.1.8.1 HOW TO ACCESS THE STORE"
+ },
+ {
+  "id": "manuals/pmsvessel-2",
+  "suite": "manuals",
+  "question": "As a Vessel User, can I create a new Modify PMS change request myself?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "expected_pages": [
+   47
+  ],
+  "expected_section": "1.1.10.1 HOW TO ACCESS MODIFY PMS"
+ },
+ {
+  "id": "manuals/pmsvessel-3",
+  "suite": "manuals",
+  "question": "How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "expected_pages": [
+   43,
+   40
+  ],
+  "expected_section": "1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK"
+ },
+ {
+  "id": "manuals/pmsvessel-4",
+  "suite": "manuals",
+  "question": "If I try to generate a work order for a component job that already has an active one, what happens?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "expected_pages": [
+   16
+  ],
+  "expected_section": "1.1.4.2 HOW TO VIEW COMPONENT DETAILS"
+ },
+ {
+  "id": "fresh/fresh-audit-1",
+  "suite": "fresh",
+  "question": "After I create an inspection record in Audit History, what do the Save, Upload and Next buttons do, and which fields must I complete?",
+  "expected_module": "audit",
+  "ui_module": "audit",
+  "expected_file": "Audit - History Manual_R1_30.06.2026.pdf",
+  "expected_pages": [
+   8
+  ],
+  "expected_section": "2.1.1 Inspection Record Page"
+ },
+ {
+  "id": "fresh/fresh-incident-1",
+  "suite": "fresh",
+  "question": "As a vessel user, how do I filter the fleet notifications shared by the office, and what can I do with a notification from that list?",
+  "expected_module": "incident",
+  "ui_module": "incident",
+  "expected_file": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf",
+  "expected_pages": [
+   5
+  ],
+  "expected_section": "2. Fleet Notification Overview"
+ },
+ {
+  "id": "fresh/fresh-safety-1",
+  "suite": "fresh",
+  "question": "In Master Review, what is the difference between the All tab and the Response Pending tab?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - Master Review Manual R1_10.06.2026.pdf",
+  "expected_pages": [
+   5
+  ],
+  "expected_section": "2. Master Review - Overview"
+ },
+ {
+  "id": "fresh/fresh-crewing-1",
+  "suite": "fresh",
+  "question": "How do I filter candidate records in Crewing, and is there a way to filter an individual column?",
+  "expected_module": "crewing",
+  "ui_module": "crewing",
+  "expected_file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "expected_pages": [
+   13
+  ],
+  "expected_section": "1.2.1.2 How to apply filters"
+ },
+ {
+  "id": "fresh/fresh-technical-1",
+  "suite": "fresh",
+  "question": "In the Office Certificates screen, which filters can I use to narrow the certificate records, and how do I reset them?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   7
+  ],
+  "expected_section": "1.1.3.2 How to apply filter"
+ },
+ {
+  "id": "fresh/fresh-moc-alt-1",
+  "suite": "fresh",
+  "question": "What are the ways to start a new MoC from the office?",
+  "expected_module": "safety",
+  "ui_module": "safety",
+  "expected_file": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf",
+  "expected_pages": [
+   8
+  ],
+  "expected_section": "4. How to create a new MoC"
+ },
+ {
+  "id": "fresh/fresh-wo-broad-1",
+  "suite": "fresh",
+  "question": "What are the different ways a work order can come into existence in PMS?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   18,
+   28,
+   29
+  ],
+  "expected_section": "Components 'Generate WO' (p.18) and 1.1.5.2 How to create an unplanned work order (p.29)"
+ },
+ {
+  "id": "fresh/fresh-wo-named-1",
+  "suite": "fresh",
+  "question": "From the Components screen, how do I raise a work order for one job on a component?",
+  "expected_module": "technical",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [
+   18
+  ],
+  "expected_section": "Components — Generate WO"
+ },
+ {
+  "id": "fresh/fresh-ctx-1",
+  "suite": "fresh",
+  "question": "How do I record the minutes of a safety meeting?",
+  "expected_module": "safety",
+  "ui_module": "technical",
+  "expected_file": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf",
+  "expected_pages": [],
+  "expected_section": "Safety Meeting manual",
+  "expected_module_original": "technical",
+  "expected_module_reason": "suite score_by names Safety as the required module; the `module` field is the originating widget context"
+ },
+ {
+  "id": "fresh/fresh-ctx-conflict-1",
+  "suite": "fresh",
+  "question": "In the Safety module, how do I add a new component to the component tree?",
+  "expected_module": "safety",
+  "ui_module": "technical",
+  "expected_file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "expected_pages": [],
+  "expected_section": "n/a — the question names Safety but the subject is a Technical procedure",
+  "expected_module_original": "technical",
+  "expected_module_reason": "agreed policy: honour the module the question names and explain the mismatch; the Technical expected_file is the subject matter, not the required routing target"
+ }
+]
