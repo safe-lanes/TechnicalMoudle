@@ -12,6 +12,51 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # Verdicts keyed by a regex over the claim text, applied within a case. Each carries the evidence I read.
 # verdict ∈ supported | contradicted | unsupported | unresolved
 READ = [
+    # ============ BATCH 4 (19-Sep, reviewer's fifth pass) — CORRECTIONS FIRST, so they override earlier rows ==
+    # Two findings I reported last round were FALSE. Both came from searching only the excerpt BODY text and
+    # not the document/section headers, and from searching for one phrasing instead of the meaning.
+    ("manuals/certsurveys-2", r"cannot be saved|not be saved", "supported",
+     "Audit/Cert. & Surveys supplied text, verbatim: 'Mandatory fields (*) must be completed before the record "
+     "can be saved.' The answer's 'if mandatory fields are blank, the record cannot be saved' is the "
+     "contrapositive of that sentence.",
+     "RETRACTION: I recorded this as UNSUPPORTED last round. The verdict was wrong — I searched for 'cannot be "
+     "saved' / 'not be saved' and missed the manual's positive phrasing. Absence of a phrase is not absence of "
+     "support, exactly as the reviewer said."),
+    ("manuals/fn-2", r"Lesson Learnt", "supported",
+     "The Lesson Learnt User Manual_Vessel_R0 (p.7), section 2 Discussion Record, WAS supplied as excerpt 2, and "
+     "the answer cites it. The words 'Lesson Learnt' appear in that excerpt's document/section header.",
+     "RETRACTION: I recorded this as UNSUPPORTED last round on the grounds that 'Lesson Learnt' appears nowhere "
+     "in the supplied text. It appears in the excerpt HEADER; my search covered only the body. Third tooling "
+     "false finding in this workstream, after the em-dash header parser and the negated-XREF rule."),
+    # Astra 4 — the correction must apply to BOTH arms. The earlier batch-1 row matched F1 first and kept the
+    # old explanation; this row precedes it so both arms get the same reasoning.
+    ("manuals/pmsoffice-5", r"vessel-side Reports|Dashboard uses Vessel, Scope|dashboard and vessel-side filters are different|filter sets are different|does not document the same Dashboard|do not list Vessel, Scope|not the same filter", "supported-with-qualification",
+     "OFFICE Dashboard filter 1.1.3.2 (p.9) and VESSEL Reports filter 1.1.9.3 (p.46) are both supplied, and the "
+     "two filter lists differ as the answer states.",
+     "VALID as a comparison of two DIFFERENT screens, which is what the question asks. NOT valid as a claim "
+     "about equivalent screens: the two passages differ in BOTH screen and environment, so nothing here "
+     "establishes that the same screen differs between Office and Vessel. Applies to both arms (earlier "
+     "versions qualified F0 only)."),
+    # Astra 5 — the audience-label framing overstated what the capture shows
+    ("manuals/hist-1", r"allowed to add comments in the Review section|Office user reviews the record", "unsupported",
+     "The expected source (Audit - History Manual_R1 p.16, 'The Review section is intended for office users "
+     "only') was never supplied; the routing sent the question to Technical. The answer describes the PMS "
+     "WORK-ORDER review procedure instead.",
+     "CORRECTED FRAMING: I previously wrote that the permission was 'inferred from an audience label'. That "
+     "overstates what the capture shows — the supplied text also says explicitly 'The user interface shown in "
+     "Ref. Figures 12-15 are applicable to the Office side.' The Office attribution is therefore locally "
+     "supported. The defect is that it is the WRONG FEATURE: work-order review, not inspection-history review."),
+    # --- the last four outstanding risk claims ---
+    ("generated/6", r"No specific role or office-generation switch is required", "supported",
+     "Read in context: the sentence is line 17 of the answer, under the heading '3. Create an unplanned work "
+     "order'. The same answer states the per-job switch requirement correctly at line 13.", ""),
+    ("generated/6", r"verified against application revision cf5241ad6", "supported",
+     "The KB provenance note names revision cf5241ad6 verbatim in the supplied text.", ""),
+    ("manuals/hist-3", r"importing a JSON file", "supported",
+     "Audit History Manual (p.13), verbatim: 'Observation details, including Positive and LAE findings, are "
+     "automatically populated from the uploaded JSON file.'", ""),
+    ("manuals/pmsvessel-1", r"available in the Store sub-module for both Office and Vessel", "supported",
+     "PMS Office 1.1.8.1 and PMS Vessel 1.1.8.1 — the same section from both environments — are both supplied.", ""),
     # ---- CHECK-NUMBER: all five checked by direct search of the full supplied text (not the top-3 window) ----
     ("manuals/prep-3", r"20 ?MB", "supported",
      "Audit - Preparation Manual_Office_R1 §4.3.4 (p.19): 'the combined size of the file(s) selected in a single "

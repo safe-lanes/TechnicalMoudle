@@ -43,7 +43,10 @@ def machine(c):
     ev = c["evidence"]
     if not ev:
         return "UNRESOLVED", "no supplied passages captured"
-    joined = " ".join((e["best_sentence"] or "") + " " + (e["section"] or "") for e in ev).lower()
+    # FIXED 19-Sep: include the DOCUMENT name as well as the section. Searching only the body text produced
+    # two false "unsupported" findings (fn-2: 'Lesson Learnt' is in the excerpt header, not the body).
+    joined = " ".join((e["best_sentence"] or "") + " " + (e["section"] or "") + " " + (e["doc"] or "")
+                      for e in ev).lower()
     claim = c["claim"].lower()
 
     # R1 — numbers and limits

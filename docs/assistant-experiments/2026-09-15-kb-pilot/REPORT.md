@@ -2022,3 +2022,76 @@ the wrong answer sit the vector ranking, the floor, the clarify margin and the a
 `routing-evidence/` now ships the routing code, the title-term proof and the complete captured input for
 `hist-1`, so the claim can be checked without repository access — the reviewer could not verify it from the
 previous pack.
+
+## 22. Reviewer's sixth pass (19-Sep) — counts confirmed, two of my findings retracted, routing proposal rebuilt
+
+No model calls; nothing deployed or reindexed; live untouched; v6 held; the clarification guard stays on hold.
+
+### 22.1 Counts (item 1)
+
+Confirmed: **277 = 150 F1 + 127 F0**, including the reported 122/123 and 109/112 risk claims. After this round
+the four outstanding risk claims are read: **F1 123/123, F0 112/112, 281 verdicts recorded.** The wider review
+remains incomplete — **1,203 machine-UNRESOLVED and 983 machine-`auto-supported` occurrences across both arms
+are still unread and are not verified** (open item C4). The ledger now states coverage before any result.
+
+### 22.2 Change A withdrawn — my proposal contradicted itself (item 2)
+
+The reviewer ran the supplied functions. Reproduced here (`routing-evidence/R1-R2-reproduction.txt`):
+`"audit history"` and `"audit preparation"` already resolve to Audit **through the existing `audit` alias**, so
+the title phrases add nothing; and the reported question says "**inspection** history", names no module, and
+returns `(None, 'no module named')`. v2 acknowledged that limitation and then set a pass condition requiring
+that same question to resolve to `audit` — **unsatisfiable, and self-contradictory.** Change A is withdrawn as
+a fix for `hist-1`.
+
+### 22.3 The two executable routing findings (item 3, `ROUTING-PROPOSAL-v3.md`)
+
+- **R1 — ambiguous title terms are not dropped.** The comment promises they are; the code keeps whichever
+  module appears first. Reproduced with a synthetic collision: reversing document order flips the mapping.
+  **Measured as latent** — a scan of the real corpus finds **no** currently ambiguous term, so R1 causes no
+  misroute today. Worth fixing, but not the cause of anything observed.
+- **R2 — a named module is honoured only if it is already a candidate.** `if named and named in best` discards
+  an explicitly named module that has no chunk inside the 1.15 floor, and vector routing then answers from a
+  different module. The code path is proven; **whether it fires on any current question is not yet measured**,
+  and that offline test is named and outstanding.
+- **Neither addresses `hist-1`**, which names no module. That remains a recall problem, and the guard stays on
+  hold.
+
+"Root cause proven" is withdrawn entirely. The recognition gap is proven; it is not the cause of `hist-1`.
+
+### 22.4 The comparison correction now applies to both arms (item 4)
+
+The six F1 `pmsoffice-5` entries had kept the old "same action" explanation because an earlier row in my
+verdict table matched first. Fixed: all ten occurrences across both arms now read
+**supported-with-qualification**, with the distinction the reviewer asked for — **valid** as a comparison of two
+*different* screens, which is what the question asks; **not** valid as a claim about equivalent screens, since
+the two passages differ in both screen and environment.
+
+### 22.5 Two of my findings retracted (item 5 and the closing caution)
+
+Both "new unsupported claims" I reported last round were **wrong**, and for the same reason: I searched the
+excerpt **bodies** only, and for one phrasing rather than the meaning.
+
+| claim | what I said | what the text says |
+|---|---|---|
+| `certsurveys-2` "if mandatory fields are blank, the record cannot be saved" | unsupported | the supplied text reads **"Mandatory fields (\*) must be completed before the record can be saved"** — the claim is its contrapositive. **Supported.** |
+| `fn-2` "the same recording steps are documented for a Lesson Learnt" | unsupported | the **Lesson Learnt User Manual p.7 §2 Discussion Record was supplied** as excerpt 2 and is cited. The words appear in the excerpt header, which my search excluded. **Supported.** |
+
+The search now covers document and section headers as well as body text. This is the **third** false finding
+produced by my own tooling in this workstream, after the em-dash header parser and the negated-`XREF` rule —
+recorded as a pattern, not as three unrelated slips.
+
+**`hist-1` framing corrected.** I wrote that the permission was "inferred from an audience label". The capture
+shows the supplied text also states plainly: *"The user interface shown in Ref. Figures 12, 13, 14 and 15 are
+applicable to the **Office** side."* The Office attribution is therefore locally supported. The defect is that
+it is the **wrong feature** — PMS work-order review, not inspection-history review. The verdict stays
+unsupported; the reason is corrected.
+
+### 22.6 Where this leaves the count of real answer defects
+
+| defect | status |
+|---|---|
+| `wo-phr-05` switch contradiction | stands, **contradicted**, one occurrence |
+| `hist-1` wrong-feature answer | stands, **unsupported**, correct by coincidence, framing corrected |
+| `certsurveys-2`, `fn-2` | **retracted — both supported** |
+
+Two real answer defects, not four. Live stays as it is; promote nothing.
