@@ -18,6 +18,8 @@ import ComponentRegisterForm from "@/components/ComponentRegisterForm";
 import ComponentRegisterFormCR from "@/components/ComponentRegisterFormCR";
 import AddEditComponentForm from "@/components/AddEditComponentForm";
 import ComponentRegisterAddEdit from "@/components/ComponentRegisterAddEdit";
+import WOAgGridTable from "@/components/WOAgGridTable";
+import type { ColDef } from "ag-grid-community";
 import { ReviewChangesDrawer } from "@/components/ReviewChangesDrawer";
 import { ReplaceRotationalItemDialog } from "@/components/ReplaceRotationalItemDialog";
 import StampSelect from "@/components/StampSelect";
@@ -862,44 +864,44 @@ const getExpectedRunningHoursDueDate = (
   return formatProfessionalDate(addDays(parsedLastDoneDate, expectedDays));
 };
 
-const JobRow: React.FC<{
-  job: any;
-  onRowClick: (job: any) => void;
-  toast: any;
-  activeComponentCode: string;
-  isAdminRole?: boolean;
-}> = ({ job, onRowClick, toast, activeComponentCode, isAdminRole }) => {
-  const [showReasonDialog, setShowReasonDialog] = useState(false);
+const getJobFrequencyDisplay = (job: any): string =>
+  job.maintenanceBasis === 'Running Hours'
+    ? `${job.intervalRunningHour || 0} RH`
+    : job.maintenanceBasis === 'Dual Frequency'
+      ? `${job.frequencyValue} ${job.frequencyUnit} / ${job.intervalRunningHour || 0} RH`
+      : `${job.frequencyValue} ${job.frequencyUnit}`;
 
-  const effectiveLastDoneDate = job.lastDoneDate;
-  const effectiveNextDueDate = job.nextDueDate;
-  const effectiveLastDoneRH = job.lastDoneRH;
-  const effectiveNextDueRH = job.nextDueRH;
+const getJobNextDueDateDisplay = (job: any): string => {
   const isRunningHoursBased =
     job.maintenanceBasis === 'Running Hours' ||
     job.maintenanceBasis === 'Dual Frequency';
-  const expectedNextDueDate = isRunningHoursBased
-    ? getExpectedRunningHoursDueDate(
-        effectiveLastDoneDate,
-        job.intervalRunningHour,
-      )
-    : formatProfessionalDate(effectiveNextDueDate);
-  const nextDueHour = (() => {
-    if (!isRunningHoursBased) return '—';
-    if (hasTrackingValue(effectiveNextDueRH)) {
-      return formatRunningHours(effectiveNextDueRH);
-    }
 
-    if (!hasTrackingValue(effectiveLastDoneRH) || !hasTrackingValue(job.intervalRunningHour)) {
-      return '—';
-    }
+  return isRunningHoursBased
+    ? getExpectedRunningHoursDueDate(job.lastDoneDate, job.intervalRunningHour)
+    : formatProfessionalDate(job.nextDueDate);
+};
 
-    const lastDoneRH = Number(effectiveLastDoneRH);
-    const intervalRunningHour = Number(job.intervalRunningHour);
-    return Number.isFinite(lastDoneRH) && Number.isFinite(intervalRunningHour)
-      ? formatRunningHours(lastDoneRH + intervalRunningHour)
-      : '—';
-  })();
+const getJobNextDueHourDisplay = (job: any): string => {
+  const isRunningHoursBased =
+    job.maintenanceBasis === 'Running Hours' ||
+    job.maintenanceBasis === 'Dual Frequency';
+  if (!isRunningHoursBased) return '—';
+  if (hasTrackingValue(job.nextDueRH)) return formatRunningHours(job.nextDueRH);
+  if (!hasTrackingValue(job.lastDoneRH) || !hasTrackingValue(job.intervalRunningHour)) return '—';
+
+  const lastDoneRH = Number(job.lastDoneRH);
+  const intervalRunningHour = Number(job.intervalRunningHour);
+  return Number.isFinite(lastDoneRH) && Number.isFinite(intervalRunningHour)
+    ? formatRunningHours(lastDoneRH + intervalRunningHour)
+    : '—';
+};
+
+const JobActionCell: React.FC<{
+  job: any;
+  toast: any;
+  activeComponentCode: string;
+}> = ({ job, toast, activeComponentCode }) => {
+  const [showReasonDialog, setShowReasonDialog] = useState(false);
 
   const generateWOMutation = useMutation({
     mutationFn: async (reason: 'Planning' | 'Breakdown' | 'Other') => {
@@ -957,59 +959,23 @@ const JobRow: React.FC<{
   };
 
   const isInactive = job.isActive === false;
-  const inactiveClass = isInactive && isAdminRole ? 'text-gray-400 opacity-60' : 'text-gray-900';
-
   return (
     <>
-      <tr 
-        className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${isInactive && isAdminRole ? 'bg-gray-50' : ''}`}
-        onClick={() => onRowClick(job)}
-        data-testid={`job-row-${job.jobNo}`}
-      >
-        <td className={`py-3 px-3 ${inactiveClass}`} data-testid={`job-no-${job.jobNo}`}>{job.jobNo}</td>
-        <td className={`py-3 px-3 ${inactiveClass}`} data-testid={`job-title-${job.jobNo}`}>{job.jobTitle}{isInactive && isAdminRole ? ' (Inactive)' : ''}</td>
-        <td className={`py-3 px-3 ${inactiveClass}`}>{job.maintenanceType}</td>
-        <td className={`py-3 px-3 ${inactiveClass}`}>
-          {job.maintenanceBasis === 'Running Hours'
-            ? `${job.intervalRunningHour || 0} RH`
-            : job.maintenanceBasis === 'Dual Frequency'
-              ? `${job.frequencyValue} ${job.frequencyUnit} / ${job.intervalRunningHour || 0} RH`
-              : `${job.frequencyValue} ${job.frequencyUnit}`}
-        </td>
-        <td className={`py-3 px-3 ${inactiveClass}`}>
-          {job.maintenanceBasis === 'Running Hours'
-            ? formatRunningHours(effectiveLastDoneRH)
-            : job.maintenanceBasis === 'Dual Frequency'
-              ? `${formatProfessionalDate(effectiveLastDoneDate)} / ${formatRunningHours(effectiveLastDoneRH)}`
-              : formatProfessionalDate(effectiveLastDoneDate)}
-        </td>
-        <td
-          className={`py-3 px-3 ${inactiveClass}`}
-          title={isRunningHoursBased ? 'Expected Next Due Date (RH-based estimate)' : undefined}
+      {!isInactive && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={(event) => {
+            event.stopPropagation();
+            setShowReasonDialog(true);
+          }}
+          disabled={generateWOMutation.isPending}
+          className="text-xs h-8"
+          data-testid={`btn-generate-wo-${job.jobNo}`}
         >
-          {expectedNextDueDate}
-          {isRunningHoursBased && expectedNextDueDate !== '—' && (
-            <span className="block text-[10px] text-gray-500">Expected</span>
-          )}
-        </td>
-        <td className={`py-3 px-3 ${inactiveClass}`}>
-          {nextDueHour}
-        </td>
-        <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-          {!isInactive && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowReasonDialog(true)}
-              disabled={generateWOMutation.isPending}
-              className="text-xs"
-              data-testid={`btn-generate-wo-${job.jobNo}`}
-            >
-              {generateWOMutation.isPending ? 'Generating...' : 'Generate WO'}
-            </Button>
-          )}
-        </td>
-      </tr>
+          {generateWOMutation.isPending ? 'Generating...' : 'Generate WO'}
+        </Button>
+      )}
       
       <Dialog open={showReasonDialog} onOpenChange={setShowReasonDialog}>
         <DialogContent className="sm:max-w-md">
@@ -1144,9 +1110,98 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     setLocation(`/pms/job/${job.id}?activeComponentCode=${encodeURIComponent(componentCode)}`);
   };
 
+  const jobColumnDefs = React.useMemo<ColDef[]>(() => {
+    const header = (label: string, marker: string, testId: string) => () => (
+      <span className="flex items-center" data-testid={testId}>
+        <Marker id={marker} /> {label}
+      </span>
+    );
+
+    return [
+      {
+        headerName: 'Job Code',
+        field: 'jobNo',
+        minWidth: 125,
+        flex: 0.8,
+        headerComponent: header('Job Code', 'B7.C.3', 'B7.C.3'),
+        tooltipField: 'jobNo',
+      },
+      {
+        headerName: 'Job Title',
+        field: 'jobTitle',
+        minWidth: 220,
+        flex: 1.8,
+        headerComponent: header('Job Title', 'B7.C.4', 'B7.C.4'),
+        valueGetter: ({ data }) =>
+          `${data?.jobTitle || '—'}${data?.isActive === false && (isSailAdmin || isClientAdmin || isExternal) ? ' (Inactive)' : ''}`,
+        tooltipValueGetter: ({ value }) => value,
+      },
+      {
+        headerName: 'Frequency',
+        minWidth: 155,
+        flex: 1.1,
+        headerComponent: header('Frequency', 'B7.C.5', 'B7.C.5'),
+        valueGetter: ({ data }) => data ? getJobFrequencyDisplay(data) : '—',
+        tooltipValueGetter: ({ value }) => value,
+      },
+      {
+        headerName: 'Last Done Date',
+        minWidth: 145,
+        flex: 1,
+        headerComponent: header('Last Done Date', 'B7.C.6', 'B7.C.6'),
+        valueGetter: ({ data }) => data ? formatProfessionalDate(data.lastDoneDate) : '—',
+        tooltipValueGetter: ({ value }) => value,
+      },
+      {
+        headerName: 'Last Done Hour',
+        minWidth: 145,
+        flex: 1,
+        headerComponent: header('Last Done Hour', 'B7.C.7', 'B7.C.7'),
+        valueGetter: ({ data }) => data ? formatRunningHours(data.lastDoneRH) : '—',
+        tooltipValueGetter: ({ value }) => value,
+      },
+      {
+        headerName: 'Next Due Date',
+        minWidth: 145,
+        flex: 1,
+        headerComponent: header('Next Due Date', 'B7.C.8', 'B7.C.8'),
+        valueGetter: ({ data }) => data ? getJobNextDueDateDisplay(data) : '—',
+        tooltipValueGetter: ({ data, value }) =>
+          data?.maintenanceBasis === 'Running Hours' || data?.maintenanceBasis === 'Dual Frequency'
+            ? `${value} (RH-based estimate)`
+            : value,
+      },
+      {
+        headerName: 'Next Due Hour',
+        minWidth: 145,
+        flex: 1,
+        headerComponent: header('Next Due Hour', 'B7.C.9', 'B7.C.9'),
+        valueGetter: ({ data }) => data ? getJobNextDueHourDisplay(data) : '—',
+        tooltipValueGetter: ({ value }) => value,
+      },
+      {
+        headerName: 'Action',
+        minWidth: 145,
+        maxWidth: 190,
+        flex: 0.9,
+        sortable: false,
+        filter: false,
+        resizable: true,
+        headerComponent: header('Action', 'B7.C.10', 'B7.C.10'),
+        cellRenderer: ({ data }: any) => data ? (
+          <JobActionCell
+            job={data}
+            toast={toast}
+            activeComponentCode={componentCode}
+          />
+        ) : null,
+      },
+    ];
+  }, [componentCode, isClientAdmin, isExternal, isSailAdmin, toast]);
+
   return (
     <>
-      <div className="overflow-x-auto">
+      <div>
         {(isSailAdmin || isClientAdmin || isTechSuperintendent || isExternal || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
         <div className="flex justify-end mb-3">
           <Button
@@ -1160,46 +1215,29 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
           </Button>
         </div>
         )}
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.3"><Marker id="B7.C.3" /> Job Code</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.4"><Marker id="B7.C.4" /> Job Title</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.5"><Marker id="B7.C.5" /> Task Type</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.6"><Marker id="B7.C.6" /> Frequency</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.7"><Marker id="B7.C.7" /> Last Done</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.8"><Marker id="B7.C.8" /> Next Due Date</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.9"><Marker id="B7.C.9" /> Next Due Hour</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.C.10"><Marker id="B7.C.10" /> Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={8} className="py-8 text-center text-gray-500">
-                  Loading jobs...
-                </td>
-              </tr>
-            ) : jobs.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="py-8 text-center text-gray-500">
-                  No jobs found for this component
-                </td>
-              </tr>
-            ) : (
-              visibleJobs.map((job, index) => (
-                <JobRow 
-                  key={index}
-                  job={job}
-                  onRowClick={handleRowClick}
-                  toast={toast}
-                  activeComponentCode={componentCode}
-                  isAdminRole={isSailAdmin || isClientAdmin || isExternal}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
+        <WOAgGridTable
+          columnDefs={jobColumnDefs}
+          rowData={visibleJobs}
+          loading={isLoading}
+          domLayout="autoHeight"
+          height="auto"
+          rowHeight={48}
+          headerHeight={44}
+          noRowsMessage="No jobs found for this component"
+          testId="component-jobs-grid"
+          getRowId={({ data }) => data.juuid || data.id}
+          getRowClass={() => 'cursor-pointer'}
+          getRowStyle={({ data }) =>
+            data?.isActive === false && (isSailAdmin || isClientAdmin || isExternal)
+              ? { color: '#9ca3af', opacity: 0.65, backgroundColor: '#f9fafb' }
+              : undefined
+          }
+          onRowClicked={({ data, event }) => {
+            const target = event?.target as HTMLElement | null;
+            if (target?.closest('button, [role="dialog"]')) return;
+            if (data) handleRowClick(data);
+          }}
+        />
         
         {/* Expand/Collapse and Pagination Controls */}
         {totalJobs > COLLAPSED_ROWS && (
