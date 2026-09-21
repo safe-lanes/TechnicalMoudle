@@ -100,7 +100,14 @@ JUDGE_DECLINE_SCOPE = True
 JUDGE_CITE_EXACT = True
 JUDGE_EVIDENCE_CHECK = True
 JUDGE_PHRASE_EQUIV = True
-JUDGE_VERSION = "8"
+# .9 (19-Sep, reviewer point): the support label is renamed to say only what it proves. Finding a required phrase
+#   in the cited document's supplied text shows that document COULD support the answer; it does not prove it
+#   supports the answer's claims. The value is therefore `phrase-present`, it is treated as NECESSARY AND NOT
+#   SUFFICIENT, and a citation pass resting on it alone is reported as PROVISIONAL until a recorded read resolves
+#   it (indexer/citation_reviews.json, consumed by the scorer). Also FIXED here: the excerpt-header parser split
+#   the document name at the first em dash, so every citation to a KB pilot file (whose filename contains one)
+#   looked "not supplied" — that defect produced most of the unresolved citation flags in the S7 report.
+JUDGE_VERSION = "9"
 DECLINE_PHRASES = {"not covered", "isn't covered", "not documented", "does not cover", "no information",
                    "do not describe", "does not describe", "not described"}
 # A sentence "names a source" when it points at a specific document, module or section.
@@ -174,7 +181,21 @@ def resolve_documents(expected: str) -> list[str]:
 
 
 # ── .8 the supplied excerpts (the captured model input) ──────────────────────────────────────────────────────────
-_EXCERPT_HEAD = re.compile(r"^\[(\d+)\]\s*\((.+?)(?:\s+—\s+(.*?))?\)\s*$", re.M)
+_EXCERPT_HEAD = re.compile(r"^\[(\d+)\]\s*\((.*)\)\s*$", re.M)
+
+
+def split_head(inside: str) -> tuple[str, str]:
+    """'<document> — <section>' → (document, section). FIXED 19-Sep: the KB pilot file names contain an em dash
+    of their own ("KB pilot: Office 'Generate Now' — generate a vessel's due work orders from the office.md"), so
+    splitting on the FIRST ' — ' truncated the document name and every citation to those files looked 'not
+    supplied'. The document is now resolved against the corpus list first; only if that fails does it fall back to
+    the LAST separator."""
+    for d in CORPUS_DOCS:
+        for cand in (d + ".pdf", d + ".docx", d + ".md", d):   # longest first: the stem is a prefix of the filename
+            if inside.startswith(cand):
+                return cand, inside[len(cand):].lstrip(" —–-").strip()
+    doc, sep, sec = inside.rpartition(" — ")
+    return (doc.strip(), sec.strip()) if sep else (inside.strip(), "")
 
 
 def supplied_blocks(supplied: str | None) -> list[dict]:
@@ -186,9 +207,9 @@ def supplied_blocks(supplied: str | None) -> list[dict]:
     out = []
     for i, m in enumerate(heads):
         body = supplied[m.end():(heads[i + 1].start() if i + 1 < len(heads) else len(supplied))]
-        sec = (m.group(3) or "").strip()
+        doc, sec = split_head(m.group(2).strip())
         pg = re.search(r"\(p\.(\d+)\)", sec)
-        out.append({"n": int(m.group(1)), "document": m.group(2).strip(), "section": sec,
+        out.append({"n": int(m.group(1)), "document": doc, "section": sec,
                     "page": int(pg.group(1)) if pg else None, "text": body.strip()})
     return out
 
@@ -394,13 +415,13 @@ def judge_ex(j: dict, manual: str, page: tuple[int, ...] | int | None, must: lis
             else:
                 txt = " ".join(b["text"] + " " + b["section"] for b in mine).lower()
                 if must and any(present(txt, p) for p in must):
-                    support = "supported"
+                    support = "phrase-present"   # .9: NECESSARY, NOT SUFFICIENT — see the note above
                 elif not must and len(content_terms_of(txt) & content_terms_of(ans)) >= 10:
-                    support = "supported"
+                    support = "phrase-present"
                 else:
                     support, _ = "unverified", review.append(
                         "cited document supplied but its text does not carry a required phrase — source-based review")
-    if JUDGE_CITE_EXACT and len(exact) > 1 and support != "supported":
+    if JUDGE_CITE_EXACT and len(exact) > 1 and support != "phrase-present":
         review.append(f"ambiguous expected manual {manual!r} → {len(exact)} corpus documents, support={support}")
     ok_cite = bool(supporting) if (JUDGE_CITATION_ANY and (JUDGE_CITE_EXACT or pages is not None)) else cite_first
     if JUDGE_CITE_EXACT and support == "not-supplied":

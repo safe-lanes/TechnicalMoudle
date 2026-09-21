@@ -1,0 +1,63 @@
+questions captured: F0 101  F1 101  union 101
+IDENTICAL supplied excerpts in both arms: 87
+DIFFERENT supplied excerpts:              14
+
+DIFFERS: A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?
+     only F0: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.28)
+     only F1: Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6.5 Ship generation
+DIFFERS: Do I create work orders myself or does the system create them?
+     same excerpt headers; the text inside differs
+DIFFERS: From the Components screen, how do I raise a work order for one job on a component?
+     same excerpt headers; the text inside differs
+DIFFERS: How are planned work orders created in PMS — do I have to create them myself?
+     same excerpt headers; the text inside differs
+DIFFERS: How do I create a work order?
+     same excerpt headers; the text inside differs
+DIFFERS: How do work orders get created in the Technical module?
+     same excerpt headers; the text inside differs
+DIFFERS: How to create work order in PMS?
+     same excerpt headers; the text inside differs
+DIFFERS: I need to raise a work order for a pump — how do I do that?
+     same excerpt headers; the text inside differs
+DIFFERS: If I try to generate a work order for a component job that already has an active one, what happens?
+     only F0: Technical - KB pilot: How work orders are created — the three ways to create a work order.md — How work orders are created — the three ways to create 
+     only F1: Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6.3 Office per-job 'Generate WO' — one job
+DIFFERS: Steps to create a new work order
+     same excerpt headers; the text inside differs
+DIFFERS: What are the different ways a work order can come into existence in PMS?
+     same excerpt headers; the text inside differs
+DIFFERS: What are the different ways to create a work order in PMS?
+     same excerpt headers; the text inside differs
+DIFFERS: Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+     only F0: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.6.1 HOW TO ACCESS RUNNING HOURS (p.38)
+     only F0: Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders Is a Per-Vessel Switch
+     only F1: Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6.1 Office 'Generate Now' — a whole vessel
+     only F1: Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6.3 Office per-job 'Generate WO' — one job
+DIFFERS: Who can generate work orders from the office, and what happens if the vessel's switch is off?
+     only F0: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.28)
+     only F0: Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders Is a Per-Vessel Switch
+     only F1: Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6 Office Generation of Work Orders — Conditions by Action
+     only F1: Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.6.1 Office 'Generate Now' — a whole vessel
+
+== observed pass/fail disagreement on identical supplied excerpts ==
+paired runs compared: 261
+runs where the two arms disagree: 18  (6.9% of those runs)
+This is a property of this run, not an accuracy margin, and not a reason to dismiss a specific failure.
+   answers    8                  run 3: F0=False F1=True
+   manuals    certsurveys-1      run 1: F0=True F1=False
+   manuals    certsurveys-3      run 3: F0=True F1=False
+   manuals    crewing-3          run 3: F0=True F1=False
+   manuals    fs-ves-1           run 1: F0=False F1=True
+   manuals    hist-3             run 2: F0=True F1=False
+   manuals    inc-1              run 3: F0=True F1=False
+   manuals    master-review-1    run 3: F0=True F1=False
+   manuals    nm-1               run 2: F0=False F1=True
+   manuals    pmsvessel-2        run 1: F0=False F1=True
+   manuals    pmsvessel-2        run 3: F0=True F1=False
+   manuals    pmsvessel-3        run 2: F0=False F1=True
+   manuals    prep-2             run 1: F0=True F1=False
+   manuals    prep-2             run 3: F0=True F1=False
+   manuals    ra-office-3        run 3: F0=False F1=True
+   manuals    ra-vessel-1        run 1: F0=True F1=False
+   manuals    ra-vessel-1        run 2: F0=False F1=True
+   manuals    ra-vessel-1        run 3: F0=False F1=True

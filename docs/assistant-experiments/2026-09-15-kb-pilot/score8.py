@@ -95,14 +95,15 @@ def verdict(row):
     if suite == "routing":
         v = row.get("ok", row.get("verdict"))
         return {"pass": bool(all(v.values()) if isinstance(v, dict) else v), "cite_first": None, "review": [],
-                "detail": "routing (module decision, not text-judged)"}
+                "detail": "routing (module decision, not text-judged)", "support": "not-checked", "citation": None}
     manual, pages, must, must_not, cls, question, scoped = spec(row)
     sup = supplied_for(row["set"], question, row.get("run", 1))
     if suite == "fresh":
         import acceptance_fresh as F
         a, m, ct, d = F.judge(FRESH[str(row["case"])], resp, sup)
         # fresh keeps its own module check; the .8 phrase equivalence reaches it through A.present
-        return {"pass": bool(a and m and ct), "cite_first": None, "review": [], "detail": d}
+        return {"pass": bool(a and m and ct), "cite_first": None, "review": [], "detail": d,
+                "support": "not-checked", "citation": ct}
     v = A.judge_ex(resp, manual, pages, must, must_not, cls, supplied=sup, scoped_must=scoped)
     ok = v["answer"] and v["citation"] and (v["attribution"] if suite == "answers" else True)
     if suite == "manuals":
@@ -113,7 +114,7 @@ def verdict(row):
         ok = ok and ok_extra
         v["detail"] += f" | rule={why}" 
     return {"pass": bool(ok), "cite_first": v["cite_first"], "review": v["review"], "detail": v["detail"],
-            "support": v["support"], "scope_fail": v["scope_fail"]}
+            "support": v["support"], "scope_fail": v["scope_fail"], "citation": v["citation"]}
 
 
 def main():
@@ -150,8 +151,12 @@ def main():
             runs = [p for c in cases for p in runs_of(c)]
             firsts = [x["cite_first"] for c in cases for x in data[suite][arm][c].values() if x["cite_first"] is not None]
             fs = f"   first-source {sum(1 for f in firsts if f)}/{len(firsts)} runs" if firsts else ""
+            prov = [x for c in cases for x in data[suite][arm][c].values()
+                    if x.get("citation") and x.get("support") == "phrase-present"]
+            ncit = [x for c in cases for x in data[suite][arm][c].values() if x.get("citation")]
+            pv = f"   citation PROVISIONAL {len(prov)}/{len(ncit)} runs" if ncit else ""
             print(f"   {arm:<16} majority {maj:>3}/{len(cases)}   all-three {allr:>3}/{len(cases)}   "
-                  f"runs {sum(runs):>3}/{len(runs)}{fs}")
+                  f"runs {sum(runs):>3}/{len(runs)}{fs}{pv}")
             for c in cases:
                 for run, x in sorted(data[suite][arm][c].items()):
                     for rv in x["review"]:

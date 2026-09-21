@@ -74,8 +74,20 @@ from acceptance_answers import ask, judge  # noqa: E402
 #      sentence carries requirement wording (must / require / need / only if / only when / has to) and no negation; the v5
 #      source-comparison sentences ("the office-switch details come from draft code-derived guidance", "the manuals do not state
 #      the role or switch conditions") were being read as conditions attached to the unplanned procedure.
+# .13 (19-Sep, reviewer-authorised after the S7 run — the reviewer read both failing answers and ruled on each):
+#      (a) FALSE FAILURE CORRECTED. The office-qualifier test required EVERY unit mentioning the switch to carry
+#          "office". An answer that correctly contrasts the ship — "In the Office the switch must be ON. The Ship
+#          does not have this switch requirement." — failed on the second sentence. A unit that mentions the switch
+#          inside a NEGATED ship clause is no longer counted as an unqualified office claim; the base judge has been
+#          negation-aware since .5, this test never was.
+#      (b) WRONG REASON CORRECTED, VERDICT KEPT. "Sail Admin wrongly attached to Generate WO" was a bare substring
+#          test and fired on the sentence that correctly says the restriction does NOT apply to the per-job route.
+#          It is now negation-aware. In its place a test for the defect that is actually there: an answer that
+#          requires the office switch for per-job Generate WO in its steps and then says the switch does not apply
+#          to that route CONTRADICTS ITSELF and fails. Only the Sail Admin restriction is excluded from per-job;
+#          the switch is not. Validated on every stored work-order dump before use.
 WO_SUITE_VERSION = "2026-09-14.11"
-JUDGE_VERSION = 12
+JUDGE_VERSION = 13
 NOT_COVERED = ["not covered", "isn't covered", "not documented", "does not cover", "no information"]
 # (id, question, module, expected manual substring (any Technical source), pages, must ALL, must_not, extra rule, source)
 CASES = [
@@ -125,7 +137,35 @@ def unit_has_office_qualifier(scope: str, word: str = "switch", action_re: str =
         # a whole-procedure Office label: the unit that carries the action starts with the label
         framed = any(re.match(r"^\s*(?:-\s*)?(?:in the office|office)\s*[:—–-]", u) and re.search(action_re, u) for u in units)
     hits = [u for u in units if word in u]
+    if version >= 13:
+        # .13: a unit that mentions the word inside a NEGATED clause is not an unqualified office claim — it is the
+        # correct contrast ("The Ship does not have this switch requirement."). Judge only the units that ASSERT it.
+        hits = [u for u in hits if not re.search(
+            r"\b(no|not|without|does not|doesn't|never|nor|neither|n't)\b[^.\n]{0,60}" + re.escape(word), u)]
+        if not hits:
+            return True          # nothing asserts the condition unqualified
     return bool(hits) and all(("office" in u) or framed for u in hits)
+
+
+# .13: the per-job route DOES require the office switch; only the Sail Admin restriction is excluded from it.
+# An answer that states the switch as a per-job condition and then excludes the switch from the per-job route
+# contradicts itself. `gw` is the per-job scope, `body` the whole answer (the denial often sits in a closing line).
+_GW_NAME = r"(per-job|per job|generate wo\b|generate wo'|'generate wo|for one job|one specific job)"
+_SWITCH = r"(office[- ]?(work[- ]order )?generation switch|work[- ]order generation switch|office switch|vessel switch|switch)"
+
+
+def switch_applicability_contradiction(gw: str, body: str) -> str | None:
+    requires = any(re.search(r"\bswitch\b", s) and re.search(r"\b(must|require[sd]?|needs?|needed|has to|only if|only when)\b", s)
+                   and not re.search(r"\b(no|not|without|nor|neither|n't)\b", s)
+                   for s in re.split(r"(?<=[.!?])\s+|\n+", gw))
+    if not requires:
+        return None
+    for s in re.split(r"(?<=[.!?])\s+|\n+", body):
+        if not re.search(_SWITCH, s) or not re.search(_GW_NAME, s):
+            continue
+        if re.search(r"\b(not to|do(es)? not apply|not apply|no switch|without the switch|not required|only to)\b", s):
+            return s.strip()
+    return None
 
 
 def wrongly_conditioned(scope: str, word: str, version: int = JUDGE_VERSION) -> bool:
@@ -290,8 +330,16 @@ def check_pairing(body: str, version: int = JUDGE_VERSION) -> tuple[bool, str]:
         elif version >= 6 and not unit_has_office_qualifier(gw, "switch", GW_RE, version):
             notes.append("Generate WO switch stated without the office qualifier [incorrect applicability]")
         gw_role = re.sub(r"for office_sail admin[^\s,;.)]*", "", gw) if version >= 9 else gw  # .9: a quoted manual file name is not a role
-        if "sail admin" in gw_role and "generate now" not in gw_role:
+        attached = "sail admin" in gw_role and "generate now" not in gw_role
+        if version >= 13 and attached:
+            # .13: negation-aware — "…not to per-job Generate WO" is the CORRECT statement, not an attachment
+            attached = any("sail admin" in s and not re.search(r"\b(no|not|without|nor|neither|n't|only to)\b", s)
+                           for s in re.split(r"(?<=[.!?])\s+|\n+", gw_role))
+        if attached:
             notes.append("Sail Admin wrongly attached to Generate WO [incorrect applicability]")
+        if version >= 13 and (bad := switch_applicability_contradiction(gw, body)):
+            notes.append(f"self-contradiction: the office switch is required for per-job Generate WO in the steps "
+                         f"and then excluded from it — \"{bad[:120]}\" [answer defect]")
     if version >= 6 and un:
         if wrongly_conditioned(un, "switch", version):
             notes.append("unplanned wrongly requires the switch [incorrect applicability]")

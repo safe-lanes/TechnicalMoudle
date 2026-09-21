@@ -1576,7 +1576,10 @@ of **both** arms, on the answer check with `support=supported`. Unchanged by thi
 **Attribution: which differences can be the change at all.** Of the 101 questions, **87 received byte-identical
 supplied excerpts in both arms; 14 received different ones** — every one of them a work-order or office-generation
 question, which is what restructuring that section should affect. On the 87 identical-input questions the two arms
-disagree on **18 of 228 paired runs**. That figure is the **observed pass/fail disagreement on identical supplied
+disagree on **18 of 261 paired runs (6.9 %)**. [CORRECTED 19-Sep: this section first published 18/228 = 7.9 %.
+The figure was read off an earlier partial run of the analysis that omitted the corrected-claims dump — 11 cases,
+33 paired runs. `s7-input-identity.txt` always said 261; the brief and this paragraph did not. 87 identical-input
+questions × 3 runs = 261.] That figure is the **observed pass/fail disagreement on identical supplied
 excerpts** for this run. It is not an accuracy margin and it is not a reason to dismiss any individual failure; it
 is used below only to say which differences *cannot* be attributed to the change.
 
@@ -1615,11 +1618,12 @@ captured requests, not from the document):
 - after (R5, arm F1): the model receives `1.1.14.6.1 Office 'Generate Now' — a whole vessel` as one block carrying
   what it does, both conditions **and** the enforcement note in full, and `1.1.14.6` as a separate lead block.
 
-**Cases marked for source-based review rather than scored on a guess: 46**, all on runs that pass, in two groups —
-23 "cited document supplied but its text does not carry a required phrase" and 23 "ambiguous expected manual
-'Technical' → 14 corpus documents". Both belong to the work-order suite, whose cases name the expected manual as
-the bare string "Technical". That is a case-definition weakness the new exactness rule exposes; it is listed as an
-open defect rather than patched.
+**Runs marked for source-based review rather than scored on a guess: 23 runs carrying 46 flags** (two each), all
+on runs that pass, all in the work-order suite. [CORRECTED 19-Sep: first published as "46 cases", which double
+counted — it is 23 distinct runs across four cases. And the cause was **a defect in my own evidence tooling**, not
+a case-definition weakness: the excerpt-header parser split the document name at the first em dash, and the KB
+pilot filenames contain one, so every citation to a KB pilot file looked "not supplied". With the parser fixed
+(judge .9) the count is **0**. See §18.3.]
 
 ### 17.6 Remaining defects
 
@@ -1636,7 +1640,7 @@ open defect rather than patched.
    restructure did not restore first place and was not intended to — the owner's instruction was explicitly not to
    shorten the document for ranking. Reported as a ranking fact, separate from the pass.
 6. **The Audit History routing defect** is unchanged and still open.
-7. **Observed pass/fail disagreement on identical supplied excerpts: 18 of 228 paired runs (7.9 %)** in this run
+7. **Observed pass/fail disagreement on identical supplied excerpts: 18 of 261 paired runs (6.9 %)** in this run
    (25 of 297, 8.4 %, in the previous one). Comparisons on these suites need paired identical-input analysis or
    many more repeats; single-run deltas are not evidence either way.
 
@@ -1653,3 +1657,116 @@ open defect rather than patched.
 | documents on the server | `documents/` untouched; R5 staged separately in `documents-r5/`, the reconciled KB files in `kb-r5/` |
 | keys | the dedicated `assistant-luna.env` key was used for the 14 new embeddings and every answer; no key borrowed, moved, written to disk or printed |
 | deployment | none |
+
+## 18. Reviewer's third pass (19-Sep) — two arithmetic corrections accepted, one false failure corrected, one answer defect recorded, and a defect found in my own evidence tooling
+
+The reviewer read the S7 pack and made five points. All five are accepted; two of them correct published
+numbers, one overturns a conclusion of mine, and chasing a fourth uncovered a bug in my tooling that had
+manufactured the "unresolved citation checks" entirely. No model calls were made in this round; live, nginx, SMS
+RAG and every other site remain untouched and nothing is deployed.
+
+### 18.1 The disagreement figure was misreported — 18 of 261 (6.9 %), not 18 of 228 (7.9 %)
+
+The reviewer is right, and the evidence file was right all along: `s7-input-identity.txt` has said
+`paired runs compared: 261` since it was written. §17.5, §17.6 and the brief quoted 228 / 7.9 %.
+
+Cause, traced: I read the figure off an **earlier partial run** of the analysis, made while the corrected-claims
+suite was still re-running, which passed four dumps instead of five. The missing suite is 14 cases, 11 of them
+identical-input — 33 paired runs. 261 − 33 = 228. I never re-read the regenerated file before quoting it.
+87 identical-input questions × 3 runs = **261**; disagreements **18**; **6.9 %**. Corrected in §17.5 and §17.6
+in place, with the correction marked.
+
+### 18.2 `wo-phr-01` F1 run 1 — false failure, corrected (work-order judge `.13`)
+
+The reviewer ruled this a judge error, which matches the diagnosis: the per-job block says "in the **office**,
+the vessel's **office work-order generation** switch must be on", and fails only because a second, correct
+sentence — "The Ship does not have this switch requirement." — mentions the switch without "office". `.13` judges
+only units that **assert** the condition; a mention inside a negated clause is skipped, which is the negation
+awareness the base judge has had since `.5`.
+
+### 18.3 `wo-phr-05` F1 run 3 — I was wrong; this is a genuine answer defect and it still fails
+
+I reported this as a judge error only. **That was wrong.** The reviewer read the answer:
+
+- in its own steps, for per-job 'Generate WO': *"In the Office, the vessel's **office work-order generation
+  switch must be ON**."*
+- in its conclusion: *"the office switch and Sail Admin restriction apply only to the relevant
+  planned-generation actions, **not to per-job Generate WO** or unplanned work orders."*
+
+The office switch **does** apply to per-job 'Generate WO'; only the Sail Admin restriction does not. The answer
+requires the switch and then excludes it — a self-contradiction, and it must fail. The judge's *reason* was also
+wrong (a bare "sail admin" substring test firing on a correctly negated sentence), so `.13` does both things: it
+makes that test negation-aware, and it adds a test for the defect that is actually present
+(`switch_applicability_contradiction`). The run stays FAIL, now for the true reason.
+
+**Validation over all ten stored work-order dumps** (`wo-judge13-validation.txt`, `wo-judge13-resolution.txt`):
+3 rule-level changes, 2 overall verdict changes —
+
+| run | .12 | .13 | reading |
+|---|---|---|---|
+| s7 · wo-phr-01 · F1 r1 | fail | **PASS** | the false failure, corrected as ruled |
+| s7 · wo-phr-05 · F1 r3 | fail | **fail** | verdict kept; reason replaced with the real contradiction |
+| s4 · wo-generic-03 · D2-hybrid r3 | PASS | **fail** | the same self-contradiction on a historical arm, previously unnoticed |
+
+`JUDGE_VERSION = 12` reproduces the previous scores exactly.
+
+### 18.4 The 46 review flags were 23 runs — and they were a defect in my own tooling
+
+Two corrections, one of them against me:
+
+1. The reviewer is right that 46 flags = **23 distinct runs × 2 flags**, across four work-order cases. §17.5 said
+   "46 cases", which double counted.
+2. Chasing them produced the real finding. Building the per-run evidence pack showed the KB pilot file recorded
+   as *"supplied to the model: no"* on a run whose answer plainly used it. The excerpt-header parser split
+   `(<document> — <section>)` at the **first** em dash, and the KB pilot filenames contain one
+   (`…: Office 'Generate Now' — generate a vessel's due work orders…`). Every citation to those files therefore
+   looked unsupplied. Fixed in judge `.9`: the document is resolved against the corpus list first (longest match),
+   falling back to the last separator. **With the parser fixed the unresolved count is 0** — the flags were mine,
+   not the cases'. The "work-order cases name their manual as the bare string 'Technical'" item stays open as a
+   case-quality point, but it was not what produced the flags.
+
+### 18.5 What the citation check proves — now labelled honestly (judge `.9`)
+
+The reviewer's substantive point: finding a required phrase in a supplied document does not prove that document
+supports the answer's claims. Accepted. The support value is renamed `phrase-present` and is stated as
+**necessary, not sufficient**; every citation pass resting on it alone is now reported as **PROVISIONAL** in its
+own column, per suite and per arm. On this run that is every citation pass — frozen 36/36, corrected 42/42,
+manual coverage 162/162, work orders 24/24 per arm. The fresh suite keeps its own citation check and is not
+covered by this label.
+
+### 18.6 The run, re-scored under judge `.9` + work-order `.13` (`score8-s7.txt`)
+
+| suite | runner's rule | F0 | F1 | other rule (F0 → F1) | first-source | citation provisional |
+|---|---|---|---|---|---|---|
+| routing 13 | all three | 13 | 13 | — | — | — |
+| retrieval 18 | all three | 18 | 18 | — | — | — |
+| frozen 12 | majority | 12 | 12 | all-three 11 → **12** | 33/36 both | 36/36 both |
+| corrected claims 14 | majority | 13 | 13 | all-three 13 → 13 | 39/42 → **36/42** | 42/42 both |
+| work orders 8 | all three | **8** | **7** | majority 8 → 8 | 24/24 both | 24/24 both |
+| manual coverage 57 | all three | **35** | **34** | majority 39 → 39 | 120/171 both | 162/162 both |
+| fresh validation 10 | all three | 10 | 10 | majority 10 → 10 | — | — |
+
+Work orders move from 6 to **7** of 8 on the corrected arm: `wo-phr-01` was a false failure and is now a pass;
+`wo-phr-05` remains the single loss and is a **real answer defect**, not a scoring artefact. Everything else is
+unchanged. Attribution is unchanged too: 87 of 101 questions had byte-identical supplied excerpts and the
+**observed pass/fail disagreement on identical supplied excerpts is 18 of 261 paired runs**; all 18 sit in the
+frozen and manual-coverage suites, none in the work-order suite.
+
+### 18.7 What remains — and what the actual chatbot defect is
+
+The reviewer asked what real chatbot fix is left once the tests stop moving. On this evidence:
+
+1. **One genuine answer defect stands: `wo-phr-05` run 3's self-contradiction** — the answer requires the office
+   switch for per-job 'Generate WO' and then denies it applies. One run of three; the other two are clean. The
+   same contradiction appears once on a historical arm. Nothing has been changed to address it — it is an answer
+   behaviour, not a test or a document problem, and it is the first item for any future prompt or content work.
+2. Corrected-claims case 01 fails all three runs on **both** arms (answer check). Pre-existing, unchanged.
+3. Case 06's first-source ranking is still behind the KB pilot file (36/42). Not addressed; the instruction was
+   not to shorten the document for ranking.
+4. Case 04's expected manual "(Operational)" names four documents; the work-order cases name theirs "Technical"
+   (14 documents). Case-quality points, not patched.
+5. The Audit History routing defect is unchanged and open.
+6. Every citation pass is provisional in the sense of §18.5. Making it conclusive needs a claim-level check
+   against the supplied text, which does not exist yet and is not built here.
+
+Position unchanged: **keep live as it is.** Nothing deployed, nothing pushed.
