@@ -1,0 +1,12 @@
+stored F1 questions with a recorded question string: 93
+  questions that NAME a module: 42
+  of those, answered from a DIFFERENT module: 0
+
+READING
+  R2 is the code path `if named and named in best:` — an explicitly named module is honoured only when it
+  already has a candidate inside the distance floor. On the stored questions the named module and the
+  answering module agree everywhere above, so R2 does not fire on any current question. Like R1 it is a
+  LATENT fault: real in the code, not causing any observed misroute.
+  This is measured from stored answers, which record the module that won — not from the pre-filter candidate
+  list, which is not stored. A case where `named` was discarded AND vector routing happened to pick the same
+  module would be invisible here; that residual is not excluded.

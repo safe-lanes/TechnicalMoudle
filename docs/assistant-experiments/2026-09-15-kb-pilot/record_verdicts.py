@@ -23,8 +23,11 @@ READ = [
      "saved' / 'not be saved' and missed the manual's positive phrasing. Absence of a phrase is not absence of "
      "support, exactly as the reviewer said."),
     ("manuals/fn-2", r"Lesson Learnt", "supported",
-     "The Lesson Learnt User Manual_Vessel_R0 (p.7), section 2 Discussion Record, WAS supplied as excerpt 2, and "
-     "the answer cites it. The words 'Lesson Learnt' appear in that excerpt's document/section header.",
+     "The Lesson Learnt User Manual_Vessel_R0 (p.7) Section 2 Discussion Record WAS supplied as excerpt 2 and "
+     "is cited. PROCEDURES COMPARED (the reviewer's caveat): the two supplied passages are word-for-word the "
+     "same — 'In Section 2 - Discussion Record, record the details of the onboard discussion / Select the "
+     "Notification Discussed on board checkbox / Enter the Date of discussion / Enter the participant details / "
+     "submitted by clicking Submit'. 'Same steps' is therefore verified, not merely inferred from presence.",
      "RETRACTION: I recorded this as UNSUPPORTED last round on the grounds that 'Lesson Learnt' appears nowhere "
      "in the supplied text. It appears in the excerpt HEADER; my search covered only the body. Third tooling "
      "false finding in this workstream, after the em-dash header parser and the negated-XREF rule."),

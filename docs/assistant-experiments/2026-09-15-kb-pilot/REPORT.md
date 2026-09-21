@@ -2095,3 +2095,70 @@ unsupported; the reason is corrected.
 | `certsurveys-2`, `fn-2` | **retracted — both supported** |
 
 Two real answer defects, not four. Live stays as it is; promote nothing.
+
+## 23. Reviewer's seventh pass (19-Sep) — register synchronised, R2 measured, and the passage traced to module selection
+
+No model calls; nothing deployed or reindexed; live untouched; v6 and the clarification guard on hold.
+
+### 23.1 Counts and the standing incompleteness (item 1)
+
+Confirmed: **281 verdicts = 151 F1 + 130 F0**; all selected risk claims reviewed (F1 123/123, F0 112/112).
+**2,186 occurrences remain unread and unverified**, and **14 reviewed claims remain `unresolved`**. The ledger
+states both before any result. "Only two defects remain" was too broad and is withdrawn: two *confirmed* answer
+defects, on top of 14 undecided claims and an unread remainder.
+
+### 23.2 `fn-2` — the caveat closed properly (item 2)
+
+The reviewer accepted the retraction but noted that finding the document does not confirm "same steps".
+Compared the two supplied procedures directly: they are **word-for-word identical** — "In Section 2 – Discussion
+Record, record the details of the onboard discussion / Select the 'Notification Discussed on board' checkbox /
+Enter the Date of discussion / Enter the participant details / submitted by clicking Submit". "Same steps" is
+now verified rather than inferred from the document's presence.
+
+### 23.3 Register synchronised (item 3)
+
+- **A2** rewritten: "root cause PROVEN" removed; replaced by the stage-by-stage diagnosis below.
+- **A2b** already reworded away from the audience-label framing; confirmed in place.
+- **C4** updated: risk-claim review complete, and the true remainder (2,186 unread, 14 unresolved) stated.
+- **C7** added: R1 and R2 measured as latent.
+- **A3** (corrected-claims case 01) re-checked and retained — it still fails all three runs on both arms.
+
+### 23.4 R2 measured offline (item 4)
+
+Over every stored F1 question carrying a question string (93): **42 name a module, 0 were answered from a
+different module.** R2 does not fire on any current question. With R1's corpus scan also returning no ambiguous
+term, **both earlier routing findings are latent** — real code defects, causing nothing observed, fixing
+nothing observed. Stated caveat: the pre-filter candidate list is not stored, so a case where the name was
+discarded *and* vector routing happened to agree would be invisible.
+
+### 23.5 Where the Audit passage is actually lost (`ROUTING-DIAGNOSIS-where-the-passage-is-lost.md`)
+
+| stage | verdict |
+|---|---|
+| indexing | **passes** — the passage is in the index: `module=audit`, p.16, §3.3 REVIEW PAGE, "The Review section is intended for office users only" |
+| vector recall | no Audit chunk reaches the 1.15 floor, so `audit` never becomes a candidate |
+| module naming | contributes nothing — the question names no module |
+| **module selection** | **the loss happens here** — Technical wins on vector similarity at margin 0.1266, above the 0.07 clarify threshold, so it answers |
+| excerpt selection | **cannot recover it** |
+
+**The architectural finding.** The candidate already runs a lexical channel, and it would have found the
+passage — a tsquery for "review section office users" ranks the correct Audit chunk **2nd corpus-wide**. But in
+`chat.py` the order is `route()` at line 103, then `search_lexical(..., routed.module, ...)` at line 108: **the
+lexical search is scoped to the module routing already chose**, so it can only reorder excerpts within that
+module and is structurally incapable of correcting a module error.
+
+**A second, independent obstacle:** the phrase "inspection history" occurs **0 times** in the entire corpus.
+The manual says "History sub-module" and "Inspection Record Page". Both words are individually frequent in the
+right manual, which is why an OR-of-terms lexical channel reaches it and a compound-phrase or embedding match
+does not.
+
+**Where a fix would go** — stated, not proposed for implementation: run `search_lexical` **unscoped before**
+`route()` and let it contribute to the module decision. That reorders two existing calls and needs no new
+component. The clarification guard remains the alternative and remains on hold. Neither is implemented, and
+neither is claimed to fix `hist-1` until measured on three outcomes.
+
+### 23.6 Standing position
+
+Open and unchanged: the `wo-phr-05` switch contradiction, the `hist-1` wrong-feature answer, the incorrect R5
+document sentence, corrected-claims case 01, 14 unresolved claims and 2,186 unread occurrences. Nothing
+deployed; no further broad model run before the routing work is decided.

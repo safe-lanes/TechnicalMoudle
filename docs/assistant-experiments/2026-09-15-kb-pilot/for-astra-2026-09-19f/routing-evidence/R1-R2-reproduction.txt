@@ -1,0 +1,30 @@
+R1 — ambiguous title terms are NOT dropped; the first document wins
+
+  documents: ['Safety - Master Review Manual R1_10.06.2026.pdf', 'Technical - Master Review Notes.pdf']
+  order 1 -> {'master review': 'safety'}
+  order 2 -> {'master review': 'technical'}
+  => order-dependent. The code comment says such a term is dropped; it is not.
+
+  ambiguous terms across the REAL corpus (same term, different modules):
+    none on the current corpus — R1 is a latent fault, not an active one
+
+
+R2 — a named module is honoured only if it is already a candidate
+
+            if h.distance <= s.route_sim_floor and (h.module not in best or h.distance < best[h.module]):
+            named, why = explicit_module(message, terms or {})
+            if named and named in best:
+                top_module, reason = named, f"explicit: {why}"
+                margin = 1.0  # the question named it — no clarification
+
+  => when the named module has no hit inside route_sim_floor, `named in best` is False and the
+     explicit name is discarded; vector routing then answers from a different module.
+
+
+WITHDRAWN CLAIM — Change A does not help the reported question
+
+   ('audit', 'module name in question')         Who can comment in the audit history review section?
+   ('audit', 'module name in question')         audit preparation checklist attachments
+   (None, 'no module named')                    Who is allowed to add comments in the Review section of an inspection 
+
+  => 'audit ...' already resolves through the alias. The reported question names no module.
