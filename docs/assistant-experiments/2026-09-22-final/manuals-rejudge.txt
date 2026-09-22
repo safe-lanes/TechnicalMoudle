@@ -1,0 +1,25 @@
+
+== LIVE: 36/57 cases pass all runs (answer ∧ citation ∧ support); runs: {'supported': 159, 'not in excerpts': 9, 'not captured': 3, 'answer ok but not in excerpts': 3}
+   passing: fs-off-1, fs-off-2, fs-ves-2, prep-1, inc-1, inc-2, inc-3, fn-1, fn-2, ll-2, crewing-1, crewing-2, crewing-3, crewing-4, crewing-5, crewing-6, moc-office-1, moc-vessel-1, moc-vessel-2, master-review-1, master-review-2, ra-office-1, ra-office-2, ra-vessel-1, ra-vessel-2, sms-office-2, safety-meeting-1, safety-meeting-2, certsurveys-2, defects-2, pmsoffice-3, pmsoffice-4, pmsoffice-5, pmsvessel-1, pmsvessel-2, pmsvessel-3
+   failing: fs-ves-1[0/3], hist-1[0/3], hist-2[0/3], hist-3[0/3], prep-2[0/3], prep-3[0/3], ll-1[0/3], nm-1[0/3], nm-2[0/3], nm-3[0/3], moc-office-2[0/3], ra-office-3[0/3], sms-office-1[0/3], sms-office-3[0/3], certsurveys-1[0/3], certsurveys-3[0/3], defects-1[0/3], defects-3[0/3], pmsoffice-1[0/3], pmsoffice-2[2/3], pmsvessel-4[0/3]
+   runs whose must phrases were NOT in the supplied excerpts (retrieval-level):
+      hist-1 r1: NOT in supplied excerpts: office users only
+      hist-1 r2: NOT in supplied excerpts: office users only
+      hist-1 r3: NOT in supplied excerpts: office users only
+      prep-3 r1: NOT in supplied excerpts: click to add attachment, delete and download
+      prep-3 r2: NOT in supplied excerpts: click to add attachment, delete and download
+      prep-3 r3: NOT in supplied excerpts: click to add attachment, delete and download
+      sms-office-1 r1: NOT in supplied excerpts: 4.1.2
+      sms-office-1 r2: NOT in supplied excerpts: 4.1.2
+      sms-office-1 r3: NOT in supplied excerpts: 4.1.2
+
+== CAND: 31/57 cases pass all runs (answer ∧ citation ∧ support); runs: {'supported': 165, 'not in excerpts': 6, 'not captured': 0, 'answer ok but not in excerpts': 3}
+   passing: fs-off-1, fs-off-2, fs-ves-2, prep-1, inc-2, inc-3, fn-2, ll-2, nm-3, crewing-1, crewing-2, crewing-5, crewing-6, moc-office-2, moc-vessel-1, moc-vessel-2, master-review-2, ra-office-1, ra-office-2, ra-vessel-2, sms-office-2, safety-meeting-1, safety-meeting-2, defects-1, defects-2, pmsoffice-3, pmsoffice-4, pmsoffice-5, pmsvessel-1, pmsvessel-2, pmsvessel-4
+   failing: fs-ves-1[1/3], hist-1[1/3], hist-2[0/3], hist-3[0/3], prep-2[1/3], prep-3[0/3], inc-1[1/3], fn-1[2/3], ll-1[0/3], nm-1[2/3], nm-2[0/3], crewing-3[2/3], crewing-4[0/3], moc-office-1[2/3], master-review-1[2/3], ra-office-3[0/3], ra-vessel-1[1/3], sms-office-1[0/3], sms-office-3[2/3], certsurveys-1[1/3], certsurveys-2[0/3], certsurveys-3[0/3], defects-3[0/3], pmsoffice-1[2/3], pmsoffice-2[1/3], pmsvessel-3[0/3]
+   runs whose must phrases were NOT in the supplied excerpts (retrieval-level):
+      prep-3 r1: NOT in supplied excerpts: click to add attachment, delete and download
+      prep-3 r2: NOT in supplied excerpts: click to add attachment, delete and download
+      prep-3 r3: NOT in supplied excerpts: click to add attachment, delete and download
+      sms-office-1 r1: NOT in supplied excerpts: 4.1.2
+      sms-office-1 r2: NOT in supplied excerpts: 4.1.2
+      sms-office-1 r3: NOT in supplied excerpts: 4.1.2

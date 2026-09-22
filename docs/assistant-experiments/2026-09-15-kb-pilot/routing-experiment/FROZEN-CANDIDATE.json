@@ -1,0 +1,53 @@
+{
+  "_purpose": "Identities of the FROZEN candidate and of the isolated live copy, recorded BEFORE the final regression run (reviewer close-out, 22-Sep-2026). Nothing here is deployed; live is untouched.",
+  "recorded_at_utc": "2026-09-22",
+  "candidate": {
+    "container": "sail-assistant-py-g4",
+    "bind": "127.0.0.1:8039 -> 8000",
+    "image": "sail-assistant-py:v6-r9",
+    "image_sha256": "722127cab5373572d36378d282ccb05d741124f792cde0a5eaa22131cb4f1da2",
+    "index_set": "kb-xref-c",
+    "index_chunks": 951,
+    "index_documents": 25,
+    "index_build_key": "…|clean=off|xrefs=2026-09-22.3|repairs=2026-09-14.1|chunker=2026-03-17.original|1200/150|embed=llamaindex-meta9|model=text-embedding-3-large:3072",
+    "xref_resolver_version": "2026-09-22.3",
+    "xref_layout": "quote-excluded (source quote in chunk metadata only)",
+    "xref_facts_revision": "aa35c4721 (xref_facts.json md5 0873c1256030c18ddd913a615b3bded6)",
+    "prompt": {"version": "v5-plain-coverage-2026-09-15", "docsPromptSha": "ff9ee87141ac1362", "toolLoopPromptSha": "7a028346c1c2fdf0", "combined": "aea94e2f5edb6948"},
+    "chat_model": "gpt-5.6-luna",
+    "chat_temperature": "default",
+    "flags": {
+      "ASSISTANT_DOCS_PROMPT": "v5",
+      "ASSISTANT_ROUTE_INTENT": "on",
+      "ASSISTANT_HYBRID": "rescue",
+      "ASSISTANT_CROSS_MODULE_GAP": "0.25",
+      "ASSISTANT_CROSS_MODULE_SLOTS": "2",
+      "ROUTE_MARGIN": "0.07",
+      "ASSISTANT_CAPTURE_OUTBOUND": "/app/out/capture.jsonl (test instrumentation only; must NOT be set on a deployed container)"
+    },
+    "note_env": "The env-file line ASSISTANT_INDEX_SET=kb-pilot is overridden by the later -e ASSISTANT_INDEX_SET=kb-xref-c; /health confirms indexSet=kb-xref-c.",
+    "known_coverage_gap": "kb-xref-c holds the same 25 documents as the live index 'repaired'. It does NOT hold the five 'Technical - KB pilot: …' work-order documents (1 chunk each) that kb-pilot-e (30 docs, 921 chunks) holds. Recorded before the run; measured by the work-order suite."
+  },
+  "live_copy": {
+    "container": "sail-assistant-py-livecopy",
+    "bind": "127.0.0.1:8040 -> 8000",
+    "started": "2026-09-22, for this run only; --restart no",
+    "image": "sail-assistant-py:prompt-v2",
+    "image_sha256": "8db669090d3690111867ece75b868001bb6ee311e866456949a9f41618c133b9",
+    "copied_from": "sail-assistant-py-cand (127.0.0.1:8017, the container nginx serves; Up 8 days; NOT touched)",
+    "env": "same env-file as live (~/central-assistant/assistant.env) + ASSISTANT_INDEX_SET=repaired, CHAT_MODEL=gpt-4o-mini, ROUTE_MARGIN=0.07 (all three identical to live's values) + ASSISTANT_CAPTURE_OUTBOUND (instrumentation only)",
+    "env_diff_vs_live": "only the capture variable; masked-value diff shows no other difference",
+    "index_set": "repaired",
+    "index_chunks": 911,
+    "index_documents": 25,
+    "prompt": {"version": "v2-xref-hardrule-2026-09-14", "docsPromptSha": "b37172f6122a0257", "toolLoopPromptSha": "f8e5a8f86bede638", "combined": "ebfd83a623e41173"},
+    "prompt_matches_live_health": true,
+    "chat_model": "gpt-4o-mini"
+  },
+  "harness": {
+    "runner_image": "sail-assistant-py:v6-r7 (same runner as S6/S7)",
+    "network": "technical-rag-net",
+    "suites": ["acceptance_routing (13)", "compare_sets retrieval 18 (expect-version 1, v2 also printed)", "acceptance_wo 8 + 5 phrasings x3", "acceptance_answers frozen 12 x3", "acceptance_generated corrected 14 x3", "acceptance_fresh 10 x3", "acceptance_manuals 57 x3 (+captures)", "xref 7 x3 (reused: xref-answers-c3-captured.json, same g4 configuration; live arm run fresh)"],
+    "pass_rules": {"wo": "all three runs", "manuals": "all three runs", "frozen": "majority of three", "corrected": "majority of three", "fresh": "majority of three", "routing": "single run, per case", "retrieval": "single routeOnly run, top module + top manual", "xref": "per run, three buckets, field-level rules; appraisals capped at limited"}
+  }
+}

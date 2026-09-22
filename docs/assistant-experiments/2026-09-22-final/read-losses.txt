@@ -1,0 +1,659 @@
+
+## ROUTING probes (13)  —  rule: single run, ok per case
+   LIVE 4/13    CAND 7/13
+   gains (CAND pass, LIVE fail)  3: ['rt-05-ctx-safety', 'rt-05-ctx-technical', 'rt-05-no-ctx']
+   LOSSES (LIVE pass, CAND fail) 0: []
+   fail on both                  6: ['rt-general-01', 'rt-general-02', 'rt-general-03', 'rt-named-02', 'rt-named-03', 'rt-pump-01']
+
+## WORK ORDERS (8 + 5 phrasings)  —  rule: answer+citation+rule in ALL 3 runs
+   LIVE 0/8    CAND 0/8
+   gains (CAND pass, LIVE fail)  0: []
+   LOSSES (LIVE pass, CAND fail) 0: []
+   fail on both                  8: ['wo-generic-01', 'wo-generic-02', 'wo-generic-03', 'wo-phr-01', 'wo-phr-02', 'wo-phr-03', 'wo-phr-04', 'wo-phr-05']
+
+## FROZEN answers (12)  —  rule: answer+citation+attribution, MAJORITY of 3
+   LIVE 11/12    CAND 11/12
+   gains (CAND pass, LIVE fail)  1: ['frozen-05']
+   LOSSES (LIVE pass, CAND fail) 1: ['frozen-08']
+   fail on both                  0: []
+
+----- LOSS FROZEN answers (12) frozen-08 CAND run 1 verdict={"answer": false, "citation": true, "attribution": true}
+      Q: How do I export crew details from the Waitlist in Crewing?
+      cites: Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.3.3 HOW TO EXPORT CREW DETAILS (p.22, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.3.3 HOW TO EXPORT CREW DETAILS (p.22, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.3.1.4 HOW TO EXPORT CREW DETAILS (p.28, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.2.3 HOW TO EXPORT CREW DETAILS (p.21, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.1.5 HOW TO EXPORT CREW DETAILS (p.19
+      The Waitlist export procedure is the same as **In Progress, section 1.2.1.5, page 19**:
+      
+      1. Open the **Waitlist** sub-sub-module.
+      2. Select the crew record by clicking its **Edit** icon.
+      3. When the record screen appears, click **Export** to download the crew form.
+      
+      Source: Crewing User Manual R2_10.06.2026, **section 1.2.3.3 “How to Export Crew Details” (Waitlist), page 22**, cross-referencing **section 1.2.1.5 (In Progress), page 19**.
+
+----- LOSS FROZEN answers (12) frozen-08 CAND run 2 verdict={"answer": false, "citation": true, "attribution": true}
+      Q: How do I export crew details from the Waitlist in Crewing?
+      cites: Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.3.3 HOW TO EXPORT CREW DETAILS (p.22, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.3.3 HOW TO EXPORT CREW DETAILS (p.22, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.3.1.4 HOW TO EXPORT CREW DETAILS (p.28, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.2.3 HOW TO EXPORT CREW DETAILS (p.21, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.1.5 HOW TO EXPORT CREW DETAILS (p.19
+      The Waitlist export procedure is the same as **In Progress, section 1.2.1.5, page 19**:
+      
+      1. Open the **Waitlist** sub-sub-module.
+      2. Select the crew record by clicking its **Edit** icon.
+      3. In the record screen, click **Export** to download the crew form.
+      
+      The transferred sequence is documented for Waitlist as an adaptation; specific Waitlist screen details were not verified.
+      
+      **Source:** Crewing User Manual R2_10.06.2026, section 1.2.3.3 “How to Export Crew Details” (p. 22); same steps as section 1.2.1.5 “How to Export Crew Details” under In Progress (p. 19).
+
+----- LOSS FROZEN answers (12) frozen-08 CAND run 3 verdict={"answer": true, "citation": true, "attribution": true}
+      Q: How do I export crew details from the Waitlist in Crewing?
+      cites: Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.3.3 HOW TO EXPORT CREW DETAILS (p.22, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.3.3 HOW TO EXPORT CREW DETAILS (p.22, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.3.1.4 HOW TO EXPORT CREW DETAILS (p.28, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.2.3 HOW TO EXPORT CREW DETAILS (p.21, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.2.1.5 HOW TO EXPORT CREW DETAILS (p.19
+      The Waitlist export procedure is the same as section **1.2.1.5, “How To Export Crew Details” under In-Progress, page 19**:
+      
+      1. Click the **Waitlist** sub-sub-module.
+      2. Select the crew record by clicking the **Edit** icon.
+      3. When the record screen appears, click **Export** to download the crew form.
+      
+      The steps are an adaptation of the In-Progress procedure; the manual does not verify the specific Waitlist screen details.
+      
+      **Source:** Crewing User Manual R2_10.06.2026, §1.2.3.3 “How To Export Crew Details” (p. 22), cross-referencing §1.2.1.5 (p. 19).
+
+## CORRECTED claims (14)  —  rule: answer+citation, MAJORITY of 3
+   LIVE 12/14    CAND 5/14
+   gains (CAND pass, LIVE fail)  0: []
+   LOSSES (LIVE pass, CAND fail) 7: ['corrected-01', 'corrected-02', 'corrected-05', 'corrected-07', 'corrected-08', 'corrected-11', 'corrected-14']
+   fail on both                  2: ['corrected-06', 'corrected-13']
+
+----- LOSS CORRECTED claims (14) corrected-01 CAND run 1 verdict={"answer": false, "citation": true}
+      Q: In Bulk Data Import for jobs, do I have to fill in the Job Code column?
+      cites: Technical:Technical - Bulk Data Import (Operationa:1.1.11.3 How To Download the Import Temp, Technical:Technical - Bulk Data Import (Operationa:TECHNICAL USER MANUAL — BULK DATA IMPORT
+      Yes. For Job imports, the **Job Code** column must be filled in, and each job code must be unique. A blank or duplicate job code is rejected.
+      
+      **Source:** Technical – Bulk Data Import (Operational) User Manual, §1.1.11.3 “How To Download the Import Template”.
+
+----- LOSS CORRECTED claims (14) corrected-01 CAND run 2 verdict={"answer": false, "citation": true}
+      Q: In Bulk Data Import for jobs, do I have to fill in the Job Code column?
+      cites: Technical:Technical - Bulk Data Import (Operationa:1.1.11.3 How To Download the Import Temp, Technical:Technical - Bulk Data Import (Operationa:TECHNICAL USER MANUAL — BULK DATA IMPORT
+      Yes. For **Job** imports, the **Job Code** column must be filled in, and each job code must be unique. Blank or duplicate job codes are rejected.
+      
+      Source: Bulk Data Import (Operational) User Manual, §1.1.11.3 “How To Download the Import Template”.
+
+----- LOSS CORRECTED claims (14) corrected-01 CAND run 3 verdict={"answer": false, "citation": true}
+      Q: In Bulk Data Import for jobs, do I have to fill in the Job Code column?
+      cites: Technical:Technical - Bulk Data Import (Operationa:1.1.11.3 How To Download the Import Temp, Technical:Technical - Bulk Data Import (Operationa:TECHNICAL USER MANUAL — BULK DATA IMPORT
+      Yes. For Job imports, the **Job Code** column must be filled in, and each job code must be unique. Blank or duplicate job codes are rejected.
+      
+      Source: [1] Technical — Bulk Data Import (Operational) User Manual, §1.1.11.3 “How To Download the Import Template”.
+
+----- LOSS CORRECTED claims (14) corrected-02 CAND run 1 verdict={"answer": false, "citation": true}
+      Q: Where do I find Bulk Data Import in the application?
+      cites: Technical:Technical - PMS User Manual For Office_S:Introduction (p.63), Technical:Technical - Bulk Data Import (Operationa:1.1.11.2 How To Access Bulk Data Import, Technical:Technical - Bulk Data Import (Operationa:TECHNICAL USER MANUAL — BULK DATA IMPORT, Technical:Technical - Bulk Data Import (Operationa:1.1.11.7 How To Complete the Import, Technical:Technical - PMS User Manual For Office_S:1.1.11.2 HOW TO UPLOAD DATA IN BULK DATA
+      Go to **Admin → Bulk Data Import**. Then select the vessel and choose the data type/template to import.
+      
+      Source:
+      - Technical — Bulk Data Import (Operational) User Manual, **1.1.11.2 How To Access Bulk Data Import**
+
+----- LOSS CORRECTED claims (14) corrected-02 CAND run 2 verdict={"answer": false, "citation": true}
+      Q: Where do I find Bulk Data Import in the application?
+      cites: Technical:Technical - PMS User Manual For Office_S:Introduction (p.63), Technical:Technical - Bulk Data Import (Operationa:1.1.11.2 How To Access Bulk Data Import, Technical:Technical - Bulk Data Import (Operationa:TECHNICAL USER MANUAL — BULK DATA IMPORT, Technical:Technical - Bulk Data Import (Operationa:1.1.11.7 How To Complete the Import, Technical:Technical - PMS User Manual For Office_S:1.1.11.2 HOW TO UPLOAD DATA IN BULK DATA
+      Find it at **Admin → Bulk Data Import**.
+      
+      Then select the **Vessel** and the **data type/template** you want to import.
+      
+      **Source:** Technical - Bulk Data Import (Operational) User Manual, section 1.1.11.2 “How To Access Bulk Data Import.”
+
+----- LOSS CORRECTED claims (14) corrected-02 CAND run 3 verdict={"answer": false, "citation": true}
+      Q: Where do I find Bulk Data Import in the application?
+      cites: Technical:Technical - PMS User Manual For Office_S:Introduction (p.63), Technical:Technical - Bulk Data Import (Operationa:1.1.11.2 How To Access Bulk Data Import, Technical:Technical - Bulk Data Import (Operationa:TECHNICAL USER MANUAL — BULK DATA IMPORT, Technical:Technical - Bulk Data Import (Operationa:1.1.11.7 How To Complete the Import, Technical:Technical - PMS User Manual For Office_S:1.1.11.2 HOW TO UPLOAD DATA IN BULK DATA
+      Find it at **Admin → Bulk Data Import**.
+      
+      Then select the vessel and the data type/template you want to import.
+      
+      **Source:** Technical Bulk Data Import (Operational) User Manual, section 1.1.11.2 “How To Access Bulk Data Import.”
+
+----- LOSS CORRECTED claims (14) corrected-05 CAND run 1 verdict={"answer": false, "citation": true}
+      Q: A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?
+      cites: Technical:Technical - Recent Updates & Changed Beh:1.1.14.1 Work-Order Numbers Now Include , Technical:Technical - Ship-Side (Vessel Crew) Oper:1.1.13.2 Completing Work Orders on the S, Technical:Technical - PMS User Manual_Vessel Speci:Introduction (p.23), Technical:Technical - PMS User Manual For Office_S:1.1.5.6 HOW TO COMPLETE THE WORK ORDER (, Technical:Technical - PMS User Manual For Office_S:Introduction (p.28)
+      1. In the master data, set up the vessel’s code.
+      2. An Admin must run **Sync Masters** to populate the vessel code.
+      3. New work orders then use the vessel code as a prefix. Until synchronization is completed, they continue using the old number format.
+      
+      **Source:** Technical — Recent Updates & Changed Behaviours (Operational) Notes, §1.1.14.1.
+
+----- LOSS CORRECTED claims (14) corrected-05 CAND run 2 verdict={"answer": false, "citation": true}
+      Q: A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?
+      cites: Technical:Technical - Recent Updates & Changed Beh:1.1.14.1 Work-Order Numbers Now Include , Technical:Technical - Ship-Side (Vessel Crew) Oper:1.1.13.2 Completing Work Orders on the S, Technical:Technical - PMS User Manual_Vessel Speci:Introduction (p.23), Technical:Technical - PMS User Manual For Office_S:1.1.5.6 HOW TO COMPLETE THE WORK ORDER (, Technical:Technical - PMS User Manual For Office_S:Introduction (p.28)
+      1. Set up the vessel code in the master data.
+      2. An Admin must run **Sync Masters** to populate the vessel code.
+      3. New work orders then use the vessel-code prefix. Until the code is set up, they continue using the old number format. Existing work-order numbers do not change.
+      
+      The documentation does not describe any separate ship-side transfer procedure.
+      
+      Source: Recent Updates & Changed Behaviours (Operational) Notes, §1.1.14.1 “Work-Order Numbers Now Include the Vessel Code”.
+
+----- LOSS CORRECTED claims (14) corrected-05 CAND run 3 verdict={"answer": false, "citation": true}
+      Q: A ship's new work orders still use the old number format without the vessel code. How does the vessel code get onto the ship?
+      cites: Technical:Technical - Recent Updates & Changed Beh:1.1.14.1 Work-Order Numbers Now Include , Technical:Technical - Ship-Side (Vessel Crew) Oper:1.1.13.2 Completing Work Orders on the S, Technical:Technical - PMS User Manual_Vessel Speci:Introduction (p.23), Technical:Technical - PMS User Manual For Office_S:1.1.5.6 HOW TO COMPLETE THE WORK ORDER (, Technical:Technical - PMS User Manual For Office_S:Introduction (p.28)
+      1. An Admin must run **Sync Masters** to populate the vessel code in the master data.
+      2. Once the code is set up, new ship work orders use it as the prefix. Until then, they retain the old number format. Existing work orders are not renumbered.
+      
+      Source: **Technical – Recent Updates & Changed Behaviours (Operational) Notes**, §1.1.14.1 “Work-Order Numbers Now Include the Vessel Code.”
+
+----- LOSS CORRECTED claims (14) corrected-07 CAND run 1 verdict={"answer": false, "citation": true}
+      Q: Can a Head of Department do everything an office user can do for their department?
+      cites: Technical:Technical - Roles & Permissions (Operati:1.1.12.6 What an HOD Can Do, Technical:Technical - Roles & Permissions (Operati:1.1.12.5 What an Office / Admin (Superin
+      Yes. A Head of Department can do everything an office user can do for their department. They can also switch between:
+      
+      1. **Me** — their own work.
+      2. **My Team** — their department’s work.
+      
+      Source: Technical - Roles & Permissions (Operational) User Manual, §1.1.12.6 “What an HOD Can Do”; §1.1.12.5 “What an Office / Admin (Superintendent) User Can Do.”
+
+----- LOSS CORRECTED claims (14) corrected-07 CAND run 2 verdict={"answer": false, "citation": true}
+      Q: Can a Head of Department do everything an office user can do for their department?
+      cites: Technical:Technical - Roles & Permissions (Operati:1.1.12.6 What an HOD Can Do, Technical:Technical - Roles & Permissions (Operati:1.1.12.5 What an Office / Admin (Superin
+      Yes. A Head of Department can do everything an office user can do for their department, and can also switch between:
+      
+      1. **“Me”** — their own work.
+      2. **“My Team”** — their department’s work.
+      
+      Source: Technical - Roles & Permissions (Operational) User Manual, sections 1.1.12.6 and 1.1.12.5.
+
+----- LOSS CORRECTED claims (14) corrected-07 CAND run 3 verdict={"answer": false, "citation": true}
+      Q: Can a Head of Department do everything an office user can do for their department?
+      cites: Technical:Technical - Roles & Permissions (Operati:1.1.12.6 What an HOD Can Do, Technical:Technical - Roles & Permissions (Operati:1.1.12.5 What an Office / Admin (Superin
+      Yes. A Head of Department can do everything an office user can do for their department, plus switch between **“Me”** (own work) and **“My Team”** (department work) using the toggle.
+      
+      Source: Technical – Roles & Permissions (Operational) User Manual, §1.1.12.6 “What an HOD Can Do”.
+
+----- LOSS CORRECTED claims (14) corrected-08 CAND run 1 verdict={"answer": false, "citation": true}
+      Q: Is Level 2 Reviewer a user role I can assign?
+      cites: Technical:Technical - Roles & Permissions (Operati:1.1.12.8 What a Level 2 Reviewer Can Do, Technical:Technical - PMS User Manual For Office_S:1.1.3.5 HOW TO APPROVE WORK ORDERS (LEVE
+      The Technical documentation does not cover whether the **Level 2 Reviewer** role can be assigned to a user. It only describes the role’s approval and rejection functions.
+      
+      **Source:** Technical – Roles & Permissions (Operational) User Manual, §1.1.12.8; PMS User Manual, §1.1.3.5.
+
+----- LOSS CORRECTED claims (14) corrected-08 CAND run 2 verdict={"answer": false, "citation": true}
+      Q: Is Level 2 Reviewer a user role I can assign?
+      cites: Technical:Technical - Roles & Permissions (Operati:1.1.12.8 What a Level 2 Reviewer Can Do, Technical:Technical - PMS User Manual For Office_S:1.1.3.5 HOW TO APPROVE WORK ORDERS (LEVE
+      The excerpts confirm that **Level 2 Reviewer is a user role**, but they do not state whether it can be assigned to a user.
+      
+      **Source:** Technical – Roles & Permissions (Operational) User Manual, §1.1.12.8; PMS User Manual, §1.1.3.5.
+
+----- LOSS CORRECTED claims (14) corrected-08 CAND run 3 verdict={"answer": false, "citation": true}
+      Q: Is Level 2 Reviewer a user role I can assign?
+      cites: Technical:Technical - Roles & Permissions (Operati:1.1.12.8 What a Level 2 Reviewer Can Do, Technical:Technical - PMS User Manual For Office_S:1.1.3.5 HOW TO APPROVE WORK ORDERS (LEVE
+      The excerpts do not state whether the Level 2 Reviewer role can be assigned to a user. They only describe its permissions and how to review a Level 2 request.
+      
+      **Source:**
+      - *Technical - Roles & Permissions (Operational) User Manual*, §1.1.12.8
+      - *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, §1.1.3.5 (p. 12)
+
+----- LOSS CORRECTED claims (14) corrected-11 CAND run 1 verdict={"answer": false, "citation": true}
+      Q: Does one press of Sync Now clear a long backlog on the ship?
+      cites: Technical:Technical - Sync (Operational) User Manu:Preamble, Technical:Technical - Sync (Operational) User Manu:1.2.6 How To Run a Manual Sync ("Sync No, Technical:Technical - Sync (Operational) User Manu:1.2.4 Auto-Sync vs Manual Sync (What's N, Technical:Technical - Ship-Side (Vessel Crew) Oper:1.1.13.5 Sync Tasks on the Ship (See the, Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.21)
+      Yes. On the ship’s **Sync Dashboard**, press **“Sync Now”** once. That press keeps the sync cycles repeating until the backlog is fully cleared, so one press can clear a long outage. The ship sends its changes to the office and receives office changes; a history entry is recorded when it completes.
+      
+      **Source:** Technical – Sync (Operational) User Manual, Preamble; §1.2.6 “How To Run a Manual Sync (‘Sync Now’) (Ship)”.
+
+----- LOSS CORRECTED claims (14) corrected-11 CAND run 2 verdict={"answer": false, "citation": true}
+      Q: Does one press of Sync Now clear a long backlog on the ship?
+      cites: Technical:Technical - Sync (Operational) User Manu:Preamble, Technical:Technical - Sync (Operational) User Manu:1.2.6 How To Run a Manual Sync ("Sync No, Technical:Technical - Sync (Operational) User Manu:1.2.4 Auto-Sync vs Manual Sync (What's N, Technical:Technical - Ship-Side (Vessel Crew) Oper:1.1.13.5 Sync Tasks on the Ship (See the, Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.21)
+      Yes. On the ship’s Sync Dashboard, one press of **“Sync Now”** keeps repeating sync cycles until the backlog is fully cleared, so a single press can clear a long outage.
+      
+      **Source:** Technical – Sync (Operational) User Manual, Preamble; §1.2.6 “How To Run a Manual Sync (‘Sync Now’) (Ship)”.
+
+----- LOSS CORRECTED claims (14) corrected-11 CAND run 3 verdict={"answer": false, "citation": true}
+      Q: Does one press of Sync Now clear a long backlog on the ship?
+      cites: Technical:Technical - Sync (Operational) User Manu:Preamble, Technical:Technical - Sync (Operational) User Manu:1.2.6 How To Run a Manual Sync ("Sync No, Technical:Technical - Sync (Operational) User Manu:1.2.4 Auto-Sync vs Manual Sync (What's N, Technical:Technical - Ship-Side (Vessel Crew) Oper:1.1.13.5 Sync Tasks on the Ship (See the, Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.21)
+      Yes. On the ship, press **“Sync Now” once** on the **Sync Dashboard**. That press keeps the sync cycles repeating until the backlog is fully cleared, including after a long outage. The ship sends its changes to the office and receives the office’s changes; a history entry is recorded when it completes.
+      
+      Source: Technical - Sync (Operational) User Manual, Preamble and §1.2.6 “How To Run a Manual Sync (‘Sync Now’) (Ship)”.
+
+----- LOSS CORRECTED claims (14) corrected-14 CAND run 1 verdict={"answer": false, "citation": true}
+      Q: Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+      cites: Technical:Technical - Recent Updates & Changed Beh:1.1.14.6 Office Generation of Work Order, Technical:Technical - Roles & Permissions (Operati:1.1.12.11 Per-Vessel Administrative Swit, Technical:Technical - Recent Updates & Changed Beh:1.1.14.7 Office Entry of Running Hours I, Technical:Technical - PMS User Manual For Office_S:1.1.6.1 HOW TO ACCESS RUNNING HOURS (p.3, Technical:Technical - PMS User Manual_Vessel Speci:TECHNICAL USER MANUAL (p.11)
+      The excerpts do not identify the office screen that holds these switches. They only state that a Sail Admin configures them in the **vessel settings**:
+      
+      - **Office work-order generation** — off by default; ships generate their own work orders regardless.
+      - **Office running-hours entry** — off by default; ship entry is unaffected.
+      
+      **Source:** *Technical - Roles & Permissions (Operational) User Manual*, §1.1.12.11; *Technical - Recent Updates & Changed Behaviours (Operational) Notes*, §§1.1.14.6–1.1.14.7.
+
+----- LOSS CORRECTED claims (14) corrected-14 CAND run 2 verdict={"answer": false, "citation": true}
+      Q: Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+      cites: Technical:Technical - Recent Updates & Changed Beh:1.1.14.6 Office Generation of Work Order, Technical:Technical - Roles & Permissions (Operati:1.1.12.11 Per-Vessel Administrative Swit, Technical:Technical - Recent Updates & Changed Beh:1.1.14.7 Office Entry of Running Hours I, Technical:Technical - PMS User Manual For Office_S:1.1.6.1 HOW TO ACCESS RUNNING HOURS (p.3, Technical:Technical - PMS User Manual_Vessel Speci:TECHNICAL USER MANUAL (p.11)
+      The Technical documentation does not specify which office screen holds these switches. It only states that a Sail Admin configures them in the **vessel settings**:
+      
+      - Office work-order generation
+      - Office running-hours entry
+      
+      **Source:** *Technical - Roles & Permissions (Operational) User Manual*, §1.1.12.11; *Technical - Recent Updates & Changed Behaviours (Operational) Notes*, §§1.1.14.6–1.1.14.7.
+
+----- LOSS CORRECTED claims (14) corrected-14 CAND run 3 verdict={"answer": false, "citation": true}
+      Q: Which office screen holds the per-vessel switches such as office work-order generation and running-hours entry?
+      cites: Technical:Technical - Recent Updates & Changed Beh:1.1.14.6 Office Generation of Work Order, Technical:Technical - Roles & Permissions (Operati:1.1.12.11 Per-Vessel Administrative Swit, Technical:Technical - Recent Updates & Changed Beh:1.1.14.7 Office Entry of Running Hours I, Technical:Technical - PMS User Manual For Office_S:1.1.6.1 HOW TO ACCESS RUNNING HOURS (p.3, Technical:Technical - PMS User Manual_Vessel Speci:TECHNICAL USER MANUAL (p.11)
+      The excerpts do not identify the specific office screen that holds these switches. They only state that a Sail Admin configures the switches in the vessel settings:
+      
+      - **Office work-order generation** — off by default; ships generate their own work orders regardless.
+      - **Office running-hours entry** — off by default; ship entry is unaffected.
+      
+      The **Running Hrs** screen is described only for viewing running-hour details, not for configuring the switch.
+      
+      **Source:** Roles & Permissions (Operational) User Manual, §1.1.12.11; Recent Updates & Changed Behaviours (Operational) Notes, §§1.1.14.6–1.1.14.7; Office_Sail Admin User Manual, §1.1.6.1 (p.38).
+
+## FRESH validation (10)  —  rule: answer+module+citation in ALL 3 runs (automatic floor)
+   LIVE 9/10    CAND 8/10
+   gains (CAND pass, LIVE fail)  0: []
+   LOSSES (LIVE pass, CAND fail) 1: ['fresh-audit-1']
+   fail on both                  1: ['fresh-wo-broad-1']
+
+----- LOSS FRESH validation (10) fresh-audit-1 CAND run 1 verdict={"answer": false, "module": true, "citation": true}
+      Q: After I create an inspection record in Audit History, what do the Save, Upload and Next buttons do, and which fields must I complete?
+      cites: Audit:Audit - History Manual_R1_30.06.2026:2.1.1 INSPECTION RECORD PAGE: (p.8), Audit:Audit - History Manual_R1_30.06.2026:3.1 INSPECTION PAGE: (p.14), Audit:Audit - History Manual_R1_30.06.2026:2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11), Audit:Audit - History Manual_R1_30.06.2026:2.1 METHOD 1: MANUAL DATA ENTRY (p.7), Audit:Audit - History Manual_R1_30.06.2026:Document (p.13)
+      Audit History supports two ways to create an inspection record:
+      
+      1. **Manual data entry**
+         1. Click **+ New Record**.
+         2. Select the **Vessel** and **Inspection Type**.
+         3. Click **Add New**.
+         4. Complete all inspection-page fields marked with **\***.
+         5. Click **Save** to save the inspection details.
+         6. Click **Upload** to attach supporting documents.
+         7. Click **Next** to proceed to the **Observation** page and enter observation details, as applicable.
+      
+      2. **SIRE/CDI file upload**
+         1. Click **New Record**.
+         2. Select **SIRE 2.0 JSON**, **CDI XML**, or **SIRE XML**, as applicable.
+         3. Click **Choose File** and select the required file.
+         4. Click **Upload**. SAIL automatically creates the inspection record and imports the inspection and observation details.
+         5. Use **Upload** to add supporting attachments manually, if required.
+      
+      **Source:**  
+      - Manual data entry and inspection-page buttons/fields: *Audit - History Manual_R1_30.06.2026*, sections **2.1 Method 1: Manual Data Entry**, **2.1.1 Inspection Record Page**, and **3.1 Inspection Page**.  
+      - SIRE/CDI upload: *Audit - History Manual_R1_30.06.2026*, section **2.2 Method 2: SIRE/CDI Upload**, and **Document** section.
+
+----- LOSS FRESH validation (10) fresh-audit-1 CAND run 2 verdict={"answer": true, "module": true, "citation": true}
+      Q: After I create an inspection record in Audit History, what do the Save, Upload and Next buttons do, and which fields must I complete?
+      cites: Audit:Audit - History Manual_R1_30.06.2026:2.1.1 INSPECTION RECORD PAGE: (p.8), Audit:Audit - History Manual_R1_30.06.2026:3.1 INSPECTION PAGE: (p.14), Audit:Audit - History Manual_R1_30.06.2026:2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11), Audit:Audit - History Manual_R1_30.06.2026:2.1 METHOD 1: MANUAL DATA ENTRY (p.7), Audit:Audit - History Manual_R1_30.06.2026:Document (p.13)
+      After creating an inspection record:
+      
+      1. **Manual data entry**
+         - Select the **Vessel**.
+         - Select the **Inspection Type**.
+         - Click **Add New**.
+         - On the inspection details page, complete all mandatory fields marked **\***.
+         - Click **Save** to save the inspection details.
+         - Click **Upload** to attach required supporting documents. Attachments are displayed under the Upload icon.
+         - Click **Next** to proceed to the **Observation** page and enter observation details, as applicable.
+      
+      2. **SIRE 2.0 JSON, CDI XML, or SIRE XML upload**
+         - Select the applicable file type, choose the file, and click **Upload**. The inspection record is created automatically.
+         - The inspection and observation details are imported automatically.
+         - Click **Upload** to add supporting attachments manually, if required.
+      
+      **Source:**  
+      - Manual data entry — *Audit - History Manual_R1_30.06.2026*, §§2.1 and 2.1.1, pp.7–8.  
+      - SIRE/CDI upload — *Audit - History Manual_R1_30.06.2026*, §2.2, p.11; *Document*, p.13.
+
+----- LOSS FRESH validation (10) fresh-audit-1 CAND run 3 verdict={"answer": true, "module": true, "citation": true}
+      Q: After I create an inspection record in Audit History, what do the Save, Upload and Next buttons do, and which fields must I complete?
+      cites: Audit:Audit - History Manual_R1_30.06.2026:2.1.1 INSPECTION RECORD PAGE: (p.8), Audit:Audit - History Manual_R1_30.06.2026:3.1 INSPECTION PAGE: (p.14), Audit:Audit - History Manual_R1_30.06.2026:2.2 METHOD 2: - SIRE\CDI UPLOAD (p.11), Audit:Audit - History Manual_R1_30.06.2026:2.1 METHOD 1: MANUAL DATA ENTRY (p.7), Audit:Audit - History Manual_R1_30.06.2026:Document (p.13)
+      After creating the inspection record:
+      
+      1. Complete every mandatory field marked with an asterisk (*).
+      2. Click **Save** to save the inspection details.
+      3. Click **Upload** to attach the required supporting documents. Uploaded attachments are displayed under the **Upload** icon.
+      4. Click **Next** to proceed to the **Observation** page and enter observation details, as applicable.
+      
+      For records imported from a SIRE 2.0 JSON file, the inspection and observation details are automatically imported; any additional supporting attachments must be uploaded manually.
+      
+      **Source:**  
+      - **Save, Upload, Next, and mandatory fields:** *Audit - History Manual_R1_30.06.2026*, sections **2.1.1 Inspection Record Page** (p. 8) and **3.1 Inspection Page** (p. 14).  
+      - **Automatically imported details and manual attachments:** *Audit - History Manual_R1_30.06.2026*, **Document** (p. 13).
+
+## MANUAL coverage (57)  —  rule: answer+citation+support in ALL 3 runs
+   LIVE 36/57    CAND 31/57
+   gains (CAND pass, LIVE fail)  4: ['defects-1', 'moc-office-2', 'nm-3', 'pmsvessel-4']
+   LOSSES (LIVE pass, CAND fail) 9: ['certsurveys-2', 'crewing-3', 'crewing-4', 'fn-1', 'inc-1', 'master-review-1', 'moc-office-1', 'pmsvessel-3', 'ra-vessel-1']
+   fail on both                  17: ['certsurveys-1', 'certsurveys-3', 'defects-3', 'fs-ves-1', 'hist-1', 'hist-2', 'hist-3', 'll-1', 'nm-1', 'nm-2', 'pmsoffice-1', 'pmsoffice-2', 'prep-2', 'prep-3', 'ra-office-3', 'sms-office-1', 'sms-office-3']
+
+----- LOSS MANUAL coverage (57) certsurveys-2 CAND run 1 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: Is there anything that stops me from saving a new certificate master record if I leave some fields blank?
+      cites: Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.18), Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.18), Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.16)
+      Yes. Fields marked with an asterisk (*) are mandatory and must be completed before the new certificate record can be saved.
+      
+      1. Click **New**; the system adds an editable row with an auto-generated Master ID.
+      2. Enter the required details in the row, including the mandatory (*) fields.
+      3. Click **Save**. The record cannot be saved while any mandatory field is blank.
+      4. Choose **Yes, Reorder** or **No, Keep at End**.
+      
+      The same procedure applies in the **Company** and **Vessel** tabs.
+      
+      **Source:** Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026, Technical User Manual, p.18.
+
+----- LOSS MANUAL coverage (57) certsurveys-2 CAND run 2 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: Is there anything that stops me from saving a new certificate master record if I leave some fields blank?
+      cites: Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.18), Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.18), Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.16)
+      Yes. Fields marked with an asterisk (*) are mandatory and must be completed before the new certificate master record can be saved. The manual does not state that every field must be filled; blank non-mandatory fields are not addressed.
+      
+      **Source:** Technical User Manual, *Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026*, p.18.
+
+----- LOSS MANUAL coverage (57) certsurveys-2 CAND run 3 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: Is there anything that stops me from saving a new certificate master record if I leave some fields blank?
+      cites: Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.18), Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.18), Technical:Technical - Cert. & Surveys User Manual :TECHNICAL USER MANUAL (p.16)
+      Yes. Mandatory fields marked with (*) must be completed before the new certificate record can be saved. Other, non-mandatory fields may be left blank. The procedure is:
+      
+      1. Click **New** to add an editable row.
+      2. Enter the required details, including **Certificate Name, Category, Group, Requirement/Reference, Applicable to Company,** and **Certificate Label**.
+      3. Click **Save**. The record cannot be saved while mandatory fields remain blank.
+      4. Choose **Yes, Reorder** or **No, Keep at End**.
+      
+      The same procedure applies in the **Company** and **Vessel** tabs.
+      
+      Source: Technical User Manual, *Cert. & Surveys User Manual For Office_Sail Admin*, p.18, Figures 21–22.
+
+----- LOSS MANUAL coverage (57) crewing-3 CAND run 1 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "code-derived+manual", "said_not_covered": false}
+      Q: On the Crew Due/Overdue timeline, what does it mean when a crew member's bar shows as green versus yellow versus red?
+      cites: Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.1.1 HOW TO ACCESS CREW DUE / OVERDUE, Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.41), Crewing:Crewing - Crewing User Manual R2_10.06.2:Introduction (p.39), Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.27), Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.72), Technical:Technical - Sync (Operational) User Manu:1.2.2 Understanding Sync Status Colours
+      - **Green:** The crew member is in an active or ongoing onboard service period.
+      - **Yellow:** The crew member is approaching the relief due period.
+      - **Red:** The crew member is overdue for relief.
+      
+      Source: Crewing User Manual R2_10.06.2026, “How to Access Crew Due / Overdue Status,” p. 39.
+
+----- LOSS MANUAL coverage (57) crewing-3 CAND run 2 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "code-derived+manual", "said_not_covered": false}
+      Q: On the Crew Due/Overdue timeline, what does it mean when a crew member's bar shows as green versus yellow versus red?
+      cites: Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.1.1 HOW TO ACCESS CREW DUE / OVERDUE, Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.41), Crewing:Crewing - Crewing User Manual R2_10.06.2:Introduction (p.39), Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.27), Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.72), Technical:Technical - Sync (Operational) User Manu:1.2.2 Understanding Sync Status Colours
+      - **Green:** Active or ongoing onboard service period.
+      - **Yellow:** The crew member is approaching the relief due period.
+      - **Red:** The crew member is overdue for relief.
+      
+      **Source:** Crewing User Manual R2_10.06.2026, section 1.5.1.1 “How to Access Crew Due / Overdue Status,” p. 39.
+
+----- LOSS MANUAL coverage (57) crewing-3 CAND run 3 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "code-derived+manual", "said_not_covered": false}
+      Q: On the Crew Due/Overdue timeline, what does it mean when a crew member's bar shows as green versus yellow versus red?
+      cites: Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.1.1 HOW TO ACCESS CREW DUE / OVERDUE, Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.41), Crewing:Crewing - Crewing User Manual R2_10.06.2:Introduction (p.39), Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.27), Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.72), Technical:Technical - Sync (Operational) User Manu:1.2.2 Understanding Sync Status Colours
+      On the Crew Due/Overdue timeline:
+      
+      - **Green:** The crew member is actively serving onboard.
+      - **Yellow:** The crew member is approaching the relief due period.
+      - **Red:** The crew member is overdue for relief.
+      
+      Source: *Crewing User Manual R2_10.06.2026*, section **1.5.1.1 How to Access Crew Due / Overdue Status**, p. 39.
+
+----- LOSS MANUAL coverage (57) crewing-4 CAND run 1 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: On the New Rotation Plan screen, besides picking the vessel, rank, and date range and then saving, is there anything else the annotated screenshot says I can do from that screen?
+      cites: Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.41), Crewing:Crewing - Crewing User Manual R2_10.06.2:Introduction (p.40), Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.2.2 HOW TO CREATE NEW ROTATION PLANS, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.3.3 HOW TO APPROVE OR REJECT A ROTAT, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.3.2 HOW TO APPLY FILTER (p.42)
+      Yes. The annotation says you can **check compliance** from the New Rotation Plan screen. It also specifies clicking **Save** and **Propose** to submit the rotation plan for approval.
+      
+      **Source:** Crewing User Manual R2_10.06.2026, p.41, Figure 46.
+
+----- LOSS MANUAL coverage (57) crewing-4 CAND run 2 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: On the New Rotation Plan screen, besides picking the vessel, rank, and date range and then saving, is there anything else the annotated screenshot says I can do from that screen?
+      cites: Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.41), Crewing:Crewing - Crewing User Manual R2_10.06.2:Introduction (p.40), Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.2.2 HOW TO CREATE NEW ROTATION PLANS, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.3.3 HOW TO APPROVE OR REJECT A ROTAT, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.3.2 HOW TO APPLY FILTER (p.42)
+      Yes. The annotated screenshot says you can **check compliance** from the New Rotation Plan screen. After selecting the vessel, ranks, and date range, you can click **Save** and **Propose** to submit the rotation plan for approval.
+      
+      Source: Crewing User Manual R2_10.06.2026, p.41, Figure 46.
+
+----- LOSS MANUAL coverage (57) crewing-4 CAND run 3 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: On the New Rotation Plan screen, besides picking the vessel, rank, and date range and then saving, is there anything else the annotated screenshot says I can do from that screen?
+      cites: Crewing:Crewing - Crewing User Manual R2_10.06.2:SAIL - CREWING MODULE USER MANUAL (p.41), Crewing:Crewing - Crewing User Manual R2_10.06.2:Introduction (p.40), Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.2.2 HOW TO CREATE NEW ROTATION PLANS, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.3.3 HOW TO APPROVE OR REJECT A ROTAT, Crewing:Crewing - Crewing User Manual R2_10.06.2:1.5.3.2 HOW TO APPLY FILTER (p.42)
+      Yes. The annotated screenshot says you can also:
+      
+      1. **Check compliance** from the New Rotation Plan screen.
+      2. Click **Propose**—along with **Save**—to submit the rotation plan for approval.
+      
+      **Source:** Crewing User Manual R2_10.06.2026, §1.5.2.2 “How to Create New Rotation Plans,” p.40–41.
+
+----- LOSS MANUAL coverage (57) fn-1 CAND run 1 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: When I'm updating the actions on a fleet notification, when exactly should I click Submit?
+      cites: Incident:Incident - Fleet Notification User Manua:Document (p.7), Incident:Incident - Fleet Notification User Manua:3. Actions (p.8), Incident:Incident - Fleet Notification User Manua:FLEET NOTIFICATION - USER MANUAL (p.6), Incident:Incident - Lesson Learnt User Manual_Ves:Document (p.8), Incident:Incident - Fleet Notification User Manua:Fleet Notification (p.8), Audit:Audit - Fleet Sharing Manual- Office_R1_:3.3 SUBMISSION (p.8)
+      Click **Submit only after all actions are completed and the Date Closed/completion date has been updated for every action**.
+      
+      1. Click the **Edit** icon for an action.
+      2. Enter its completion date (**Date Closed**) and status, then click **Save**. Use **Discard** to cancel changes.
+      3. Repeat for all pending actions.
+      4. Upload supporting documents if needed.
+      5. After every action has been updated, click **Submit** to finalize the section. The updated Fleet Notification is then reflected in the table and the Office is notified automatically.
+      
+      Source: Fleet Notification User Manual—Section 3, “Actions” (pp. 7–8).
+
+----- LOSS MANUAL coverage (57) fn-1 CAND run 2 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: When I'm updating the actions on a fleet notification, when exactly should I click Submit?
+      cites: Incident:Incident - Fleet Notification User Manua:Document (p.7), Incident:Incident - Fleet Notification User Manua:3. Actions (p.8), Incident:Incident - Fleet Notification User Manua:FLEET NOTIFICATION - USER MANUAL (p.6), Incident:Incident - Lesson Learnt User Manual_Ves:Document (p.8), Incident:Incident - Fleet Notification User Manua:Fleet Notification (p.8), Audit:Audit - Fleet Sharing Manual- Office_R1_:3.3 SUBMISSION (p.8)
+      Click **Submit only after all actions are completed and the Date Closed/completion date has been updated for every action**.
+      
+      1. Open each action with the **Edit** icon.
+      2. Enter its completion date (**Date Closed**).
+      3. Click **Save**. Use **Discard** to cancel instead.
+      4. Repeat for all pending actions.
+      5. After every action is updated, click **Submit** to finalize the section and notify the Office automatically.
+      
+      Source: Fleet Notification User Manual—Section 3: Actions, pp. 7–8.
+
+----- LOSS MANUAL coverage (57) fn-1 CAND run 3 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: When I'm updating the actions on a fleet notification, when exactly should I click Submit?
+      cites: Incident:Incident - Fleet Notification User Manua:Document (p.7), Incident:Incident - Fleet Notification User Manua:3. Actions (p.8), Incident:Incident - Fleet Notification User Manua:FLEET NOTIFICATION - USER MANUAL (p.6), Incident:Incident - Lesson Learnt User Manual_Ves:Document (p.8), Incident:Incident - Fleet Notification User Manua:Fleet Notification (p.8), Audit:Audit - Fleet Sharing Manual- Office_R1_:3.3 SUBMISSION (p.8)
+      Click **Submit only after updating the Date Closed/completion date for every pending action** and saving each update. Then submit the completed Actions section. The Fleet Notification information will be reflected in the table, and the Office will be notified automatically.
+      
+      **Source:** Fleet Notification User Manual – Vessel, Section 3: Actions, pp. 7–8.
+
+----- LOSS MANUAL coverage (57) inc-1 CAND run 1 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: Can a vessel user fill in the closeout comments and close an incident report themselves?
+      cites: Incident:Incident - Incident User Manual R0_20.05:Report Closed (p.19), Incident:Incident - Near Miss User Manual R1_30.0:6. OFFICE CLOSEOUT (p.11), Incident:Incident - Incident User Manual R0_20.05:Pending Office Closure (p.19), Incident:Incident - Incident User Manual R0_20.05:Part A: Description (p.6), Incident:Incident - Incident User Manual R0_20.05:Part K: Office Closeout (p.18), Audit:Audit - History Manual_R1_30.06.2026:2.1.3 ADDING VESSEL COMMENTS AND CAUSE A, Safety:Safety - MOC User Manual_Vessel_R0_31.03:MOC USER MANUAL (p.10)
+      No. A vessel user cannot fill in the Office Closeout comments or close the incident report.
+      
+      1. **Vessel user:** Complete the applicable vessel actions and submit the required incident information. Once all vessel actions are complete, the report remains open and requires office closure.
+      2. **Office user:** Review the report, enter **Office Comments**, mark it as reviewed, and submit the closeout. Vessel users must not enter or modify this section.
+      
+      **Source:**  
+      - Vessel completion and pending office closure — *Incident User Manual*, “Pending Office Closure,” p. 19; “Part A: Description,” p. 6.  
+      - Office comments and closure — *Near Miss User Manual*, “6. Office Closeout,” p. 11; *Incident User Manual*, “Part K: Office Closeout,” p. 18.
+
+----- LOSS MANUAL coverage (57) inc-1 CAND run 2 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: Can a vessel user fill in the closeout comments and close an incident report themselves?
+      cites: Incident:Incident - Incident User Manual R0_20.05:Report Closed (p.19), Incident:Incident - Near Miss User Manual R1_30.0:6. OFFICE CLOSEOUT (p.11), Incident:Incident - Incident User Manual R0_20.05:Pending Office Closure (p.19), Incident:Incident - Incident User Manual R0_20.05:Part A: Description (p.6), Incident:Incident - Incident User Manual R0_20.05:Part K: Office Closeout (p.18), Audit:Audit - History Manual_R1_30.06.2026:2.1.3 ADDING VESSEL COMMENTS AND CAUSE A, Safety:Safety - MOC User Manual_Vessel_R0_31.03:MOC USER MANUAL (p.10)
+      No. The **Office Closeout** section is for office users only; vessel users should not enter or modify its information. Therefore, a vessel user cannot fill in the closeout comments or close the incident report.
+      
+      After vessel actions are completed, the report remains open and requires closure by the office.
+      
+      **Source:** Incident User Manual, “Part K: Office Closeout” (p.18) and “Pending Office Closure” (p.19); Near Miss User Manual, “6. OFFICE CLOSEOUT” (p.11).
+
+----- LOSS MANUAL coverage (57) inc-1 CAND run 3 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: Can a vessel user fill in the closeout comments and close an incident report themselves?
+      cites: Incident:Incident - Incident User Manual R0_20.05:Report Closed (p.19), Incident:Incident - Near Miss User Manual R1_30.0:6. OFFICE CLOSEOUT (p.11), Incident:Incident - Incident User Manual R0_20.05:Pending Office Closure (p.19), Incident:Incident - Incident User Manual R0_20.05:Part A: Description (p.6), Incident:Incident - Incident User Manual R0_20.05:Part K: Office Closeout (p.18), Audit:Audit - History Manual_R1_30.06.2026:2.1.3 ADDING VESSEL COMMENTS AND CAUSE A, Safety:Safety - MOC User Manual_Vessel_R0_31.03:MOC USER MANUAL (p.10)
+      No. A vessel user cannot enter closeout comments or close an incident report.
+      
+      1. **Vessel user:** Complete the vessel actions, but do not use or modify the Office Closeout section. The report remains open and is marked as **Pending Office Closure**.
+      
+      2. **Office user:** Review the report and close it if satisfactory. The office closeout form supports comments, review, actions, and submission; the report is closed by the office user.
+      
+      **Sources:**
+      - Vessel pending closure: *Incident User Manual*, “Pending Office Closure,” p. 19.
+      - Office-only closeout: *Incident User Manual*, “Part K: Office Closeout,” p. 18; *Near Miss User Manual*, “6. Office Closeout,” p. 11.
+
+----- LOSS MANUAL coverage (57) master-review-1 CAND run 1 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: What can I do with the action icons in the Master Review report table besides deleting a record?
+      cites: Safety:Safety - Master Review Manual R1_10.06.2:MASTER REVIEW USER MANUAL (p.6), Safety:Safety - Master Review Manual R1_10.06.2:2. MASTER REVIEW - OVERVIEW (p.5), Safety:Safety - Master Review Manual R1_10.06.2:3. HOW TO CREATE A NEW RECORD (p.7), Safety:Safety - Master Review Manual R1_10.06.2:MASTER REVIEW USER MANUAL (p.6), Safety:Safety - Master Review Manual R1_10.06.2:MASTER REVIEW USER MANUAL (p.9), Audit:Audit - History Manual_R1_30.06.2026:1.4 ACTION ICONS. (p.6)
+      Besides deleting a record, the Master Review action icons let you:
+      
+      1. **Add an attachment** by uploading supporting documents to the History record.
+      2. **View attachments** already attached to the History record.
+      3. **Edit the record** by opening and modifying the selected History record.
+      
+      Source: Master Review User Manual R1_10.06.2026, “Master Review User Manual,” p. 6.
+
+----- LOSS MANUAL coverage (57) master-review-1 CAND run 2 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: What can I do with the action icons in the Master Review report table besides deleting a record?
+      cites: Safety:Safety - Master Review Manual R1_10.06.2:MASTER REVIEW USER MANUAL (p.6), Safety:Safety - Master Review Manual R1_10.06.2:2. MASTER REVIEW - OVERVIEW (p.5), Safety:Safety - Master Review Manual R1_10.06.2:3. HOW TO CREATE A NEW RECORD (p.7), Safety:Safety - Master Review Manual R1_10.06.2:MASTER REVIEW USER MANUAL (p.6), Safety:Safety - Master Review Manual R1_10.06.2:MASTER REVIEW USER MANUAL (p.9), Audit:Audit - History Manual_R1_30.06.2026:1.4 ACTION ICONS. (p.6)
+      Besides deleting a record, the Master Review action icons let you:
+      
+      1. **Add an attachment** — upload and attach supporting documents to the record.
+      2. **View attachments** — view documents already attached to the record.
+      3. **Edit the record** — open and edit the selected record.
+      
+      **Source:** Master Review User Manual, “Action Icons” (p. 6).
+
+----- LOSS MANUAL coverage (57) master-review-1 CAND run 3 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: What can I do with the action icons in the Master Review report table besides deleting a record?
+      cites: Safety:Safety - Master Review Manual R1_10.06.2:MASTER REVIEW USER MANUAL (p.6), Safety:Safety - Master Review Manual R1_10.06.2:2. MASTER REVIEW - OVERVIEW (p.5), Safety:Safety - Master Review Manual R1_10.06.2:3. HOW TO CREATE A NEW RECORD (p.7), Safety:Safety - Master Review Manual R1_10.06.2:MASTER REVIEW USER MANUAL (p.6), Safety:Safety - Master Review Manual R1_10.06.2:MASTER REVIEW USER MANUAL (p.9), Audit:Audit - History Manual_R1_30.06.2026:1.4 ACTION ICONS. (p.6)
+      Besides deleting a record, the Master Review action icons let you:
+      
+      1. **Add an attachment** — upload and attach supporting documents to the History record.
+      2. **View attachments** — view documents attached to the History record.
+      3. **Edit the record** — open and edit the selected History record.
+      
+      Source: Master Review User Manual, “MASTER REVIEW USER MANUAL,” p. 6; “2. MASTER REVIEW - OVERVIEW,” p. 5.
+
+----- LOSS MANUAL coverage (57) moc-office-1 CAND run 1 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: In the MoC Log, what does clicking the eye icon actually do, and does that differ between the Office and Vessel versions of the manual?
+      cites: Safety:Safety - MOC User Manual_Office_R0_31.03:3. MoC LOG – OVERVIEW (p.7), Safety:Safety - MOC User Manual_Vessel_R0_31.03:2. MoC LOG - OVERVIEW (p.5), Safety:Safety - MOC User Manual_Vessel_R0_31.03:2. MoC LOG - OVERVIEW (p.5), Safety:Safety - MOC User Manual_Office_R0_31.03:3. MoC LOG – OVERVIEW (p.7), Safety:Safety - MOC User Manual_Vessel_R0_31.03:1. OPENING SCREEN (p.4), Technical:Technical - Defects User Manual For Offi:1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT 
+      Yes, it differs:
+      
+      1. **Office version:** Click the eye icon to **view, edit, or export** the selected MoC record.
+      2. **Vessel version:** Click the eye icon to **view the documents attached** to the selected MoC record.
+      
+      **Source:**
+      - Office: *Safety - MOC User Manual_Office_R0_31.03.2026*, “MoC LOG – OVERVIEW,” p. 7.
+      - Vessel: *Safety - MOC User Manual_Vessel_R0_31.03.2026*, “MoC LOG - OVERVIEW,” p. 5.
+
+----- LOSS MANUAL coverage (57) moc-office-1 CAND run 2 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: In the MoC Log, what does clicking the eye icon actually do, and does that differ between the Office and Vessel versions of the manual?
+      cites: Safety:Safety - MOC User Manual_Office_R0_31.03:3. MoC LOG – OVERVIEW (p.7), Safety:Safety - MOC User Manual_Vessel_R0_31.03:2. MoC LOG - OVERVIEW (p.5), Safety:Safety - MOC User Manual_Vessel_R0_31.03:2. MoC LOG - OVERVIEW (p.5), Safety:Safety - MOC User Manual_Office_R0_31.03:3. MoC LOG – OVERVIEW (p.7), Safety:Safety - MOC User Manual_Vessel_R0_31.03:1. OPENING SCREEN (p.4), Technical:Technical - Defects User Manual For Offi:1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT 
+      - **Office:** Clicking the eye icon opens the selected MoC record, where you can **view, edit, or export** it.
+      - **Vessel:** Clicking the eye icon lets you **view the documents attached** to the selected MoC record.
+      
+      Yes, the behavior differs between the two versions.
+      
+      **Source:** Office MoC User Manual, “MoC Log – Overview,” p. 7; Vessel MoC User Manual, “MoC Log – Overview,” p. 5.
+
+----- LOSS MANUAL coverage (57) moc-office-1 CAND run 3 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: In the MoC Log, what does clicking the eye icon actually do, and does that differ between the Office and Vessel versions of the manual?
+      cites: Safety:Safety - MOC User Manual_Office_R0_31.03:3. MoC LOG – OVERVIEW (p.7), Safety:Safety - MOC User Manual_Vessel_R0_31.03:2. MoC LOG - OVERVIEW (p.5), Safety:Safety - MOC User Manual_Vessel_R0_31.03:2. MoC LOG - OVERVIEW (p.5), Safety:Safety - MOC User Manual_Office_R0_31.03:3. MoC LOG – OVERVIEW (p.7), Safety:Safety - MOC User Manual_Vessel_R0_31.03:1. OPENING SCREEN (p.4), Technical:Technical - Defects User Manual For Offi:1.1.5.4 HOW TO VIEW AND EDIT COC DEFECT 
+      Clicking the eye icon differs between the two versions:
+      
+      - **Office:** Opens the selected MoC record so it can be **viewed, edited, or exported**.
+      - **Vessel:** Opens the selected MoC record to **view its attached documents**.
+      
+      So, the manuals describe different eye-icon behavior: record viewing/editing/exporting in Office, versus viewing attachments in Vessel.
+      
+      **Source:**
+      - *Safety - MOC User Manual_Office_R0_31.03.2026*, §3 “MoC Log – Overview,” p.7.
+      - *Safety - MOC User Manual_Vessel_R0_31.03.2026*, §2 “MoC Log - Overview,” p.5.
+
+----- LOSS MANUAL coverage (57) pmsvessel-3 CAND run 1 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?
+      cites: Technical:Technical - PMS User Manual For Office_S:1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS, Technical:Technical - PMS User Manual_Vessel Speci:1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS, Technical:Technical - PMS User Manual_Vessel Speci:1.1.7.6 HOW TO DO STOCK TRANSACTION OF S, Technical:Technical - PMS User Manual For Office_S:1.1.7.8 HOW TO DO STOCK TRANSACTION OF S, Technical:Technical - PMS User Manual_Vessel Speci:1.1.8.5 HOW TO UPDATE & TRACK STORE INVE
+      No. Stores bulk updates follow the Spares bulk-update procedure rather than a separate process.
+      
+      1. **Stores**
+         1. Open the **Store** sub-sub-module.
+         2. Click **+ Bulk Updates Store**.
+         3. Follow the bulk-update steps provided for **Spares**.
+         4. The same process can be used for the selected category—**Stores, Lubes, Chemicals, or Others**—and for the **Inventory, Location, or History** tab.
+      
+      2. **Spares**
+         1. Open the **Spares** sub-sub-module.
+         2. Click **Bulk Update Spares** to update multiple spares at once.
+      
+      The Office and Vessel manuals describe these steps consistently, although the button wording is shown as **“+ Bulk Updates Store”** for Stores and **“Bulk Update Spares”** for Spares.
+      
+      **Source:**  
+      - Stores: *Technical - PMS User Manual For Office_Sail Admin*, §1.1.8.3, p.50; *Technical - PMS User Manual_Vessel Specific*, §1.1.8.3, p.43.  
+      - Spares: *Technical - PMS User Manual For Office_Sail Admin*, §1.1.7.8, p.47; *Technical - PMS User Manual_Vessel Specific*, §1.1.7.6, p.40.
+
+----- LOSS MANUAL coverage (57) pmsvessel-3 CAND run 2 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": true}
+      Q: How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?
+      cites: Technical:Technical - PMS User Manual For Office_S:1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS, Technical:Technical - PMS User Manual_Vessel Speci:1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS, Technical:Technical - PMS User Manual_Vessel Speci:1.1.7.6 HOW TO DO STOCK TRANSACTION OF S, Technical:Technical - PMS User Manual For Office_S:1.1.7.8 HOW TO DO STOCK TRANSACTION OF S, Technical:Technical - PMS User Manual_Vessel Speci:1.1.8.5 HOW TO UPDATE & TRACK STORE INVE
+      For a bulk stock update in **Stores**:
+      
+      1. Open the **Store** sub-sub-module.
+      2. Click **+ Bulk Updates Store**.
+      3. For the remaining bulk-update actions, the Stores instructions direct you to the **Spares** sub-sub-module instructions.
+      4. This applies to the selected category—**Stores, Lubes, Chemicals, or Others**—and to the **Inventory, Location, or History** tab.
+      
+      Stores and Spares use separate sub-modules and separate buttons, but the Stores documentation does not describe a separate detailed workflow beyond directing you to the Spares instructions.
+      
+      For **Spares**, open the **Spares** sub-sub-module and click **Bulk Update Spares** to update multiple spares at once.
+      
+      The Office and Vessel manuals give the same initial Stores actions; no different Office/Ship condition is stated.
+      
+      **Source:**  
+      - Stores bulk update — *Technical - PMS User Manual For Office_Sail Admin*, §1.1.8.3, p.50.  
+      - Stores bulk update — *Technical - PMS User Manual_Vessel Specific*, §1.1.8.3, p.43.  
+      - Spares bulk update — *Technical - PMS User Manual For Office_Sail Admin*, §1.1.7.8, p.47; *Technical - PMS User Manual_Vessel Specific*, §1.1.7.6, p.40.
+
+----- LOSS MANUAL coverage (57) pmsvessel-3 CAND run 3 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?
+      cites: Technical:Technical - PMS User Manual For Office_S:1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS, Technical:Technical - PMS User Manual_Vessel Speci:1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS, Technical:Technical - PMS User Manual_Vessel Speci:1.1.7.6 HOW TO DO STOCK TRANSACTION OF S, Technical:Technical - PMS User Manual For Office_S:1.1.7.8 HOW TO DO STOCK TRANSACTION OF S, Technical:Technical - PMS User Manual_Vessel Speci:1.1.8.5 HOW TO UPDATE & TRACK STORE INVE
+      No. Stores uses the same bulk-update flow as Spares; it is not a separate process.
+      
+      1. Open the **Store** sub-sub-module.
+      2. Click **+ Bulk Updates Store**.
+      3. Follow the bulk-update steps used for **Spares**:
+         - Open the **Spares** sub-sub-module.
+         - Click **Bulk Update Spares** to update multiple items at once.
+      4. Apply the steps to the selected category—**Stores, Lubes, Chemicals, or Others**—and tab—**Inventory, Location, or History**.
+      
+      The Office and Vessel manuals describe the same process. The button is written as **“+ Bulk Updates Store”** for Stores and **“Bulk Update Spares”** for Spares.
+      
+      **Source:**  
+      - Stores bulk updates: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, §1.1.8.3, p.50; *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, §1.1.8.3, p.43.  
+      - Spares bulk updates: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, §1.1.7.8, p.47; *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, §1.1.7.6, p.40.
+
+----- LOSS MANUAL coverage (57) ra-vessel-1 CAND run 1 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: As a vessel user, can I edit Generic Risk Assessments in the Generic RA Library, or only look at them?
+      cites: Safety:Safety - Risk Assessment User Manual_Ves:4. HOW TO VIEW GENERIC RISK ASSESSMENT R, Safety:Safety - Risk Assessment User Manual_Off:5. ACCESSING THE GENERIC RISK ASSESSMENT, Safety:Safety - Risk Assessment User Manual_Off:7. VESSEL RISK ASSESSMENT (VRA) OVERVIEW, Safety:Safety - Risk Assessment User Manual_Ves:6. HOW TO CREATE NEW VESSEL RISK ASSESSM, Safety:Safety - Risk Assessment User Manual_Off:7.1 CREATING VESSEL RISK ASSESSMENT (VRA
+      As a vessel user, you can **only view** Generic Risk Assessments; they cannot be edited in the Generic RA Library.
+      
+      1. Open the **Generic RA Library** from the sidebar.
+      2. Click the **Eye** icon to open the Risk Assessment form in view-only mode.
+      
+      **Source:** Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026, section 4, p. 7.
+
+----- LOSS MANUAL coverage (57) ra-vessel-1 CAND run 2 verdict={"answer": false, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: As a vessel user, can I edit Generic Risk Assessments in the Generic RA Library, or only look at them?
+      cites: Safety:Safety - Risk Assessment User Manual_Ves:4. HOW TO VIEW GENERIC RISK ASSESSMENT R, Safety:Safety - Risk Assessment User Manual_Off:5. ACCESSING THE GENERIC RISK ASSESSMENT, Safety:Safety - Risk Assessment User Manual_Off:7. VESSEL RISK ASSESSMENT (VRA) OVERVIEW, Safety:Safety - Risk Assessment User Manual_Ves:6. HOW TO CREATE NEW VESSEL RISK ASSESSM, Safety:Safety - Risk Assessment User Manual_Off:7.1 CREATING VESSEL RISK ASSESSMENT (VRA
+      As a **vessel user, you can only view** Generic Risk Assessments in the Generic RA Library; you cannot edit them.
+      
+      1. Open the **Generic RA Library**.
+      2. Click the **Eye** icon to open the Risk Assessment form in view-only mode.
+      
+      Vessel users can edit records in the **Vessel RA** area, but this does not apply to the Generic RA Library.
+      
+      **Source:** Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026, section 4, p.7.
+
+----- LOSS MANUAL coverage (57) ra-vessel-1 CAND run 3 verdict={"answer": true, "citation": true, "support": "not captured", "sources": "manual", "said_not_covered": false}
+      Q: As a vessel user, can I edit Generic Risk Assessments in the Generic RA Library, or only look at them?
+      cites: Safety:Safety - Risk Assessment User Manual_Ves:4. HOW TO VIEW GENERIC RISK ASSESSMENT R, Safety:Safety - Risk Assessment User Manual_Off:5. ACCESSING THE GENERIC RISK ASSESSMENT, Safety:Safety - Risk Assessment User Manual_Off:7. VESSEL RISK ASSESSMENT (VRA) OVERVIEW, Safety:Safety - Risk Assessment User Manual_Ves:6. HOW TO CREATE NEW VESSEL RISK ASSESSM, Safety:Safety - Risk Assessment User Manual_Off:7.1 CREATING VESSEL RISK ASSESSMENT (VRA
+      As a vessel user, you can only view Generic Risk Assessments in the Generic RA Library; you cannot edit them there.
+      
+      1. Open the RA sub-module. The **Generic RA Library** opens by default.
+      2. Select **Generic RA Library** from the sidebar if needed.
+      3. Click the **Eye** icon to open the Risk Assessment form.
+      4. The library is available to vessel users for **viewing purposes only**.
+      
+      The **Edit GRA** action is documented for the Office interface, not for vessel users.
+      
+      Source: Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026, section 4, p.7; Safety - Risk Assessment User Manual_Office_R1_30.05.2026, section 5, p.8.
+judge self-test: passed (discounts attribution and denial, keeps real instructions)
+
+
+## CROSS-REFERENCE cases (7 x 3 runs)  —  rule: judge_xref buckets per run; appraisals capped at limited
+   CAND  correct 18/21  limited  3/21  incorrect  0/21   appraisals-filter:lim/lim/lim  audit-history-regression:cor/cor/cor  monthly-test-create:cor/cor/cor  stores-export:cor/cor/cor  stores-filter:cor/cor/cor  surveys-edit:cor/cor/cor  waitlist-export:cor/cor/cor
+         mean prompt tokens 1609 (n=21)   mean latency 5.0s
+   LIVE  correct  3/21  limited  3/21  incorrect 15/21   appraisals-filter:inc/inc/inc  audit-history-regression:cor/cor/cor  monthly-test-create:inc/inc/inc  stores-export:inc/inc/inc  stores-filter:lim/lim/lim  surveys-edit:inc/inc/inc  waitlist-export:inc/inc/inc
+
+## TOKENS per answer (mean, from response.usage where present)
+   wo         CAND  n=24   prompt    1672  completion    513
+   frozen     CAND  n=36   prompt    1647  completion    281
+   corrected  CAND  n=42   prompt    1117  completion    201
+   fresh      CAND  n=30   prompt    1624  completion    330
+   manuals    CAND  n=171  prompt    1548  completion    233
+
+## SUMMARY
+   routing 13             (4, 7)
+   work orders 8+5        (0, 0)
+   frozen 12              (11, 11)
+   corrected 14           (12, 5)
+   fresh 10               (9, 8)
+   manuals 57             (36, 31)
+   xref 21 (CAND)         18
+   xref 21 (LIVE)         3

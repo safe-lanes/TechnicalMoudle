@@ -30,6 +30,12 @@ from app.config import settings                          # noqa: E402
 ARMS = {"baseline": "http://sail-assistant-py-g1:8000",
         "repaired_b": "http://sail-assistant-py-g3:8000",
         "repaired_c": "http://localhost:8000"}
+# Final regression (22-Sep close-out): the same seven cases against the isolated copy of the deployed
+# configuration. XREF_ARMS="live=http://sail-assistant-py-livecopy:8000" replaces the arm table; the
+# cases, runs and request shape are unchanged, so the result is comparable with xref-answers-c3-captured.json.
+import os                                                # noqa: E402
+if os.environ.get("XREF_ARMS"):
+    ARMS = dict(kv.split("=", 1) for kv in os.environ["XREF_ARMS"].split(";") if kv)
 RUNS = 3
 _n = 0
 
