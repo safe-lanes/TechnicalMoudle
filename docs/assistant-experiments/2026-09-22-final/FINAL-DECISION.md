@@ -162,9 +162,9 @@ both `proxy_pass http://127.0.0.1:8017;` → `sail-assistant-py-cand`. Both imag
 shared database (`sail-assistant-db`) is already at `0007`, so no schema step is involved.
 
 Deploy (only after a candidate has PASSED and the owner has approved):
-1. `docker run -d --name sail-assistant-py-cand2 --restart unless-stopped --network technical-rag-net -p 127.0.0.1:8018:8000 --env-file ~/central-assistant/assistant-luna.env -e ASSISTANT_INDEX_SET=<passing index set> -e ASSISTANT_DOCS_PROMPT=v5 -e ASSISTANT_ROUTE_INTENT=on -e ASSISTANT_HYBRID=rescue -e ASSISTANT_CROSS_MODULE_GAP=0.25 -e ASSISTANT_CROSS_MODULE_SLOTS=2 -e ROUTE_MARGIN=0.07 sail-assistant-py:v6-r9` — **no** `ASSISTANT_CAPTURE_OUTBOUND` on a served container.
-2. `curl -s http://127.0.0.1:8018/health` must show the intended `indexSet`, `chunks`, `docsPromptSha ff9ee87141ac1362`, `chatModel gpt-5.6-luna`.
-3. Change the two `proxy_pass` lines above from `8017` to `8018`; `sudo nginx -t && sudo systemctl reload nginx`. `sail-assistant-py-cand` keeps running untouched.
+1. `docker run -d --name sail-assistant-py-cand2 --restart unless-stopped --network technical-rag-net -p 127.0.0.1:8041:8000 --env-file ~/central-assistant/assistant-luna.env -e ASSISTANT_INDEX_SET=<passing index set> -e ASSISTANT_DOCS_PROMPT=v5 -e ASSISTANT_ROUTE_INTENT=on -e ASSISTANT_HYBRID=rescue -e ASSISTANT_CROSS_MODULE_GAP=0.25 -e ASSISTANT_CROSS_MODULE_SLOTS=2 -e ROUTE_MARGIN=0.07 sail-assistant-py:v6-r9` — **no** `ASSISTANT_CAPTURE_OUTBOUND` on a served container.
+2. `curl -s http://127.0.0.1:8041/health` must show the intended `indexSet`, `chunks`, `docsPromptSha ff9ee87141ac1362`, `chatModel gpt-5.6-luna`. (8041 is free today; 8016–8039 are taken by the experiment containers, 8040 was the live copy — check `ss -ltn` first.)
+3. Change the two `proxy_pass` lines above from `8017` to `8041`; `sudo nginx -t && sudo systemctl reload nginx`. `sail-assistant-py-cand` keeps running untouched.
 4. Post-deploy: the 18-query retrieval suite and the routing probes through the public path; compare `/health` through nginx with step 2.
 
 Rollback: change the same two lines back to `8017`, `sudo nginx -t && sudo systemctl reload nginx` (seconds; the old container never stopped). Then `docker stop sail-assistant-py-cand2 && docker rm sail-assistant-py-cand2` by name.
