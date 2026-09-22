@@ -1861,6 +1861,12 @@ var init_schema = __esm({
       // Last completion running hours (for RH-based jobs)
       nextDueRH: text2("next_due_rh"),
       // Calculated: lastDoneRH + frequencyValue (for RH-based jobs)
+      rhEstimatedDueDate: text2("rh_estimated_due_date"),
+      // Historical-utilization projection; never an RH trigger
+      rhAveragePerDay: decimal2("rh_average_per_day", { precision: 12, scale: 6 }),
+      // Full-precision RH/day used for the projection
+      rhEstimateBasis: text2("rh_estimate_basis"),
+      // 'HISTORICAL' or an explicit unavailable reason
       // Authorized-rebaseline stamp (migration 161): shore tracking values only pass the
       // one-way applier's job-tracking guard when this incoming stamp is newer than local.
       trackingRebaselinedAt: timestamp3("tracking_rebaselined_at"),
@@ -5564,7 +5570,7 @@ var init_syncConfig = __esm({
         isGlobal: false,
         isConfigurable: false,
         businessRules: "Ship can request changes via Modify PMS (change_request) but cannot edit jobs directly",
-        notes: "Job definitions managed by office. Ship uses change_request for modifications. PROTECTED TRACKING COLUMNS (migration 161): last_done_date, next_due_date, last_done_rh, next_due_rh are SHIP-owned once non-NULL \u2014 the one-way applier strips incoming shore values unless the row carries a newer tracking_rebaselined_at stamp (authorized shore admin rebaseline). See oneWayApplier evaluateJobTrackingGuard."
+        notes: "Job definitions managed by office. Ship uses change_request for modifications. PROTECTED TRACKING COLUMNS (migration 161): last_done_date, next_due_date, last_done_rh, next_due_rh are SHIP-owned once non-NULL \u2014 the one-way applier strips incoming shore values unless the row carries a newer tracking_rebaselined_at stamp (authorized shore admin rebaseline). Historical RH estimate columns rh_estimated_due_date, rh_average_per_day, and rh_estimate_basis are protected with the RH cycle so an older shore row cannot replace a newer ship completion estimate; completion learning writes them with sync bypass. See oneWayApplier evaluateJobTrackingGuard."
       },
       job_component_links: {
         tableName: "job_component_links",
@@ -7907,12 +7913,12 @@ async function getColumnMeta(pool4, tableName) {
 async function getLatestRotationDate(conn, componentId, excludeRhruuid) {
   try {
     const params = [componentId];
-    let sql25 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
+    let sql26 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
     if (excludeRhruuid) {
-      sql25 += ` AND rhruuid <> $2`;
+      sql26 += ` AND rhruuid <> $2`;
       params.push(excludeRhruuid);
     }
-    const res = await conn.query(sql25, params);
+    const res = await conn.query(sql26, params);
     const v = res.rows[0]?.latest;
     if (!v) return null;
     const d = v instanceof Date ? v : new Date(String(v));
@@ -7962,6 +7968,19 @@ function evaluateJobTrackingGuard(localRow, incomingRow) {
     const localVal = localRow[col];
     if (localVal !== null && localVal !== void 0 && localVal !== "") {
       strip.push(col);
+    }
+  }
+  const estimateColumns = ["rh_estimated_due_date", "rh_average_per_day", "rh_estimate_basis"];
+  const localRhCycleInitialized = [
+    "last_done_rh",
+    ...estimateColumns
+  ].some((col) => {
+    const value = localRow[col];
+    return value !== null && value !== void 0 && value !== "";
+  });
+  if (localRhCycleInitialized) {
+    for (const col of estimateColumns) {
+      if (!strip.includes(col)) strip.push(col);
     }
   }
   if (strip.length > 0) strip.push("tracking_rebaselined_at");
@@ -8947,7 +8966,15 @@ var init_oneWayApplier = __esm({
     init_syncDiagLogger();
     init_completedWorkOrderDate();
     columnMetaCache = /* @__PURE__ */ new Map();
-    JOB_TRACKING_COLUMNS = ["last_done_date", "next_due_date", "last_done_rh", "next_due_rh"];
+    JOB_TRACKING_COLUMNS = [
+      "last_done_date",
+      "next_due_date",
+      "last_done_rh",
+      "next_due_rh",
+      "rh_estimated_due_date",
+      "rh_average_per_day",
+      "rh_estimate_basis"
+    ];
     SYNC_COLUMN_ALIASES = { location2: "location_2" };
     SKIP_UPDATE_COLUMNS = /* @__PURE__ */ new Set(["id", "created_at", "createdAt"]);
     SELF_HEAL_MAX_ROWS_PER_CYCLE = 50;
@@ -11456,17 +11483,29 @@ function finiteRh(value) {
 }
 function preserveNewerJobRhState(job, updates) {
   const guarded = { ...updates };
+  const currentDate = parseWorkOrderDate(job.lastDoneDate);
+  const incomingDate = parseWorkOrderDate(guarded.lastDoneDate);
+  if (currentDate && incomingDate && incomingDate.getTime() <= currentDate.getTime()) {
+    delete guarded.lastDoneDate;
+    delete guarded.nextDueDate;
+  }
   const currentLastDone = finiteRh(job.lastDoneRH);
   const incomingLastDone = finiteRh(guarded.lastDoneRH);
-  if (currentLastDone !== null && incomingLastDone !== null && incomingLastDone < currentLastDone) {
+  if (currentLastDone !== null && incomingLastDone !== null && incomingLastDone <= currentLastDone) {
     delete guarded.lastDoneRH;
     delete guarded.nextDueRH;
+    delete guarded.rhEstimatedDueDate;
+    delete guarded.rhAveragePerDay;
+    delete guarded.rhEstimateBasis;
     return guarded;
   }
   const currentNextDue = finiteRh(job.nextDueRH);
   const incomingNextDue = finiteRh(guarded.nextDueRH);
   if (currentNextDue !== null && incomingNextDue !== null && incomingNextDue < currentNextDue) {
     delete guarded.nextDueRH;
+    delete guarded.rhEstimatedDueDate;
+    delete guarded.rhAveragePerDay;
+    delete guarded.rhEstimateBasis;
   }
   return guarded;
 }
@@ -11518,6 +11557,140 @@ var init_jobCycleCalc = __esm({
   "shared/workOrders/jobCycleCalc.ts"() {
     "use strict";
     init_dateUtils();
+    init_dateParse();
+  }
+});
+
+// server/services/rhDueDateService.ts
+var rhDueDateService_exports = {};
+__export(rhDueDateService_exports, {
+  RH_ESTIMATE_BASIS_VERSION: () => RH_ESTIMATE_BASIS_VERSION,
+  calculateHistoricalRhAverage: () => calculateHistoricalRhAverage,
+  effectiveDueDate: () => effectiveDueDate,
+  estimateRhDueDate: () => estimateRhDueDate,
+  isCurrentRhEstimateBasis: () => isCurrentRhEstimateBasis,
+  resolveAuthoritativeRhComponent: () => resolveAuthoritativeRhComponent,
+  rhEstimateBasis: () => rhEstimateBasis
+});
+function isCurrentRhEstimateBasis(basis) {
+  return Boolean(basis?.startsWith(`${RH_ESTIMATE_BASIS_VERSION}_`));
+}
+function rhEstimateBasis(reason) {
+  return `${RH_ESTIMATE_BASIS_VERSION}_${reason}`;
+}
+function numeric3(value) {
+  if (value === null || value === void 0 || String(value).trim() === "") return null;
+  const result = Number(value);
+  return Number.isFinite(result) ? result : null;
+}
+function pointDate(point) {
+  return parseWorkOrderDate(point.dateUpdatedLocal);
+}
+function calculateHistoricalRhUtilization(points) {
+  const ordered = points.map((point) => ({
+    point,
+    date: pointDate(point),
+    rh: numeric3(point.cumulativeRH ?? point.newRH),
+    stamp: point.stampHolder || null
+  })).filter((item) => item.date !== null && item.point.isDeleted !== true).sort((a, b) => {
+    const byDate = a.date.getTime() - b.date.getTime();
+    if (byDate !== 0) return byDate;
+    return String(a.point.enteredAtUTC || "").localeCompare(String(b.point.enteredAtUTC || ""));
+  });
+  let lastBoundary = -1;
+  ordered.forEach((item, index3) => {
+    if (item.point.meterReplaced || item.point.isRenewalReset) lastBoundary = index3;
+  });
+  const valid = ordered.slice(Math.max(0, lastBoundary)).filter((item) => item.rh !== null);
+  if (valid.length < 2) return null;
+  const latest = valid[valid.length - 1];
+  let latestStampStart = valid.length - 1;
+  while (latestStampStart > 0 && valid[latestStampStart - 1].stamp === latest.stamp) {
+    latestStampStart--;
+  }
+  for (let startIndex = latestStampStart; startIndex < valid.length - 1; startIndex++) {
+    const start = valid[startIndex];
+    const days = (latest.date.getTime() - start.date.getTime()) / 864e5;
+    const delta = latest.rh - start.rh;
+    if (!(days > 0) || !(delta > 0)) continue;
+    return {
+      averagePerDay: delta / days,
+      latestDate: latest.date,
+      latestRh: latest.rh
+    };
+  }
+  return null;
+}
+function calculateHistoricalRhAverage(points) {
+  return calculateHistoricalRhUtilization(points)?.averagePerDay ?? null;
+}
+async function resolveAuthoritativeRhComponent(component, findById5, findByCode2, fallbackVesselId) {
+  if (!component) return null;
+  const expectedVesselId = component.vesselId || fallbackVesselId || null;
+  const isAuthoritativeMaster = (candidate) => Boolean(
+    candidate && String(candidate.rhCounterType || "").toUpperCase() === "MASTER" && (!expectedVesselId || candidate.vesselId === expectedVesselId)
+  );
+  if (String(component.rhCounterType || "").toUpperCase() !== "INHERITED") {
+    return isAuthoritativeMaster(component) ? component : null;
+  }
+  let master = null;
+  if (component.rhMasterComponentId) {
+    master = await findById5(String(component.rhMasterComponentId));
+  }
+  if (!isAuthoritativeMaster(master) && component.rhCounterSource && expectedVesselId) {
+    master = await findByCode2(component.rhCounterSource, expectedVesselId);
+  }
+  return isAuthoritativeMaster(master) ? master : null;
+}
+function estimateRhDueDate(completionDate, rhFrequency, points) {
+  const utilization = calculateHistoricalRhUtilization(points);
+  if (!utilization) {
+    return { dueDate: null, averagePerDay: null, basis: rhEstimateBasis("INSUFFICIENT_HISTORY") };
+  }
+  const completion = parseWorkOrderDate(completionDate);
+  if (!completion) {
+    return {
+      dueDate: null,
+      averagePerDay: utilization.averagePerDay,
+      basis: rhEstimateBasis("INVALID_COMPLETION_DATE")
+    };
+  }
+  const frequency = numeric3(rhFrequency);
+  if (frequency === null || frequency <= 0) {
+    return {
+      dueDate: null,
+      averagePerDay: utilization.averagePerDay,
+      basis: rhEstimateBasis("MISSING_RH_FREQUENCY")
+    };
+  }
+  const projectedDays = Math.max(0, Math.round(frequency / utilization.averagePerDay));
+  const due = new Date(Date.UTC(
+    completion.getUTCFullYear(),
+    completion.getUTCMonth(),
+    completion.getUTCDate() + projectedDays
+  ));
+  return {
+    dueDate: formatWorkOrderCalendarDate(due),
+    averagePerDay: utilization.averagePerDay,
+    basis: rhEstimateBasis("HISTORICAL")
+  };
+}
+function effectiveDueDate(calendarDueDate, rhDueDate) {
+  if (!calendarDueDate && !rhDueDate) return { date: null, basis: "UNAVAILABLE" };
+  if (!calendarDueDate) return { date: rhDueDate || null, basis: "RUNNING_HOURS" };
+  if (!rhDueDate) return { date: calendarDueDate, basis: "CALENDAR" };
+  const calendar = parseWorkOrderDate(calendarDueDate);
+  const rh = parseWorkOrderDate(rhDueDate);
+  if (!calendar || !rh) return { date: calendarDueDate, basis: "CALENDAR" };
+  if (calendar.getTime() === rh.getTime()) return { date: calendarDueDate, basis: "CALENDAR_AND_RUNNING_HOURS" };
+  return calendar < rh ? { date: calendarDueDate, basis: "CALENDAR" } : { date: rhDueDate, basis: "RUNNING_HOURS" };
+}
+var RH_ESTIMATE_BASIS_VERSION;
+var init_rhDueDateService = __esm({
+  "server/services/rhDueDateService.ts"() {
+    "use strict";
+    init_dateParse();
+    RH_ESTIMATE_BASIS_VERSION = "RH_COMPLETION_FIRST_LATEST_V2";
   }
 });
 
@@ -11527,8 +11700,161 @@ __export(shipCompletionLearner_exports, {
   collectCompletionWouuidsFromFullRows: () => collectCompletionWouuidsFromFullRows,
   collectCompletionWouuidsFromLogs: () => collectCompletionWouuidsFromLogs,
   filterAdvanceOnly: () => filterAdvanceOnly,
-  learnFromShipCompletions: () => learnFromShipCompletions
+  learnFromShipCompletions: () => learnFromShipCompletions,
+  refreshRhEstimatesFromAuditRows: () => refreshRhEstimatesFromAuditRows
 });
+async function refreshRhEstimatesFromAuditRows(client, auditRowUuids) {
+  if (auditRowUuids.length === 0) return 0;
+  const componentsRes = await client.query(
+    `SELECT DISTINCT
+            a.component_id,
+            c.cuuid AS component_cuuid,
+            c.id::text AS component_legacy_id,
+            c.component_code
+       FROM running_hours_audit a
+       LEFT JOIN components c
+         ON c.cuuid = a.component_id OR c.id::text = a.component_id
+      WHERE a.rhauuid = ANY($1::text[])`,
+    [auditRowUuids]
+  );
+  const componentIdentities = Array.from(new Set(
+    componentsRes.rows.flatMap((row) => [
+      row.component_id,
+      row.component_cuuid,
+      row.component_legacy_id
+    ].filter(Boolean).map(String))
+  ));
+  const componentCodes = Array.from(new Set(
+    componentsRes.rows.map((row) => row.component_code).filter(Boolean).map(String)
+  ));
+  if (componentIdentities.length === 0) return 0;
+  const jobsRes = await client.query(
+    `SELECT DISTINCT
+            j.juuid, j.vessel_id, j.component_id, j.component_code,
+            j.maintenance_basis, j.interval_running_hour,
+            j.last_done_date, j.last_done_rh, j.next_due_rh,
+            c.cuuid AS component_cuuid, c.id AS component_legacy_id,
+            c.vessel_id AS component_vessel_id, c.rh_counter_type,
+            c.rh_master_component_id, c.rh_counter_source
+       FROM jobs j
+       JOIN components c
+         ON c.cuuid = j.component_id
+         OR c.id::text = j.component_id
+         OR (c.component_code = j.component_code AND c.vessel_id = j.vessel_id)
+      WHERE j.maintenance_basis IN ('Running Hours', 'Dual Frequency')
+        AND j.next_due_rh IS NOT NULL
+        AND (
+          c.cuuid = ANY($1::text[])
+          OR c.id::text = ANY($1::text[])
+          OR c.rh_master_component_id = ANY($1::text[])
+          OR c.rh_counter_source = ANY($2::text[])
+         )
+       ORDER BY j.juuid`,
+    [componentIdentities, componentCodes]
+  );
+  let refreshed = 0;
+  for (const job of jobsRes.rows) {
+    const lockedJobRes = await client.query(
+      `SELECT last_done_date, last_done_rh, next_due_rh, interval_running_hour
+         FROM jobs
+        WHERE juuid = $1
+        FOR UPDATE`,
+      [job.juuid]
+    );
+    const lockedJob = lockedJobRes.rows[0];
+    if (!lockedJob) continue;
+    const toRhComponent = (row) => row ? {
+      id: row.id,
+      cuuid: row.cuuid,
+      vesselId: row.vessel_id,
+      rhCounterType: row.rh_counter_type,
+      rhMasterComponentId: row.rh_master_component_id,
+      rhCounterSource: row.rh_counter_source
+    } : null;
+    const findById5 = async (id) => {
+      const result = await client.query(
+        `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+           FROM components WHERE cuuid = $1 OR id::text = $1 LIMIT 1`,
+        [id]
+      );
+      return toRhComponent(result.rows[0]);
+    };
+    const findByCode2 = async (code, vesselId) => {
+      const result = await client.query(
+        `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+           FROM components WHERE component_code = $1 AND vessel_id = $2 LIMIT 1`,
+        [code, vesselId]
+      );
+      return toRhComponent(result.rows[0]);
+    };
+    const source = await resolveAuthoritativeRhComponent(
+      {
+        id: job.component_legacy_id,
+        cuuid: job.component_cuuid,
+        vesselId: job.component_vessel_id,
+        rhCounterType: job.rh_counter_type,
+        rhMasterComponentId: job.rh_master_component_id,
+        rhCounterSource: job.rh_counter_source
+      },
+      findById5,
+      findByCode2,
+      job.vessel_id
+    );
+    let estimate = {
+      dueDate: null,
+      averagePerDay: null,
+      basis: rhEstimateBasis("MISSING_RH_SOURCE")
+    };
+    if (source?.cuuid) {
+      const audits = await client.query(
+        `SELECT cumulative_rh, new_rh, previous_rh, date_updated_local,
+                meter_replaced, is_renewal_reset, stamp_holder, entered_at_utc, is_deleted
+           FROM running_hours_audit
+          WHERE component_id = $1
+            AND COALESCE(is_deleted, false) = false
+          ORDER BY entered_at_utc DESC`,
+        [source.cuuid]
+      );
+      estimate = estimateRhDueDate(
+        lockedJob.last_done_date,
+        lockedJob.interval_running_hour,
+        audits.rows.map((row) => ({
+          cumulativeRH: row.cumulative_rh,
+          newRH: row.new_rh,
+          previousRH: row.previous_rh,
+          dateUpdatedLocal: row.date_updated_local,
+          meterReplaced: row.meter_replaced,
+          isRenewalReset: row.is_renewal_reset,
+          stampHolder: row.stamp_holder,
+          enteredAtUTC: row.entered_at_utc,
+          isDeleted: row.is_deleted
+        }))
+      );
+    }
+    const update7 = await client.query(
+      `UPDATE jobs
+          SET rh_estimated_due_date = $2,
+              rh_average_per_day = $3,
+              rh_estimate_basis = $4,
+              updated_at = NOW()
+        WHERE juuid = $1
+          AND last_done_date IS NOT DISTINCT FROM $5
+          AND last_done_rh IS NOT DISTINCT FROM $6
+          AND next_due_rh IS NOT DISTINCT FROM $7`,
+      [
+        job.juuid,
+        estimate.dueDate,
+        estimate.averagePerDay,
+        estimate.basis,
+        lockedJob.last_done_date,
+        lockedJob.last_done_rh,
+        lockedJob.next_due_rh
+      ]
+    );
+    refreshed += update7.rowCount ?? 0;
+  }
+  return refreshed;
+}
 function collectCompletionWouuidsFromLogs(logs) {
   const out = /* @__PURE__ */ new Set();
   for (const log2 of logs) {
@@ -11573,7 +11899,14 @@ function filterAdvanceOnly(localJob, jobUpdates) {
     if (!advance) {
       delete ju.lastDoneRH;
       delete ju.nextDueRH;
+      delete ju.rhEstimatedDueDate;
+      delete ju.rhAveragePerDay;
+      delete ju.rhEstimateBasis;
     }
+  } else if (ju.rhEstimatedDueDate !== void 0 || ju.rhAveragePerDay !== void 0 || ju.rhEstimateBasis !== void 0) {
+    delete ju.rhEstimatedDueDate;
+    delete ju.rhAveragePerDay;
+    delete ju.rhEstimateBasis;
   }
   return Object.keys(ju).length > 0 ? ju : null;
 }
@@ -11584,7 +11917,7 @@ function buildSet(updates, startIdx) {
   for (const [k, col] of Object.entries(COL_MAP)) {
     if (updates[k] !== void 0) {
       parts.push(`"${col}" = $${i++}`);
-      values.push(String(updates[k]));
+      values.push(updates[k] === null ? null : String(updates[k]));
     }
   }
   parts.push(`updated_at = NOW()`);
@@ -11601,6 +11934,7 @@ async function learnFromShipCompletions(client, wouuids) {
       const woRes = await client.query(
         `SELECT wouuid, status, job_id, vessel_id, maintenance_basis,
                 date_completed, wo_completion_rh, completion_rh, current_reading,
+                component_id,
                 next_due_date, due_date, work_order_no
            FROM work_orders WHERE wouuid = $1 LIMIT 1`,
         [wouuid]
@@ -11625,8 +11959,8 @@ async function learnFromShipCompletions(client, wouuids) {
         continue;
       }
       const jobRes = await client.query(
-        `SELECT juuid, job_no, vessel_id, frequency_value, frequency_unit, interval_running_hour,
-                last_done_date, last_done_rh
+        `SELECT juuid, job_no, vessel_id, component_id, frequency_value, frequency_unit, interval_running_hour,
+                last_done_date, last_done_rh, next_due_rh, rh_estimated_due_date
            FROM jobs WHERE juuid = $1 FOR UPDATE`,
         [wo.job_id]
       );
@@ -11653,9 +11987,87 @@ async function learnFromShipCompletions(client, wouuids) {
         job: {
           frequencyValue: job.frequency_value,
           frequencyUnit: job.frequency_unit,
-          intervalRunningHour: job.interval_running_hour
+          intervalRunningHour: job.interval_running_hour,
+          lastDoneDate: job.last_done_date,
+          lastDoneRH: job.last_done_rh
         }
       });
+      if (jobUpdates.lastDoneRH !== void 0 && completionRH != null && (wo.maintenance_basis === "Running Hours" || wo.maintenance_basis === "Dual Frequency")) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
+        const toRhComponent = (row) => row ? {
+          id: row.id,
+          cuuid: row.cuuid,
+          vesselId: row.vessel_id,
+          rhCounterType: row.rh_counter_type,
+          rhMasterComponentId: row.rh_master_component_id,
+          rhCounterSource: row.rh_counter_source
+        } : null;
+        const findComponentById = async (id) => {
+          const result2 = await client.query(
+            `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+               FROM components
+              WHERE cuuid = $1 OR id::text = $1
+              LIMIT 1`,
+            [id]
+          );
+          return toRhComponent(result2.rows[0]);
+        };
+        const findComponentByCode3 = async (code, vesselId) => {
+          const result2 = await client.query(
+            `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+               FROM components
+              WHERE component_code = $1 AND vessel_id = $2
+              LIMIT 1`,
+            [code, vesselId]
+          );
+          return toRhComponent(result2.rows[0]);
+        };
+        const componentRes = await client.query(
+          `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+             FROM components
+            WHERE cuuid = $1 OR id::text = $1
+            LIMIT 1`,
+          [wo.component_id || job.component_id]
+        );
+        const sourceComponent = await resolveAuthoritativeRhComponent(
+          toRhComponent(componentRes.rows[0]),
+          findComponentById,
+          findComponentByCode3,
+          wo.vessel_id || job.vessel_id
+        );
+        const sourceId = sourceComponent?.cuuid;
+        if (sourceId) {
+          const auditsRes = await client.query(
+            `SELECT cumulative_rh, new_rh, previous_rh, date_updated_local,
+                    meter_replaced, is_renewal_reset, stamp_holder, entered_at_utc, is_deleted
+               FROM running_hours_audit
+               WHERE component_id = $1
+                 AND COALESCE(is_deleted, false) = false
+              ORDER BY entered_at_utc DESC`,
+            [sourceId]
+          );
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.interval_running_hour,
+            auditsRes.rows.map((row) => ({
+              cumulativeRH: row.cumulative_rh,
+              newRH: row.new_rh,
+              previousRH: row.previous_rh,
+              dateUpdatedLocal: row.date_updated_local,
+              meterReplaced: row.meter_replaced,
+              isRenewalReset: row.is_renewal_reset,
+              stampHolder: row.stamp_holder,
+              enteredAtUTC: row.entered_at_utc,
+              isDeleted: row.is_deleted
+            }))
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
+        }
+      }
       const filtered = filterAdvanceOnly(job, jobUpdates);
       if (!filtered) {
         result.skipped++;
@@ -11692,11 +12104,15 @@ var init_shipCompletionLearner = __esm({
     init_workOrderStatus();
     init_syncDiagLogger();
     init_completedWorkOrderDate();
+    init_rhDueDateService();
     COL_MAP = {
       lastDoneDate: "last_done_date",
       nextDueDate: "next_due_date",
       lastDoneRH: "last_done_rh",
-      nextDueRH: "next_due_rh"
+      nextDueRH: "next_due_rh",
+      rhEstimatedDueDate: "rh_estimated_due_date",
+      rhAveragePerDay: "rh_average_per_day",
+      rhEstimateBasis: "rh_estimate_basis"
     };
   }
 });
@@ -12558,8 +12974,8 @@ function firstNonEmptyRH(...values) {
 function normalizePartARunningHours(value) {
   const trimmed = value === null || value === void 0 ? "" : String(value).trim();
   if (!trimmed) return "";
-  const numeric3 = Number(trimmed);
-  return Number.isFinite(numeric3) ? String(numeric3) : trimmed;
+  const numeric4 = Number(trimmed);
+  return Number.isFinite(numeric4) ? String(numeric4) : trimmed;
 }
 function normalizePartADateForInput(value) {
   const trimmed = value?.trim();
@@ -12758,6 +13174,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
     }
   }
   const completionWouuids = /* @__PURE__ */ new Set();
+  const rhAuditRowUuids = /* @__PURE__ */ new Set();
   let selfHealInserted = 0;
   if (payload.fullRows && payload.fullRows.length > 0) {
     const { collectCompletionWouuidsFromFullRows: collectCompletionWouuidsFromFullRows2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
@@ -12768,6 +13185,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
         continue;
       }
       collectCompletionWouuidsFromFullRows2(t.tableName, t.rows).forEach((w) => completionWouuids.add(w));
+      if (t.tableName === "running_hours_audit") {
+        t.rows.forEach((row) => {
+          const id = row.rhauuid ?? row.Rhauuid;
+          if (id) rhAuditRowUuids.add(String(id));
+        });
+      }
       const r = await applyFullRowsIfAbsent(t.tableName, t.rows);
       selfHealInserted += r.inserted;
       if (r.errors.length > 0) r.errors.slice(0, 3).forEach((e) => syncDiag(`SELF-HEAL APPLY ERROR: ${e.substring(0, 150)}`));
@@ -12824,6 +13247,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
           const dropped = new Set(insertResult.failedRowUuids || []);
           const appliedInsertLogs = acceptedLogs.filter((l) => (l.oldValue === null || l.oldValue === void 0) && !deferred.has(l) && !dropped.has(l.rowUuid));
           collectCompletionWouuidsFromLogs2(appliedInsertLogs).forEach((w) => completionWouuids.add(w));
+          appliedInsertLogs.filter((log2) => log2.tableName === "running_hours_audit").forEach((log2) => rhAuditRowUuids.add(log2.rowUuid));
         }
         fieldLogApplyErrors += insertResult.errors.length;
         (insertResult.failedRowUuids || []).forEach((r) => droppedRowUuids.add(r));
@@ -13022,6 +13446,8 @@ async function receivePushData(batchUuid, vesselId, payload) {
               droppedRowUuids.add(log2.rowUuid);
               console.warn(`[Sync Push] UPDATE skipped \u2014 row missing on receiver: ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} (change dropped; see FIELD-LOG-INSERT RECOVERY)`);
               syncDiag(`UPDATE-MISS: ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} \u2014 row not found, UPDATE had no effect`);
+            } else if (log2.tableName === "running_hours_audit") {
+              rhAuditRowUuids.add(log2.rowUuid);
             }
             if (log2.tableName === "running_hours_audit" && (fieldNameSnake === "new_rh" || fieldNameSnake === "cumulative_rh") && valueToApply !== null) {
               try {
@@ -13224,6 +13650,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
             await learnFromShipCompletions2(client, Array.from(completionWouuids));
             completionWouuids.clear();
           }
+          if (rhAuditRowUuids.size > 0) {
+            const { refreshRhEstimatesFromAuditRows: refreshRhEstimatesFromAuditRows2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+            const refreshed = await refreshRhEstimatesFromAuditRows2(client, Array.from(rhAuditRowUuids));
+            syncDiag(`RH-ESTIMATE REFRESH: audits=${rhAuditRowUuids.size} jobs=${refreshed}`);
+            rhAuditRowUuids.clear();
+          }
         }
         await client.query("COMMIT");
       } catch (txErr) {
@@ -13236,9 +13668,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
     }
     totalReceived += fieldLogsStored;
   }
-  if (completionWouuids.size > 0) {
+  if (completionWouuids.size > 0 || rhAuditRowUuids.size > 0) {
     try {
-      const { learnFromShipCompletions: learnFromShipCompletions2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+      const {
+        learnFromShipCompletions: learnFromShipCompletions2,
+        refreshRhEstimatesFromAuditRows: refreshRhEstimatesFromAuditRows2
+      } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
       const pool4 = await getPool();
       const client = await pool4.connect();
       try {
@@ -13249,6 +13684,9 @@ async function receivePushData(batchUuid, vesselId, payload) {
         stillOpen.forEach((w) => completionWouuids.delete(w));
         if (completionWouuids.size > 0) {
           await learnFromShipCompletions2(client, Array.from(completionWouuids));
+        }
+        if (rhAuditRowUuids.size > 0) {
+          await refreshRhEstimatesFromAuditRows2(client, Array.from(rhAuditRowUuids));
         }
         await client.query("COMMIT");
       } catch (learnErr) {
@@ -13261,6 +13699,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
         client.release();
       }
       completionWouuids.clear();
+      rhAuditRowUuids.clear();
     } catch (learnOuterErr) {
       syncDiag(`COMPLETION-LEARN (fullRows-only) setup failed: ${String(learnOuterErr?.message || learnOuterErr).substring(0, 160)}`);
     }
@@ -25554,7 +25993,10 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const comp = await this.getComponent(componentId);
         const resolvedId = comp ? comp.cuuid : componentId;
-        let query = db2.select().from(runningHoursAudit).where(or(eq7(runningHoursAudit.componentId, resolvedId), eq7(runningHoursAudit.componentId, componentId))).orderBy(desc2(runningHoursAudit.enteredAtUTC));
+        let query = db2.select().from(runningHoursAudit).where(and6(
+          or(eq7(runningHoursAudit.componentId, resolvedId), eq7(runningHoursAudit.componentId, componentId)),
+          or(eq7(runningHoursAudit.isDeleted, false), isNull2(runningHoursAudit.isDeleted))
+        )).orderBy(desc2(runningHoursAudit.enteredAtUTC));
         if (limit) {
           return await query.limit(limit);
         }
@@ -35399,6 +35841,31 @@ var init_complianceAnomalyService = __esm({
 });
 
 // shared/utils/workOrderFilters.ts
+function resolveDisplayedWorkOrderDueDate(wo) {
+  const basis = String(wo.maintenanceBasis || "").trim().toLowerCase();
+  const calendarDueDate = wo.dueDate || null;
+  const expectedRhDueDate = wo.rhEstimatedDueDate || null;
+  if (basis === "running hours") {
+    return { date: expectedRhDueDate, isExpectedRhDate: Boolean(expectedRhDueDate) };
+  }
+  if (basis !== "dual frequency") {
+    return { date: calendarDueDate, isExpectedRhDate: false };
+  }
+  if (!calendarDueDate) {
+    return { date: expectedRhDueDate, isExpectedRhDate: Boolean(expectedRhDueDate) };
+  }
+  if (!expectedRhDueDate) {
+    return { date: calendarDueDate, isExpectedRhDate: false };
+  }
+  const calendar = parseWorkOrderDate(calendarDueDate);
+  const expectedRh = parseWorkOrderDate(expectedRhDueDate);
+  if (!calendar) return { date: expectedRhDueDate, isExpectedRhDate: true };
+  if (!expectedRh) return { date: calendarDueDate, isExpectedRhDate: false };
+  return expectedRh.getTime() < calendar.getTime() ? { date: expectedRhDueDate, isExpectedRhDate: true } : { date: calendarDueDate, isExpectedRhDate: false };
+}
+function getDisplayedWorkOrderDueDate(wo) {
+  return resolveDisplayedWorkOrderDueDate(wo).date;
+}
 function isStoredCompleted(wo) {
   return !!wo.status && FINALIZED_STATUSES.has(wo.status.toLowerCase().trim());
 }
@@ -35600,9 +36067,12 @@ function compareWorkOrders(a, b, field, dir, activeTab = "") {
       break;
     case "dueDate": {
       const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
-      const aVal = useSubmitted ? a.submittedDate || "" : a.dueDate || "";
-      const bVal = useSubmitted ? b.submittedDate || "" : b.dueDate || "";
-      cmp = aVal.localeCompare(bVal);
+      const aVal = useSubmitted ? a.submittedDate || "" : getDisplayedWorkOrderDueDate(a) || "";
+      const bVal = useSubmitted ? b.submittedDate || "" : getDisplayedWorkOrderDueDate(b) || "";
+      const aDate = parseWorkOrderDate(aVal);
+      const bDate = parseWorkOrderDate(bVal);
+      if (aDate && bDate) cmp = aDate.getTime() - bDate.getTime();
+      else cmp = aVal.localeCompare(bVal);
       break;
     }
     case "status": {
@@ -35732,9 +36202,9 @@ function normalizeWorkOrderB2Date(value) {
   if (!trimmed) return null;
   const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const numeric3 = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
-  if (numeric3) {
-    return `${numeric3[3]}-${numeric3[2].padStart(2, "0")}-${numeric3[1].padStart(2, "0")}`;
+  const numeric4 = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (numeric4) {
+    return `${numeric4[3]}-${numeric4[2].padStart(2, "0")}-${numeric4[1].padStart(2, "0")}`;
   }
   const named = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
   if (named) {
@@ -35804,6 +36274,59 @@ var init_workOrderB2Validation = __esm({
       nov: "11",
       dec: "12"
     };
+  }
+});
+
+// server/modules/work-orders/utils/workOrderListHydration.ts
+function buildHydrationJobIndexes(jobs2) {
+  const byVesselJobAndComponentCode = /* @__PURE__ */ new Map();
+  const byVesselJobAndComponentId = /* @__PURE__ */ new Map();
+  const jobsByVesselAndNumber = /* @__PURE__ */ new Map();
+  for (const job of jobs2) {
+    if (job.vesselId && job.jobNo) {
+      const baseKey = `${job.vesselId}:${job.jobNo}`;
+      const matches = jobsByVesselAndNumber.get(baseKey) ?? [];
+      matches.push(job);
+      jobsByVesselAndNumber.set(baseKey, matches);
+      if (job.componentCode) {
+        byVesselJobAndComponentCode.set(`${baseKey}:${job.componentCode}`, job);
+      }
+      if (job.componentId) {
+        byVesselJobAndComponentId.set(`${baseKey}:${job.componentId}`, job);
+      }
+    }
+  }
+  const uniqueByVesselAndJob = /* @__PURE__ */ new Map();
+  jobsByVesselAndNumber.forEach((matches, key) => {
+    if (matches.length === 1) uniqueByVesselAndJob.set(key, matches[0]);
+  });
+  return {
+    byVesselJobAndComponentCode,
+    byVesselJobAndComponentId,
+    uniqueByVesselAndJob
+  };
+}
+function resolveWorkOrderHydrationJob(workOrder, jobsById, indexes) {
+  if (workOrder.jobId) {
+    return jobsById.get(workOrder.jobId) ?? null;
+  }
+  if (workOrder.vesselId && workOrder.templateCode) {
+    const baseKey = `${workOrder.vesselId}:${workOrder.templateCode}`;
+    if (workOrder.componentCode) {
+      const byCode = indexes.byVesselJobAndComponentCode.get(`${baseKey}:${workOrder.componentCode}`);
+      if (byCode) return byCode;
+    }
+    if (workOrder.component) {
+      const byId = indexes.byVesselJobAndComponentId.get(`${baseKey}:${workOrder.component}`);
+      if (byId) return byId;
+    }
+    return indexes.uniqueByVesselAndJob.get(baseKey) ?? null;
+  }
+  return null;
+}
+var init_workOrderListHydration = __esm({
+  "server/modules/work-orders/utils/workOrderListHydration.ts"() {
+    "use strict";
   }
 });
 
@@ -37592,6 +38115,7 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
     allJobs = await findJobs2(vesselId);
   }
   const jobsMap = new Map(allJobs.map((job) => [job.juuid, job]));
+  const hydrationJobIndexes = buildHydrationJobIndexes(allJobs);
   const componentsByCodeMap = /* @__PURE__ */ new Map();
   const componentsMap = /* @__PURE__ */ new Map();
   if (isAllVessels) {
@@ -37655,11 +38179,13 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
       rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
       rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
     } : void 0;
-    const job = wo.jobId ? jobsMap.get(wo.jobId) : wo.templateCode ? allJobs.find((j) => j.jobNo === wo.templateCode) : null;
+    const job = resolveWorkOrderHydrationJob(wo, jobsMap, hydrationJobIndexes);
+    const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || null;
+    const isRhBased = maintenanceBasis === "Running Hours" || maintenanceBasis === "Dual Frequency";
     const component = wo.componentCode ? componentsByCodeMap.get(`${woVesselId}:${wo.componentCode}`) : wo.component ? componentsMap.get(wo.component) : null;
     const componentId = component?.cuuid || component?.id;
     let dueRH;
-    if (wo.maintenanceBasis === "Running Hours") {
+    if (maintenanceBasis === "Running Hours") {
       dueRH = parseRH3(job?.nextDueRH);
       if (dueRH == null) {
         const woNextDue = parseRH3(wo.nextDueReading);
@@ -37673,7 +38199,9 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
         }
       }
     }
-    const currentRH = wo.maintenanceBasis === "Running Hours" ? parseRH3(component?.currentCumulativeRH) ?? parseRH3(wo.currentReading) : void 0;
+    const nextDueHour = maintenanceBasis === "Running Hours" ? dueRH ?? null : maintenanceBasis === "Dual Frequency" ? parseRH3(job?.nextDueRH) ?? parseRH3(wo.nextDueReading) ?? null : null;
+    const rhEstimatedDueDate = isRhBased ? job?.rhEstimatedDueDate ?? null : null;
+    const currentRH = isRhBased ? parseRH3(component?.currentCumulativeRH) ?? parseRH3(wo.currentReading) : void 0;
     const isJobCritical3 = job?.jobPriority === "Critical" || job?.classRelated === "true" || job?.classRelated === true;
     const rhLeadTimeHours = wo.maintenanceBasis === "Running Hours" ? isJobCritical3 ? vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL : vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL : void 0;
     const calendarLeadTimeDays = wo.maintenanceBasis !== "Running Hours" && vesselSettings ? isJobCritical3 ? vesselSettings.calendarLeadDaysCritical : vesselSettings.calendarLeadDaysNonCritical : void 0;
@@ -37715,6 +38243,7 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
     }
     return {
       ...wo,
+      maintenanceBasis,
       assignedTo: resolvedAssignedTo,
       assignedToRankId: resolvedAssignedToRankId,
       criticality: wo.criticality || job?.criticality || null,
@@ -37724,6 +38253,8 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
       leadTimeUnit: job?.leadTimeUnit ?? null,
       componentCritical: component?.critical === true,
       dueRH: dueRH ?? null,
+      nextDueHour,
+      rhEstimatedDueDate,
       currentRH: currentRH ?? null,
       plannedDate
     };
@@ -40425,6 +40956,7 @@ var init_workOrderService2 = __esm({
     init_workOrderPayload();
     init_workOrderB2Validation();
     init_completedWorkOrderDate();
+    init_workOrderListHydration();
   }
 });
 
@@ -48801,6 +49333,7 @@ init_woCompletionRhRequirement();
 init_workOrderPayload();
 init_workOrderB2Validation();
 init_completedWorkOrderDate();
+init_rhDueDateService();
 async function completeWorkOrder(workOrderId, body) {
   const {
     runningHours,
@@ -49420,6 +49953,28 @@ async function completeWorkOrder(workOrderId, body) {
         originalDueDate,
         job
       });
+      if (jobUpdates.lastDoneRH !== void 0 && cycleRH && (workOrder.maintenanceBasis === "Running Hours" || workOrder.maintenanceBasis === "Dual Frequency")) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          findComponent2,
+          findComponentByCode2,
+          workOrder.vesselId
+        );
+        if (rhComponent) {
+          const audits = await findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
+        }
+      }
       if (workOrder.maintenanceBasis === "Dual Frequency" && jobCompletionDate && !cycleRH) {
         console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
       }
@@ -49597,39 +50152,40 @@ async function finalizeWorkOrderCompletion(workOrderId) {
     }
     if (job && jobCompletionDate) {
       const basis = workOrder.maintenanceBasis;
-      if (basis === "Calendar" || basis === "Dual Frequency") {
-        const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-        const updates = { lastDoneDate: jobCompletionDate };
-        if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate2(jobCompletionDate, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) updates.nextDueDate = nextDue;
-        }
-        await updateJob3(job.juuid, updates);
-        console.log(`\u2705 [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${jobCompletionDate}`);
-      }
       const finalizeCycleRH = workOrder.woCompletionRh ?? workOrder.runningHours;
-      if (basis === "Running Hours") {
-        await updateJob3(job.juuid, { lastDoneDate: jobCompletionDate });
-        console.log(`\u2705 [Finalize] Updated RH job ${job.jobNo} lastDoneDate: ${jobCompletionDate}`);
-      }
-      if ((basis === "Running Hours" || basis === "Dual Frequency") && finalizeCycleRH) {
-        const currentRH = parseInt(String(finalizeCycleRH));
-        if (!isNaN(currentRH)) {
-          const rhUpdates = { lastDoneRH: currentRH };
-          if (jobCompletionDate) {
-            rhUpdates.lastDoneDate = jobCompletionDate;
-          }
-          const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-          if (rhInterval && !isNaN(rhInterval)) {
-            rhUpdates.nextDueRH = currentRH + rhInterval;
-          }
-          const { preserveNewerJobRhState: preserveNewerJobRhState2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
-          const guardedRhUpdates = preserveNewerJobRhState2(job, rhUpdates);
-          if (Object.keys(guardedRhUpdates).length > 0) {
-            await updateJob3(job.juuid, guardedRhUpdates);
-            console.log(`\u2705 [Finalize] Updated RH job ${job.jobNo} cycle fields without reducing newer RH state`);
-          }
+      const { computeJobCycleUpdates: computeJobCycleUpdates2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
+      const { jobUpdates } = computeJobCycleUpdates2({
+        maintenanceBasis: basis,
+        dateOfCompletion: jobCompletionDate,
+        completionRH: finalizeCycleRH != null ? String(finalizeCycleRH) : null,
+        originalDueDate,
+        job
+      });
+      if (jobUpdates.lastDoneRH !== void 0 && (basis === "Running Hours" || basis === "Dual Frequency")) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          findComponent2,
+          findComponentByCode2,
+          workOrder.vesselId
+        );
+        if (rhComponent) {
+          const audits = await findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
         }
+      }
+      if (Object.keys(jobUpdates).length > 0) {
+        await updateJob3(job.juuid, jobUpdates);
+        console.log(`\u2705 [Finalize] Updated ${basis} job ${job.jobNo} cycle fields without reducing newer RH state`);
       }
     }
   } catch (err) {
@@ -51264,6 +51820,16 @@ async function getSuperintendentNotificationSummary(scope, now = /* @__PURE__ */
 init_errors();
 init_storage();
 init_auth();
+
+// server/modules/work-orders/utils/updateActorIdentity.ts
+function enrichWorkOrderUpdateWithActor(body, actor) {
+  if (actor && (!body.userId || body.userId === "system")) {
+    body.userId = actor;
+  }
+  return body;
+}
+
+// server/modules/work-orders/controllers/workOrderController.ts
 function resolveActorIdentity(req) {
   const { user } = req;
   if (!user) return void 0;
@@ -51426,10 +51992,7 @@ async function updateWorkOrder2(req, res) {
     const authReq = req;
     const body = { ...req.body };
     delete body.superintendentAck;
-    if (actor) {
-      if (!body.userId || body.userId === "system") body.userId = actor;
-      if (!body.performedBy || body.performedBy === "system") body.performedBy = actor;
-    }
+    enrichWorkOrderUpdateWithActor(body, actor);
     body.userRole = authReq.user?.role;
     body.userUuid = authReq.user?.userUuid ?? body.userUuid;
     const result = await updateWorkOrder(req.params.id, body);
@@ -85259,11 +85822,11 @@ function computePointInTimeStatus(input) {
   const woId = wo.wouuid || wo.id;
   const woPostponements = woId ? postponements.filter((p) => p.workOrderId === woId) : [];
   const activePostponement = findActivePostponementAt(woPostponements, refDate);
-  const effectiveDueDate = activePostponement?.newDueDate ?? (woPostponements.length > 0 ? wo.originalDueDate ?? wo.dueDate ?? null : wo.dueDate ?? wo.originalDueDate ?? null);
+  const effectiveDueDate2 = activePostponement?.newDueDate ?? (woPostponements.length > 0 ? wo.originalDueDate ?? wo.dueDate ?? null : wo.dueDate ?? wo.originalDueDate ?? null);
   const computed = computeWorkOrderStatus({
     // No pre-normalization needed: computeWorkOrderStatus now parses all
     // stored formats via the shared parser (dateParse.ts).
-    dueDate: effectiveDueDate,
+    dueDate: effectiveDueDate2,
     dueRH: parseNumber(wo.nextDueReading),
     currentRH: parseNumber(wo.currentReading),
     isExecution: wo.isExecution ?? false,
@@ -88121,6 +88684,9 @@ var ALL_SEED_IDS = [
 ];
 
 // server/routes.ts
+init_db();
+init_schema();
+import { and as and34, eq as eq39, isNull as isNull6, sql as sql25 } from "drizzle-orm";
 async function registerRoutes(app2) {
   try {
     await ensureMaintenanceHistoryImmutability();
@@ -88452,9 +89018,17 @@ async function registerRoutes(app2) {
       const allJobs = await storage.getJobs();
       let updatedCalendar = 0;
       let updatedRH = 0;
+      let updatedRhEstimate = 0;
+      const {
+        estimateRhDueDate: estimateRhDueDate2,
+        isCurrentRhEstimateBasis: isCurrentRhEstimateBasis2,
+        rhEstimateBasis: rhEstimateBasis2,
+        resolveAuthoritativeRhComponent: resolveAuthoritativeRhComponent2
+      } = await Promise.resolve().then(() => (init_rhDueDateService(), rhDueDateService_exports));
       for (const job of allJobs) {
         let updates = {};
         let needsUpdate = false;
+        let effectiveNextDueRh = job.nextDueRH;
         if (job.maintenanceBasis === "Calendar" && !job.nextDueDate) {
           const rawLastDone = job.lastDoneDate;
           if (rawLastDone && job.frequencyValue && job.frequencyUnit) {
@@ -88469,24 +89043,76 @@ async function registerRoutes(app2) {
             }
           }
         }
-        if (job.maintenanceBasis === "Running Hours" && !job.nextDueRH) {
+        if ((job.maintenanceBasis === "Running Hours" || job.maintenanceBasis === "Dual Frequency") && !job.nextDueRH) {
           const lastDoneRH = job.lastDoneRH;
           const intervalRH = Number(job.intervalRunningHour);
           if (lastDoneRH && !isNaN(intervalRH) && intervalRH > 0) {
             const lastRH = Number(lastDoneRH);
             if (!isNaN(lastRH)) {
-              updates.nextDueRH = String(lastRH + intervalRH);
-              needsUpdate = true;
-              updatedRH++;
+              const derivedNextDueRh = String(lastRH + intervalRH);
+              const db2 = await getDb();
+              const repaired = await db2.update(jobs).set({
+                nextDueRH: derivedNextDueRh,
+                updatedAt: /* @__PURE__ */ new Date()
+              }).where(and34(
+                eq39(jobs.juuid, job.juuid),
+                isNull6(jobs.nextDueRH),
+                sql25`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`
+              )).returning({ nextDueRH: jobs.nextDueRH });
+              if (repaired.length > 0) {
+                effectiveNextDueRh = repaired[0].nextDueRH;
+                updatedRH++;
+              } else {
+                effectiveNextDueRh = null;
+              }
             }
           }
         }
         if (needsUpdate) {
           await storage.updateJob(job.juuid, updates);
         }
+        if ((job.maintenanceBasis === "Running Hours" || job.maintenanceBasis === "Dual Frequency") && !isCurrentRhEstimateBasis2(job.rhEstimateBasis) && job.lastDoneDate && Number(job.intervalRunningHour) > 0 && Number(effectiveNextDueRh) >= 0) {
+          let component = job.componentId ? await storage.getComponent(job.componentId) : null;
+          if (!component && job.componentCode && job.vesselId) {
+            component = await storage.getComponentByCode(job.componentCode, job.vesselId);
+          }
+          component = await resolveAuthoritativeRhComponent2(
+            component,
+            (id) => storage.getComponent(id),
+            (code, vesselId) => storage.getComponentByCode(code, vesselId),
+            job.vesselId
+          );
+          let estimate = {
+            dueDate: null,
+            averagePerDay: null,
+            basis: rhEstimateBasis2("MISSING_RH_SOURCE")
+          };
+          if (component) {
+            const audits = await storage.getRunningHoursAudits(component.cuuid || component.id);
+            estimate = estimateRhDueDate2(
+              job.lastDoneDate,
+              job.intervalRunningHour,
+              audits
+            );
+          }
+          const db2 = await getDb();
+          const saved = await db2.update(jobs).set({
+            rhEstimatedDueDate: estimate.dueDate,
+            rhAveragePerDay: estimate.averagePerDay === null ? null : String(estimate.averagePerDay),
+            rhEstimateBasis: estimate.basis,
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(and34(
+            eq39(jobs.juuid, job.juuid),
+            sql25`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
+            sql25`${jobs.nextDueRH} IS NOT DISTINCT FROM ${effectiveNextDueRh}`,
+            sql25`${jobs.rhEstimatedDueDate} IS NOT DISTINCT FROM ${job.rhEstimatedDueDate}`,
+            sql25`${jobs.rhEstimateBasis} IS NOT DISTINCT FROM ${job.rhEstimateBasis}`
+          )).returning({ juuid: jobs.juuid });
+          if (saved.length > 0) updatedRhEstimate++;
+        }
       }
-      if (updatedCalendar > 0 || updatedRH > 0) {
-        console.log(`\u2705 Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH)`);
+      if (updatedCalendar > 0 || updatedRH > 0 || updatedRhEstimate > 0) {
+        console.log(`\u2705 Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH), ${updatedRhEstimate} RH historical estimates`);
       } else {
         console.log("\u2705 Job backfill check complete - all jobs already have due dates/RH calculated");
       }
