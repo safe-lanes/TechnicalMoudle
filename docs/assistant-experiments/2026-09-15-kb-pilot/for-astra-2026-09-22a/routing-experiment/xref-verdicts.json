@@ -1,0 +1,183 @@
+[
+ {
+  "indices": [
+   0,
+   3,
+   6
+  ],
+  "classes": "AC",
+  "label": "In-Progress edit/delete pasted into Recruited, Waitlist, Rejected",
+  "reason": "Step 1 is 'Click on ‘In-Progress’ sub-sub module' and the caption reads 'In Progress crew record table'. These are sibling crew lists and the source sentence says 'apply the same steps', so the user is sent to a different list."
+ },
+ {
+  "indices": [
+   1,
+   4,
+   7
+  ],
+  "classes": "AC",
+  "label": "In-Progress export pasted into Recruited, Waitlist, Rejected",
+  "reason": "Same navigation step and caption; this is the Waitlist case the reviewer raised."
+ },
+ {
+  "indices": [
+   2,
+   5,
+   8
+  ],
+  "classes": "D",
+  "label": "In-Progress filters pasted into Recruited, Waitlist, Rejected",
+  "reason": "No navigation, no source naming. The filters listed (Rank Applied, Vessel Type, Nationality, Status, Manning Agent) are candidate-list filters common to all four lists. Reads correctly."
+ },
+ {
+  "indices": [
+   12,
+   15,
+   23
+  ],
+  "classes": "BC",
+  "label": "Annual D&A create/delete pasted into Periodic, Monthly, Summary",
+  "reason": "Instruction says 'create new ANNUAL drug and alcohol record'; caption 'Annual D&A Test interface'. Reviewer's example. The buttons transfer; the record type named does not."
+ },
+ {
+  "indices": [
+   14,
+   17,
+   24
+  ],
+  "classes": "C",
+  "label": "Annual D&A review/export pasted into Periodic, Monthly, Summary",
+  "reason": "Steps are generic (vessel dropdown, History, Export). Only the captions say 'Annual D&A Test'."
+ },
+ {
+  "indices": [
+   13,
+   16,
+   18
+  ],
+  "classes": "BC",
+  "label": "Crew Promotion filters pasted into Periodic, Monthly, Post Incident",
+  "reason": "Instruction says 'refine CREW PROMOTION records by Name, PROMOTION RANK, Vessel, Vessel Type, Nationality, Criteria, Status'. Both the record type AND the field list belong to another screen."
+ },
+ {
+  "indices": [
+   9,
+   11
+  ],
+  "classes": "BC",
+  "label": "Crew Promotion filters pasted into Appraisals and Annual",
+  "reason": "Same text as above."
+ },
+ {
+  "indices": [
+   22
+  ],
+  "classes": "BC",
+  "label": "Crew Promotion filters pasted into Others",
+  "reason": "Same text as above."
+ },
+ {
+  "indices": [
+   10,
+   25
+  ],
+  "classes": "C",
+  "label": "Crew Promotion export pasted into Appraisals and Training Needs",
+  "reason": "Instruction is generic ('Export CSV'/'Export Excel'); the caption describes the Crew Promotion dashboard and 'promotion status'."
+ },
+ {
+  "indices": [
+   19
+  ],
+  "classes": "BC",
+  "label": "Post Incident create pasted into Others",
+  "reason": "Instruction says 'enter the required INCIDENT details ... in the POST INCIDENT TEST form'."
+ },
+ {
+  "indices": [
+   20
+  ],
+  "classes": "C",
+  "label": "Post Incident edit pasted into Others",
+  "reason": "Caption only: 'Post Incident Test screen'."
+ },
+ {
+  "indices": [
+   21
+  ],
+  "classes": "C",
+  "label": "Post Incident export pasted into Others",
+  "reason": "Caption only."
+ },
+ {
+  "indices": [
+   26
+  ],
+  "classes": "BC",
+  "label": "Certificates filter pasted into Surveys",
+  "reason": "Instruction says 'view vessel-specific CERTIFICATE records' and 'CERTIFICATE due status'."
+ },
+ {
+  "indices": [
+   27
+  ],
+  "classes": "BC",
+  "label": "Certificates export pasted into Surveys",
+  "reason": "Instruction says 'download the displayed CERTIFICATE records in PDF format'. Reviewer's example. CODE: SurveysPage has its own PDF/CSV/Excel export."
+ },
+ {
+  "indices": [
+   28
+  ],
+  "classes": "ABC",
+  "label": "Certificates edit pasted into Surveys",
+  "reason": "Step 1 is 'Go to the Certificates sub-sub module', every caption is Certificates, and the note describes certificate status colours. CODE: Surveys edits in its own grid, no Certificates hop."
+ },
+ {
+  "indices": [
+   29
+  ],
+  "classes": "D",
+  "label": "Defects Dashboard filter, self-reference",
+  "reason": "Source and destination are the same sub-module on two pages. Reads correctly."
+ },
+ {
+  "indices": [
+   30,
+   31,
+   32,
+   33,
+   34
+  ],
+  "classes": "C",
+  "label": "Defects Logs steps pasted into Condition of Class (CoC)",
+  "reason": "CODE: DefectsCoC.tsx is its own page with its own export, and CoC records are created through the shared DefectFormWizard with is_coc set — so the steps and the 'defect report' wording DO transfer. Only the captions ('Defects Log interface') name the wrong screen."
+ },
+ {
+  "indices": [
+   35,
+   38
+  ],
+  "classes": "AC",
+  "label": "Spares filter pasted into Stores (Office and Vessel manuals)",
+  "reason": "Step 1 is 'Click on the Spares sub-sub module'. CODE: Stores is its own screen with its own filters, so this is wrong, not a genuine screen switch."
+ },
+ {
+  "indices": [
+   36,
+   39
+  ],
+  "classes": "AC",
+  "label": "Spares inventory pasted into Stores",
+  "reason": "Step 1 navigates to Spares. CODE: Stores maintains its own inventory view."
+ },
+ {
+  "indices": [
+   37,
+   40
+  ],
+  "classes": "AC",
+  "label": "Spares export pasted into Stores",
+  "reason": "Step 1 navigates to Spares. CODE: Stores exports stores_<tab>_inventory/history .xlsx itself."
+ }
+]

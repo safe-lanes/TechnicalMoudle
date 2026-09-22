@@ -1,0 +1,90 @@
+41 resolved cross-references · 27 distinct pasted bodies · 20 verdict groups, every distinct body read
+
+  A navigation to the wrong sub-module       13
+  B wrong record type / field list in steps  13
+  C wrong screen named in the caption only   37
+  D clean                                     4
+
+  carrying source-specific wording somewhere: 37 of 41
+  clean: [2, 5, 8, 29]
+
+[AC ] In-Progress edit/delete pasted into Recruited, Waitlist, Rejected
+        crew p.21, crew p.22, crew p.23
+        Step 1 is 'Click on ‘In-Progress’ sub-sub module' and the caption reads 'In Progress crew record table'. These are sibling crew lists and the source sentence says 'apply the same steps', so the user is sent to a different list.
+
+[AC ] In-Progress export pasted into Recruited, Waitlist, Rejected
+        crew p.21, crew p.22, crew p.23
+        Same navigation step and caption; this is the Waitlist case the reviewer raised.
+
+[D  ] In-Progress filters pasted into Recruited, Waitlist, Rejected
+        crew p.21, crew p.22, crew p.23
+        No navigation, no source naming. The filters listed (Rank Applied, Vessel Type, Nationality, Status, Manning Agent) are candidate-list filters common to all four lists. Reads correctly.
+
+[BC ] Annual D&A create/delete pasted into Periodic, Monthly, Summary
+        crew p.61, crew p.62, crew p.68
+        Instruction says 'create new ANNUAL drug and alcohol record'; caption 'Annual D&A Test interface'. Reviewer's example. The buttons transfer; the record type named does not.
+
+[C  ] Annual D&A review/export pasted into Periodic, Monthly, Summary
+        crew p.61, crew p.62, crew p.68
+        Steps are generic (vessel dropdown, History, Export). Only the captions say 'Annual D&A Test'.
+
+[BC ] Crew Promotion filters pasted into Periodic, Monthly, Post Incident
+        crew p.61, crew p.62, crew p.63
+        Instruction says 'refine CREW PROMOTION records by Name, PROMOTION RANK, Vessel, Vessel Type, Nationality, Criteria, Status'. Both the record type AND the field list belong to another screen.
+
+[BC ] Crew Promotion filters pasted into Appraisals and Annual
+        crew p.51, crew p.59
+        Same text as above.
+
+[BC ] Crew Promotion filters pasted into Others
+        crew p.66
+        Same text as above.
+
+[C  ] Crew Promotion export pasted into Appraisals and Training Needs
+        crew p.51, crew p.90
+        Instruction is generic ('Export CSV'/'Export Excel'); the caption describes the Crew Promotion dashboard and 'promotion status'.
+
+[BC ] Post Incident create pasted into Others
+        crew p.66
+        Instruction says 'enter the required INCIDENT details ... in the POST INCIDENT TEST form'.
+
+[C  ] Post Incident edit pasted into Others
+        crew p.66
+        Caption only: 'Post Incident Test screen'.
+
+[C  ] Post Incident export pasted into Others
+        crew p.66
+        Caption only.
+
+[BC ] Certificates filter pasted into Surveys
+        tech p.10
+        Instruction says 'view vessel-specific CERTIFICATE records' and 'CERTIFICATE due status'.
+
+[BC ] Certificates export pasted into Surveys
+        tech p.10
+        Instruction says 'download the displayed CERTIFICATE records in PDF format'. Reviewer's example. CODE: SurveysPage has its own PDF/CSV/Excel export.
+
+[ABC] Certificates edit pasted into Surveys
+        tech p.10
+        Step 1 is 'Go to the Certificates sub-sub module', every caption is Certificates, and the note describes certificate status colours. CODE: Surveys edits in its own grid, no Certificates hop.
+
+[D  ] Defects Dashboard filter, self-reference
+        tech p.11
+        Source and destination are the same sub-module on two pages. Reads correctly.
+
+[C  ] Defects Logs steps pasted into Condition of Class (CoC)
+        tech p.19, tech p.19, tech p.19, tech p.20, tech p.20
+        CODE: DefectsCoC.tsx is its own page with its own export, and CoC records are created through the shared DefectFormWizard with is_coc set — so the steps and the 'defect report' wording DO transfer. Only the captions ('Defects Log interface') name the wrong screen.
+
+[AC ] Spares filter pasted into Stores (Office and Vessel manuals)
+        tech p.43, tech p.49
+        Step 1 is 'Click on the Spares sub-sub module'. CODE: Stores is its own screen with its own filters, so this is wrong, not a genuine screen switch.
+
+[AC ] Spares inventory pasted into Stores
+        tech p.44, tech p.51
+        Step 1 navigates to Spares. CODE: Stores maintains its own inventory view.
+
+[AC ] Spares export pasted into Stores
+        tech p.44, tech p.51
+        Step 1 navigates to Spares. CODE: Stores exports stores_<tab>_inventory/history .xlsx itself.
+
