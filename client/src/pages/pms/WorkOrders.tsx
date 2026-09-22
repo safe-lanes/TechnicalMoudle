@@ -618,7 +618,7 @@ const WorkOrders: React.FC = () => {
 
     if (shouldShowNextDueHourColumn(activeTab)) {
       cols.push({
-        headerName: 'Next Due Hour',
+        headerName: 'Due Hour',
         field: 'nextDueHour',
         minWidth: 145,
         flex: 1,
