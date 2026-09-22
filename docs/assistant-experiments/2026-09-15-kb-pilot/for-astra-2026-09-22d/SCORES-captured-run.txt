@@ -1,0 +1,41 @@
+judge self-test: passed (discounts attribution and denial, keeps real instructions)
+
+63 answers · 3 runs · 7 frozen cases · errors 0
+
+case                       baseline r1    baseline r2    baseline r3    repaired_b r1  repaired_b r2  repaired_b r3  repaired_c r1  repaired_c r2  repaired_c r3 
+----------------------------------------------------------------------------------------------------------------
+waitlist-export            incorrect      incorrect      incorrect      correct        correct        correct        correct        correct        correct       
+monthly-test-create        correct        correct        correct        correct        correct        correct        correct        correct        correct       
+appraisals-filter          incorrect      incorrect      incorrect      limited        limited        limited        limited        limited        limited       
+stores-export              incorrect      incorrect      incorrect      correct        correct        correct        correct        correct        correct       
+stores-filter              incorrect      incorrect      incorrect      incorrect      correct        incorrect      correct        correct        incorrect     
+surveys-edit               incorrect      incorrect      incorrect      correct        correct        correct        correct        incorrect      correct       
+audit-history-regression   correct        correct        correct        correct        correct        correct        correct        correct        correct       
+
+TOTALS per arm (each of 3 runs counted separately)
+   baseline   correct  6/21   limited  0/21   incorrect 15/21
+   repaired_b correct 16/21   limited  3/21   incorrect  2/21
+   repaired_c correct 16/21   limited  3/21   incorrect  2/21
+
+WHY, per case (run 1 shown; differences across runs flagged)
+   waitlist-export            baseline   incorrect  must_not 'in-progress' as an instruction: “Click the **In-Progress** s
+   waitlist-export            repaired_b correct    'in progress' discounted (attribution/denial): “This procedure is the 
+   waitlist-export            repaired_c correct    'in-progress' discounted (attribution/denial): “The Waitlist export pr
+   monthly-test-create        baseline   correct    -
+   monthly-test-create        repaired_b correct    'annual d&a record' discounted (attribution/denial): “The procedure is
+   monthly-test-create        repaired_c correct    -
+   appraisals-filter          baseline   incorrect  must_not 'promotion rank' as an instruction: “Select filters such as *
+   appraisals-filter          repaired_b limited    capped at 'limited': Reviewer, 22-Sep, added BEFORE any answer was gen
+   appraisals-filter          repaired_c limited    capped at 'limited': Reviewer, 22-Sep, added BEFORE any answer was gen
+   stores-export              baseline   incorrect  must_not 'spares sub' as an instruction: “Open the **Spares** sub-sub-
+   stores-export              repaired_b correct    -
+   stores-export              repaired_c correct    -
+   stores-filter              baseline   incorrect  must_not 'criticality' as an instruction: “Use the dropdown filters **
+   stores-filter              repaired_b incorrect  must_not 'criticality' as an instruction: “The Stores screen does **no   [varies across runs: ['incorrect', 'correct', 'incorrect']]
+   stores-filter              repaired_c correct    'criticality' discounted (attribution/denial): “The Vessel excerpt als   [varies across runs: ['correct', 'correct', 'incorrect']]
+   surveys-edit               baseline   incorrect  must_not 'certificates sub' as an instruction: “Go to the **Certificat
+   surveys-edit               repaired_b correct    -
+   surveys-edit               repaired_c correct    -   [varies across runs: ['correct', 'incorrect', 'correct']]
+   audit-history-regression   baseline   correct    -
+   audit-history-regression   repaired_b correct    -
+   audit-history-regression   repaired_c correct    -

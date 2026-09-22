@@ -1,0 +1,13 @@
+42 captured outbound requests in capture-g4.jsonl
+  #2: SOURCE LINE REACHED THE MODEL -> ['click on the ‘in-progress’ sub']
+  #6: SOURCE LINE REACHED THE MODEL -> ['promotion rank']
+  #12: SOURCE LINE REACHED THE MODEL -> ["go to the 'certificates' sub", "click the 'issue date' cell"]
+  #16: SOURCE LINE REACHED THE MODEL -> ['click on the ‘in-progress’ sub']
+  #20: SOURCE LINE REACHED THE MODEL -> ['promotion rank']
+  #26: SOURCE LINE REACHED THE MODEL -> ["go to the 'certificates' sub", "click the 'issue date' cell"]
+  #30: SOURCE LINE REACHED THE MODEL -> ['click on the ‘in-progress’ sub']
+  #34: SOURCE LINE REACHED THE MODEL -> ['promotion rank']
+  #40: SOURCE LINE REACHED THE MODEL -> ["go to the 'certificates' sub", "click the 'issue date' cell"]
+requests whose context contained a resolved cross-reference: 21
+  ... with the adapted 'Steps for' block present : 21
+  ... with a SOURCE step line present (leak)     : 9

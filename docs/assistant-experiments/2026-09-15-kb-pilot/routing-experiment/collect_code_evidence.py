@@ -21,8 +21,14 @@ BLOCKS = [
      "client/src/pages/TechnicalModule.tsx", 214, 226),
     ("Stores has its own export to stores_<tab>_inventory / _history .xlsx",
      "client/src/pages/stores/Stores.tsx", 859, 912),
-    ("Stores filter controls: Search and Stock only",
-     "client/src/pages/stores/Stores.tsx", 2712, 2745),
+    ("Stores LOCATION view controls: vessel selector, Search, All Categories, Stock (data-testid stores-loc-*)",
+     "client/src/pages/stores/Stores.tsx", 2690, 2770),
+    ("Stores INVENTORY view controls (the viewMode === 'inventory' branch): Search, All Categories, Stock",
+     "client/src/pages/stores/Stores.tsx", 2772, 2832),
+    ("Stores HISTORY view: search box only",
+     "client/src/pages/stores/Stores.tsx", 2855, 2865),
+    ("Surveys editable columns: Survey Date, Due Date, 1st Range Date, 2nd Range Date, Postponed (editable: canEditSurvey, DateCellEditor)",
+     "client/src/pages/cert-surveys/SurveysPage.tsx", 404, 500),
     ("Spares filter controls: Search, Criticality, Rotation Item, Stock",
      "client/src/pages/spares/SparesNew.tsx", 3695, 3742),
     ("Surveys edits in the grid rather than on another screen",
@@ -41,6 +47,11 @@ BLOCKS = [
 
 # (claim, pattern, file) -> counted, because an absence is the evidence
 COUNTS = [
+    ("Certificates page editable columns (each 'editable: canEdit')", "editable: canEdit",
+     "client/src/pages/cert-surveys/CertificatesPage.tsx"),
+    ("Surveys page editable columns (each 'editable: canEditSurvey')", "editable: canEditSurvey",
+     "client/src/pages/cert-surveys/SurveysPage.tsx"),
+    ("'Issue Date' anywhere in the Surveys page", "issue date", "client/src/pages/cert-surveys/SurveysPage.tsx"),
     ("'criticality' anywhere in the Stores screen", "criticality", "client/src/pages/stores/Stores.tsx"),
     ("'rotation' anywhere in the Stores screen", "rotation", "client/src/pages/stores/Stores.tsx"),
     ("'Certificates' anywhere in the Surveys page", "certificates",
