@@ -1,0 +1,178 @@
+{
+  "_frozen": "2026-09-22, BEFORE the repaired index was built or any answer was generated.",
+  "_scoring": [
+    "Three separate buckets, never merged. An UNRESOLVED answer is NOT a successful procedural repair.",
+    "  correct   — the answer gives the destination procedure and breaks none of the must_not rules",
+    "  limited   — the answer is honest but incomplete: it declines, or defers to the source section,",
+    "              or omits the procedure. Counted separately; it is not a pass.",
+    "  incorrect — the answer breaks a must_not rule, i.e. it still carries the source screen,",
+    "              record type or an unverified field into the destination.",
+    "must_not is decisive: one hit makes the answer incorrect regardless of what else it says.",
+    "bucket_cap on a case means it cannot score above that bucket however good the answer.",
+    "AMENDED AFTER THE RUN, both disclosed in the report: (a) a must_not hit is discounted when the sentence carrying it is an attribution/citation ('same as ... section ... page') or an explicit denial ('are not available'), because the frozen intent was to forbid the wrong INSTRUCTION, not the word; (b) 'procedural: false' exempts a yes/no question from the two-step test. Every discounted hit is printed with its sentence so the judgement can be checked.",
+    "AMENDED 22-Sep (second reviewer read): field-level rules for surveys-edit and stores-filter, applied to the existing 63 answers without regenerating them."
+  ],
+  "_arms": {
+    "baseline": "index kb-pilot-e (unrepaired documents)",
+    "repaired": "isolated index set built from the same cached parses with the repaired resolver",
+    "constant": "same model gpt-5.6-luna, same prompt v5, same retrieval settings, same candidate container"
+  },
+  "cases": [
+    {
+      "id": "waitlist-export",
+      "question": "How do I export crew details from the Waitlist in Crewing?",
+      "module": "crewing",
+      "must_include_any": [
+        [
+          "waitlist"
+        ]
+      ],
+      "must_include_all": [
+        [
+          "export"
+        ]
+      ],
+      "must_not": [
+        "in-progress",
+        "in progress"
+      ],
+      "must_not_note": "The Waitlist section says 'apply the same steps'; sending the reader to the In-Progress list changes the list they are working on.",
+      "evidence": "Crewing manual 1.2.3.3 (Waitlist) pointing at 1.2.1.5 (In Progress, p.19)"
+    },
+    {
+      "id": "monthly-test-create",
+      "question": "How do I create a new monthly alcohol test record in Crewing?",
+      "module": "crewing",
+      "must_include_any": [
+        [
+          "monthly"
+        ]
+      ],
+      "must_include_all": [],
+      "must_not": [
+        "annual drug and alcohol record",
+        "annual d&a record",
+        "create new annual",
+        "annual record"
+      ],
+      "must_not_note": "The destination section is Monthly; instructing the reader to create an ANNUAL record is the reviewer's example.",
+      "evidence": "Crewing manual 1.8.3.2 (Monthly) pointing at 1.8.1.2 (Annual, p.58)"
+    },
+    {
+      "id": "appraisals-filter",
+      "question": "How do I apply filters on the All Crew Appraisals screen?",
+      "module": "crewing",
+      "must_include_any": [
+        [
+          "filter",
+          "filters"
+        ]
+      ],
+      "must_include_all": [],
+      "must_not": [
+        "promotion rank"
+      ],
+      "must_not_note": "The filter fields for Appraisals are established by neither the manual nor any code available here, so a Promotion-specific field list must not be presented as an Appraisals filter. Naming NO fields is acceptable and counts as correct provided the procedure is given.",
+      "evidence": "Crewing manual 1.7.1.2 (Appraisals) pointing at 1.6.1.2 (All Crew Promotion, p.45); fields UNVERIFIED",
+      "bucket_cap": "limited",
+      "bucket_cap_reason": "Reviewer, 22-Sep, added BEFORE any answer was generated: omitting the unverified filter fields is the honest outcome, but it is a LIMITATION, not a fully repaired procedural answer. This case can never score 'correct'."
+    },
+    {
+      "id": "stores-export",
+      "question": "How do I export store items from the Stores sub-module?",
+      "module": "technical",
+      "must_include_any": [
+        [
+          "stores",
+          "store"
+        ]
+      ],
+      "must_include_all": [
+        [
+          "export"
+        ]
+      ],
+      "must_not": [
+        "spares sub",
+        "spares sub-sub",
+        "'spares' sub",
+        "click on the spares",
+        "open the spares"
+      ],
+      "must_not_note": "Stores is its own screen with its own export (client/src/pages/stores/Stores.tsx:861-909).",
+      "evidence": "Technical PMS 1.1.8.6 pointing at 1.1.7.7 (Spares); CODE-verified destination"
+    },
+    {
+      "id": "stores-filter",
+      "question": "What filters can I use on the Stores screen in PMS?",
+      "module": "technical",
+      "must_include_any": [
+        [
+          "stores",
+          "store"
+        ]
+      ],
+      "must_include_all": [
+        [
+          "all categories"
+        ]
+      ],
+      "must_not": [
+        "criticality",
+        "rotation item"
+      ],
+      "must_not_note": "PROVEN by code: 'criticality' and 'rotation' occur ZERO times in stores/Stores.tsx; the verified controls are Search and Stock. Offering them as Stores filters is incorrect.",
+      "evidence": "client/src/pages/stores/Stores.tsx:2716 (Search), 2740 (Stock); SparesNew.tsx:3710/3723 has Criticality and Rotation Item",
+      "field_rule_note": "Added 22-Sep: the verified Stores filter set is Search, All Categories, Stock on the Inventory and Location views (Stores.tsx:2772-2829, :2694-2767). An answer that omits All Categories is incomplete -> limited."
+    },
+    {
+      "id": "surveys-edit",
+      "question": "How do I edit a survey record in Cert. & Surveys?",
+      "module": "technical",
+      "must_include_any": [
+        [
+          "survey date",
+          "due date",
+          "1st range date",
+          "2nd range date",
+          "postponed"
+        ]
+      ],
+      "must_include_all": [],
+      "must_not": [
+        "certificates sub",
+        "'certificates' sub",
+        "go to the certificates",
+        "switch to certificates",
+        "open the certificates",
+        "issue date",
+        "expiry date",
+        "last annual",
+        "last interm",
+        "endorsement date"
+      ],
+      "must_not_note": "Surveys edits in its own grid (SurveysPage.tsx:108-109, CellEditingStoppedEvent) and the page contains zero references to Certificates.",
+      "evidence": "Technical Cert. & Surveys 1.1.4.4 pointing at 1.1.3.4 (Certificates, p.8); CODE-verified destination",
+      "field_rule_note": "Added 22-Sep after the reviewer's second read, applied to EXISTING answers: Surveys edits Survey Date, Due Date, 1st/2nd Range Date, Postponed (SurveysPage.tsx:415-499); the Certificates fields must not be given as Surveys instructions."
+    },
+    {
+      "id": "audit-history-regression",
+      "question": "Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?",
+      "module": "audit",
+      "must_include_any": [
+        [
+          "office"
+        ]
+      ],
+      "must_include_all": [],
+      "must_not": [
+        "work order",
+        "work-order"
+      ],
+      "must_not_note": "REGRESSION CHECK, not a cross-reference case: the candidate must still answer from Audit History §3.3 p.16 and must not revert to the PMS work-order review procedure.",
+      "evidence": "Audit - History Manual_R1 p.16 §3.3 REVIEW PAGE",
+      "procedural": false,
+      "procedural_note": "Added AFTER the run, on reading: this is a yes/no permission question, not a procedure, so the 'two instruction markers' test does not apply to it. The must_not rule is unchanged."
+    }
+  ]
+}

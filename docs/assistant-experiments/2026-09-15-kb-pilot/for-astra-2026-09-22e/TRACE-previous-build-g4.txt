@@ -1,0 +1,71 @@
+42 captured requests in capture-g4.jsonl
+
+# 2
+     '‘in—progress’ sub'          excerpt [1]  the manual's OWN pointer sentence — legitimate, not an instruction
+     '‘in-progress’ sub'          excerpt [5]  SOURCE SECTION retrieved on its own — Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.5 HOW TO EXPORT CR
+# 6
+     'promotion rank'             excerpt [5]  SOURCE SECTION retrieved on its own — Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.2 HOW TO APPLY FIL
+# 8
+     "'spares' sub"               excerpt [1]  the manual's OWN pointer sentence — legitimate, not an instruction
+     "'spares' sub"               excerpt [2]  the manual's OWN pointer sentence — legitimate, not an instruction
+#10
+     'criticality'                excerpt [1]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'rotation item'              excerpt [1]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     '‘spares’ sub'               excerpt [1]  the manual's OWN pointer sentence — legitimate, not an instruction
+     'criticality'                excerpt [2]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'rotation item'              excerpt [2]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'criticality'                excerpt [3]  OUR ADAPTED BLOCK (continuation chunk after the split) — content defect
+     'rotation item'              excerpt [3]  OUR ADAPTED BLOCK (continuation chunk after the split) — content defect
+#12
+     'issue date'                 excerpt [2]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'issue date'                 excerpt [3]  SOURCE SECTION retrieved on its own — Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06
+     'expiry date'                excerpt [3]  SOURCE SECTION retrieved on its own — Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06
+     "'certificates' sub"         excerpt [3]  SOURCE SECTION retrieved on its own — Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06
+#16
+     '‘in—progress’ sub'          excerpt [1]  the manual's OWN pointer sentence — legitimate, not an instruction
+     '‘in-progress’ sub'          excerpt [5]  SOURCE SECTION retrieved on its own — Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.5 HOW TO EXPORT CR
+#20
+     'promotion rank'             excerpt [5]  SOURCE SECTION retrieved on its own — Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.2 HOW TO APPLY FIL
+#22
+     "'spares' sub"               excerpt [1]  the manual's OWN pointer sentence — legitimate, not an instruction
+     "'spares' sub"               excerpt [2]  the manual's OWN pointer sentence — legitimate, not an instruction
+#24
+     'criticality'                excerpt [1]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'rotation item'              excerpt [1]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     '‘spares’ sub'               excerpt [1]  the manual's OWN pointer sentence — legitimate, not an instruction
+     'criticality'                excerpt [2]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'rotation item'              excerpt [2]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'criticality'                excerpt [3]  OUR ADAPTED BLOCK (continuation chunk after the split) — content defect
+     'rotation item'              excerpt [3]  OUR ADAPTED BLOCK (continuation chunk after the split) — content defect
+#26
+     'issue date'                 excerpt [2]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'issue date'                 excerpt [3]  SOURCE SECTION retrieved on its own — Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06
+     'expiry date'                excerpt [3]  SOURCE SECTION retrieved on its own — Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06
+     "'certificates' sub"         excerpt [3]  SOURCE SECTION retrieved on its own — Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06
+#30
+     '‘in—progress’ sub'          excerpt [1]  the manual's OWN pointer sentence — legitimate, not an instruction
+     '‘in-progress’ sub'          excerpt [5]  SOURCE SECTION retrieved on its own — Crewing - Crewing User Manual R2_10.06.2026 — 1.2.1.5 HOW TO EXPORT CR
+#34
+     'promotion rank'             excerpt [5]  SOURCE SECTION retrieved on its own — Crewing - Crewing User Manual R2_10.06.2026 — 1.6.1.2 HOW TO APPLY FIL
+#36
+     "'spares' sub"               excerpt [1]  the manual's OWN pointer sentence — legitimate, not an instruction
+     "'spares' sub"               excerpt [2]  the manual's OWN pointer sentence — legitimate, not an instruction
+#38
+     'criticality'                excerpt [1]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'rotation item'              excerpt [1]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     '‘spares’ sub'               excerpt [1]  the manual's OWN pointer sentence — legitimate, not an instruction
+     'criticality'                excerpt [2]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'rotation item'              excerpt [2]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'criticality'                excerpt [3]  OUR ADAPTED BLOCK (continuation chunk after the split) — content defect
+     'rotation item'              excerpt [3]  OUR ADAPTED BLOCK (continuation chunk after the split) — content defect
+#40
+     'issue date'                 excerpt [2]  our adapted block, inside a DENIAL / indexing note — not an instruction
+     'issue date'                 excerpt [3]  SOURCE SECTION retrieved on its own — Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06
+     'expiry date'                excerpt [3]  SOURCE SECTION retrieved on its own — Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06
+     "'certificates' sub"         excerpt [3]  SOURCE SECTION retrieved on its own — Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06
+
+SUMMARY by origin (term occurrences):
+    15  SOURCE SECTION retrieved on its own
+    15  our adapted block, inside a DENIAL / indexing note
+    12  the manual's OWN pointer sentence
+     6  OUR ADAPTED BLOCK (continuation chunk after the split)
