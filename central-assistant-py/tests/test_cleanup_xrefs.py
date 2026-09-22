@@ -203,3 +203,36 @@ def test_destination_without_verified_facts_says_so_instead_of_inventing():
     assert "**Not established:**" in block
     assert "have NOT been confirmed for Waitlist" in block
     assert "Carry it out on the" not in block  # no screen claim without evidence
+
+
+def test_substitution_needs_justification_and_is_refused_without_one():
+    """Reviewer boundary (22-Sep): rewriting screen names must NOT be a blanket rule — some
+    procedures genuinely require another screen. A substitution needs either code-verified facts for
+    the destination, or the manual's own 'apply the same steps'."""
+    body = "* Click on the 'Spares' sub-sub module.\n* Click 'Export' to download."
+    args = dict(dest_parent="Consumables", dest_title="How To Export Consumables",
+                src_citation="section 1.1.7.7 'How To Export Spares Records' under Spares, page 41",
+                src_parent="Spares", body=body, src_title="How To Export Spares Records")
+
+    # no 'same steps' in the pointer and no verified facts -> the source wording is left alone
+    refused = xrefs.render_resolved(**args, pointer_body="* Refer to the 'Spares' sub-sub-module.")
+    assert "NOT rewritten" in refused
+    head = refused.split("Quoted verbatim", 1)[0]
+    assert "Click on the 'Consumables' sub-sub module" not in head
+
+    # the manual asserting sameness is sufficient justification
+    allowed = xrefs.render_resolved(
+        **args, pointer_body="* Refer to the 'Spares' sub-sub-module for the export process and apply the same steps.")
+    assert "NOT rewritten" not in allowed
+    assert "Click on the 'Consumables' sub-sub module" in allowed.split("Quoted verbatim", 1)[0]
+
+
+def test_code_verified_destination_justifies_substitution_without_the_phrase():
+    """Stores has verified facts, so the substitution stands even if the pointer omits the phrase."""
+    out = xrefs.render_resolved(
+        dest_parent="Stores", dest_title="How To Export Store Items",
+        src_citation="section 1.1.7.7 'How To Export Spares Records' under Spares, page 41",
+        src_parent="Spares", body="* Click on the 'Spares' sub-sub module.",
+        src_title="How To Export Spares Records", pointer_body="* Refer to the 'Spares' sub-sub-module.")
+    assert "NOT rewritten" not in out
+    assert "Click on the 'Stores' sub-sub module" in out.split("Quoted verbatim", 1)[0]

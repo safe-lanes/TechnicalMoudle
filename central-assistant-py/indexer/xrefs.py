@@ -30,9 +30,13 @@ from dataclasses import dataclass, field
 
 # Resolver version — part of the build key and of every reproducibility record. Bump on ANY
 # change to the matching rules, the settings below or the label wording.
-XREF_VERSION = "2026-09-14.4"  # .3: chained resolutions name the intermediate pointer(s); .4: target body includes its next-page continuation
+XREF_VERSION = "2026-09-22.1"  # .4: target body includes its next-page continuation; 2026-09-22.1: the
+# resolved block is three labelled parts — adapted destination steps, what is not established, then the
+# source quoted verbatim with captions marked. Substitutions are gated by substitution_allowed().
 XREF_SETTINGS = {"title_match_min_ratio": 0.6, "max_chain_depth": 3, "process_words": "fallback",
-                 "label": "(Cross-reference resolved: the steps for <parent › section> are the same as section <n> '<title>' under <parent>, page <p>. They are:)"}
+                 "label": "(Cross-reference resolved. Two separate parts follow: guidance adapted for <dest>, then the source text quoted verbatim.)",
+                 "substitution_gate": "code-verified destination facts OR the manual's own 'apply the same steps'",
+                 "never_edited": "the quoted source body"}
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$", re.M)
 NUM_RE = re.compile(r"^\s*((?:\d+\.)*\d+)\.?\s*(.*)$")
@@ -226,8 +230,28 @@ def _object_words(title: str) -> list[str]:
     return [w for w in t.split() if w not in _GENERIC_OBJ and len(w) > 2]
 
 
+SAME_STEPS_RE = re.compile(r"\b(?:apply|follow|using)\s+the\s+same\s+steps?\b|\bthe\s+same\s+"
+                           r"(?:steps?|process|procedure|way)\b|\bsame\s+steps?\s+appl", re.I)
+
+
+def substitution_allowed(pointer_body: str, f: dict) -> tuple[bool, str]:
+    """Whether the source's screen name and record noun may be replaced by the destination's.
+
+    NOT a blanket rule — some procedures genuinely do require another screen, and rewriting those
+    would invent a workflow. A substitution needs one of two justifications:
+      * the product code verifies the destination is its own screen (xref_facts.json), or
+      * the manual's own pointer sentence asserts the procedure is the same ("apply the same steps").
+    Without either, the steps are quoted and caveated but never rewritten."""
+    if f.get("screen"):
+        return True, "the product code verifies the destination is its own screen"
+    if SAME_STEPS_RE.search(pointer_body or ""):
+        return True, "the manual's own pointer states the procedure is the same"
+    return False, ("neither the code nor the manual's pointer establishes that the destination uses "
+                   "the same screen, so the source's wording is left exactly as written")
+
+
 def adapt_steps(body: str, src_parent: str, dest_parent: str, dest_title: str, src_title: str,
-                f: dict) -> tuple[list[str], list[str]]:
+                f: dict, allow_substitution: bool = True) -> tuple[list[str], list[str]]:
     """Destination steps derived from the source steps, with every substitution justified.
 
     Three bounded rules, applied only to instruction lines:
@@ -251,7 +275,7 @@ def adapt_steps(body: str, src_parent: str, dest_parent: str, dest_title: str, s
         s = re.sub(r"<[^>]+>", "", line)
         s = re.sub(r"\(\s*(?:Ref\.?|See)\s*Figure[^)]*\)", "", s).strip()
         s = re.sub(r"\s{2,}", " ", s)
-        if NAV.search(s):                                                     # rule 1
+        if allow_substitution and NAV.search(s):                              # rule 1
             s = NAV.sub(lambda m: m.group(0).replace(m.group(1), dest_parent), s)
         if re.search(r"\bfilters?\b", s, re.I) and re.search(r"\bsuch as\b|\bby\b.*,|\(.*,.*\)", s):
             if f.get("filters"):                                              # rule 2
@@ -261,11 +285,11 @@ def adapt_steps(body: str, src_parent: str, dest_parent: str, dest_title: str, s
                 notes.append(f"The filter fields available in {dest_parent} are not established by the "
                              f"manual or by code available here, so the list quoted from {src_parent} "
                              f"is not repeated. Use the filters the screen offers.")
-        if swap:                                                              # rule 3
+        if allow_substitution and swap:                                       # rule 3
             s = re.sub(rf"\b{re.escape(swap[0])}\b", swap[1], s, flags=re.I)
         # rule 3b — the source SUB-MODULE name used as a record qualifier ("refine crew promotion
         # records"), which rule 3 cannot see because it comes from the parent heading, not the title.
-        if src_parent and dest_parent and norm(src_parent) != norm(dest_parent):
+        if allow_substitution and src_parent and dest_parent and norm(src_parent) != norm(dest_parent):
             for variant in (src_parent, re.sub(r"(?i)^all\s+", "", src_parent)):
                 if variant and re.search(rf"\b{re.escape(variant)}\b", s, re.I):
                     s = re.sub(rf"\b{re.escape(variant)}\b", dest_parent, s, flags=re.I)
@@ -276,7 +300,7 @@ def adapt_steps(body: str, src_parent: str, dest_parent: str, dest_title: str, s
 
 
 def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_parent: str,
-                    body: str, src_title: str = "") -> str:
+                    body: str, src_title: str = "", pointer_body: str = "") -> str:
     """Three clearly separated parts, so adapted guidance never masquerades as a verbatim quote:
 
       1. WHAT APPLIES HERE — destination screen and record, from this manual's own section heading,
@@ -313,8 +337,11 @@ def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_pa
 
     # An unresolved note may be scoped to one action: {"when": "filter", "text": "..."}. A plain
     # string always shows. Without this, the Certificates filter caveat appeared on an EDIT section.
+    allow, why_sub = substitution_allowed(pointer_body, f)
     steps, step_notes = adapt_steps(body, src_parent, dest_parent or src_parent, dest_title,
-                                    src_title or dest_title, f)
+                                    src_title or dest_title, f, allow_substitution=allow)
+    if not allow:
+        step_notes.append(f"The steps below are NOT rewritten for {where}: {why_sub}.")
     if steps:
         out.append(f"\n**Steps for {where}** — adapted from the source section below; the manual "
                    f"states the procedure is the same, and the screen facts above are from the "
@@ -387,7 +414,7 @@ def resolve_xrefs(pages: dict[int, str], max_depth: int = 3) -> tuple[dict[int, 
         inserts[(s.page, s.end)] = render_resolved(
             dest_parent=here, dest_title=title_words(s.title).title(), src_citation=src + via,
             src_parent=_parent_title(sections, target) or target.title, body=target.body,
-            src_title=target.title)
+            src_title=target.title, pointer_body=s.body)
     out = dict(pages)
     for (pn, off), text in sorted(inserts.items(), key=lambda kv: (kv[0][0], -kv[0][1])):
         md = out[pn]
