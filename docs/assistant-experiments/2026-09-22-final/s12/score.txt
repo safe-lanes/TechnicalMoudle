@@ -1,0 +1,61 @@
+
+## ROUTING probes (13)  —  rule: single run, ok per case
+   LIVE 4/13    CAND 13/13
+   gains (CAND pass, LIVE fail)  9: ['rt-05-ctx-safety', 'rt-05-ctx-technical', 'rt-05-no-ctx', 'rt-general-01', 'rt-general-02', 'rt-general-03', 'rt-named-02', 'rt-named-03', 'rt-pump-01']
+   LOSSES (LIVE pass, CAND fail) 0: []
+   fail on both                  0: []
+
+## WORK ORDERS (8 + 5 phrasings)  —  rule: answer+citation+rule in ALL 3 runs
+   LIVE 0/8    CAND 8/8
+   gains (CAND pass, LIVE fail)  8: ['wo-generic-01', 'wo-generic-02', 'wo-generic-03', 'wo-phr-01', 'wo-phr-02', 'wo-phr-03', 'wo-phr-04', 'wo-phr-05']
+   LOSSES (LIVE pass, CAND fail) 0: []
+   fail on both                  0: []
+
+## FROZEN answers (12)  —  rule: answer+citation+attribution, MAJORITY of 3
+   LIVE 11/12    CAND 11/12
+   gains (CAND pass, LIVE fail)  1: ['frozen-05']
+   LOSSES (LIVE pass, CAND fail) 1: ['frozen-08']
+   fail on both                  0: []
+
+## CORRECTED claims (14)  —  rule: answer+citation, MAJORITY of 3
+   LIVE 12/14    CAND 13/14
+   gains (CAND pass, LIVE fail)  2: ['corrected-06', 'corrected-13']
+   LOSSES (LIVE pass, CAND fail) 1: ['corrected-01']
+   fail on both                  0: []
+
+## FRESH validation (10)  —  rule: answer+module+citation in ALL 3 runs (automatic floor)
+   LIVE 9/10    CAND 9/10
+   gains (CAND pass, LIVE fail)  1: ['fresh-wo-broad-1']
+   LOSSES (LIVE pass, CAND fail) 1: ['fresh-audit-1']
+   fail on both                  0: []
+
+## MANUAL coverage (57)  —  rule: answer+citation+support in ALL 3 runs
+   LIVE 36/57    CAND 31/57
+   gains (CAND pass, LIVE fail)  4: ['defects-1', 'moc-office-2', 'nm-3', 'sms-office-3']
+   LOSSES (LIVE pass, CAND fail) 9: ['certsurveys-2', 'crewing-2', 'crewing-3', 'crewing-4', 'fn-1', 'moc-office-1', 'pmsvessel-2', 'pmsvessel-3', 'ra-vessel-1']
+   fail on both                  17: ['certsurveys-1', 'certsurveys-3', 'defects-3', 'fs-ves-1', 'hist-1', 'hist-2', 'hist-3', 'll-1', 'nm-1', 'nm-2', 'pmsoffice-1', 'pmsoffice-2', 'pmsvessel-4', 'prep-2', 'prep-3', 'ra-office-3', 'sms-office-1']
+judge self-test: the 3 stored wrong Stores answers score 'incorrect'
+judge self-test: passed (discounts attribution and denial, keeps real instructions)
+
+
+## CROSS-REFERENCE cases (7 x 3 runs)  —  rule: judge_xref buckets per run; appraisals capped at limited
+   CAND  correct 21/21  limited  3/21  incorrect  0/21   appraisals-filter:lim/lim/lim  audit-history-regression:cor/cor/cor  monthly-test-create:cor/cor/cor  stores-bulk-update:cor/cor/cor  stores-export:cor/cor/cor  stores-filter:cor/cor/cor  surveys-edit:cor/cor/cor  waitlist-export:cor/cor/cor
+         mean prompt tokens 1688 (n=24)   mean latency 5.1s
+   LIVE  correct  6/21  limited  3/21  incorrect 15/21   appraisals-filter:inc/inc/inc  audit-history-regression:cor/cor/cor  monthly-test-create:inc/inc/inc  stores-bulk-update:cor/cor/cor  stores-export:inc/inc/inc  stores-filter:lim/lim/lim  surveys-edit:inc/inc/inc  waitlist-export:inc/inc/inc
+
+## TOKENS per answer (mean, from response.usage where present)
+   wo         CAND  n=24   prompt    2288  completion    820
+   frozen     CAND  n=36   prompt    1647  completion    295
+   corrected  CAND  n=42   prompt    1341  completion    290
+   fresh      CAND  n=30   prompt    1737  completion    398
+   manuals    CAND  n=171  prompt    1581  completion    230
+
+## SUMMARY
+   routing 13             (4, 13)
+   work orders 8+5        (0, 8)
+   frozen 12              (11, 11)
+   corrected 14           (12, 13)
+   fresh 10               (9, 9)
+   manuals 57             (36, 31)
+   xref 21 (CAND)         21
+   xref 21 (LIVE)         6

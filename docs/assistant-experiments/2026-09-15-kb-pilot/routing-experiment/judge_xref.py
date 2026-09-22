@@ -39,7 +39,12 @@ CITATION = re.compile("same as|same steps|section |page |source *:|cross-?refere
 DENIAL = re.compile("not available|not exist|does not exist|do not exist|are not|is not|no longer|"
                     "not present|not offered|not on this screen|unavailable|does not use|do not use|"
                     "does not apply|do not apply|not apply to|does not establish|do not establish|"
-                    "not established|not to exist|stated not to|said not to", re.I)
+                    "not established|not to exist|stated not to|said not to|"
+                    # 22-Sep (stores-bulk-update, seen AFTER the run, pinned below): a PROHIBITION of the wrong
+                    # screen — "Do not open the Spares sub-sub-module", "it is not necessary to open Spares",
+                    # "not performed in the Spares screen" — is the opposite of an instruction to open it.
+                    "do not open|does not open|not open|never open|without opening|not necessary to open|"
+                    "not required to open|not performed in|not performed on|must not open", re.I)
 
 
 def self_test() -> None:
@@ -51,14 +56,22 @@ def self_test() -> None:
                      "The **Criticality** and **Rotation Item** filters mentioned in the Spares source text do **not** exist on the Stores screen.",
                      "The certificate field **Issue Date** does not apply to Surveys.",
                      # rerun, 22-Sep: a denial in the form "stated not to exist" — correct, was flagged
-                     "**Criticality** and **Rotation Item** are named in the referenced Spares steps but are stated not to exist on the Stores screen."]
+                     "**Criticality** and **Rotation Item** are named in the referenced Spares steps but are stated not to exist on the Stores screen.",
+                     # stores-bulk-update, 22-Sep (S12 run, read in full): three correct PROHIBITIONS scored as instructions
+                     "Stores uses its own screen and bulk-update page, but the remaining transaction steps are the same as Spares. Do **not** open the Spares sub-sub-module.",
+                     "Use the **Stores** screen; it is not necessary to open Spares.",
+                     "Open the **Stores** sub-sub-module. This must be done on the Stores screen; do not open Spares.",
+                     "It is **not performed in the Spares screen**, but the Stores transaction steps are the same as the applicable Spares procedure."]
     # the rerun's other flag is a PROVENANCE defect (my note attributed to the manual), not a wrong screen
     prov = "the manual notes that the sequence is transferable, while the referenced screen details describe In Progress."
     if not PROVENANCE.search(prov):
         raise SystemExit("judge self-test FAILED: provenance misattribution not detected")
     must_keep = ["Click the In-Progress sub-sub-module.",
                  "Use the dropdown filters for Criticality, Rotation Item, or Stock.",
-                 "- **Criticality**"]                     # a bare bullet offering the field IS an instruction
+                 "- **Criticality**",                     # a bare bullet offering the field IS an instruction
+                 "Open the **Spares** sub-sub-module.",   # the wrong-screen instruction itself stays an instruction
+                 "Click **Bulk Update Spares** to update multiple items at once.",
+                 "3. Use the same bulk-update steps as in the **Spares** sub-sub-module: open **Spares**, then click **Bulk Update Spares**."]
     # the reviewer's catch: bold markers between the words hid three wrong-screen instructions
     bold = "Go to the **Certificates** sub-submodule."
     if "certificates sub" not in normalise(bold):
