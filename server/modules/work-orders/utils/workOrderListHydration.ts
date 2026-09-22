@@ -42,9 +42,9 @@ export function buildHydrationJobIndexes<T extends HydrationJob>(jobs: T[]): Hyd
   }
 
   const uniqueByVesselAndJob = new Map<string, T>();
-  for (const [key, matches] of jobsByVesselAndNumber) {
+  jobsByVesselAndNumber.forEach((matches, key) => {
     if (matches.length === 1) uniqueByVesselAndJob.set(key, matches[0]);
-  }
+  });
 
   return {
     byVesselJobAndComponentCode,
