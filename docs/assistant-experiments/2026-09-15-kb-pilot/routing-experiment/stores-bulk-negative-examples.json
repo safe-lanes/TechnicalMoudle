@@ -1,0 +1,125 @@
+{
+ "_purpose": "Negative examples for the stores-bulk-update cross-reference case (22-Sep-2026): stored answers proven wrong against the product code. judge_xref.self_test() must score every one of them 'incorrect'.",
+ "examples": [
+  {
+   "run": 1,
+   "index_set": "kb-xref-d",
+   "container": "sail-assistant-py-g5",
+   "question": "How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?",
+   "response": "For **Stores**, it is not a separate process from Spares:\n\n1. Open the **Store** sub-sub-module.\n2. Click **+ Bulk Updates Store**.\n3. Use the same bulk-update steps as in the **Spares** sub-sub-module: open **Spares**, then click **Bulk Update Spares** to update multiple items at once.\n4. The procedure supports the selected category—**Stores, Lubes, Chemicals, or Others**—and tab—**Inventory, Location, or History**.\n\nThe same instructions are provided in both the Office and Vessel manuals; no different role, setting, or record-state requirement is specified.\n\nThe supported related operation is bulk updating **Spares** directly: open **Spares** and click **Bulk Update Spares**.\n\n**Source:**\n- Stores bulk updates: *Technical - PMS User Manual For Office_Sail Admin*, §1.1.8.3, p.50; *Technical - PMS User Manual_Vessel Specific*, §1.1.8.3, p.43.\n- Spares bulk updates: *Technical - PMS User Manual For Office_Sail Admin*, §1.1.7.8, p.47; *Technical - PMS User Manual_Vessel Specific*, §1.1.7.6, p.40.",
+   "citations": [
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.50)",
+     "distance": 0.6933
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)",
+     "distance": 0.7199
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)",
+     "distance": 0.7718
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)",
+     "distance": 0.7887
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTORY TRANSACTIONS (p.44)",
+     "distance": 0.7907
+    }
+   ],
+   "verdict_by_reading": "WRONG: instructs opening the Spares sub-sub-module / clicking 'Bulk Update Spares' for a Stores task; the code keeps Stores bulk update on /stores/bulk-update (Stores.tsx:982-983)"
+  },
+  {
+   "run": 2,
+   "index_set": "kb-xref-d",
+   "container": "sail-assistant-py-g5",
+   "question": "How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?",
+   "response": "For a bulk stock update of **Stores** items:\n\n1. Open the **Store** sub-sub-module.\n2. Click **+ Bulk Updates Store**.\n3. Use the same bulk-update steps as in the **Spares** sub-sub-module:\n   1. Open **Spares**.\n   2. Click **Bulk Update Spares** to update multiple items at once.\n4. The same process applies to the selected category—**Stores, Lubes, Chemicals, or Others**—and to the selected tab—**Inventory, Location, or History**.\n\nIt is **not a separate process** from Spares. The Stores instructions explicitly direct you to follow the same steps as Spares. The Office and Vessel manuals describe the same navigation and buttons; no different role, setting, or record-state condition is specified.\n\n**Source:**  \n- Stores bulk updates: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, §1.1.8.3, p.50; *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, §1.1.8.3, p.43.  \n- Spares bulk updates: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, §1.1.7.8, p.47; *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, §1.1.7.6, p.40.",
+   "citations": [
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.50)",
+     "distance": 0.6933
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)",
+     "distance": 0.7199
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)",
+     "distance": 0.7718
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)",
+     "distance": 0.7887
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTORY TRANSACTIONS (p.44)",
+     "distance": 0.7907
+    }
+   ],
+   "verdict_by_reading": "WRONG: instructs opening the Spares sub-sub-module / clicking 'Bulk Update Spares' for a Stores task; the code keeps Stores bulk update on /stores/bulk-update (Stores.tsx:982-983)"
+  },
+  {
+   "run": 3,
+   "index_set": "kb-xref-d",
+   "container": "sail-assistant-py-g5",
+   "question": "How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?",
+   "response": "Stores does not use a separate bulk-update workflow from Spares. The sequence is the same, but the module and button names differ.\n\n1. **Stores — Office or Ship**\n   1. Open the **Store** sub-sub-module.\n   2. Click **+ Bulk Updates Store**.\n   3. Follow the Spares bulk-update steps.\n   4. Use the process for the selected category—**Stores, Lubes, Chemicals, or Others**—and tab—**Inventory, Location, or History**.\n\n2. **Spares — Office or Ship**\n   1. Open the **Spares** sub-sub-module.\n   2. Click **Bulk Update Spares** to update multiple spares at once.\n\nThus, Stores follows the Spares bulk-update process rather than having a separate workflow; only the module and button labels are different.\n\n**Source:**\n- Stores bulk updates: *PMS User Manual For Office_Sail Admin*, §1.1.8.3, p.50; *PMS User Manual_Vessel Specific*, §1.1.8.3, p.43.\n- Spares bulk updates: *PMS User Manual For Office_Sail Admin*, §1.1.7.8, p.47; *PMS User Manual_Vessel Specific*, §1.1.7.6, p.40.",
+   "citations": [
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.50)",
+     "distance": 0.6933
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK (p.43)",
+     "distance": 0.7199
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.7.6 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.40)",
+     "distance": 0.7718
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+     "section": "1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK (p.47)",
+     "distance": 0.7887
+    },
+    {
+     "module": "Technical",
+     "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+     "section": "1.1.8.5 HOW TO UPDATE & TRACK STORE INVENTORY TRANSACTIONS (p.44)",
+     "distance": 0.7907
+    }
+   ],
+   "verdict_by_reading": "WRONG on reading (kept as a negative example): lists 'Open the Spares sub-sub-module, click Bulk Update Spares' as a block of the Stores answer; the Spares page is never used for Stores"
+  }
+ ]
+}

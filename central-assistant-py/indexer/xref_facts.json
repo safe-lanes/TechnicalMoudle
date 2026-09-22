@@ -18,7 +18,7 @@
     "Keys are matched case-insensitively against the destination sub-module name that xrefs.py derives",
     "from the manual's own structure."
   ],
-  "_revision": "aa35c4721 (TechnicalMoudle, branch chatbot-enterprise, 22-Sep-2026)",
+  "_revision": "aa35c4721 (TechnicalMoudle, branch chatbot-enterprise, 22-Sep-2026); stores.bulk_update added at a30d14f83 (22-Sep-2026, files identical on origin/replit_dev f95b6e307)",
   "stores": {
     "screen": "Stores",
     "own_screen_evidence": "client/src/pages/TechnicalModule.tsx:218-221 renders <Spares /> and <Stores /> as separate components",
@@ -32,6 +32,8 @@
     "not_present": ["Criticality", "Rotation Item"],
     "export": "Stores exports from its own screen to stores_<tab>_inventory_<timestamp>.xlsx and stores_<tab>_history_<timestamp>.xlsx",
     "export_evidence": "client/src/pages/stores/Stores.tsx:861-909, Export control at 2580",
+    "bulk_update": "Bulk update stays inside Stores: the '+ Bulk Update <Stores/Lubes/Chemicals/Others>' button (the label follows the selected tab; the manual prints it as '+ Bulk Updates Store') opens Stores' own full-screen bulk-update page. There, choose 'Consume' or 'Receive' in the transaction-mode selector, enter the quantities per location (for Receive, the received date/place fields apply to all rows), click 'Save Updates', then 'Confirm & Save'. The Spares sub-sub-module is NOT opened at any point; Spares has its own separate bulk-update page. Both bulk-update pages need the PMS admin permission on the server (code-derived; the manual states no role)",
+    "bulk_update_evidence": "verified 22-Sep-2026 at revision a30d14f83 (chatbot-enterprise), files byte-identical on origin/replit_dev f95b6e307: Stores.tsx:2631-2637 button label and onClick=openBulkUpdateModal; Stores.tsx:982-983 openBulkUpdateModal = navigate('/stores/bulk-update?tab=' + activeTab); App.tsx:80-81 route /stores/bulk-update -> BulkUpdateStores; BulkUpdateStores.tsx:716-717 Consume/Receive select, :759-770 received date/place, :964-971 'Save Updates', :1005-1007 'Confirm & Save', :164-172 POST /technical/api/stores/:vesselId/batch-consume|batch-receive; server/modules/stores/routes.ts:45,48 requirePMSAdmin. Spares: SparesNew.tsx:2641 navigate('/spares/bulk-update'), App.tsx:76-77, BulkUpdateSpares.tsx:141 POST /technical/api/spares/bulk-update, server/modules/spares/routes.ts:25 — a separate page and route, not shared with Stores",
     "unresolved": [
       "Whether the Office and Vessel environments expose exactly the same Stores filter set is established only by the code being one component; the manuals document them on different pages and were not compared control-by-control."
     ]

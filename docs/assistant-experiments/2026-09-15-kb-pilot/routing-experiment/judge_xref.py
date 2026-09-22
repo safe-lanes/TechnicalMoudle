@@ -72,6 +72,15 @@ def self_test() -> None:
     for s in must_keep:
         if CITATION.search(normalise(s)) or DENIAL.search(normalise(s)):
             raise SystemExit(f"judge self-test FAILED: should NOT discount -> {s!r}")
+    # 22-Sep: stored answers PROVEN wrong against the product code (a Stores user told to open Spares) must
+    # score 'incorrect' under the stores-bulk-update case — a judge that passes them is broken.
+    negp = HERE / "stores-bulk-negative-examples.json"
+    if negp.exists() and "stores-bulk-update" in CASES:
+        for ex in json.loads(negp.read_text(encoding="utf-8"))["examples"]:
+            b, why = judge(CASES["stores-bulk-update"], ex["response"] or "")
+            if b != "incorrect":
+                raise SystemExit(f"judge self-test FAILED: negative example run {ex['run']} scored {b!r}: {why}")
+        print("judge self-test: the 3 stored wrong Stores answers score 'incorrect'")
     print("judge self-test: passed (discounts attribution and denial, keeps real instructions)\n")
 
 

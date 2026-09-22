@@ -1,5 +1,6 @@
 """Pre-chunk cleanup + cross-reference resolution — behaviour on synthetic manual pages
 shaped like the real parses (agentic captions, cost_effective OCR tables, callouts)."""
+import re
 from indexer.clean_markdown import clean_pages
 from indexer import xrefs
 from indexer.xrefs import is_pointer, resolve_xrefs
@@ -281,3 +282,40 @@ def test_parenthesised_filter_list_is_rewritten_to_the_verified_list():
     steps2, notes2 = xrefs.adapt_steps(body, "Spares", "Consumables", "How To Apply Filter",
                                        "How To Apply Filter", {}, allow_substitution=True)
     assert "Criticality" not in "\n".join(steps2) and any("not repeated" in n for n in notes2)
+
+
+def test_mixed_section_with_own_steps_and_a_same_steps_pointer_is_resolved_and_stays_on_its_screen(monkeypatch):
+    """22-Sep-2026, verified in the product code (Stores.tsx:982-983 navigates to /stores/bulk-update):
+    PMS §1.1.8.3 has its own steps AND 'Refer to the Spares sub-sub-module and follow the same steps'.
+    is_pointer() must keep ignoring it (it is not a bare pointer); mixed_pointer() must resolve it, and
+    the resolved block must tell the reader to stay on Stores — never to open Spares."""
+    monkeypatch.setenv("XREF_LAYOUT", "quote-excluded")
+    pages = {
+        47: "## 1.1.7 SPARES\n\n### 1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK\n\n"
+            "* Click on the 'Spares' sub – sub module. (Ref Figure 81)\n\n"
+            "* Click on the 'Bulk Update Spares' button to update multiple spares at once. (Ref Figure 81)",
+        50: "## 1.1.8 STORES\n\n### 1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK\n\n"
+            "* Click the 'Store' sub-sub-module. (Ref Figure 85)\n\n"
+            "* Click on the '+ Bulk Updates Store' button. (Ref Figure 85)\n\n"
+            "* Refer to the 'Spares' sub-sub-module and follow the same steps.\n\n"
+            "Screenshot of Stores Inventory interface showing how to perform bulk updates. A callout points to the button.\n\n"
+            "Use the same steps as described above to perform bulk updates for the selected category (Stores, Lubes, Chemicals, or Others) and tab (Inventory, Location, or History).",
+    }
+    body = pages[50].split("\n\n", 2)[2]
+    assert is_pointer(body) is None                       # still not a bare pointer
+    assert xrefs.mixed_pointer(body) == "Spares"
+    # a pointer of another form is NOT matched by the mixed detector (deliberately out of scope)
+    assert xrefs.mixed_pointer("* Click 'New'.\n* Refer to the 'Crew Appraisal Form' process and apply the same steps.") is None
+    assert xrefs.mixed_pointer("* Click 'New'.\n* Refer to the 'Spares' sub-sub-module for details.") is None  # no 'same steps'
+    out, rep = resolve_xrefs(pages)
+    assert rep.resolved == [("1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK", "1.1.7.8 HOW TO DO STOCK TRANSACTION OF SPARES IN BULK")]
+    block = out[50][out[50].index("(Cross-reference resolved"):]
+    assert "does **not** mean opening the Spares sub-sub-module; stay on Stores" in block
+    assert "Carry it out on the **Stores** screen" in block
+    assert "Bulk update stays inside Stores" in block and "'Save Updates', then 'Confirm & Save'" in block
+    # the adapted steps never instruct opening Spares, and the source's own text is not in the page
+    adapted = block[block.index("**Steps for Stores**"):]
+    assert not re.search(r"click(?:\s+on)?\s+the\s+'Spares'\s+sub", adapted, re.I)
+    assert "Bulk Update Spares" not in out[50]
+    assert xrefs.SOURCE_QUOTES and "Bulk Update Spares" in xrefs.SOURCE_QUOTES[0]["quote"]
+    assert out[47] == pages[47]

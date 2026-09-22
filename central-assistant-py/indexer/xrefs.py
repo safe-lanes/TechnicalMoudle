@@ -31,7 +31,9 @@ from dataclasses import dataclass, field
 
 # Resolver version — part of the build key and of every reproducibility record. Bump on ANY
 # change to the matching rules, the settings below or the label wording.
-XREF_VERSION = "2026-09-22.3"  # .3: rule 2 rewrites a PARENTHESISED filter list too (the reviewer's reproduction:
+XREF_VERSION = "2026-09-22.4"  # .4: MIXED sections (own steps + "refer to X and follow the same steps") are resolved
+# too — PMS 1.1.8.3 Stores bulk update escaped the repair and two answers told the user to open Spares (code refutes it);
+# .3: rule 2 rewrites a PARENTHESISED filter list too (the reviewer's reproduction:
 # "(Criticality, Rotation Item, or Stock)" survived inside the adapted Stores steps and contradicted the block);
 # .2: intro line is layout-aware (quote-excluded no longer promises a quote);
 # 2026-09-22.1 — .4: target body includes its next-page continuation; 2026-09-22.1: the
@@ -123,6 +125,28 @@ def is_pointer(body: str) -> str | None:
         return None
     m = XREF_RE.search(re.sub(r"<[^>]+>", "", body))
     return m.group(1).strip() if m else None
+
+
+def mixed_pointer(body: str) -> str | None:
+    """A section that has its OWN steps and then defers the rest to another sub-module.
+
+    22-Sep-2026 (reviewer, verified in the product code): PMS §1.1.8.3 'How to update stock transactions in
+    a store in bulk' says "Click the 'Store' sub-sub-module. Click on the '+ Bulk Updates Store' button.
+    Refer to the 'Spares' sub-sub-module and follow the same steps." Its body is longer than a bare
+    pointer, so is_pointer() ignored it, the raw sentence reached the model, and two of three answers
+    told a Stores user to OPEN Spares and click 'Bulk Update Spares' — which the code refutes:
+    Stores.tsx:982-983 navigates to /stores/bulk-update, Stores' own page. This detector accepts a
+    section whose body contains a pointer sentence that (a) names a sub-module/tab/section in the
+    manual's usual form AND (b) asserts the procedure is the same. Pointers of other forms ("refer to
+    the 'X' process", a bare quoted heading) are deliberately NOT matched here."""
+    if is_pointer(body):
+        return None
+    plain = re.sub(r"<[^>]+>", "", body)
+    for sent in re.split(r"(?<=[.!?])\s+|\n", plain):
+        m = XREF_RE.search(sent)
+        if m and SAME_STEPS_RE.search(sent):
+            return m.group(1).strip()
+    return None
 
 
 def _parent_title(sections: list[Section], s: Section) -> str:
@@ -333,7 +357,7 @@ def adapt_steps(body: str, src_parent: str, dest_parent: str, dest_title: str, s
 
 
 def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_parent: str,
-                    body: str, src_title: str = "", pointer_body: str = "") -> str:
+                    body: str, src_title: str = "", pointer_body: str = "", mixed: bool = False) -> str:
     """Three clearly separated parts, so adapted guidance never masquerades as a verbatim quote:
 
       1. WHAT APPLIES HERE — destination screen and record, from this manual's own section heading,
@@ -353,6 +377,13 @@ def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_pa
            (f"\n\n(Cross-reference resolved. Two separate parts follow: guidance adapted for {where}, "
             f"then the source text quoted verbatim.)\n"),
            f"**Applies to: {where} › {dest_title}.** The procedure is the same as {src_citation}."]
+    if mixed:
+        # the section's own steps (above) already put the reader on the destination screen; the pointer
+        # hands over the REST of the procedure. Said outright, because the raw sentence "refer to the
+        # 'Spares' sub-sub-module and follow the same steps" was read as "open Spares" (22-Sep-2026).
+        out.append(f"The steps of this section above are carried out on {where}. \"Refer to {src_parent} and "
+                   f"follow the same steps\" means the remaining procedure is the same as the {src_parent} "
+                   f"procedure — it does **not** mean opening the {src_parent} sub-sub-module; stay on {where}.")
 
     if f.get("screen"):
         out.append(f"Carry it out on the **{f['screen']}** screen — {where} is its own screen "
@@ -362,12 +393,13 @@ def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_pa
     act = norm(dest_title)
     relevant = {"filters": "filter" in act, "edit": "edit" in act or "update" in act,
                 "export": "export" in act or "download" in act,
-                "creation": "create" in act or "new" in act}
+                "creation": "create" in act or "new" in act,
+                "bulk_update": "bulk" in act}
     if f.get("filters") and relevant["filters"]:
         out.append(f"Verified filters on this screen: **{', '.join(f['filters'])}**."
                    + (f" The quoted steps also name {', '.join(f['not_present'])}, which "
                       f"**do not exist here**." if f.get("not_present") else ""))
-    for key in ("edit", "export", "creation"):
+    for key in ("edit", "export", "creation", "bulk_update"):
         if f.get(key) and relevant[key]:
             out.append(f"{f[key]}.")
     if relevant["edit"] and f.get("editable_fields"):
@@ -447,6 +479,10 @@ def resolve_xrefs(pages: dict[int, str], max_depth: int = 3) -> tuple[dict[int, 
     inserts: dict[tuple[int, int], str] = {}  # (page, end offset) -> text to append
     for s in sections:
         name = is_pointer(s.body)
+        mixed = False
+        if not name:
+            name = mixed_pointer(s.body)
+            mixed = bool(name)
         if not name:
             continue
         chain = [s.title]
@@ -488,7 +524,7 @@ def resolve_xrefs(pages: dict[int, str], max_depth: int = 3) -> tuple[dict[int, 
         inserts[(s.page, s.end)] = render_resolved(
             dest_parent=here, dest_title=title_words(s.title).title(), src_citation=src + via,
             src_parent=_parent_title(sections, target) or target.title, body=target.body,
-            src_title=target.title, pointer_body=s.body)
+            src_title=target.title, pointer_body=s.body, mixed=mixed)
     out = dict(pages)
     for (pn, off), text in sorted(inserts.items(), key=lambda kv: (kv[0][0], -kv[0][1])):
         md = out[pn]
