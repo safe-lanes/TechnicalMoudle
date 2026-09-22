@@ -138,7 +138,10 @@ def test_resolves_appends_target_steps_and_reports_edges():
     assert "Quoted verbatim from" in out[9] and "refer to Spares:" in out[9]
     # the adapted part comes first, the quote after it — a reader must not meet the source's
     # screen names before being told which screen they are on
-    assert out[9].index("**Applies to: Stores") < out[9].index("Quoted verbatim from") < out[9].index("Choose the criteria")
+    # the adapted steps come first and the verbatim quote after; the source step text therefore
+    # appears TWICE — once adapted, once quoted — so the quoted copy is the LAST occurrence
+    assert out[9].index("**Applies to: Stores") < out[9].index("**Steps for Stores**") \
+        < out[9].index("Quoted verbatim from") < out[9].rindex("Choose the criteria")
     # the pointer's own sentence is kept, and the appended text lands inside the pointer section (before the next heading)
     assert out[9].index("Refer to the 'Spares'") < out[9].index("Choose the criteria") < out[9].index("### 1.1.8.6")
     # dead end: no 'Warehouse' section

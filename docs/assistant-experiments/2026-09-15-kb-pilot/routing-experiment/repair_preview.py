@@ -46,6 +46,8 @@ def main() -> None:
         dest_parent, dest_title, citation, via = m.group(1), m.group(2), m.group(3), (m.group(4) or "")
         body = row["content"][m.end():].strip("\n")
         src_parent = (re.search(r"under (.+?),", citation) or re.search(r"'(.+?)'", citation)).group(1)
+        # the SOURCE SECTION TITLE, which is what drives the record-type swap
+        src_title = (re.search(r"'(.+?)'", citation) or re.match(r"(.*)", citation)).group(1)
 
         print("=" * 108)
         print(f"### {label}   [{module} p.{page} {row['section']}]")
@@ -56,7 +58,7 @@ def main() -> None:
         print("\n--- AFTER (new render) ---")
         print(xrefs.render_resolved(dest_parent=dest_parent, dest_title=dest_title,
                                     src_citation=citation + via, src_parent=src_parent,
-                                    body=body)[:1700].rstrip())
+                                    body=body, src_title=src_title)[:1700].rstrip())
         print()
 
 

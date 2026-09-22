@@ -38,6 +38,13 @@ HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$", re.M)
 NUM_RE = re.compile(r"^\s*((?:\d+\.)*\d+)\.?\s*(.*)$")
 XREF_RE = re.compile(r"refer\s+to\s+(?:the\s+)?[\"'‘’“”<u>]*\s*([^'\"‘’“”<>]{2,60}?)\s*[\"'‘’“”</u>]*\s*(sub-?sub-?module|sub-?module|module|tab|section|sub-?menu)", re.I)
 PROCESS_WORDS = ["filter", "export", "edit", "delete", "create", "view", "review", "add", "update", "apply", "track", "open", "close"]
+# A step that tells the reader to open a named sub-module. The manuals use curly quotes and en/em
+# dashes ("‘In-Progress’ sub—sub module"), so an ASCII-only pattern silently misses most of them.
+_Q = "[‘’“”'\"]?"
+_DASH = "[-‐-―]"
+NAV = re.compile(r"(?:click(?:\s+on)?|go to|open|navigate to)\s+(?:the\s+)?" + _Q +
+                 r"([A-Za-z][A-Za-z ‐-―\-/&]{1,28}?)" + _Q +
+                 r"\s*sub\s*" + _DASH + r"?\s*sub\s*" + _DASH + r"?\s*module", re.I)
 
 
 def norm(s: str) -> str:
@@ -204,8 +211,72 @@ def label_captions(body: str, src_parent: str) -> str:
     return re.sub(r"(?mi)^(\s*(?:screenshot(?:_from_computer)?|screen shot)\s*:\s*)(.*)$", mark, body)
 
 
+_GENERIC_OBJ = {"how", "to", "a", "an", "the", "and", "or", "record", "records", "details", "report",
+                "reports", "crew", "new", "all", "test", "item", "items", "data"}
+
+
+def _object_words(title: str) -> list[str]:
+    """The distinctive words of a section title — what the section is ABOUT, minus the verb and the
+    generic nouns. '1.8.2.2 How To Create And Delete Periodic Alcohol Test Record' -> ['periodic',
+    'alcohol']. Used to say, in the adapted steps, which record the reader is actually working on."""
+    t = norm(title)
+    t = re.sub(r"^how to\s+", "", t)
+    t = re.sub(r"\b(create|delete|edit|export|apply|view|review|update|track|add|filter|filters|"
+               r"download|open|close|manage)\b", " ", t)
+    return [w for w in t.split() if w not in _GENERIC_OBJ and len(w) > 2]
+
+
+def adapt_steps(body: str, src_parent: str, dest_parent: str, dest_title: str, src_title: str,
+                f: dict) -> tuple[list[str], list[str]]:
+    """Destination steps derived from the source steps, with every substitution justified.
+
+    Three bounded rules, applied only to instruction lines:
+      1. navigation — a step naming the SOURCE sub-module names the DESTINATION instead. The manual
+         itself establishes this: the section sits under the destination and says "apply the same
+         steps", so the screen is the one the reader is already on.
+      2. field lists — an enumerated filter list is replaced by the VERIFIED list when the code gives
+         one, and otherwise dropped, with the omission reported. Never carried over unverified.
+      3. record type — a distinctive noun of the source section ('annual') becomes the destination's
+         ('periodic'), taken from the destination's own heading.
+    Anything no rule covers is left alone. Returns (steps, unresolved notes)."""
+    src_obj, dest_obj = _object_words(src_title), _object_words(dest_title)
+    swap = (src_obj[0], dest_obj[0]) if len(src_obj) == 1 and dest_obj else None
+    steps, notes = [], []
+    for raw in body.splitlines():
+        line = raw.strip()
+        if not line.startswith("*") or line.startswith("**"):
+            continue
+        # two passes: tags first, THEN figure references — "(<u>Ref Figure 19</u>)" only becomes a
+        # plain "(Ref Figure 19)" once the tags are gone, so a single alternation leaves it behind
+        s = re.sub(r"<[^>]+>", "", line)
+        s = re.sub(r"\(\s*(?:Ref\.?|See)\s*Figure[^)]*\)", "", s).strip()
+        s = re.sub(r"\s{2,}", " ", s)
+        if NAV.search(s):                                                     # rule 1
+            s = NAV.sub(lambda m: m.group(0).replace(m.group(1), dest_parent), s)
+        if re.search(r"\bfilters?\b", s, re.I) and re.search(r"\bsuch as\b|\bby\b.*,|\(.*,.*\)", s):
+            if f.get("filters"):                                              # rule 2
+                s = re.sub(r"(such as|by)\s+[^.]*", f"\\1 {', '.join(f['filters'])}", s, count=1)
+            else:
+                s = re.sub(r"\s*(such as|by)\s+[^.]*", "", s, count=1).rstrip(" .") + "."
+                notes.append(f"The filter fields available in {dest_parent} are not established by the "
+                             f"manual or by code available here, so the list quoted from {src_parent} "
+                             f"is not repeated. Use the filters the screen offers.")
+        if swap:                                                              # rule 3
+            s = re.sub(rf"\b{re.escape(swap[0])}\b", swap[1], s, flags=re.I)
+        # rule 3b — the source SUB-MODULE name used as a record qualifier ("refine crew promotion
+        # records"), which rule 3 cannot see because it comes from the parent heading, not the title.
+        if src_parent and dest_parent and norm(src_parent) != norm(dest_parent):
+            for variant in (src_parent, re.sub(r"(?i)^all\s+", "", src_parent)):
+                if variant and re.search(rf"\b{re.escape(variant)}\b", s, re.I):
+                    s = re.sub(rf"\b{re.escape(variant)}\b", dest_parent, s, flags=re.I)
+                    break
+        if s.strip("* ").strip():
+            steps.append(s)
+    return steps, list(dict.fromkeys(notes))
+
+
 def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_parent: str,
-                    body: str) -> str:
+                    body: str, src_title: str = "") -> str:
     """Three clearly separated parts, so adapted guidance never masquerades as a verbatim quote:
 
       1. WHAT APPLIES HERE — destination screen and record, from this manual's own section heading,
@@ -242,7 +313,15 @@ def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_pa
 
     # An unresolved note may be scoped to one action: {"when": "filter", "text": "..."}. A plain
     # string always shows. Without this, the Certificates filter caveat appeared on an EDIT section.
-    unresolved = []
+    steps, step_notes = adapt_steps(body, src_parent, dest_parent or src_parent, dest_title,
+                                    src_title or dest_title, f)
+    if steps:
+        out.append(f"\n**Steps for {where}** — adapted from the source section below; the manual "
+                   f"states the procedure is the same, and the screen facts above are from the "
+                   f"product code. This is an adaptation, not a quotation:\n")
+        out.extend(steps)
+
+    unresolved = list(step_notes)
     for u in f.get("unresolved", []):
         if isinstance(u, dict):
             if relevant.get(u.get("when", ""), True):
@@ -307,7 +386,8 @@ def resolve_xrefs(pages: dict[int, str], max_depth: int = 3) -> tuple[dict[int, 
             via = " (reached via " + ", ".join(f"section {number_of(t)}" for t in chain[1:-1]) + ", which itself refers onward)"
         inserts[(s.page, s.end)] = render_resolved(
             dest_parent=here, dest_title=title_words(s.title).title(), src_citation=src + via,
-            src_parent=_parent_title(sections, target) or target.title, body=target.body)
+            src_parent=_parent_title(sections, target) or target.title, body=target.body,
+            src_title=target.title)
     out = dict(pages)
     for (pn, off), text in sorted(inserts.items(), key=lambda kv: (kv[0][0], -kv[0][1])):
         md = out[pn]
