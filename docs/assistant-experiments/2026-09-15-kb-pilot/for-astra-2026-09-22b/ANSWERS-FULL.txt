@@ -1,0 +1,653 @@
+judge self-test: passed (discounts attribution and denial, keeps real instructions)
+
+42 answers · 3 runs · 7 frozen cases · errors 0
+
+case                       baseline r1    baseline r2    baseline r3    repaired r1    repaired r2    repaired r3   
+----------------------------------------------------------------------------------------------------------------
+waitlist-export            incorrect      incorrect      incorrect      correct        incorrect      correct       
+monthly-test-create        correct        correct        correct        correct        correct        correct       
+appraisals-filter          incorrect      incorrect      incorrect      limited        limited        limited       
+stores-export              limited        correct        correct        correct        correct        correct       
+stores-filter              incorrect      incorrect      incorrect      correct        correct        incorrect     
+surveys-edit               correct        correct        correct        correct        correct        correct       
+audit-history-regression   correct        correct        correct        correct        correct        correct       
+
+TOTALS per arm (each of 3 runs counted separately)
+   baseline   correct 11/21   limited  1/21   incorrect  9/21
+   repaired   correct 16/21   limited  3/21   incorrect  2/21
+
+WHY, per case (run 1 shown; differences across runs flagged)
+   waitlist-export            baseline   incorrect  must_not 'in-progress' as an instruction: “Click the **In-Progress** s
+   waitlist-export            repaired   correct    'in progress' discounted (attribution/denial): “This procedure is the    [varies across runs: ['correct', 'incorrect', 'correct']]
+   monthly-test-create        baseline   correct    -
+   monthly-test-create        repaired   correct    -
+   appraisals-filter          baseline   incorrect  must_not 'promotion rank' as an instruction: “Select the required filt
+   appraisals-filter          repaired   limited    capped at 'limited': Reviewer, 22-Sep, added BEFORE any answer was gen
+   stores-export              baseline   limited    missing required term(s): [['stores', 'store']]   [varies across runs: ['limited', 'correct', 'correct']]
+   stores-export              repaired   correct    -
+   stores-filter              baseline   incorrect  must_not 'criticality' as an instruction: “**Criticality**, **Rotation
+   stores-filter              repaired   correct    'criticality' discounted (attribution/denial): “**Criticality** and **   [varies across runs: ['correct', 'correct', 'incorrect']]
+   surveys-edit               baseline   correct    -
+   surveys-edit               repaired   correct    -
+   audit-history-regression   baseline   correct    -
+   audit-history-regression   repaired   correct    -
+
+==============================================================================================================
+waitlist-export   Q: How do I export crew details from the Waitlist in Crewing?
+   must_not: ['in-progress', 'in progress']
+
+--- baseline run 1 [incorrect] must_not 'in-progress' as an instruction: “Click the **In-Progress** sub-sub-module.”; 'in-progress' discounted (attribution/denial): “For **Waitlist**, use the same steps as **In-Progress**, section 1.2.1.5, page 19:”; 'in-progress' discounted (attribution/denial): “same steps as In-Progress, section 1.2.1.5, p.19.”
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    For **Waitlist**, use the same steps as **In-Progress**, section 1.2.1.5, page 19:
+    
+    1. Click the **In-Progress** sub-sub-module.
+    2. Select the crew record by clicking its **Edit** icon.
+    3. In the record screen, click **Export** to download the crew form.
+    
+    The manual also supports exporting from **Crew Database** as CSV/Excel for all displayed records, or exporting an individual record from its **Edit** screen.
+    
+    **Source:** Waitlist — *Crewing User Manual R2_10.06.2026*, section 1.2.3.3, p.22; same steps as In-Progress, section 1.2.1.5, p.19. Crew Database — section 1.3.1.4, p.28.
+
+--- baseline run 2 [incorrect] must_not 'in-progress' as an instruction: “Open the **In-Progress** sub-sub-module.”; 'in progress' discounted (attribution/denial): “The Waitlist procedure uses the same steps as **section 1.2.1.5, “How to Export Crew Details” under In Progres”
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To export crew details from **Waitlist**:
+    
+    1. Open the **In-Progress** sub-sub-module.
+    2. Select the crew record by clicking its **Edit** icon.
+    3. In the crew form, click **Export** to download the crew form.
+    
+    The Waitlist procedure uses the same steps as **section 1.2.1.5, “How to Export Crew Details” under In Progress,” page 19**.
+    
+    Other supported export options are available in **Crew Database**: export all displayed data as CSV or Excel, or export an individual record through **Edit → Export**.
+    
+    **Source:**
+    - Waitlist: *Crewing User Manual R2_10.06.2026*, section 1.2.3.3, p. 22; resolved cross-reference to section 1.2.1.5, p. 19.
+    - Crew Database: *Crewing User Manual R2_10.06.2026*, section 1.3.1.4, p. 28.
+
+--- baseline run 3 [incorrect] must_not 'in-progress' as an instruction: “Click the **In-Progress** sub-sub-module.”; 'in progress' discounted (attribution/denial): “The Waitlist export steps are the same as **“How To Export Crew Details” under In Progress, section 1.2.1.5, p”
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    The Waitlist export steps are the same as **“How To Export Crew Details” under In Progress, section 1.2.1.5, page 19**:
+    
+    1. Click the **In-Progress** sub-sub-module.
+    2. Select the crew record by clicking the **Edit** icon.
+    3. In the crew form, click **Export** to download the crew form.
+    
+    **Source:** Crewing User Manual R2_10.06.2026, section 1.2.3.3 “How To Export Crew Details” (p. 22), cross-referenced to section 1.2.1.5 (p. 19).
+
+--- repaired run 1 [correct] 'in progress' discounted (attribution/denial): “This procedure is the same as **In Progress**, section **1.2.1.5, page 19**.”; 'in progress' discounted (attribution/denial): “same steps as In Progress section 1.2.1.5, page 19.”
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To export crew details from the **Waitlist**:
+    
+    1. Open the **Waitlist** sub-sub-module.
+    2. Select the crew record by clicking its **Edit** icon.
+    3. In the record screen, click **Export** to download the crew form.
+    
+    This procedure is the same as **In Progress**, section **1.2.1.5, page 19**. The manual confirms the action sequence, but does not verify the specific Waitlist screen details.
+    
+    Other supported export methods are exporting all displayed records from **Crew Database** as CSV or Excel, or exporting an individual Crew Database record.
+    
+    **Source:** Waitlist export — *Crewing User Manual R2_10.06.2026*, section 1.2.3.3, page 22; same steps as In Progress section 1.2.1.5, page 19.
+
+--- repaired run 2 [incorrect] must_not 'in-progress' as an instruction: “Other supported export options are the **In-Progress** procedure and **Crew Database**, where you can export a”; 'in-progress' discounted (attribution/denial): “This procedure is the same as **section 1.2.1.5, “How To Export Crew Details” under In-Progress, page 19**.”; 'in-progress' discounted (attribution/denial): “same steps as In-Progress section 1.2.1.5, page 19.”
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To export crew details from the **Waitlist**:
+    
+    1. Click the **Waitlist** sub-sub-module.
+    2. Select the crew record by clicking the **Edit** icon.
+    3. When the record opens, click **Export** to download the crew form.
+    
+    This procedure is the same as **section 1.2.1.5, “How To Export Crew Details” under In-Progress, page 19**. The manual confirms the action sequence, but does not verify the Waitlist screen’s exact fields, record types, or figures.
+    
+    Other supported export options are the **In-Progress** procedure and **Crew Database**, where you can export all displayed data as CSV or Excel, or export an individual record.
+    
+    **Source:** Waitlist — *Crewing User Manual R2_10.06.2026*, section 1.2.3.3, page 22; same steps as In-Progress section 1.2.1.5, page 19. Crew Database — section 1.3.1.4, page 28.
+
+--- repaired run 3 [correct] 'in progress' discounted (attribution/denial): “The Waitlist procedure is the same as **“How To Export Crew Details” under In Progress, section 1.2.1.5, page ”; 'in progress' discounted (attribution/denial): “same steps as In Progress section 1.2.1.5, p.19.”
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To export crew details from the **Waitlist**:
+    
+    1. Click the **Waitlist** sub-submodule.
+    2. Select the crew record by clicking the **Edit** icon.
+    3. In the record screen, click **Export** to download the crew form.
+    
+    The Waitlist procedure is the same as **“How To Export Crew Details” under In Progress, section 1.2.1.5, page 19**. The sequence is confirmed, but the Waitlist screen details have not been verified.
+    
+    Other supported export options are available from **Crew Database**, where you can export all displayed data as CSV or Excel, or export an individual record.
+    
+    **Source:** Waitlist — Crewing User Manual R2_10.06.2026, section 1.2.3.3, p.22; same steps as In Progress section 1.2.1.5, p.19.
+
+==============================================================================================================
+monthly-test-create   Q: How do I create a new monthly alcohol test record in Crewing?
+   must_not: ['annual drug and alcohol record', 'annual d&a record', 'create new annual', 'annual record']
+
+--- baseline run 1 [correct] 
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To create a new monthly alcohol test record:
+    
+    1. Select the vessel from the **Vessel** dropdown.
+    2. Click the **+** icon to create a new record.
+    3. Enter and select all required information in **Part A** and **Part B**.
+    4. Click:
+       - **Delete** to remove the record.
+       - **Save** to save it as a draft.
+       - **Submit** to submit it for processing.
+    
+    These steps are the same as **Annual D&A Test**, section **1.8.1.2, page 58**, as stated in the Monthly Alcohol Test cross-reference.
+    
+    **Source:** Monthly Alcohol Test, section 1.8.3.2, p.62; cross-reference to Annual D&A Test, section 1.8.1.2, p.58.
+
+--- baseline run 2 [correct] 
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To create a new monthly alcohol test record:
+    
+    1. Select the vessel from the **Vessel** dropdown.
+    2. Click the **+** icon to create a new record.
+    3. Enter and select all required information in **Part A** and **Part B**.
+    4. Click **Save** to save it as a draft or **Submit** to submit it for processing.
+    
+    The Monthly procedure uses the same steps as **Annual D&A Test**, section 1.8.1.2, page 58.
+    
+    **Source:** Monthly Alcohol Test, section 1.8.3.2, p. 62; cross-reference to Annual D&A Test, section 1.8.1.2, p. 58.
+
+--- baseline run 3 [correct] 
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To create a new monthly alcohol test record:
+    
+    1. Select the vessel from the **Vessel** dropdown.
+    2. Click the **+** icon.
+    3. In the form that appears, enter and select all required information in **Part A** and **Part B**.
+    4. Click **Save** to save the record as a draft, or **Submit** to submit it for processing. Click **Delete** if you need to remove the record.
+    
+    These steps are the same as **Annual D&A Test**, section **1.8.1.2, page 58**, as stated in the Monthly Alcohol Test instructions.
+    
+    **Source:** Crewing User Manual R2_10.06.2026, section 1.8.3.2, p. 62; resolved cross-reference to section 1.8.1.2, p. 58.
+
+--- repaired run 1 [correct] 
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To create a new monthly alcohol test record:
+    
+    1. Open the **Monthly** sub-submodule to view the scheduled monthly alcohol tests.
+    2. Select the vessel from the **Vessel Dropdown**.
+    3. Click the **“+”** icon to create a new monthly drug and alcohol record.
+    4. Enter and select all required information in **Part A** and **Part B**.
+    5. Click:
+       - **Save** to save the record as a draft.
+       - **Submit** to submit it for processing.
+    
+    The monthly procedure is stated to be the same as **“How To Create And Delete Annual D A Record,” section 1.8.1.2, page 58**. The Monthly screen names, fields, and figures have not been independently confirmed.
+    
+    **Source:** Crewing User Manual R2_10.06.2026, sections 1.8.3.1 and 1.8.3.2, p. 62; cross-reference to section 1.8.1.2, p. 58.
+
+--- repaired run 2 [correct] 
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To create a new monthly alcohol test record:
+    
+    1. Open the **Monthly** sub-submodule to view the monthly alcohol test records.
+    2. Select the vessel from the **Vessel** dropdown.
+    3. Click the **+** icon to create a new monthly drug and alcohol record.
+    4. Enter and select all required information in **Part A** and **Part B**.
+    5. Click:
+       - **Save** to save the record as a draft.
+       - **Submit** to submit it for processing.
+    
+    The procedure is the same as **section 1.8.1.2, “How To Create And Delete Annual D A Record,” page 58**. The manual notes that the Monthly screen details have not been verified, so the screen names, fields, and figures are based on the Annual procedure.
+    
+    **Source:** Crewing User Manual R2_10.06.2026, section 1.8.3.1 “How To Access Monthly Alcohol Test,” p. 62; section 1.8.3.2 “How To Create And Delete Monthly Alcohol Test Record,” p. 62, cross-referencing section 1.8.1.2, p. 58.
+
+--- repaired run 3 [correct] 
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    To create a new monthly alcohol test record:
+    
+    1. Open the **Monthly** sub-submodule.
+    2. Select the vessel from the **Vessel Dropdown**.
+    3. Click the **+** icon.
+    4. Enter and select all required information in **Part A** and **Part B**.
+    5. Click **Save** to save the record as a draft, or **Submit** to submit it for processing.
+    
+    The procedure is the same as **Annual D&A Test, section 1.8.1.2, page 58**. The Monthly screen’s exact names, fields, and figures have not been verified; only the action sequence is confirmed as transferable.
+    
+    Source: **Crewing User Manual R2_10.06.2026**, section **1.8.3.2 How to Create and Delete Monthly Alcohol Test Record**, p. 62; same steps as section **1.8.1.2**, p. 58.
+
+==============================================================================================================
+appraisals-filter   Q: How do I apply filters on the All Crew Appraisals screen?
+   must_not: ['promotion rank']
+
+--- baseline run 1 [incorrect] must_not 'promotion rank' as an instruction: “Select the required filters to search and refine crew appraisal records by **Name, Promotion Rank, Vessel, Ves”
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    The All Crew Appraisals filter steps are the same as **section 1.6.1.2, “How To Apply Filters,” under All Crew Promotion (page 45)**:
+    
+    1. Click **Filters** to activate the filter options.
+    2. Select the required filters to search and refine crew appraisal records by **Name, Promotion Rank, Vessel, Vessel Type, Nationality, Criteria,** and **Status**.
+    3. Click **Apply** to display the filtered results.
+    
+    The manual also documents filtering for candidate records, waitlisted records, and Training Needs records.
+    
+    **Source:**  
+    - All Crew Appraisals — section 1.7.1.2, “How To Apply Filter,” page 51; resolved cross-reference to All Crew Promotion, section 1.6.1.2, page 45.
+
+--- baseline run 2 [incorrect] must_not 'promotion rank' as an instruction: “Select the required filters to search and refine crew appraisal records by **Name, Promotion Rank, Vessel, Ves”
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    On **All Crew Appraisals**, apply filters as follows. These steps are the same as **section 1.6.1.2, “How to Apply Filters,” under All Crew Promotion (page 45)**:
+    
+    1. Click **Filters** to activate the filter options.
+    2. Select the required filters to search and refine crew appraisal records by **Name, Promotion Rank, Vessel, Vessel Type, Nationality, Criteria,** and **Status**.
+    3. Click **Apply** to display the filtered results.
+    
+    Source: All Crew Appraisals — Crewing User Manual R2_10.06.2026, section 1.7.1.2, page 51; same steps as All Crew Promotion, section 1.6.1.2, page 45.
+
+--- baseline run 3 [incorrect] must_not 'promotion rank' as an instruction: “**Name, Promotion Rank, Vessel, Vessel Type, Nationality, Criteria,** and **Status**.”
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    On the **All Crew Appraisals** screen:
+    
+    1. Click **Filters** to activate the filter options.
+    2. Select the required filters: **Name, Promotion Rank, Vessel, Vessel Type, Nationality, Criteria,** and **Status**.
+    3. Click **Apply** to display the filtered results.
+    
+    These steps are the same as **All Crew Promotion — How To Apply Filters**, section **1.6.1.2**, page 45.
+    
+    The same filtering pattern is also documented for **Training Needs, In Progress, Waitlist,** and **All Crew Promotion**.
+    
+    **Source:**
+    - All Crew Appraisals — Crewing User Manual, section 1.7.1.2, page 51; resolved cross-reference to All Crew Promotion, section 1.6.1.2, page 45.
+    - All Crew Promotion — section 1.6.1.2, page 45.
+    - In Progress — section 1.2.1.2, page 13.
+    - Waitlist — section 1.2.3.4, page 22.
+    - Training Needs — section 1.10.1.4, page 90.
+
+--- repaired run 1 [limited] capped at 'limited': Reviewer, 22-Sep, added BEFORE any answer was generated: omitting the unverified filter fi
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    On **All Crew Appraisals**, apply filters as follows. The procedure is the same as **“How To Apply Filters” under All Crew Promotion, section 1.6.1.2, page 45**:
+    
+    1. Click **Filters** to activate the filter options.
+    2. Select the required filters to search and refine appraisal records. The available All Crew Appraisals filter fields are not specified in the documentation; use the fields shown on the screen.
+    3. Click **Apply** to display the filtered results.
+    
+    **Source:** Crewing User Manual R2_10.06.2026, section 1.7.1.2 “How To Apply Filter,” p. 51; same procedure as section 1.6.1.2, p. 45.
+
+--- repaired run 2 [limited] capped at 'limited': Reviewer, 22-Sep, added BEFORE any answer was generated: omitting the unverified filter fi
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    The All Crew Appraisals filter procedure is the same as **“How To Apply Filters” under All Crew Promotion, section 1.6.1.2, page 45**:
+    
+    1. Click **Filters** to activate the filter options.
+    2. Select the required filters to search and refine the appraisal records. The available All Crew Appraisals filter fields are not specified in the documentation; use the fields shown on the screen.
+    3. Click **Apply** to display the filtered results.
+    
+    Source: **Crewing User Manual R2_10.06.2026, section 1.7.1.2, p.51**, cross-referencing **section 1.6.1.2, p.45**.
+
+--- repaired run 3 [limited] capped at 'limited': Reviewer, 22-Sep, added BEFORE any answer was generated: omitting the unverified filter fi
+    cites: Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1, Crewing:Crewing - Crewing User Manual R2_1
+    The All Crew Appraisals filter procedure is the same as **“How To Apply Filters” under All Crew Promotion, section 1.6.1.2, page 45**:
+    
+    1. Click **Filters** to activate the filter options.
+    2. Select the required filters to search and refine appraisal records. The available All Crew Appraisals filter fields are not established in the documentation provided; use the filters shown on the screen.
+    3. Click **Apply** to display the filtered results.
+    
+    Source: All Crew Appraisals — section 1.7.1.2, page 51; same steps as Crewing User Manual, All Crew Promotion — section 1.6.1.2, page 45.
+
+==============================================================================================================
+stores-export   Q: How do I export store items from the Stores sub-module?
+   must_not: ['spares sub', 'spares sub-sub', "'spares' sub", 'click on the spares', 'open the spares']
+
+--- baseline run 1 [limited] missing required term(s): [['stores', 'store']]
+    cites: Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of
+    The excerpts support the same export procedure in both the Vessel and Office versions:
+    
+    1. Open the **Spares** sub-sub-module.
+    2. Select the required tab: **Inventory**, **Location**, or **History**.
+    3. Click **Export** to download the report.
+    4. Repeat the procedure for the **Location** and **History** tabs, and for the **Lubes**, **Chemicals**, and **Others** categories.
+    
+    For the Vessel manual, these steps are the same as **Spares › How To Export Spares Records**, section **1.1.7.7, page 41**. For the Office manual, they are the same as section **1.1.7.9, page 48**.
+    
+    **Source:** Vessel PMS User Manual, section 1.1.8.6, page 44; Office Sail Admin PMS User Manual, section 1.1.8.6, page 51.
+
+--- baseline run 2 [correct] 
+    cites: Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of
+    The export procedure is supported in both the Vessel PMS and Office Sail Admin manuals. It is the same as the Spares export procedure.
+    
+    **Vessel PMS**
+    
+    1. Open the **Spares** sub-sub-module.
+    2. Select **Inventory**, **Location**, or **History**.
+    3. Click **Export** to download the report.
+    4. Repeat the procedure for the **Location** and **History** tabs, and for the **Lubes, Chemicals,** and **Others** categories.
+    
+    These steps are the same as **section 1.1.7.7, “How To Export Spares Records,” page 41**.
+    
+    **Office Sail Admin**
+    
+    1. Open the **Spares** sub-sub-module.
+    2. Select **Inventory**, **Location**, or **History**.
+    3. Click **Export** to download the report.
+    4. Repeat the procedure for the **Location** and **History** tabs, and for the **Lubes, Chemicals,** and **Others** categories.
+    
+    These steps are the same as **section 1.1.7.9, “How To Export Spares Records,” page 48**.
+    
+    **Source:**
+    - Vessel PMS User Manual, section **1.1.8.6 “How To Export Store Items,” p. 44**; resolved cross-reference to **1.1.7.7, p. 41**.
+    - Office Sail Admin User Manual, section **1.1.8.6 “How To Export Store Items,” p. 51**; resolved cross-reference to **1.1.7.9, p. 48**.
+
+--- baseline run 3 [correct] 
+    cites: Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of
+    To export store items:
+    
+    1. Open the **Spares** sub-sub-module.
+    2. Select the required tab: **Inventory**, **Location**, or **History**.
+    3. Click **Export** to download the report.
+    4. To download reports from the **Location** or **History** tabs, follow the same procedure.
+    
+    Repeat these steps for **Stores, Lubes, Chemicals,** and **Others**.
+    
+    The procedure is the same as **“How To Export Spares Records”**:
+    - **Vessel:** section 1.1.7.7, p. 41.
+    - **Office:** section 1.1.7.9, p. 48.
+    
+    **Source:**
+    - Vessel PMS User Manual, section 1.1.8.6 “How To Export Store Items,” p. 44.
+    - Office Sail Admin PMS User Manual, section 1.1.8.6 “How To Export Store Items,” p. 51.
+
+--- repaired run 1 [correct] 
+    cites: Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual For Of
+    To export store items:
+    
+    1. Open the **Stores** sub-module.
+    2. Select the required tab: **Inventory**, **Location**, or **History**.
+    3. Click **Export** to download the report.
+    
+    The same procedure applies to each tab. In the vessel system, exports are saved from the Stores screen as store inventory or history Excel reports. This procedure is the same as **“How To Export Spares Records”**—section **1.1.7.7, page 41** in the Vessel manual and section **1.1.7.9, page 48** in the Office manual.
+    
+    **Source:** Vessel PMS User Manual, section 1.1.8.6, p.44; Office Sail Admin PMS User Manual, section 1.1.8.6, p.51.
+
+--- repaired run 2 [correct] 
+    cites: Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual For Of
+    The procedure is the same as **“How To Export Spares Records”** under Spares (section **1.1.7.7, page 41** for Vessel, or section **1.1.7.9, page 48** for Office):
+    
+    1. Open the **Stores** sub-sub-module.
+    2. Select the **Inventory**, **Location**, or **History** tab.
+    3. Click **Export** to download the report.
+    
+    Repeat the same procedure for the **Location** and **History** tabs. The same steps also apply to **Lubes, Chemicals, and Others**.
+    
+    **Source:** Vessel Specific Technical PMS User Manual, §1.1.8.6 and §1.1.7.7, pp. 44, 41; Office Sail Admin Technical PMS User Manual, §1.1.8.6 and §1.1.7.9, pp. 51, 48.
+
+--- repaired run 3 [correct] 
+    cites: Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual For Of
+    To export store items from **Stores**:
+    
+    1. Open the **Stores** sub-sub-module.
+    2. Select the required tab: **Inventory**, **Location**, or **History**.
+    3. Click **Export** to download the report.
+    
+    The procedure is the same as exporting Spares records: **section 1.1.7.7, page 41** for the Vessel manual and **section 1.1.7.9, page 48** for the Office manual. The same steps also apply to **Lubes, Chemicals, and Others**.
+    
+    **Source:** Vessel Technical PMS User Manual, §1.1.8.6 p.44 and resolved §1.1.7.7 p.41; Office Sail Admin PMS User Manual, §1.1.8.6 p.51 and resolved §1.1.7.9 p.48.
+
+==============================================================================================================
+stores-filter   Q: What filters can I use on the Stores screen in PMS?
+   must_not: ['criticality', 'rotation item']
+
+--- baseline run 1 [incorrect] must_not 'criticality' as an instruction: “**Criticality**, **Rotation Item**, and **Stock**.”; must_not 'criticality' as an instruction: “Apply the **Criticality**, **Rotation Item**, and **Stock** filters.”; must_not 'rotation item' as an instruction: “**Criticality**, **Rotation Item**, and **Stock**.”; must_not 'rotation item' as an instruction: “Apply the **Criticality**, **Rotation Item**, and **Stock** filters.”
+    cites: Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of
+    The Stores screen supports these filter options:
+    
+    1. **Vessel PMS / Ship**
+       1. Open **Spares**; the **Inventory** tab opens by default.
+       2. Use the **Search** field.
+       3. Use the dropdown filters: **Criticality**, **Rotation Item**, and **Stock**.
+       
+       These are the same steps as **Spares › How To Apply Filter**, section **1.1.7.5, page 40**.
+    
+    2. **Office / Sail Admin**
+       1. Open **Spares**; the **Inventory** tab opens by default.
+       2. Select the **Vessel**.
+       3. Search for parts or components.
+       4. Apply the **Criticality**, **Rotation Item**, and **Stock** filters.
+       
+       These are the same steps as **Spares › How To Apply Filter**, section **1.1.7.7, page 47**.
+    
+    **Source:**  
+    - Vessel PMS: *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, section **1.1.8.2**, cross-reference to **1.1.7.5**, p. 40.  
+    - Office: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, section **1.1.8.2**, cross-reference to **1.1.7.7**, p. 47.
+
+--- baseline run 2 [incorrect] must_not 'criticality' as an instruction: “Use the **Search** field and the **Criticality**, **Rotation Item**, or **Stock** dropdown filters to refine t”; must_not 'criticality' as an instruction: “Search for parts or components and apply the **Criticality**, **Rotation Item**, or **Stock** filters.”; must_not 'rotation item' as an instruction: “Use the **Search** field and the **Criticality**, **Rotation Item**, or **Stock** dropdown filters to refine t”; must_not 'rotation item' as an instruction: “Search for parts or components and apply the **Criticality**, **Rotation Item**, or **Stock** filters.”
+    cites: Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of
+    On the Stores screen, filtering differs by environment:
+    
+    **Vessel PMS**
+    1. Open the **Spares** sub-sub-module; the **Inventory** tab opens by default.
+    2. Use the **Search** field and the **Criticality**, **Rotation Item**, or **Stock** dropdown filters to refine the records.
+    
+    These are the same steps as **Spares › How To Apply Filter**, section **1.1.7.5, page 40**, according to the resolved cross-reference.
+    
+    **Office PMS**
+    1. Open the **Spares** sub-sub-module; the **Inventory** tab opens by default.
+    2. Select the **Vessel**.
+    3. Search for parts or components and apply the **Criticality**, **Rotation Item**, or **Stock** filters.
+    
+    These are the same steps as **Spares › How To Apply Filter**, section **1.1.7.7, page 47**, according to the resolved cross-reference.
+    
+    **Source:** Vessel Technical PMS User Manual, section 1.1.8.2, page 43; Office Sail Admin PMS User Manual, section 1.1.8.2, page 49.
+
+--- baseline run 3 [incorrect] must_not 'criticality' as an instruction: “Use the dropdown filters for **Criticality**, **Rotation Item**, or **Stock**.”; must_not 'criticality' as an instruction: “Apply the **Criticality**, **Rotation Item**, or **Stock** filters.”; must_not 'rotation item' as an instruction: “Use the dropdown filters for **Criticality**, **Rotation Item**, or **Stock**.”; must_not 'rotation item' as an instruction: “Apply the **Criticality**, **Rotation Item**, or **Stock** filters.”
+    cites: Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of
+    On the Stores screen, the available filters differ by application:
+    
+    1. **Vessel PMS**
+       1. Open **Stores > Spares**; the **Inventory** tab opens by default.
+       2. Use the **Search** field.
+       3. Use the dropdown filters for **Criticality**, **Rotation Item**, or **Stock**.
+       
+       These steps are the same as **Spares > How To Apply Filter**, section **1.1.7.5, page 40**, because the Stores procedure explicitly cross-references it.
+    
+    2. **Office / Sail Admin PMS**
+       1. Open **Stores > Spares**; the **Inventory** tab opens by default.
+       2. Select the **Vessel**.
+       3. Search for parts or components.
+       4. Apply the **Criticality**, **Rotation Item**, or **Stock** filters.
+    
+    The **Location** tab organizes spares by physical storage location, and the **History** tab shows transaction history; these are tabs, not listed filters.
+    
+    **Source:**  
+    - Vessel PMS User Manual, section **1.1.8.2**, p.43; resolved to Spares section **1.1.7.5**, p.40.  
+    - Office Sail Admin User Manual, section **1.1.8.2**, p.49; resolved to Spares section **1.1.7.7**, p.47.
+
+--- repaired run 1 [correct] 'criticality' discounted (attribution/denial): “**Criticality** and **Rotation Item** are not available on this screen.”; 'criticality' discounted (attribution/denial): “Although the quoted Spares procedure also mentions **Criticality** and **Rotation Item**, the Stores guidance ”; 'rotation item' discounted (attribution/denial): “**Criticality** and **Rotation Item** are not available on this screen.”; 'rotation item' discounted (attribution/denial): “Although the quoted Spares procedure also mentions **Criticality** and **Rotation Item**, the Stores guidance ”
+    cites: Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of
+    On the **Stores** screen, the supported filters are:
+    
+    **Office PMS — Stores**
+    1. Open **Stores**; the **Inventory** tab opens by default.
+    2. Select the **Vessel**.
+    3. Use **Search** to find parts/components.
+    4. Use the **Stock** filter to refine the records.
+    
+    These steps are stated as the same as **Spares › How To Apply Filter**, section 1.1.7.7, p. 47. The Stores guidance identifies **Search** and **Stock** as the verified filters; **Criticality** and **Rotation Item** are not available on this screen.
+    
+    **Vessel PMS — Stores**
+    1. Open **Stores**; the **Inventory** tab opens by default.
+    2. Use **Search** to find records.
+    3. Use the **Stock** filter to refine the displayed records.
+    
+    These steps are stated as the same as **Spares › How To Apply Filter**, section 1.1.7.5, p. 40. Although the quoted Spares procedure also mentions **Criticality** and **Rotation Item**, the Stores guidance says they do not exist on the Stores screen.
+    
+    **Source:** Office Sail Admin manual, §1.1.8.2, p. 49, cross-referenced to §1.1.7.7, p. 47; Vessel Specific manual, §1.1.8.2, p. 43, cross-referenced to §1.1.7.5, p. 40.
+
+--- repaired run 2 [correct] 'criticality' discounted (attribution/denial): “- The Stores guidance states that **Criticality** and **Rotation Item** are not available on this screen.”; 'criticality' discounted (attribution/denial): “- The Stores guidance states that **Criticality** and **Rotation Item** do not exist on this screen.”; 'criticality' discounted (attribution/denial): “The quoted Spares procedures list **Criticality**, **Rotation Item**, and **Stock**, but the Stores-specific g”; 'rotation item' discounted (attribution/denial): “- The Stores guidance states that **Criticality** and **Rotation Item** are not available on this screen.”; 'rotation item' discounted (attribution/denial): “- The Stores guidance states that **Criticality** and **Rotation Item** do not exist on this screen.”; 'rotation item' discounted (attribution/denial): “The quoted Spares procedures list **Criticality**, **Rotation Item**, and **Stock**, but the Stores-specific g”
+    cites: Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of
+    On the **Stores** screen, the supported filters are:
+    
+    1. **Office PMS**
+       - Open **Stores**; the **Inventory** tab opens by default.
+       - Select a **Vessel** if needed.
+       - Use **Search** to find parts/components.
+       - Use the **Stock** filter to refine the records.
+       - The Stores guidance states that **Criticality** and **Rotation Item** are not available on this screen.
+    
+    2. **Ship PMS**
+       - Open **Stores**; the **Inventory** tab opens by default.
+       - Use **Search** and **Stock**.
+       - The Stores guidance states that **Criticality** and **Rotation Item** do not exist on this screen.
+    
+    The quoted Spares procedures list **Criticality**, **Rotation Item**, and **Stock**, but the Stores-specific guidance identifies only **Search** and **Stock** as verified Stores filters.
+    
+    **Source:** Office Stores guidance, *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, §1.1.8.2, p.49; Ship Stores guidance, *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, §1.1.8.2, p.43; quoted Spares procedures, §§1.1.7.7, p.47 and 1.1.7.5, p.40.
+
+--- repaired run 3 [incorrect] must_not 'criticality' as an instruction: “**Criticality, Rotation Item, and Stock**.”; must_not 'rotation item' as an instruction: “**Criticality, Rotation Item, and Stock**.”; 'criticality' discounted (attribution/denial): “The provided screen verification states that **Criticality** and **Rotation Item** are not available on Stores”; 'criticality' discounted (attribution/denial): “However, the same excerpt’s screen verification states that only **Search** and **Stock** are present on Store”; 'rotation item' discounted (attribution/denial): “The provided screen verification states that **Criticality** and **Rotation Item** are not available on Stores”; 'rotation item' discounted (attribution/denial): “However, the same excerpt’s screen verification states that only **Search** and **Stock** are present on Store”
+    cites: Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual_Vessel, Technical:Technical - PMS User Manual For Of
+    The provided documentation gives two Stores filter descriptions:
+    
+    1. **Office PMS — Stores**
+       1. Open **Stores**; the **Inventory** tab opens by default.
+       2. Select the **Vessel**.
+       3. Search for parts/components.
+       4. Use the **Search** and **Stock** filters. The provided screen verification states that **Criticality** and **Rotation Item** are not available on Stores.
+    
+       This procedure is stated to be the same as **Spares › How To Apply Filter**, section 1.1.7.7, page 47.
+    
+    2. **Vessel PMS — Stores**
+       1. Open **Stores**; the **Inventory** tab opens by default.
+       2. Use the search field and dropdown filters: **Criticality, Rotation Item, and Stock**.
+       
+       However, the same excerpt’s screen verification states that only **Search** and **Stock** are present on Stores, and that **Criticality** and **Rotation Item** do not exist there. Therefore, the documentation is inconsistent; the verified Stores filters are **Search** and **Stock**.
+    
+       This procedure is stated to be the same as **Spares › How To Apply Filter**, section 1.1.7.5, page 40.
+    
+    **Source:**  
+    - Office Stores guidance: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, section 1.1.8.2, p.49; same steps as Spares section 1.1.7.7, p.47.  
+    - Vessel Stores guidance: *Technical - PMS User Manual_Vessel Specific_R3_0
+
+==============================================================================================================
+surveys-edit   Q: How do I edit a survey record in Cert. & Surveys?
+   must_not: ['certificates sub', "'certificates' sub", 'go to the certificates', 'switch to certificates', 'open the certificates']
+
+--- baseline run 1 [correct] 
+    cites: Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M
+    To edit a survey record:
+    
+    1. Go to the **Certificates** sub-submodule.
+    2. Select the required vessel from the **Vessel** dropdown.
+    3. Click the **Issue Date** cell and select the required date from the date picker.
+    4. Choose the new date, then press **Enter** or click outside the field. The record updates immediately and the corresponding **Last Edit/Upload** timestamp refreshes.
+    5. Where applicable, use the same procedure to update **Expiry Date**, **Last Annual**, **Last Intermediate**, or **Endorsement Date**.
+    
+    These steps are the same as **Certificates › How To Edit A Certificate**, section **1.1.3.4, page 8**.
+    
+    **Source:** Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026, section **1.1.4.4 How To Edit A Surveys**, p. 10; resolved cross-reference to section **1.1.3.4 How To Edit A Certificate**, p. 8.
+
+--- baseline run 2 [correct] 
+    cites: Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M
+    To edit a survey record:
+    
+    1. Go to the **Certificates** sub-sub-module. The Surveys edit procedure uses the same steps as **“How To Edit A Certificate,” section 1.1.3.4, page 8**.
+    2. Select the required vessel from the **Vessel** dropdown.
+    3. Click the **Issue Date** cell and select the required date from the date picker.
+    4. Choose the new date, then press **Enter** or click outside the field. The system updates the record immediately and refreshes the corresponding **Last Edit/Upload** timestamp.
+    5. Where applicable, use the same procedure to update **Expiry Date**, **Last Annual**, **Last Intermediate**, or **Endorsement Date**.
+    
+    **Source:**  
+    - Surveys — “How To Edit A Surveys,” section 1.1.4.4, p.10; same steps as Certificates, section 1.1.3.4, p.8.
+
+--- baseline run 3 [correct] 
+    cites: Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M
+    To edit a survey record:
+    
+    1. Go to the **Certificates** sub-submodule.
+    2. Select the required vessel from the **Vessel** dropdown.
+    3. Click the **Issue Date** cell and choose the required date from the date picker.
+    4. Press **Enter** or click outside the field. The record updates immediately and the corresponding **Last Edit/Upload** timestamp refreshes.
+    5. Use the same procedure to update **Expiry Date**, **Last Annual**, **Last Intermediate**, or **Endorsement Date**, where applicable.
+    
+    These are the same steps as **“How To Edit A Certificate,” section 1.1.3.4, page 8**.
+    
+    Source: Surveys — “How To Edit A Surveys,” section 1.1.4.4, page 10; Certificates — “How To Edit A Certificate,” section 1.1.3.4, page 8.
+
+--- repaired run 1 [correct] 
+    cites: Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M
+    To edit a survey record:
+    
+    1. Go to the **Surveys** sub-sub-module.
+    2. Select the required vessel from the **Vessel** dropdown.
+    3. Click the **Issue Date** cell and select the required date from the date picker.
+    4. Choose the new date, then press **Enter** or click outside the field. The record updates immediately and the corresponding **Last Edit/Upload** timestamp refreshes.
+    5. Follow the same procedure for **Expiry Date**, **Last Annual**, **Last Intermediate**, and **Endorsement Date**, where applicable.
+    
+    This procedure is the same as **“How To Edit A Certificate,” section 1.1.3.4, page 8**, adapted for the Surveys screen.
+    
+    **Source:** Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026, section 1.1.4.4 “How To Edit A Surveys,” p.10; cross-referenced section 1.1.3.4 “How To Edit A Certificate,” p.8.
+
+--- repaired run 2 [correct] 
+    cites: Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M
+    The survey-edit procedure is the same as **“How To Edit A Certificate,” section 1.1.3.4, page 8**, carried out on the **Surveys** screen:
+    
+    1. Open the **Surveys** sub-sub-module.
+    2. Select the required vessel from the **Vessel** dropdown.
+    3. Click the **Issue Date** cell and select the required date from the date picker.
+    4. Choose the new date, then press **Enter** or click outside the field. The record updates immediately and the corresponding **Last Edit/Upload** timestamp refreshes.
+    5. Where applicable, follow the same procedure for **Expiry Date, Last Annual, Last Intermediate,** and **Endorsement Date**.
+    
+    The excerpts state no specific role or Office/Ship restriction for this procedure.
+    
+    **Source:** Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026, section 1.1.4.4 “How To Edit A Surveys,” p.10; resolved cross-reference to section 1.1.3.4 “How To Edit A Certificate,” p.8.
+
+--- repaired run 3 [correct] 
+    cites: Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M, Technical:Technical - Cert. & Surveys User M
+    To edit a survey record:
+    
+    The procedure is the same as **“How To Edit A Certificate,” section 1.1.3.4, page 8**, carried out on the **Surveys** screen.
+    
+    1. Go to the **Surveys** sub-sub-module.
+    2. Select the required vessel from the **Vessel** dropdown.
+    3. Click the **Issue Date** cell and select the required date from the date picker.
+    4. Choose the new date, then press **Enter** or click outside the field. The record updates immediately and the corresponding **Last Edit/Upload** timestamp refreshes.
+    5. Use the same procedure to update **Expiry Date, Last Annual, Last Intermediate**, and **Endorsement Date**, where applicable.
+    
+    **Source:** Technical – Cert. & Surveys User Manual for Office_Sail Admin_R2_08.06.2026, section 1.1.4.4 “How To Edit A Surveys,” p.10; cross-referenced to section 1.1.3.4 “How To Edit A Certificate,” p.8.
+
+==============================================================================================================
+audit-history-regression   Q: Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?
+   must_not: ['work order', 'work-order']
+
+--- baseline run 1 [correct] 
+    cites: Technical:Technical - Ship-Side (Vessel Crew, Technical:Technical - PMS User Manual For Of, Technical:Technical - Sync (Operational) Use, Technical:Technical - PMS User Manual For Of, Safety:Safety - Master Review Manual R1_1, Audit:Audit - History Manual_R1_30.06.20
+    Only **office users** are allowed to add comments in the **Review** section of an inspection history record. The ship is not permitted to add them.
+    
+    1. Enter the review comment.
+    2. Add the date using the calendar icon.
+    3. Click **Save**. Use **Add New** to enter another review comment.
+    
+    **Source:** Audit - History Manual R1_30.06.2026, §3.3 “Review Page” (p.16).
+
+--- baseline run 2 [correct] 
+    cites: Technical:Technical - Ship-Side (Vessel Crew, Technical:Technical - PMS User Manual For Of, Technical:Technical - Sync (Operational) Use, Technical:Technical - PMS User Manual For Of, Safety:Safety - Master Review Manual R1_1, Audit:Audit - History Manual_R1_30.06.20
+    Only **office users** are allowed to add comments in the **Review** section of an inspection history record. The ship is not permitted to add them there.
+    
+    Source: Audit – History Manual R1_30.06.2026, §3.3 “Review Page,” p.16.
+
+--- baseline run 3 [correct] 
+    cites: Technical:Technical - Ship-Side (Vessel Crew, Technical:Technical - PMS User Manual For Of, Technical:Technical - Sync (Operational) Use, Technical:Technical - PMS User Manual For Of, Safety:Safety - Master Review Manual R1_1, Audit:Audit - History Manual_R1_30.06.20
+    Only **office users** are allowed to add comments in the **Review** section of an inspection history record. The ship is not authorized for this section.
+    
+    Source: Audit - History Manual_R1_30.06.2026, §3.3 “Review Page,” p.16.
+
+--- repaired run 1 [correct] 
+    cites: Technical:Technical - Ship-Side (Vessel Crew, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual For Of, Safety:Safety - Master Review Manual R1_1, Audit:Audit - History Manual_R1_30.06.20
+    Only **office users** are allowed to add comments in the **Review** section of an inspection history record. The Review section is intended for office users only.
+    
+    1. Enter the Review comment.
+    2. Click **Add New** if another comment is needed.
+    3. Select the date using the calendar icon.
+    4. Click **Save**.
+    
+    **Source:** Audit - History Manual_R1_30.06.2026, §3.3 “Review Page,” p.16.
+
+--- repaired run 2 [correct] 
+    cites: Technical:Technical - Ship-Side (Vessel Crew, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual For Of, Safety:Safety - Master Review Manual R1_1, Audit:Audit - History Manual_R1_30.06.20
+    Only **office users** are allowed to add comments in the **Review** section of an inspection history record. The Review section is intended for office users only; they enter the comment, optionally add another comment and a date, then click **Save**.
+    
+    Source: Audit History Manual R1_30.06.2026, §3.3 “Review Page,” p.16.
+
+--- repaired run 3 [correct] 
+    cites: Technical:Technical - Ship-Side (Vessel Crew, Technical:Technical - PMS User Manual For Of, Technical:Technical - PMS User Manual For Of, Safety:Safety - Master Review Manual R1_1, Audit:Audit - History Manual_R1_30.06.20
+    Only **office users** are allowed to add comments in the **Review** section. The ship is not authorized to do so.
+    
+    Source: Audit – History Manual R1_30.06.2026, §3.3 “Review Page,” p.16.

@@ -1,0 +1,33 @@
+judge self-test: passed (discounts attribution and denial, keeps real instructions)
+
+42 answers · 3 runs · 7 frozen cases · errors 0
+
+case                       baseline r1    baseline r2    baseline r3    repaired r1    repaired r2    repaired r3   
+----------------------------------------------------------------------------------------------------------------
+waitlist-export            incorrect      incorrect      incorrect      correct        incorrect      correct       
+monthly-test-create        correct        correct        correct        correct        correct        correct       
+appraisals-filter          incorrect      incorrect      incorrect      limited        limited        limited       
+stores-export              limited        correct        correct        correct        correct        correct       
+stores-filter              incorrect      incorrect      incorrect      correct        correct        incorrect     
+surveys-edit               correct        correct        correct        correct        correct        correct       
+audit-history-regression   correct        correct        correct        correct        correct        correct       
+
+TOTALS per arm (each of 3 runs counted separately)
+   baseline   correct 11/21   limited  1/21   incorrect  9/21
+   repaired   correct 16/21   limited  3/21   incorrect  2/21
+
+WHY, per case (run 1 shown; differences across runs flagged)
+   waitlist-export            baseline   incorrect  must_not 'in-progress' as an instruction: “Click the **In-Progress** s
+   waitlist-export            repaired   correct    'in progress' discounted (attribution/denial): “This procedure is the    [varies across runs: ['correct', 'incorrect', 'correct']]
+   monthly-test-create        baseline   correct    -
+   monthly-test-create        repaired   correct    -
+   appraisals-filter          baseline   incorrect  must_not 'promotion rank' as an instruction: “Select the required filt
+   appraisals-filter          repaired   limited    capped at 'limited': Reviewer, 22-Sep, added BEFORE any answer was gen
+   stores-export              baseline   limited    missing required term(s): [['stores', 'store']]   [varies across runs: ['limited', 'correct', 'correct']]
+   stores-export              repaired   correct    -
+   stores-filter              baseline   incorrect  must_not 'criticality' as an instruction: “**Criticality**, **Rotation
+   stores-filter              repaired   correct    'criticality' discounted (attribution/denial): “**Criticality** and **   [varies across runs: ['correct', 'correct', 'incorrect']]
+   surveys-edit               baseline   correct    -
+   surveys-edit               repaired   correct    -
+   audit-history-regression   baseline   correct    -
+   audit-history-regression   repaired   correct    -
