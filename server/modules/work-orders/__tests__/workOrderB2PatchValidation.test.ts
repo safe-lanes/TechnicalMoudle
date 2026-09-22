@@ -161,6 +161,7 @@ describe('PATCH Work Order B2 snapshot validation', () => {
       approvalTier: 'standard',
       missedCycles: 0,
       consumedSpareParts: [],
+      performedBy: 'Third Engineer',
     };
     repo.findById.mockResolvedValue(legacyWO);
     repo.update.mockImplementation(async (_id, updates) => ({ ...legacyWO, ...updates }));
@@ -169,6 +170,7 @@ describe('PATCH Work Order B2 snapshot validation', () => {
     await expect(updateWorkOrder('wo-1', {
       status: 'Completed',
       approvalAction: 'approved',
+      userId: 'Chief Engineer',
       startDateTime: legacyWO.startDateTime,
       woCompletionRh: legacyWO.woCompletionRh,
       // Exact WorkOrderFormPage.handleApprove payload shape.
@@ -184,7 +186,14 @@ describe('PATCH Work Order B2 snapshot validation', () => {
     expect(firstApprovalUpdate).not.toHaveProperty('startDateTime');
     expect(firstApprovalUpdate).not.toHaveProperty('woCompletionRh');
     expect(firstApprovalUpdate).not.toHaveProperty('completionDateTime');
+    expect(firstApprovalUpdate).not.toHaveProperty('performedBy');
     expect(firstApprovalUpdate.dateCompleted).toBe(legacyWO.dateCompleted);
+    expect(repo.createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionType: 'approve',
+        userId: 'Chief Engineer',
+      }),
+    );
     expect(repo.updateJob).not.toHaveBeenCalledWith(
       'job-1',
       expect.objectContaining({ lastDoneRH: expect.anything() }),
@@ -192,6 +201,102 @@ describe('PATCH Work Order B2 snapshot validation', () => {
     expect(repo.updateJob).not.toHaveBeenCalledWith(
       'job-1',
       expect.objectContaining({ nextDueRH: expect.anything() }),
+    );
+  });
+
+  it('rejects a Pending Approval work order without replacing the submitted performer', async () => {
+    const pendingWO = {
+      id: 'wo-1',
+      wouuid: 'wo-uuid',
+      workOrderNo: 'JOB-1-2026-1',
+      status: 'Pending Approval',
+      maintenanceBasis: 'Calendar',
+      component: 'component-1',
+      componentCode: '651.001',
+      vesselId: 'vessel-1',
+      performedBy: 'Third Engineer',
+      consumedSpareParts: [],
+    };
+    repo.findById.mockResolvedValue(pendingWO);
+    repo.update.mockImplementation(async (_id, updates) => ({ ...pendingWO, ...updates }));
+
+    const { updateWorkOrder } = await import('../services/workOrderService');
+    await expect(updateWorkOrder('wo-1', {
+      status: 'Rejected',
+      approvalAction: 'rejected',
+      rejectionComments: 'Execution details require correction.',
+      userId: 'Chief Engineer',
+    })).resolves.toMatchObject({
+      workOrder: {
+        status: 'Due',
+        performedBy: 'Third Engineer',
+      },
+    });
+
+    expect(repo.createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionType: 'reject',
+        userId: 'Chief Engineer',
+      }),
+    );
+  });
+
+  it('still rejects an explicit performer change while Pending Approval', async () => {
+    repo.findById.mockResolvedValue({
+      id: 'wo-1',
+      wouuid: 'wo-uuid',
+      workOrderNo: 'JOB-1-2026-1',
+      status: 'Pending Approval',
+      maintenanceBasis: 'Calendar',
+      component: 'component-1',
+      componentCode: '651.001',
+      vesselId: 'vessel-1',
+      performedBy: 'Third Engineer',
+    });
+
+    const { updateWorkOrder } = await import('../services/workOrderService');
+    await expect(updateWorkOrder('wo-1', {
+      status: 'Completed',
+      approvalAction: 'approved',
+      performedBy: 'Chief Engineer',
+      userId: 'Chief Engineer',
+    })).rejects.toMatchObject({
+      details: expect.objectContaining({
+        code: 'PENDING_APPROVAL_EXECUTION_FIELDS_READ_ONLY',
+        disallowedFields: ['performedBy'],
+      }),
+    });
+  });
+
+  it('preserves an explicitly supplied performer on a normal execution update', async () => {
+    const activeWO = {
+      id: 'wo-1',
+      wouuid: 'wo-uuid',
+      workOrderNo: 'JOB-1-2026-1',
+      status: 'Active',
+      maintenanceBasis: 'Calendar',
+      component: 'component-1',
+      componentCode: '651.001',
+      vesselId: 'vessel-1',
+      performedBy: null,
+      consumedSpareParts: [],
+    };
+    repo.findById.mockResolvedValue(activeWO);
+    repo.update.mockImplementation(async (_id, updates) => ({ ...activeWO, ...updates }));
+
+    const { updateWorkOrder } = await import('../services/workOrderService');
+    await expect(updateWorkOrder('wo-1', {
+      performedBy: 'Third Engineer',
+      userId: 'Third Engineer',
+    })).resolves.toMatchObject({
+      workOrder: {
+        performedBy: 'Third Engineer',
+      },
+    });
+
+    expect(repo.update).toHaveBeenCalledWith(
+      'wo-1',
+      expect.objectContaining({ performedBy: 'Third Engineer' }),
     );
   });
 
